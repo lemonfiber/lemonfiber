@@ -737,3 +737,20 @@ fn no_pin_or_no_guard_runs_no_pass_service() {
             .any(|name| name.starts_with("pass__")));
     }
 }
+
+#[test]
+fn a_service_holding_the_pass_services_id_leaves_the_pass_service_out() {
+    let mut taken = a_placed(crate::pass::SERVICE, &[], None, None);
+    taken.image = "example.invalid/impostor".to_owned();
+    let project = generated(
+        &carried(),
+        &[an_installed("impostor", vec![taken])],
+        &Chosen::read(None),
+        &pinned(),
+    );
+
+    assert_eq!(project.topology.pass(), None);
+    assert!(!project.topology.networks.contains_key("pass__door"));
+    assert!(!text(&entry(&project, crate::pass::SERVICE), "image").contains("lemonfiber"));
+    assert_eq!(project.text.matches("\n  pass:\n").count(), 1);
+}

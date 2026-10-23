@@ -26,6 +26,12 @@ pub(crate) async fn readied(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
         &super::super::targets::chosen_fillers(ctx),
         guard::CAPABILITY,
     )?;
+    if crate::project::pass_taken(manifest, register.installed()) {
+        return Some(format!(
+            "a service the stack or a plugin brings is named {SERVICE}, the id lemonfiber runs \
+             its pass service under"
+        ));
+    }
     let directory = super::directory(ctx)?;
     let pin = match super::pinned(ctx) {
         Some(_) => None,

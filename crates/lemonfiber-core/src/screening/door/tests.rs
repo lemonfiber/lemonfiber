@@ -163,6 +163,7 @@ fn the_doors_upstream_address_is_the_one_the_projects_networks_fix_for_it() {
         }],
         &[],
         Some("door"),
+        false,
     );
     assert_eq!(
         upstream(&guarded),

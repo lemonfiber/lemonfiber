@@ -30,6 +30,17 @@ fn a_service_spelled_like_a_bundled_one_is_refused_naming_both() {
 }
 
 #[test]
+fn a_service_taking_the_id_lemonfiber_runs_its_pass_service_under_is_refused() {
+    for id in ["pass", "PASS"] {
+        let said = without(SERVICE, &format!("[[service]]\nid          = \"{id}\""));
+        assert!(
+            names(&said, &[&format!("service {id}.id"), "live-stream passes"]),
+            "{id} got: {said:?}"
+        );
+    }
+}
+
+#[test]
 fn a_service_on_a_port_the_stack_publishes_is_refused_naming_both() {
     let said = without("port        = 25600", "port        = 8096");
     assert!(

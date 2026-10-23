@@ -154,13 +154,14 @@ impl Topology {
 }
 
 /// The networks `members` need for `asks` and `links`, `guard` being the service that
-/// fills `stream.guard`.
+/// fills `stream.guard` and `pass` whether the pass service runs beside it.
 #[must_use]
 pub fn derived(
     members: &[Member<'_>],
     asks: &[Settled<'_>],
     links: &[Named<'_>],
     guard: Option<&str>,
+    pass: bool,
 ) -> Topology {
     let host = |id: &str| -> String {
         members
@@ -210,11 +211,7 @@ pub fn derived(
         join(&name, &asker, fixed.map(|fixed| fixed.asker));
         join(&name, &reached, fixed.and_then(|fixed| fixed.reached));
     }
-    if let Some(guard) = guard.as_deref().filter(|_| {
-        members
-            .iter()
-            .any(|member| member.id == crate::pass::SERVICE)
-    }) {
+    if let Some(guard) = guard.as_deref().filter(|_| pass) {
         let name = named(&["pass", guard]);
         networks.insert(name.clone(), internal(Some(PASS_SUBNET)));
         join(&name, crate::pass::SERVICE, Some(PASS_ON_PASS));

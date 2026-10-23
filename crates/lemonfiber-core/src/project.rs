@@ -25,7 +25,7 @@ use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
 pub(crate) use inputs::filler as placed_at;
 use inputs::Inputs;
-pub(crate) use inputs::{declared, moved_in_place, written};
+pub(crate) use inputs::{declared, moved_in_place, pass_taken, written};
 
 /// The file the project is written to, beneath the project directory.
 pub const FILE: &str = "compose.generated.yml";
@@ -239,7 +239,7 @@ fn pass_unit<'a>(
     topology: &Topology,
     image: Option<&str>,
 ) -> Option<Unit<'a>> {
-    let image = image?;
+    let image = image.filter(|_| inputs.pass)?;
     let at = topology.pass()?;
     let profile = profile_of(manifest, installed, inputs.guard.as_deref()?)?;
     Some(Unit {

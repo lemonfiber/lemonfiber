@@ -9,7 +9,7 @@ use lemonfiber_sidecar::pass::PARAMETER;
 pub use lemonfiber_sidecar::pass::{File, Key, Live, LivePath, KEY_BYTES};
 
 /// The pass service's id in the project.
-pub const SERVICE: &str = "pass";
+pub const SERVICE: &str = lemonfiber_manifest::container::PASS_SERVICE;
 
 /// The request this binary answers as the pass service under.
 pub const REQUEST: &str = "pass";

@@ -20,7 +20,7 @@
 //! mistake in it, and the author is the only one who can say which of the two names
 //! they meant.
 
-use lemonfiber_manifest::container::{doubled, published};
+use lemonfiber_manifest::container::{doubled, published, PASS_SERVICE};
 
 use crate::schema::{Manifest, Service};
 use crate::Violation;
@@ -76,7 +76,19 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
 
 /// An id the shipped stack declares, or one written as a shipped id is.
 fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>) {
-    if let Some(held) = bundled::named(&service.id) {
+    if lemonfiber_manifest::environment_name(&service.id)
+        == lemonfiber_manifest::environment_name(PASS_SERVICE)
+    {
+        found.push(Violation {
+            location: format!("{at}.id"),
+            message: format!(
+                "{} is written as {PASS_SERVICE} is, the id lemonfiber runs the service that \
+                 confirms live-stream passes under — a service of a plugin holding it would be \
+                 handed that service's network and the directory its key is kept in",
+                service.id
+            ),
+        });
+    } else if let Some(held) = bundled::named(&service.id) {
         found.push(Violation {
             location: format!("{at}.id"),
             message: format!(

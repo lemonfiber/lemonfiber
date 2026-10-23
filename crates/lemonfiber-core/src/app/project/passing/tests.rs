@@ -15,6 +15,16 @@ const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2
 /// A machine running the stack this build carries, asking `registry` what it publishes,
 /// with a guard installed where `guarded`; answers where the project is.
 fn machine(name: &str, registry: &Arc<Registered>, guarded: bool) -> (Ctx, PathBuf) {
+    machine_with(name, registry, guarded, &[])
+}
+
+/// The same, with a plugin's service under each of `also` installed beside the guard.
+fn machine_with(
+    name: &str,
+    registry: &Arc<Registered>,
+    guarded: bool,
+    also: &[&str],
+) -> (Ctx, PathBuf) {
     let mut ctx = crate::test_support::a_context()
         .over(crate::test_support::embedded())
         .build()
@@ -28,6 +38,12 @@ fn machine(name: &str, registry: &Arc<Registered>, guarded: bool) -> (Ctx, PathB
         assert!(register
             .record(crate::test_support::an_installed("door", vec![door]))
             .is_ok());
+        for id in also {
+            let service = crate::test_support::a_placed(id, &[], None, None);
+            assert!(register
+                .record(crate::test_support::an_installed("other", vec![service]))
+                .is_ok());
+        }
         assert!(
             crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register)
                 .is_ok()
@@ -186,4 +202,17 @@ async fn no_randomness_makes_no_key_and_says_so() {
         !project.join(PINNED).exists(),
         "a pin was kept with no key beside it"
     );
+}
+
+#[tokio::test]
+async fn a_service_holding_the_pass_services_id_leaves_it_out_and_makes_nothing() {
+    let registry = Registered::publishing(DIGEST);
+    let (ctx, project) = machine_with("pass-taken", &registry, true, &[SERVICE]);
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains("named pass"), "{said}");
+    assert!(registry.asked().is_empty());
+    assert!(!project.join(PINNED).exists());
+    assert_eq!(held(&project, File::Key), None);
 }

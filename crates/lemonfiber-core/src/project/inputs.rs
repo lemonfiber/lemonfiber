@@ -37,6 +37,8 @@ pub(super) struct Inputs {
     pub(super) links: Vec<(String, String)>,
     /// The service that fills `stream.guard`, where one does.
     pub(super) guard: Option<String>,
+    /// Whether the pass service runs beside the guard.
+    pub(super) pass: bool,
 }
 
 impl Inputs {
@@ -63,7 +65,7 @@ impl Inputs {
             })
             .collect();
         let links: Vec<Named<'_>> = self.links.iter().map(|(by, to)| Named { by, to }).collect();
-        topology::derived(&members, &asks, &links, self.guard.as_deref())
+        topology::derived(&members, &asks, &links, self.guard.as_deref(), self.pass)
     }
 }
 
@@ -117,7 +119,8 @@ pub(super) fn read(
         }
     }
     let guard = fill(guard::CAPABILITY);
-    if pass && guard.is_some() {
+    let pass = pass && guard.is_some() && !pass_taken(manifest, installed);
+    if pass {
         members.push(Standing {
             id: crate::pass::SERVICE.to_owned(),
             confined: true,
@@ -149,7 +152,22 @@ pub(super) fn read(
         asks,
         links,
         guard,
+        pass,
     }
+}
+
+/// Whether a service of the stack or of a plugin holds the id the pass service runs
+/// under, which leaves the pass service out rather than written over it.
+pub(crate) fn pass_taken(manifest: &Manifest, installed: &[Installed]) -> bool {
+    written(manifest, installed)
+        .map(|service| service.id.as_str())
+        .chain(
+            installed
+                .iter()
+                .flat_map(|one| &one.services)
+                .map(|placed| placed.service.as_str()),
+        )
+        .any(|id| id == crate::pass::SERVICE)
 }
 
 /// The ask of `proxy.front` each plugin service the household reaches at a hostname makes
