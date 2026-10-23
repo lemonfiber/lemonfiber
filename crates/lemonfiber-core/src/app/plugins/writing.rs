@@ -19,7 +19,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installed;
-use crate::ports::filesystem::Lying;
+use crate::ports::filesystem::{Lying, Readable};
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
@@ -189,7 +189,7 @@ fn seeded(
     recording: (&str, &str, &Path),
     write: &crate::plugin::Write,
 ) -> Result<(), Box<Problem>> {
-    let (plugin, stamp, journal) = recording;
+    let plugin = recording.0;
     let secrets = crate::settings::secrets_at(ctx)
         .and_then(|at| crate::settings::Secrets::at(&at).ok())
         .unwrap_or_default();
@@ -199,30 +199,25 @@ fn seeded(
             .map(str::to_owned)
     };
     let unwritten = |why: String| Box::new(unwritable(&write.path, &why));
-    let escaped = super::super::project::directory(ctx)
-        .is_none_or(|stack| ctx.seams.confined.lies(&write.path, &stack) == Lying::Escaped);
-    if escaped {
-        return Err(unwritten(LINKED.to_owned()));
-    }
     match &write.lands {
         crate::plugin::Lands::Starting { bytes, seeded } => {
             let bytes = crate::plugin::seeding::written(bytes, &held, ctx.seams.random.as_ref())
                 .map_err(unwritten)?;
-            if *seeded {
-                made_whole(ctx, plugin, stamp, journal, &write.path, Some(&bytes))
+            let readable = if *seeded {
+                Readable::Owner
             } else {
-                made_shared(ctx, recording, &write.path, &bytes)
-            }
+                Readable::Shared
+            };
+            made_confined(ctx, recording, &write.path, &bytes, readable)
         }
         crate::plugin::Lands::Upstream(fields) => {
             let text = crate::plugin::seeding::upstream(fields, &held).map_err(unwritten)?;
-            made_whole(
+            made_confined(
                 ctx,
-                plugin,
-                stamp,
-                journal,
+                recording,
                 &write.path,
-                Some(text.as_bytes()),
+                text.as_bytes(),
+                Readable::Owner,
             )
         }
         crate::plugin::Lands::Directory { .. }
@@ -252,23 +247,23 @@ fn recorded_making(
         .map_err(|failure| Box::new(failure.problem()))
 }
 
-/// Write one starting file that names no secret as the stack's own files are written:
-/// beneath the stack directory, through no link, readable by whoever the service runs as.
-fn made_shared(
+/// Write one file beneath the stack directory that a plugin's service reads, readable as
+/// `readable` says, through no link on the way to it, since the directory is one its
+/// container writes.
+fn made_confined(
     ctx: &Ctx,
     recording: (&str, &str, &Path),
     path: &Path,
     content: &[u8],
+    readable: Readable,
 ) -> Result<(), Box<Problem>> {
     let stack =
         super::super::project::directory(ctx).ok_or_else(|| Box::new(unwritable(path, LINKED)))?;
     recorded_making(ctx, recording, path, false)?;
-    path.parent()
-        .map_or(Ok(()), std::fs::create_dir_all)
-        .and_then(|()| {
-            crate::within::write_unlinked(ctx.seams.confined.as_ref(), path, &stack, content)
-        })
-        .map_err(|why| Box::new(unwritable(path, &why.to_string())))
+    ctx.seams
+        .confined
+        .written(path, &stack, content, readable)
+        .map_err(|fault| Box::new(unwritable(path, &fault.message)))
 }
 
 /// Mint the key an adapter service is asked with and write it where its container reads

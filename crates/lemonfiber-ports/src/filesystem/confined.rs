@@ -29,6 +29,22 @@ pub trait Confined: Send + Sync {
     /// is not a plain file is where the file is expected, or where the write itself fails.
     fn overwrite(&self, path: &Path, within: &Path, contents: &[u8]) -> Result<(), Fault>;
 
+    /// Write `contents` whole into `path`, making it and every directory missing above it
+    /// where they are not there, as `readable` says, only where it and every step to it
+    /// lie beneath `within` with no link on the way.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where a link, a path leading outside `within` or something that
+    /// is not a plain file is met, or where the write itself fails.
+    fn written(
+        &self,
+        path: &Path,
+        within: &Path,
+        contents: &[u8],
+        readable: Readable,
+    ) -> Result<(), Fault>;
+
     /// Whether `path` lies beneath `within` with no link at any step on the way, itself
     /// included, whatever it is.
     fn lies(&self, path: &Path, within: &Path) -> Lying;
@@ -43,6 +59,15 @@ pub trait Confined: Send + Sync {
     /// or something already at `to` is met, or where the move itself fails; nothing is
     /// moved.
     fn moved(&self, from: &Path, to: &Path, within: &Path) -> Result<(), Fault>;
+}
+
+/// Who may read a file written beneath a directory a container can write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Readable {
+    /// Its owner alone: a file holding a secret.
+    Owner,
+    /// Whoever the service runs as, as the stack's own files are.
+    Shared,
 }
 
 /// Where a path somebody else's container can write lies.

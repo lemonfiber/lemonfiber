@@ -18,7 +18,7 @@
 use std::io::{Read as _, Write as _};
 use std::path::{Component, Path};
 
-use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, Lying, READ_LIMIT};
+use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, Lying, Readable, READ_LIMIT};
 
 use super::Disk;
 
@@ -29,6 +29,16 @@ impl Confined for Disk {
 
     fn overwrite(&self, path: &Path, within: &Path, contents: &[u8]) -> Result<(), Fault> {
         overwrite(path, within, contents)
+    }
+
+    fn written(
+        &self,
+        path: &Path,
+        within: &Path,
+        contents: &[u8],
+        readable: Readable,
+    ) -> Result<(), Fault> {
+        written(path, within, contents, readable)
     }
 
     fn lies(&self, path: &Path, within: &Path) -> Lying {
@@ -89,6 +99,71 @@ pub(super) fn overwrite(path: &Path, within: &Path, contents: &[u8]) -> Result<(
         return Err(Fault::escaped(path, within));
     }
     landed(file.set_len(0).and_then(|()| (&file).write_all(contents)))
+}
+
+/// Write `contents` whole into `path`, made with every directory missing above it, as
+/// `readable` says, opened once refusing a link at its own name and then held to lying
+/// beneath `within` by what was opened.
+pub(super) fn written(
+    path: &Path,
+    within: &Path,
+    contents: &[u8],
+    readable: Readable,
+) -> Result<(), Fault> {
+    if let Some(parent) = path.parent() {
+        make(parent, within)?;
+    }
+    let file = match created(readable).open(path) {
+        Ok(file) => file,
+        Err(_) if unopened(path) == Beneath::Escaped => return Err(Fault::escaped(path, within)),
+        Err(error) => return Err(Fault::new(error.to_string())),
+    };
+    if standing(&file, path, within) != Standing::Plain {
+        return Err(Fault::escaped(path, within));
+    }
+    landed(
+        kept_to(&file, readable)
+            .and_then(|()| file.set_len(0))
+            .and_then(|()| (&file).write_all(contents)),
+    )
+}
+
+/// Opening to write, a file made new readable as `readable` says.
+#[cfg(unix)]
+fn created(readable: Readable) -> std::fs::OpenOptions {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let mut options = options(Use::Write);
+    options.mode(mode(readable));
+    options
+}
+
+/// Opening to write, where the platform keeps no mode.
+#[cfg(windows)]
+fn created(_readable: Readable) -> std::fs::OpenOptions {
+    options(Use::Write)
+}
+
+/// The mode a file readable as `readable` says is held to.
+#[cfg(unix)]
+const fn mode(readable: Readable) -> u32 {
+    match readable {
+        Readable::Owner => 0o600,
+        Readable::Shared => 0o644,
+    }
+}
+
+/// `file` held to the mode `readable` names, through its own handle, whatever it was made
+/// with.
+#[cfg(unix)]
+fn kept_to(file: &std::fs::File, readable: Readable) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    file.set_permissions(std::fs::Permissions::from_mode(mode(readable)))
+}
+
+/// Nothing, where the platform keeps no mode.
+#[cfg(windows)]
+fn kept_to(_file: &std::fs::File, _readable: Readable) -> std::io::Result<()> {
+    Ok(())
 }
 
 /// Make `path` and every directory missing above it, one at a time from `within` down,

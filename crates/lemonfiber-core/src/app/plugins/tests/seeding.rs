@@ -158,7 +158,7 @@ async fn a_seeded_file_reached_through_a_link_the_service_planted_is_not_written
         problem
             .as_ref()
             .and_then(|problem| problem.detail.as_deref())
-            .is_some_and(|said| said.contains("link")),
+            .is_some_and(|said| said.contains("was not made beneath")),
         "{problem:?}"
     );
     assert!(!elsewhere.path().join("application.yml").exists());
