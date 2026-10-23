@@ -27,6 +27,7 @@ mod cors;
 mod proxies;
 // The decline service's own media-server key, minted for it alone.
 mod decline;
+mod enveloping;
 mod fulfilment;
 // The request gate's routes, and the key it holds for the media server.
 mod gate;
@@ -218,6 +219,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         )
         .await,
     );
+
+    // What the stream guard enforces and the live-stream paths the pass service confirms,
+    // from the declaration the media server answers once its administrator is set up.
+    wirings.extend(Box::pin(enveloping::seed_envelope(ctx, &fillers, project.as_deref())).await);
 
     // The curators the request service hands a request to, and the credentials it held
     // before the gate taken back.

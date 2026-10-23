@@ -4,7 +4,13 @@ use lemonfiber_core::pass::{File, Key, Live, LivePath, FORWARDED, KEY_BYTES, PAT
 use lemonfiber_fixtures::scratch::Scratch;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
-use super::{answering, held, serve};
+use super::{answering, compiled, serve, texts, Held};
+
+/// The key and the live-stream paths under `config`, as the service compiles them.
+fn held(config: &std::path::Path) -> Result<Held, String> {
+    let (key, live) = texts(config)?;
+    compiled(&key, &live)
+}
 
 /// The key these passes are made with.
 const fn key() -> Key {
@@ -126,4 +132,42 @@ fn files_the_service_cannot_read_are_named() {
     assert!(held(unmatchable.path())
         .err()
         .is_some_and(|why| why.contains("cannot be matched with")));
+}
+
+#[tokio::test]
+async fn files_the_core_rewrites_hold_from_the_next_question() {
+    let config = configured("pass-rewritten");
+    let at = free().await;
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let path = config.path().to_path_buf();
+    let serving = tokio::spawn(async move {
+        serve(&path, at, Box::pin(async move { drop(stopped.await) })).await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let pass = key().issue(STREAM, "member-1", now);
+    let moved = format!("/watch/{STREAM}/s.ts?lfpass={pass}");
+
+    let before = asked(at, Some(&moved)).await;
+    let _ = std::fs::write(
+        config.path().join(File::Live.name()),
+        Live::of(vec![LivePath {
+            pattern: "^/watch/(?P<stream>[^/]+)/".to_owned(),
+            stream: "^[a-z0-9]{6}$".to_owned(),
+        }])
+        .written(),
+    );
+    let after = asked(at, Some(&moved)).await;
+    let again = asked(at, Some(&moved)).await;
+    let _ = std::fs::write(config.path().join(File::Key.name()), "short");
+    let unreadable = asked(at, Some(&moved)).await;
+
+    let _ = stop.send(());
+    assert!(before.contains("403"), "{before}");
+    assert!(after.contains("204"), "{after}");
+    assert!(again.contains("204"), "{again}");
+    assert!(unreadable.contains("403"), "{unreadable}");
+    drop(serving.await);
 }
