@@ -408,12 +408,12 @@ async fn worked(
     // and a stop the operator asked for must not.
     let addressed = addressed(action, &report.plan);
     halted::before(ctx, action, &addressed);
-    let output = ctx
-        .seams
-        .runner
-        .run(&command)
-        .await
-        .map_err(|err| Box::new(err.problem()))?;
+    let output = if matches!(action, Action::Pull(_)) {
+        pulled(ctx, &command).await
+    } else {
+        ctx.seams.runner.run(&command).await
+    }
+    .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
     halted::after(ctx, action, &addressed).await;
 
@@ -435,6 +435,30 @@ async fn worked(
     }
 
     Ok(report)
+}
+
+/// Run a pull, handing each line the engine writes to the narrator as it arrives.
+async fn pulled(
+    ctx: &Ctx,
+    command: &[String],
+) -> Result<crate::ports::process::Output, crate::ports::process::Failure> {
+    let mut progress = ctx.seams.runner.stream(command).await?;
+    let mut output = crate::ports::process::Output {
+        status: None,
+        stdout: String::new(),
+        stderr: String::new(),
+    };
+    while let Some(event) = progress.recv().await {
+        match event {
+            crate::ports::process::Progress::Line(line) => {
+                ctx.narrator.pulled(&line).await;
+                output.stdout.push_str(&line);
+                output.stdout.push('\n');
+            }
+            crate::ports::process::Progress::Ended(status) => output.status = status,
+        }
+    }
+    Ok(output)
 }
 
 /// Put the credentials a service adopts at first start where it will read them.

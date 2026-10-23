@@ -328,3 +328,34 @@ async fn a_stack_that_contradicts_itself_is_refused_with_every_fault_at_once() {
         );
     }
 }
+
+#[tokio::test]
+async fn a_pull_hands_each_line_the_engine_writes_to_the_narrator() {
+    let heard = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx = a_context()
+        .runner(Arc::new(Scripted(Ok(Output {
+            status: Some(0),
+            stdout: "library Pulling\nlibrary Pulled\n".to_owned(),
+            stderr: String::new(),
+        }))))
+        .engine(Arc::new(Reporting::default()))
+        .settings(Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        })
+        .build()
+        .with_narrator(Arc::<lemonfiber_fixtures::heard::Heard>::clone(&heard));
+
+    let produced = report(
+        dispatch(
+            Command::Pull {
+                forms: vec!["library".to_owned()],
+            },
+            &ctx,
+        )
+        .await,
+    );
+
+    assert_eq!(produced.map(|report| report.status), Some(Some(0)));
+    assert_eq!(heard.pull_lines(), ["library Pulling", "library Pulled"]);
+}

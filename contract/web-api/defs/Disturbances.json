@@ -3,6 +3,10 @@
   "description": "What acting on this stack would take away, one answer per way of acting.\n\nNamed by the situation rather than by the verb, because the verb has two\nspellings: the command line stops named services with `stop` and the HTTP\nsurface spells that same operation `down`. These bytes are what both surfaces\nanswer with, so a table keyed by verb would be right for one caller and wrong\nfor the other. A field each caller maps its own word onto is right for both.\n\nCarried on the status reading because a surface deciding whether to stop\nsomething has already read that, and because none of these lengths depends on\nwhat the stack is currently doing — they are the clocks the run is held to,\nwhich is a property of the configuration. A second read to learn a length is\na read a surface would skip, and then it would estimate.",
   "type": "object",
   "properties": {
+    "fetching": {
+      "description": "Fetching a form's images.",
+      "$ref": "TakesAway.json"
+    },
     "restarting": {
       "description": "Restarting services.",
       "$ref": "TakesAway.json"
@@ -29,6 +33,7 @@
     "stopping",
     "stopping_after_downloads",
     "restarting",
-    "switching"
+    "switching",
+    "fetching"
   ]
 }

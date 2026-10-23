@@ -285,7 +285,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
         Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
-        Command::Pull { .. } => reports("pull", LIFECYCLE),
+        Command::Pull { .. } => reports("pull", LIFECYCLE).disturbing(Situation::Fetching),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         Command::Plugins(asked) => plugin(asked),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),

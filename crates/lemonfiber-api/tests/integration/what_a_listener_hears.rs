@@ -547,6 +547,21 @@ async fn a_wait_names_the_job_it_belongs_to_and_an_untied_one_names_none() {
     );
 }
 
+#[tokio::test]
+async fn each_line_a_pull_writes_reaches_the_stream_as_a_pull_event_of_its_job() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let mut listening = live.listening(None).await;
+
+    Saying::for_job(Arc::clone(&live), "9f2c1a7e04b3d815")
+        .pulled("jellyfin Pulling")
+        .await;
+
+    let heard = listening.next().await.unwrap_or_default();
+    assert!(heard.contains("\nevent: pull\n"), "{heard}");
+    assert!(heard.contains("jellyfin Pulling"), "{heard}");
+    assert!(heard.contains(r#""job":"9f2c1a7e04b3d815""#), "{heard}");
+}
+
 /// A walk's steps carry the name of the job that walks, and the carrying ends with it.
 ///
 /// Its own channel rather than the surface's, so a walk's steps are tied to the walk
