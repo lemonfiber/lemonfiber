@@ -216,9 +216,9 @@ async fn asked_of(
 ///
 /// Everything else here is written for the operator. This is the only part anybody in the
 /// house ever meets, and it reaches them on the request service's own page because they
-/// have no account here on purpose — what a thing costs, whether the disk has room, and
-/// whether anything is counted over a period at all, which is the one moment all three are
-/// in hand at once.
+/// have no account here on purpose — whether the house has room for new things and whether
+/// anything is counted over a period at all, which is the one moment both are in hand at
+/// once.
 ///
 /// **The notices and the block are one pass deliberately.** The sentence saying why nothing
 /// can be fetched and the permission that stops anything being asked for go up and come
