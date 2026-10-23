@@ -151,3 +151,35 @@ fn a_variable_holding_the_address_of_a_capability_asked_each_of_is_refused() {
     );
     assert_eq!(with_url(false), Vec::<String>::new());
 }
+
+#[test]
+fn a_variable_asking_the_address_of_anything_but_a_core_capability_is_refused() {
+    let addressing = |url_of: &str| {
+        said(&INSTALLABLE.replace(
+            "config_path = \"/config\"\n",
+            &format!(
+                "config_path = \"/config\"\n\n[service.env]\nREACHED = {{ url_of = \"{url_of}\" }}\n"
+            ),
+        ))
+    };
+    let by_name = addressing("jellyfin");
+    assert_eq!(by_name.len(), 1, "{by_name:?}");
+    assert!(
+        names(
+            &by_name,
+            &[
+                "service komga.env.REACHED",
+                "jellyfin",
+                "not a core capability"
+            ]
+        ),
+        "{by_name:?}"
+    );
+    let namespaced = addressing("kavita.reader");
+    assert_eq!(namespaced.len(), 1, "{namespaced:?}");
+    assert!(
+        names(&namespaced, &["service komga.env.REACHED", "kavita.reader"]),
+        "{namespaced:?}"
+    );
+    assert_eq!(addressing("library.curate"), Vec::<String>::new());
+}

@@ -64,6 +64,24 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
             }));
         }
     }
+    addressed(manifest, found);
+}
+
+/// Every address a variable asks for held to the published core vocabulary, as an ask is.
+fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
+    for service in &manifest.services {
+        for (name, value) in &service.env {
+            let Value::Url(url) = value else { continue };
+            if vocabulary::is_core_name(&url.url_of) {
+                claiming::core(
+                    &url.url_of,
+                    &format!("service {}.env.{name}", service.id),
+                    vocabulary::removed(),
+                    found,
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]
