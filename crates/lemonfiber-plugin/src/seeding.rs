@@ -39,7 +39,7 @@ pub enum Form {
 
 impl Form {
     /// The word a placeholder names [`Form::Pbkdf2`] by.
-    pub const PBKDF2: &'static str = "pbkdf2";
+    pub const PBKDF2: &str = "pbkdf2";
 
     /// The form a placeholder's word names, where it names one.
     fn named(word: &str) -> Option<Self> {
