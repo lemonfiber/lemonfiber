@@ -161,6 +161,7 @@ fn timed_out(check: &dyn Check) -> Finding {
         origin: reported
             .as_ref()
             .map_or(crate::origin::Origin::Bundled, |one| one.origin.clone()),
+        disruptive: None,
     }
 }
 

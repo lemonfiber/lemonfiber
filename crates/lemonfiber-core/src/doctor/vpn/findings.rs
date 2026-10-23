@@ -46,11 +46,7 @@ pub(super) fn assemble(
 /// without a tunnel has two things wrong with it and folding them into a single
 /// verdict would report whichever was written last.
 pub(super) fn killswitch_findings(held: &Held) -> Vec<Finding> {
-    let mut findings = vec![finding(
-        "vpn.killswitch",
-        "killswitch",
-        killswitch::verdict(held),
-    )];
+    let mut findings = vec![killswitch::judged(held)];
     if matches!(held, Held::NotRestored) {
         findings.push(finding(
             "vpn.tunnel-restored",
@@ -182,14 +178,10 @@ pub(super) fn unreachable_engine(
             Verdict::Unverified { reason, remedy },
         )
         .about(&pair.client),
-        finding(
-            "vpn.killswitch",
-            "killswitch",
-            killswitch::verdict(&not_attempted(
-                disruptive,
-                "the container engine could not be reached, so the tunnel could not be dropped",
-            )),
-        ),
+        killswitch::judged(&not_attempted(
+            disruptive,
+            "the container engine could not be reached, so the tunnel could not be dropped",
+        )),
         port_forward_offline(port_forward),
     ]
 }

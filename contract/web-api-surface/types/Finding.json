@@ -18,6 +18,12 @@
       ],
       "required": true
     },
+    "disruptive": {
+      "type": [
+        "anyOf(null,ref:Disruptive)"
+      ],
+      "required": false
+    },
     "onset": {
       "type": [
         "null|string"

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What checking a finding disturbs, and the narrowing a diagnosis runs it under.",
+  "type": "object",
+  "properties": {
+    "bounded": {
+      "description": "The whole seconds the disturbance is bounded to, where the stack bounds it.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "disturbs": {
+      "description": "What checking it disturbs, in the stack's words.",
+      "type": "string"
+    },
+    "only": {
+      "description": "The check or group a `diagnose` action takes as `only` to run it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "disturbs",
+    "only"
+  ]
+}

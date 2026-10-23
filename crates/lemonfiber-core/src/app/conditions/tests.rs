@@ -88,6 +88,7 @@ fn found(verdict: Verdict) -> Finding {
         said: None,
         onset: None,
         origin: crate::origin::Origin::Bundled,
+        disruptive: None,
     }
 }
 

@@ -169,6 +169,18 @@ pub enum Verdict {
     },
 }
 
+/// What checking a finding disturbs, and the narrowing a diagnosis runs it under.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Disruptive {
+    /// What checking it disturbs, in the stack's words.
+    pub disturbs: String,
+    /// The whole seconds the disturbance is bounded to, where the stack bounds it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounded: Option<u64>,
+    /// The check or group a `diagnose` action takes as `only` to run it.
+    pub only: String,
+}
+
 /// One thing a check established, and how it turned out.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Finding {
@@ -230,6 +242,10 @@ pub struct Finding {
     /// ran for something other than a diagnosis.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub onset: Option<String>,
+    /// What checking it disturbs, where the read left it unverified because checking it
+    /// disturbs something, and how a diagnosis is asked to run it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disruptive: Option<Disruptive>,
     /// Whose check this is: one this build ships, or one a named plugin contributed.
     ///
     /// Carried rather than read off the identifier. A contributed check's id is
@@ -255,7 +271,37 @@ impl Finding {
             caused_by: None,
             said: None,
             onset: None,
+            disruptive: None,
             origin: crate::origin::Origin::Bundled,
+        }
+    }
+
+    /// A finding the read left unverified because checking it disturbs something: `why`
+    /// it was not run, when to run it, and what running it disturbs.
+    #[must_use]
+    pub fn unasked(
+        category: Category,
+        check: &str,
+        title: &str,
+        why: String,
+        when: &str,
+        disruptive: Disruptive,
+    ) -> Self {
+        let remedy = Remedy::new(when).with_detail(format!(
+            "lemonfiber doctor --only {} --disruptive",
+            disruptive.only
+        ));
+        Self {
+            disruptive: Some(disruptive),
+            ..Self::in_category(
+                category,
+                check,
+                title,
+                Verdict::Unverified {
+                    reason: why,
+                    remedy,
+                },
+            )
         }
     }
 

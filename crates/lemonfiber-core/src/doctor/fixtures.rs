@@ -23,6 +23,7 @@ pub(super) fn finding(title: &str, verdict: Verdict) -> Finding {
         onset: None,
         verdict,
         origin: crate::origin::Origin::Bundled,
+        disruptive: None,
     }
 }
 
