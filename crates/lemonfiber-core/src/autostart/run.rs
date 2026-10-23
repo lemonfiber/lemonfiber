@@ -27,12 +27,7 @@ use crate::stack::compose::Action;
 
 use crate::app::Ctx;
 
-/// The record's file name, named once so the layout and the readers agree.
-///
-/// The same file [`crate::config::paths::Paths::autostart`] names. Setup writes the
-/// answer into it before anything has ever been run, and this writes the rest of it
-/// afterwards, which is why both spellings have to land on one file.
-const RECORD: &str = "autostart.json";
+use crate::config::paths::AUTOSTART as RECORD;
 
 /// What is to come back after a restart, as the last run left it.
 #[must_use]

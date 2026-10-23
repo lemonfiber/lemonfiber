@@ -49,11 +49,61 @@ pub(crate) const RUN_VERDICTS: &str = "run-proofs.json";
 /// named once for the reason the install record's is.
 pub(crate) const CATALOGUE: &str = "catalogue.json";
 
+/// The file name of the settings the operator recorded by name.
 pub(crate) const SETTINGS: &str = "settings.json";
 
+/// The file name of the secrets lemonfiber holds by name.
 pub(crate) const SECRETS: &str = "secrets.json";
 
+/// The directory each service's own secrets file is written in.
 pub(crate) const SECRETS_FILES: &str = "env";
+
+/// What the stack looked like when lemonfiber last wrote it.
+pub(crate) const BASELINE: &str = "baseline.json";
+/// What lemonfiber last materialised.
+pub(crate) const MATERIALISED: &str = "materialised.json";
+/// The operator's quality choice.
+pub(crate) const QUALITY: &str = "quality.json";
+/// The operator's notification choice.
+pub(crate) const NOTIFICATIONS: &str = "notifications.json";
+/// The operator's autostart answer.
+pub(crate) const AUTOSTART: &str = "autostart.json";
+/// Which restart of this machine lemonfiber last acted on.
+pub(crate) const BOOT: &str = "boot.json";
+/// What the household declared about its line.
+pub(crate) const BANDWIDTH: &str = "bandwidth.json";
+/// Why each request was turned down.
+pub(crate) const REFUSALS: &str = "refusals.json";
+/// When each person was first handed a code.
+pub(crate) const HANDOFFS: &str = "handoffs.json";
+/// The choices whose cost was stated once.
+pub(crate) const ACCEPTED: &str = "accepted.json";
+/// The port the egress guard last forwarded to every torrent client.
+pub(crate) const FORWARDED: &str = "forwarded.json";
+/// What the update check remembers between runs.
+pub(crate) const UPDATES: &str = "updates.json";
+/// When each invitation was offered.
+pub(crate) const INVITATIONS: &str = "invitations.json";
+/// What the household agreed about the requests nobody rules on.
+pub(crate) const EXPIRING: &str = "expiring.json";
+/// What the operator has been told, and what is still owed them.
+pub(crate) const OUTBOX: &str = "outbox.json";
+/// Which containers lemonfiber stopped itself.
+pub(crate) const HALTED: &str = "halted.json";
+/// The public halves of the keys a phone proves the operator with.
+pub const DEVICE_KEYS: &str = "device-keys.json";
+/// The keys other programs reach the web surface with, as digests.
+pub const KEYS: &str = "keys.json";
+/// When each of those keys was last used.
+pub const KEYS_USED: &str = "keys-used.json";
+/// Whose asking was taken away while the disk had no room.
+pub(crate) const HELD_BACK: &str = "held-back.json";
+/// Every repair lemonfiber carried out.
+pub(crate) const REPAIRS: &str = "repairs.json";
+/// The last day each member's client spoke to the media server.
+pub(crate) const GRANTS: &str = "grants.json";
+/// What is wrong, and since when.
+pub(crate) const CONDITIONS: &str = "conditions.json";
 
 impl Paths {
     /// The layout beneath a configuration base and a data base.
@@ -136,7 +186,7 @@ impl Paths {
     /// journal it persists across runs — it is the only memory of what was written.
     #[must_use]
     pub fn baseline(&self) -> PathBuf {
-        self.config.join("baseline.json")
+        self.config.join(BASELINE)
     }
 
     /// The last entry of the request gate's record a diagnosis read, so the next one
@@ -163,7 +213,7 @@ impl Paths {
     /// run applies the same choice rather than falling back to the default.
     #[must_use]
     pub fn quality(&self) -> PathBuf {
-        self.config.join("quality.json")
+        self.config.join(QUALITY)
     }
 
     /// The operator's notification choice: which appetite is in force, and the
@@ -172,7 +222,7 @@ impl Paths {
     /// respects the answer rather than falling back to the quiet default.
     #[must_use]
     pub fn notifications(&self) -> PathBuf {
-        self.config.join("notifications.json")
+        self.config.join(NOTIFICATIONS)
     }
 
     /// The operator's autostart answer: whether they asked for the stack to come
@@ -183,7 +233,7 @@ impl Paths {
     /// the operator believing they chose something they did not.
     #[must_use]
     pub fn autostart(&self) -> PathBuf {
-        self.config.join("autostart.json")
+        self.config.join(AUTOSTART)
     }
 
     /// Which restart of this machine lemonfiber last acted on.
@@ -199,7 +249,7 @@ impl Paths {
     /// though it had just happened.
     #[must_use]
     pub fn boot(&self) -> PathBuf {
-        self.config.join("boot.json")
+        self.config.join(BOOT)
     }
 
     /// What the household declared about its line: the limits, the hours, the cap,
@@ -209,7 +259,7 @@ impl Paths {
     /// leave every share resolving to nothing until the stack had watched again.
     #[must_use]
     pub fn bandwidth(&self) -> PathBuf {
-        self.config.join("bandwidth.json")
+        self.config.join(BANDWIDTH)
     }
 
     /// Why a request was turned down, by the number the request service files it
@@ -219,7 +269,7 @@ impl Paths {
     /// get a household out of.
     #[must_use]
     pub fn refusals(&self) -> PathBuf {
-        self.config.join("refusals.json")
+        self.config.join(REFUSALS)
     }
 
     /// When each person was first handed a code to sign a device in with. Kept with
@@ -227,7 +277,7 @@ impl Paths {
     /// a code still waiting on somebody's phone from one never handed over.
     #[must_use]
     pub fn handoffs(&self) -> PathBuf {
-        self.config.join("handoffs.json")
+        self.config.join(HANDOFFS)
     }
 
     /// The choices the operator answered whose cost was stated to them once —
@@ -236,7 +286,103 @@ impl Paths {
     /// stack without it would put every settled question again.
     #[must_use]
     pub fn accepted(&self) -> PathBuf {
-        self.config.join("accepted.json")
+        self.config.join(ACCEPTED)
+    }
+
+    /// The port the egress guard last forwarded, which every torrent client was set to.
+    #[must_use]
+    pub fn forwarded(&self) -> PathBuf {
+        self.config.join(FORWARDED)
+    }
+
+    /// When each invitation was offered, which the media server may lose.
+    #[must_use]
+    pub fn invitations(&self) -> PathBuf {
+        self.config.join(INVITATIONS)
+    }
+
+    /// What the household agreed about the requests nobody rules on.
+    #[must_use]
+    pub fn expiring(&self) -> PathBuf {
+        self.config.join(EXPIRING)
+    }
+
+    /// What the operator has been told, and what is still owed them.
+    #[must_use]
+    pub fn outbox(&self) -> PathBuf {
+        self.config.join(OUTBOX)
+    }
+
+    /// Which containers lemonfiber stopped itself.
+    #[must_use]
+    pub fn halted(&self) -> PathBuf {
+        self.config.join(HALTED)
+    }
+
+    /// The public halves of the keys a phone proves the operator with.
+    #[must_use]
+    pub fn device_keys(&self) -> PathBuf {
+        self.config.join(DEVICE_KEYS)
+    }
+
+    /// The keys other programs reach the web surface with, as digests.
+    #[must_use]
+    pub fn keys(&self) -> PathBuf {
+        self.config.join(KEYS)
+    }
+
+    /// When each of those keys was last used.
+    #[must_use]
+    pub fn keys_used(&self) -> PathBuf {
+        self.config.join(KEYS_USED)
+    }
+
+    /// Whose asking was taken away while the disk had no room.
+    #[must_use]
+    pub fn held_back(&self) -> PathBuf {
+        self.config.join(HELD_BACK)
+    }
+
+    /// Every repair lemonfiber carried out, and what each came to.
+    #[must_use]
+    pub fn repairs(&self) -> PathBuf {
+        self.config.join(REPAIRS)
+    }
+
+    /// The last day each member's client spoke to the media server.
+    #[must_use]
+    pub fn grants(&self) -> PathBuf {
+        self.config.join(GRANTS)
+    }
+
+    /// What is wrong, since when, and whether the operator was told.
+    #[must_use]
+    pub fn conditions(&self) -> PathBuf {
+        self.config.join(CONDITIONS)
+    }
+
+    /// Every answer an installed plugin's adapter gave outside its contract.
+    #[must_use]
+    pub fn nonconforming(&self) -> PathBuf {
+        self.config.join(NONCONFORMING)
+    }
+
+    /// What each installed plugin is run with again: its manifest and its run proofs' starting files.
+    #[must_use]
+    pub fn plugin_starting(&self) -> PathBuf {
+        self.config.join(STARTING_KEPT)
+    }
+
+    /// What each installed plugin's run proofs last came to.
+    #[must_use]
+    pub fn run_verdicts(&self) -> PathBuf {
+        self.config.join(RUN_VERDICTS)
+    }
+
+    /// The newest plugin catalogue index this machine verified.
+    #[must_use]
+    pub fn catalogue(&self) -> PathBuf {
+        self.config.join(CATALOGUE)
     }
 
     /// When the release list was last asked which version of lemonfiber is newest,
@@ -248,7 +394,7 @@ impl Paths {
     /// threw that away would put a laptop with no route out straight back to asking.
     #[must_use]
     pub fn updates(&self) -> PathBuf {
-        self.config.join("updates.json")
+        self.config.join(UPDATES)
     }
 
     /// The password the web surface asks for, as the verifier that proves it.
@@ -332,7 +478,7 @@ impl Paths {
     /// overwritten, so it belongs with what a backup keeps.
     #[must_use]
     pub fn materialised(&self) -> PathBuf {
-        self.config.join("materialised.json")
+        self.config.join(MATERIALISED)
     }
 
     /// The baseline the storage check records, to notice when hardlinks stop

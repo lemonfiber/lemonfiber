@@ -116,7 +116,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         .settings
         .env_file
         .as_deref()
-        .map(|env| env.with_file_name("materialised.json"));
+        .map(|env| env.with_file_name(crate::config::paths::MATERIALISED));
     // The quality choice is carried into the quality sync config only when a real run
     // brings the stack up or fetches for it. A teardown or restart has no business
     // rewriting a config the running container reads, and a rehearsal changes

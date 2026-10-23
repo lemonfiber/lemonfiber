@@ -89,7 +89,7 @@ pub fn alerts(ctx: &Ctx, action: AlertAction) -> Result<AlertReport, Box<Problem
 /// directory a backup captures, or nowhere when nothing is configured. Equal to
 /// [`crate::config::paths::Paths::notifications`].
 fn path(ctx: &Ctx) -> Option<PathBuf> {
-    super::targets::beside_env(ctx, "notifications.json")
+    super::targets::beside_env(ctx, crate::config::paths::NOTIFICATIONS)
 }
 
 #[cfg(test)]

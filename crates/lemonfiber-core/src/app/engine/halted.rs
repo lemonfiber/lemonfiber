@@ -27,8 +27,7 @@ use crate::stack::compose::Action;
 
 use super::super::Ctx;
 
-/// The record's file name, named once so the reader and the writers agree.
-const RECORD: &str = "halted.json";
+use crate::config::paths::HALTED as RECORD;
 
 /// The containers lemonfiber stopped, by the service each belongs to.
 ///

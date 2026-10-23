@@ -43,10 +43,7 @@ pub(crate) mod pausing;
 mod reaching;
 mod revising;
 
-/// Where the declaration is kept, beside the environment file a backup captures.
-///
-/// Equal to [`crate::config::paths::Paths::bandwidth`].
-const RECORD: &str = "bandwidth.json";
+use crate::config::paths::BANDWIDTH as RECORD;
 
 /// The stack setting that says which zone its containers read a clock in.
 const ZONE: &str = "TZ";

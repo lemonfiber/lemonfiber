@@ -61,15 +61,9 @@ pub const REFUSALS: [Code; 10] = [
     UNLINKABLE,
 ];
 
-/// The file the keys are kept in, beside the configuration a backup carries.
-pub const FILE: &str = "keys.json";
+pub use crate::config::paths::KEYS as FILE;
 
-/// The file each key's last use is kept in, written only by the serving surface.
-///
-/// Apart from the keys themselves so that the surface, which writes this often, never
-/// rewrites the record a mint or a revoke in another process is writing at the same
-/// moment.
-pub const USED_FILE: &str = "keys-used.json";
+pub use crate::config::paths::KEYS_USED as USED_FILE;
 
 /// Bytes of secret. Wide enough that guessing is not a strategy.
 const WIDTH: usize = 32;

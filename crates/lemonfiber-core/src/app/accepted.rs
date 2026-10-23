@@ -48,7 +48,7 @@ pub(crate) fn save(ctx: &Ctx, accepted: &Accepted) -> Result<(), Box<Problem>> {
 /// Where the record is kept: beside the environment file, or nowhere on a machine
 /// with nothing configured — which has no choices recorded either.
 fn path(ctx: &Ctx) -> Option<PathBuf> {
-    super::targets::beside_env(ctx, "accepted.json")
+    super::targets::beside_env(ctx, crate::config::paths::ACCEPTED)
 }
 
 /// Record the operator's answer to one check, and report as though it had already

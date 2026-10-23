@@ -17,6 +17,7 @@ mod how_long_a_file_may_be;
 mod modest_terminal;
 mod nothing_a_plugin_brings_gets_its_own_account;
 mod nothing_here_runs_what_somebody_sent;
+mod nothing_is_kept_beside_the_configuration_unsaid;
 mod nothing_leaves_on_its_own;
 mod nothing_reports_on_you;
 mod nothing_resolves_a_second_host;

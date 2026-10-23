@@ -17,8 +17,7 @@ use crate::ports::service::PLAYER;
 /// How many days a grant lasts after the member's client last spoke to the core.
 pub const LASTS: i64 = 30;
 
-/// The file the grants are kept in, beside the configuration.
-const KEPT: &str = "grants.json";
+use crate::config::paths::GRANTS as KEPT;
 
 /// The last day each member's client spoke to the core, by the id the media server
 /// files them under.

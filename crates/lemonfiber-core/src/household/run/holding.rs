@@ -32,11 +32,7 @@ use std::collections::BTreeMap;
 use crate::app::{record, targets, Ctx};
 use crate::ports::service::{Approving, Holding};
 
-/// What the record is called, beside the environment file.
-///
-/// Named once and used from both sides: a reader and a writer disagreeing about the name
-/// would look exactly like a household nobody had ever held back.
-const NAME: &str = "held-back.json";
+use crate::config::paths::HELD_BACK as NAME;
 
 /// Who has had their asking taken away, and what came off each of them.
 ///
