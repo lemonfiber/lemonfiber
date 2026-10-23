@@ -36,7 +36,7 @@
           "host": "conformance-download",
           "name": "conformance",
           "port": 80,
-          "protocol": "conformance"
+          "protocol": "sabnzbd"
         }
       },
       "case": "register_download_client-answers",
@@ -70,7 +70,7 @@
           "host": "conformance-download",
           "name": "conformance",
           "port": 80,
-          "protocol": "conformance"
+          "protocol": "sabnzbd"
         },
         "id": "{library.curate@1/download_clients-answers#/0/id}"
       },
@@ -113,12 +113,45 @@
           "path": "/data/conformance"
         }
       },
-      "case": "register_root_folder-answers",
+      "case": "register_root_folder-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "register_root_folder"
+    },
+    {
+      "asked": {
+        "folder": {
+          "media_type": "movies",
+          "path": "/data/conformance"
+        }
+      },
+      "case": "register_root_folder-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "register_root_folder"
+    },
+    {
+      "asked": {
+        "folder": {
+          "media_type": "music",
+          "path": "/data/conformance"
+        }
+      },
+      "case": "register_root_folder-answers-music",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "music",
       "operation": "register_root_folder"
     },
     {
@@ -145,12 +178,26 @@
       "asked": {
         "kind": "tv"
       },
-      "case": "search_upgrades-answers",
+      "case": "search_upgrades-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "search_upgrades"
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "search_upgrades-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "search_upgrades"
     },
     {
@@ -179,12 +226,39 @@
       "asked": {
         "sort": "series"
       },
-      "case": "records-answers",
+      "case": "records-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "records"
+    },
+    {
+      "asked": {
+        "sort": "film"
+      },
+      "case": "records-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "records"
+    },
+    {
+      "asked": {
+        "sort": "artist"
+      },
+      "case": "records-answers-music",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "music",
       "operation": "records"
     },
     {
@@ -197,12 +271,51 @@
         },
         "sort": "series"
       },
-      "case": "carry-answers",
+      "case": "carry-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "carry"
+    },
+    {
+      "asked": {
+        "item": {
+          "folder": null,
+          "name": "conformance",
+          "profile": null,
+          "rest": ""
+        },
+        "sort": "film"
+      },
+      "case": "carry-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "carry"
+    },
+    {
+      "asked": {
+        "item": {
+          "folder": null,
+          "name": "conformance",
+          "profile": null,
+          "rest": ""
+        },
+        "sort": "artist"
+      },
+      "case": "carry-answers-music",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "music",
       "operation": "carry"
     },
     {
@@ -210,24 +323,53 @@
         "kind": "tv",
         "term": "conformance"
       },
-      "case": "lookup-answers",
+      "case": "lookup-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "lookup"
+    },
+    {
+      "asked": {
+        "kind": "movies",
+        "term": "conformance"
+      },
+      "case": "lookup-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "lookup"
     },
     {
       "asked": {
         "kind": "tv"
       },
-      "case": "add_plan-answers",
+      "case": "add_plan-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "add_plan"
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "add_plan-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "add_plan"
     },
     {
@@ -244,12 +386,36 @@
           "root_folder": "/data/conformance"
         }
       },
-      "case": "add-answers",
+      "case": "add-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "add"
+    },
+    {
+      "asked": {
+        "entry": {
+          "held_as": null,
+          "reference": 0,
+          "title": "conformance",
+          "year": null
+        },
+        "kind": "movies",
+        "plan": {
+          "quality_profile": 1,
+          "root_folder": "/data/conformance"
+        }
+      },
+      "case": "add-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "add"
     },
     {
@@ -276,12 +442,26 @@
       "asked": {
         "kind": "tv"
       },
-      "case": "probe_releases-answers",
+      "case": "probe_releases-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "probe_releases"
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "probe_releases-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "probe_releases"
     },
     {
@@ -300,12 +480,26 @@
       "asked": {
         "kind": "tv"
       },
-      "case": "library-answers",
+      "case": "library-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "library"
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "library-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "library"
     },
     {
@@ -313,12 +507,27 @@
         "kind": "tv",
         "term": "conformance"
       },
-      "case": "find_items-answers",
+      "case": "find_items-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "find_items"
+    },
+    {
+      "asked": {
+        "kind": "movies",
+        "term": "conformance"
+      },
+      "case": "find_items-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "find_items"
     },
     {
@@ -326,12 +535,27 @@
         "id": 0,
         "kind": "tv"
       },
-      "case": "item_history-answers",
+      "case": "item_history-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "item_history"
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "movies"
+      },
+      "case": "item_history-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "item_history"
     },
     {
@@ -339,12 +563,27 @@
         "id": 0,
         "kind": "tv"
       },
-      "case": "item_queue-answers",
+      "case": "item_queue-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "item_queue"
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "movies"
+      },
+      "case": "item_queue-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "item_queue"
     },
     {
@@ -353,24 +592,54 @@
         "kind": "tv",
         "season": null
       },
-      "case": "item_parts-answers",
+      "case": "item_parts-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "item_parts"
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "movies",
+        "season": null
+      },
+      "case": "item_parts-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "item_parts"
     },
     {
       "asked": {
         "kind": "tv"
       },
-      "case": "stuck_items-answers",
+      "case": "stuck_items-answers-tv",
       "expect": {
         "conforms": true
       },
       "keyed": true,
       "live": false,
+      "media_type": "tv",
+      "operation": "stuck_items"
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "stuck_items-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
       "operation": "stuck_items"
     }
   ],

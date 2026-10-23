@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use lemonfiber_contract::client::Witness;
-use lemonfiber_contract::conformance::{cases, Case, Expect};
+use lemonfiber_contract::conformance::{filed, Case, Expect};
 use lemonfiber_contract::{Contracted, Failure};
 use lemonfiber_plugin::{Manifest, Service, Violation};
 
@@ -69,6 +69,12 @@ pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
         .filter(|one| !one.speaks.is_empty())
     {
         let pinned = upstream(&manifest, service);
+        let files: Vec<String> = manifest
+            .services
+            .iter()
+            .find(|one| service.fronts.as_deref() == Some(one.id.as_str()))
+            .map(|one| one.media_types.clone())
+            .unwrap_or_default();
         for named in &service.speaks {
             let Some(spoken) = published
                 .iter()
@@ -76,7 +82,7 @@ pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
             else {
                 continue;
             };
-            for case in cases(spoken) {
+            for case in filed(spoken, &files) {
                 let recording = format!("{RECORDINGS}/{named}/{}.json", case.case);
                 let verdict = match recorded::read(&root, &recording) {
                     Err(unrunnable) => Verdict::Unproven { why: unrunnable.0 },

@@ -153,14 +153,18 @@ pub fn conformance(capability: &Capability) -> Value {
                 crate::conformance::Expect::Status(statuses) => json!({ "status": statuses }),
                 crate::conformance::Expect::Conforms => json!({ "conforms": true }),
             };
-            json!({
+            let mut listed = json!({
                 "case": case.case,
                 "operation": case.operation.name,
                 "keyed": case.keyed,
                 "expect": expect,
                 "live": case.live,
                 "asked": case.asks
-            })
+            });
+            if let (Some(media_type), Some(fields)) = (case.media_type, listed.as_object_mut()) {
+                fields.insert("media_type".to_owned(), json!(media_type));
+            }
+            listed
         })
         .collect();
     json!({

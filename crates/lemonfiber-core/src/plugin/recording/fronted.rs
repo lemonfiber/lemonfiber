@@ -11,7 +11,7 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{
     ready_path, KEY_FILE, UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME,
 };
-use lemonfiber_contract::conformance::cases;
+use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
 use lemonfiber_plugin::{Health, HealthKind};
 use serde_json::Value;
@@ -73,12 +73,16 @@ fn fixture(contract: &str, case: &str) -> String {
     format!("{RECORDINGS}/{contract}/{case}.json")
 }
 
-/// What names each case of every contract `adapter` speaks, and where its recording sits.
-pub(super) fn fixtures(adapter: &lemonfiber_plugin::Service) -> Vec<(String, String)> {
+/// What names each case of every contract `adapter` speaks that an upstream filing `files`
+/// is asked, and where its recording sits.
+pub(super) fn fixtures(
+    adapter: &lemonfiber_plugin::Service,
+    files: &[String],
+) -> Vec<(String, String)> {
     contracts(adapter)
         .iter()
         .flat_map(|(spoken, capability)| {
-            cases(capability)
+            filed(capability, files)
                 .into_iter()
                 .map(|case| (named(spoken, &case.case), fixture(spoken, &case.case)))
                 .collect::<Vec<_>>()
@@ -330,7 +334,7 @@ impl Asking<'_> {
         };
         let mut asked = Vec::new();
         for (spoken, capability) in &contracts {
-            for case in cases(capability) {
+            for case in filed(capability, &self.upstream.media_types) {
                 let step = named(spoken, &case.case);
                 let one = self
                     .case(&reached, &mut filling, spoken, &case)

@@ -114,9 +114,9 @@ async fn a_download_client_is_posted_to_its_endpoint() {
         .is_ok());
 
     let sent = fake.request();
-    assert!(sent
-        .as_ref()
-        .is_some_and(|request| request.url.ends_with("/api/v3/downloadclient")));
+    assert!(sent.as_ref().is_some_and(|request| request
+        .url
+        .ends_with("/api/v3/downloadclient?forceSave=true")));
     assert!(sent.is_some_and(|request| request.body.is_some_and(|body| body.contains("SABnzbd"))));
 }
 

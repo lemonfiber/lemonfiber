@@ -76,6 +76,9 @@ pub struct Operation {
     pub largest: usize,
     /// What its conformance case posts, its placeholders still to be filled.
     pub asks: serde_json::Value,
+    /// For an operation bound to a kind of media, what its case for each media type posts
+    /// instead, by media type; none for every other operation.
+    pub filed: Vec<(&'static str, serde_json::Value)>,
     /// How its answer is read.
     reads: Reading,
 }
@@ -96,6 +99,7 @@ impl Operation {
             answered: schemars::schema_for!(R),
             largest: client::LARGEST,
             asks: serde_json::Value::Null,
+            filed: Vec::new(),
             reads: read_as::<R>,
         }
     }
