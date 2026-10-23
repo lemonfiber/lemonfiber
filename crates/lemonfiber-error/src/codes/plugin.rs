@@ -507,4 +507,26 @@ codes! {
         remedy: "Update the plugin from its source with lemonfiber plugin update, which keeps \
             its manifest again, then run the recipe.",
     }
+    /// Raised when a third-party plugin declares a secret of another service that names no
+    /// capability of its own it is for.
+    UNAIMED_CROSSING = "PLUGIN-46" {
+        severity: Error,
+        status: 403,
+        since: "0.18.0",
+        meaning: "A third-party plugin is granted another service's credential only for a \
+            capability it fills, one credential for each, and this secret names none with for. \
+            Nothing was written.",
+        remedy: "Take it up with whoever published the plugin: each secret of another service \
+            names the capability of the plugin's own it is for.",
+    }
+    /// Raised when a grant asked to be revoked is not one the plugin holds.
+    NO_GRANT = "PLUGIN-47" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "The plugin holds no grant of that credential, so nothing was revoked. The \
+            message names the grants it holds.",
+        remedy: "See every grant on lemonfiber credentials, and revoke one by the plugin and the \
+            credential it names.",
+    }
 }
