@@ -6,6 +6,7 @@
 mod copying;
 mod mounting;
 mod moving;
+mod passing;
 mod profiled;
 mod retiring;
 mod secrets;
@@ -31,6 +32,7 @@ use crate::wiring::Chosen;
 
 pub(crate) use copying::{pending as copies, Copies};
 pub(crate) use moving::{beneath as moved_beneath, moved};
+pub(crate) use passing::readied as pass_readied;
 pub(crate) use retiring::{retired, still_there};
 pub(crate) use secrets::written as secrets_written;
 pub(crate) use sweeping::{swept, Sweep};
@@ -182,7 +184,14 @@ pub(crate) fn topology(ctx: &Ctx, manifest: &Manifest) -> Result<Topology, Box<P
         manifest,
         register.installed(),
         &super::targets::chosen_fillers(ctx),
+        pinned(ctx).is_some(),
     ))
+}
+
+/// The image the pass service runs, where one is pinned for this release.
+pub(crate) fn pinned(ctx: &Ctx) -> Option<String> {
+    held_as(ctx, crate::pass::PINNED)
+        .and_then(|held| crate::pass::pinned(&held, crate::stack::RUNNING))
 }
 
 /// The profiles of the services `services` run inside, which Compose has to activate for
@@ -211,8 +220,12 @@ pub(crate) fn hosting_with(ctx: &Ctx, installed: &Installed) -> BTreeSet<String>
         .zip(super::plugins::read(ctx).ok())
         .map(|(manifest, register)| {
             let beside = super::plugins::beside(&register, installed);
-            let topology =
-                crate::project::topology(&manifest, &beside, &super::targets::chosen_fillers(ctx));
+            let topology = crate::project::topology(
+                &manifest,
+                &beside,
+                &super::targets::chosen_fillers(ctx),
+                pinned(ctx).is_some(),
+            );
             crate::project::hosting(&manifest, &beside, &topology, &services)
         })
         .unwrap_or_default()

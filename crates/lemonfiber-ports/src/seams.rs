@@ -24,6 +24,7 @@ use crate::occupancy::Occupancy;
 use crate::process::Runner;
 use crate::program::Program;
 use crate::random::Random;
+use crate::registry::Registry;
 use crate::resolve::Resolver;
 use crate::time::Clock;
 use crate::FileSystem;
@@ -41,6 +42,8 @@ pub struct Seams {
     pub filesystem: Arc<dyn FileSystem>,
     /// How requests leave this machine.
     pub http: Arc<dyn Http>,
+    /// How a container registry is asked what it publishes.
+    pub registry: Arc<dyn Registry>,
     /// How the engine is asked what it has pulled.
     pub images: Arc<dyn Images>,
     /// How the engine is asked which networks the project holds, and told to take one

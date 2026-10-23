@@ -25,7 +25,7 @@ use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
 pub(crate) use inputs::filler as placed_at;
 use inputs::Inputs;
-pub(crate) use inputs::{declared, moved_in_place, written};
+pub(crate) use inputs::{declared, moved_in_place, pass_taken, written};
 
 /// The file the project is written to, beneath the project directory.
 pub const FILE: &str = "compose.generated.yml";
@@ -49,6 +49,9 @@ pub struct Reading<'a> {
     /// written: who the services run as, the time zone, where the library is kept and
     /// the interface the household tier is published on. Never a secret.
     pub operator: &'a dyn Fn(&str) -> Option<String>,
+    /// The image the pass service runs, pinned by its digest, where one is pinned for
+    /// this release.
+    pub pass: Option<&'a str>,
 }
 
 impl Reading<'_> {
@@ -64,6 +67,7 @@ impl Reading<'_> {
             moved: &[],
             name: crate::PRODUCT,
             operator: &|_| None,
+            pass: None,
         }
     }
 }
@@ -86,7 +90,7 @@ pub fn generated(
     chosen: &Chosen,
     reading: &Reading<'_>,
 ) -> Project {
-    let inputs = inputs::read(manifest, installed, chosen);
+    let inputs = inputs::read(manifest, installed, chosen, reading.pass.is_some());
     let topology = inputs.topology();
     let address =
         |service: &str, url: &UrlOf| address(manifest, installed, &inputs, &topology, service, url);
@@ -108,6 +112,13 @@ pub fn generated(
                 .iter()
                 .map(move |placed| plugin::unit(&one.plugin, placed, &secrets))
         }))
+        .chain(pass_unit(
+            manifest,
+            installed,
+            &inputs,
+            &topology,
+            reading.pass,
+        ))
         .map(|unit| beside(unit, reading.moved))
         .collect();
     let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -170,10 +181,15 @@ pub fn entries(installed: &Installed, reading: &Reading<'_>) -> String {
 }
 
 /// The networks `manifest`'s services and `installed`'s are placed on, wired as `chosen`
-/// settles them.
+/// settles them, with the pass service beside the guard where `pass` is pinned.
 #[must_use]
-pub fn topology(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Topology {
-    inputs::read(manifest, installed, chosen).topology()
+pub fn topology(
+    manifest: &Manifest,
+    installed: &[Installed],
+    chosen: &Chosen,
+    pass: bool,
+) -> Topology {
+    inputs::read(manifest, installed, chosen, pass).topology()
 }
 
 /// The profiles of the services that `services` run inside, which have to be active for
@@ -191,20 +207,61 @@ pub fn hosting(
             Some(Placed::Inside(host)) => Some(host),
             _ => None,
         })
-        .filter_map(|host| {
-            manifest
-                .services
-                .iter()
-                .find(|service| &service.id == host)
-                .map(|service| service.profile.clone())
-                .or_else(|| {
-                    installed
-                        .iter()
-                        .find(|one| one.services.iter().any(|placed| &placed.service == host))
-                        .map(|one| plugin::profile(&one.plugin))
-                })
-        })
+        .filter_map(|host| profile_of(manifest, installed, host))
         .collect()
+}
+
+/// The profile the named service starts with: its own where the stack declares it, and
+/// its plugin's where a plugin brings it.
+fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<String> {
+    manifest
+        .services
+        .iter()
+        .find(|service| service.id == id)
+        .map(|service| service.profile.clone())
+        .or_else(|| {
+            installed
+                .iter()
+                .find(|one| one.services.iter().any(|placed| placed.service == id))
+                .map(|one| plugin::profile(&one.plugin))
+        })
+}
+
+/// Nothing in the environment of the pass service, which reads only its own files.
+static UNSET: BTreeMap<String, Value> = BTreeMap::new();
+
+/// The pass service, running `image` with the guard's profile at its address on the
+/// network it shares with the guard, where an image is pinned and a guard is filled.
+fn pass_unit<'a>(
+    manifest: &Manifest,
+    installed: &[Installed],
+    inputs: &Inputs,
+    topology: &Topology,
+    image: Option<&str>,
+) -> Option<Unit<'a>> {
+    let image = image.filter(|_| inputs.pass)?;
+    let at = topology.pass()?;
+    let profile = profile_of(manifest, installed, inputs.guard.as_deref()?)?;
+    Some(Unit {
+        id: crate::pass::SERVICE,
+        namespace: crate::pass::SERVICE,
+        profile,
+        image: literal(image),
+        published: Vec::new(),
+        contract: None,
+        takes_data: false,
+        config_path: crate::pass::CONFIGURATION,
+        config_ro: true,
+        mounts: &[],
+        tmpfs: &[],
+        env: &UNSET,
+        user: UserMode::Uid,
+        posture: lemonfiber_manifest::container::Posture::Confined,
+        mem_limit_mib: Some(crate::pass::MEMORY_MIB),
+        shape: None,
+        secrets_file: None,
+        command: crate::pass::command(at),
+    })
 }
 
 /// Whether a journalled change is a write of the project.
@@ -272,6 +329,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
         secrets_file: names_a_secret(&service.env)
             .then(|| (reading.secrets_file)(&service.id))
             .flatten(),
+        command: Vec::new(),
     }
 }
 

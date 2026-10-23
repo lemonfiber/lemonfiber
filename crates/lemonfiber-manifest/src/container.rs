@@ -52,6 +52,10 @@ pub const MEDIA_SERVE: &str = "media.serve";
 /// The stream guard's capability, whose filler the core hands a certificate.
 pub const STREAM_GUARD: &str = "stream.guard";
 
+/// The id lemonfiber runs its pass service under, which no service of the stack or of a
+/// plugin may take.
+pub const PASS_SERVICE: &str = "pass";
+
 /// The media a service files, in the stack manifest's vocabulary.
 pub const MEDIA: [&str; 5] = ["tv", "movies", "music", "books", "comics"];
 

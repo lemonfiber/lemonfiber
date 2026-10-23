@@ -130,6 +130,8 @@ pub struct Unit<'a> {
     pub shape: Option<Shape>,
     /// Its own secrets file, where it names a secret and has one.
     pub secrets_file: Option<PathBuf>,
+    /// The arguments its image's program is run with, where not the image's own.
+    pub command: Vec<String>,
 }
 
 /// What an entry's values are read from beyond its unit.
@@ -159,6 +161,9 @@ pub struct Entry {
     /// Who it runs as, where not the image's choice.
     #[serde(skip_serializing_if = "Option::is_none")]
     user: Option<String>,
+    /// The arguments its image's program is run with, where not the image's own.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    command: Vec<String>,
     /// Its environment.
     environment: BTreeMap<String, String>,
     /// Its own secrets file, where it names a secret.
@@ -278,6 +283,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
                 operated(values, PGID_KEY, OPERATOR_FALLBACK)
             )
         }),
+        command: unit.command.iter().map(|word| literal(word)).collect(),
         environment: environment(unit, values),
         env_file: unit
             .secrets_file

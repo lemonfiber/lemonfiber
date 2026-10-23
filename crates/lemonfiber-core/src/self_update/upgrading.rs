@@ -23,9 +23,6 @@ use super::installed::Installed;
 /// in [`crate::outbound`], which is the list an operator can read and switch off.
 const RELEASES: &str = "https://github.com/lemonfiber/lemonfiber";
 
-/// Where this project's own image is published, each release under its version.
-const IMAGE: &str = "ghcr.io/lemonfiber/lemonfiber";
-
 /// What to type to bring this copy to `version`, or to whatever is newest where no
 /// version is named.
 ///
@@ -47,7 +44,9 @@ pub fn command(installed: Installed, version: Option<&str>) -> Option<String> {
         (Installed::Cargo, Some(version)) => Some(format!(
             "cargo install --git {RELEASES} --tag v{version} --force {product}"
         )),
-        (Installed::Image, Some(version)) => Some(format!("docker pull {IMAGE}:{version}")),
+        (Installed::Image, Some(version)) => {
+            Some(format!("docker pull {}:{version}", crate::IMAGE))
+        }
         (Installed::Installer | Installed::Elsewhere | Installed::Untellable, Some(version)) => {
             Some(format!(
                 "curl -LsSf {RELEASES}/releases/download/v{version}/{product}-installer.sh | sh"

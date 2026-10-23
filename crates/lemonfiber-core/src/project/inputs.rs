@@ -37,6 +37,8 @@ pub(super) struct Inputs {
     pub(super) links: Vec<(String, String)>,
     /// The service that fills `stream.guard`, where one does.
     pub(super) guard: Option<String>,
+    /// Whether the pass service runs beside the guard.
+    pub(super) pass: bool,
 }
 
 impl Inputs {
@@ -63,13 +65,18 @@ impl Inputs {
             })
             .collect();
         let links: Vec<Named<'_>> = self.links.iter().map(|(by, to)| Named { by, to }).collect();
-        topology::derived(&members, &asks, &links, self.guard.as_deref())
+        topology::derived(&members, &asks, &links, self.guard.as_deref(), self.pass)
     }
 }
 
 /// The inputs `manifest`'s services and `installed`'s, wired as `chosen` settles them,
-/// come to.
-pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Inputs {
+/// come to, with the pass service among them where `pass` is pinned and a guard is filled.
+pub(super) fn read(
+    manifest: &Manifest,
+    installed: &[Installed],
+    chosen: &Chosen,
+    pass: bool,
+) -> Inputs {
     let fill = |capability: &str| filler(manifest, installed, chosen, capability);
     let mut members: Vec<Standing> = written(manifest, installed)
         .map(|service| Standing {
@@ -111,6 +118,17 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
             standing.publishes = true;
         }
     }
+    let guard = fill(guard::CAPABILITY);
+    let pass = pass && guard.is_some() && !pass_taken(manifest, installed);
+    if pass {
+        members.push(Standing {
+            id: crate::pass::SERVICE.to_owned(),
+            confined: true,
+            publishes: false,
+            inside: None,
+            fronts: None,
+        });
+    }
     let mut asks = Vec::new();
     let mut links = Vec::new();
     for wired in settle(manifest, installed, chosen) {
@@ -133,8 +151,23 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
         members,
         asks,
         links,
-        guard: fill(guard::CAPABILITY),
+        guard,
+        pass,
     }
+}
+
+/// Whether a service of the stack or of a plugin holds the id the pass service runs
+/// under, which leaves the pass service out rather than written over it.
+pub(crate) fn pass_taken(manifest: &Manifest, installed: &[Installed]) -> bool {
+    written(manifest, installed)
+        .map(|service| service.id.as_str())
+        .chain(
+            installed
+                .iter()
+                .flat_map(|one| &one.services)
+                .map(|placed| placed.service.as_str()),
+        )
+        .any(|id| id == crate::pass::SERVICE)
 }
 
 /// The ask of `proxy.front` each plugin service the household reaches at a hostname makes

@@ -8,6 +8,21 @@
 use lemonfiber_sidecar::pass::PARAMETER;
 pub use lemonfiber_sidecar::pass::{File, Key, Live, LivePath, KEY_BYTES};
 
+/// The pass service's id in the project.
+pub const SERVICE: &str = lemonfiber_manifest::container::PASS_SERVICE;
+
+/// The request this binary answers as the pass service under.
+pub const REQUEST: &str = "pass";
+
+/// The file beneath the project directory the pass service's image is pinned in.
+pub const PINNED: &str = "pass.image";
+
+/// Where the pass service reads its files inside its container.
+pub const CONFIGURATION: &str = lemonfiber_manifest::container::CONFIGURATION;
+
+/// The memory the pass service is held to, in MiB.
+pub const MEMORY_MIB: u32 = 64;
+
 /// The port the pass service listens on, inside the network it shares with the guard.
 pub const PORT: u16 = 8090;
 
@@ -16,6 +31,29 @@ pub const PATH: &str = "/pass";
 
 /// The header the guard names the request it forwards in.
 pub const FORWARDED: &str = "X-Forwarded-Uri";
+
+/// The image the pass service runs for release `version`: the release's own, at
+/// `digest`.
+#[must_use]
+pub fn pin(version: &str, digest: &str) -> String {
+    format!("{}:{version}@{digest}", crate::IMAGE)
+}
+
+/// The image `held` pins the pass service to, where it pins release `version`'s own by
+/// its digest.
+#[must_use]
+pub fn pinned(held: &str, version: &str) -> Option<String> {
+    let held = held.trim();
+    held.strip_prefix(&pin(version, ""))
+        .filter(|digest| lemonfiber_ports::registry::is_digest(digest))
+        .map(|_| held.to_owned())
+}
+
+/// What the pass service is started with: answering at `at`.
+#[must_use]
+pub fn command(at: std::net::SocketAddr) -> Vec<String> {
+    vec![REQUEST.to_owned(), "--listen".to_owned(), at.to_string()]
+}
 
 /// The group a live-stream path names its live stream with.
 const STREAM: &str = lemonfiber_ports::service::STREAM_NAME;

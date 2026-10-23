@@ -86,6 +86,7 @@ pub(crate) fn unit<'a>(plugin: &str, placed: &'a Placed, reading: &Reading<'_>) 
         mem_limit_mib: fields.mem_limit_mib,
         shape: placed.shape,
         secrets_file: secrets_file(placed, reading),
+        command: Vec::new(),
     }
 }
 

@@ -34,6 +34,26 @@ impl Image {
     }
 }
 
+/// One image, named by the tag it is published under.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tagged {
+    /// The registry path, with no tag and no digest on it.
+    pub repository: String,
+    /// The tag it is published under.
+    pub tag: String,
+}
+
+impl Tagged {
+    /// One image, from its repository and the tag it is published under.
+    #[must_use]
+    pub fn new(repository: &str, tag: &str) -> Self {
+        Self {
+            repository: repository.to_owned(),
+            tag: tag.to_owned(),
+        }
+    }
+}
+
 /// What a registry offers beside an image.
 ///
 /// The bytes as the registry served them, both of them, and nothing read out of
@@ -53,12 +73,12 @@ pub struct Offered {
 /// name that did not resolve, an answer in a shape this build cannot read, or a
 /// repository it may not look in. Nothing about the image follows from it.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-#[error("{repository} could not be asked about {digest}: {reason}")]
+#[error("{repository} could not be asked about {asked}: {reason}")]
 pub struct Unanswerable {
     /// The repository that was asked.
     pub repository: String,
-    /// The digest it was asked about.
-    pub digest: String,
+    /// The digest or the tag it was asked about.
+    pub asked: String,
     /// The transport's own account of why, kept verbatim.
     pub reason: String,
 }
@@ -69,10 +89,31 @@ impl Unanswerable {
     pub fn about(image: &Image, reason: &str) -> Self {
         Self {
             repository: image.repository.clone(),
-            digest: image.digest.clone(),
+            asked: image.digest.clone(),
             reason: reason.to_owned(),
         }
     }
+
+    /// A question that could not be put, about one tag.
+    #[must_use]
+    pub fn about_tag(tagged: &Tagged, reason: &str) -> Self {
+        Self {
+            repository: tagged.repository.clone(),
+            asked: tagged.tag.clone(),
+            reason: reason.to_owned(),
+        }
+    }
+}
+
+/// Whether `digest` is one sha256 digest, written as a registry writes it.
+#[must_use]
+pub fn is_digest(digest: &str) -> bool {
+    digest.strip_prefix("sha256:").is_some_and(|hex| {
+        hex.len() == 64
+            && hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
 }
 
 /// Asks a registry what it holds beside an image.
@@ -88,6 +129,18 @@ pub trait Registry: Send + Sync {
     /// Returns [`Unanswerable`] where the question could not be put or the answer
     /// could not be read.
     async fn signatures(&self, image: &Image) -> Result<Vec<Offered>, Unanswerable>;
+
+    /// The digest the registry publishes `tagged` at: its image index where it serves
+    /// one, so the engine pulls each platform's own image from it.
+    ///
+    /// Nothing where the registry answers that nothing is published under the tag, which
+    /// is an answer. Anything that stopped the asking is [`Unanswerable`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Unanswerable`] where the question could not be put or the answer
+    /// could not be read.
+    async fn digest(&self, tagged: &Tagged) -> Result<Option<String>, Unanswerable>;
 }
 
 #[cfg(test)]

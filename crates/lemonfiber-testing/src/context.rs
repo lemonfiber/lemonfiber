@@ -225,6 +225,7 @@ impl Context {
                 .http
                 .unwrap_or_else(|| lemonfiber_fixtures::http::Fake::silent()),
             resolver: lemonfiber_fixtures::ports::Resolving::anywhere(),
+            registry: lemonfiber_fixtures::registered::Registered::unpublished(),
             program: lemonfiber_fixtures::proving::Proving::unreachable(),
             ..live
         };

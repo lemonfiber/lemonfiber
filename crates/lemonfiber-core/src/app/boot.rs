@@ -399,6 +399,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         unvetted: None,
         moves: Vec::new(),
         swept: Vec::new(),
+        passing: None,
     }
 }
 

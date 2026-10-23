@@ -6,8 +6,9 @@
 //!
 //! Each network's subnet is a slot of [`RANGE`] chosen from its name, so the slot a
 //! network holds does not move when another network comes or goes, except where the two
-//! met at one slot. The fixed subnets [`super::PROXY_SUBNET`] and [`super::MEDIA_SUBNET`]
-//! lie in the range too, and no other network is given a slot inside them.
+//! met at one slot. The fixed subnets [`super::PROXY_SUBNET`], [`super::MEDIA_SUBNET`] and
+//! [`super::PASS_SUBNET`] lie in the range too, and no other network is given a slot inside
+//! them.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::Ipv4Addr;

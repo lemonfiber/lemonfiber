@@ -104,3 +104,44 @@ fn live_stream_paths_that_do_not_compile_or_place_no_stream_are_refused() {
         assert!(Watching::of(&live).is_err(), "{pattern} {stream}");
     }
 }
+
+const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+
+#[test]
+fn a_pin_is_this_releases_own_image_at_its_digest() {
+    assert_eq!(
+        super::pin("0.18.0", DIGEST),
+        format!("ghcr.io/lemonfiber/lemonfiber:0.18.0@{DIGEST}")
+    );
+}
+
+#[test]
+fn a_pin_is_held_only_for_the_release_it_names_and_only_by_a_digest() {
+    let pin = super::pin("0.18.0", DIGEST);
+    assert_eq!(
+        super::pinned(&format!("{pin}\n"), "0.18.0"),
+        Some(pin.clone())
+    );
+    assert_eq!(super::pinned(&pin, "0.18.1"), None);
+    assert_eq!(super::pinned(&pin, "0.18"), None);
+    assert_eq!(
+        super::pinned(&super::pin("0.18.0", "sha256:abc"), "0.18.0"),
+        None
+    );
+    assert_eq!(
+        super::pinned(
+            &format!("example.invalid/lemonfiber:0.18.0@{DIGEST}"),
+            "0.18.0"
+        ),
+        None
+    );
+    assert_eq!(super::pinned(&format!("{pin} extra"), "0.18.0"), None);
+}
+
+#[test]
+fn the_pass_service_is_started_answering_at_its_address() {
+    assert_eq!(
+        super::command(std::net::SocketAddr::from(([10, 80, 96, 34], 8090))),
+        ["pass", "--listen", "10.80.96.34:8090"]
+    );
+}

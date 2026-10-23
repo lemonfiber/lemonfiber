@@ -42,6 +42,12 @@
       ],
       "required": false
     },
+    "passing": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "plan": {
       "type": [
         "ref:Plan"
