@@ -586,9 +586,9 @@ dependencies = [
 
 [[package]]
 name = "ctutils"
-version = "0.4.2"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d5515a3834141de9eafb9717ad39eea8247b5674e6066c404e8c4b365d2a29e"
+checksum = "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
 dependencies = [
  "cmov",
 ]
@@ -1420,6 +1420,7 @@ dependencies = [
  "rustls-pki-types",
  "serde_json",
  "sysinfo",
+ "tar",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -1499,6 +1500,7 @@ dependencies = [
  "lemonfiber-sidecar",
  "libc",
  "rcgen",
+ "regex",
  "ring",
  "schemars",
  "serde",
@@ -1570,6 +1572,7 @@ dependencies = [
  "lemonfiber-manifest",
  "regex",
  "regex-syntax",
+ "ring",
  "schemars",
  "serde",
  "thiserror",
@@ -1581,6 +1584,7 @@ dependencies = [
 name = "lemonfiber-sidecar"
 version = "0.17.0"
 dependencies = [
+ "base64",
  "ring",
  "serde",
  "serde_json",
