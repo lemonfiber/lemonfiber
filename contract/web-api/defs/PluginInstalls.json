@@ -11,7 +11,7 @@
       ]
     },
     "demand": {
-      "description": "What asking for one of a plugin's demand recipes came to, or nothing where none\nwas asked for.",
+      "description": "What asking for one of a plugin's demand recipes came to, or nothing where none\nwas asked for.\n\nBoxed for the reason the install is: it carries a whole recipe, and every other\nrun's report would otherwise be as large as the one run that asks for one.",
       "anyOf": [
         {
           "$ref": "PluginDemand.json"

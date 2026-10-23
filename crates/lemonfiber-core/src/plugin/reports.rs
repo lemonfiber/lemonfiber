@@ -267,7 +267,10 @@ pub struct Installs {
     pub nonconforming: Vec<Nonconforming>,
     /// What asking for one of a plugin's demand recipes came to, or nothing where none
     /// was asked for.
-    pub demand: Option<Demand>,
+    ///
+    /// Boxed for the reason the install is: it carries a whole recipe, and every other
+    /// run's report would otherwise be as large as the one run that asks for one.
+    pub demand: Option<Box<Demand>>,
     /// What proving a plugin again came to, or nothing where nothing was proved.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<Reproof>,

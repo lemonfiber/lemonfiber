@@ -38,11 +38,11 @@ fn asked(ran: Option<Ran>) -> Installs {
         substituted: Vec::new(),
         sources: Vec::new(),
         nonconforming: Vec::new(),
-        demand: Some(Demand {
+        demand: Some(Box::new(Demand {
             plugin: "komga".to_owned(),
             recipe: rescan(),
             ran,
-        }),
+        })),
         proof: None,
         agreement: Some("1a2b3c4d".to_owned()),
         rehearsed: false,

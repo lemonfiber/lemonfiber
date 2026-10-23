@@ -58,7 +58,7 @@ pub(super) async fn demand(
         substituted: Vec::new(),
         sources: Vec::new(),
         nonconforming: Vec::new(),
-        demand: Some(demand),
+        demand: Some(Box::new(demand)),
         proof: None,
         agreement: Some(offer),
         rehearsed: ctx.dry_run,
