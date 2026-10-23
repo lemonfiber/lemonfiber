@@ -3,6 +3,11 @@
   "description": "One thing that is wrong, as the expanded summary lists it.",
   "type": "object",
   "properties": {
+    "acknowledged": {
+      "description": "Whether the operator has acknowledged it by declining its fix. It still stands\nand is still counted.",
+      "type": "boolean",
+      "default": false
+    },
     "check": {
       "description": "The check that raised it.",
       "type": "string"

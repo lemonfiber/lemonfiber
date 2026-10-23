@@ -1,5 +1,11 @@
 {
   "fields": {
+    "acknowledged": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
     "check": {
       "type": [
         "string"

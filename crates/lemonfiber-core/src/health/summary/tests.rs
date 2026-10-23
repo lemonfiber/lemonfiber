@@ -415,3 +415,21 @@ fn an_affected_item_carries_when_its_check_went_wrong() {
         vec![("service.sonarr", "3000"), ("vpn.egress", RAISED)]
     );
 }
+
+#[test]
+fn an_acknowledged_item_is_shown_as_acknowledged_and_still_counted() {
+    let mut declined = wrong("vpn.leak", Severity::Error, "VPN leak");
+    declined.declined = true;
+    let open = wrong("disk.full", Severity::Warning, "disk 94% full");
+
+    let summary = Summary::of(Reach::Running, &[&declined, &open], SETTLED);
+
+    assert_eq!(summary.wanting_attention, 2);
+    assert_eq!(summary.standing, Standing::of(Severity::Error));
+    let acknowledged: Vec<(&str, bool)> = summary
+        .affected
+        .iter()
+        .map(|item| (item.check.as_str(), item.acknowledged))
+        .collect();
+    assert_eq!(acknowledged, [("vpn.leak", true), ("disk.full", false)]);
+}

@@ -66,6 +66,7 @@ fn wrong(check: &str, onset: &str) -> Affected {
         remedies: Vec::new(),
         downstream: Vec::new(),
         exit: None,
+        acknowledged: false,
     }
 }
 
