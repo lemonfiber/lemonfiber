@@ -5,7 +5,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_plugin::Manifest;
 
 use super::declared;
-use crate::doctor::{examine, Category, Finding, Narrowing, Verdict};
+use crate::doctor::{examine, Category, Finding, Narrowing, Reported, Verdict};
 use crate::error::codes::plugin::PROOF_ASKED_FAILED;
 use crate::origin::Origin;
 use crate::plugin::Installed;
@@ -165,4 +165,38 @@ async fn a_service_nobody_can_reach_leaves_the_proof_unverified_and_the_plugins(
         );
     }
     assert_eq!((unanswered.len(), nowhere.len()), (1, 1));
+}
+
+#[tokio::test]
+async fn a_request_proof_is_asked_for_by_its_own_id_and_reports_against_its_service() {
+    let http = Fake::always(Answer::served(
+        200,
+        "application/json",
+        r#"{"isClaimed":true}"#,
+    ));
+    let transport = Arc::clone(&http) as Arc<dyn Http>;
+    let checks = declared(&installed(), &answering(), &transport);
+
+    let reported = checks.first().and_then(|check| check.reports());
+    assert_eq!(
+        reported,
+        Some(Reported {
+            check: "komga:claimed".to_owned(),
+            service: Some("komga".to_owned()),
+            origin: Origin::Plugin {
+                named: "komga".to_owned()
+            },
+        })
+    );
+    let named = examine(&checks, &Narrowing::Check("komga:claimed".to_owned())).await;
+    let other = examine(&checks, &Narrowing::Check("komga:other".to_owned())).await;
+    assert_eq!(
+        named
+            .findings
+            .iter()
+            .map(|one| one.check.as_str())
+            .collect::<Vec<_>>(),
+        ["komga:claimed"]
+    );
+    assert!(other.findings.is_empty(), "{:?}", other.findings);
 }
