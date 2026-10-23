@@ -5,6 +5,11 @@
 //! contract's path, `about` and `ready`, and every one of them only under the plugin's
 //! key, which the core wrote to the adapter's configuration directory before it started.
 
+pub mod credential;
+pub mod endpoint;
+pub mod settings;
+pub mod web;
+
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::Path;

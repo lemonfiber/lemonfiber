@@ -11,16 +11,20 @@ publish = false
 
 [dependencies]
 lemonfiber-contract = { workspace = true }
+lemonfiber-error = { workspace = true }
+lemonfiber-ports = { workspace = true }
+async-trait = { workspace = true }
 axum = { workspace = true }
+form_urlencoded = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["net"] }
 
 [dev-dependencies]
 lemonfiber-adapters = { workspace = true }
-lemonfiber-ports = { workspace = true }
-async-trait = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+lemonfiber-fixtures = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "rt"] }
 tower = { workspace = true, features = ["util"] }
 
 [lints]
