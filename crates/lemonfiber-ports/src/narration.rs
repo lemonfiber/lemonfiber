@@ -38,3 +38,6 @@ pub struct Silent;
 impl Narrator for Silent {
     async fn say(&self, _said: &str) {}
 }
+
+#[cfg(test)]
+mod tests;

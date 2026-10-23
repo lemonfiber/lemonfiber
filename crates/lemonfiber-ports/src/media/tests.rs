@@ -1,4 +1,4 @@
-use super::Kind;
+use super::{offered, Kind};
 
 fn declared(of: &[&str]) -> Vec<String> {
     of.iter().map(|&media| media.to_owned()).collect()
@@ -32,5 +32,37 @@ fn a_service_filing_both_is_television() {
     assert_eq!(
         Kind::of_declared(&declared(&["movies", "tv"])),
         Some(Kind::Tv)
+    );
+}
+
+#[test]
+fn nothing_offered_is_said_as_nothing() {
+    assert_eq!(offered::<&str>(&[]), "");
+}
+
+#[test]
+fn a_single_word_is_offered_on_its_own() {
+    assert_eq!(offered(&["lossless"]), "lossless");
+}
+
+#[test]
+fn two_words_are_offered_as_one_or_the_other() {
+    assert_eq!(offered(&["tv", "movies"]), "tv or movies");
+}
+
+#[test]
+fn three_or_more_words_are_listed_with_the_last_offered_after_or() {
+    assert_eq!(
+        offered(&["compact", "lossless", "hi-res"]),
+        "compact, lossless, or hi-res"
+    );
+    assert_eq!(
+        offered(&[
+            "tv".to_owned(),
+            "movies".to_owned(),
+            "music".to_owned(),
+            "books".to_owned()
+        ]),
+        "tv, movies, music, or books"
     );
 }
