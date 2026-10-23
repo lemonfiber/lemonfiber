@@ -316,6 +316,7 @@ fn a_music_choice_still_recorded_is_a_success_however_the_service_answered() {
             choice: choice.clone(),
             disposition: Disposition::Recorded,
             outcome,
+            changes: lemonfiber_core::quality::CHANGES.to_owned(),
         };
         assert_eq!(format!("{:?}", settled(&Outcome::Music(report))), success());
     }
@@ -409,6 +410,7 @@ fn a_music_choice_is_recorded_even_where_the_service_refused_it() {
         outcome: Some(Triggered::Failed {
             detail: "refused".to_owned(),
         }),
+        changes: lemonfiber_core::quality::CHANGES.to_owned(),
     };
     assert_ne!(
         format!("{:?}", settled(&Outcome::Music(refused))),

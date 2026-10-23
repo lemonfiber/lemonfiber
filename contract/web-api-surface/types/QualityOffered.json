@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "formats": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "media_types": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "presets": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

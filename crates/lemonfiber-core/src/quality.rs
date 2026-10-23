@@ -16,6 +16,8 @@
 
 pub(crate) mod run;
 
+pub use run::{offered, CHANGES};
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};

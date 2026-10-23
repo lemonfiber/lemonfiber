@@ -3,6 +3,13 @@
   "description": "The operator's quality choice, what each preset means, and what the command\ndid with it.",
   "type": "object",
   "properties": {
+    "changes": {
+      "description": "What a choice changes, in the stack's words; present where this answers one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "choices": {
       "description": "The global choice first, then each media type set apart from it.",
       "type": "array",
@@ -29,6 +36,10 @@
         }
       ]
     },
+    "offered": {
+      "description": "What a choice may be made from.",
+      "$ref": "QualityOffered.json"
+    },
     "overwritten": {
       "description": "The hand-edited config a reapply replaced — or, rehearsed, would replace — with\nthe diff of what goes against what lands in its place.\n\nAbsent everywhere else, and absent for a reapply over a config already in\nlemonfiber's own hand. Consent given against a yes-or-no is consent to\nsomething the operator was never shown: they know a file they edited is about\nto go, and not which of their lines is in it. The lines are masked the way\nevery stack-file diff is, so a key that drifted is named without its value.",
       "anyOf": [
@@ -49,6 +60,7 @@
     "choices",
     "customised",
     "disposition",
+    "offered",
     "rehearsed"
   ]
 }

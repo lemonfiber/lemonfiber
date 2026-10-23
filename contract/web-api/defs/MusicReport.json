@@ -3,6 +3,10 @@
   "description": "What choosing an audio format for music did: the choice, whether it was recorded\nor only rehearsed, and — once recorded — what became of applying it to the music\nservice.\n\nMusic has no resolution and no community profile to lean on, so unlike a resolution\npreset the choice is carried straight to the service through its API. The choice is\nstill recorded first, so it is remembered even when the service cannot be reached.",
   "type": "object",
   "properties": {
+    "changes": {
+      "description": "What the choice changes, in the stack's words.",
+      "type": "string"
+    },
     "choice": {
       "description": "The format chosen, what it means, and what it costs.",
       "$ref": "MusicChoice.json"
@@ -30,6 +34,7 @@
   "required": [
     "choice",
     "disposition",
+    "changes",
     "rehearsed"
   ]
 }

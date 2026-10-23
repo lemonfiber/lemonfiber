@@ -190,6 +190,8 @@ fn a_held_quality_choice_is_a_validation_result_rather_than_a_failure() {
         music: None,
         customised: false,
         overwritten: None,
+        offered: lemonfiber_core::model::QualityOffered::default(),
+        changes: None,
         disposition: Disposition::Held,
     };
     assert_ne!(format!("{:?}", settled(&Outcome::Quality(held))), success());
@@ -199,6 +201,8 @@ fn a_held_quality_choice_is_a_validation_result_rather_than_a_failure() {
         music: None,
         customised: false,
         overwritten: None,
+        offered: lemonfiber_core::model::QualityOffered::default(),
+        changes: None,
         disposition: Disposition::Shown,
     };
     assert_eq!(

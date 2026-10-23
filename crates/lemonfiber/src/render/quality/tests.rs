@@ -37,6 +37,8 @@ fn every_quality_disposition_says_what_became_of_the_choice() {
             music: Some(music_pick()),
             customised,
             overwritten: None,
+            offered: lemonfiber_core::model::QualityOffered::default(),
+            changes: None,
             disposition,
         };
         let text = quality(&report).text();
@@ -49,6 +51,8 @@ fn every_quality_disposition_says_what_became_of_the_choice() {
         music: None,
         customised: false,
         overwritten: None,
+        offered: lemonfiber_core::model::QualityOffered::default(),
+        changes: None,
         disposition: Disposition::Shown,
     };
     assert!(!quality(&plain).text().contains("authoritative"));
@@ -68,6 +72,8 @@ fn a_reapply_that_replaced_an_edit_shows_which_lines_went() {
                 diff: "- # mine\n+ include:\n".to_owned(),
             }),
             disposition,
+            offered: lemonfiber_core::model::QualityOffered::default(),
+            changes: None,
         };
         let text = quality(&report).text();
         assert!(text.contains("What went, in config/recyclarr"), "{text}");
@@ -86,6 +92,8 @@ fn a_reapply_with_nothing_to_replace_shows_no_lines() {
         music: None,
         customised: false,
         overwritten: None,
+        offered: lemonfiber_core::model::QualityOffered::default(),
+        changes: None,
         disposition: Disposition::Reapplied,
     };
     assert!(!quality(&report).text().contains("What went"));
@@ -109,6 +117,7 @@ fn the_music_choice_reports_what_became_of_applying_it() {
             choice: music_pick(),
             disposition: Disposition::Recorded,
             outcome,
+            changes: lemonfiber_core::quality::CHANGES.to_owned(),
         };
         assert!(music(&report).text().contains(expected));
     }
@@ -118,6 +127,7 @@ fn the_music_choice_reports_what_became_of_applying_it() {
         choice: music_pick(),
         disposition: Disposition::Rehearsed,
         outcome: None,
+        changes: lemonfiber_core::quality::CHANGES.to_owned(),
     };
     let text = music(&rehearsed).text();
     assert!(text.contains("Would save."));

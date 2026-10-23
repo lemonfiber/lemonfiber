@@ -22,7 +22,7 @@ use crate::app::{Ctx, QualityAction};
 use crate::audio::Format;
 use crate::config::{store, MEDIA_SERVER_MODE_KEY};
 use crate::error::{Diagnose, Problem};
-use crate::model::{Disposition, MusicChoice, PresetChoice, QualityReport};
+use crate::model::{Disposition, MusicChoice, PresetChoice, QualityOffered, QualityReport};
 use crate::ports::media::MUSIC;
 use crate::quality::{Preset, Selection};
 use crate::transcoding::{warn_before_confirming, Playback, Warning};
@@ -30,6 +30,11 @@ use crate::wizard::Library;
 
 /// The scope a global choice is reported under, as opposed to a media type's name.
 const EVERYTHING: &str = "everything";
+
+/// What a quality choice changes.
+pub const CHANGES: &str = "A quality choice shapes what is fetched from now on. Nothing \
+     already in the library changes; lemonfiber quality upgrade is what fetches it again at \
+     the quality chosen.";
 
 /// Show or change the quality preset.
 ///
@@ -44,6 +49,7 @@ const EVERYTHING: &str = "everything";
 /// ordinary run withholds.
 pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport, Box<Problem>> {
     let mut selection = load_selection(ctx)?;
+    let chose = matches!(action, QualityAction::Set { .. });
     let playback = playback(ctx);
     let record = materialised_record(ctx);
     let into = ctx.settings.stack_dir.as_deref();
@@ -111,13 +117,11 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
         }
     };
 
-    Ok(report(
-        &selection,
-        playback,
-        customised,
-        disposition,
-        overwritten,
-    ))
+    let mut answered = report(&selection, playback, customised, disposition, overwritten);
+    if chose {
+        answered.changes = Some(CHANGES.to_owned());
+    }
+    Ok(answered)
 }
 
 /// Where the record of what lemonfiber last wrote to the stack is kept — beside the
@@ -244,6 +248,19 @@ fn report(
         customised,
         overwritten,
         disposition,
+        offered: offered(),
+        changes: None,
+    }
+}
+
+/// Every preset, music format and media type a choice may be made from.
+#[must_use]
+pub fn offered() -> QualityOffered {
+    let owned = |words: &[&str]| words.iter().map(|word| (*word).to_owned()).collect();
+    QualityOffered {
+        presets: owned(&Preset::ALL.map(Preset::label)),
+        formats: owned(&Format::ALL.map(Format::label)),
+        media_types: owned(&crate::ports::media::chosen_for()),
     }
 }
 

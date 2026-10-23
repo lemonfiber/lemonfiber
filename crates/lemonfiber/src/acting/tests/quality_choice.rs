@@ -36,6 +36,8 @@ fn a_quality(disposition: Disposition) -> QualityReport {
         music: None,
         customised: false,
         overwritten: None,
+        offered: lemonfiber_core::model::QualityOffered::default(),
+        changes: None,
         disposition,
     }
 }

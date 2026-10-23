@@ -38,6 +38,34 @@ pub enum Kind {
 /// The media type a service declares for music.
 pub const MUSIC: &str = "music";
 
+/// `words` as one choice is offered from them: `a, b, or c`.
+#[must_use]
+pub fn offered<T: AsRef<str>>(words: &[T]) -> String {
+    match words {
+        [] => String::new(),
+        [only] => only.as_ref().to_owned(),
+        [first, second] => format!("{} or {}", first.as_ref(), second.as_ref()),
+        [rest @ .., last] => format!(
+            "{}, or {}",
+            rest.iter()
+                .map(AsRef::as_ref)
+                .collect::<Vec<_>>()
+                .join(", "),
+            last.as_ref()
+        ),
+    }
+}
+
+/// Every media type a quality choice may be made for: each kind of video, then music.
+#[must_use]
+pub fn chosen_for() -> Vec<&'static str> {
+    Kind::ALL
+        .into_iter()
+        .map(Kind::media_type)
+        .chain(std::iter::once(MUSIC))
+        .collect()
+}
+
 impl Kind {
     /// Both, television first.
     pub const ALL: [Self; 2] = [Self::Tv, Self::Movies];

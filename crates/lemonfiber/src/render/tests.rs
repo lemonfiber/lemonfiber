@@ -238,6 +238,8 @@ fn the_first_of_them() -> Vec<Outcome> {
             music: None,
             customised: false,
             overwritten: None,
+            offered: lemonfiber_core::model::QualityOffered::default(),
+            changes: None,
             disposition: Disposition::Shown,
         }),
         Outcome::Upgrade(UpgradeReport {
@@ -250,6 +252,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             choice: music_pick(),
             disposition: Disposition::Recorded,
             outcome: None,
+            changes: lemonfiber_core::quality::CHANGES.to_owned(),
         }),
         Outcome::Trace(a_trace()),
         Outcome::Household(HouseholdReport {
