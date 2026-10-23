@@ -1,6 +1,6 @@
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{forgotten, kept, root};
+use super::{forgotten, kept, manifest, root};
 use crate::config::Settings;
 use crate::plugin::Installed;
 use crate::test_support::a_context;
@@ -48,6 +48,33 @@ fn with_nowhere_to_keep_them_nothing_is_kept() {
             &installed,
             std::path::Path::new("/lemonfiber/no/such/source"),
         );
+        assert_eq!(
+            manifest(&ctx, &installed).err().as_deref(),
+            Some("there is nowhere configured that its manifest is kept")
+        );
     }
     forgotten(&ctx, "quality");
+}
+
+#[test]
+fn where_the_place_to_keep_them_cannot_be_made_nothing_is_kept() {
+    let home = Scratch::new("kept-blocked");
+    let source = Scratch::new("kept-blocked-source");
+    let _ = std::fs::write(source.join(lemonfiber_bundle::MANIFEST), "a");
+    let _ = std::fs::write(home.join("plugin-starting"), "not a directory");
+    let ctx = a_context()
+        .settings(Settings {
+            env_file: Some(home.join(".env")),
+            ..Settings::default()
+        })
+        .build();
+    let Some(installed) = installed() else {
+        return;
+    };
+    kept(&ctx, &installed, &source);
+    assert_eq!(
+        root(&ctx, "quality").map(|at| at.join(lemonfiber_bundle::MANIFEST).exists()),
+        Some(false)
+    );
+    assert!(manifest(&ctx, &installed).is_err());
 }
