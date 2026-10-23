@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "bounded": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "disturbs": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "only": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

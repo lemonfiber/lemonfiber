@@ -32,7 +32,8 @@ use crate::error::Remedy;
 
 use super::leak::Reach;
 use super::probe::running;
-use super::Verdict;
+use super::{Category, Finding, Verdict};
+use crate::doctor::Disruptive;
 use crate::error::codes::vpn::{KILLSWITCH_LEAKS, TUNNEL_NOT_RESTORED};
 use crate::ports::docker::Container;
 
@@ -149,7 +150,35 @@ pub(super) fn not_attempted(disruptive: bool, reason: &str) -> Held {
     }
 }
 
-/// The finding this test earns.
+/// The id the killswitch finding is reported under.
+pub(super) const CHECK: &str = "vpn.killswitch";
+
+/// What the killswitch finding is called.
+pub(super) const TITLE: &str = "killswitch";
+
+/// The killswitch finding: unverified and saying what testing it disturbs where the test
+/// was not asked for, and otherwise what the test came to.
+pub(super) fn judged(held: &Held) -> Finding {
+    match held {
+        Held::NotAttempted { reason } if *reason == not_asked_for() => Finding::unasked(
+            Category::Vpn,
+            CHECK,
+            TITLE,
+            reason.clone(),
+            "Run the disruptive check when transfers can be interrupted",
+            Disruptive {
+                disturbs: "every transfer through the tunnel, which is dropped until traffic is \
+                           confirmed stopped and then put back"
+                    .to_owned(),
+                bounded: Some(DISTURBANCE.as_secs()),
+                only: Category::Vpn.as_str().to_owned(),
+            },
+        ),
+        _ => Finding::in_category(Category::Vpn, CHECK, TITLE, verdict(held)),
+    }
+}
+
+/// The verdict this test earns.
 pub(super) fn verdict(held: &Held) -> Verdict {
     match held {
         Held::Yes => Verdict::Pass {
@@ -173,11 +202,6 @@ pub(super) fn verdict(held: &Held) -> Verdict {
             .in_state(crate::error::State::Guided)
             .with_detail(format!("the world saw {seen} while the tunnel was down")),
         ),
-        Held::NotAttempted { reason } if *reason == not_asked_for() => Verdict::Unverified {
-            reason: reason.clone(),
-            remedy: Remedy::new("Run the disruptive check when transfers can be interrupted")
-                .with_detail("lemonfiber doctor --only vpn --disruptive"),
-        },
         Held::NotAttempted { reason } => Verdict::Unverified {
             reason: reason.clone(),
             remedy: Remedy::new(

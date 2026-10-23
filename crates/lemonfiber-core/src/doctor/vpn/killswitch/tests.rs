@@ -142,7 +142,8 @@ fn an_untested_killswitch_is_never_reported_as_working() {
     let untested = Held::NotAttempted {
         reason: not_asked_for(),
     };
-    let said = shown(&verdict(&untested));
+    let finding = super::judged(&untested);
+    let said = shown(&finding.verdict);
     assert!(said.starts_with("Unverified"), "{said}");
     // And it says how to get a real answer, which the other unattempted
     // reasons cannot — they are about a stack that is not ready to be tested.
@@ -150,6 +151,25 @@ fn an_untested_killswitch_is_never_reported_as_working() {
         said.contains("lemonfiber doctor --only vpn --disruptive"),
         "{said}"
     );
+    let disruptive = finding
+        .disruptive
+        .clone()
+        .unwrap_or_else(|| unreachable!("{finding:?}"));
+    assert_eq!(disruptive.bounded, Some(super::DISTURBANCE.as_secs()));
+    assert!(
+        disruptive.disturbs.contains("transfer"),
+        "{}",
+        disruptive.disturbs
+    );
+    assert!(crate::doctor::narrowing::Narrowing::parse(&disruptive.only)
+        .is_some_and(|only| only.keeps(&finding)));
+}
+
+#[test]
+fn a_killswitch_that_could_not_be_tested_carries_nothing_to_disturb() {
+    let finding = super::judged(&not_attempted(true, "the tunnel container is not running"));
+    assert_eq!(finding.disruptive, None);
+    assert!(matches!(finding.verdict, Verdict::Unverified { .. }));
 }
 
 #[test]

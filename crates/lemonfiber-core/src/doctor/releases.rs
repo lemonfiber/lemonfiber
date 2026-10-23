@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::{Category, Check, Finding, Verdict};
+use super::{Category, Check, Disruptive, Finding, Verdict};
 use crate::doctor::credentials::Target;
 use crate::error::codes::qual::{NONE_AVAILABLE, PRESET_UNMET};
 use crate::error::{Problem, Remedy, State};
@@ -58,10 +58,15 @@ fn not_asked_for() -> String {
     )
 }
 
-/// How to get a real answer, said the way the other opt-in check says it.
-fn how_to_ask() -> Remedy {
-    Remedy::new("Run the search when one can be spent against the indexers")
-        .with_detail("lemonfiber doctor --only services.releases --disruptive")
+/// What a live release search disturbs, and the narrowing that runs it.
+fn disruption() -> Disruptive {
+    Disruptive {
+        disturbs: "one real search per service against the indexers, counted towards the daily \
+                   cap they hold the operator to"
+            .to_owned(),
+        bounded: Some(crate::doctor::CHECK_BUDGET.as_secs()),
+        only: NONE.to_owned(),
+    }
 }
 
 /// Searches the resolution services for the operator's wanted content, so a preset that
@@ -162,14 +167,13 @@ async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
     }
 
     if !check.disruptive {
-        return vec![Finding::in_category(
+        return vec![Finding::unasked(
             Category::Services,
             NONE,
             "Releases for the chosen quality",
-            Verdict::Unverified {
-                reason: not_asked_for(),
-                remedy: how_to_ask(),
-            },
+            not_asked_for(),
+            "Run the search when one can be spent against the indexers",
+            disruption(),
         )];
     }
 
@@ -231,3 +235,6 @@ fn none_available(media: &str) -> Problem {
     )
     .in_state(State::Guided)
 }
+
+#[cfg(test)]
+mod tests;

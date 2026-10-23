@@ -149,6 +149,7 @@ fn found(check: &str, verdict: Checked) -> Finding {
         onset: None,
         verdict,
         origin: lemonfiber_core::origin::Origin::Bundled,
+        disruptive: None,
     }
 }
 

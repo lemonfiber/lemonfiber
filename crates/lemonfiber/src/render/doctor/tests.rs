@@ -16,6 +16,7 @@ fn a_failing_finding() -> Finding {
         onset: None,
         verdict: Verdict::Fail(a_problem()),
         origin: lemonfiber_core::origin::Origin::Bundled,
+        disruptive: None,
     }
 }
 
@@ -120,85 +121,34 @@ fn a_finding_lemonfiber_can_mend_says_so_and_names_the_command() {
 #[test]
 fn every_verdict_reads_with_its_own_mark() {
     let findings = vec![
-        Finding {
-            check: "a".to_owned(),
-            category: Category::Storage,
-            title: "noted".to_owned(),
-            service: None,
-            service_name: None,
-            caused_by: None,
-            said: None,
-            onset: None,
-            verdict: Verdict::Pass {
+        Finding::in_category(
+            Category::Storage,
+            "a",
+            "noted",
+            Verdict::Pass {
                 note: Some("plenty of room".to_owned()),
             },
-            origin: lemonfiber_core::origin::Origin::Bundled,
-        },
-        Finding {
-            check: "b".to_owned(),
-            category: Category::Storage,
-            title: "bare".to_owned(),
-            service: None,
-            service_name: None,
-            caused_by: None,
-            said: None,
-            onset: None,
-            verdict: Verdict::Pass { note: None },
-            origin: lemonfiber_core::origin::Origin::Bundled,
-        },
-        Finding {
-            check: "c".to_owned(),
-            category: Category::Vpn,
-            title: "warned".to_owned(),
-            service: None,
-            service_name: None,
-            caused_by: None,
-            said: None,
-            onset: None,
-            verdict: Verdict::Warn(a_problem()),
-            origin: lemonfiber_core::origin::Origin::Bundled,
-        },
-        Finding {
-            check: "d".to_owned(),
-            category: Category::Vpn,
-            title: "failed".to_owned(),
-            service: None,
-            service_name: None,
-            caused_by: None,
-            said: None,
-            onset: None,
-            verdict: Verdict::Fail(a_problem()),
-            origin: lemonfiber_core::origin::Origin::Bundled,
-        },
-        Finding {
-            check: "e".to_owned(),
-            category: Category::Network,
-            title: "unproven".to_owned(),
-            service: None,
-            service_name: None,
-            caused_by: None,
-            said: None,
-            onset: None,
-            verdict: Verdict::Unverified {
+        ),
+        Finding::in_category(Category::Storage, "b", "bare", Verdict::Pass { note: None }),
+        Finding::in_category(Category::Vpn, "c", "warned", Verdict::Warn(a_problem())),
+        Finding::in_category(Category::Vpn, "d", "failed", Verdict::Fail(a_problem())),
+        Finding::in_category(
+            Category::Network,
+            "e",
+            "unproven",
+            Verdict::Unverified {
                 reason: "nothing answered".to_owned(),
                 remedy: Remedy::new("start it").with_detail("compose up"),
             },
-            origin: lemonfiber_core::origin::Origin::Bundled,
-        },
-        Finding {
-            check: "f".to_owned(),
-            category: Category::Network,
-            title: "passed over".to_owned(),
-            service: None,
-            service_name: None,
-            caused_by: None,
-            said: None,
-            onset: None,
-            verdict: Verdict::Skipped {
+        ),
+        Finding::in_category(
+            Category::Network,
+            "f",
+            "passed over",
+            Verdict::Skipped {
                 reason: "not applicable".to_owned(),
             },
-            origin: lemonfiber_core::origin::Origin::Bundled,
-        },
+        ),
     ];
     let report = DoctorReport {
         rehearsed: false,
@@ -236,6 +186,7 @@ fn an_unverified_finding_without_detail_still_carries_its_remedy() {
                 remedy: Remedy::new("start it"),
             },
             origin: lemonfiber_core::origin::Origin::Bundled,
+            disruptive: None,
         }],
     };
     assert!(diagnosis(&report).text().contains("→ start it"));
@@ -285,6 +236,7 @@ fn an_answered_choice_stops_leading_without_disappearing() {
             onset: None,
             verdict: Verdict::Warn(a_problem().in_state(State::Suppressed)),
             origin: lemonfiber_core::origin::Origin::Bundled,
+            disruptive: None,
         }],
     };
     let text = diagnosis(&report).text();

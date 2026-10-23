@@ -18,6 +18,17 @@
       "description": "A stable identifier for the thing checked, such as `vpn.egress-match`.",
       "type": "string"
     },
+    "disruptive": {
+      "description": "What checking it disturbs, where the read left it unverified because checking it\ndisturbs something, and how a diagnosis is asked to run it.",
+      "anyOf": [
+        {
+          "$ref": "Disruptive.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "onset": {
       "description": "When the stack first saw this check wrong since it last saw it right, in whole\nseconds since the epoch.\n\nSet after the run from the store of conditions, like [`Self::said`], so it is\nthe moment the health summary names for the same check and a restart does not\nmove it. Absent where the finding says nothing is wrong, and where the checks\nran for something other than a diagnosis.",
       "type": [

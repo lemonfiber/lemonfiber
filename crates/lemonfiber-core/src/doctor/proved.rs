@@ -117,6 +117,7 @@ impl Proved {
             said: None,
             onset: None,
             origin: self.origin(),
+            disruptive: None,
         }
     }
 
