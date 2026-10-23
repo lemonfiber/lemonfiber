@@ -123,7 +123,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::SUCCESS
             }
         }
-        // A reset run without --confirm that found edits to revert only previewed them —
+        // A reset run without an offer that found edits to revert only previewed them —
         // like a held quality choice, it needs the operator's say-so, so a script sees a
         // non-zero result to act on. Both an edited stack file and a drifted connection
         // are pending reverts, so either one left unconfirmed is a non-zero result.

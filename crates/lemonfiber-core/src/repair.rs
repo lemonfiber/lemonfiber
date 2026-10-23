@@ -395,11 +395,11 @@ impl Writing {
             Self::Ours => None,
             Self::Changed => Some(
                 Remedy::new("You have changed this since lemonfiber wrote it, so it is left alone")
-                    .with_detail("lemonfiber reset --confirm restores lemonfiber's own"),
+                    .with_detail("lemonfiber reset names the offer that restores lemonfiber's own"),
             ),
             Self::Adopted => Some(
                 Remedy::new("This is a value you set and lemonfiber adopted, so it is left alone")
-                    .with_detail("lemonfiber reset --confirm restores lemonfiber's own"),
+                    .with_detail("lemonfiber reset names the offer that restores lemonfiber's own"),
             ),
             Self::TheirsAlone => Some(
                 Remedy::new("lemonfiber has never written this, so it will not start now")

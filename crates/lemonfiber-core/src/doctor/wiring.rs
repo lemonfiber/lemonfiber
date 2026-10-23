@@ -350,7 +350,7 @@ fn unreachable(managed: &Managed, wired: &Wired) -> Problem {
          and never empties",
         Remedy::new("Keep your value and make the client reachable, or put lemonfiber's back")
             .with_detail(
-            "lemonfiber seed --adopt keeps yours; lemonfiber reset --confirm restores lemonfiber's",
+            "lemonfiber seed --adopt keeps yours; lemonfiber reset names the offer that restores lemonfiber's",
         ),
     )
 }

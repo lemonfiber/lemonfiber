@@ -8,7 +8,7 @@ Part of the [command reference](../commands.md).
 ```text
 Take somebody out of the household, in both places they have an account.
 
-Revokes access to the media server and to the request service. Their watch history goes with the account — the media server offers no way to keep it — and the request service destroys what they asked for. Because none of that can be got back, it says what would go and does nothing until `--confirm`.
+Revokes access to the media server and to the request service. Their watch history goes with the account — the media server offers no way to keep it — and the request service destroys what they asked for. Because none of that can be got back, it says what would go, does nothing, and prints a name for that offer; answering with `--offer` and that name is the yes.
 
 Usage: lemonfiber remove [OPTIONS] <NAME>
 
@@ -17,11 +17,11 @@ Arguments:
           Whose account to take away, as `lemonfiber household` shows them
 
 Options:
-      --confirm
-          Go ahead and remove them, having seen what goes
-
       --json
           Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the reading that made it printed it
 
       --dry-run
           Say what would happen, and change nothing

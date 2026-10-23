@@ -8,16 +8,16 @@ Part of the [command reference](../commands.md).
 ```text
 Put the stack back to lemonfiber's own state, reverting every edit you made.
 
-The opposite of adopt: it discards your hand-edits to the stack files and restores lemonfiber's own. Because it throws work away, it names exactly what will be lost and does nothing until `--confirm` — run it once to see the diffs, again with `--confirm` to reset.
+The opposite of adopt: it discards your hand-edits to the stack files and restores lemonfiber's own. Because it throws work away, it names exactly what will be lost, does nothing, and prints a name for that offer — run it once to see the diffs, again with `--offer` and that name to reset.
 
 Usage: lemonfiber reset [OPTIONS]
 
 Options:
-      --confirm
-          Go ahead and revert, having seen what will be lost
-
       --json
           Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the reading that made it printed it
 
       --dry-run
           Say what would happen, and change nothing
