@@ -1,6 +1,6 @@
-use super::{describe, Endpoint};
-use lemonfiber_fixtures::http::Fake;
-use lemonfiber_ports::http::Response;
+use super::{describe, form_encoded, Endpoint};
+use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_ports::http::{Method, Request, Response};
 use lemonfiber_ports::service::Failure;
 
 fn answered(status: u16, body: impl Into<String>) -> Response {
@@ -9,6 +9,94 @@ fn answered(status: u16, body: impl Into<String>) -> Response {
         headers: Vec::new(),
         body: body.into(),
     }
+}
+
+fn unanswered() -> Endpoint {
+    Endpoint::new(Fake::silent(), "http://upstream", "upstream")
+}
+
+fn asking(url: String) -> Request {
+    Request {
+        method: Method::Get,
+        url,
+        headers: Vec::new(),
+        body: None,
+        pinned: None,
+    }
+}
+
+#[test]
+fn form_fields_are_encoded_in_order_with_reserved_characters_escaped() {
+    assert_eq!(
+        form_encoded(&[("name", "a b"), ("mode", "x&y=z")]),
+        "name=a+b&mode=x%26y%3Dz"
+    );
+    assert_eq!(form_encoded(&[]), "");
+}
+
+#[test]
+fn a_url_joins_the_path_to_the_base_without_doubling_its_slash() {
+    let endpoint = Endpoint::new(Fake::silent(), "http://upstream:8080//", "upstream");
+    assert_eq!(endpoint.url("/api/v3"), "http://upstream:8080/api/v3");
+    let endpoint = Endpoint::new(Fake::silent(), "http://upstream:8080", "upstream");
+    assert_eq!(endpoint.url("/api/v3"), "http://upstream:8080/api/v3");
+}
+
+#[tokio::test]
+async fn a_request_that_is_answered_comes_back_as_the_answer() {
+    let http = Fake::always(Answer::reply(204, "done"));
+    let endpoint = Endpoint::new(http.clone(), "http://upstream", "upstream");
+    let answer = endpoint.send(&asking(endpoint.url("/ping"))).await;
+    assert!(matches!(answer, Ok(Response { status: 204, ref body, .. }) if body == "done"));
+    assert!(http.asked_for("http://upstream/ping"));
+}
+
+#[tokio::test]
+async fn a_request_nothing_answers_is_the_service_not_answering() {
+    let endpoint = unanswered();
+    let answer = endpoint.send(&asking(endpoint.url("/ping"))).await;
+    assert!(matches!(answer, Err(Failure::Unavailable { service }) if service == "upstream"));
+}
+
+#[test]
+fn a_refused_credential_is_blamed_on_the_service_whatever_it_said() {
+    let endpoint = unanswered();
+    for status in [401, 403] {
+        let refusal = endpoint.refusal(&answered(status, "go away"));
+        assert!(
+            matches!(refusal, Failure::Unauthorised { ref service } if service == "upstream"),
+            "{status}: {refusal:?}"
+        );
+    }
+}
+
+#[test]
+fn any_other_failed_status_is_refused_in_the_services_own_words() {
+    let endpoint = unanswered();
+    let refusal = endpoint.refusal(&answered(500, "database is locked"));
+    assert!(matches!(refusal, Failure::Refused { service, detail }
+        if service == "upstream" && detail == "HTTP 500: database is locked"));
+}
+
+#[test]
+fn a_success_is_expected_and_anything_else_is_its_refusal() {
+    let endpoint = unanswered();
+    assert!(endpoint.expect_success(&answered(200, "")).is_ok());
+    assert!(matches!(
+        endpoint.expect_success(&answered(401, "")),
+        Err(Failure::Unauthorised { .. })
+    ));
+}
+
+#[test]
+fn a_json_answer_is_read_as_what_was_asked_for_only_when_it_succeeded() {
+    let endpoint = unanswered();
+    let read = endpoint.decode::<Vec<u32>>(&answered(200, "[1,2]"), "the list");
+    assert_eq!(read.ok(), Some(vec![1, 2]));
+    let refused = endpoint.decode::<Vec<u32>>(&answered(502, "bad gateway"), "the list");
+    assert!(
+        matches!(refused, Err(Failure::Refused { detail, .. }) if detail == "HTTP 502: bad gateway")
+    );
 }
 
 #[test]
@@ -127,7 +215,7 @@ fn a_json_answer_lends_a_refusal_only_its_message_never_the_fields_beside_it() {
 
 #[test]
 fn an_answer_in_the_wrong_shape_is_refused_without_quoting_what_it_held() {
-    let endpoint = Endpoint::new(Fake::silent(), "http://upstream", "upstream");
+    let endpoint = unanswered();
     let refused = endpoint.decode::<Vec<u32>>(&answered(200, r#"["a-key-held"]"#), "the list");
     assert!(matches!(refused, Err(Failure::Refused { detail, .. })
         if detail == "the list: the answer is not in the shape expected at line 1 column 13"));
