@@ -44,6 +44,17 @@
       "description": "Whether a monitored item matched the term at all — a false here is itself the\nanswer: nobody asked for it.",
       "type": "boolean"
     },
+    "searchable": {
+      "description": "What a search would spend to tell nothing at the quality from nothing at all,\nwhere the trace stopped at `monitored` with that open and a search would spend\nsomething.",
+      "anyOf": [
+        {
+          "$ref": "Searchable.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "stages": {
       "description": "The stages it passed through, in order.",
       "type": "array",

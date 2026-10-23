@@ -25,7 +25,7 @@ mod explaining;
 mod reading;
 
 use assembling::assemble;
-use explaining::{not_matched, searched, unexplained};
+use explaining::{not_matched, searchable, searched, unexplained};
 use reading::{
     account_explainable, asking, beside, library_presence, providers, troubles, Fragments, Reads,
 };
@@ -111,8 +111,12 @@ pub(crate) async fn trace(
                 reads,
             },
         );
-        if searching && unexplained(&report) {
-            searched(&mut report, &curator.name, asking(&service, kind).await);
+        if unexplained(&report) {
+            if searching {
+                searched(&mut report, &curator.name, asking(&service, kind).await);
+            } else if service.wants_any().await.unwrap_or(false) {
+                report.searchable = Some(searchable(&curator.name));
+            }
         }
         if let Some(reason) = account_explainable(&report) {
             let said = troubles(providers(ctx, &manifest).await);

@@ -259,3 +259,46 @@ fn problem(summary: &str) -> Problem {
         Remedy::new("do something"),
     )
 }
+
+/// A trace not allowed to ask the indexers, and what it came back saying.
+async fn unsearched(fake: &Fake) -> TraceReport {
+    trace(&ctx_with(fake), "expanse", None, false)
+        .await
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn a_trace_resting_at_monitored_says_what_a_search_would_spend_and_cover() {
+    let report = unsearched(&Fake::searching(MONITORED, ONE_WANTED, NO_RELEASES)).await;
+
+    assert_eq!(report.furthest, Stage::Monitored);
+    let reason = report.stall.clone().unwrap_or_default();
+    assert!(reason.contains("no search was run"), "{reason}");
+    let searchable = report
+        .searchable
+        .unwrap_or_else(|| unreachable!("no search was offered"));
+    assert!(
+        searchable.spends.contains("daily cap"),
+        "{}",
+        searchable.spends
+    );
+    assert!(
+        searchable.covers.contains("wanted list"),
+        "{}",
+        searchable.covers
+    );
+    assert!(
+        searchable.covers.contains("quality in force"),
+        "{}",
+        searchable.covers
+    );
+}
+
+#[tokio::test]
+async fn a_trace_a_search_would_spend_nothing_on_offers_none() {
+    let nothing_wanted = unsearched(&Fake::searching(MONITORED, NOTHING_WANTED, NO_RELEASES)).await;
+    let searched = searched_for(&Fake::searching(MONITORED, ONE_WANTED, NO_RELEASES)).await;
+
+    assert_eq!(nothing_wanted.searchable, None);
+    assert_eq!(searched.searchable, None);
+}

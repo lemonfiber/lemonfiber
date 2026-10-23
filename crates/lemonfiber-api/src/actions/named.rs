@@ -347,8 +347,8 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // changes it — the tunnel taken away to prove the killswitch, and a live
         // search spent against the indexers. A read that disturbed something would
         // not be a read, and a POST is the only door this surface has that is not one.
-        "diagnose" => widening(action, disruptive).and_then(|()| diagnosing(only)),
-        "search" => widening(action, disruptive).and_then(|()| following(term, season)),
+        "diagnose" => widening(action, disruptive.included()).and_then(|()| diagnosing(only)),
+        "search" => widening(action, disruptive.allowed()).and_then(|()| following(term, season)),
         // The offer and the yes are one action because they are one request read
         // twice: unconfirmed it says what each repair would do and what else
         // changes if it does, and confirmed it carries out what was agreed to.

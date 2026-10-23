@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "covers": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "spends": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
