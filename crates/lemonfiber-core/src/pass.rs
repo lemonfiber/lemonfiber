@@ -59,23 +59,23 @@ impl Watching {
     /// in it, where its id has the shape that path declares.
     #[must_use]
     pub fn stream<'a>(&self, path: &'a str) -> Option<&'a str> {
-        let (pattern, shape) = self
+        let (captured, shape) = self
             .paths
             .iter()
-            .find(|(pattern, _)| pattern.is_match(path))?;
-        let stream = pattern.captures(path)?.name(STREAM)?.as_str();
+            .find_map(|(pattern, shape)| Some((pattern.captures(path)?, shape)))?;
+        let stream = captured.name(STREAM)?.as_str();
         shape.is_match(stream).then_some(stream)
     }
 
-    /// Whether the request `forwarded` names carries, in its one `lfpass`, a pass `key`
-    /// confirms for the live stream its path names at `now`, in seconds since the Unix
-    /// epoch.
+    /// Whether the request `forwarded` names has a path the upstream reads only as
+    /// written and carries, in its one `lfpass`, a pass `key` confirms for the live stream
+    /// that path names at `now`, in seconds since the Unix epoch.
     #[must_use]
     pub fn confirms(&self, key: &Key, forwarded: &str, now: u64) -> bool {
-        if forwarded.contains('#') {
+        let (path, query) = forwarded.split_once('?').unwrap_or((forwarded, ""));
+        if forwarded.contains('#') || !normal(path) {
             return false;
         }
-        let (path, query) = forwarded.split_once('?').unwrap_or((forwarded, ""));
         let mut carried = query
             .split('&')
             .filter(|pair| pair.split_once('=').map_or(*pair, |(name, _)| name) == PARAMETER);
@@ -88,6 +88,22 @@ impl Watching {
         self.stream(path)
             .is_some_and(|stream| key.confirms(pass, stream, now))
     }
+}
+
+/// Whether `path` is one the upstream reads only as written: starting at `/`, with no
+/// percent-encoding, `;` parameter, backslash, doubled slash, control character,
+/// whitespace or dot segment.
+fn normal(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.contains("//")
+        && !path.chars().any(|character| {
+            matches!(character, '%' | ';' | '\\')
+                || character.is_control()
+                || character.is_whitespace()
+        })
+        && path
+            .split('/')
+            .all(|segment| segment != "." && segment != "..")
 }
 
 #[cfg(test)]

@@ -69,12 +69,14 @@ fn held(config: &Path) -> Result<Held, String> {
     Ok(Held { key, watching })
 }
 
-/// `204` where the forwarded request's pass is good for the live stream its path names,
-/// and `403` for anything else, a request naming none included.
+/// The guard's question, answered at this moment.
 async fn answer(State(held): State<Arc<Held>>, headers: HeaderMap) -> StatusCode {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(u64::MAX, |since| since.as_secs());
+    answered(&held, &headers, now())
+}
+
+/// `204` where the request `headers` forward carries a pass good at `now` for the live
+/// stream its path names, and `403` for anything else, a request naming none included.
+fn answered(held: &Held, headers: &HeaderMap, now: u64) -> StatusCode {
     let confirmed = headers
         .get(FORWARDED)
         .and_then(|forwarded| forwarded.to_str().ok())
@@ -84,6 +86,14 @@ async fn answer(State(held): State<Arc<Held>>, headers: HeaderMap) -> StatusCode
     } else {
         StatusCode::FORBIDDEN
     }
+}
+
+/// This moment, in seconds since the Unix epoch; a clock before the epoch reads as the
+/// last moment there is, which no pass outlives.
+fn now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(u64::MAX, |since| since.as_secs())
 }
 
 #[cfg(test)]

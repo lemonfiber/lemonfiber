@@ -46,6 +46,31 @@ fn a_pass_for_another_live_stream_or_a_path_naming_none_is_refused() {
 }
 
 #[test]
+fn a_path_the_upstream_could_read_otherwise_is_refused() {
+    let pass = key().issue(STREAM, "member-1", NOW);
+    for path in [
+        format!("live/{STREAM}/s.ts"),
+        format!("/live/{STREAM}/../zzz999/s.ts"),
+        format!("/live/{STREAM}/./s.ts"),
+        format!("/live/{STREAM}/s.ts/.."),
+        format!("/live/{STREAM}//s.ts"),
+        format!("/live/{STREAM}/%2e%2e/s.ts"),
+        format!("/live/{STREAM}/..\\zzz999/s.ts"),
+        format!("/live/{STREAM}/s.ts;x"),
+        format!("/live/{STREAM}/s\u{7f}.ts"),
+        format!("/live/{STREAM}/s\n.ts"),
+        format!("/live/{STREAM}/s .ts"),
+        format!("/live/{STREAM}/s\u{a0}.ts"),
+    ] {
+        assert!(
+            !watching().confirms(&key(), &format!("{path}?lfpass={pass}"), NOW),
+            "{path:?}"
+        );
+    }
+    assert!(watching().confirms(&key(), &format!("/live/{STREAM}/s.ts?lfpass={pass}"), NOW));
+}
+
+#[test]
 fn a_pass_anywhere_but_one_lfpass_is_refused() {
     let pass = key().issue(STREAM, "member-1", NOW);
     for carried in [
