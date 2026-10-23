@@ -254,6 +254,11 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
     // materialised rather than after, so a run that is going to be refused does not
     // rewrite anything on the way to saying so.
     verified(ctx).await?;
+    let passing = if starts(action) {
+        pass_readied(ctx).await
+    } else {
+        None
+    };
 
     let Composed {
         manifest,
@@ -310,6 +315,7 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
             Vec::new()
         },
         swept: sweep.networks.clone(),
+        passing,
     };
     Ok(Readied {
         manifest,
@@ -318,6 +324,16 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         sweep,
         copies,
     })
+}
+
+/// Ready the pass service before a start writes the project that runs it, and say why it
+/// is left out where it is. A rehearsal pins and makes nothing.
+async fn pass_readied(ctx: &Ctx) -> Option<String> {
+    if ctx.dry_run {
+        return None;
+    }
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    super::project::pass_readied(ctx, &manifest).await
 }
 
 /// What a lifecycle command settled before anything runs.

@@ -50,6 +50,15 @@ const MEDIA_SUBNET: Subnet = Subnet {
 /// trusts to name a client.
 pub const DOOR_ON_MEDIA: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 18);
 
+/// The subnet the pass service and the guard share, which nothing else joins.
+const PASS_SUBNET: Subnet = Subnet {
+    whole: (Ipv4Addr::new(10, 80, 96, 32), 28),
+    handed_out: (Ipv4Addr::new(10, 80, 96, 40), 29),
+};
+
+/// The pass service's fixed address there, the one it answers at and the guard asks.
+pub const PASS_ON_PASS: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 34);
+
 /// One service, as its place on the project's networks needs it.
 #[derive(Debug, Clone, Copy)]
 pub struct Member<'a> {
@@ -131,6 +140,17 @@ impl Topology {
             })
             .then_some(DOOR_ON_MEDIA)
     }
+
+    /// Where the guard asks the pass service about a pass, where the project runs one.
+    #[must_use]
+    pub fn pass(&self) -> Option<std::net::SocketAddr> {
+        let Some(Placed::On(on)) = self.placed.get(crate::pass::SERVICE) else {
+            return None;
+        };
+        on.values()
+            .any(|held| *held == Some(PASS_ON_PASS))
+            .then(|| std::net::SocketAddr::from((PASS_ON_PASS, crate::pass::PORT)))
+    }
 }
 
 /// The networks `members` need for `asks` and `links`, `guard` being the service that
@@ -189,6 +209,16 @@ pub fn derived(
         networks.insert(name.clone(), internal(fixed.map(|fixed| fixed.subnet)));
         join(&name, &asker, fixed.map(|fixed| fixed.asker));
         join(&name, &reached, fixed.and_then(|fixed| fixed.reached));
+    }
+    if let Some(guard) = guard.as_deref().filter(|_| {
+        members
+            .iter()
+            .any(|member| member.id == crate::pass::SERVICE)
+    }) {
+        let name = named(&["pass", guard]);
+        networks.insert(name.clone(), internal(Some(PASS_SUBNET)));
+        join(&name, crate::pass::SERVICE, Some(PASS_ON_PASS));
+        join(&name, guard, None);
     }
     for link in links {
         let (by, to) = (host(link.by), host(link.to));

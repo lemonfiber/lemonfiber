@@ -18,6 +18,7 @@ pub(crate) struct Resolved {
     render_group: Option<u32>,
     moved: Vec<crate::model::MovedReport>,
     name: String,
+    pass: Option<String>,
 }
 
 impl Resolved {
@@ -45,6 +46,7 @@ impl Resolved {
             recorded,
             changing: None,
             name: ctx.settings.project.clone(),
+            pass: crate::app::project::pinned(ctx),
             files: files_of(ctx),
             nfs: ctx.settings.nfs.clone(),
             fillers: manifest.map(|manifest| {
@@ -127,6 +129,7 @@ impl Resolved {
             moved: &self.moved,
             name: &self.name,
             operator: &operator,
+            pass: self.pass.as_deref(),
         })
     }
 }

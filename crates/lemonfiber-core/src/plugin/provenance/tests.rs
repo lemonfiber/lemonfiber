@@ -233,6 +233,13 @@ impl lemonfiber_ports::registry::Registry for Answering {
     async fn signatures(&self, _image: &Image) -> Result<Vec<Offered>, Unanswerable> {
         self.0.clone()
     }
+
+    async fn digest(
+        &self,
+        _tagged: &lemonfiber_ports::registry::Tagged,
+    ) -> Result<Option<String>, Unanswerable> {
+        Ok(None)
+    }
 }
 
 /// A manifest pinning one image, in the shape a plugin's source takes.

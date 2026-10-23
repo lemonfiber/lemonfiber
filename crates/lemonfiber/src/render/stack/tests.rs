@@ -71,6 +71,20 @@ fn a_lifecycle_report_names_the_command_the_drops_and_the_edits_it_kept() {
     assert!(text.contains("-a"));
 }
 
+#[test]
+fn a_start_that_leaves_the_pass_service_out_says_why() {
+    let report = LifecycleReport {
+        status: Some(0),
+        passing: Some("no image of lemonfiber 0.0.0 is published".to_owned()),
+        ..a_lifecycle("up", a_plan("media", Vec::new()))
+    };
+    let text = lifecycle(&report).text();
+    assert!(
+        text.contains("left out: pass — no image of lemonfiber 0.0.0 is published"),
+        "{text}"
+    );
+}
+
 /// Told before the bind fails, and told as a fact rather than a refusal.
 #[test]
 fn a_port_something_else_holds_is_named_on_both_sides_before_the_start() {

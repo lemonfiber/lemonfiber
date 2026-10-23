@@ -262,6 +262,12 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     // Saying what was left out, and that it was deliberate, before the operator
     // goes looking for a service that was never going to start.
     lines.extend(left_out(&report.plan));
+    if let Some(passing) = &report.passing {
+        lines.put(format!(
+            "left out: {} — {passing}",
+            lemonfiber_core::pass::SERVICE
+        ));
+    }
 
     if let Some(condition) = report.condition {
         lines.spaced(describe(condition));

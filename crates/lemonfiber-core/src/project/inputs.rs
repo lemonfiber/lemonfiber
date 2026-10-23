@@ -68,8 +68,13 @@ impl Inputs {
 }
 
 /// The inputs `manifest`'s services and `installed`'s, wired as `chosen` settles them,
-/// come to.
-pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Inputs {
+/// come to, with the pass service among them where `pass` is pinned and a guard is filled.
+pub(super) fn read(
+    manifest: &Manifest,
+    installed: &[Installed],
+    chosen: &Chosen,
+    pass: bool,
+) -> Inputs {
     let fill = |capability: &str| filler(manifest, installed, chosen, capability);
     let mut members: Vec<Standing> = written(manifest, installed)
         .map(|service| Standing {
@@ -111,6 +116,16 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
             standing.publishes = true;
         }
     }
+    let guard = fill(guard::CAPABILITY);
+    if pass && guard.is_some() {
+        members.push(Standing {
+            id: crate::pass::SERVICE.to_owned(),
+            confined: true,
+            publishes: false,
+            inside: None,
+            fronts: None,
+        });
+    }
     let mut asks = Vec::new();
     let mut links = Vec::new();
     for wired in settle(manifest, installed, chosen) {
@@ -133,7 +148,7 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
         members,
         asks,
         links,
-        guard: fill(guard::CAPABILITY),
+        guard,
     }
 }
 

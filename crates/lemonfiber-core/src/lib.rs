@@ -171,3 +171,6 @@ pub mod wizard;
 
 /// The name of the product, as it appears to users.
 pub const PRODUCT: &str = "lemonfiber";
+
+/// Where this project's own image is published, each release under its version.
+pub const IMAGE: &str = "ghcr.io/lemonfiber/lemonfiber";

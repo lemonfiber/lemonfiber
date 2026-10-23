@@ -89,6 +89,10 @@ pub struct LifecycleReport {
     /// named and left by a rehearsal. Empty for every other action.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub swept: Vec<String>,
+    /// Why the pass service is left out of the project a start writes, where the stream
+    /// guard is filled and it is. Absent for every other action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passing: Option<String>,
 }
 
 /// The operator's own overlay, named because nothing in it was held to the model.

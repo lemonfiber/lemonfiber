@@ -68,6 +68,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     // they do. It does not go through the one they share, which is exactly how a
     // guard comes to hold everywhere but the path nobody remembered.
     super::verified(ctx).await?;
+    let passing = super::pass_readied(ctx).await;
 
     let Composed {
         manifest,
@@ -138,6 +139,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         unvetted: crate::overlay::unvetted(ctx),
         moves: Vec::new(),
         swept: sweep.networks.clone(),
+        passing,
     };
 
     if ctx.dry_run {

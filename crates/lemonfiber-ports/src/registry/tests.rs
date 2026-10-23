@@ -1,4 +1,4 @@
-use super::{Image, Offered, Unanswerable};
+use super::{is_digest, Image, Offered, Tagged, Unanswerable};
 
 #[test]
 fn an_image_is_a_repository_and_the_digest_that_fixes_it() {
@@ -31,4 +31,22 @@ fn what_is_offered_is_the_bytes_and_nothing_read_out_of_them() {
     };
     assert_eq!(offered.payload, "{}");
     assert_eq!(offered.signature, vec![1, 2, 3]);
+}
+
+#[test]
+fn a_tag_that_could_not_be_asked_about_names_the_repository_and_the_tag() {
+    let said = Unanswerable::about_tag(&Tagged::new("ghcr.io/x/y", "1.2.3"), "refused").to_string();
+    assert!(said.contains("ghcr.io/x/y"), "{said}");
+    assert!(said.contains("1.2.3"), "{said}");
+    assert!(said.contains("refused"), "{said}");
+}
+
+const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+
+#[test]
+fn a_digest_is_sha256_in_lowercase_hex() {
+    assert!(is_digest(DIGEST));
+    assert!(!is_digest(&DIGEST.to_uppercase()));
+    assert!(!is_digest(DIGEST.get(..70).unwrap_or_default()));
+    assert!(!is_digest("sha512:00"));
 }

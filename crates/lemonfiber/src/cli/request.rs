@@ -500,10 +500,10 @@ pub enum Request {
     ///
     /// Run by the stack as a service of its own, holding the pass key read-only, and
     /// never by hand.
-    #[command(hide = true)]
+    #[command(hide = true, name = lemonfiber_core::pass::REQUEST)]
     Pass {
         /// The directory holding the pass key and the media server's live-stream paths.
-        #[arg(long, value_name = "PATH", default_value = "/config")]
+        #[arg(long, value_name = "PATH", default_value = lemonfiber_core::pass::CONFIGURATION)]
         config: PathBuf,
         /// The address to answer at: the service's own on the network it shares with the
         /// guard.

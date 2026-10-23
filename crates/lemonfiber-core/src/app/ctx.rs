@@ -332,6 +332,13 @@ impl Ctx {
         self
     }
 
+    /// The same context, asking the given seam what a container registry publishes.
+    #[must_use]
+    pub fn with_registry(mut self, registry: Arc<dyn crate::ports::registry::Registry>) -> Self {
+        self.seams.registry = registry;
+        self
+    }
+
     /// The same context, running an image's own program through the given seam.
     #[must_use]
     pub fn with_program(mut self, program: Arc<dyn crate::ports::program::Program>) -> Self {

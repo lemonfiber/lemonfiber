@@ -6,7 +6,7 @@ use lemonfiber_contract::capabilities::proxy::front::CAPABILITY as PROXY_FRONT;
 
 use super::{
     derived, Block, Member, Named, Placed, Settled, Topology, DOOR_ON_MEDIA, DOOR_ON_PROXY,
-    MEDIA_SUBNET, PROXY_ON_PROXY, PROXY_SUBNET,
+    MEDIA_SUBNET, PASS_ON_PASS, PROXY_ON_PROXY, PROXY_SUBNET,
 };
 
 const fn member(id: &str) -> Member<'_> {
@@ -352,4 +352,48 @@ fn two_different_asks_never_spell_one_network() {
     assert_eq!(asked.len(), 2, "{asked:?}");
     assert_eq!(super::named(&["a_b", "c"]), "a_5f_b__c");
     assert_ne!(super::named(&["a", "b__c"]), super::named(&["a__b", "c"]));
+}
+
+#[test]
+fn the_pass_service_shares_one_network_with_the_guard_and_nothing_else() {
+    let door = Member {
+        confined: true,
+        publishes: true,
+        ..member("door")
+    };
+    let pass = Member {
+        confined: true,
+        ..member(crate::pass::SERVICE)
+    };
+    let members = [door, pass, member("caddy")];
+    let asks = [ask("door", PROXY_FRONT, "caddy")];
+
+    let guarded = derived(&members, &asks, &[], Some("door"));
+    let unguarded = derived(&members, &asks, &[], None);
+
+    assert_eq!(
+        on(&guarded, crate::pass::SERVICE),
+        BTreeMap::from([("pass__door".to_owned(), Some(PASS_ON_PASS))])
+    );
+    assert_eq!(on(&guarded, "door").get("pass__door"), Some(&None));
+    assert_eq!(
+        joined(&guarded).get("pass__door"),
+        Some(&BTreeSet::from([
+            "door".to_owned(),
+            crate::pass::SERVICE.to_owned()
+        ]))
+    );
+    assert!(guarded
+        .networks
+        .get("pass__door")
+        .is_some_and(|network| network.internal && !network.masquerade));
+    assert_eq!(
+        guarded.pass(),
+        Some(std::net::SocketAddr::from((
+            PASS_ON_PASS,
+            crate::pass::PORT
+        )))
+    );
+    assert_eq!(unguarded.pass(), None);
+    assert!(!unguarded.networks.contains_key("pass__door"));
 }

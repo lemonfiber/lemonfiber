@@ -231,3 +231,19 @@ fn disturbing_the_stack_while_repairing_is_its_own_flag() {
         Some((false, true))
     );
 }
+
+#[test]
+fn the_command_the_project_starts_the_pass_service_with_is_one_this_parser_reads() {
+    let at = std::net::SocketAddr::from(([10, 80, 96, 34], 8090));
+    let line = std::iter::once("lemonfiber".to_owned()).chain(lemonfiber_core::pass::command(at));
+    let read = Cli::try_parse_from(line).ok().and_then(|cli| cli.command);
+    assert!(
+        matches!(
+            read,
+            Some(Request::Pass { ref config, listen })
+                if listen == at
+                    && config.as_path() == std::path::Path::new(lemonfiber_core::pass::CONFIGURATION)
+        ),
+        "{read:?}"
+    );
+}
