@@ -132,3 +132,21 @@ fn a_starting_file_is_planned_only_where_the_service_holds_none_yet() {
         ]
     );
 }
+
+#[test]
+fn a_services_starting_files_hold_no_more_placeholders_in_all_than_it_may() {
+    let text = "{{secret:api-key}}\n".repeat(9);
+    let shipped = |service: &str, path: &str| Shipped {
+        service: service.to_owned(),
+        path: path.to_owned(),
+        bytes: text.clone().into_bytes(),
+    };
+    let said = super::crowded(&[
+        shipped("komga", "a.ini"),
+        shipped("komga", "b.ini"),
+        shipped("adapter", "c.ini"),
+    ]);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(said.iter().all(|one| one.location == "config/komga"
+        && one.message.contains("holds 18 placeholders, past the 16")));
+}

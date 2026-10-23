@@ -199,6 +199,11 @@ fn seeded(
             .map(str::to_owned)
     };
     let unwritten = |why: String| Box::new(unwritable(&write.path, &why));
+    let escaped = super::super::project::directory(ctx)
+        .is_none_or(|stack| ctx.seams.confined.lies(&write.path, &stack) == Lying::Escaped);
+    if escaped {
+        return Err(unwritten(LINKED.to_owned()));
+    }
     match &write.lands {
         crate::plugin::Lands::Starting { bytes, seeded } => {
             let bytes = crate::plugin::seeding::written(bytes, &held, ctx.seams.random.as_ref())

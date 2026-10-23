@@ -137,3 +137,29 @@ async fn a_starting_file_naming_a_secret_the_plugin_does_not_hold_is_refused_bef
     );
     assert_eq!(minted(&ctx), None);
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_seeded_file_reached_through_a_link_the_service_planted_is_not_written() {
+    let ctx = seeding("seeded-linked");
+    let at = shipped("seeded-linked");
+    let _ = std::fs::create_dir_all(at.join("config/komga/conf"));
+    let _ = std::fs::write(
+        at.join("config/komga/conf/application.yml"),
+        "api-key: {{secret:upstream-key}}\n",
+    );
+    let elsewhere = lemonfiber_fixtures::scratch::Scratch::new("seeded-linked-elsewhere");
+    let config = stack_of(&ctx).join("config/komga");
+    let _ = std::fs::create_dir_all(&config);
+    let _ = std::os::unix::fs::symlink(elsewhere.path(), config.join("conf"));
+
+    let problem = installing(&ctx, &at).await.err();
+    assert!(
+        problem
+            .as_ref()
+            .and_then(|problem| problem.detail.as_deref())
+            .is_some_and(|said| said.contains("link")),
+        "{problem:?}"
+    );
+    assert!(!elsewhere.path().join("application.yml").exists());
+}

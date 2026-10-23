@@ -77,3 +77,11 @@ fn a_starting_file_names_only_secrets_of_the_plugins_own_services() {
         );
     }
 }
+
+#[test]
+fn a_file_holding_more_placeholders_than_a_service_may_is_refused() {
+    let text = "k = {{secret:one}}\n".repeat(super::MOST_PLACEHOLDERS + 1);
+    assert!(placeholders(&text).is_err_and(|why| why.contains("more than 16 placeholders")));
+    let most = "k = {{secret:one}}\n".repeat(super::MOST_PLACEHOLDERS);
+    assert!(placeholders(&most).is_ok_and(|named| named.len() == super::MOST_PLACEHOLDERS));
+}

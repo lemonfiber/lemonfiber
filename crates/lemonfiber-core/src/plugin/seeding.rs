@@ -12,7 +12,7 @@ use std::num::NonZeroU32;
 use std::path::Path;
 
 use base64::Engine as _;
-use lemonfiber_plugin::seeding::{filled, placeholders, Form};
+use lemonfiber_plugin::seeding::{filled, placeholders, Form, MOST_PLACEHOLDERS};
 use lemonfiber_plugin::{Manifest, Violation};
 use lemonfiber_ports::random::Random;
 
@@ -71,7 +71,8 @@ pub fn shipped<'a>(
     Ok(found)
 }
 
-/// What is wrong with any of the starting files `shipped` against `manifest`.
+/// What is wrong with any of the starting files `shipped` against `manifest`, each file on
+/// its own and each service's files together.
 #[must_use]
 pub fn refused(manifest: &Manifest, shipped: &[Shipped]) -> Vec<Violation> {
     shipped
@@ -79,7 +80,35 @@ pub fn refused(manifest: &Manifest, shipped: &[Shipped]) -> Vec<Violation> {
         .flat_map(|file| {
             lemonfiber_plugin::seeding::refused(manifest, &file.service, &file.path, &file.bytes)
         })
+        .chain(crowded(shipped))
         .collect()
+}
+
+/// Each service whose starting files hold more placeholders in all than one may.
+fn crowded(shipped: &[Shipped]) -> Vec<Violation> {
+    let mut counted: BTreeMap<&str, usize> = BTreeMap::new();
+    for file in shipped {
+        *counted.entry(&file.service).or_default() += named(&file.bytes);
+    }
+    counted
+        .into_iter()
+        .filter(|(_, count)| *count > MOST_PLACEHOLDERS)
+        .map(|(service, count)| Violation {
+            location: format!("config/{service}"),
+            message: format!(
+                "holds {count} placeholders, past the {MOST_PLACEHOLDERS} a service's starting \
+                 files may hold"
+            ),
+        })
+        .collect()
+}
+
+/// How many placeholders `bytes` hold, none where they are not text or cannot be read.
+fn named(bytes: &[u8]) -> usize {
+    std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|text| placeholders(text).ok())
+        .map_or(0, |named| named.len())
 }
 
 /// Whether `bytes` name a secret, and so are written with its value, owner-only.

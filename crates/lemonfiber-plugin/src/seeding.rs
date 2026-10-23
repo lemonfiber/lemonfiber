@@ -20,6 +20,13 @@ pub const CLOSES: &str = "}}";
 /// What separates the secret a placeholder names from the form it asks for.
 pub const FORMED: char = '|';
 
+/// The most placeholders one service's starting files may hold in all.
+///
+/// Each is written when the service is installed and again whenever its secret is
+/// replaced, and its hashed form is a hundred thousand rounds of PBKDF2, so a file of
+/// them would be a manifest that holds an install up rather than one that configures it.
+pub const MOST_PLACEHOLDERS: usize = 16;
+
 /// The form a placeholder asks its secret to be written in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
@@ -90,6 +97,12 @@ pub fn placeholders(text: &str) -> Result<Vec<Placeholder<'_>>, String> {
             form,
             span: start..end,
         });
+        if found.len() > MOST_PLACEHOLDERS {
+            return Err(format!(
+                "has more than {MOST_PLACEHOLDERS} placeholders, the most a service's \
+                 starting files may hold"
+            ));
+        }
         from = end;
     }
     Ok(found)
