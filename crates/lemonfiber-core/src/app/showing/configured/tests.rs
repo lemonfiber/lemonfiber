@@ -191,6 +191,26 @@ async fn a_panel_list_homepage_would_expand_is_refused_and_nothing_is_written() 
     }
 }
 
+#[tokio::test]
+async fn a_file_that_is_a_link_is_neither_read_nor_written_through() {
+    for (named, key) in [("services", SERVICES), ("widgets", WIDGETS)] {
+        let (scratch, homepage) = homepage(&format!("homepage-linked-{named}"));
+        let elsewhere = scratch.path().join("elsewhere.yaml");
+        let _ = std::fs::write(&elsewhere, SHIPPED);
+        let at = scratch.path().join(key);
+        let _ = std::fs::remove_file(&at);
+        let _ = std::os::unix::fs::symlink(&elsewhere, &at);
+
+        assert!(homepage.panels().await.is_err(), "{key}");
+        assert!(homepage.apply(&panels()).await.is_err(), "{key}");
+        assert_eq!(
+            std::fs::read_to_string(&elsewhere).ok().as_deref(),
+            Some(SHIPPED),
+            "{key}"
+        );
+    }
+}
+
 #[test]
 fn either_file_declared_unmanaged_is_the_dashboard_unmanaged() {
     let declared = |area: &str| vec![(area.to_owned(), "mine".to_owned())];

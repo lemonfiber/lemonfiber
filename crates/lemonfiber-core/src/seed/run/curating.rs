@@ -2,6 +2,8 @@
 //!
 //! Everything a single curator needs pointed at it, and the order it has to happen in.
 
+use std::collections::BTreeMap;
+
 use lemonfiber_contract::capabilities::library::curate;
 
 use super::clients::Held;
@@ -12,7 +14,7 @@ use super::{
 };
 use crate::app::targets::{spoken, Spoken};
 use crate::doctor::credentials::Reach;
-use crate::ports::service::{Client, DownloadClient};
+use crate::ports::service::{Client, DownloadClient, RootFolder};
 use crate::wiring::{Filler, Fillers};
 
 /// A service that files media, as the core asks it.
@@ -70,6 +72,17 @@ pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
         .collect()
 }
 
+/// The root folders more than one of `curating` wants, each with the curators wanting it:
+/// two curators on one folder would each rewrite the other's files, so such a folder is
+/// refused rather than wired.
+pub(super) fn contested(curating: &[Curator<'_>]) -> BTreeMap<String, Vec<String>> {
+    let claims: Vec<(&str, Vec<RootFolder>)> = curating
+        .iter()
+        .map(|curator| (curator.name(), wanted_roots(curator.media_types())))
+        .collect();
+    crate::seed::contested_roots(claims.iter().map(|(name, roots)| (*name, roots.as_slice())))
+}
+
 /// The inputs a seed pass reads once and hands to every curator it seeds: the
 /// contested-root map across every curator, who fills each ask and the credential each
 /// download client answers to, the host data root each root folder is checked against,
@@ -78,7 +91,7 @@ pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
 /// `curator` varies across.
 pub(super) struct CuratorSeeding<'a> {
     /// Root-folder paths more than one curator wants — refused rather than wired.
-    pub(super) contested: &'a std::collections::BTreeMap<String, Vec<String>>,
+    pub(super) contested: &'a BTreeMap<String, Vec<String>>,
     /// Who fills each of the stack's asks, and where each is reached.
     pub(super) fillers: &'a Fillers,
     /// The credential each download client answers to, where it is in hand.

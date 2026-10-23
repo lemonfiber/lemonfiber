@@ -196,6 +196,28 @@ fn an_assembled_part_whose_wiring_names_no_entry_carries_no_dashboard_table() {
 }
 
 #[test]
+fn an_assembled_part_takes_its_entry_from_the_wiring_naming_its_service() {
+    let wired = format!(
+        "{CURATOR}\n[[wiring]]\nservice = \"other\"\ndashboard_icon = \"other.png\"\n\n\
+         [[wiring]]\nservice = \"curator\"\ndashboard_icon = \"sonarr.png\"\n"
+    );
+    let service = only_service(&stack(&[held("curator", &wired, Stage::Assembled)]));
+    let icon = service
+        .get("dashboard")
+        .and_then(|dashboard| dashboard.get("icon"))
+        .and_then(toml::Value::as_str);
+    assert_eq!(icon, Some("sonarr.png"));
+}
+
+#[test]
+fn an_assembled_part_whose_wirings_name_other_services_carries_no_dashboard_table() {
+    let wired =
+        format!("{CURATOR}\n[[wiring]]\nservice = \"other\"\ndashboard_icon = \"other.png\"\n");
+    let service = only_service(&stack(&[held("curator", &wired, Stage::Assembled)]));
+    assert!(service.get("dashboard").is_none());
+}
+
+#[test]
 fn the_assembly_reads_back_as_a_stack_manifest() {
     let Ok(text) = assembled(
         BUNDLE,
@@ -242,13 +264,16 @@ fn each_part_that_cannot_be_a_stack_service_is_refused_saying_why() {
 }
 
 #[test]
-fn a_word_the_plugin_leaves_out_and_an_ask_naming_no_capability_are_not_written() {
+fn a_word_the_plugin_leaves_out_and_an_ask_naming_no_capability_by_name_are_not_written() {
     let sparse = CURATOR
         .replace(
             "without_it  = \"Find and download episodes yourself\"\n",
             "",
         )
-        .replace("[[claim]]", "[[ask]]\neach = true\n\n[[claim]]");
+        .replace(
+            "[[claim]]",
+            "[[ask]]\neach = true\n\n[[ask]]\ncapability = 7\n\n[[claim]]",
+        );
     let written = stack(&[held("curator", &sparse, Stage::Assembled)]);
     let whole = stack(&[held("curator", CURATOR, Stage::Assembled)]);
     assert!(only_service(&written).get("without_it").is_none());

@@ -91,8 +91,8 @@ impl Configured {
                 "the panel list carries {what}, which Homepage would expand from its environment"
             )));
         }
-        self.write(SERVICES, &written(&services(panels))?)?;
-        self.write(WIDGETS, &written(&widgets(panels))?)
+        self.write(SERVICES, &written(&services(panels)))?;
+        self.write(WIDGETS, &written(&widgets(panels)))
     }
 
     /// The panel list Homepage's files hold.
@@ -299,10 +299,8 @@ fn expanded(panels: &Panels) -> Option<&'static str> {
 }
 
 /// `value` as the file holds it.
-fn written(value: &impl Serialize) -> Result<String, Failure> {
-    serde_json::to_string_pretty(value)
-        .map(|text| text + "\n")
-        .map_err(|failure| refused(failure.to_string()))
+fn written(value: &impl Serialize) -> String {
+    serde_json::to_string_pretty(value).unwrap_or_default() + "\n"
 }
 
 /// Homepage's files would not take what it was told, for `why`.

@@ -5,8 +5,10 @@ use std::path::Path;
 
 use lemonfiber_ports::service::Panels;
 
-use super::Ctx;
+use super::{withheld, withheld_brought, Ctx};
 use crate::app::showing;
+use crate::app::targets::{chosen_fillers, project_directory};
+use crate::plugin::Installed;
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
@@ -14,11 +16,12 @@ use crate::wiring::Fillers;
 /// no service to do it.
 pub(super) const CONNECTION: &str = "The dashboard's panels";
 
-/// Hold the dashboard to the panel list for the stack's `services` and every installed
-/// plugin's.
+/// Hold the dashboard to the panel list for the stack's `services` and those of the
+/// `installed` plugins.
 pub(super) async fn seed_dashboard(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    installed: &[Installed],
     fillers: &Fillers,
     project: Option<&Path>,
 ) -> Option<Wiring> {
@@ -37,12 +40,10 @@ pub(super) async fn seed_dashboard(
         Ok(search) => search,
         Err(detail) => return Some(settled(State::Failed { detail })),
     };
-    let register =
-        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
     let named = ctx.site.name().await;
     let wanted = showing::panels::panels(
         services,
-        register.installed(),
+        installed,
         fillers,
         &crate::door::run::place(ctx, named.as_deref()),
         &search,
@@ -70,15 +71,29 @@ pub(super) async fn seed_dashboard(
 }
 
 /// Apply the dashboard the panel list again, as a change to what it is made from owes it,
-/// and say how that came out: nothing where the stack cannot be read or runs no dashboard.
+/// as a seed pass does it, and say how that came out: nothing where the stack or the
+/// record of what is installed cannot be read, or no dashboard is there to apply.
 pub(crate) async fn reshow(ctx: &Ctx) -> Option<State> {
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let fillers = crate::app::targets::fillers_here(ctx, &manifest);
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    seed_dashboard(ctx, &manifest.services, &fillers, project.as_deref())
-        .await
-        .map(|wiring| wiring.state)
+    let mut manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let _ = withheld(&mut manifest.services, &ctx.settings.unmanaged);
+    let register = crate::app::plugins::read(ctx).ok()?;
+    let (installed, _) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = Fillers::of(
+        &manifest,
+        &installed,
+        &chosen_fillers(ctx),
+        project.as_deref(),
+    );
+    seed_dashboard(
+        ctx,
+        &manifest.services,
+        &installed,
+        &fillers,
+        project.as_deref(),
+    )
+    .await
+    .map(|wiring| wiring.state)
 }
 
 /// A panel list by how much it shows.

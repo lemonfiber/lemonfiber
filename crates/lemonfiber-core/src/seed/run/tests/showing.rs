@@ -1,6 +1,6 @@
 //! The dashboard, applied the panel list for every service on the machine.
 
-use super::super::showing::seed_dashboard;
+use super::super::showing::{reshow, seed_dashboard};
 use super::*;
 
 /// The shipped services file the dashboard starts with.
@@ -45,7 +45,7 @@ fn services_file(scratch: &lemonfiber_fixtures::scratch::Scratch) -> String {
 async fn seeded(ctx: &Ctx, project: &std::path::Path) -> Option<State> {
     let services = carried();
     let fillers = fillers_at(services.clone(), project);
-    seed_dashboard(ctx, &services, &fillers, Some(project))
+    seed_dashboard(ctx, &services, &[], &fillers, Some(project))
         .await
         .map(|wiring| wiring.state)
 }
@@ -62,6 +62,27 @@ async fn the_dashboard_is_applied_the_panel_list_once_and_then_holds_it() {
         Some(State::AlreadyWired)
     );
     assert_eq!(services_file(&scratch), written);
+}
+
+#[tokio::test]
+async fn the_dashboard_is_applied_again_over_the_stack_and_what_is_installed() {
+    let (scratch, mut ctx) = dashboard("dashboard-reshown", false);
+
+    assert_eq!(reshow(&ctx).await, Some(State::Wired));
+
+    ctx.settings.unmanaged = vec![("homepage".to_owned(), "mine".to_owned())];
+    assert_eq!(reshow(&ctx).await, None);
+    ctx.settings.unmanaged.clear();
+
+    let _ = std::fs::write(
+        scratch.path().join(crate::config::paths::PLUGINS),
+        "not a register",
+    );
+    assert_eq!(reshow(&ctx).await, None);
+
+    let mut stackless = ctx;
+    stackless.stack = crate::test_support::nowhere();
+    assert_eq!(reshow(&stackless).await, None);
 }
 
 #[tokio::test]
@@ -123,11 +144,11 @@ async fn a_stack_running_no_dashboard_is_not_asked() {
     let fillers = fillers_at(services.clone(), scratch.path());
 
     assert!(
-        seed_dashboard(&ctx, &services, &fillers, Some(scratch.path()))
+        seed_dashboard(&ctx, &services, &[], &fillers, Some(scratch.path()))
             .await
             .is_none()
     );
-    assert!(seed_dashboard(&ctx, &services, &fillers, None)
+    assert!(seed_dashboard(&ctx, &services, &[], &fillers, None)
         .await
         .is_none());
 }
@@ -183,7 +204,7 @@ async fn a_first_party_dashboard_speaking_the_contract_is_applied_the_panel_list
     let ctx = contracted_ctx(&project, SHOWER, true, http.clone());
     let fillers = beside(&project, true, &SHOWER_TRUSTED);
 
-    let state = seed_dashboard(&ctx, &undashboarded(), &fillers, Some(&project))
+    let state = seed_dashboard(&ctx, &undashboarded(), &[], &fillers, Some(&project))
         .await
         .map(|wiring| wiring.state);
 
@@ -200,6 +221,7 @@ async fn a_dashboard_that_cannot_be_asked_is_reported_or_passed_over() {
     let unreached = seed_dashboard(
         &ctx,
         &undashboarded(),
+        &[],
         &beside(&project, true, &SHOWER_TRUSTED),
         Some(&project),
     )
@@ -216,11 +238,31 @@ async fn a_dashboard_that_cannot_be_asked_is_reported_or_passed_over() {
         let ctx = contracted_ctx(&project, SHOWER, keyed, http.clone());
         let fillers = beside(&project, speaking, &SHOWER_TRUSTED);
         assert!(
-            seed_dashboard(&ctx, &undashboarded(), &fillers, Some(&project))
+            seed_dashboard(&ctx, &undashboarded(), &[], &fillers, Some(&project))
                 .await
                 .is_none(),
             "{named}"
         );
         assert!(http.requests().is_empty(), "{named}");
     }
+}
+
+#[tokio::test]
+async fn a_dashboard_that_will_not_take_the_panel_list_fails_saying_so() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("dashboard-refusing");
+    let http = Fake::by_path(vec![
+        (PANELS, Answer::reply(200, r#"{"groups":[],"widgets":[]}"#)),
+        (APPLY, Answer::reply(500, "")),
+    ]);
+    let ctx = contracted_ctx(&project, SHOWER, true, http);
+    let fillers = beside(&project, true, &SHOWER_TRUSTED);
+
+    let state = seed_dashboard(&ctx, &undashboarded(), &[], &fillers, Some(&project))
+        .await
+        .map(|wiring| wiring.state);
+
+    assert!(
+        matches!(&state, Some(State::Failed { detail }) if detail.contains("could not be applied")),
+        "{state:?}"
+    );
 }
