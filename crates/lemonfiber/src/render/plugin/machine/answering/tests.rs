@@ -10,6 +10,8 @@ fn recipe() -> Recipe {
         id: "adopt".to_owned(),
         title: "Hand the library over".to_owned(),
         why: "So the comics are read where the household looks".to_owned(),
+        on: lemonfiber_core::plugin::On::Install,
+        inputs: Vec::new(),
         steps: vec![
             Step {
                 id: "ask".to_owned(),
@@ -61,6 +63,37 @@ fn every_call_is_said_in_order_with_the_adapter_it_reaches_through() {
              token@metadata.example.org"
         ),
         "{said}"
+    );
+}
+
+#[test]
+fn what_a_recipe_asks_for_is_said_and_a_secret_is_marked_as_one() {
+    let asking = Recipe {
+        on: lemonfiber_core::plugin::On::Demand,
+        inputs: vec![
+            lemonfiber_core::plugin::RecipeInput {
+                name: "code".to_owned(),
+                ask: "The claim code".to_owned(),
+                secret: true,
+            },
+            lemonfiber_core::plugin::RecipeInput {
+                name: "user".to_owned(),
+                ask: "Who claims it".to_owned(),
+                secret: false,
+            },
+        ],
+        ..recipe()
+    };
+    let said = recipes(&[asking]).text();
+    assert!(said.contains("runs only when asked for by name"), "{said}");
+    assert!(
+        said.contains("asks code: The claim code (a secret, taken without showing it)"),
+        "{said}"
+    );
+    assert!(said.contains("asks user: Who claims it\n"), "{said}");
+    assert!(
+        !recipes(&[recipe()]).text().contains("asked for by name"),
+        "an install recipe is not said to run on demand"
     );
 }
 

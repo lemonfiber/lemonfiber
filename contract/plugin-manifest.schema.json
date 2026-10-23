@@ -815,7 +815,7 @@
           "type": "array",
           "items": {"$ref": "#/$defs/Input"}
         },
-        "on": {"description": "When it runs: as part of installing the plugin, or when it is asked for.", "$ref": "#/$defs/PluginRecipeOn"},
+        "on": {"description": "When it runs: as part of installing the plugin, or when it is asked for.", "$ref": "#/$defs/PluginRecipeOn", "default": "install"},
         "pair": {
           "description": "Every value this flow could carry to every destination it could reach.\n\nA flow with no pair behind it fails validation before a call is made, which is\nwhat makes \"what does this plugin tell whom\" answerable from the manifest.",
           "type": "array",

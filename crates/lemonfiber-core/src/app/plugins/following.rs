@@ -77,7 +77,7 @@ pub(super) fn gathered(
             .filter(|input| !given.values().contains_key(&input.name))
             .collect();
         for input in unanswered {
-            let question = input.ask.as_deref().unwrap_or(&input.name);
+            let question = input.question();
             let typed = if input.secret {
                 asking.secret(question)
             } else {

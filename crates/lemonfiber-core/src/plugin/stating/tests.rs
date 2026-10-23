@@ -262,6 +262,8 @@ fn a_shape_is_asked_to_be_approved_after_every_value_the_recipes_send_elsewhere(
         id: "adopt".to_owned(),
         title: "Adopt".to_owned(),
         why: "Held".to_owned(),
+        on: lemonfiber_plugin::On::Install,
+        inputs: Vec::new(),
         steps: Vec::new(),
         pairs: vec![crate::plugin::Pair {
             value: "token".to_owned(),
