@@ -383,6 +383,16 @@ fn an_adapters_key_is_minted_once_kept_after_and_never_made_up() {
     assert!(super::super::writing::carry_out(&ctx, "plex", "1", &key).is_ok());
     let minted = std::fs::read_to_string(&path).unwrap_or_default();
     assert!(minted.len() > 32, "{minted}");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = std::fs::metadata(&path).map(|kept| kept.permissions().mode() & 0o777);
+        assert_eq!(
+            mode.ok(),
+            Some(0o600),
+            "the key is readable beyond its owner"
+        );
+    }
     assert!(super::super::writing::carry_out(&ctx, "plex", "2", &key).is_ok());
     assert_eq!(std::fs::read_to_string(&path).ok(), Some(minted));
 
@@ -450,9 +460,17 @@ fn only_a_first_party_plugin_replaces_a_stack_service() {
     );
     let nothing = super::super::replacing::unreplaced(&plain, &[]);
 
+    let stranger = stranger.err();
     assert_eq!(
-        stranger.err().map(|problem| problem.code),
+        stranger.as_ref().map(|problem| problem.code),
         Some(crate::error::codes::plugin::STRANGER_REPLACING)
+    );
+    let said = stranger
+        .map(|problem| format!("{} {}", problem.summary, problem.detail.unwrap_or_default()))
+        .unwrap_or_default();
+    assert!(
+        said.contains("jellyfin"),
+        "the refusal does not name the service: {said}"
     );
     assert!(trusted.is_ok());
     assert!(nothing.is_ok());

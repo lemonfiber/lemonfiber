@@ -22,7 +22,7 @@ tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
 lemonfiber-fixtures = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 
 [lints]
 workspace = true

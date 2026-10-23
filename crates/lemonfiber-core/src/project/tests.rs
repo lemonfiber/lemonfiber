@@ -594,6 +594,27 @@ fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
         project.text
     );
     assert_eq!(project.text.matches("\n  jellyfin:\n").count(), 1);
+    let configuration = |project: &Project| {
+        sequence(&entry(project, "jellyfin"), "volumes")
+            .into_iter()
+            .find_map(|volume| {
+                volume
+                    .split_once(':')
+                    .map(|(from, _)| from.to_owned())
+                    .filter(|from| from.starts_with("./config/"))
+            })
+    };
+    let standing = project_of_the_stack_alone();
+    assert_eq!(
+        configuration(&project),
+        Some("./config/jellyfin".to_owned())
+    );
+    assert_eq!(configuration(&project), configuration(&standing));
+}
+
+/// The project of the stack this build carries, with nothing installed.
+fn project_of_the_stack_alone() -> Project {
+    project(&carried(), &[])
 }
 
 /// Only a first-party plugin's service taking the stack's service's own id moves in place
@@ -653,13 +674,34 @@ fn a_plugin_service_the_household_reaches_shares_a_network_with_the_proxy() {
     );
 }
 
-const PINNED_PASS: &str = "ghcr.io/lemonfiber/lemonfiber:0.18.0@sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+#[test]
+fn a_plugin_services_ask_joins_it_to_that_asks_network_and_no_other() {
+    let mut asker = a_placed("subs", &[], None, None);
+    asker.asks = vec![crate::plugin::Asking {
+        capability: "media.serve".to_owned(),
+        each: false,
+    }];
+    let project = project(&carried(), &[an_installed("subs", vec![asker])]);
 
-fn pinned() -> Reading<'static> {
-    Reading {
-        pass: Some(PINNED_PASS),
-        ..Reading::bare()
-    }
+    let networks = |id: &str| match project.topology.placed.get(id) {
+        Some(Where::On(networks)) => networks.keys().cloned().collect::<Vec<_>>(),
+        _ => Vec::new(),
+    };
+    assert_eq!(
+        networks("subs"),
+        ["ask__subs__media.serve__jellyfin", "own__subs"]
+    );
+    assert!(networks("jellyfin").contains(&"ask__subs__media.serve__jellyfin".to_owned()));
+    let members = project
+        .topology
+        .placed
+        .iter()
+        .filter(|(_, placed)| {
+            matches!(placed, Where::On(networks) if networks.contains_key("ask__subs__media.serve__jellyfin"))
+        })
+        .map(|(id, _)| id.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(members, ["jellyfin", "subs"]);
 }
 
 fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
@@ -675,82 +717,4 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-#[test]
-fn the_pass_service_runs_its_pinned_image_alone_beside_the_guard() {
-    let project = generated(&carried(), &[], &Chosen::read(None), &pinned());
-    let pass = entry(&project, crate::pass::SERVICE);
-
-    assert_eq!(text(&pass, "image"), PINNED_PASS);
-    assert_eq!(
-        sequence(&pass, "command"),
-        ["pass", "--listen", "10.80.96.34:8090"]
-    );
-    assert_eq!(
-        sequence(&pass, "profiles"),
-        sequence(&entry(&project, "door"), "profiles")
-    );
-    assert_eq!(sequence(&pass, "volumes"), ["./config/pass:/config:ro"]);
-    assert_eq!(sequence(&pass, "cap_drop"), ["ALL"]);
-    assert_eq!(pass.get("read_only").and_then(Yaml::as_bool), Some(true));
-    assert_eq!(text(&pass, "mem_limit"), "64m");
-    assert!(ports(&pass).is_empty());
-    let networks: Vec<String> = pass
-        .get("networks")
-        .and_then(Yaml::as_mapping)
-        .map(|networks| {
-            networks
-                .keys()
-                .filter_map(|name| name.as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default();
-    assert_eq!(networks, ["pass__door"]);
-    assert!(entry(&project, "door")
-        .get("networks")
-        .and_then(|networks| networks.get("pass__door"))
-        .is_some());
-    assert_eq!(
-        project.topology.pass(),
-        Some(std::net::SocketAddr::from((
-            crate::topology::PASS_ON_PASS,
-            crate::pass::PORT
-        )))
-    );
-}
-
-#[test]
-fn no_pin_or_no_guard_runs_no_pass_service() {
-    let unpinned = project(&carried(), &[]);
-    let mut unguarded = carried();
-    for service in &mut unguarded.services {
-        service.provides.retain(|named| named != "stream.guard");
-    }
-    let unguarded = generated(&unguarded, &[], &Chosen::read(None), &pinned());
-
-    for project in [unpinned, unguarded] {
-        assert!(entry(&project, crate::pass::SERVICE).is_null());
-        assert_eq!(project.topology.pass(), None);
-        assert!(!project
-            .topology
-            .networks
-            .keys()
-            .any(|name| name.starts_with("pass__")));
-    }
-}
-
-#[test]
-fn a_service_holding_the_pass_services_id_leaves_the_pass_service_out() {
-    let mut taken = a_placed(crate::pass::SERVICE, &[], None, None);
-    taken.image = "example.invalid/impostor".to_owned();
-    let project = generated(
-        &carried(),
-        &[an_installed("impostor", vec![taken])],
-        &Chosen::read(None),
-        &pinned(),
-    );
-
-    assert_eq!(project.topology.pass(), None);
-    assert!(!project.topology.networks.contains_key("pass__door"));
-    assert!(!text(&entry(&project, crate::pass::SERVICE), "image").contains("lemonfiber"));
-    assert_eq!(project.text.matches("\n  pass:\n").count(), 1);
-}
+mod pass;

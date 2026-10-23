@@ -150,3 +150,61 @@ async fn proving_with_an_unreadable_record_or_no_stack_is_refused() {
         crate::error::codes::plugin::UNRECORDED.to_string()
     );
 }
+
+#[tokio::test]
+async fn an_update_proves_the_plugin_again_and_clears_what_was_kept() {
+    let ctx = kept_against("reprove-update", r#"["media.serve@1"]"#).await;
+    let next = speaking().replace(r#"version     = "1.2.0""#, r#"version     = "1.3.0""#);
+    assert_ne!(next, speaking());
+
+    let updated = updating(&ctx, &source("reprove-update-next", &next)).await;
+
+    assert!(updated.is_ok(), "{updated:?}");
+    assert!(conformance::fills(&ctx, "komga", "media.serve"));
+    assert!(report(reading(&ctx).await).is_some_and(|listed| listed.nonconforming.is_empty()));
+}
+
+#[tokio::test]
+async fn installing_again_proves_the_plugin_again_and_clears_what_was_kept() {
+    let ctx = kept_against("reprove-reinstall", r#"["media.serve@1"]"#).await;
+    assert!(removing(&ctx, "komga").await.is_ok());
+    conformance::witness(&ctx, "komga", "media.serve")
+        .nonconforming("holdings", "the answer did not read");
+    assert!(!conformance::fills(&ctx, "komga", "media.serve"));
+
+    let installed = installing(&ctx, &source("reprove-reinstall-again", &speaking())).await;
+
+    assert!(installed.is_ok_and(|done| done.install.is_some_and(|install| install.recorded)));
+    assert!(conformance::fills(&ctx, "komga", "media.serve"));
+}
+
+#[tokio::test]
+async fn the_installed_plugins_name_each_answer_kept_against_one_with_when_and_why() {
+    let ctx = kept_against("reprove-listed", r#"["media.serve@1"]"#).await;
+
+    let listed = report(reading(&ctx).await).map(|listed| listed.nonconforming);
+
+    let kept = listed.unwrap_or_default();
+    let [one] = kept.as_slice() else {
+        unreachable!("one answer was not listed: {kept:?}");
+    };
+    assert_eq!(
+        (
+            one.plugin.as_str(),
+            one.capability.as_str(),
+            one.operation.as_str(),
+            one.why.as_str()
+        ),
+        (
+            "komga",
+            "media.serve",
+            "holdings",
+            "the answer did not read"
+        )
+    );
+    assert!(
+        one.at.len() >= 20 && one.at.get(10..11) == Some("T"),
+        "{}",
+        one.at
+    );
+}

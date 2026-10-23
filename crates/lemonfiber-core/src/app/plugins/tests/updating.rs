@@ -570,3 +570,37 @@ async fn an_update_to_a_version_naming_an_in_process_adapter_is_refused() {
     );
     assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
 }
+
+/// An update to a version whose one service would guard the egress is refused as the
+/// install would be, naming the field, and the installed version stays on.
+#[tokio::test]
+async fn an_update_to_a_version_whose_one_service_guards_the_egress_is_refused() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("update-egress-guard", runner.clone(), answering(200));
+    assert_eq!(
+        counted(installing(&ctx, &source("update-egress-guard", PROVING)).await),
+        Some(1)
+    );
+    let before = runner.seen().len();
+    let guarding = next().replace(
+        r#"config_path = "/app/data""#,
+        "config_path = \"/app/data\"\nprovides    = [\"network.egress-guard\"]\nshape       = \
+         \"egress-guard\"",
+    );
+    assert_ne!(guarding, next());
+
+    let refused = updating(&ctx, &source("update-egress-guard-next", &guarding))
+        .await
+        .err()
+        .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
+        .unwrap_or_default();
+
+    assert_eq!(refused.0, "PLUGIN-3");
+    assert!(refused.1.contains("service komga.shape"), "{}", refused.1);
+    assert_eq!(
+        runner.seen().len(),
+        before,
+        "nothing was asked of the engine"
+    );
+    assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
+}

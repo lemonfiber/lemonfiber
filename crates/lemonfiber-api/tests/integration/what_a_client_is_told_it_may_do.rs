@@ -87,6 +87,11 @@ async fn a_member_is_told_what_is_theirs_and_what_is_not() {
         "{said}"
     );
     assert_eq!(
+        standing(&said, "/api/plugins"),
+        Some("unpermitted"),
+        "what is installed, and every answer kept against it, is the operator's: {said}"
+    );
+    assert_eq!(
         standing(&said, "/api/actions/no-such-action"),
         None,
         "a request this stack does not have is absent: {said}"

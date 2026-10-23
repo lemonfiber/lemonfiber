@@ -446,4 +446,35 @@ fn a_choice_over_a_record_that_will_not_read_is_refused() {
     assert_eq!(refused.as_deref(), Some("PLUGIN-4"));
 }
 
+#[test]
+fn the_listing_carries_an_installed_plugins_ask_after_the_stacks_with_its_origin() {
+    let (ctx, at) = ctx("plugin-asks");
+    let mut asker = crate::test_support::a_placed("subfinder", &[], None, None);
+    asker.asks = vec![crate::plugin::Asking {
+        capability: "media.serve".to_owned(),
+        each: false,
+    }];
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::an_installed("subs", vec![asker]))
+        .is_ok());
+    let written = register.to_json().unwrap_or_default();
+    assert!(std::fs::write(at.join("config").join("plugins.json"), written).is_ok());
+
+    let wired = listing(&ctx).map(|report| report.wired).unwrap_or_default();
+    let theirs = wired
+        .iter()
+        .position(|one| one.by == "subfinder")
+        .unwrap_or_else(|| unreachable!("the plugin's ask is not listed"));
+    assert!(wired.get(theirs).is_some_and(|one| one.origin
+        == crate::origin::Origin::Plugin {
+            named: "subs".to_owned()
+        }));
+    assert!(wired
+        .iter()
+        .take(theirs)
+        .all(|one| one.origin == crate::origin::Origin::Bundled));
+    assert!(theirs > 0);
+}
+
 mod regenerating;
