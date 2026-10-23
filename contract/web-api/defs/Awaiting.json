@@ -6,6 +6,11 @@
       "description": "Everything still coming down has finished arriving.",
       "type": "string",
       "const": "downloads"
+    },
+    {
+      "description": "A form's images have come down the line.",
+      "type": "string",
+      "const": "images"
     }
   ]
 }

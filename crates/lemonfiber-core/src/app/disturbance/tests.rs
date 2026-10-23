@@ -154,6 +154,27 @@ fn an_unbounded_operation_says_what_it_is_waiting_for() {
     );
 }
 
+#[test]
+fn fetching_a_forms_images_is_open_ended_on_the_images_coming_down_the_line() {
+    let command = Command::Pull {
+        forms: vec!["media".to_owned()],
+    };
+
+    assert_eq!(
+        of(&command, WAITED),
+        Some(Disturbance::Until(Awaiting::Images))
+    );
+    let said = sentence(Disturbance::Until(Awaiting::Images));
+    assert!(said.contains("images have come down the line"), "{said}");
+    assert!(!said.contains("seconds"), "{said}");
+    assert_eq!(
+        crate::model::Disturbances::all(WAITED).fetching,
+        crate::model::TakesAway::OpenEnded {
+            until: Awaiting::Images
+        }
+    );
+}
+
 /// The payload states every situation there is, and nothing else.
 ///
 /// This is the join that keeps the two halves from drifting apart. A new

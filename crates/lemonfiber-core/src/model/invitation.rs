@@ -228,6 +228,8 @@ pub struct HouseholdRemoval {
     pub asks_through_the_request_service: bool,
     /// How far it got.
     pub revoked: Revoked,
+    /// What removing them does to their watch history, in the stack's words.
+    pub watch_history: String,
     /// What could not be done, and anything else worth the operator's attention.
     pub findings: Vec<String>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.

@@ -45,6 +45,8 @@ pub enum Disturbance {
 pub enum Awaiting {
     /// Everything still coming down has finished arriving.
     Downloads,
+    /// A form's images have come down the line.
+    Images,
 }
 
 /// One of the ways a lifecycle verb puts the stack out.
@@ -66,6 +68,8 @@ pub enum Situation {
     Restarting,
     /// The running set is being changed to a different one.
     Switching,
+    /// A form's images are being fetched.
+    Fetching,
 }
 
 impl Situation {
@@ -81,6 +85,7 @@ impl Situation {
         Self::StoppingAfterDownloads,
         Self::Restarting,
         Self::Switching,
+        Self::Fetching,
     ];
 
     /// What a payload calls this situation.
@@ -95,6 +100,7 @@ impl Situation {
             Self::StoppingAfterDownloads => "stopping_after_downloads",
             Self::Restarting => "restarting",
             Self::Switching => "switching",
+            Self::Fetching => "fetching",
         }
     }
 
@@ -118,6 +124,7 @@ impl Situation {
             // ninety-four per cent, and how long that takes belongs to whoever
             // is seeding it.
             Self::StoppingAfterDownloads => Disturbance::Until(Awaiting::Downloads),
+            Self::Fetching => Disturbance::Until(Awaiting::Images),
         }
     }
 }
@@ -184,6 +191,11 @@ fn sentence(disturbance: Disturbance) -> String {
         ),
         Disturbance::Until(Awaiting::Downloads) => {
             "this does not finish until everything still coming down has arrived".to_owned()
+        }
+        Disturbance::Until(Awaiting::Images) => {
+            "this does not finish until the images have come down the line, which can take long \
+             and use much of it"
+                .to_owned()
         }
     }
 }

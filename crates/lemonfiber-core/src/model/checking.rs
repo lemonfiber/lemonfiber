@@ -129,6 +129,8 @@ pub struct Disturbances {
     pub restarting: TakesAway,
     /// Changing the running set, which stops whatever falls outside the new one.
     pub switching: TakesAway,
+    /// Fetching a form's images.
+    pub fetching: TakesAway,
 }
 
 impl Disturbances {
@@ -147,6 +149,7 @@ impl Disturbances {
             stopping_after_downloads: Situation::StoppingAfterDownloads.takes(patience).into(),
             restarting: Situation::Restarting.takes(patience).into(),
             switching: Situation::Switching.takes(patience).into(),
+            fetching: Situation::Fetching.takes(patience).into(),
         }
     }
 }

@@ -47,6 +47,17 @@ pub struct MusicChoice {
     pub note: String,
 }
 
+/// What a quality choice may be made from, each in the plain terms the command takes it in.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct QualityOffered {
+    /// Every resolution preset, least to most demanding.
+    pub presets: Vec<String>,
+    /// Every format music may take, least to most demanding.
+    pub formats: Vec<String>,
+    /// Every kind of media a choice may be made for apart from everything at once.
+    pub media_types: Vec<String>,
+}
+
 /// The operator's quality choice, what each preset means, and what the command
 /// did with it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -73,6 +84,11 @@ pub struct QualityReport {
     pub overwritten: Option<crate::model::StackEdit>,
     /// What became of the choice.
     pub disposition: Disposition,
+    /// What a choice may be made from.
+    pub offered: QualityOffered,
+    /// What a choice changes, in the stack's words; present where this answers one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<String>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by
@@ -96,6 +112,8 @@ pub struct MusicReport {
     /// What became of applying it to the music service, or `None` for a rehearsal
     /// that applied nothing.
     pub outcome: Option<Triggered>,
+    /// What the choice changes, in the stack's words.
+    pub changes: String,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by

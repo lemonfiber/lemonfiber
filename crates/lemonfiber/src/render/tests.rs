@@ -238,6 +238,8 @@ fn the_first_of_them() -> Vec<Outcome> {
             music: None,
             customised: false,
             overwritten: None,
+            offered: lemonfiber_core::model::QualityOffered::default(),
+            changes: None,
             disposition: Disposition::Shown,
         }),
         Outcome::Upgrade(UpgradeReport {
@@ -250,6 +252,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             choice: music_pick(),
             disposition: Disposition::Recorded,
             outcome: None,
+            changes: lemonfiber_core::quality::CHANGES.to_owned(),
         }),
         Outcome::Trace(a_trace()),
         Outcome::Household(HouseholdReport {
@@ -291,6 +294,21 @@ fn the_first_of_them() -> Vec<Outcome> {
         Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
         Outcome::Credentials(lemonfiber_core::credential::Inventory::of(Vec::new())),
     ]
+}
+
+/// What removing somebody would cost, unconfirmed.
+fn a_member_removed() -> Outcome {
+    Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
+        rehearsed: false,
+        name: "ana".to_owned(),
+        confirmed: false,
+        requests: 1,
+        asks_through_the_request_service: true,
+        revoked: lemonfiber_core::model::Revoked::Nothing,
+        watch_history: "Their watch history goes with the account, and cannot be got back."
+            .to_owned(),
+        findings: Vec::new(),
+    })
 }
 
 /// The second half of the list above.
@@ -373,15 +391,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             applied: None,
         }),
         a_handoff(),
-        Outcome::Removal(lemonfiber_core::model::HouseholdRemoval {
-            rehearsed: false,
-            name: "ana".to_owned(),
-            confirmed: false,
-            requests: 1,
-            asks_through_the_request_service: true,
-            revoked: lemonfiber_core::model::Revoked::Nothing,
-            findings: Vec::new(),
-        }),
+        a_member_removed(),
         // Nothing measured and nothing taken, which is the answer with every
         // optional paragraph absent — and still a report rather than a blank.
         Outcome::Space(lemonfiber_core::space::reckon(

@@ -35,6 +35,7 @@ pub(crate) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<
             choice,
             disposition: Disposition::Rehearsed,
             outcome: None,
+            changes: crate::quality::CHANGES.to_owned(),
         });
     }
 
@@ -45,6 +46,7 @@ pub(crate) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<
         choice,
         disposition: Disposition::Recorded,
         outcome: Some(outcome),
+        changes: crate::quality::CHANGES.to_owned(),
     })
 }
 

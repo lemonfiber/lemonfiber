@@ -1,5 +1,11 @@
 {
   "fields": {
+    "changes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "choice": {
       "type": [
         "ref:MusicChoice"

@@ -1,5 +1,11 @@
 {
   "fields": {
+    "fetching": {
+      "type": [
+        "ref:TakesAway"
+      ],
+      "required": true
+    },
     "restarting": {
       "type": [
         "ref:TakesAway"

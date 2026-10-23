@@ -6,6 +6,7 @@
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{LifecycleReport, StackEdit};
+use crate::ports::process::{Failure, Output, Progress};
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
 
@@ -408,12 +409,12 @@ async fn worked(
     // and a stop the operator asked for must not.
     let addressed = addressed(action, &report.plan);
     halted::before(ctx, action, &addressed);
-    let output = ctx
-        .seams
-        .runner
-        .run(&command)
-        .await
-        .map_err(|err| Box::new(err.problem()))?;
+    let output = if matches!(action, Action::Pull(_)) {
+        pulled(ctx, &command).await
+    } else {
+        ctx.seams.runner.run(&command).await
+    }
+    .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
     halted::after(ctx, action, &addressed).await;
 
@@ -435,6 +436,24 @@ async fn worked(
     }
 
     Ok(report)
+}
+
+/// Run a pull, handing each line the engine writes to the narrator as it arrives and
+/// keeping none of them.
+async fn pulled(ctx: &Ctx, command: &[String]) -> Result<Output, Failure> {
+    let mut progress = ctx.seams.runner.stream(command).await?;
+    let mut output = Output {
+        status: None,
+        stdout: String::new(),
+        stderr: String::new(),
+    };
+    while let Some(event) = progress.recv().await {
+        match event {
+            Progress::Line(line) => ctx.narrator.pulled(&line).await,
+            Progress::Ended(status) => output.status = status,
+        }
+    }
+    Ok(output)
 }
 
 /// Put the credentials a service adopts at first start where it will read them.

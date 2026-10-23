@@ -121,6 +121,14 @@ async fn a_program_that_outlasts_the_bound_is_stopped() {
     assert_eq!(outcome, Some(None), "stopped, so there is no exit status");
 }
 
+/// A streamed program that outlasts the bound is stopped as a run is, and its stream
+/// ends without an exit status.
+#[tokio::test(start_paused = true)]
+async fn a_streamed_program_that_outlasts_the_bound_is_stopped() {
+    let (_, status) = drain(&Local, &["sh", "-c", "sleep 30"]).await;
+    assert_eq!(status, None, "stopped, so there is no exit status");
+}
+
 /// Whether the process `pid` names is still there to be signalled.
 fn alive(pid: &str) -> bool {
     std::process::Command::new("kill")

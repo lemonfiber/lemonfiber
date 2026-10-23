@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a quality choice may be made from, each in the plain terms the command takes it in.",
+  "type": "object",
+  "properties": {
+    "formats": {
+      "description": "Every format music may take, least to most demanding.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "media_types": {
+      "description": "Every kind of media a choice may be made for apart from everything at once.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "presets": {
+      "description": "Every resolution preset, least to most demanding.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "presets",
+    "formats",
+    "media_types"
+  ]
+}

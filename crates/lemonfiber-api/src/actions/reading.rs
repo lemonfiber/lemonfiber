@@ -16,7 +16,8 @@ use lemonfiber_core::app::restore;
 use lemonfiber_core::app::{Command, Diagnosing, QualityAction, Tracing};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
-use lemonfiber_core::quality::Preset;
+use lemonfiber_core::ports::media::offered;
+use lemonfiber_core::quality::{self, Preset};
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::repair::run::Consent;
 
@@ -168,7 +169,7 @@ pub(super) fn quality(
         let Some(format) = Format::from_label(preset) else {
             return Err(Refused::Unrecognised {
                 argument: "preset".to_owned(),
-                offered: "try compact, lossless, or hi-res".to_owned(),
+                offered: format!("try {}", offered(&quality::offered().formats)),
             });
         };
         return Ok(Command::QualityMusic { format });
@@ -176,7 +177,7 @@ pub(super) fn quality(
     let Some(preset) = Preset::from_label(preset) else {
         return Err(Refused::Unrecognised {
             argument: "preset".to_owned(),
-            offered: "try space-saving, balanced, high-quality, or maximum".to_owned(),
+            offered: format!("try {}", offered(&quality::offered().presets)),
         });
     };
     // Asked as one value and answered with one expression rather than through an
@@ -194,7 +195,7 @@ pub(super) fn quality(
     } else {
         Err(Refused::Unrecognised {
             argument: "media_type".to_owned(),
-            offered: "try tv, movies, or music".to_owned(),
+            offered: format!("try {}", offered(&quality::offered().media_types)),
         })
     }
 }

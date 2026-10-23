@@ -35,6 +35,10 @@
     "revoked": {
       "description": "How far it got.",
       "$ref": "Revoked.json"
+    },
+    "watch-history": {
+      "description": "What removing them does to their watch history, in the stack's words.",
+      "type": "string"
     }
   },
   "required": [
@@ -43,6 +47,7 @@
     "requests",
     "asks-through-the-request-service",
     "revoked",
+    "watch-history",
     "findings",
     "rehearsed"
   ]

@@ -1,5 +1,11 @@
 {
   "fields": {
+    "changes": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "choices": {
       "type": [
         "array[ref:PresetChoice]"
@@ -23,6 +29,12 @@
         "anyOf(null,ref:MusicChoice)"
       ],
       "required": false
+    },
+    "offered": {
+      "type": [
+        "ref:QualityOffered"
+      ],
+      "required": true
     },
     "overwritten": {
       "type": [

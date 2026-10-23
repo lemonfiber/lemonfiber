@@ -396,3 +396,29 @@ fn a_reapply_with_nowhere_to_write_is_reported() {
         "a reapply with nowhere to write is refused"
     );
 }
+
+#[test]
+fn every_answer_offers_the_presets_formats_and_media_types_the_command_takes() {
+    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show);
+
+    assert_eq!(
+        report.offered.presets,
+        ["space-saving", "balanced", "high-quality", "maximum"]
+    );
+    assert_eq!(report.offered.formats, ["compact", "lossless", "hi-res"]);
+    assert_eq!(report.offered.media_types, ["tv", "movies", "music"]);
+}
+
+#[test]
+fn only_an_answer_to_a_choice_says_it_shapes_future_acquisitions_alone() {
+    let env = scratch("changes");
+    let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
+
+    let chosen = run(&context, set(Preset::Balanced, None, false));
+    let shown = run(&context, QualityAction::Show);
+
+    assert_eq!(chosen.changes.as_deref(), Some(super::CHANGES));
+    assert!(super::CHANGES.contains("from now on"));
+    assert!(super::CHANGES.contains("Nothing already in the library changes"));
+    assert_eq!(shown.changes, None);
+}

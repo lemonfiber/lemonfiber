@@ -10,6 +10,14 @@ use lemonfiber_core::PRODUCT;
 
 use super::Lines;
 
+/// What became of a choice, then what it changes where the stack said.
+fn saved(became: &str, changes: Option<&str>) -> String {
+    changes.map_or_else(
+        || became.to_owned(),
+        |changes| format!("{became} {changes}"),
+    )
+}
+
 /// The quality choice, what each preset means, and what the command did with it.
 pub(super) fn quality(report: &QualityReport) -> Lines {
     let mut lines = Lines::default();
@@ -24,7 +32,7 @@ pub(super) fn quality(report: &QualityReport) -> Lines {
         // the expectation is often the opposite, that lowering quality shrinks the
         // library or raising it re-grabs everything.
         Disposition::Recorded => {
-            lines.spaced("Saved. This affects future acquisitions only — nothing already downloaded changes.");
+            lines.spaced(saved("Saved.", report.changes.as_deref()));
             if report.customised {
                 lines.put(format!(
                     "Your quality sync config is customised, so this preset will not apply on its \
@@ -33,9 +41,7 @@ pub(super) fn quality(report: &QualityReport) -> Lines {
             }
         }
         Disposition::Rehearsed => {
-            lines.spaced(
-                "Would save. This affects future acquisitions only — nothing downloaded changes.",
-            );
+            lines.spaced(saved("Would save.", report.changes.as_deref()));
         }
         Disposition::Held => {
             lines.spaced(
@@ -140,14 +146,10 @@ pub(super) fn music_choice(choice: &MusicChoice) -> Lines {
 pub(super) fn music(report: &MusicReport) -> Lines {
     let mut lines = music_choice(&report.choice);
     if matches!(report.disposition, Disposition::Rehearsed) {
-        lines.spaced(
-            "Would save. This affects future acquisitions only — nothing downloaded changes.",
-        );
+        lines.spaced(saved("Would save.", Some(&report.changes)));
         return lines;
     }
-    lines.spaced(
-        "Saved. This affects future acquisitions only — nothing already downloaded changes.",
-    );
+    lines.spaced(saved("Saved.", Some(&report.changes)));
     match &report.outcome {
         None | Some(Triggered::Started) => {
             lines.put("Applied to the music service.");

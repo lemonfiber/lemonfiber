@@ -5,9 +5,14 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use lemonfiber_ports::narration::Narrator;
 
-/// Everything a run said, in the order it said it.
+/// Everything a run said, and every line of a pull it handed on, each in its order.
 #[derive(Debug, Default)]
-pub struct Heard(Mutex<Vec<String>>);
+pub struct Heard {
+    /// What was said.
+    said: Mutex<Vec<String>>,
+    /// What a pull wrote.
+    pulled: Mutex<Vec<String>>,
+}
 
 impl Heard {
     /// Every line heard so far.
@@ -16,14 +21,30 @@ impl Heard {
     /// rather than passing one that expected none without having looked.
     #[must_use]
     pub fn said(&self) -> Vec<String> {
-        self.0.lock().map(|said| said.clone()).unwrap_or_default()
+        self.said
+            .lock()
+            .map(|said| said.clone())
+            .unwrap_or_default()
+    }
+
+    /// Every line of a pull handed on so far.
+    #[must_use]
+    pub fn pull_lines(&self) -> Vec<String> {
+        self.pulled
+            .lock()
+            .map(|pulled| pulled.clone())
+            .unwrap_or_default()
     }
 }
 
 #[async_trait]
 impl Narrator for Heard {
     async fn say(&self, said: &str) {
-        crate::noted(&self.0, said.to_owned());
+        crate::noted(&self.said, said.to_owned());
+    }
+
+    async fn pulled(&self, line: &str) {
+        crate::noted(&self.pulled, line.to_owned());
     }
 }
 

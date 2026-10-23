@@ -22,6 +22,9 @@ pub trait Narrator: Send + Sync {
     /// wait that could fail because nobody was listening would be a wait made worse
     /// by the reporting added to it.
     async fn say(&self, said: &str);
+
+    /// Hand on one line the container engine wrote while pulling images, as it wrote it.
+    async fn pulled(&self, _line: &str) {}
 }
 
 /// The narrator for a run nobody is listening to.
@@ -35,3 +38,6 @@ pub struct Silent;
 impl Narrator for Silent {
     async fn say(&self, _said: &str) {}
 }
+
+#[cfg(test)]
+mod tests;
