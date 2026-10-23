@@ -23,22 +23,25 @@ const REPLACING: &str = "a real run would mint a new value, write it where the o
      in the service's settings, its secrets file and its adapter's upstream.json, and restart \
      what reads it. Nothing was replaced.";
 
-/// The installed plugin `held` is a secret lemonfiber minted for, and the secret's id.
+/// The installed `plugin` that `held` is a secret lemonfiber minted for, and the secret's id.
 pub(super) fn minted<'a>(
     held: &Held,
+    plugin: &str,
     installed: &'a [Installed],
 ) -> Option<(&'a Installed, String)> {
-    let plugin = held.plugins()?;
-    let owner = installed.iter().find(|one| one.plugin == plugin)?;
-    let id = held
-        .setting
-        .strip_prefix(&crate::settings::named(plugin, ""))?;
-    owner
-        .declared
-        .secrets
+    installed
         .iter()
-        .any(|secret| secret.minted && secret.id == id)
-        .then(|| (owner, id.to_owned()))
+        .filter(|owner| owner.plugin == plugin)
+        .find_map(|owner| {
+            owner
+                .declared
+                .secrets
+                .iter()
+                .find(|secret| {
+                    secret.minted && held.setting == crate::settings::named(plugin, &secret.id)
+                })
+                .map(|secret| (owner, secret.id.clone()))
+        })
 }
 
 /// Replace the minted secret `secret` of `installed` with a fresh value, everywhere it is
@@ -53,13 +56,15 @@ pub(super) async fn rotate(
         return would_rotate(held, REPLACING);
     }
     let refused = |detail: String| Rotation::stopped(&held.name, Settled::Refused { detail });
-    let Some(stack) = crate::app::project::directory(ctx) else {
+    let Some((stack, kept)) = crate::app::project::directory(ctx)
+        .zip(crate::app::plugins::kept::root(ctx, &installed.plugin))
+    else {
         return refused("there is no stack directory to find the service's settings in".to_owned());
     };
     let Some(value) = crate::plugin::seeding::mint(ctx.seams.random.as_ref()) else {
         return refused(crate::plugin::seeding::UNMINTED.to_owned());
     };
-    let files = match rewritten(ctx, installed, &stack, secret, &value) {
+    let files = match rewritten(ctx, installed, &stack, &kept, secret, &value) {
         Ok(files) => files,
         Err(detail) => return refused(detail),
     };
@@ -78,13 +83,16 @@ pub(super) async fn rotate(
             reached(service, written)
         })
         .collect();
-    let secrets_file = crate::settings::written(ctx, &[installed]).err();
+    let secrets_file = crate::settings::written(ctx, &[installed])
+        .err()
+        .as_ref()
+        .map(ToString::to_string);
     consumers.extend(
         installed
             .services
             .iter()
             .filter(|placed| reads_it(placed, secret))
-            .map(|placed| reached(&placed.service, secrets_file.as_ref())),
+            .map(|placed| reached(&placed.service, secrets_file.clone())),
     );
     consumers.extend(handed(ctx, installed, &stack, secret));
     let services: Vec<String> = installed
@@ -107,22 +115,21 @@ pub(super) async fn rotate(
     Rotation::landed(&held.name, &fingerprint(&value), consumers)
 }
 
-/// Each seeded starting file of `installed` that names `secret`, with the new value where
-/// the old one stands, by its service and where it is; or why one cannot be.
+/// Each seeded starting file of `installed` kept at `kept` that names `secret`, with the
+/// new value where the old one stands in `stack`, by its service and where it is; or why
+/// one cannot be.
 fn rewritten(
     ctx: &Ctx,
     installed: &Installed,
     stack: &Path,
+    kept: &Path,
     secret: &str,
     value: &str,
 ) -> Result<Vec<(String, PathBuf, Vec<u8>)>, String> {
-    let Some(kept) = crate::app::plugins::kept::root(ctx, &installed.plugin) else {
-        return Ok(Vec::new());
-    };
     let mut files = Vec::new();
     for placed in &installed.services {
         let templates = crate::plugin::program::shipped(Some(Starting {
-            root: &kept,
+            root: kept,
             service: &placed.service,
         }))?;
         for (path, template) in templates {
@@ -233,9 +240,9 @@ fn hands_it(placed: &Placed, secret: &str) -> bool {
 }
 
 /// How far a write reached `service`: updated, or failed with why.
-fn reached(service: &str, failed: Option<impl std::fmt::Display>) -> Propagation {
+fn reached(service: &str, failed: Option<String>) -> Propagation {
     match failed {
         None => Propagation::updated(service),
-        Some(why) => Propagation::failed(service, &why.to_string()),
+        Some(why) => Propagation::failed(service, &why),
     }
 }

@@ -71,17 +71,11 @@ pub(crate) fn forgotten(ctx: &Ctx, plugin: &str) {
 /// Every service `installed` runs a proof of or whose starting files at `source` name a
 /// secret, once each.
 fn proved(installed: &Installed, source: &Path) -> Vec<String> {
-    let seeded = crate::plugin::seeding::shipped(
-        installed
-            .services
-            .iter()
-            .map(|placed| placed.service.as_str()),
-        source,
-    )
-    .unwrap_or_default()
-    .into_iter()
-    .filter(|file| crate::plugin::seeding::seeded(&file.bytes))
-    .map(|file| file.service);
+    let seeded = crate::plugin::seeding::shipped_by(installed, source)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|file| crate::plugin::seeding::seeded(&file.bytes))
+        .map(|file| file.service);
     let mut services: Vec<String> = installed
         .run_proofs
         .iter()

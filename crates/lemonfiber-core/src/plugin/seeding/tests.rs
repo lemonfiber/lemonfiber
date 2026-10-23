@@ -199,6 +199,16 @@ fn a_replacement_whose_line_is_gone_twice_there_or_unanchored_is_refused() {
             "stands alone on its line",
         ),
         (&template[..], &[0xff, 0xfe][..], "it is not text"),
+        (
+            &[0xff, 0xfe][..],
+            &b"api_key = 0123\n"[..],
+            "it is not text",
+        ),
+        (
+            &b"api_key = {{secret:api-key\n"[..],
+            &b"api_key = 0123\n"[..],
+            "never closes",
+        ),
     ] {
         let refused = super::replaced(template, current, "api-key", "fedcba", &random);
         assert!(
@@ -210,17 +220,24 @@ fn a_replacement_whose_line_is_gone_twice_there_or_unanchored_is_refused() {
 
 #[test]
 fn a_replaced_hash_is_derived_afresh_for_the_new_value() {
-    let replaced = super::replaced(
-        b"WebUI\\Password_PBKDF2=\"{{secret:api-key|pbkdf2}}\"\n",
-        b"WebUI\\Port=8080\nWebUI\\Password_PBKDF2=\"@ByteArray(old:old)\"\n",
-        "api-key",
-        "fedcba",
-        &Chance::exactly(Some(vec![9_u8; 16])),
-    )
-    .ok()
-    .flatten()
-    .and_then(|bytes| String::from_utf8(bytes).ok())
-    .unwrap_or_default();
+    let hashing = |random: &Chance| {
+        super::replaced(
+            b"WebUI\\Password_PBKDF2=\"{{secret:api-key|pbkdf2}}\"\n",
+            b"WebUI\\Port=8080\nWebUI\\Password_PBKDF2=\"@ByteArray(old:old)\"\n",
+            "api-key",
+            "fedcba",
+            random,
+        )
+    };
+    assert_eq!(
+        hashing(&Chance::exactly(None)),
+        Err(super::UNMINTED.to_owned())
+    );
+    let replaced = hashing(&Chance::exactly(Some(vec![9_u8; 16])))
+        .ok()
+        .flatten()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_default();
     assert!(replaced.starts_with("WebUI\\Port=8080\nWebUI\\Password_PBKDF2=\"@ByteArray("));
     assert!(!replaced.contains("old:old"), "{replaced}");
 }

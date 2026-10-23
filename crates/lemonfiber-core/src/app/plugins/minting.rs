@@ -11,10 +11,12 @@ use super::super::Ctx;
 use super::following::diagnosed;
 use crate::error::Problem;
 use crate::journal::{Change, Kind};
+use crate::plugin::first_party::FirstParty;
 use crate::plugin::Installed;
 
-/// Hold a freshly minted value for each secret `manifest` mints that `plugin` holds none
-/// of yet, journalling each by its fingerprint.
+/// Hold a freshly minted value for each secret `manifest` mints that `would` holds none
+/// of yet, journalling each by its fingerprint; for a plugin `trusted` names, the key the
+/// stack already published for a part it moves in place of instead.
 ///
 /// # Errors
 ///
@@ -25,13 +27,13 @@ pub(super) fn minted(
     would: &Installed,
     manifest: &Manifest,
     stamp: &str,
+    trusted: &[FirstParty],
 ) -> Result<(), Box<Problem>> {
-    let plugin = would.plugin.as_str();
-    let first_party =
-        crate::plugin::first_party::holds(crate::plugin::first_party::EMBEDDED, would);
     if !manifest.secrets.iter().any(|secret| secret.minted) {
         return Ok(());
     }
+    let plugin = would.plugin.as_str();
+    let first_party = crate::plugin::first_party::holds(trusted, would);
     let held = crate::settings::secrets_at(ctx)
         .zip(crate::app::targets::layout(ctx))
         .ok_or(crate::config::store::Failure::Nowhere);
@@ -41,8 +43,9 @@ pub(super) fn minted(
         .iter()
         .filter(|secret| secret.minted)
         .map(|secret| {
-            moved(ctx, manifest, &secret.of)
-                .filter(|_| first_party)
+            first_party
+                .then(|| moved(ctx, manifest, &secret.of))
+                .flatten()
                 .or_else(|| crate::plugin::seeding::mint(ctx.seams.random.as_ref()))
                 .map(|value| (crate::settings::named(plugin, &secret.id), value))
         })
@@ -88,14 +91,15 @@ pub(super) fn minted(
 /// lemonfiber published it for what reads it, where `of` moves in place of one.
 ///
 /// A part moved in place keeps its configuration, so its upstream answers to the key it
-/// had; one minted afresh would be a key nothing seeded into it. Asked only of a plugin
-/// this build embeds as first-party: the stack's own key goes to nothing else.
+/// had; one minted afresh would be a key nothing seeded into it. Asked only of a
+/// first-party plugin: the stack's own key goes to nothing else.
 fn moved(ctx: &Ctx, manifest: &Manifest, of: &str) -> Option<String> {
-    let reserved = manifest
+    manifest
         .services
         .iter()
-        .find(|service| service.id == of)?
-        .replaces
-        .as_deref()?;
-    crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
+        .filter(|service| service.id == of)
+        .find_map(|service| service.replaces.as_deref())
+        .and_then(|reserved| {
+            crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
+        })
 }

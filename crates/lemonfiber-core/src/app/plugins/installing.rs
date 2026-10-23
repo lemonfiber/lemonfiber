@@ -120,7 +120,13 @@ pub(super) async fn install(
         let (standing, before) = verifying::looked(ctx).await?;
 
         writing::unlinked(ctx, &would, stack)?;
-        super::minting::minted(ctx, &would, &read.manifest, &stamp)?;
+        super::minting::minted(
+            ctx,
+            &would,
+            &read.manifest,
+            &stamp,
+            crate::plugin::first_party::EMBEDDED,
+        )?;
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
 
         // Started before it is registered, which is why the invocation carries this

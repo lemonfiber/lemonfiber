@@ -74,6 +74,24 @@ pub fn shipped<'a>(
     Ok(found)
 }
 
+/// Every file the plugin's source at `source` ships for each service `installed` runs.
+///
+/// # Errors
+///
+/// As [`shipped`].
+pub(crate) fn shipped_by(
+    installed: &super::Installed,
+    source: &Path,
+) -> Result<Vec<Shipped>, String> {
+    shipped(
+        installed
+            .services
+            .iter()
+            .map(|placed| placed.service.as_str()),
+        source,
+    )
+}
+
 /// What is wrong with any of the starting files `shipped` against `manifest`, each file on
 /// its own and each service's files together.
 #[must_use]

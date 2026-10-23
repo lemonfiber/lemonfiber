@@ -4,7 +4,6 @@
 use super::proving::verdicts;
 use super::speaking::{adapting, speaking};
 use super::*;
-use crate::credential::Settled;
 
 /// The adapter's upstream key, minted, in the starting file and in `upstream.json`.
 fn seeded() -> String {
@@ -233,6 +232,7 @@ fn nothing_is_minted_where_the_machine_supplies_no_random_bytes() {
         &crate::plugin::Installed::of(&manifest),
         &manifest,
         "1",
+        &[],
     );
 
     assert!(refused
@@ -300,84 +300,18 @@ fn nothing_is_minted_where_the_secret_store_cannot_be_written() {
         &unfiled,
         &crate::plugin::Installed::of(&manifest),
         &manifest,
-        "1"
+        "1",
+        &[],
     )
     .is_err());
     assert!(super::super::minting::minted(
         &storeless,
         &crate::plugin::Installed::of(&manifest),
         &manifest,
-        "1"
+        "1",
+        &[],
     )
     .is_err());
 }
 
-#[tokio::test]
-async fn a_replaced_upstream_key_is_written_where_the_old_one_stands_and_handed_to_the_adapter() {
-    let ctx = seeding("seeded-replaced");
-    let _ = installing(&ctx, &shipped("seeded-replaced")).await;
-    let before = minted(&ctx).unwrap_or_default();
-    let starting = stack_of(&ctx).join("config/komga/application.yml");
-    let _ = std::fs::write(
-        &starting,
-        format!("server:\n  port: 25600\nkomga:\n  api-key: {before}\n  remember: true\n"),
-    );
-
-    let inventory = crate::app::credentials::credentials(
-        &ctx,
-        crate::app::command::Asking::Rotate {
-            credential: "komga upstream-key".to_owned(),
-        },
-    )
-    .await;
-    let rotated = inventory.ok().and_then(|inventory| inventory.rotated);
-    assert!(
-        rotated
-            .as_ref()
-            .is_some_and(|rotation| matches!(rotation.settled, Settled::Replaced { .. })),
-        "{rotated:?}"
-    );
-
-    let after = minted(&ctx).unwrap_or_default();
-    assert_eq!(after.len(), 32);
-    assert_ne!(after, before);
-    assert_eq!(
-        read(&starting),
-        format!("server:\n  port: 25600\nkomga:\n  api-key: {after}\n  remember: true\n")
-    );
-    assert_eq!(
-        read(&stack_of(&ctx).join("config/komga-adapter/upstream.json")),
-        format!(r#"{{"api_key":"{after}"}}"#)
-    );
-    assert!(journalled(&ctx).iter().any(|change| matches!(
-        &change.kind,
-        crate::journal::Kind::Secret { name, previous: Some(_), .. } if name == "komga:upstream-key"
-    )));
-}
-
-#[tokio::test]
-async fn a_replacement_whose_line_the_service_took_away_is_refused_and_keeps_the_old_key() {
-    let ctx = seeding("seeded-unreplaced");
-    let _ = installing(&ctx, &shipped("seeded-unreplaced")).await;
-    let before = minted(&ctx);
-    let starting = stack_of(&ctx).join("config/komga/application.yml");
-    let _ = std::fs::write(&starting, "server:\n  port: 25600\n");
-
-    let inventory = crate::app::credentials::credentials(
-        &ctx,
-        crate::app::command::Asking::Rotate {
-            credential: "komga upstream-key".to_owned(),
-        },
-    )
-    .await;
-    let rotated = inventory.ok().and_then(|inventory| inventory.rotated);
-    assert!(
-        rotated.as_ref().is_some_and(|rotation| matches!(
-            &rotation.settled,
-            Settled::Refused { detail } if detail.contains("application.yml")
-        )),
-        "{rotated:?}"
-    );
-    assert_eq!(minted(&ctx), before);
-    assert_eq!(read(&starting), "server:\n  port: 25600\n");
-}
+mod replacing;
