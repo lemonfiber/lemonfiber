@@ -325,6 +325,14 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
                     path: "/home/op/.config/lemonfiber/env/komga.env".to_owned(),
                     puts: Puts::Secrets,
                 },
+                Changing {
+                    path: "/opt/lemonfiber/stack/config/komga/application.yml".to_owned(),
+                    puts: Puts::Starting,
+                },
+                Changing {
+                    path: "/opt/lemonfiber/stack/config/komga-adapter/upstream.json".to_owned(),
+                    puts: Puts::Upstream,
+                },
             ],
             ..install(one, false)
         })),
@@ -342,6 +350,14 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
     assert_eq!(keyed, [format!("a key        {key}")], "{said}");
     assert!(
         said.contains("secrets file /home/op/.config/lemonfiber/env/komga.env"),
+        "{said}"
+    );
+    assert!(
+        said.contains("a file       /opt/lemonfiber/stack/config/komga/application.yml"),
+        "{said}"
+    );
+    assert!(
+        said.contains("credentials  /opt/lemonfiber/stack/config/komga-adapter/upstream.json"),
         "{said}"
     );
 }

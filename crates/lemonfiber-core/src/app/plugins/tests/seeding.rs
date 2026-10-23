@@ -163,3 +163,75 @@ async fn a_seeded_file_reached_through_a_link_the_service_planted_is_not_written
     );
     assert!(!elsewhere.path().join("application.yml").exists());
 }
+
+/// `at`'s upstream shipping a link among its starting files.
+#[cfg(unix)]
+fn linked(at: &std::path::Path) {
+    let _ = std::os::unix::fs::symlink(at.join("plugin.toml"), at.join("config/komga/linked.yml"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_link_among_the_starting_files_is_refused_before_anything_is_written() {
+    let ctx = seeding("seeded-linked-shipped");
+    let at = shipped("seeded-linked-shipped");
+    linked(&at);
+    let problem = installing(&ctx, &at).await.err();
+    let code = problem.as_ref().map(|problem| problem.code.to_string());
+    let said = problem
+        .and_then(|problem| problem.detail)
+        .unwrap_or_default();
+    assert_eq!(code, Some(crate::error::codes::plugin::REFUSED.to_string()));
+    assert!(said.contains("no starting file may be either"), "{said}");
+    assert_eq!(minted(&ctx), None);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn starting_files_that_cannot_be_read_again_once_accepted_plan_nothing() {
+    let ctx = seeding("seeded-reread");
+    let at = shipped("seeded-reread");
+    let outcome = installing(&ctx, &at).await;
+    assert!(outcome.is_ok(), "{outcome:?}");
+    let register = super::super::read(&ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let installed = register.installed().first().cloned();
+    assert!(installed.is_some(), "the seeded plugin was not registered");
+    let Some(installed) = installed else {
+        return;
+    };
+    linked(&at);
+
+    let planned = super::super::planned::writes(
+        &ctx,
+        &installed,
+        &stack_of(&ctx),
+        Some(&crate::plugin::root(&at)),
+    );
+    let problem = planned.err();
+    assert_eq!(
+        problem.as_ref().map(|problem| problem.code.to_string()),
+        Some(crate::error::codes::plugin::UNREADABLE.to_string())
+    );
+    assert!(problem
+        .and_then(|problem| problem.detail)
+        .is_some_and(|said| said.contains("no starting file may be either")));
+}
+
+#[test]
+fn nothing_is_minted_where_the_machine_supplies_no_random_bytes() {
+    let mut ctx = seeding("seeded-unminted");
+    ctx.seams.random = std::sync::Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None));
+    let manifest = lemonfiber_plugin::Manifest::from_toml(&seeded());
+    assert!(manifest.is_ok(), "{manifest:?}");
+    let Ok(manifest) = manifest else {
+        return;
+    };
+
+    let refused = super::super::minting::minted(&ctx, "komga", &manifest, "1");
+
+    assert!(refused
+        .err()
+        .and_then(|problem| problem.detail)
+        .is_some_and(|said| said.contains(crate::plugin::seeding::UNMINTED)));
+    assert_eq!(minted(&ctx), None);
+}

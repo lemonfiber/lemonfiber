@@ -627,3 +627,16 @@ async fn a_first_run_that_does_not_finish_fails_the_service_at_it() {
     }
     assert_eq!(unfinished(crate::seed::State::Wired), "Wired");
 }
+
+#[tokio::test]
+async fn an_adapter_fronting_a_minted_upstream_credential_is_handed_it_and_recorded() {
+    let minting = FRONTED.replace(
+        "fronts      = \"jellyfin\"\n",
+        "fronts      = \"jellyfin\"\nupstream    = { api_key = { secret = \"upstream-key\" } }\n",
+    ) + "\n[[secret]]\nid     = \"upstream-key\"\nof     = \"jellyfin\"\nminted = true\nwhy    = \
+         \"The key the adapter signs in to Jellyfin with\"\n";
+    let at = source("fronted-minted-upstream", &minting);
+    let read = recorded(&at, &engine(), &answering(), Some(7)).await;
+    assert_eq!(failed_at(&read), Vec::new());
+    assert_eq!(read.recordings.len(), 4);
+}

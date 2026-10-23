@@ -109,8 +109,12 @@ pub(crate) fn carry_out(
                 )?;
                 continue;
             }
-            crate::plugin::Lands::Starting { .. } | crate::plugin::Lands::Upstream(_) => {
-                seeding::seeded(ctx, (plugin, stamp, &journal), write)?;
+            crate::plugin::Lands::Starting { bytes, seeded } => {
+                seeding::starting(ctx, (plugin, stamp, &journal), &write.path, bytes, *seeded)?;
+                continue;
+            }
+            crate::plugin::Lands::Upstream(fields) => {
+                seeding::upstream(ctx, (plugin, stamp, &journal), &write.path, fields)?;
                 continue;
             }
         };

@@ -437,3 +437,33 @@ fn a_file_held_beside_the_starting_files_is_its_owners_alone_and_replaces_a_link
         .hold("absent/lemonfiber.key", "k3y")
         .is_err_and(|why| why.contains("could not be made at")));
 }
+
+#[test]
+fn a_secret_named_in_two_starting_files_is_minted_once_for_the_copy() {
+    let source = Scratch::new("throwaway-minted-once");
+    put(
+        &source,
+        "config/recyclarr/a.yml",
+        b"key: {{secret:api-key}}\n",
+    );
+    put(
+        &source,
+        "config/recyclarr/b.yml",
+        b"key: {{secret:api-key}}\n",
+    );
+    let copy = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling());
+    let minted = copy
+        .as_ref()
+        .ok()
+        .and_then(|copy| copy.minted("api-key"))
+        .map(str::to_owned)
+        .unwrap_or_default();
+    let read = |relative: &str| {
+        copy.as_ref()
+            .ok()
+            .and_then(|copy| std::fs::read_to_string(copy.path().join(relative)).ok())
+    };
+    assert_eq!(minted.len(), 32, "{minted:?}");
+    assert_eq!(read("a.yml"), Some(format!("key: {minted}\n")));
+    assert_eq!(read("b.yml"), Some(format!("key: {minted}\n")));
+}
