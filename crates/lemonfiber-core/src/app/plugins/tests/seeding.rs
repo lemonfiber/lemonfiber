@@ -235,3 +235,61 @@ fn nothing_is_minted_where_the_machine_supplies_no_random_bytes() {
         .is_some_and(|said| said.contains(crate::plugin::seeding::UNMINTED)));
     assert_eq!(minted(&ctx), None);
 }
+
+/// What carrying out `lands` at `komga`'s `application.yml` says went wrong, where it did.
+fn carried(ctx: &Ctx, lands: crate::plugin::Lands) -> Option<String> {
+    let planned = [crate::plugin::Write {
+        path: stack_of(ctx).join("config/komga/application.yml"),
+        lands,
+    }];
+    super::super::writing::carry_out(ctx, "komga", "1", &planned)
+        .err()
+        .map(|problem| problem.detail.unwrap_or_default())
+}
+
+#[test]
+fn a_seeded_write_naming_a_secret_nothing_holds_writes_nothing() {
+    let ctx = seeding("seeded-unheld");
+    let starting = carried(
+        &ctx,
+        crate::plugin::Lands::Starting {
+            bytes: b"api-key: {{secret:nobody}}\n".to_vec(),
+            seeded: true,
+        },
+    );
+    let upstream = carried(
+        &ctx,
+        crate::plugin::Lands::Upstream([("api_key".to_owned(), "nobody".to_owned())].into()),
+    );
+
+    assert!(
+        starting
+            .as_deref()
+            .is_some_and(|said| said.contains("nobody, which nothing holds")),
+        "{starting:?}"
+    );
+    assert!(
+        upstream
+            .as_deref()
+            .is_some_and(|said| said.contains("names the secret nobody")),
+        "{upstream:?}"
+    );
+    assert!(!stack_of(&ctx).join("config/komga/application.yml").exists());
+}
+
+#[test]
+fn nothing_is_minted_where_the_secret_store_cannot_be_written() {
+    let manifest = lemonfiber_plugin::Manifest::from_toml(&seeded());
+    assert!(manifest.is_ok(), "{manifest:?}");
+    let Ok(manifest) = manifest else {
+        return;
+    };
+    let unfiled = seeding("seeded-unfiled");
+    let store = crate::settings::secrets_at(&unfiled).unwrap_or_default();
+    let _ = std::fs::create_dir_all(store.join("in-the-way"));
+    let mut storeless = seeding("seeded-storeless");
+    storeless.settings.env_file = None;
+
+    assert!(super::super::minting::minted(&unfiled, "komga", &manifest, "1").is_err());
+    assert!(super::super::minting::minted(&storeless, "komga", &manifest, "1").is_err());
+}

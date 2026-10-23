@@ -59,7 +59,10 @@ pub(crate) fn carry_out(
     // files live is the machine setup has not run on, which is the very refusal every
     // other record raises — reused rather than restated, so an operator meets one
     // sentence about it rather than two.
-    let Some(paths) = crate::app::targets::layout(ctx) else {
+    let (Some(paths), Some(stack)) = (
+        crate::app::targets::layout(ctx),
+        super::super::project::directory(ctx),
+    ) else {
         return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
     };
     let journal = paths.journal();
@@ -110,11 +113,18 @@ pub(crate) fn carry_out(
                 continue;
             }
             crate::plugin::Lands::Starting { bytes, seeded } => {
-                seeding::starting(ctx, (plugin, stamp, &journal), &write.path, bytes, *seeded)?;
+                seeding::starting(
+                    ctx,
+                    (plugin, stamp, &journal),
+                    &stack,
+                    &write.path,
+                    bytes,
+                    *seeded,
+                )?;
                 continue;
             }
             crate::plugin::Lands::Upstream(fields) => {
-                seeding::upstream(ctx, (plugin, stamp, &journal), &write.path, fields)?;
+                seeding::upstream(ctx, (plugin, stamp, &journal), &stack, &write.path, fields)?;
                 continue;
             }
         };
@@ -146,7 +156,7 @@ pub(crate) fn carry_out(
 }
 
 /// Why a path beneath the stack directory is not written to.
-pub(super) const LINKED: &str = "it is reached through a link or lies outside the stack directory";
+const LINKED: &str = "it is reached through a link or lies outside the stack directory";
 
 /// Refuse where a mount source of `installed`'s services is reached through a link from
 /// the stack directory, before its document is written from the record.

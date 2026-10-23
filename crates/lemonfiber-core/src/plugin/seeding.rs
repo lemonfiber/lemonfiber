@@ -23,7 +23,10 @@ use super::program::{shipped as held, Starting};
 pub(crate) const MINTED_BYTES: usize = 16;
 
 /// How many rounds the hashed form of a secret is derived over.
-const ROUNDS: u32 = 100_000;
+const ROUNDS: NonZeroU32 = match NonZeroU32::new(100_000) {
+    Some(rounds) => rounds,
+    None => NonZeroU32::MIN,
+};
 
 /// How many random bytes salt the hashed form of a secret.
 const SALT_BYTES: usize = 16;
@@ -159,7 +162,7 @@ fn hashed(value: &str, random: &dyn Random) -> Option<String> {
     let mut hash = [0_u8; ring::digest::SHA512_OUTPUT_LEN];
     ring::pbkdf2::derive(
         ring::pbkdf2::PBKDF2_HMAC_SHA512,
-        NonZeroU32::new(ROUNDS)?,
+        ROUNDS,
         &salt,
         value.as_bytes(),
         &mut hash,
@@ -183,10 +186,10 @@ pub(crate) fn written(
     value: &dyn Fn(&str) -> Option<String>,
     random: &dyn Random,
 ) -> Result<Vec<u8>, String> {
-    if !seeded(bytes) {
-        return Ok(bytes.to_vec());
-    }
-    let text = std::str::from_utf8(bytes).map_err(|why| why.to_string())?;
+    let text = match std::str::from_utf8(bytes) {
+        Ok(text) if seeded(bytes) => text,
+        _ => return Ok(bytes.to_vec()),
+    };
     filled(text, |placeholder| {
         let held = value(placeholder.secret).ok_or_else(|| {
             format!(

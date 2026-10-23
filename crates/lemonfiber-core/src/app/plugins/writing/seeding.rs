@@ -8,13 +8,14 @@ use crate::error::Problem;
 use crate::ports::filesystem::Readable;
 
 use super::super::super::Ctx;
-use super::{recorded_making, unwritable, LINKED};
+use super::{recorded_making, unwritable};
 
 /// Write a starting file holding `bytes`, each secret it names written as the secret store
 /// holds it for the plugin, readable by its owner alone where it names one.
 pub(super) fn starting(
     ctx: &Ctx,
     recording: (&str, &str, &Path),
+    stack: &Path,
     path: &Path,
     bytes: &[u8],
     seeded: bool,
@@ -30,7 +31,7 @@ pub(super) fn starting(
     } else {
         Readable::Shared
     };
-    made_confined(ctx, recording, path, &bytes, readable)
+    made_confined(ctx, recording, stack, path, &bytes, readable)
 }
 
 /// Write an adapter's `upstream.json`, each of `fields` with its secret's value as the
@@ -38,12 +39,20 @@ pub(super) fn starting(
 pub(super) fn upstream(
     ctx: &Ctx,
     recording: (&str, &str, &Path),
+    stack: &Path,
     path: &Path,
     fields: &BTreeMap<String, String>,
 ) -> Result<(), Box<Problem>> {
     let text = crate::plugin::seeding::upstream(fields, &holding(ctx, recording.0))
         .map_err(|why| Box::new(unwritable(path, &why)))?;
-    made_confined(ctx, recording, path, text.as_bytes(), Readable::Owner)
+    made_confined(
+        ctx,
+        recording,
+        stack,
+        path,
+        text.as_bytes(),
+        Readable::Owner,
+    )
 }
 
 /// The value the secret store holds for each of `plugin`'s secrets, by its id.
@@ -59,21 +68,20 @@ fn holding(ctx: &Ctx, plugin: &str) -> impl Fn(&str) -> Option<String> {
     }
 }
 
-/// Write one file beneath the stack directory that a plugin's service reads, readable as
-/// `readable` says, through no link on the way to it, since the directory is one its
-/// container writes.
+/// Write one file beneath `stack` that a plugin's service reads, readable as `readable`
+/// says, through no link on the way to it, since the directory is one its container
+/// writes.
 fn made_confined(
     ctx: &Ctx,
     recording: (&str, &str, &Path),
+    stack: &Path,
     path: &Path,
     content: &[u8],
     readable: Readable,
 ) -> Result<(), Box<Problem>> {
-    let stack = super::super::super::project::directory(ctx)
-        .ok_or_else(|| Box::new(unwritable(path, LINKED)))?;
     recorded_making(ctx, recording, path, false)?;
     ctx.seams
         .confined
-        .written(path, &stack, content, readable)
+        .written(path, stack, content, readable)
         .map_err(|fault| Box::new(unwritable(path, &fault.message)))
 }

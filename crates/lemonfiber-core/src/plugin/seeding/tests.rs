@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::num::NonZeroU32;
 use std::path::Path;
 
 use base64::Engine as _;
@@ -67,7 +66,7 @@ fn the_hashed_form_is_a_salted_pbkdf2_of_the_value_that_verifies() {
     let hash = encoded.decode(hash).unwrap_or_default();
     let verified = ring::pbkdf2::verify(
         ring::pbkdf2::PBKDF2_HMAC_SHA512,
-        NonZeroU32::new(100_000).unwrap_or(NonZeroU32::MIN),
+        super::ROUNDS,
         &salt,
         HELD.as_bytes(),
         &hash,
@@ -149,4 +148,14 @@ fn a_services_starting_files_hold_no_more_placeholders_in_all_than_it_may() {
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(said.iter().all(|one| one.location == "config/komga"
         && one.message.contains("holds 18 placeholders, past the 16")));
+}
+
+#[test]
+fn the_hashed_form_is_refused_without_random_bytes_to_salt_it() {
+    let refused = written(
+        b"WebUI\\Password_PBKDF2=\"{{secret:api-key|pbkdf2}}\"",
+        &held,
+        &Chance::exactly(None),
+    );
+    assert_eq!(refused, Err(super::UNMINTED.to_owned()));
 }
