@@ -159,3 +159,68 @@ fn the_hashed_form_is_refused_without_random_bytes_to_salt_it() {
     );
     assert_eq!(refused, Err(super::UNMINTED.to_owned()));
 }
+
+#[test]
+fn a_replaced_value_is_written_where_the_old_one_stands_and_nothing_else_moves() {
+    let template = b"[misc]\napi_key = {{secret:api-key}}\nport = 8080\n";
+    let current = b"[misc]\nhost = 0.0.0.0\napi_key = was\nport = 8080\n# written by the service\n";
+    let replaced = super::replaced(template, current, "api-key", "fedcba", &Chance::cycling());
+    assert_eq!(
+        replaced,
+        Ok(Some(
+            b"[misc]\nhost = 0.0.0.0\napi_key = fedcba\nport = 8080\n# written by the service\n"
+                .to_vec()
+        ))
+    );
+    assert_eq!(
+        super::replaced(template, current, "other", "fedcba", &Chance::cycling()),
+        Ok(None)
+    );
+}
+
+#[test]
+fn a_replacement_whose_line_is_gone_twice_there_or_unanchored_is_refused() {
+    let random = Chance::cycling();
+    let template = b"api_key = {{secret:api-key}}\n";
+    for (template, current, says) in [
+        (
+            &template[..],
+            &b"apikey = 0123\n"[..],
+            "is not where the service keeps it now",
+        ),
+        (
+            &template[..],
+            &b"api_key = 01\napi_key = 23\n"[..],
+            "is not where the service keeps it now",
+        ),
+        (
+            &b"{{secret:api-key}}\n"[..],
+            &b"0123\n"[..],
+            "stands alone on its line",
+        ),
+        (&template[..], &[0xff, 0xfe][..], "it is not text"),
+    ] {
+        let refused = super::replaced(template, current, "api-key", "fedcba", &random);
+        assert!(
+            refused.as_ref().is_err_and(|why| why.contains(says)),
+            "{says}: {refused:?}"
+        );
+    }
+}
+
+#[test]
+fn a_replaced_hash_is_derived_afresh_for_the_new_value() {
+    let replaced = super::replaced(
+        b"WebUI\\Password_PBKDF2=\"{{secret:api-key|pbkdf2}}\"\n",
+        b"WebUI\\Port=8080\nWebUI\\Password_PBKDF2=\"@ByteArray(old:old)\"\n",
+        "api-key",
+        "fedcba",
+        &Chance::exactly(Some(vec![9_u8; 16])),
+    )
+    .ok()
+    .flatten()
+    .and_then(|bytes| String::from_utf8(bytes).ok())
+    .unwrap_or_default();
+    assert!(replaced.starts_with("WebUI\\Port=8080\nWebUI\\Password_PBKDF2=\"@ByteArray("));
+    assert!(!replaced.contains("old:old"), "{replaced}");
+}

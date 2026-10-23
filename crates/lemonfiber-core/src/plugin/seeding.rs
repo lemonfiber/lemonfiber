@@ -205,6 +205,81 @@ pub(crate) fn written(
     .map(String::into_bytes)
 }
 
+/// `current` with the value on each line `template` puts a placeholder naming `secret`
+/// on replaced by `value`, in the form that placeholder names, and every other byte kept;
+/// nothing where `template` names no such placeholder.
+///
+/// The line is found by the text around the placeholder on its line in `template`, which
+/// has to stand on exactly one line of `current` and has to be some text.
+///
+/// # Errors
+///
+/// Where `template` or `current` is not text, the text around a placeholder is none or
+/// is found on no line or on more than one, or a hash has no random bytes to salt it.
+pub(crate) fn replaced(
+    template: &[u8],
+    current: &[u8],
+    secret: &str,
+    value: &str,
+    random: &dyn Random,
+) -> Result<Option<Vec<u8>>, String> {
+    let shipped = std::str::from_utf8(template).map_err(|_| NOT_TEXT.to_owned())?;
+    let named: Vec<_> = placeholders(shipped)?
+        .into_iter()
+        .filter(|placeholder| placeholder.secret == secret)
+        .collect();
+    if named.is_empty() {
+        return Ok(None);
+    }
+    let mut now = std::str::from_utf8(current)
+        .map_err(|_| NOT_TEXT.to_owned())?
+        .to_owned();
+    for placeholder in named {
+        let before = shipped[..placeholder.span.start]
+            .rsplit('\n')
+            .next()
+            .unwrap_or_default();
+        let after = shipped[placeholder.span.end..]
+            .split('\n')
+            .next()
+            .unwrap_or_default();
+        if before.trim().is_empty() && after.trim().is_empty() {
+            return Err(format!(
+                "the placeholder for {secret} stands alone on its line, so nothing finds where its \
+                 value is now"
+            ));
+        }
+        let written = match placeholder.form {
+            Form::Plain => value.to_owned(),
+            Form::Pbkdf2 => hashed(value, random).ok_or_else(|| UNMINTED.to_owned())?,
+        };
+        now = anchored(&now, before, after, &written).ok_or_else(|| {
+            format!("the line holding {secret} is not where the service keeps it now")
+        })?;
+    }
+    Ok(Some(now.into_bytes()))
+}
+
+/// `text` with the one line that starts with `before` and ends with `after` holding
+/// `written` between them, or nothing where no line or more than one does.
+fn anchored(text: &str, before: &str, after: &str, written: &str) -> Option<String> {
+    let mut lines: Vec<String> = text.split('\n').map(str::to_owned).collect();
+    let mut found = lines.iter_mut().filter(|line| {
+        line.len() >= before.len() + after.len()
+            && line.starts_with(before)
+            && line.ends_with(after)
+    });
+    let line = found.next()?;
+    *line = format!("{before}{written}{after}");
+    if found.next().is_some() {
+        return None;
+    }
+    Some(lines.join("\n"))
+}
+
+/// What is said of a starting file that is not text where a secret is to be written in it.
+const NOT_TEXT: &str = "it is not text, so where a secret stands in it cannot be read";
+
 /// The `upstream.json` an adapter reads: each of `fields` with its secret's value.
 ///
 /// # Errors

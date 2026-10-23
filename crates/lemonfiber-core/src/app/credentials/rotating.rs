@@ -70,6 +70,10 @@ pub(crate) async fn rotate(
     project: Option<&Path>,
 ) -> Rotation {
     if let Some(plugin) = held.plugins() {
+        let register = crate::app::plugins::read(ctx).unwrap_or_default();
+        if let Some((installed, secret)) = super::minting::minted(held, register.installed()) {
+            return super::minting::rotate(ctx, held, installed, &secret).await;
+        }
         return Rotation::stopped(
             &held.name,
             Settled::Elsewhere {

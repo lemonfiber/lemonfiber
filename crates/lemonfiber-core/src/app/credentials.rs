@@ -16,6 +16,7 @@
 
 mod declining;
 mod gating;
+mod minting;
 pub(crate) mod pending;
 mod reading;
 mod resetting;

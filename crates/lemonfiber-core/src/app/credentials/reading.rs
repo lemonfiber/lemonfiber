@@ -88,6 +88,9 @@ pub(crate) async fn taken(
 const UNHELD: &str = "nowhere yet — lemonfiber holds a plugin's secret once the plugin's \
                       recipes capture it";
 
+/// Where a secret lemonfiber mints for a plugin lives while nothing holds it.
+const UNMINTED: &str = "nowhere yet — lemonfiber mints it when the plugin is installed";
+
 /// Every secret one installed plugin declared it would hold, attributed to it.
 fn declared(
     ctx: &Ctx,
@@ -118,9 +121,14 @@ fn declared(
                 location: match (crossing, value, location) {
                     (true, ..) => format!("not kept — it is {}'s, and read from there", secret.of),
                     (false, Some(_), Some(at)) => at.to_owned(),
+                    _ if secret.minted => UNMINTED.to_owned(),
                     _ => UNHELD.to_owned(),
                 },
-                origin: Origin::Service,
+                origin: if secret.minted {
+                    Origin::Lemonfiber
+                } else {
+                    Origin::Service
+                },
                 from: crate::origin::Origin::Plugin {
                     named: plugin.plugin.clone(),
                 },
