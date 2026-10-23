@@ -156,7 +156,7 @@ pub fn taking(installed: &Installed) -> Vec<Taking> {
 
 /// What the reading lists as approved one by one: each value the recipes would carry
 /// elsewhere, each service taking a privileged shape, and each credential granted to the
-/// plugin (`ARCH-R323`).
+/// plugin.
 #[must_use]
 pub fn asked(would: &Installed, taking: &[Taking]) -> Vec<String> {
     let mut asked: Vec<String> = super::approvals(&would.recipes)

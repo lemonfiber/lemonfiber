@@ -1,4 +1,5 @@
-//! Every refusal of an install, an update, a removal or a proving, listed so a client can
+//! Every refusal of an install, an update, a removal, a proving or a revoked grant, listed so
+//! a client can
 //! name each code and read its status before it meets it. The status is the one each
 //! code is declared with in the registry.
 //!
@@ -11,16 +12,17 @@ use crate::error::codes::plugin::{
     ADDRESS_REFUSED, ALREADY, ANOTHER_PLUGIN, ANSWERED, CALL_REFUSED, CATALOGUE_OFF,
     CATALOGUE_REPLACED, CATALOGUE_UNREACHABLE, CATALOGUE_UNREADABLE, HEADER_NAMED, INPUT_UNMATCHED,
     MANIFEST_UNKEPT, NEWEST_UNKEPT, NOTHING_TO_PROVE, NOTHING_TO_REMOVE, NOTHING_TO_RUN,
-    NOTHING_TO_UPDATE, NOT_AS_REVIEWED, NOT_CATALOGUED, NOWHERE, NO_REVISION, OCCUPIED,
+    NOTHING_TO_UPDATE, NOT_AS_REVIEWED, NOT_CATALOGUED, NOWHERE, NO_GRANT, NO_REVISION, OCCUPIED,
     PATH_NOT_PLAIN, REFUSED, SCHEME_REFUSED, SIGNATURE_UNVERIFIED, SOURCE_OFF, SPELLED_ALIKE,
-    STEP_FAILED, STRANGER_REPLACING, STUCK, TWO_SOURCES, UNAPPROVED, UNFETCHED, UNPROVED,
-    UNREADABLE, UNRECORDABLE, UNWRITABLE, VALUE_WITHHELD,
+    STEP_FAILED, STRANGER_REPLACING, STUCK, TWO_SOURCES, UNAIMED_CROSSING, UNAPPROVED, UNFETCHED,
+    UNPROVED, UNREADABLE, UNRECORDABLE, UNWRITABLE, VALUE_WITHHELD,
 };
 use crate::error::Code;
 
-/// Every plugin code an install, an update, a removal or a proving is refused with, apart
+/// Every plugin code an install, an update, a removal, a proving or a revoked grant is
+/// refused with, apart
 /// from the record that cannot be read and the offer that moved.
-pub const REFUSALS: [Code; 39] = [
+pub const REFUSALS: [Code; 41] = [
     UNREADABLE,
     REFUSED,
     ALREADY,
@@ -60,6 +62,8 @@ pub const REFUSALS: [Code; 39] = [
     NOTHING_TO_PROVE,
     NOTHING_TO_RUN,
     MANIFEST_UNKEPT,
+    UNAIMED_CROSSING,
+    NO_GRANT,
 ];
 
 #[cfg(test)]

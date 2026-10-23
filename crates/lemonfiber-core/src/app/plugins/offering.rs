@@ -240,7 +240,7 @@ pub(super) fn acting(
 
 /// Whether this run acts on an install's or an update's reading, refused as [`acting`]
 /// refuses, and every service that reading has taking a privileged shape. Each grant the
-/// reading names is asked for as `<setting>@<plugin>` beside the rest (`ARCH-R323`).
+/// reading names is asked for as `<setting>@<plugin>` beside the rest.
 ///
 /// # Errors
 ///

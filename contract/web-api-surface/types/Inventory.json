@@ -1,5 +1,11 @@
 {
   "fields": {
+    "grants": {
+      "type": [
+        "array[ref:CredentialGranted]"
+      ],
+      "required": true
+    },
     "held": {
       "type": [
         "array[ref:CredentialHeld]"
@@ -21,6 +27,12 @@
     "revealed": {
       "type": [
         "anyOf(null,ref:Revealed)"
+      ],
+      "required": false
+    },
+    "revoked": {
+      "type": [
+        "anyOf(null,ref:CredentialRevoked)"
       ],
       "required": false
     },

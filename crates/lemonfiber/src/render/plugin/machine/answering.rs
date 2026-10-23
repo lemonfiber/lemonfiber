@@ -9,7 +9,7 @@
 //! The manifest's own rules refuse such a word before an install reads it; this is the
 //! second wall, not the first.
 
-use lemonfiber_core::plugin::{Adapter, Grant, Recipe, Taking};
+use lemonfiber_core::plugin::{Adapter, Installed, Recipe, Taking};
 use lemonfiber_core::text::plain;
 
 use super::super::super::Lines;
@@ -126,8 +126,9 @@ fn word(adapter: Adapter) -> String {
 
 /// Every credential of another service the plugin is granted, with the capability it is
 /// for, whose it is and, before it is granted, what approving it is written as.
-pub(super) fn granting(plugin: &str, granted: &[Grant], acted: bool) -> Lines {
+pub(super) fn granting(would: &Installed, acted: bool) -> Lines {
     let mut lines = Lines::default();
+    let (plugin, granted) = (would.plugin.as_str(), &would.granted);
     if granted.is_empty() {
         return lines;
     }

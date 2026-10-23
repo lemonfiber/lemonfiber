@@ -1,4 +1,4 @@
-//! What a credential crossing to a plugin is for (`ARCH-R322`).
+//! What a credential crossing to a plugin is for.
 
 use crate::schema::Manifest;
 use crate::Violation;

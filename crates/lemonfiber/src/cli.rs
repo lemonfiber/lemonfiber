@@ -40,7 +40,7 @@ pub use under::{
 pub use allowance::{RawAllowance, RawUnrated};
 pub use bandwidth::RawBandwidth;
 pub use companion::{CompanionCommand, RawCompanion};
-pub use credentials::RawCredentials;
+pub use credentials::{Granting, RawCredentials};
 pub use downloads::{DownloadsCommand, RawDownloads};
 pub use keys::{KeyCommand, RawKey};
 pub use logs::RawLogs;

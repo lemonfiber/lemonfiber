@@ -30,6 +30,12 @@
       ],
       "required": false
     },
+    "granted": {
+      "type": [
+        "array[ref:PluginGrant]"
+      ],
+      "required": false
+    },
     "installed_at": {
       "type": [
         "string"

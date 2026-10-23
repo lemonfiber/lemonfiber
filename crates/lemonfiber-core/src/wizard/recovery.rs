@@ -160,9 +160,9 @@ pub fn described(change: &Change) -> String {
         Kind::DeviceKeyRevoked { name } => format!("the revoke of the device key {name}"),
         Kind::Setting { name, .. } => format!("the setting {name}"),
         Kind::Secret { name, .. } => format!("the secret {name}"),
-        Kind::Granted {
-            plugin, credential, ..
-        } => format!("{plugin}'s grant of {credential}"),
+        Kind::Granted { plugin, grant, .. } => {
+            format!("{plugin}'s grant of {}", grant.credential)
+        }
         Kind::Overlaid { path, .. } => format!("the overlay {path}"),
     }
 }

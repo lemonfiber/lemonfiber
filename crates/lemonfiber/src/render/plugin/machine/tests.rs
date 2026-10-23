@@ -13,7 +13,7 @@ use lemonfiber_core::doctor::{Category, Finding, Verdict as Checked};
 /// The library is mounted for a service that is reached and not for one that is
 /// not, which is not a rule — it is the pair of shapes this renderer draws
 /// differently, arranged so one listing exercises both.
-fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
+pub(super) fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
     Installed {
         granted: Vec::new(),
         plugin: plugin.to_owned(),

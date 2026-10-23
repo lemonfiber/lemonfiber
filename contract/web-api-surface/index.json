@@ -188,6 +188,8 @@
     "PLUGIN-40": 403,
     "PLUGIN-44": 404,
     "PLUGIN-45": 409,
+    "PLUGIN-46": 403,
+    "PLUGIN-47": 404,
     "PLUGIN-5": 400,
     "PLUGIN-6": 500,
     "PLUGIN-7": 500,

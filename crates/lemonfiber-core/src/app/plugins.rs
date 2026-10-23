@@ -87,7 +87,7 @@ mod refusals;
 // What a plugin's services would take that this machine already holds.
 mod occupied;
 // Which plugins may move one of the stack's own services in place.
-mod granting;
+pub(crate) mod granting;
 mod replacing;
 // Installing what the record already holds: an update, or a second source for one name.
 mod planned;

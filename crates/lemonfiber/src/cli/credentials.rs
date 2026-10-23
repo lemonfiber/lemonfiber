@@ -10,7 +10,7 @@
 //! history file, where it would otherwise sit in the clear for as long as that
 //! file lives.
 
-use clap::Args;
+use clap::{Args, Subcommand};
 
 /// What is being asked about the credentials this stack holds.
 #[derive(Debug, Clone, Args)]
@@ -25,4 +25,23 @@ pub struct RawCredentials {
     /// Yes, print it in the clear — having read what that costs.
     #[arg(long, requires = "reveal")]
     pub confirm: bool,
+    /// End a grant of another service's credential to a third-party plugin.
+    #[command(subcommand)]
+    pub grant: Option<Granting>,
+}
+
+/// What can be asked of a credential granted to a third-party plugin.
+#[derive(Debug, Clone, Subcommand)]
+pub enum Granting {
+    /// End one grant: the credential is written out of the plugin's secrets file and its
+    /// services reading it restart. Read first, then answered with the offer it names.
+    Revoke {
+        /// The plugin holding the grant.
+        plugin: String,
+        /// The credential, by the setting `lemonfiber credentials` lists it under.
+        credential: String,
+        /// The offer the reading named, which is the yes to ending it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
+    },
 }

@@ -68,11 +68,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(overriding(&install.overrides, install.recorded));
         lines.extend(answering::recipes(&install.would.recipes));
         lines.extend(answering::taking(&install.taking, acted));
-        lines.extend(answering::granting(
-            &install.would.plugin,
-            &install.would.granted,
-            acted,
-        ));
+        lines.extend(answering::granting(&install.would, acted));
         lines.extend(container(&install.would));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
@@ -373,13 +369,12 @@ fn undone(undo: &Undo) -> String {
         Action::Rehold { name, .. } => format!("put the secret {name} back"),
         Action::Regrant {
             plugin,
-            credential,
+            grant,
             give: true,
-            ..
-        } => format!("granted {credential} to {plugin} again"),
-        Action::Regrant {
-            plugin, credential, ..
-        } => format!("ended {plugin}'s grant of {credential}"),
+        } => format!("granted {} to {plugin} again", grant.credential),
+        Action::Regrant { plugin, grant, .. } => {
+            format!("ended {plugin}'s grant of {}", grant.credential)
+        }
         Action::Leave { path } => format!("left the overlay {path} as it is"),
     }
 }

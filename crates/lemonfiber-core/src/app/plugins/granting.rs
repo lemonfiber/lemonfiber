@@ -1,9 +1,11 @@
-//! What crosses to a third-party plugin only because the operator grants it (`F14-R20`).
+//! What crosses to a third-party plugin only because the operator grants it.
 
+use lemonfiber_manifest::container::Value;
 use lemonfiber_manifest::Manifest;
 
 use super::following::diagnosed;
-use crate::error::codes::plugin::UNAIMED_CROSSING;
+use crate::credential::{Granted, Revoked};
+use crate::error::codes::plugin::{NO_GRANT, UNAIMED_CROSSING};
 use crate::error::{Problem, Remedy, State};
 use crate::journal::{Change, Kind};
 use crate::plugin::first_party::{holds, FirstParty};
@@ -17,7 +19,7 @@ use super::super::Ctx;
 /// # Errors
 ///
 /// Where it declares one, naming the secret and whose credential it is.
-pub(super) fn aimed(would: &Installed, trusted: &[FirstParty]) -> Result<(), Box<Problem>> {
+pub(crate) fn aimed(would: &Installed, trusted: &[FirstParty]) -> Result<(), Box<Problem>> {
     if holds(trusted, would) {
         return Ok(());
     }
@@ -30,13 +32,16 @@ pub(super) fn aimed(would: &Installed, trusted: &[FirstParty]) -> Result<(), Box
                     format!(
                         "{}'s secret {} is {}'s credential and names no capability of {}'s own \
                          it is for",
-                        would.plugin, secret.id, secret.of, would.plugin
+                        would.plugin,
+                        crate::text::plain(&secret.id),
+                        crate::text::plain(&secret.of),
+                        would.plugin
                     ),
                     "Nothing was written. A third-party plugin is granted another service's \
                      credential only for a capability it fills, one credential for each.",
                     Remedy::new(format!(
-                        "Take it up with whoever published {}: the secret names the capability \
-                         it is for with for",
+                        "Take it up with whoever published {}: each secret of another service \
+                         names the capability of the plugin's own it is needed for",
                         would.plugin
                     )),
                 )
@@ -47,9 +52,9 @@ pub(super) fn aimed(would: &Installed, trusted: &[FirstParty]) -> Result<(), Box
 
 /// Each grant `would` asks for where it is not one of `trusted`: every secret of another
 /// service it declares, by the setting that service's credential is held under here, with
-/// the capability it is for. Nothing for a first-party plugin, which `F14-R18` lets the
-/// stack's credentials reach whole, and nothing for a service holding no credential here.
-pub(super) fn asked(
+/// the capability it is for. Nothing for a first-party plugin, which the stack's
+/// credentials reach whole, and nothing for a service holding no credential here.
+pub(crate) fn asked(
     ctx: &Ctx,
     stack: &Manifest,
     others: &[Installed],
@@ -97,7 +102,7 @@ pub(super) fn asked(
 }
 
 /// Each of `grants` stamped as approved at `stamp`.
-pub(super) fn approved(grants: &[Grant], stamp: &str) -> Vec<Grant> {
+pub(crate) fn approved(grants: &[Grant], stamp: &str) -> Vec<Grant> {
     grants
         .iter()
         .map(|grant| Grant {
@@ -113,7 +118,7 @@ pub(super) fn approved(grants: &[Grant], stamp: &str) -> Vec<Grant> {
 /// # Errors
 ///
 /// Where there is no journal to write to, or it would not take them.
-pub(super) fn journalled(
+pub(crate) fn journalled(
     ctx: &Ctx,
     plugin: &str,
     was: &[Grant],
@@ -142,20 +147,128 @@ pub(super) fn journalled(
 }
 
 /// The journalled change of `plugin` being given `grant`, or of the grant ending.
-pub(crate) fn change(plugin: &str, grant: &Grant, given: bool, stamp: &str) -> Change {
+fn change(plugin: &str, grant: &Grant, given: bool, stamp: &str) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: crate::plugin::owner(plugin),
         target: grant.credential.clone(),
         kind: Kind::Granted {
             plugin: plugin.to_owned(),
-            credential: grant.credential.clone(),
-            of: grant.of.clone(),
-            serves: grant.serves.clone(),
-            at: grant.at.clone(),
+            grant: grant.clone(),
             given,
         },
     }
+}
+
+/// The parts revoking a grant is offered over, as a refusal names them.
+pub(super) const REVOKING: [&str; 2] = ["the grant it ends", "what it would restart"];
+
+/// End `plugin`'s grant of `credential`, or say what ending it would do where no offer
+/// is answered or this is a rehearsal.
+///
+/// The credential is written out of every secrets file that read it and the plugin's
+/// services reading it restart, journalled as one operation an undo reverses. What the
+/// plugin was handed while it held the grant it may have kept, which only replacing the
+/// credential takes back.
+///
+/// # Errors
+///
+/// Where the record cannot be read, the plugin holds no such grant, the offer moved, or
+/// the journal, the record or a secrets file cannot be written.
+pub(crate) async fn revoke(
+    ctx: &Ctx,
+    plugin: &str,
+    credential: &str,
+    agreement: Option<&str>,
+) -> Result<Revoked, Box<Problem>> {
+    let held = super::read(ctx)?;
+    let one = held.holds(plugin);
+    let grant = one.and_then(|one| {
+        one.granted
+            .iter()
+            .find(|grant| grant.credential.eq_ignore_ascii_case(credential.trim()))
+    });
+    let (Some(one), Some(grant)) = (one, grant) else {
+        return Err(Box::new(no_grant(plugin, credential, one)));
+    };
+    let restarts = readers(one, &grant.of);
+    let offer = crate::agreement::parted(&[
+        &[&serde_json::to_string(grant).unwrap_or_default()],
+        &[&restarts.join("\n")],
+    ]);
+    let consent = super::Consent {
+        agreement: agreement.map(str::to_owned),
+        ..super::Consent::default()
+    };
+    let mut revoked = Revoked {
+        grant: Granted::of(plugin, grant),
+        restarts,
+        agreement: offer.clone(),
+        ended: false,
+        unrestarted: None,
+    };
+    if !super::offering::acting(ctx, &consent, plugin, &offer, &REVOKING, &[])? {
+        return Ok(revoked);
+    }
+    let stamp = ctx.stamp();
+    journalled(ctx, plugin, std::slice::from_ref(grant), &[], &stamp)?;
+    let mut after = held.clone();
+    after.regrant(plugin, grant, false);
+    super::super::record::keep(super::kept_at(ctx).as_deref(), &after)?;
+    crate::settings::files::reread_now(
+        ctx,
+        &crate::plugin::Holding::Crossing(grant.credential.clone()),
+    )?;
+    let running = crate::settings::running(ctx, &revoked.restarts).await;
+    revoked.unrestarted = crate::settings::restarted(ctx, &running).await;
+    revoked.ended = true;
+    Ok(revoked)
+}
+
+/// Each service of `one` whose environment reads a secret of `of`.
+fn readers(one: &Installed, of: &str) -> Vec<String> {
+    let crossing: Vec<&str> = one
+        .declared
+        .secrets
+        .iter()
+        .filter(|secret| secret.of == of)
+        .map(|secret| secret.id.as_str())
+        .collect();
+    one.services
+        .iter()
+        .filter(|placed| {
+            placed.fields.env.values().any(|value| {
+                matches!(value, Value::Secret(named) if crossing.contains(&named.secret.as_str()))
+            })
+        })
+        .map(|placed| placed.service.clone())
+        .collect()
+}
+
+/// A revoke naming a grant `plugin` does not hold, with the grants it does.
+fn no_grant(plugin: &str, credential: &str, one: Option<&Installed>) -> Problem {
+    let holds: Vec<&str> = one
+        .iter()
+        .flat_map(|one| one.granted.iter().map(|grant| grant.credential.as_str()))
+        .collect();
+    Problem::new(
+        NO_GRANT,
+        format!(
+            "{} holds no grant of {}",
+            crate::text::plain(plugin),
+            crate::text::plain(credential)
+        ),
+        "Nothing was revoked.",
+        Remedy::new(
+            "Revoke one of the grants the plugin holds, as lemonfiber credentials lists them",
+        ),
+    )
+    .with_detail(if holds.is_empty() {
+        "it holds none".to_owned()
+    } else {
+        format!("it holds {}", holds.join(", "))
+    })
+    .in_state(State::Guided)
 }
 
 /// Every secret of `would` that is another service's credential.
@@ -164,6 +277,3 @@ fn crossing(would: &Installed) -> impl Iterator<Item = &crate::plugin::Secret> {
         !crate::plugin::own_secret(&would.plugin, crate::plugin::services_of(would), &secret.of)
     })
 }
-
-#[cfg(test)]
-mod tests;

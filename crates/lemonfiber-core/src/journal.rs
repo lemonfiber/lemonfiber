@@ -258,15 +258,8 @@ pub enum Kind {
     Granted {
         /// The plugin it was granted to.
         plugin: String,
-        /// The setting the credential is held under.
-        credential: String,
-        /// The service whose credential it is.
-        of: String,
-        /// The capability of the plugin's own it was granted to fill.
-        #[serde(rename = "for")]
-        serves: String,
-        /// When the grant was approved.
-        at: String,
+        /// The grant, by the setting the credential is held under.
+        grant: crate::plugin::Grant,
         /// Whether it was given, rather than ended.
         given: bool,
     },
@@ -442,15 +435,8 @@ pub enum Action {
     Regrant {
         /// The plugin the grant is of.
         plugin: String,
-        /// The setting the credential is held under.
-        credential: String,
-        /// The service whose credential it is.
-        of: String,
-        /// The capability of the plugin's own it was granted to fill.
-        #[serde(rename = "for")]
-        serves: String,
-        /// When the grant was approved.
-        at: String,
+        /// The grant, by the setting the credential is held under.
+        grant: crate::plugin::Grant,
         /// Whether to give it, rather than end it.
         give: bool,
     },

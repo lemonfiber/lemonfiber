@@ -13,6 +13,7 @@
         "const:\"leave\"",
         "const:\"move-back\"",
         "const:\"reconfigure\"",
+        "const:\"regrant\"",
         "const:\"rehold\"",
         "const:\"reinstate\"",
         "const:\"reinstate-device\"",
@@ -51,6 +52,18 @@
       ],
       "required": true
     },
+    "give": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "grant": {
+      "type": [
+        "ref:PluginGrant"
+      ],
+      "required": true
+    },
     "id": {
       "type": [
         "string"
@@ -82,6 +95,12 @@
       "required": true
     },
     "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "plugin": {
       "type": [
         "string"
       ],
@@ -142,6 +161,7 @@
     "\"leave\"",
     "\"move-back\"",
     "\"reconfigure\"",
+    "\"regrant\"",
     "\"rehold\"",
     "\"reinstate\"",
     "\"reinstate-device\"",

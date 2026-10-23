@@ -1,4 +1,4 @@
-//! What crosses to a third-party plugin because the operator granted it (`F14-R20`).
+//! What crosses to a third-party plugin because the operator granted it.
 
 use serde::{Deserialize, Serialize};
 

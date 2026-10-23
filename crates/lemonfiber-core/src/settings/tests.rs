@@ -12,6 +12,7 @@ use crate::credential::fingerprint;
 mod changing;
 mod files;
 mod filing;
+mod granting;
 mod own;
 mod reaching;
 mod stacked;
