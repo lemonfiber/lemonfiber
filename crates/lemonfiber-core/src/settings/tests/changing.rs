@@ -487,6 +487,17 @@ async fn a_secret_is_listed_without_its_value_and_never_written_here() {
     assert!(matches!(again, Ok(crate::app::Outcome::Settings(report))
         if report.secrets.iter().any(|one| one.name == "comics:token"
             && one.from == Some(crate::model::SecretFrom::Operator))));
+    let minted = [crate::settings::Keeping {
+        name: "comics:token",
+        value: "minted-value",
+        from: crate::settings::Source::Minted,
+        at: 3,
+    }];
+    assert!(crate::settings::kept(&at, &minted, &|_| Ok(())).is_ok());
+    let made = crate::settings::run::settings(&machine.ctx, &crate::app::Settling::Read).await;
+    assert!(matches!(made, Ok(crate::app::Outcome::Settings(report))
+        if report.secrets.iter().any(|one| one.name == "comics:token"
+            && one.from == Some(crate::model::SecretFrom::Minted))));
 }
 
 #[tokio::test]

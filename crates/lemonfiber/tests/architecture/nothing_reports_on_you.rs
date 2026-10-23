@@ -157,6 +157,13 @@ const MINTING: &[(&str, &str)] = &[
          second key carries another",
     ),
     (
+        "crates/lemonfiber-core/src/plugin/seeding.rs",
+        "the credential a plugin's upstream answers to, minted at install for that one service, \
+         and the salt its hashed form is written with. Held in the secret store and written into \
+         the service's own files and its adapter's on this machine, and sent nowhere else; a \
+         reinstall elsewhere mints another",
+    ),
+    (
         "crates/lemonfiber-core/src/secret.rs",
         "the two passwords lemonfiber has to mint rather than read: the torrent client's web UI \
          and the media server's administrator. Recorded in the settings file because the \

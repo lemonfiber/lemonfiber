@@ -193,6 +193,16 @@ fn stamped(file: &mut EnvFile) {
 /// Returns [`Failure::NotWritten`] where the directory could not be created or
 /// the file could not be written.
 pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
+    write_bytes(path, text.as_bytes())
+}
+
+/// Write `bytes` whole at `path`, owner-only, as [`write`] writes text.
+///
+/// # Errors
+///
+/// Returns [`Failure::NotWritten`] where the directory could not be created or
+/// the file could not be written.
+pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), Failure> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -200,7 +210,7 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
     if let Err(err) = make_private_dir(parent) {
         return Err(unwritable(path, &err));
     }
-    if let Err(err) = write_owner_only(path, text) {
+    if let Err(err) = write_owner_only(path, bytes) {
         return Err(unwritable(path, &err));
     }
     settled(parent);
@@ -233,11 +243,11 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
 /// something at that name that will not be unlinked or by putting a link back between the
 /// unlink and the create; and nothing outside the directory is ever followed, emptied or
 /// changed.
-fn write_owner_only(path: &Path, text: &str) -> std::io::Result<()> {
+fn write_owner_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write as _;
     let (staging, mut file) = staged(path)?;
     let moved = file
-        .write_all(text.as_bytes())
+        .write_all(bytes)
         .and_then(|()| make_private(&file))
         .and_then(|()| file.sync_all())
         .and_then(|()| std::fs::rename(&staging, path));

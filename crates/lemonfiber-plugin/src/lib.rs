@@ -21,6 +21,7 @@ pub mod offering;
 pub mod pointing;
 pub mod refusing;
 mod schema;
+pub mod seeding;
 pub mod vocabulary;
 
 pub use conforming::Violation;

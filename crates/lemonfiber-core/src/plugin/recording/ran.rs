@@ -62,6 +62,7 @@ pub(super) async fn taken(
     running: Running<'_>,
     root: &Path,
     program: &dyn Program,
+    random: &dyn crate::ports::random::Random,
 ) -> Taken {
     let took = match (running.fixture, placed(manifest, running.service)) {
         (Some(fixture), Some(placed)) => {
@@ -75,6 +76,7 @@ pub(super) async fn taken(
                 running.run,
                 &Operator::recording(),
                 Some(starting),
+                random,
             )
             .await;
             let pinned = format!("{}@{}", placed.image, placed.digest);

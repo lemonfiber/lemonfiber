@@ -66,7 +66,7 @@ pub(crate) async fn update(
     unheld(ctx, &would, without.installed(), stack)?;
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
-        super::planned::writes(ctx, &would, stack)?,
+        super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?,
     ));
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
     let (acting, taking) =
@@ -281,11 +281,15 @@ enum Came {
 /// reading taken before anything moved. It carries out no reversal of its own; the
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
-    let put = super::planned::writes(ctx, coming.would, coming.stack).and_then(|planned| {
-        let planned = super::writing::landing(ctx, planned);
-        super::writing::unlinked(ctx, coming.would, coming.stack)
-            .and_then(|()| carry_out(ctx, &coming.would.plugin, coming.stamp, &planned))
-    });
+    let put = super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source))
+        .and_then(|planned| {
+            let planned = super::writing::landing(ctx, planned);
+            super::writing::unlinked(ctx, coming.would, coming.stack)
+                .and_then(|()| {
+                    super::minting::minted(ctx, &coming.would.plugin, coming.manifest, coming.stamp)
+                })
+                .and_then(|()| carry_out(ctx, &coming.would.plugin, coming.stamp, &planned))
+        });
     if let Err(why) = put {
         return Came::Stopped(why.detail.unwrap_or(why.summary));
     }
@@ -394,7 +398,7 @@ pub(super) fn brought_back(
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()
-        && super::planned::writes(ctx, was, stack)
+        && super::planned::writes(ctx, was, stack, None)
             .and_then(|planned| {
                 carry_out(
                     ctx,

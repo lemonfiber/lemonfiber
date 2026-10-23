@@ -33,7 +33,7 @@ fn a_copy_holds_every_starting_file_and_goes_when_dropped() {
         "config/other/elsewhere.yml",
         b"not this service's\n",
     );
-    let copy = Throwaway::of(of(&source));
+    let copy = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling());
     let made = copy.as_ref().ok().map(|copy| copy.path().to_path_buf());
     let read = |relative: &str| {
         made.as_ref()
@@ -52,7 +52,7 @@ fn a_copy_is_open_to_whoever_the_run_is_and_its_parent_to_nobody_else() {
     use std::os::unix::fs::PermissionsExt as _;
     let source = Scratch::new("throwaway-modes");
     put(&source, "config/recyclarr/recyclarr.yml", b"x");
-    let copy = Throwaway::of(of(&source));
+    let copy = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling());
     let mode = |at: &Path| {
         std::fs::metadata(at)
             .map(|meta| meta.permissions().mode() & 0o777)
@@ -71,7 +71,7 @@ fn a_copy_is_open_to_whoever_the_run_is_and_its_parent_to_nobody_else() {
 #[test]
 fn a_service_shipping_nothing_is_run_with_an_empty_directory() {
     let source = Scratch::new("throwaway-none");
-    let copy = Throwaway::of(of(&source));
+    let copy = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling());
     let empty = copy
         .as_ref()
         .ok()
@@ -114,7 +114,7 @@ fn a_link_anywhere_from_the_source_down_is_refused_rather_than_followed() {
     );
 
     for source in [&linked_start, &linked_ancestor, &linked_file, &linked_below] {
-        let refused = Throwaway::of(of(source));
+        let refused = Throwaway::of(of(source), &lemonfiber_fixtures::ports::Chance::cycling());
         assert!(
             refused
                 .as_ref()
@@ -176,25 +176,28 @@ fn starting_files_past_the_bounds_are_refused() {
     for index in 0..=MOST_FILES {
         put(&many, &format!("config/recyclarr/{index}.yml"), b"x");
     }
-    let refused = Throwaway::of(of(&many));
+    let refused = Throwaway::of(of(&many), &lemonfiber_fixtures::ports::Chance::cycling());
     assert!(refused.is_err_and(|why| why.contains("pass 64 files")));
 
     let exactly = Scratch::new("throwaway-exactly");
     for index in 0..MOST_FILES {
         put(&exactly, &format!("config/recyclarr/{index}.yml"), b"x");
     }
-    assert!(Throwaway::of(of(&exactly)).is_ok());
+    assert!(Throwaway::of(of(&exactly), &lemonfiber_fixtures::ports::Chance::cycling()).is_ok());
 
     let heavy = Scratch::new("throwaway-heavy");
     let half = usize::try_from(MOST_BYTES / 2).unwrap_or_default();
     put(&heavy, "config/recyclarr/a.bin", &vec![0; half]);
     put(&heavy, "config/recyclarr/b.bin", &vec![0; half + 1]);
-    assert!(Throwaway::of(of(&heavy)).is_err_and(|why| why.contains("bytes")));
+    assert!(
+        Throwaway::of(of(&heavy), &lemonfiber_fixtures::ports::Chance::cycling())
+            .is_err_and(|why| why.contains("bytes"))
+    );
 
     let full = Scratch::new("throwaway-full");
     put(&full, "config/recyclarr/a.bin", &vec![0; half]);
     put(&full, "config/recyclarr/b.bin", &vec![0; half]);
-    assert!(Throwaway::of(of(&full)).is_ok());
+    assert!(Throwaway::of(of(&full), &lemonfiber_fixtures::ports::Chance::cycling()).is_ok());
 }
 
 #[test]
@@ -243,7 +246,11 @@ fn a_copy_that_cannot_be_made_where_it_goes_is_refused_naming_where() {
     put(&source, "config/recyclarr/recyclarr.yml", b"x");
     let temp = Scratch::new("throwaway-unmade-temp");
     let _ = std::fs::write(temp.join("file"), "a file where a directory goes");
-    let refused = Throwaway::beneath(&temp.join("file"), of(&source));
+    let refused = Throwaway::beneath(
+        &temp.join("file"),
+        of(&source),
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+    );
     assert!(
         refused
             .as_ref()
@@ -311,7 +318,8 @@ fn a_directory_or_file_that_cannot_be_read_is_refused_rather_than_skipped() {
 #[test]
 fn a_further_directory_beside_the_copy_is_open_to_the_service_and_goes_with_it() {
     let source = Scratch::new("throwaway-emptied");
-    let Ok(copy) = Throwaway::of(of(&source)) else {
+    let Ok(copy) = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling())
+    else {
         return;
     };
     let data = copy.emptied("data");
@@ -338,7 +346,8 @@ fn a_further_directory_beside_the_copy_is_open_to_the_service_and_goes_with_it()
 #[test]
 fn what_ran_with_the_copy_left_in_it_is_read_back_from_a_file_beneath_it_alone() {
     let source = Scratch::new("throwaway-wrote");
-    let Ok(copy) = Throwaway::of(of(&source)) else {
+    let Ok(copy) = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling())
+    else {
         return;
     };
     let _ = std::fs::create_dir_all(copy.path().join("deep"));
@@ -374,7 +383,8 @@ fn what_ran_with_the_copy_is_never_read_back_through_a_link_it_made() {
     let elsewhere = Scratch::new("throwaway-wrote-elsewhere");
     put(&elsewhere, "host.xml", b"host secret");
     let source = Scratch::new("throwaway-wrote-linked");
-    let Ok(copy) = Throwaway::of(of(&source)) else {
+    let Ok(copy) = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling())
+    else {
         return;
     };
     let _ = symlink(elsewhere.join("host.xml"), copy.path().join("named.xml"));
@@ -392,7 +402,8 @@ fn what_ran_with_the_copy_is_never_read_back_through_a_link_it_made() {
 fn a_file_held_beside_the_starting_files_is_its_owners_alone_and_replaces_a_link() {
     use std::os::unix::fs::PermissionsExt as _;
     let source = Scratch::new("throwaway-held");
-    let Ok(copy) = Throwaway::of(of(&source)) else {
+    let Ok(copy) = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling())
+    else {
         return;
     };
     let mode = |at: &Path| {
@@ -425,4 +436,34 @@ fn a_file_held_beside_the_starting_files_is_its_owners_alone_and_replaces_a_link
     assert!(copy
         .hold("absent/lemonfiber.key", "k3y")
         .is_err_and(|why| why.contains("could not be made at")));
+}
+
+#[test]
+fn a_secret_named_in_two_starting_files_is_minted_once_for_the_copy() {
+    let source = Scratch::new("throwaway-minted-once");
+    put(
+        &source,
+        "config/recyclarr/a.yml",
+        b"key: {{secret:api-key}}\n",
+    );
+    put(
+        &source,
+        "config/recyclarr/b.yml",
+        b"key: {{secret:api-key}}\n",
+    );
+    let copy = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling());
+    let minted = copy
+        .as_ref()
+        .ok()
+        .and_then(|copy| copy.minted("api-key"))
+        .map(str::to_owned)
+        .unwrap_or_default();
+    let read = |relative: &str| {
+        copy.as_ref()
+            .ok()
+            .and_then(|copy| std::fs::read_to_string(copy.path().join(relative)).ok())
+    };
+    assert_eq!(minted.len(), 32, "{minted:?}");
+    assert_eq!(read("a.yml"), Some(format!("key: {minted}\n")));
+    assert_eq!(read("b.yml"), Some(format!("key: {minted}\n")));
 }

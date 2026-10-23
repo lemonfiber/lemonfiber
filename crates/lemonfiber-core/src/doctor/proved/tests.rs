@@ -36,6 +36,7 @@ fn running(program: Arc<Proving>, kept: &Scratch, now: &str, uid: &str) -> Runni
         starting: Some(kept.path().to_path_buf()),
         kept: Some(kept.join("run-proofs.json")),
         now: now.to_owned(),
+        random: Arc::new(lemonfiber_fixtures::ports::Chance::cycling()),
     }
 }
 

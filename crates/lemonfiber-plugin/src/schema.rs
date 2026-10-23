@@ -232,6 +232,10 @@ pub struct Service {
     /// against. Required where `speaks` is.
     #[serde(default)]
     pub fronts: Option<String>,
+    /// Each field of the `upstream.json` lemonfiber writes for this adapter, to the secret
+    /// it holds.
+    #[serde(default)]
+    pub upstream: std::collections::BTreeMap<String, lemonfiber_manifest::container::SecretOf>,
     /// The API this service answers the stack's other services in, by the name those
     /// services know it by: declared on the upstream an adapter of the same plugin fronts,
     /// where other services reach that upstream directly rather than through the adapter.

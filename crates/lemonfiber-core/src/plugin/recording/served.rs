@@ -52,10 +52,13 @@ pub(super) async fn answers(
             log: Vec::new(),
         }
     };
-    let copy = Throwaway::of(Some(Starting {
-        root,
-        service: &placed.service,
-    }))
+    let copy = Throwaway::of(
+        Some(Starting {
+            root,
+            service: &placed.service,
+        }),
+        recorder.random,
+    )
     .map_err(failing("starting files"))?;
     certified(placed, &copy).map_err(failing("certificate"))?;
     let data = if placed.takes_data {
@@ -71,7 +74,8 @@ pub(super) async fn answers(
         .serve(&serve)
         .await
         .map_err(|unran| failing("container")(unran.to_string()))?;
-    let mut scrub = Scrub::of(&[], Some(&served));
+    let seeded: Vec<String> = copy.made().map(str::to_owned).collect();
+    let mut scrub = Scrub::of(&seeded, Some(&served));
     let reaching = Reaching {
         placed,
         copy: &copy,
@@ -199,6 +203,7 @@ async fn asked(
     }
     let mut made: Vec<String> = held.iter().flat_map(|held| held.made.clone()).collect();
     made.extend(reaching.before.key.iter().cloned());
+    made.extend(reaching.copy.made().map(str::to_owned));
     *scrub = Scrub::of(&made, Some(served));
     let port = served.port;
     let mut answers = Vec::new();

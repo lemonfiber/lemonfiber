@@ -109,6 +109,35 @@ pub(crate) fn names(said: &[String], words: &[&str]) -> bool {
         .any(|one| words.iter().all(|word| one.contains(word)))
 }
 
+/// The upstream the fixture's service stands in front of when it speaks.
+pub(crate) const UPSTREAM: &str = r#"[[service]]
+id          = "komga-server"
+name        = "Komga server"
+image       = "docker.io/gotson/komga"
+digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+tag         = "1.11.0"
+criticality = "important"
+
+"#;
+
+/// The fixture's service, speaking `speaks` in front of an upstream of its own and
+/// saying `rest`.
+pub(crate) fn speaking(speaks: &str, rest: &str) -> String {
+    INSTALLABLE
+        .replace(
+            "config_path = \"/config\"\n",
+            &format!(
+                "config_path = \"/config\"\nspeaks      = {speaks}\nfronts      = \"komga-server\"\n{rest}"
+            ),
+        )
+        .replace("[[claim]]\n", &format!("{UPSTREAM}[[claim]]\n"))
+        .replace("[[wiring]]\n", "[[wiring]]\nservice         = \"komga\"\n")
+        .replace(
+            "id      = \"komga.serves\"\n",
+            "id      = \"komga.serves\"\nservice = \"komga\"\n",
+        )
+}
+
 /// The fixture's service with `added` after its configuration directory.
 pub(crate) fn with(added: &str) -> String {
     INSTALLABLE.replace(

@@ -110,14 +110,7 @@ impl Filling<'_> {
 
     /// What the adapter's `upstream.json` holds now.
     fn upstream(&self) -> Result<serde_json::Map<String, Value>, String> {
-        let held = self
-            .held
-            .wrote(Path::new(UPSTREAM_FILE))?
-            .ok_or_else(|| format!("there is no {UPSTREAM_FILE} yet"))?;
-        match serde_json::from_slice(&held) {
-            Ok(Value::Object(fields)) => Ok(fields),
-            _ => Err(format!("{UPSTREAM_FILE} is not an object")),
-        }
+        held_upstream(self.held)?.ok_or_else(|| format!("there is no {UPSTREAM_FILE} yet"))
     }
 
     /// Each minted credential written to `upstream.json` at its field.
@@ -125,13 +118,33 @@ impl Filling<'_> {
         if minted.is_empty() {
             return Ok(());
         }
-        let mut fields = self.upstream()?;
-        for (field, value) in minted {
-            fields.insert(field.clone(), Value::String(value.clone()));
-        }
-        self.held
-            .hold(UPSTREAM_FILE, &Value::Object(fields).to_string())
+        handed_over(self.held, minted)
     }
+}
+
+/// What the adapter's `upstream.json` in `held` holds, where it holds one.
+fn held_upstream(held: &Throwaway) -> Result<Option<serde_json::Map<String, Value>>, String> {
+    match held.wrote(Path::new(UPSTREAM_FILE))? {
+        None => Ok(None),
+        Some(bytes) => match serde_json::from_slice(&bytes) {
+            Ok(Value::Object(fields)) => Ok(Some(fields)),
+            _ => Err(format!("{UPSTREAM_FILE} is not an object")),
+        },
+    }
+}
+
+/// `fields` written into the adapter's `upstream.json` in `held`, beside whatever else it
+/// already holds.
+///
+/// # Errors
+///
+/// Where what it holds is not an object, or the file could not be written.
+pub(super) fn handed_over(held: &Throwaway, fields: &[(String, String)]) -> Result<(), String> {
+    let mut kept = held_upstream(held)?.unwrap_or_default();
+    for (field, value) in fields {
+        kept.insert(field.clone(), Value::String(value.clone()));
+    }
+    held.hold(UPSTREAM_FILE, &Value::Object(kept).to_string())
 }
 
 #[cfg(test)]

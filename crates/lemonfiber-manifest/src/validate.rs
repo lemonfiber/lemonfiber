@@ -516,6 +516,19 @@ fn contained(service: &Service) -> Vec<String> {
         .into_iter()
         .map(|(at, what)| format!("{}: {what}", at.trim_start_matches(&field)))
         .chain(shaped)
+        .chain(
+            service
+                .secret
+                .iter()
+                .filter(|secret| secret.minted)
+                .map(|secret| {
+                    format!(
+                "secret {}: is minted, and lemonfiber mints a secret for a plugin it installs \
+                 rather than for a part the bundle assembles",
+                secret.id
+            )
+                }),
+        )
         .collect()
 }
 

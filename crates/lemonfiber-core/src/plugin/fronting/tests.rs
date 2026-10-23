@@ -24,6 +24,7 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
         networks: Vec::new(),
         speaks: Vec::new(),
         fronts: None,
+        upstream: std::collections::BTreeMap::new(),
         native: None,
         replaces: None,
         shape: None,

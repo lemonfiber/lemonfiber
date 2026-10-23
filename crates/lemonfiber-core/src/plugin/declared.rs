@@ -28,6 +28,9 @@ pub struct Secret {
     pub of: String,
     /// What holding it is for.
     pub why: String,
+    /// Whether lemonfiber made the value at install.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub minted: bool,
 }
 
 /// What a plugin declared about itself, as its install read it.
@@ -107,6 +110,7 @@ impl Declaration {
                     id: secret.id.clone(),
                     of: secret.of.clone(),
                     why: secret.why.clone(),
+                    minted: secret.minted,
                 })
                 .collect(),
         }

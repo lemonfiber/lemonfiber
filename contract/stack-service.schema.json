@@ -306,6 +306,7 @@
       "type": "object",
       "properties": {
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
+        "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it.", "type": "boolean"},
         "of": {"description": "Whose credential it is.", "type": "string"},
         "why": {"description": "What holding it is for.", "type": "string"}
       },

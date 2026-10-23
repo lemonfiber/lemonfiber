@@ -14,7 +14,7 @@ use lemonfiber_contract::capabilities::{identity::source, media::serve};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::plugin::{Installed, Register};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
-use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying};
+use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying, Readable};
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Access, Certificate, Invited, Member, NamedLibrary};
 use lemonfiber_core::stack::Source;
@@ -259,6 +259,16 @@ impl Confined for Keyed {
         contents: &[u8],
     ) -> Result<(), Fault> {
         self.inner.overwrite(path, within, contents)
+    }
+
+    fn written(
+        &self,
+        path: &std::path::Path,
+        within: &std::path::Path,
+        contents: &[u8],
+        readable: Readable,
+    ) -> Result<(), Fault> {
+        self.inner.written(path, within, contents, readable)
     }
 
     fn lies(&self, path: &std::path::Path, within: &std::path::Path) -> Lying {

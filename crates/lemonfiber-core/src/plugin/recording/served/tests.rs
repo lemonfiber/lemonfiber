@@ -20,10 +20,13 @@ fn placed(text: &str) -> Option<Placed> {
 #[test]
 fn a_service_is_served_as_lemonfiber_runs_it_with_throwaway_files_and_its_port() {
     let source = Scratch::new("served-settled");
-    let Ok(copy) = Throwaway::of(Some(Starting {
-        root: &source,
-        service: "sonarr",
-    })) else {
+    let Ok(copy) = Throwaway::of(
+        Some(Starting {
+            root: &source,
+            service: "sonarr",
+        }),
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+    ) else {
         return;
     };
     let Some(sonarr) = placed(SERVED) else {

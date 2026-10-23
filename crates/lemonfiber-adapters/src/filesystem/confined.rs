@@ -18,7 +18,7 @@
 use std::io::{Read as _, Write as _};
 use std::path::{Component, Path};
 
-use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, Lying, READ_LIMIT};
+use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, Lying, Readable, READ_LIMIT};
 
 use super::Disk;
 
@@ -29,6 +29,16 @@ impl Confined for Disk {
 
     fn overwrite(&self, path: &Path, within: &Path, contents: &[u8]) -> Result<(), Fault> {
         overwrite(path, within, contents)
+    }
+
+    fn written(
+        &self,
+        path: &Path,
+        within: &Path,
+        contents: &[u8],
+        readable: Readable,
+    ) -> Result<(), Fault> {
+        written(path, within, contents, readable)
     }
 
     fn lies(&self, path: &Path, within: &Path) -> Lying {
@@ -91,11 +101,98 @@ pub(super) fn overwrite(path: &Path, within: &Path, contents: &[u8]) -> Result<(
     landed(file.set_len(0).and_then(|()| (&file).write_all(contents)))
 }
 
+/// Write `contents` whole into `path`, made with every directory missing above it, as
+/// `readable` says, opened through the handle of the directory it is in and refusing a
+/// link at its own name, then held to lying beneath `within` by what was opened.
+pub(super) fn written(
+    path: &Path,
+    within: &Path,
+    contents: &[u8],
+    readable: Readable,
+) -> Result<(), Fault> {
+    let file = created(path, within, readable)?;
+    if standing(&file, path, within) != Standing::Plain {
+        return Err(Fault::escaped(path, within));
+    }
+    landed(
+        kept_to(&file, readable)
+            .and_then(|()| file.set_len(0))
+            .and_then(|()| (&file).write_all(contents)),
+    )
+}
+
+/// `path` opened to write, made new readable as `readable` says where it is not there,
+/// through the handle of the directory it is in, every step to which was reached through
+/// no link, and refusing a link at its own name.
+#[cfg(unix)]
+fn created(path: &Path, within: &Path, readable: Readable) -> Result<std::fs::File, Fault> {
+    use rustix::fs::{openat, Mode, OFlags};
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(Fault::escaped(path, within));
+    };
+    let here = made(parent, within)?;
+    let flags =
+        OFlags::RDWR | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+    let made_as = match readable {
+        Readable::Owner => Mode::RUSR | Mode::WUSR,
+        Readable::Shared => Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::ROTH,
+    };
+    openat(&here, name, flags, made_as)
+        .map(std::fs::File::from)
+        .map_err(|error| match error {
+            rustix::io::Errno::LOOP => Fault::escaped(path, within),
+            error => Fault::new(error.to_string()),
+        })
+}
+
+/// `path` opened to write, made where it is not there with every directory above it.
+/// Windows has no flag that refuses a link on the way, so what was opened is held to
+/// `within` afterwards.
+#[cfg(windows)]
+fn created(path: &Path, within: &Path, _readable: Readable) -> Result<std::fs::File, Fault> {
+    if let Some(parent) = path.parent() {
+        make(parent, within)?;
+    }
+    options(Use::Write)
+        .open(path)
+        .map_err(|error| Fault::new(error.to_string()))
+}
+
+/// The mode a file readable as `readable` says is held to.
+#[cfg(unix)]
+const fn mode(readable: Readable) -> u32 {
+    match readable {
+        Readable::Owner => 0o600,
+        Readable::Shared => 0o644,
+    }
+}
+
+/// `file` held to the mode `readable` names, through its own handle, whatever it was made
+/// with.
+#[cfg(unix)]
+fn kept_to(file: &std::fs::File, readable: Readable) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    file.set_permissions(std::fs::Permissions::from_mode(mode(readable)))
+}
+
+/// Nothing, where the platform keeps no mode.
+#[cfg(windows)]
+fn kept_to(_file: &std::fs::File, _readable: Readable) -> std::io::Result<()> {
+    Ok(())
+}
+
 /// Make `path` and every directory missing above it, one at a time from `within` down,
 /// each made and then opened through the handle of the one above it and never through
 /// a link, so a link put on the way between two steps is refused rather than followed.
 #[cfg(unix)]
 pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
+    made(path, within).map(drop)
+}
+
+/// The directory `path`, made with every directory missing above it as [`make`] makes
+/// them, held open by the handle the walk ended on.
+#[cfg(unix)]
+fn made(path: &Path, within: &Path) -> Result<rustix::fd::OwnedFd, Fault> {
     use rustix::fs::{mkdirat, openat, Mode, OFlags, CWD};
     let opening = OFlags::DIRECTORY | OFlags::RDONLY | OFlags::CLOEXEC;
     let unmade = |error: rustix::io::Errno| {
@@ -113,7 +210,7 @@ pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
         }
         here = openat(&here, name, opening | OFlags::NOFOLLOW, Mode::empty()).map_err(unmade)?;
     }
-    Ok(())
+    Ok(here)
 }
 
 /// Make `path` and every directory missing above it, one at a time from `within` down.

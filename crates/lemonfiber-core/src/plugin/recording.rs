@@ -121,7 +121,9 @@ pub async fn record(path: &Path, recorder: Recorder<'_>) -> Result<Recorded, Unr
     let mut failed = Vec::new();
     if refusals.is_empty() {
         for running in ran::runs(&manifest) {
-            recordings.push(ran::taken(&manifest, running, &root, recorder.program).await);
+            recordings.push(
+                ran::taken(&manifest, running, &root, recorder.program, recorder.random).await,
+            );
         }
         let (asked, unfailed) = asked::taken(&manifest, &root, recorder).await;
         recordings.extend(asked);

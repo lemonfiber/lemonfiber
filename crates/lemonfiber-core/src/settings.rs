@@ -17,7 +17,7 @@ pub(crate) mod undoing;
 
 pub(crate) use files::{text, written};
 pub(crate) use resolved::{holding, Resolved};
-pub(crate) use secrets::{kept, Keeping, Secrets, Source};
+pub(crate) use secrets::{filed, kept, Keeping, Secrets, Source};
 pub(crate) use store::Settings;
 
 use crate::app::Ctx;

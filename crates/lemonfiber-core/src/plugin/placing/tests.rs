@@ -22,6 +22,7 @@ fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec<Wri
         installed,
         stack,
         reading,
+        Vec::new(),
         Some(Write::project(project_at(), None, GENERATED.to_owned())),
     )
 }
@@ -54,6 +55,7 @@ fn placed(service: &str) -> Placed {
         networks: Vec::new(),
         speaks: Vec::new(),
         fronts: None,
+        upstream: std::collections::BTreeMap::new(),
         native: None,
         replaces: None,
         shape: None,
@@ -100,7 +102,12 @@ fn a_service_keeps_its_configuration_where_the_bundled_ones_keep_theirs() {
 fn document(planned: &[Write]) -> Option<String> {
     planned.iter().find_map(|one| match &one.lands {
         Lands::Document { text, .. } => Some(text.clone()),
-        Lands::Directory { .. } | Lands::Key | Lands::Region { .. } | Lands::Secrets(_) => None,
+        Lands::Directory { .. }
+        | Lands::Key
+        | Lands::Region { .. }
+        | Lands::Secrets(_)
+        | Lands::Starting { .. }
+        | Lands::Upstream(_) => None,
     })
 }
 
@@ -110,9 +117,12 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|one| match &one.lands {
             Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
-            Lands::Directory { .. } | Lands::Document { .. } | Lands::Key | Lands::Secrets(_) => {
-                None
-            }
+            Lands::Directory { .. }
+            | Lands::Document { .. }
+            | Lands::Key
+            | Lands::Secrets(_)
+            | Lands::Starting { .. }
+            | Lands::Upstream(_) => None,
         })
         .collect()
 }

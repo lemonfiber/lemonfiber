@@ -65,6 +65,7 @@ fn secret_lines(secret: &SecretRead) -> Lines {
                 SecretFrom::Operator => "entered by you",
                 SecretFrom::Recipe => "captured by a recipe",
                 SecretFrom::Granted => "another service's credential, granted",
+                SecretFrom::Minted => "made by lemonfiber at install",
             }
         )
     });

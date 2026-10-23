@@ -18,7 +18,7 @@ impl Filler {
     fn new(random: Option<u8>) -> Option<Self> {
         Some(Self {
             random: FixedRandom(random.map(|byte| vec![byte; 32])),
-            held: Throwaway::of(None).ok()?,
+            held: Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()).ok()?,
         })
     }
 

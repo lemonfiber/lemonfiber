@@ -69,6 +69,7 @@ fn placed() -> Placed {
         networks: Vec::new(),
         speaks: Vec::new(),
         fronts: None,
+        upstream: std::collections::BTreeMap::new(),
         native: None,
         replaces: None,
         shape: None,
@@ -226,6 +227,7 @@ fn the_port_an_adapter_speaks_on_is_published_on_loopback_at_a_port_the_engine_p
         listens: Some(8080),
         speaks: vec!["media.serve@1".to_owned()],
         fronts: None,
+        upstream: std::collections::BTreeMap::new(),
         ..placed()
     });
     assert!(

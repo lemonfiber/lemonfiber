@@ -62,6 +62,7 @@ pub(super) fn secrets(
                     kept.source(&name).map(|source| match source {
                         Source::Operator => SecretFrom::Operator,
                         Source::Recipe => SecretFrom::Recipe,
+                        Source::Minted => SecretFrom::Minted,
                     }),
                     kept.value(&name).is_some(),
                 ),

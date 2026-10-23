@@ -71,6 +71,7 @@ fn running(ctx: &Ctx, stack: &Stack) -> Vec<Box<dyn Check>> {
         starting: crate::app::targets::beside_env(ctx, crate::config::paths::STARTING_KEPT),
         kept: crate::app::targets::beside_env(ctx, crate::config::paths::RUN_VERDICTS),
         now: ctx.stamp(),
+        random: Arc::clone(&ctx.seams.random),
     };
     stack
         .installed

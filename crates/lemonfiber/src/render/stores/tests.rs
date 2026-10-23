@@ -170,6 +170,7 @@ fn every_source_of_a_secret_is_said_and_a_stack_reading_none_says_so() {
         secrets: vec![
             secret("reader:typed", Some(SecretFrom::Operator)),
             secret("reader:granted", Some(SecretFrom::Granted)),
+            secret("reader:minted", Some(SecretFrom::Minted)),
             secret("reader:none", None),
         ],
         ..listing()
@@ -181,6 +182,10 @@ fn every_source_of_a_secret_is_said_and_a_stack_reading_none_says_so() {
     );
     assert!(
         text.contains("  reader:granted  not held, another service's credential, granted"),
+        "{text}"
+    );
+    assert!(
+        text.contains("  reader:minted  not held, made by lemonfiber at install  (reader's)"),
         "{text}"
     );
     assert!(

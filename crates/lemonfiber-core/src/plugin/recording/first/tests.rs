@@ -29,10 +29,13 @@ fn placed(api: &str) -> Option<Placed> {
 
 fn copy(name: &str) -> Option<(Scratch, Throwaway)> {
     let source = Scratch::new(name);
-    let copy = Throwaway::of(Some(Starting {
-        root: &source,
-        service: "sonarr",
-    }))
+    let copy = Throwaway::of(
+        Some(Starting {
+            root: &source,
+            service: "sonarr",
+        }),
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+    )
     .ok()?;
     Some((source, copy))
 }
