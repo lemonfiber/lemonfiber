@@ -45,6 +45,7 @@ fn bundled(id: &str, provides: &[&str]) -> lemonfiber_manifest::Service {
         last_release: "2026-01-01".to_owned(),
         describes: "an example service".to_owned(),
         without_it: "nothing works".to_owned(),
+        dashboard: lemonfiber_manifest::Dashboard::default(),
         media_types: Vec::new(),
         provides: provides.iter().map(|one| (*one).to_owned()).collect(),
         claim: Vec::new(),

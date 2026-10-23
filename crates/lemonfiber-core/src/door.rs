@@ -30,7 +30,7 @@ use lemonfiber_manifest::{ApiKind, Bind, Service};
 
 use crate::plugin::{Installed, Placed};
 
-pub use address::{address, proxied, publishes_a_name, Address, Place};
+pub use address::{address, proxied, publishes_a_name, Address, Place, ONLY_HERE};
 pub use chosen::{chosen, Chosen, Refusal, KEPT};
 
 /// What a service published to the local network is to the people in the house.

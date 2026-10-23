@@ -57,6 +57,30 @@ pub(crate) fn put(
     rewritten(confined, path, (key, &before), &after, record)
 }
 
+/// Write `text` as the whole of the file at `path`, where it holds anything else, and
+/// carry the record of what was materialised with it where that held the file as it
+/// stood.
+///
+/// For a file of the stack's whose whole text a part's adapter owns. It is read and
+/// written the way a region's file is, never through a link.
+///
+/// # Errors
+///
+/// Where the file cannot be read or written.
+pub(crate) fn replace(
+    confined: &dyn Confined,
+    path: &Path,
+    key: &str,
+    text: &str,
+    record: Option<&Path>,
+) -> Result<(), String> {
+    let before = read_unlinked(confined, path, directory_of(path))?.unwrap_or_default();
+    if before == text {
+        return Ok(());
+    }
+    rewritten(confined, path, (key, &before), text, record)
+}
+
 /// What taking a region back out came to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Withdrawn {

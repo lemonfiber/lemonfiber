@@ -114,6 +114,9 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     if asked.setting == super::own::DEVICE_KEY_APPS {
         crate::device_keys::run::apps_changed(ctx, was.as_deref(), asked.value).await?;
     }
+    if asked.setting == super::own::DASHBOARD_SEARCH {
+        let _ = crate::seed::run::reshow(ctx).await;
+    }
     change.applied = true;
     change.unrestarted = restarting::restarted(ctx, &change.restarts).await;
     Ok(super::listing::report(

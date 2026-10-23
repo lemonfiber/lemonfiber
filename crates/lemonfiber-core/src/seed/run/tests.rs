@@ -47,6 +47,7 @@ fn manifest_service(
         last_release: "2026-01-01".to_owned(),
         describes: "an example service".to_owned(),
         without_it: "nothing works".to_owned(),
+        dashboard: lemonfiber_manifest::Dashboard::default(),
         media_types: Vec::new(),
         provides: Vec::new(),
         claim: Vec::new(),
@@ -551,6 +552,7 @@ mod publishing;
 mod quality;
 mod replacing;
 mod requests;
+mod showing;
 mod subtitles;
 mod taken_back;
 mod targets;

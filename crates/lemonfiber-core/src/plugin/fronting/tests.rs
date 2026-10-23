@@ -1,4 +1,4 @@
-use super::{listed, proxied, taken, HOUSEHOLD_GROUP, OPERATOR_GROUP};
+use super::{proxied, taken};
 use crate::plugin::installed::{Installed, Placed, Reached};
 
 fn placed(service: &str, reached: Option<Reached>) -> Placed {
@@ -15,6 +15,9 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
         provides: Vec::new(),
         name: "Komga".to_owned(),
         description: "Reads comics: in a browser".to_owned(),
+        icon: None,
+        hidden: false,
+        health: None,
         api: None,
         listens: None,
         media_types: Vec::new(),
@@ -101,67 +104,6 @@ fn two_household_services_are_two_stanzas() {
     ]));
 
     assert_eq!(both.matches("reverse_proxy").count(), 2, "{both}");
-}
-
-#[test]
-fn a_household_service_is_listed_linking_to_the_household_address() {
-    let said = listed(&installed(vec![placed("komga", Some(household(None)))]));
-
-    assert_eq!(
-        said,
-        "- \"Library\":\n    - \"Komga\":\n        icon: \"komga.png\"\n        href: \
-         \"http://{{HOMEPAGE_VAR_LAN_HOST}}:25600\"\n        description: \"Reads comics: in \
-         a browser\"\n"
-    );
-}
-
-#[test]
-fn an_operator_surface_is_listed_linking_to_this_machine_under_the_automation_group() {
-    let said = listed(&installed(vec![placed("admin", Some(loopback()))]));
-
-    assert!(said.starts_with("- \"Automation\":\n"), "{said}");
-    assert!(said.contains("\"http://localhost:8090\""), "{said}");
-}
-
-#[test]
-fn a_group_the_manifest_named_is_the_one_used_and_shared_by_its_services() {
-    let said = listed(&installed(vec![
-        placed("komga", Some(household(Some("Reading")))),
-        placed("admin", Some(loopback())),
-        placed("second", Some(household(Some("Reading")))),
-    ]));
-
-    assert_eq!(said.matches("- \"Reading\":").count(), 1, "{said}");
-    assert_eq!(said.matches("- \"Automation\":").count(), 1, "{said}");
-}
-
-#[test]
-fn a_service_nothing_reaches_is_not_listed_and_one_with_no_name_is_listed_by_id() {
-    let mut nameless = placed("komga", Some(household(None)));
-    nameless.name = String::new();
-    let said = listed(&installed(vec![placed("worker", None), nameless]));
-
-    assert!(!said.contains("worker"), "{said}");
-    assert!(said.contains("- \"komga\":"), "{said}");
-}
-
-/// The defaults are the stack's answer rather than this module's, so they are held
-/// to the dashboard the stack ships: each is a group there, holding the tier it is
-/// the default for.
-#[test]
-fn each_default_group_is_one_the_shipped_dashboard_keeps_that_tier_in() {
-    let shipped = include_str!("../../../../../assets/media-stack/config/homepage/services.yaml");
-    for (group, link) in [
-        (HOUSEHOLD_GROUP, "http://{{HOMEPAGE_VAR_LAN_HOST}}"),
-        (OPERATOR_GROUP, "http://localhost"),
-    ] {
-        let after = shipped
-            .split(&format!("- {group}:\n"))
-            .nth(1)
-            .and_then(|rest| rest.split("\n- ").next())
-            .unwrap_or_default();
-        assert!(after.contains(link), "{group} holds no {link} entry");
-    }
 }
 
 #[test]

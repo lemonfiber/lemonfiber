@@ -757,3 +757,5 @@ fn an_adapter_an_older_record_carries_is_read_back_as_none() {
         .flat_map(|one| &one.services)
         .all(|placed| placed.api.is_none()));
 }
+
+mod dashboard;

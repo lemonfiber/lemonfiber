@@ -45,6 +45,9 @@ fn placed(service: &str) -> Placed {
         provides: Vec::new(),
         name: "Komga".to_owned(),
         description: "Reads comics".to_owned(),
+        icon: None,
+        hidden: false,
+        health: None,
         api: None,
         listens: None,
         media_types: Vec::new(),
@@ -113,30 +116,23 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
         .collect()
 }
 
-/// A household service gets a region in the proxy and one on the dashboard, both
-/// the plugin's, both after the document that declares the service.
+/// A household service gets a region in the proxy, the plugin's, after the document
+/// that declares the service.
 #[test]
-fn a_household_service_is_written_into_the_proxy_and_the_dashboard_after_its_document() {
+fn a_household_service_is_written_into_the_proxy_after_its_document() {
     let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
 
     assert_eq!(
         regions(&planned),
-        vec![
-            (crate::plugin::PROXY.to_owned(), "plugin komga".to_owned()),
-            (
-                crate::plugin::DASHBOARD.to_owned(),
-                "plugin komga".to_owned()
-            ),
-        ]
+        vec![(crate::plugin::PROXY.to_owned(), "plugin komga".to_owned())]
     );
     assert!(planned
-        .iter()
-        .take(planned.len() - 2)
-        .all(|one| !matches!(one.lands, Lands::Region { .. })));
+        .last()
+        .is_some_and(|one| matches!(one.lands, Lands::Region { .. })));
 }
 
-/// The tier decides: an operator surface is listed and not proxied, and a service
-/// nothing reaches is neither, so a plugin of only those writes no proxy region.
+/// The tier decides: an operator surface is not proxied, and neither is a service
+/// nothing reaches, so a plugin of only those writes no region.
 #[test]
 fn a_service_the_household_does_not_reach_is_given_no_route() {
     let mut plugin = installed("komga", &["komga", "worker"]);
@@ -148,13 +144,7 @@ fn a_service_the_household_does_not_reach_is_given_no_route() {
     });
     let _ = plugin.services.get_mut(1).map(|one| one.reached = None);
 
-    assert_eq!(
-        regions(&writes(&plugin, stack(), &Reading::bare())),
-        vec![(
-            crate::plugin::DASHBOARD.to_owned(),
-            "plugin komga".to_owned()
-        )]
-    );
+    assert!(regions(&writes(&plugin, stack(), &Reading::bare())).is_empty());
 }
 
 #[test]
@@ -180,7 +170,6 @@ fn installing_writes_a_directory_for_each_service_and_the_project() {
             PathBuf::from("/opt/lemonfiber/stack/config/komga-worker"),
             PathBuf::from("/opt/lemonfiber/stack/compose.generated.yml"),
             PathBuf::from("/opt/lemonfiber/stack/config/caddy/Caddyfile"),
-            PathBuf::from("/opt/lemonfiber/stack/config/homepage/services.yaml"),
         ]
     );
 }
@@ -212,9 +201,8 @@ fn a_directory_carries_no_content_and_the_project_carries_what_was_generated() {
     let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
     assert_eq!(
         planned.len(),
-        4,
-        "one household service is one directory, the project, and a region in each of the \
-         proxy and the dashboard"
+        3,
+        "one household service is one directory, the project, and a region in the proxy"
     );
     assert_eq!(planned.first().map(super::Write::is_directory), Some(true));
     assert_eq!(document(&planned).as_deref(), Some(GENERATED));

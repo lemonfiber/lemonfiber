@@ -12,7 +12,7 @@ mod resolved;
 mod restarting;
 pub(crate) mod run;
 mod secrets;
-mod store;
+pub(crate) mod store;
 pub(crate) mod undoing;
 
 pub(crate) use files::{text, written};
@@ -62,6 +62,20 @@ pub(crate) fn secrets_at(ctx: &Ctx) -> Option<std::path::PathBuf> {
         .env_file
         .as_deref()
         .map(|env| env.with_file_name(SECRETS))
+}
+
+/// Where the dashboard's search box sends a search: the address recorded, or the default
+/// where none is.
+///
+/// # Errors
+///
+/// Why the address recorded is not one, naming the setting.
+pub(crate) fn dashboard_search(ctx: &Ctx) -> Result<String, String> {
+    let recorded = recorded::Recorded::of(ctx);
+    let Some(value) = recorded.value(own::DASHBOARD_SEARCH) else {
+        return Ok(own::DEFAULT_SEARCH.to_owned());
+    };
+    own::refusal(own::DASHBOARD_SEARCH, value).map_or_else(|| Ok(value.to_owned()), Err)
 }
 
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {

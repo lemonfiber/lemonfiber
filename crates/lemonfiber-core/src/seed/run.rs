@@ -38,6 +38,7 @@ mod minted;
 mod published;
 pub(crate) use published::published_as;
 mod quality;
+mod showing;
 mod subtitles;
 mod taken_back;
 // The request service's connection to the media server, held at the request gate's route
@@ -52,7 +53,7 @@ mod withholding;
 
 use applications::{seed_applications, skipped};
 use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FIELD};
-use curating::{seed_curator, wanted_clients, CuratorSeeding};
+use curating::{contested, seed_curator, wanted_clients, CuratorSeeding};
 // Reached by reconfiguration as well as by seeding: what the curators that file media
 // are, and the record of what lemonfiber last wrote. One answer to each, rather than a
 // second reader beside this one that could disagree with it.
@@ -65,6 +66,7 @@ pub(crate) use guarding::exposure;
 use identity::seed_request_identity;
 pub(crate) use quality::reprofile;
 pub(crate) use reset::reset_connections;
+pub(crate) use showing::reshow;
 pub(crate) use subtitles::rewatch;
 use withholding::{withheld, withheld_brought};
 
@@ -154,18 +156,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // warning.
     let data_root = crate::app::targets::data_root(ctx);
     let curating = curators(&fillers);
-    // A root folder one curator wants and another does too is contested: two curators
-    // on one folder would each rewrite the other's files, so it is refused rather
-    // than wired. Detected across every curator up front, before any is wired.
-    let root_claims: Vec<(&str, Vec<crate::ports::service::RootFolder>)> = curating
-        .iter()
-        .map(|curator| (curator.name(), wanted_roots(curator.media_types())))
-        .collect();
-    let contested = crate::seed::contested_roots(
-        root_claims
-            .iter()
-            .map(|(name, roots)| (*name, roots.as_slice())),
-    );
+    let contested = contested(&curating);
     // The expected-state baseline — what seeding last wrote into each service — is
     // loaded so this pass records against what earlier ones set, and saved once at
     // the end. Unlike the per-connection journal, it persists across runs: it is the
@@ -261,6 +252,17 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // like releases that happen to have none.
     wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
     wirings.extend(quality::seed_quality(ctx, &fillers).await);
+
+    wirings.extend(
+        showing::seed_dashboard(
+            ctx,
+            &manifest.services,
+            &installed,
+            &fillers,
+            project.as_deref(),
+        )
+        .await,
+    );
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the

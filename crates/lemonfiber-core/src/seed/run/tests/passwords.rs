@@ -254,6 +254,7 @@ async fn seed_skips_the_torrent_client_when_no_password_is_announced() {
         .wirings
         .iter()
         .filter(|wiring| !matches!(wiring.state, crate::seed::State::Unmatched { .. }))
+        .filter(|wiring| wiring.connection != super::super::showing::CONNECTION)
         .all(is_skipped);
     assert!(
         all_skipped,
@@ -273,6 +274,7 @@ async fn seed_skips_the_torrent_client_when_its_log_cannot_be_read() {
         .wirings
         .iter()
         .filter(|wiring| !matches!(wiring.state, crate::seed::State::Unmatched { .. }))
+        .filter(|wiring| wiring.connection != super::super::showing::CONNECTION)
         .all(is_skipped);
     assert!(all_skipped, "an unreadable log is skipped, not failed");
 }

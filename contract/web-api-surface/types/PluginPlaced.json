@@ -48,6 +48,24 @@
       ],
       "required": false
     },
+    "health": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "hidden": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
+    "icon": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "image": {
       "type": [
         "string"

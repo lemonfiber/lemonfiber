@@ -766,5 +766,6 @@ fn the_egress_guard_shape_is_named_as_a_manifest_spells_it_and_gives_the_tunnel_
     assert_eq!(shape.approval("gluetun"), "egress-guard@gluetun");
 }
 
+mod dashboard;
 mod linking;
 mod networks;

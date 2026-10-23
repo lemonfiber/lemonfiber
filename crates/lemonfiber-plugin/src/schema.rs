@@ -318,6 +318,17 @@ pub struct Wiring {
     /// the stack uses for its tier.
     #[serde(default)]
     pub dashboard_group: Option<String>,
+    /// The line beside its entry on the bundled dashboard. Defaults to the plugin's
+    /// description.
+    #[serde(default)]
+    pub dashboard_description: Option<String>,
+    /// The icon its entry on the bundled dashboard shows, named from the dashboard's own
+    /// icon set. Defaults to the service's id with `.png` after it.
+    #[serde(default)]
+    pub dashboard_icon: Option<String>,
+    /// Whether it has no entry on the bundled dashboard.
+    #[serde(default)]
+    pub dashboard_hidden: bool,
 }
 
 /// One capability a plugin's service asks for.
@@ -346,6 +357,13 @@ pub struct Entry<'a> {
     pub hostname: &'a str,
     /// The group on the bundled dashboard it appears under, where one was named.
     pub group: Option<&'a str>,
+    /// The line beside its entry on the bundled dashboard: the one named, or the
+    /// plugin's description.
+    pub description: &'a str,
+    /// The icon its entry on the bundled dashboard shows, where one was named.
+    pub icon: Option<&'a str>,
+    /// Whether it has no entry on the bundled dashboard.
+    pub hidden: bool,
 }
 
 impl Manifest {
@@ -373,6 +391,11 @@ impl Manifest {
                 .and_then(|wiring| wiring.hostname.as_deref())
                 .unwrap_or(&service.id),
             group: declared.and_then(|wiring| wiring.dashboard_group.as_deref()),
+            description: declared
+                .and_then(|wiring| wiring.dashboard_description.as_deref())
+                .unwrap_or(&self.plugin.description),
+            icon: declared.and_then(|wiring| wiring.dashboard_icon.as_deref()),
+            hidden: declared.is_some_and(|wiring| wiring.dashboard_hidden),
         }
     }
 
