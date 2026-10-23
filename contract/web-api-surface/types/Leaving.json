@@ -1,5 +1,11 @@
 {
   "fields": {
+    "on_behalf": {
+      "type": [
+        "array[ref:OnBehalf]"
+      ],
+      "required": true
+    },
     "ours": {
       "type": [
         "array[ref:Outbound]"

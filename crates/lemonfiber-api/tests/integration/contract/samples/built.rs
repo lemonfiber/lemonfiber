@@ -388,6 +388,11 @@ pub(super) fn what_leaves() -> lemonfiber_core::outbound::Leaving {
             switch: lemonfiber_core::config::REACH_INDEXER_KEY.to_owned(),
             cost: "a key is recorded without ever having been proven".to_owned(),
         }],
+        on_behalf: vec![lemonfiber_core::outbound::OnBehalf {
+            plugin: "comics".to_owned(),
+            destination: "metadata.example".to_owned(),
+            purpose: "a destination this plugin's recipes declare".to_owned(),
+        }],
         theirs: vec![lemonfiber_core::outbound::Elsewhere {
             service: "prowlarr".to_owned(),
             destination: "the indexers you configured".to_owned(),

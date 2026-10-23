@@ -19,6 +19,7 @@
 //! ones the images in this stack name, and the indexer is wherever the operator
 //! pointed it — with its query stripped, because an indexer authenticates by one.
 
+mod behalf;
 mod ours;
 mod theirs;
 
@@ -155,11 +156,25 @@ pub struct Elsewhere {
     pub origin: crate::origin::Origin,
 }
 
-/// Everything that leaves this machine: lemonfiber's own requests, and the stack's.
+/// A request lemonfiber makes on an installed plugin's behalf, attributed to it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct OnBehalf {
+    /// The plugin that declared it, by its id.
+    pub plugin: String,
+    /// Where it goes, as the plugin declared it.
+    pub destination: String,
+    /// Why it may be made.
+    pub purpose: String,
+}
+
+/// Everything that leaves this machine: lemonfiber's own requests, those it makes on an
+/// installed plugin's behalf, and the stack's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Leaving {
     /// Every request lemonfiber makes on its own account, in a fixed order.
     pub ours: Vec<Outbound>,
+    /// Every request lemonfiber makes on an installed plugin's behalf.
+    pub on_behalf: Vec<OnBehalf>,
     /// The requests made by services this stack runs, attributed to them.
     pub theirs: Vec<Elsewhere>,
 }
@@ -171,8 +186,9 @@ pub struct Leaving {
 /// started, and an operator deciding what they are comfortable with is deciding
 /// about the stack rather than about this minute.
 ///
-/// Every installed plugin is part of the stack for this, read from its record: each of
-/// its services, and every destination its recipes declare outside it.
+/// Every installed plugin is read from its record: each of its services is part of the
+/// stack, and every destination its recipes declare outside it is lemonfiber's to send to
+/// on its behalf.
 #[must_use]
 pub fn leaving(
     settings: &Settings,
@@ -180,12 +196,13 @@ pub fn leaving(
     installed: &[crate::plugin::Installed],
 ) -> Leaving {
     let mut theirs = theirs::elsewhere(services);
-    theirs.extend(theirs::brought(services, installed));
+    theirs.extend(theirs::brought(installed));
     Leaving {
         ours: EVERY
             .iter()
             .map(|reach| ours::outbound(*reach, settings, services, installed))
             .collect(),
+        on_behalf: behalf::declared(services, installed),
         theirs,
     }
 }

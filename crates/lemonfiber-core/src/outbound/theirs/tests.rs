@@ -281,12 +281,12 @@ fn a_service_added_to_the_stack_is_reported_without_a_change_here() {
 }
 
 mod brought {
-    use super::super::{brought, CARRIED, NO_RECORD};
+    use super::super::{brought, NO_RECORD};
     use crate::origin::Origin;
     use crate::plugin::Register;
 
     /// One installed plugin with one service, whose recipes reach one host outside the
-    /// stack and one of the stack's own services.
+    /// stack, which is not the service's own request.
     const INSTALLED: &str = r#"{
       "installed": [
         {
@@ -307,17 +307,10 @@ mod brought {
       ]
     }"#;
 
-    fn stack() -> Vec<lemonfiber_manifest::Service> {
-        crate::test_support::stack()
-            .manifest()
-            .map(|manifest| manifest.services)
-            .unwrap_or_default()
-    }
-
     /// What the plugin in [`INSTALLED`] brings to the shipped stack's account.
     fn listed() -> Vec<super::super::Elsewhere> {
         Register::parse(INSTALLED)
-            .map(|register| brought(&stack(), register.installed()))
+            .map(|register| brought(register.installed()))
             .unwrap_or_default()
     }
 
@@ -337,28 +330,11 @@ mod brought {
             Some((false, NO_RECORD, comics())),
             "{listed:?}"
         );
-    }
-
-    #[test]
-    fn a_host_its_recipes_declare_is_listed_as_the_plugins_and_one_inside_the_stack_is_not() {
-        let listed = listed();
-
-        let hosts: Vec<(&str, &str, bool, Origin)> = listed
-            .iter()
-            .filter(|one| one.purpose == CARRIED)
-            .map(|one| {
-                (
-                    one.service.as_str(),
-                    one.destination.as_str(),
-                    one.recorded,
-                    one.origin.clone(),
-                )
-            })
-            .collect();
-        assert_eq!(
-            hosts,
-            vec![("comics", "metadata.example", true, comics())],
-            "{listed:?}"
+        assert!(
+            listed
+                .iter()
+                .all(|one| one.destination != "metadata.example"),
+            "what the plugin's recipes reach is lemonfiber's request, not a service's: {listed:?}"
         );
     }
 
@@ -371,7 +347,7 @@ mod brought {
               "asks_for": "Series and issue details for the comics it files""#,
         );
         let listed = Register::parse(&said)
-            .map(|register| brought(&stack(), register.installed()))
+            .map(|register| brought(register.installed()))
             .unwrap_or_default();
 
         let service = listed.iter().find(|one| one.service == "komga");
@@ -394,6 +370,6 @@ mod brought {
 
     #[test]
     fn nothing_installed_brings_nothing() {
-        assert!(brought(&stack(), &[]).is_empty());
+        assert!(brought(&[]).is_empty());
     }
 }

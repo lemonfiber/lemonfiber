@@ -6,12 +6,13 @@
 //! it is the sentence somebody came here to read; the purpose and the cost follow,
 //! because they are what turning it off is weighed against.
 //!
-//! The stack's own requests are last and are headed as theirs. An operator reading
+//! What lemonfiber sends for an installed plugin follows its own requests, each naming
+//! the plugin. The stack's own requests are last and are headed as theirs. An operator reading
 //! this is entitled to know what running the stack reaches, and equally entitled not
 //! to have it counted against the product that started it.
 
 use lemonfiber_core::config::OFFLINE_KEY;
-use lemonfiber_core::outbound::{nothing_configured, Elsewhere, Leaving, Outbound};
+use lemonfiber_core::outbound::{nothing_configured, Elsewhere, Leaving, OnBehalf, Outbound};
 
 use super::Lines;
 
@@ -25,6 +26,7 @@ pub(crate) fn leaving(report: &Leaving) -> Lines {
     lines.spaced(format!(
         "Stop all of it at once with:  lemonfiber config set {OFFLINE_KEY} on"
     ));
+    lines.extend(on_behalf(&report.on_behalf));
     lines.extend(theirs(&report.theirs));
     lines
 }
@@ -54,6 +56,20 @@ fn where_to(entry: &Outbound) -> String {
         return nothing_configured().to_owned();
     }
     entry.destination.join(", ")
+}
+
+/// What lemonfiber sends for installed plugins, each line naming the plugin it is for.
+fn on_behalf(sent: &[OnBehalf]) -> Lines {
+    let mut lines = Lines::default();
+    if sent.is_empty() {
+        return lines;
+    }
+    lines.spaced("What lemonfiber sends on behalf of installed plugins:");
+    for one in sent {
+        lines.spaced(format!("  {} — for plugin {}", one.destination, one.plugin));
+        lines.put(format!("    {}", one.purpose));
+    }
+    lines
 }
 
 /// What the stack's own services reach, headed as theirs.
