@@ -4,6 +4,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use lemonfiber_error::withheld::REDACTED;
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 
 /// How long reaching the upstream may take.
@@ -91,7 +92,13 @@ async fn sent(
     request: &Request,
     most: usize,
 ) -> Result<Fetched, Unreachable> {
-    let unreached = |why: reqwest::Error| Unreachable::once(&request.url, &why.to_string());
+    let query = query_of(&request.url);
+    let unreached = |why: reqwest::Error| {
+        Unreachable::once(
+            &withheld(&request.url, query),
+            &withheld(&why.without_url().to_string(), query),
+        )
+    };
     let mut built = client.request(method(request.method), &request.url);
     for (name, value) in &request.headers {
         built = built.header(name, value);
@@ -125,6 +132,19 @@ async fn sent(
         headers,
         bytes: within.then_some(bytes),
     })
+}
+
+/// The whole of a URL's query, where it carries one: an upstream may take its key there,
+/// and which parameter holds it is the upstream's own word, so none of it is shown.
+fn query_of(url: &str) -> Option<&str> {
+    url.split_once('?')
+        .map(|(_, query)| query)
+        .filter(|query| !query.is_empty())
+}
+
+/// `text` with `query` withheld wherever it appears.
+fn withheld(text: &str, query: Option<&str>) -> String {
+    query.map_or_else(|| text.to_owned(), |query| text.replace(query, REDACTED))
 }
 
 /// The verb `reqwest` sends for `method`.

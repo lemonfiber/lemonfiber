@@ -2,7 +2,7 @@ use lemonfiber_ports::http::{Http, Method, Request};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-use super::{method, read_as_text, Web};
+use super::{method, query_of, read_as_text, withheld, Web};
 
 async fn answering(answer: &'static str) -> Option<String> {
     let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
@@ -216,4 +216,44 @@ async fn a_client_keeping_sessions_carries_the_cookie_a_sign_in_sets_and_no_othe
         Err(_) => None,
     };
     assert_eq!(dropped, Some(("Ok.".to_owned(), String::new())));
+}
+
+/// A query these tests stand a key in, as an upstream that takes its key there is asked.
+const KEYED: &str = "mode=queue&r=held-in-the-query";
+
+#[tokio::test]
+async fn a_failed_call_shows_none_of_its_query_in_its_url_or_its_reason() {
+    let Ok(listener) = std::net::TcpListener::bind("127.0.0.1:0") else {
+        return;
+    };
+    let address = listener
+        .local_addr()
+        .map(|at| at.to_string())
+        .unwrap_or_default();
+    drop(listener);
+    let failed = match Web::new() {
+        Ok(web) => web
+            .send(&asking(format!("http://{address}/api?{KEYED}")))
+            .await
+            .err(),
+        Err(_) => None,
+    };
+    let said = format!("{failed:?}");
+    assert!(failed.is_some(), "the call reached something");
+    assert!(
+        !said.contains("0f0f0f0f") && !said.contains("apikey"),
+        "{said}"
+    );
+}
+
+#[test]
+fn only_a_query_that_holds_something_is_withheld() {
+    assert_eq!(query_of("http://upstream/api"), None);
+    assert_eq!(query_of("http://upstream/api?"), None);
+    assert_eq!(
+        query_of(&format!("http://upstream/api?{KEYED}")),
+        Some(KEYED)
+    );
+    assert_eq!(withheld("plain words", None), "plain words");
+    assert!(!withheld(&format!("failed at /api?{KEYED}"), Some(KEYED)).contains(KEYED));
 }
