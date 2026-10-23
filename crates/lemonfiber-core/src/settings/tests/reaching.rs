@@ -240,11 +240,7 @@ async fn an_assembled_parts_crossing_key_is_listed_as_granted() {
         super::super::listing::secrets(&machine.ctx, &readers, manifest.as_ref(), &[], &resolved);
 
     let granted = listed.iter().find(|one| one.name == "unpackerr:tv-key");
-    assert_eq!(
-        granted.map(|one| one.from),
-        Some(Some(SecretFrom::Granted)),
-        "{listed:?}"
-    );
+    assert_eq!(granted.map(|one| one.from), Some(Some(SecretFrom::Granted)));
 }
 
 /// A crossing key the operator sets by hand is written into every file that reads it at
