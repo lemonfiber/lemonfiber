@@ -316,6 +316,29 @@ fn a_directory_or_file_that_cannot_be_read_is_refused_rather_than_skipped() {
 }
 
 #[test]
+fn a_file_made_readable_is_open_to_the_service_and_one_not_there_is_refused() {
+    let Ok(copy) = Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()) else {
+        return;
+    };
+    assert!(copy.hold("held.pem", "text").is_ok());
+
+    assert_eq!(copy.readable("held.pem"), Ok(()));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        assert_eq!(
+            std::fs::metadata(copy.path().join("held.pem"))
+                .map(|file| file.permissions().mode() & 0o777)
+                .ok(),
+            Some(0o644)
+        );
+    }
+    assert!(copy
+        .readable("absent.pem")
+        .is_err_and(|why| why.contains("absent.pem")));
+}
+
+#[test]
 fn a_further_directory_beside_the_copy_is_open_to_the_service_and_goes_with_it() {
     let source = Scratch::new("throwaway-emptied");
     let Ok(copy) = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling())

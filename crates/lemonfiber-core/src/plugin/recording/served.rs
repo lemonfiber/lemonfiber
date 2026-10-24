@@ -123,9 +123,10 @@ pub(super) fn library(placed: &Placed, copy: &Throwaway) -> Result<Option<PathBu
         return Ok(None);
     }
     let data = copy.emptied(Path::new(DATA))?;
-    if let Ok(folder) = Path::new(FOLDER).strip_prefix(LIBRARY) {
-        copy.emptied(&Path::new(DATA).join(folder))?;
-    }
+    let folder = Path::new(FOLDER)
+        .strip_prefix(LIBRARY)
+        .unwrap_or(Path::new(""));
+    copy.emptied(&Path::new(DATA).join(folder))?;
     Ok(Some(data))
 }
 
