@@ -255,6 +255,15 @@ async fn asked(
     Ok(answers)
 }
 
+/// How long the service is given to come up: its health's own limit, or the recorder's.
+pub(super) fn allowed(health: Option<&Health>) -> Duration {
+    health
+        .and_then(|health| health.timeout_s)
+        .map_or(HEALTHY_WITHIN, |seconds| {
+            Duration::from_secs(u64::from(seconds))
+        })
+}
+
 /// Wait until the service's health passes, or say why it did not within its limit.
 pub(super) async fn healthy(
     recorder: Recorder<'_>,
@@ -262,11 +271,7 @@ pub(super) async fn healthy(
     health: Option<&Health>,
     served: &Served,
 ) -> Result<(), String> {
-    let within = health
-        .and_then(|health| health.timeout_s)
-        .map_or(HEALTHY_WITHIN, |seconds| {
-            Duration::from_secs(u64::from(seconds))
-        });
+    let within = allowed(health);
     let until = Instant::now() + within;
     loop {
         let standing = recorder

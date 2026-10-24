@@ -18,7 +18,7 @@ use serde_json::Value;
 use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
-use super::served::{healthy, settled, settled_as, LOG_LINES};
+use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::{ASKED_WITH, RECORDINGS};
 use crate::plugin::container::LOOPBACK;
@@ -488,6 +488,14 @@ impl Asking<'_> {
                 ],
             )
         };
+        let until = tokio::time::Instant::now() + allowed(self.health);
+        while crate::ports::service::MediaServer::startup_completed(&source)
+            .await
+            .is_err()
+            && tokio::time::Instant::now() < until
+        {
+            tokio::time::sleep(POLL).await;
+        }
         crate::seed::wire_media_server_admin(&source, self.recorder.random, None, false, &keep)
             .await
             .map_err(unfinished)

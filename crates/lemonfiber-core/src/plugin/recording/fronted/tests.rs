@@ -574,6 +574,7 @@ async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_i
     let http = identity(
         vec![
             json("false"),
+            json("false"),
             Answer::served(401, "text/plain", "Unauthorized"),
             json("false"),
         ],
@@ -605,6 +606,28 @@ async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_i
             .pointer("/response/json"),
         Some(&json!({"id": "m1", "token": "<redacted>"}))
     );
+}
+
+#[tokio::test]
+async fn a_first_run_waits_while_the_upstream_is_still_starting() {
+    let at = source("fronted-identity-starting", &identifying());
+    let json = |body: &str| Answer::served(200, "application/json", body);
+    let starting = || Answer::served(503, "text/html", "Jellyfin is starting up");
+    let http = identity(
+        vec![
+            starting(),
+            starting(),
+            json("false"),
+            json("false"),
+            Answer::served(401, "text/plain", "Unauthorized"),
+            json("false"),
+        ],
+        json("null"),
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(failed_at(&read), Vec::new());
+    assert_eq!(posted(&http, "/startup_completed").len(), 6);
 }
 
 #[tokio::test]
