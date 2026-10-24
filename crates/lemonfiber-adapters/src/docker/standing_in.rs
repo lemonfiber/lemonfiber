@@ -26,9 +26,9 @@ const MOST: u64 = 8192;
 /// The network whose gateway the engine resolves `host-gateway` to.
 const BRIDGE: &str = "bridge";
 
-/// What the engine names itself under Docker Desktop, which forwards `host-gateway` to this
-/// machine's own loopback interface.
-const DESKTOP: &str = "Docker Desktop";
+/// What each engine that forwards `host-gateway` to this machine's own loopback interface
+/// names itself.
+const LOOPBACK_ENGINES: [&str; 2] = ["Docker Desktop", "OrbStack"];
 
 /// What a stand-in answers anything it was not given.
 const REFUSED: &str = r#"{"status":false,"error":"not answered here"}"#;
@@ -97,14 +97,15 @@ async fn answering(mut accepted: Accepted, stand_in: Arc<StandIn>) {
 }
 
 /// Where the engine resolves `host-gateway` to on this machine: its loopback interface
-/// under Docker Desktop, and the default bridge network's gateway otherwise.
+/// under an engine that forwards `host-gateway` there, and the default bridge network's
+/// gateway otherwise.
 async fn gateway(docker: &Docker) -> Result<IpAddr, Unran> {
     let info = docker.info().await.map_err(|error| refused(&error))?;
-    if info
-        .operating_system
-        .as_deref()
-        .is_some_and(|system| system.contains(DESKTOP))
-    {
+    if info.operating_system.as_deref().is_some_and(|system| {
+        LOOPBACK_ENGINES
+            .iter()
+            .any(|engine| system.contains(engine))
+    }) {
         return Ok(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
     let bridge = docker

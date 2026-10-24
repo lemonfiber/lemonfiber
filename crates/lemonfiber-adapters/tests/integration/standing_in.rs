@@ -115,6 +115,24 @@ async fn under_docker_desktop_it_answers_on_loopback_what_it_was_given_until_dro
 }
 
 #[tokio::test]
+async fn under_orbstack_it_answers_on_loopback_without_asking_for_the_bridge() {
+    let mut engine = fake::engine("standing-in-orbstack", vec![info("OrbStack")]);
+    let port = a_free_port();
+
+    let answering = Daemon::at(&engine.socket).stand_in(&stand_in(port)).await;
+
+    assert!(answering.is_ok(), "{:?}", answering.as_ref().err());
+    let given = asked(port, "/api?mode=version").await.unwrap_or_default();
+    assert!(given.ends_with(&format!("\r\n\r\n{VERSION}")), "{given}");
+    assert!(!engine
+        .asked_for()
+        .iter()
+        .any(|path| path.contains("/networks/bridge")));
+    drop(answering);
+    engine.stop().await;
+}
+
+#[tokio::test]
 async fn a_request_it_cannot_read_is_refused_and_one_cut_short_is_answered_as_far_as_it_went() {
     let engine = fake::engine("standing-in-unread", vec![info("Docker Desktop")]);
     let port = a_free_port();
@@ -146,7 +164,7 @@ async fn elsewhere_it_answers_on_the_gateway_of_the_engine_bridge_network() {
     let mut engine = fake::engine(
         "standing-in-bridge",
         vec![
-            info("OrbStack"),
+            info("Ubuntu 24.04.1 LTS"),
             bridge(r#"[{"Subnet":"fd00::/64"},{"Subnet":"127.0.0.0/8","Gateway":"127.0.0.1"}]"#),
         ],
     );
@@ -170,7 +188,7 @@ async fn a_bridge_network_naming_no_gateway_it_can_read_is_refused() {
     let engine = fake::engine(
         "standing-in-no-gateway",
         vec![
-            info("OrbStack"),
+            info("Ubuntu 24.04.1 LTS"),
             bridge(r#"[{"Gateway":"not an address"}]"#),
         ],
     );
@@ -196,7 +214,7 @@ async fn an_engine_that_will_not_describe_itself_or_its_bridge_is_refused() {
             fake::Reply::Body(500, r#"{"message":"no info"}"#.to_owned()),
         )],
     );
-    let no_bridge = fake::engine("standing-in-no-bridge", vec![info("OrbStack")]);
+    let no_bridge = fake::engine("standing-in-no-bridge", vec![info("Ubuntu 24.04.1 LTS")]);
 
     let unsaid = Daemon::at(&silent.socket)
         .stand_in(&stand_in(a_free_port()))
