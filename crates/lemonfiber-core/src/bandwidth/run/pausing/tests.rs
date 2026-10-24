@@ -104,7 +104,7 @@ async fn a_client_nothing_here_can_open_is_named_as_not_reached() {
     assert!(paused.is_ok_and(|paused| paused
         .clients
         .iter()
-        .any(|client| client.client == crate::sabnzbd::SERVICE
+        .any(|client| client.client == "sabnzbd"
             && client.unreached.is_some()
             && client.now.is_none())));
 }

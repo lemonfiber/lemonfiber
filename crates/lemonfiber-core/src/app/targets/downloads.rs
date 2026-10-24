@@ -11,14 +11,12 @@ use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::{ApiKind, Manifest};
 
 use crate::app::Ctx;
-use crate::ports::filesystem::Beneath;
 use crate::ports::service::Download;
 use crate::qbittorrent::Qbittorrent;
-use crate::sabnzbd::Sabnzbd;
 use crate::wiring::{Filler, Fillers};
 
 use super::filled::{spoken, Spoken};
-use super::opening::{credential_file, loopback};
+use super::opening::loopback;
 use super::secrets::{chosen_fillers, recorded_secret};
 use crate::dashboard::Protocol;
 
@@ -30,13 +28,6 @@ pub(crate) enum DownloadKind {
         base: String,
         /// The password recorded for this client alone.
         password: String,
-    },
-    /// The bundled Usenet client, reached with the key it wrote for itself.
-    Usenet {
-        /// Where the host reaches it.
-        base: String,
-        /// The key, read from the file this client's own declaration names.
-        key: String,
     },
     /// A client asked over the contract of the protocol it moves.
     Over {
@@ -80,11 +71,6 @@ impl DownloadTarget {
             DownloadKind::Torrent { base, password } => Downloading::Torrent(Box::new(
                 Qbittorrent::authenticated(ctx.seams.http.clone(), base, password.clone()),
             )),
-            DownloadKind::Usenet { base, key } => Downloading::Usenet(Box::new(Sabnzbd::new(
-                ctx.seams.http.clone(),
-                base,
-                key.clone(),
-            ))),
             DownloadKind::Over {
                 protocol: Protocol::Torrent,
                 adapter,
@@ -171,12 +157,12 @@ pub(crate) struct DeclaredDownload {
 pub(crate) async fn declared_downloads(ctx: &Ctx, fillers: &Fillers) -> Vec<DeclaredDownload> {
     let mut declared = Vec::new();
     for filler in fillers.services() {
-        let Some(protocol) = moving(filler) else {
+        let Some(moving) = moving(filler) else {
             continue;
         };
         declared.push(DeclaredDownload {
             id: filler.id.clone(),
-            target: reached(ctx, fillers, filler, protocol).await,
+            target: reached(ctx, fillers, filler, moving).await,
         });
     }
     declared
@@ -193,48 +179,66 @@ const fn contract(protocol: Protocol) -> (&'static str, u32) {
     }
 }
 
-/// The adapter this build holds for the bundled client moving `protocol`.
-const fn bundled(protocol: Protocol) -> ApiKind {
-    match protocol {
-        Protocol::Torrent => ApiKind::Qbittorrent,
-        Protocol::Usenet => ApiKind::Sabnzbd,
-    }
+/// How a download client is known to move its protocol.
+#[derive(Clone, Copy)]
+enum Moving {
+    /// It speaks that protocol's contract.
+    Contracted(Protocol),
+    /// It is the bundled torrent client, which this build still has an adapter for.
+    Bundled,
+    /// It is the stack's own Usenet client, which this build has no adapter
+    /// for until it moves to its plugin, so it is declared and never reached.
+    Unadapted,
 }
 
-/// The protocol `filler` moves as a download client: by the contract it speaks, before
+/// How `filler` moves a protocol as a download client: by the contract it speaks, before
 /// the bundled adapter it names. Nothing where it is no download client.
-fn moving(filler: &Filler) -> Option<Protocol> {
+fn moving(filler: &Filler) -> Option<Moving> {
     PROTOCOLS
         .into_iter()
         .find(|protocol| {
             let (capability, major) = contract(*protocol);
             filler.contracted(capability, major)
         })
+        .map(Moving::Contracted)
         .or_else(|| {
-            PROTOCOLS
-                .into_iter()
-                .find(|protocol| filler.speaks(bundled(*protocol)))
+            filler
+                .speaks(ApiKind::Qbittorrent)
+                .then_some(Moving::Bundled)
+        })
+        .or_else(|| {
+            filler
+                .adapter
+                .as_ref()
+                .is_some_and(|api| api.kind == ApiKind::Sabnzbd)
+                .then_some(Moving::Unadapted)
         })
 }
 
-/// How the host asks `filler`, a download client moving `protocol`: over that
-/// protocol's contract where it speaks it, otherwise as the bundled client at the port it
-/// publishes with the credential it answers to. Nothing where it speaks the contract and
-/// cannot be asked over it, publishes no port, or its credential is not in hand.
+/// How the host asks `filler`, a download client moving as `moving` says: over its
+/// protocol's contract where it speaks it, otherwise as the bundled torrent client at the
+/// port it publishes with the password recorded for it. Nothing where it speaks the
+/// contract and cannot be asked over it, publishes no port, or its password is not in
+/// hand.
 async fn reached(
     ctx: &Ctx,
     fillers: &Fillers,
     filler: &Filler,
-    protocol: Protocol,
+    moving: Moving,
 ) -> Option<DownloadTarget> {
-    let (capability, major) = contract(protocol);
-    let kind = match spoken(ctx, filler, capability, major).await {
-        Spoken::Over(adapter) => DownloadKind::Over { protocol, adapter },
-        Spoken::Unanswered => return None,
-        Spoken::Not => {
-            let base = loopback(filler.published?);
-            answering(ctx, fillers, filler, protocol, base).await?
+    let kind = match moving {
+        Moving::Contracted(protocol) => {
+            let (capability, major) = contract(protocol);
+            match spoken(ctx, filler, capability, major).await {
+                Spoken::Over(adapter) => DownloadKind::Over { protocol, adapter },
+                Spoken::Unanswered | Spoken::Not => return None,
+            }
         }
+        Moving::Bundled => DownloadKind::Torrent {
+            base: loopback(filler.published?),
+            password: recorded_password(ctx, fillers, filler)?,
+        },
+        Moving::Unadapted => return None,
     };
     Some(DownloadTarget {
         service: filler.id.clone(),
@@ -242,44 +246,11 @@ async fn reached(
     })
 }
 
-/// The bundled client moving `protocol` that `filler` is, at `base`, with the credential
-/// it answers to, or nothing where that credential is not in hand.
-async fn answering(
-    ctx: &Ctx,
-    fillers: &Fillers,
-    filler: &Filler,
-    protocol: Protocol,
-    base: String,
-) -> Option<DownloadKind> {
-    match protocol {
-        Protocol::Torrent => recorded_password(ctx, fillers, filler)
-            .map(|password| DownloadKind::Torrent { base, password }),
-        Protocol::Usenet => match usenet_key(ctx, filler).await {
-            Beneath::Read(key) => Some(DownloadKind::Usenet { base, key }),
-            _ => None,
-        },
-    }
-}
-
 /// The password recorded for this torrent client, under the setting kept for it alone,
 /// or nothing where none is recorded or no setting can be kept for it.
 pub(crate) fn recorded_password(ctx: &Ctx, fillers: &Fillers, filler: &Filler) -> Option<String> {
     let setting = fillers.setting(filler, crate::config::PASSWORD_SUFFIX)?;
     recorded_secret(ctx, &setting)
-}
-
-/// The key this Usenet client wrote for itself, read from the file its own declaration
-/// names — beneath its own directory where a plugin brought it.
-///
-/// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
-/// written, and a file refused stays refused, so the caller can say so.
-pub(crate) async fn usenet_key(ctx: &Ctx, filler: &Filler) -> Beneath {
-    match credential_file(ctx, filler).await {
-        Beneath::Read(text) => {
-            crate::sabnzbd::api_key(&text).map_or(Beneath::Absent, Beneath::Read)
-        }
-        other => other,
-    }
 }
 
 /// The first torrent client among the targets.
@@ -339,7 +310,6 @@ pub(crate) fn committed_of(downloads: &[Download]) -> u64 {
 pub(crate) const fn protocol_of(kind: &DownloadKind) -> Protocol {
     match kind {
         DownloadKind::Torrent { .. } => Protocol::Torrent,
-        DownloadKind::Usenet { .. } => Protocol::Usenet,
         DownloadKind::Over { protocol, .. } => *protocol,
     }
 }

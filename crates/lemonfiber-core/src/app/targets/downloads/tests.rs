@@ -91,7 +91,7 @@ fn passwords(targets: &[super::DownloadTarget]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|target| match &target.kind {
             DownloadKind::Torrent { base, password } => Some((base.clone(), password.clone())),
-            DownloadKind::Usenet { .. } | DownloadKind::Over { .. } => None,
+            DownloadKind::Over { .. } => None,
         })
         .collect()
 }
@@ -207,9 +207,14 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
     let targets = [
         DownloadTarget {
             service: "usenet".to_owned(),
-            kind: DownloadKind::Usenet {
-                base: "http://127.0.0.1:8085".to_owned(),
-                key: "usenet-key".to_owned(),
+            kind: DownloadKind::Over {
+                protocol: Protocol::Usenet,
+                adapter: Contracted::new(
+                    Fake::silent(),
+                    "http://127.0.0.1:8085",
+                    "usenet",
+                    "usenet-key",
+                ),
             },
         },
         DownloadTarget {
@@ -490,13 +495,6 @@ fn every_kind_of_client_is_asked_as_the_protocol_it_moves() {
                 password: a_password(),
             },
             Protocol::Torrent,
-        ),
-        (
-            DownloadKind::Usenet {
-                base: "http://127.0.0.1:8085".to_owned(),
-                key: "usenet-key".to_owned(),
-            },
-            Protocol::Usenet,
         ),
         (
             DownloadKind::Over {

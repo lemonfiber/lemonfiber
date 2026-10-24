@@ -89,7 +89,6 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
                     Credential::ApiKey("theirs".to_owned()),
                 ),
             ]),
-            refused: std::collections::BTreeSet::new(),
         },
     )
     .await;

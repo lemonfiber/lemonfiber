@@ -11,11 +11,8 @@ use crate::ports::filesystem::Beneath;
 /// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
 /// written, and a file refused stays refused, so the caller can say so.
 pub(super) async fn curator_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
-    if let Some(minted) = &filler.minted {
-        return crate::settings::secrets_at(ctx)
-            .and_then(|at| crate::settings::Secrets::at(&at).ok())
-            .and_then(|secrets| secrets.value(minted).map(str::to_owned))
-            .map_or(Beneath::Absent, Beneath::Read);
+    if filler.minted.is_some() {
+        return minted_key(ctx, filler).map_or(Beneath::Absent, Beneath::Read);
     }
     match crate::app::targets::credential_file(ctx, filler).await {
         Beneath::Read(text) => {
@@ -23,6 +20,15 @@ pub(super) async fn curator_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Be
         }
         other => other,
     }
+}
+
+/// The credential lemonfiber minted for `filler`, from the secret store, where its plugin
+/// declares one and the store holds it.
+pub(super) fn minted_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Option<String> {
+    let minted = filler.minted.as_ref()?;
+    crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .and_then(|secrets| secrets.value(minted).map(str::to_owned))
 }
 
 /// A connection refused because the filler's credential file was, saying why.

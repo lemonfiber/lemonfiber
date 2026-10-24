@@ -1,3 +1,5 @@
+use lemonfiber_contract::capabilities::download::usenet;
+use lemonfiber_contract::Contracted;
 use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
 use super::{bandwidth, counting, fetch, possible, settled, wanted, zone, Asked, Fetch};
@@ -386,15 +388,19 @@ fn a_client_that_says_what_it_moved() -> super::reaching::Client {
     }
 }
 
+/// The Usenet client's service.
+const USENET: &str = "sabnzbd";
+
 /// The Usenet client on the same stack, which is not there.
 fn a_client_that_will_not_say() -> super::reaching::Client {
     super::reaching::Client {
-        service: crate::sabnzbd::SERVICE.to_owned(),
-        client: Downloading::Usenet(Box::new(crate::sabnzbd::Sabnzbd::new(
+        service: USENET.to_owned(),
+        client: Downloading::Usenet(Box::new(usenet::Adapter(Contracted::new(
             Fake::silent(),
             "http://127.0.0.1:8080",
+            USENET,
             "the-key",
-        ))),
+        )))),
     }
 }
 

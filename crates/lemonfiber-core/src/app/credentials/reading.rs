@@ -168,8 +168,8 @@ pub(crate) fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
         ApiKind::Servarr => Some(crate::servarr::api_key),
         ApiKind::Bazarr => Some(crate::bazarr::api_key),
         ApiKind::Seerr => Some(crate::seerr::api_key),
-        ApiKind::Sabnzbd => Some(crate::sabnzbd::api_key),
-        ApiKind::Qbittorrent
+        ApiKind::Sabnzbd
+        | ApiKind::Qbittorrent
         | ApiKind::Bindery
         | ApiKind::Jellyfin
         | ApiKind::Audiobookshelf

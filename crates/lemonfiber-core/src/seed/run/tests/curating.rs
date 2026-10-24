@@ -275,58 +275,6 @@ fn a_filler_nothing_connects_is_not_told_about() {
 
 /// A plugin's Usenet client whose key file leads away from the directory its container
 /// owns is not read, and each curator that asks for it is told why on that connection.
-#[tokio::test]
-async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection() {
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
-    let stand_in = crate::test_support::a_placed(
-        "nzbget",
-        &["download.usenet"],
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-            key_source: lemonfiber_manifest::KeySource::ConfigIni,
-            path: Some("/config/sabnzbd.ini".to_owned()),
-            version: None,
-        }),
-        Some(6789),
-    );
-    let installed = [crate::test_support::an_installed("nzbget", vec![stand_in])];
-    let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
-    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
-        SeedFs::keyed(None, Some(USENET_CONFIG)).leading_away(vec!["config/nzbget/"]),
-    ));
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|manifest| {
-            crate::wiring::Fillers::of(&manifest, &installed, &chosen, Some(stack_root()))
-        })
-        .unwrap_or_default();
-
-    let held =
-        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
-    let refused = super::super::clients::refused(&fillers, &held);
-
-    assert!(
-        held.of(&holder(Some("nzbget"), "nzbget")).is_none(),
-        "the file was read"
-    );
-    assert_eq!(
-        refused
-            .iter()
-            .map(|wiring| wiring.connection.as_str())
-            .collect::<Vec<&str>>(),
-        vec![
-            "nzbget the stand-in into Sonarr",
-            "nzbget the stand-in into Radarr",
-            "nzbget the stand-in into Lidarr",
-        ]
-    );
-    assert!(refused.iter().all(|wiring| matches!(
-        &wiring.state,
-        crate::seed::State::Refused { reason } if reason.starts_with("nzbget's credential file")
-    )));
-}
-
-/// A curator filing a media type with no category field is told about no client.
 #[test]
 fn a_curator_with_no_category_is_told_about_no_client() {
     assert_eq!(

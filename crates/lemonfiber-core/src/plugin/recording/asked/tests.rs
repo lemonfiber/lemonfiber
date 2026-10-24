@@ -1,7 +1,6 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_plugin::{Manifest, Request};
 
-use super::super::first::Presented;
 use super::super::tests::asking::SERVED;
 use super::{answered, items, kept, unrecorded, Item};
 use crate::ports::http::Response;
@@ -91,37 +90,6 @@ fn request(path: &str, accept: Option<&str>) -> Request {
         path: path.to_owned(),
         accept: accept.map(str::to_owned),
     }
-}
-
-#[tokio::test]
-async fn a_key_read_from_a_query_is_appended_to_the_query_and_nothing_presented_without_one() {
-    let http = Fake::always(Answer::reply(200, "{}"));
-    let held = Presented::Query("apikey", "a b&c".to_owned());
-    let queued = request("/api?mode=queue&output=json", None);
-    let _ = answered(http.as_ref(), 8, &item(&queued, true), Some(&held)).await;
-    let bare = request("/api", Some("application/json"));
-    let _ = answered(http.as_ref(), 8, &item(&bare, true), Some(&held)).await;
-    let _ = answered(http.as_ref(), 8, &item(&bare, false), None).await;
-    let asked: Vec<(String, Vec<(String, String)>)> = http
-        .requests()
-        .into_iter()
-        .map(|one| (one.url, one.headers))
-        .collect();
-    let accept = vec![("Accept".to_owned(), "application/json".to_owned())];
-    assert_eq!(
-        asked,
-        vec![
-            (
-                "http://127.0.0.1:8/api?mode=queue&output=json&apikey=a%20b%26c".to_owned(),
-                Vec::new()
-            ),
-            (
-                "http://127.0.0.1:8/api?apikey=a%20b%26c".to_owned(),
-                accept.clone()
-            ),
-            ("http://127.0.0.1:8/api".to_owned(), accept),
-        ]
-    );
 }
 
 #[tokio::test]

@@ -298,20 +298,13 @@ pub(super) async fn answered(
     if !lemonfiber_plugin::refusing::carried::is_route(&asked.path) {
         return Err(format!("{} is not a route on the service", asked.path));
     }
-    let mut url = format!("http://{LOOPBACK}:{port}{}", asked.path);
+    let url = format!("http://{LOOPBACK}:{port}{}", asked.path);
     let mut headers = Vec::new();
     if let Some(accept) = &asked.accept {
         headers.push(("Accept".to_owned(), accept.clone()));
     }
     match presented {
         Some(Presented::Header(name, value)) => headers.push(((*name).to_owned(), value.clone())),
-        Some(Presented::Query(name, value)) => {
-            let joined = if asked.path.contains('?') { '&' } else { '?' };
-            url = format!(
-                "{url}{joined}{name}={}",
-                crate::endpoint::query_encoded(value)
-            );
-        }
         Some(Presented::Session) | None => {}
     }
     let request = crate::ports::http::Request {

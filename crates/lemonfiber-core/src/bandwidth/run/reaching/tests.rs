@@ -128,13 +128,21 @@ fn torrent() -> DownloadTarget {
     }
 }
 
+/// The Usenet client's service.
+const USENET: &str = "sabnzbd";
+
 /// The Usenet client as a read target, holding the key it wrote.
 fn usenet() -> DownloadTarget {
     DownloadTarget {
-        service: crate::sabnzbd::SERVICE.to_owned(),
-        kind: DownloadKind::Usenet {
-            base: "http://127.0.0.1:8080".to_owned(),
-            key: "usenet-key".to_owned(),
+        service: USENET.to_owned(),
+        kind: DownloadKind::Over {
+            protocol: Protocol::Usenet,
+            adapter: Contracted::new(
+                Fake::silent(),
+                "http://127.0.0.1:8080",
+                USENET,
+                "usenet-key",
+            ),
         },
     }
 }
