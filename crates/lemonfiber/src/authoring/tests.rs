@@ -2,13 +2,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber::cli::Authoring;
-use lemonfiber_core::plugin::{Recorder, Ungenerated};
+use lemonfiber_core::plugin::{Recorder, Retaking, Ungenerated};
 use lemonfiber_core::ports::program::{Program, Unran};
 use lemonfiber_core::ports::registry::Registry;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::serving::Serves;
 
-use super::{document_of, held_keys, unrenderable, vocabulary, Answered};
+use super::{document_of, held_keys, taking, unrenderable, vocabulary, Answered};
 use crate::exit::FAILURE;
 
 /// A manifest nothing refuses, pinning one image and claiming nothing.
@@ -94,6 +94,7 @@ async fn published(
             serving: &serving,
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
+            taking: &Retaking::Written,
         },
     )
     .await
@@ -468,7 +469,11 @@ fn running() -> String {
 async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made() {
     let at = source("record", &running());
     let wrote = published(
-        &Authoring::Record { path: at.clone() },
+        &Authoring::Record {
+            path: at.clone(),
+            check: false,
+            adapter: None,
+        },
         false,
         &answering(404, "{}"),
         lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
@@ -494,7 +499,11 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
         text.replace("\"note\": \"\"", "\"note\": \"It starts.\""),
     );
     let noted = published(
-        &Authoring::Record { path: at.clone() },
+        &Authoring::Record {
+            path: at.clone(),
+            check: false,
+            adapter: None,
+        },
         false,
         &answering(404, "{}"),
         lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
@@ -506,6 +515,8 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
     let unmade = read(
         Authoring::Record {
             path: source("record-unmade", &running()),
+            check: false,
+            adapter: None,
         },
         false,
     )
@@ -516,10 +527,32 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
     let nowhere = read(
         Authoring::Record {
             path: PathBuf::from("/lemonfiber/no/such/plugin"),
+            check: false,
+            adapter: None,
         },
         false,
     )
     .await;
     assert_eq!(nowhere.code, FAILURE);
     assert!(nowhere.fault.is_some());
+}
+
+#[test]
+fn a_check_holds_what_it_takes_and_starts_the_adapter_it_names() {
+    let asked = |check, adapter: Option<&str>| {
+        taking(&Authoring::Record {
+            path: PathBuf::from("."),
+            check,
+            adapter: adapter.map(str::to_owned),
+        })
+    };
+    assert_eq!(asked(false, None), Retaking::Written);
+    assert_eq!(asked(true, None), Retaking::Checked { adapter: None });
+    assert_eq!(
+        asked(true, Some("plugin-sonarr:pr")),
+        Retaking::Checked {
+            adapter: Some("plugin-sonarr:pr".to_owned())
+        }
+    );
+    assert_eq!(taking(&Authoring::Capabilities), Retaking::Written);
 }

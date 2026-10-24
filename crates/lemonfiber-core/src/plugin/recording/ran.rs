@@ -5,10 +5,9 @@ use std::path::Path;
 use lemonfiber_plugin::{Manifest, Run};
 
 use super::written::{before, written};
-use super::{placed, Taken, Took};
+use super::{placed, Recorder, Retaking, Taken, Took};
 use crate::plugin::program::{performed, recorded, Came, Operator, Starting};
 use crate::plugin::recorded::{Of, Recording, RunAsked, RunResult};
-use crate::ports::program::Program;
 
 /// One run a manifest names a recording for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,8 +60,7 @@ pub(super) async fn taken(
     manifest: &Manifest,
     running: Running<'_>,
     root: &Path,
-    program: &dyn Program,
-    random: &dyn crate::ports::random::Random,
+    recorder: Recorder<'_>,
 ) -> Taken {
     let took = match (running.fixture, placed(manifest, running.service)) {
         (Some(fixture), Some(placed)) => {
@@ -71,16 +69,16 @@ pub(super) async fn taken(
                 service: &placed.service,
             };
             let came = performed(
-                program,
+                recorder.program,
                 &placed,
                 running.run,
                 &Operator::recording(),
                 Some(starting),
-                random,
+                recorder.random,
             )
             .await;
             let pinned = format!("{}@{}", placed.image, placed.digest);
-            kept(root, fixture, &pinned, running.run, &came)
+            kept(root, fixture, &pinned, running.run, &came, recorder.taking)
         }
         _ => Took::Unrecorded {
             why: "names no fixture, or no one service of this plugin, so there is nowhere to \
@@ -96,7 +94,14 @@ pub(super) async fn taken(
 }
 
 /// What a run came to, written to `fixture` beneath `root` where it ended.
-fn kept(root: &Path, fixture: &str, pinned: &str, run: &Run, came: &Came) -> Took {
+fn kept(
+    root: &Path,
+    fixture: &str,
+    pinned: &str,
+    run: &Run,
+    came: &Came,
+    taking: &Retaking,
+) -> Took {
     let result = match came {
         Came::Ended(result) => recorded(result),
         Came::Overran(seconds) => return Took::Overran { seconds: *seconds },
@@ -129,6 +134,7 @@ fn kept(root: &Path, fixture: &str, pinned: &str, run: &Run, came: &Came) -> Too
             },
             result,
         },
+        taking,
     )
 }
 

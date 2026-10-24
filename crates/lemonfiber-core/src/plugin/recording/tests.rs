@@ -61,6 +61,7 @@ async fn ran(
             serving: &serving,
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
+            taking: &crate::plugin::Retaking::Written,
         },
     )
     .await
@@ -317,18 +318,22 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
     );
     let at = source("record-claim-run", &manifest);
     let program = Proving::exiting(0, "v8.7.3 (");
+    let serving = Serves::refusing(Unran::Unreachable {
+        reason: "no engine in a test".to_owned(),
+    });
+    let silent =
+        || -> std::sync::Arc<dyn crate::ports::http::Http> { Fake::always(Answer::Silent) };
+    let chance = lemonfiber_fixtures::ports::Chance::cycling();
+    let recorder = Recorder {
+        program: program.as_ref(),
+        serving: &serving,
+        transport: &silent,
+        random: &chance,
+        taking: &crate::plugin::Retaking::Written,
+    };
     let mut took = Vec::new();
     for running in runs {
-        took.push(
-            super::ran::taken(
-                &read,
-                running,
-                &at,
-                program.as_ref(),
-                &lemonfiber_fixtures::ports::Chance::cycling(),
-            )
-            .await,
-        );
+        took.push(super::ran::taken(&read, running, &at, recorder).await);
     }
     let kept: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(at.join("recordings/recyclarr/runs.json")).unwrap_or_default(),

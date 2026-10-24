@@ -1,4 +1,5 @@
-//! Taking every recording a manifest names again, from its pin.
+//! Taking every recording a manifest names again, from its pin, and writing it or holding
+//! the one there to it.
 //!
 //! A run proof's or a run probe's by running it, bounded as every proof's run is. Every
 //! request's from one fresh container of its service, after the first run the core
@@ -7,12 +8,14 @@
 //! A service is recorded whole or not at all, and the note already at each path is kept.
 
 mod addressed;
+mod alike;
 mod asked;
 mod first;
 mod fronted;
 mod ran;
 mod scrubbed;
 mod served;
+mod unasked;
 mod written;
 
 use std::path::Path;
@@ -29,7 +32,30 @@ use crate::ports::program::Program;
 use crate::ports::random::Random;
 use crate::ports::serving::Serving;
 
-/// What a recording run reaches the outside through.
+/// How a recording run keeps what it takes.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Retaking {
+    /// Each recording written from its pin, and each no case asked removed.
+    #[default]
+    Written,
+    /// Each recording held to what was taken, and nothing written or removed.
+    Checked {
+        /// An image the engine holds, each adapter started from in place of its pin.
+        adapter: Option<String>,
+    },
+}
+
+impl Retaking {
+    /// The image each adapter is started from in place of its pin, where one is named.
+    fn adapter(&self) -> Option<&str> {
+        match self {
+            Self::Written => None,
+            Self::Checked { adapter } => adapter.as_deref(),
+        }
+    }
+}
+
+/// What a recording run reaches the outside through, and how it keeps what it takes.
 #[derive(Clone, Copy)]
 pub struct Recorder<'a> {
     /// Runs an image's own program once, for a run proof.
@@ -40,6 +66,8 @@ pub struct Recorder<'a> {
     pub transport: &'a (dyn Fn() -> Arc<dyn Http> + Send + Sync),
     /// Where a credential a first run mints comes from.
     pub random: &'a dyn Random,
+    /// Whether what is taken is written or held to what is there.
+    pub taking: &'a Retaking,
 }
 
 /// What taking one recording came to.
@@ -68,6 +96,11 @@ pub enum Took {
         /// Why.
         why: String,
     },
+    /// The recording answers no case that was asked, so it was removed.
+    Removed,
+    /// The recording answers no case that was asked, and is left as it was because the
+    /// run writes nothing.
+    Unasked,
 }
 
 /// One recording a manifest names, and what taking it came to.
@@ -105,7 +138,8 @@ pub struct Recorded {
     pub recordings: Vec<Taken>,
     /// Each service whose recordings were not taken.
     pub failed: Vec<Failed>,
-    /// Whether every recording was written or reproduced, each with a note.
+    /// Whether every recording was written or reproduced, each with a note, and each no
+    /// case asked removed.
     pub holds: bool,
 }
 
@@ -121,19 +155,21 @@ pub async fn record(path: &Path, recorder: Recorder<'_>) -> Result<Recorded, Unr
     let mut failed = Vec::new();
     if refusals.is_empty() {
         for running in ran::runs(&manifest) {
-            recordings.push(
-                ran::taken(&manifest, running, &root, recorder.program, recorder.random).await,
-            );
+            recordings.push(ran::taken(&manifest, running, &root, recorder).await);
         }
         let (asked, unfailed) = asked::taken(&manifest, &root, recorder).await;
         recordings.extend(asked);
         failed = unfailed;
+        if failed.is_empty() {
+            let strays = unasked::taken(&root, &recordings, recorder.taking);
+            recordings.extend(strays);
+        }
     }
     let holds = refusals.is_empty()
         && failed.is_empty()
         && recordings
             .iter()
-            .all(|one| matches!(one.took, Took::Written | Took::Reproduced));
+            .all(|one| matches!(one.took, Took::Written | Took::Reproduced | Took::Removed));
     Ok(Recorded {
         id: manifest.plugin.id.clone(),
         refusals,

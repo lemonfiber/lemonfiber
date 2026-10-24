@@ -40,12 +40,14 @@ fn each_recording_is_said_with_what_taking_it_came_to() {
             taken(Took::Unrecorded {
                 why: "\u{1b}[2Jno engine".to_owned(),
             }),
+            taken(Took::Removed),
+            taken(Took::Unasked),
         ],
         false,
     );
     let said = shown(&every);
     for words in [
-        "quality — every recording its manifest names, taken again from its pin",
+        "quality — every recording its manifest names, taken again",
         "proof recyclarr.runs",
         "recordings/recyclarr/runs-version.json: written",
         "written with an empty note, which has to say why it is evidence",
@@ -53,6 +55,8 @@ fn each_recording_is_said_with_what_taking_it_came_to() {
         "refused: it differs",
         "still running at its limit of 30 seconds, and stopped",
         "not recorded: [2Jno engine",
+        "answers no case, and removed",
+        "answers no case, so it is refused and left as it was",
         "Not every recording is taken.",
     ] {
         assert!(said.contains(words), "{words}: {said}");

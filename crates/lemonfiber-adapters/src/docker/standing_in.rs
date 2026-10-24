@@ -5,7 +5,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bollard::Docker;
 use futures_util::{Stream, StreamExt as _};
@@ -30,9 +29,6 @@ const DESKTOP: &str = "Docker Desktop";
 
 /// What a stand-in answers anything it was not given.
 const REFUSED: &str = r#"{"status":false,"error":"not answered here"}"#;
-
-/// How long a stand-in waits after a connection it could not take before the next.
-const AFTER_A_FAILED_ACCEPT: Duration = Duration::from_millis(100);
 
 /// Each connection a stand-in is asked on, as it is taken.
 type Accepted = Pin<Box<dyn Stream<Item = std::io::Result<TcpStream>> + Send>>;
@@ -84,7 +80,7 @@ async fn answering(mut accepted: Accepted, stand_in: Arc<StandIn>) {
                 let stand_in = Arc::clone(&stand_in);
                 tokio::spawn(async move { answered(stream, &stand_in).await });
             }
-            Err(_) => tokio::time::sleep(AFTER_A_FAILED_ACCEPT).await,
+            Err(_) => tokio::time::sleep(crate::AFTER_A_FAILED_ACCEPT).await,
         }
     }
 }

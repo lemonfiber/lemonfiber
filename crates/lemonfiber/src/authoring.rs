@@ -20,7 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use lemonfiber::cli::Authoring;
-use lemonfiber_core::plugin::{Capabilities, Key, Recorder, Ungenerated};
+use lemonfiber_core::plugin::{Capabilities, Key, Recorder, Retaking, Ungenerated};
 use lemonfiber_core::ports::registry::Registry;
 
 use crate::exit::FAILURE;
@@ -96,7 +96,21 @@ pub(crate) async fn published(
         Authoring::Claims { path } => claims(path, json),
         Authoring::Conform { path } => conform(path, json).await,
         Authoring::Provenance { path, keys } => vouched_for(path, keys, json, asking).await,
-        Authoring::Record { path } => recorded(path, json, recorder).await,
+        Authoring::Record { path, .. } => recorded(path, json, recorder).await,
+    }
+}
+
+/// How a recording run asked for by `read` keeps what it takes.
+pub(crate) fn taking(read: &Authoring) -> Retaking {
+    match read {
+        Authoring::Record {
+            check: true,
+            adapter,
+            ..
+        } => Retaking::Checked {
+            adapter: adapter.clone(),
+        },
+        _ => Retaking::Written,
     }
 }
 

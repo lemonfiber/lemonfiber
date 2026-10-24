@@ -21,7 +21,7 @@ pub(crate) fn recorded(read: &Recorded, json: bool) -> Option<Lines> {
 fn said(read: &Recorded) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
-        "{} — every recording its manifest names, taken again from its pin",
+        "{} — every recording its manifest names, taken again",
         read.id
     ));
     if !read.refusals.is_empty() {
@@ -76,6 +76,8 @@ fn took(took: &Took) -> String {
             format!("still running at its limit of {seconds} seconds, and stopped")
         }
         Took::Unrecorded { why } => format!("not recorded: {why}"),
+        Took::Removed => "answers no case, and removed".to_owned(),
+        Took::Unasked => "answers no case, so it is refused and left as it was".to_owned(),
     }
 }
 

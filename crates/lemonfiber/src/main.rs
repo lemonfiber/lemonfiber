@@ -381,11 +381,13 @@ async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCod
     let fresh = || -> std::sync::Arc<dyn lemonfiber_core::ports::http::Http> {
         std::sync::Arc::new(lemonfiber_adapters::http::Web::new())
     };
+    let taking = authoring::taking(read);
     let recorder = lemonfiber_core::plugin::Recorder {
         program: &engine,
         serving: &engine,
         transport: &fresh,
         random: &lemonfiber_adapters::Os,
+        taking: &taking,
     };
     let answered = authoring::published(read, json, &asking, recorder).await;
     if let Some(fault) = answered.fault {

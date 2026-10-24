@@ -303,16 +303,31 @@ pub enum Authoring {
         #[arg(long = "key", value_name = "PEM")]
         keys: Vec<PathBuf>,
     },
-    /// Run each proof that runs the image's own program, and write its recording.
+    /// Take every recording the manifest names again, from its pins, and write each.
     ///
-    /// Each runs as an install runs it: a new container from the pinned image, with no
+    /// A run is run as an install runs it: a new container from the pinned image, with no
     /// network, under the service's posture, user and memory limit, with a throwaway copy
-    /// of its starting files, bounded in time and in what is read. The recording keeps
-    /// the note already written in it. A recording of the same image and arguments that
-    /// the run does not reproduce byte for byte is refused and left as it was, and exits
-    /// non-zero. No image is pulled.
+    /// of its starting files, bounded in time and in what is read. A request is asked of
+    /// one fresh container of its service after its first run, and each conformance case
+    /// of an adapter of the plugin asked of that adapter in front of it. Each recording
+    /// keeps the note already written in it, and a conformance recording no case asks is
+    /// removed. A run's recording that the run does not reproduce byte for byte is refused
+    /// and left as it was, and exits non-zero. No image is pulled.
     Record {
         /// The plugin's source: its directory, or the `plugin.toml` inside it.
         path: PathBuf,
+        /// Hold every recording to what is taken again, and write and remove nothing.
+        ///
+        /// Exits non-zero naming each recording that differs and each conformance
+        /// recording no case asks. An identifier or a moment the service makes afresh on
+        /// each run is held to its shape alone.
+        #[arg(long)]
+        check: bool,
+        /// Start each adapter from this image the engine holds, in place of its pin.
+        ///
+        /// The image the plugin's CI built from its own `Dockerfile`. Taken only with
+        /// `--check`, so a recording is only ever written from a pin.
+        #[arg(long, value_name = "IMAGE", requires = "check")]
+        adapter: Option<String>,
     },
 }

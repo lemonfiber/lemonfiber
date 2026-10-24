@@ -18,6 +18,14 @@
 //! crate is permitted in exactly one file here, so a subsystem cannot quietly grow
 //! its own way out. See `.docs/architecture/ports-and-adapters.md`.
 
+use std::time::Duration;
+
+/// How long a listener waits after a connection it could not take before asking again.
+///
+/// A failure to accept is usually the process out of descriptors, and asking again at
+/// once would spin on it.
+pub const AFTER_A_FAILED_ACCEPT: Duration = Duration::from_millis(100);
+
 pub mod docker;
 pub mod filesystem;
 pub mod hosting;

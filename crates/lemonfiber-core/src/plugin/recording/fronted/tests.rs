@@ -146,6 +146,7 @@ async fn read(
             serving,
             transport: &shared,
             random: &FixedRandom(random.map(|byte| vec![byte; 32])),
+            taking: &crate::plugin::Retaking::Written,
         },
     )
     .await
@@ -702,3 +703,5 @@ async fn a_curator_whose_download_client_cannot_answer_fails_at_it_and_starts_no
     assert_eq!(serving.stood_in().len(), 1);
     assert!(serving.asked().is_empty());
 }
+
+mod checking;
