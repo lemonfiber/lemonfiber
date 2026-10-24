@@ -17,6 +17,7 @@ pub struct Serves {
     asked: Mutex<Vec<Serve>>,
     removed: Mutex<Vec<Served>>,
     stood_in: Mutex<Vec<StandIn>>,
+    unanswering: Option<Unran>,
 }
 
 /// A stand-in that answers nothing, standing for one the engine would answer.
@@ -37,15 +38,29 @@ impl Serves {
             asked: Mutex::new(Vec::new()),
             removed: Mutex::new(Vec::new()),
             stood_in: Mutex::new(Vec::new()),
+            unanswering: None,
         }
     }
 
-    /// Keep `stand_in` as asked, and answer for it with nothing.
-    fn standing_in(&self, stand_in: &StandIn) -> Box<dyn Answering> {
+    /// Keep `stand_in` as asked, and answer for it with nothing, or refuse it where this
+    /// answers no stand-in.
+    fn standing_in(&self, stand_in: &StandIn) -> Result<Box<dyn Answering>, Unran> {
         if let Ok(mut held) = self.stood_in.lock() {
             held.push(stand_in.clone());
         }
-        Box::new(Answers)
+        match &self.unanswering {
+            Some(unran) => Err(unran.clone()),
+            None => Ok(Box::new(Answers)),
+        }
+    }
+
+    /// No stand-in can answer, for `unran`.
+    #[must_use]
+    pub fn unanswering(self, unran: Unran) -> Self {
+        Self {
+            unanswering: Some(unran),
+            ..self
+        }
     }
 
     /// Every stand-in it was asked to answer, in the order asked.
@@ -210,6 +225,6 @@ impl Serving for Serves {
     }
 
     async fn stand_in(&self, stand_in: &StandIn) -> Result<Box<dyn Answering>, Unran> {
-        Ok(self.standing_in(stand_in))
+        self.standing_in(stand_in)
     }
 }

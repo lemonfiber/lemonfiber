@@ -107,6 +107,7 @@ fn a_served_container_is_on_its_own_network_with_its_port_on_loopback_alone() {
     );
     assert_eq!(host.devices, None);
     assert_eq!(host.binds, None);
+    assert_eq!(host.extra_hosts, None);
     assert_eq!(asked.networking_config, None);
 }
 
@@ -125,6 +126,24 @@ fn a_container_with_an_alias_is_reached_by_it_on_its_network() {
         .and_then(|endpoints| endpoints.get("lemonfiber-record-1-2-3").cloned())
         .and_then(|endpoint| endpoint.aliases);
     assert_eq!(aliases, Some(vec!["jellyfin".to_owned()]));
+}
+
+#[test]
+fn each_name_a_container_reaches_this_machine_by_resolves_to_the_engine_host_gateway() {
+    let asked = body(
+        &Serve {
+            reaching: vec!["conformance-download".to_owned(), "indexer".to_owned()],
+            ..serve()
+        },
+        "lemonfiber-record-1-2-3",
+    );
+    assert_eq!(
+        asked.host_config.and_then(|host| host.extra_hosts),
+        Some(vec![
+            "conformance-download:host-gateway".to_owned(),
+            "indexer:host-gateway".to_owned()
+        ])
+    );
 }
 
 #[test]

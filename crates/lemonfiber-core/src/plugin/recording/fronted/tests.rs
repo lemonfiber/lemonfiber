@@ -681,3 +681,24 @@ async fn an_adapter_of_another_contract_is_recorded_with_nothing_answering_besid
     assert!(serving.stood_in().is_empty());
     assert!(serving.asked().iter().all(|one| one.reaching.is_empty()));
 }
+
+#[tokio::test]
+async fn a_curator_whose_download_client_cannot_answer_fails_at_it_and_starts_nothing() {
+    let at = source("fronted-client-unanswered", &curating());
+    let serving = engine().unanswering(Unran::Refused {
+        reason: "127.0.0.1:8080 could not be taken to answer on".to_owned(),
+    });
+    let read = recorded(&at, &serving, &answering(), Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read)
+            .first()
+            .map(|(step, why)| (step.as_str(), why.as_str())),
+        Some((
+            "download client",
+            "the container engine refused the run: 127.0.0.1:8080 could not be taken to answer on"
+        ))
+    );
+    assert_eq!(serving.stood_in().len(), 1);
+    assert!(serving.asked().is_empty());
+}
