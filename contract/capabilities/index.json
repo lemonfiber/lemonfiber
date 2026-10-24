@@ -330,7 +330,7 @@
         },
         {
           "path": "indexer.search/v1/conformance.json",
-          "sha256": "3268e51221e600540850efe49c8680401805aa79407f19f68ce52d33e8cdd2b2"
+          "sha256": "f36390ba8b7bc711ca2c5f3e2ea22225e94a9c4f3ecf6a8604a4a8123ddfc618"
         }
       ],
       "majors": [
@@ -357,7 +357,7 @@
         },
         {
           "path": "subtitles.fetch/v1/conformance.json",
-          "sha256": "1812494b9a28cd3bdfaaf85a5296a6efd61de9bb46b952f61426ec1077c80d25"
+          "sha256": "32366d84655be6af598fbf1826fde81681457cf71c59f39cfc310ac202d1bfb8"
         }
       ],
       "majors": [
@@ -500,7 +500,7 @@
         },
         {
           "path": "request.intake/v1/conformance.json",
-          "sha256": "e984a53a2fd12f392e1223faa8fc141d94132165ebfa78733a09ecde7ea1d1ba"
+          "sha256": "88f279b6f6281e42dea522f3e9a99156f62ee12216e01ecb02a39349d4089844"
         }
       ],
       "majors": [
@@ -764,7 +764,7 @@
         },
         {
           "path": "quality.sync/v1/conformance.json",
-          "sha256": "afab6d5a83121b73490dff1d5ed8874fccf1b4f0a350335cc956402534c4b764"
+          "sha256": "c87530207952cabb26cb79c611c0cb3d98dabf16f72bbdc19df8805ead24fa1f"
         }
       ],
       "majors": [
@@ -791,7 +791,7 @@
         },
         {
           "path": "dashboard.show/v1/conformance.json",
-          "sha256": "4be77b3a7252fa0fc4555458cab0f571fea32a09101fecfc2b17e45f6aae97ad"
+          "sha256": "eaeb6ac8255c57cc3d256113b4f5d3e06bbe697d1b59875ca620410e06f78d31"
         }
       ],
       "majors": [
@@ -818,7 +818,7 @@
         },
         {
           "path": "archive.extract/v1/conformance.json",
-          "sha256": "1d3babe91c29d9b183e564551de7cc0a4f608095bc99e40739751a28c4e2c904"
+          "sha256": "501b5cdce4a16790e1d6c8f53bf114c75a106048b7828aaec39b204132f1c5b5"
         }
       ],
       "majors": [
@@ -907,7 +907,7 @@
         },
         {
           "path": "request.gate/v1/conformance.json",
-          "sha256": "23876c31f2b98fe8d3f2be2a1c9b7ac2c11335a1d46bce68137a628b909f4e01"
+          "sha256": "44966d4c6da082a5326fb9ca4dac5370c955ad96f5a6646044e8c9d7de5cc0c2"
         }
       ],
       "majors": [

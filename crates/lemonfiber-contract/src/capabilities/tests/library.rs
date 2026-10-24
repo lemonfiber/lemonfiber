@@ -313,8 +313,12 @@ fn the_client_the_cases_register_answers_a_curators_tests_and_files_under_each_c
         answering
             .answers
             .iter()
-            .find(|(asked, _)| asked == mode)
-            .and_then(|(_, text)| serde_json::from_str::<serde_json::Value>(text).ok())
+            .find(|said| {
+                said.method == "GET"
+                    && said.path == "/api"
+                    && said.query == Some(("mode".to_owned(), mode.to_owned()))
+            })
+            .and_then(|said| serde_json::from_str::<serde_json::Value>(said.body.as_deref()?).ok())
     };
     let categories: Vec<String> = said("get_config")
         .and_then(|config| config.pointer("/config/categories")?.as_array().cloned())
@@ -323,10 +327,7 @@ fn the_client_the_cases_register_answers_a_curators_tests_and_files_under_each_c
         .filter_map(|one| one.get("name")?.as_str().map(str::to_owned))
         .collect();
 
-    assert_eq!(
-        (answering.port, answering.asked_by.as_str()),
-        (8080, "mode")
-    );
+    assert_eq!(answering.port, 8080);
     assert_eq!(categories, vec!["*", "conformance", "tv", "movies"]);
     assert!(said("version").is_some_and(|version| version
         .get("version")

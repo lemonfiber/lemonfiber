@@ -20,18 +20,35 @@ use lemonfiber_ports::service::{
     Requesting, Requests, Searching, Target, Telling, Wish,
 };
 
-use super::{curator_address, CURATOR, CURATOR_PORT, FOLDER, NAMED, TOKEN_HASH};
+use super::{curator_address, CURATOR, CURATOR_PORT, FOLDER, NAMED, PROFILE, TOKEN_HASH};
 use crate::conformance::Placeholder;
 
 /// The media server account the conformance cases link, find and ask for, in the shape a
 /// media server's account id takes.
 const MEMBER: &str = "c0f04a7e5e1d4b2a9c3f0e8d7b6a5c4d";
 
-/// Where the conformance cases say the identity source is reached.
-const IDENTITY_AT: &str = "http://conformance-identity";
+/// The host the conformance cases name the identity source on.
+pub const IDENTITY_HOST: &str = "conformance-identity";
 
-/// The quality profile the conformance cases hand a curator.
-const PROFILE: u32 = 1;
+/// The port the conformance cases name the identity source on, where the recorder's
+/// stand-in for it answers.
+const IDENTITY_PORT: u16 = 58096;
+
+/// The protocol the conformance cases name the identity source in: the native API of the
+/// media server the bundle ships.
+const IDENTITY_PROTOCOL: &str = "jellyfin";
+
+/// The release of the identity source the recorder's stand-in answers it is.
+const IDENTITY_VERSION: &str = "10.11.11";
+
+/// The account the identity source holds for the owner the conformance cases sign in.
+const OWNER: &str = "0a11ce0000000000000000000000000a";
+
+/// What the identity source the recorder stands in for names itself by.
+const SERVER: &str = "5e7e000000000000000000000000005e";
+
+/// The key the identity source the recorder stands in for makes for whoever asks for one.
+const SERVER_KEY: &str = "ce55000000000000000000000000000c";
 
 /// A member, a request and a title no request service holds.
 const NOBODY: &str = "0";
@@ -51,12 +68,80 @@ const REGION: &str = "US";
 /// The page of results the conformance cases ask for.
 const PAGE: u32 = 1;
 
-/// Where the conformance cases reach a curator or the identity source.
+/// Where the conformance cases reach a curator.
 fn endpoint() -> Endpoint {
     Endpoint {
         host: CURATOR.to_owned(),
         port: CURATOR_PORT,
         base: String::new(),
+    }
+}
+
+/// Where the conformance cases reach the identity source.
+fn identity_endpoint() -> Endpoint {
+    Endpoint {
+        host: IDENTITY_HOST.to_owned(),
+        port: IDENTITY_PORT,
+        base: String::new(),
+    }
+}
+
+/// What answers as the identity source the conformance cases sign a request service in
+/// through while it is recorded: the media server's sign-in of the owner the cases name,
+/// the key it makes and lists for whoever asks, what it says it is, and the accounts it
+/// holds, the owner and the member the cases link; and nothing more.
+#[must_use]
+pub fn identity_answering() -> lemonfiber_ports::serving::StandIn {
+    use lemonfiber_ports::serving::Said;
+    use serde_json::json;
+    let account = |id: &str, name: &str, administrator: bool| {
+        json!({
+            "Id": id,
+            "Name": name,
+            "ServerId": SERVER,
+            "HasPassword": true,
+            "Policy": { "IsAdministrator": administrator, "IsDisabled": false, "EnableAllFolders": true },
+            "Configuration": {},
+        })
+    };
+    let about = json!({
+        "Id": SERVER,
+        "ServerName": NAMED,
+        "Version": IDENTITY_VERSION,
+        "ProductName": "Jellyfin Server",
+        "LocalAddress": format!("http://{IDENTITY_HOST}:{IDENTITY_PORT}"),
+        "StartupWizardCompleted": true,
+    })
+    .to_string();
+    lemonfiber_ports::serving::StandIn {
+        port: IDENTITY_PORT,
+        headers: Vec::new(),
+        answers: vec![
+            Said::json(
+                "POST",
+                "/Users/AuthenticateByName",
+                json!({ "User": account(OWNER, NAMED, true), "AccessToken": SERVER_KEY, "ServerId": SERVER })
+                    .to_string(),
+            ),
+            Said::empty("POST", "/Auth/Keys"),
+            Said::json(
+                "GET",
+                "/Auth/Keys",
+                json!({
+                    "Items": [{ "Id": 1, "AccessToken": SERVER_KEY, "AppName": "{query:App}", "IsActive": true }],
+                    "TotalRecordCount": 1,
+                    "StartIndex": 0,
+                })
+                .to_string(),
+            ),
+            Said::json("GET", "/System/Info/Public", about.clone()),
+            Said::json("GET", "/System/Info", about),
+            Said::json(
+                "GET",
+                "/Users",
+                json!([account(OWNER, NAMED, true), account(MEMBER, "member", false)]).to_string(),
+            ),
+        ],
     }
 }
 
@@ -68,8 +153,8 @@ fn earlier(operation: &str, pointer: &str) -> String {
 /// The identity source the conformance cases sign the request service in through.
 fn identity() -> IdentitySource {
     IdentitySource {
-        at: IDENTITY_AT.to_owned(),
-        protocol: Protocol(NAMED.to_owned()),
+        at: format!("http://{IDENTITY_HOST}:{IDENTITY_PORT}"),
+        protocol: Protocol(IDENTITY_PROTOCOL.to_owned()),
         credential: Credential::UserPass {
             username: NAMED.to_owned(),
             password: Placeholder::Minted.written(),
@@ -157,7 +242,7 @@ crate::contract! {
             /// Where it reaches the identity source after sign-in, and with what.
             fn media_server_link() -> MediaServerLink where asks = Asked {};
             /// Reach the identity source somewhere else, with a new key.
-            fn link_media_server(refer at: &Endpoint as Endpoint, str key: &str) -> () where asks = Asked { at: endpoint(), key: Placeholder::Minted.written() };
+            fn link_media_server(refer at: &Endpoint as Endpoint, str key: &str) -> () where asks = Asked { at: identity_endpoint(), key: Placeholder::Minted.written() };
         }
         impl Approving {
             /// What the household may ask for where nobody chose otherwise.

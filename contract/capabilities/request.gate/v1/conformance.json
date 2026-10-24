@@ -17,7 +17,7 @@
       "asked": {
         "routes": [
           {
-            "address": "http://conformance-curator:80",
+            "address": "http://conformance-curator:58989",
             "credential": "{minted}",
             "majors": [],
             "path": "tv",

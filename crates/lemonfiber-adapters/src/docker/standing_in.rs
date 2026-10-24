@@ -2,6 +2,8 @@
 //! containers it serves reach this machine by, answering what it was given and refusing
 //! everything else.
 
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -10,6 +12,7 @@ use bollard::Docker;
 use futures_util::{Stream, StreamExt as _};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
 
 use lemonfiber_ports::program::Unran;
 use lemonfiber_ports::serving::{Answering, StandIn};
@@ -29,6 +32,12 @@ const DESKTOP: &str = "Docker Desktop";
 
 /// What a stand-in answers anything it was not given.
 const REFUSED: &str = r#"{"status":false,"error":"not answered here"}"#;
+
+/// What opens a value a body takes from what the stand-in heard.
+const HEARD: &str = "{query:";
+
+/// The value each query parameter held the last time a request carried it.
+type Heard = BTreeMap<String, String>;
 
 /// Each connection a stand-in is asked on, as it is taken.
 type Accepted = Pin<Box<dyn Stream<Item = std::io::Result<TcpStream>> + Send>>;
@@ -74,11 +83,13 @@ pub(super) async fn stood_in(
 /// Answer each connection `accepted` yields as `stand_in` says, pausing after one that
 /// could not be taken.
 async fn answering(mut accepted: Accepted, stand_in: Arc<StandIn>) {
+    let heard = Arc::new(Mutex::new(Heard::new()));
     while let Some(taken) = accepted.next().await {
         match taken {
             Ok(stream) => {
                 let stand_in = Arc::clone(&stand_in);
-                tokio::spawn(async move { answered(stream, &stand_in).await });
+                let heard = Arc::clone(&heard);
+                tokio::spawn(async move { answered(stream, &stand_in, &heard).await });
             }
             Err(_) => tokio::time::sleep(crate::AFTER_A_FAILED_ACCEPT).await,
         }
@@ -114,7 +125,7 @@ async fn gateway(docker: &Docker) -> Result<IpAddr, Unran> {
 /// Read one request from `stream`, its headers to their end, and answer it as `stand_in`
 /// says, closing after; what cannot be read is answered as far as it was read, and a
 /// connection that cannot be written to is left.
-async fn answered(mut stream: TcpStream, stand_in: &StandIn) {
+async fn answered(mut stream: TcpStream, stand_in: &StandIn, heard: &Mutex<Heard>) {
     let mut reading = BufReader::new((&mut stream).take(MOST));
     let mut first = Vec::new();
     let mut header = Vec::new();
@@ -128,30 +139,88 @@ async fn answered(mut stream: TcpStream, stand_in: &StandIn) {
         header.clear();
     }
     let first = String::from_utf8_lossy(&first);
-    let target = first.split(' ').nth(1).unwrap_or_default();
-    let (status, body) = answer(stand_in, target);
-    let response = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\
-         Connection: close\r\n\r\n{body}",
-        body.len()
-    );
+    let mut asked = first.split(' ');
+    let method = asked.next().unwrap_or_default();
+    let target = asked.next().unwrap_or_default();
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    let response = {
+        let mut heard = heard.lock().await;
+        heard.extend(pairs(query).map(|(name, value)| (name.to_owned(), value.to_owned())));
+        response(stand_in, method, path, query, &heard)
+    };
     let _ = stream.write_all(response.as_bytes()).await;
     let _ = stream.shutdown().await;
 }
 
-/// The status and body `stand_in` answers `target` with.
-fn answer<'a>(stand_in: &'a StandIn, target: &str) -> (&'static str, &'a str) {
-    let asked = target.split_once('?').and_then(|(_, query)| {
-        query.split('&').find_map(|pair| {
-            let (name, value) = pair.split_once('=')?;
-            (name == stand_in.asked_by).then_some(value)
-        })
-    });
+/// The whole answer `stand_in` gives `method` at `path` asked with `query`, its headers and
+/// body included, each value a body takes from `heard` filled in.
+fn response(stand_in: &StandIn, method: &str, path: &str, query: &str, heard: &Heard) -> String {
+    let (status, body) = answer(stand_in, method, path, query);
+    let body = body.map(|body| filled(body, heard));
+    let mut response = format!("HTTP/1.1 {status} \r\n");
+    for (name, value) in &stand_in.headers {
+        let _ = write!(response, "{name}: {value}\r\n");
+    }
+    if let Some(body) = &body {
+        let _ = write!(
+            response,
+            "Content-Type: application/json\r\nContent-Length: {}\r\n",
+            body.len()
+        );
+    }
+    response.push_str("Connection: close\r\n\r\n");
+    response.push_str(&body.unwrap_or_default());
+    response
+}
+
+/// Each query parameter in `query` that has a value, as its name and that value.
+fn pairs(query: &str) -> impl Iterator<Item = (&str, &str)> {
+    query.split('&').filter_map(|pair| pair.split_once('='))
+}
+
+/// `body` with each `{query:<name>}` in it the value `heard` holds for `<name>`, written as
+/// JSON string content, and nothing where it holds none.
+fn filled(body: &str, heard: &Heard) -> String {
+    let mut written = String::new();
+    let mut rest = body;
+    while let Some((before, after)) = rest.split_once(HEARD) {
+        written.push_str(before);
+        let Some((name, tail)) = after.split_once('}') else {
+            written.push_str(HEARD);
+            rest = after;
+            break;
+        };
+        let value = heard.get(name).map(String::as_str).unwrap_or_default();
+        let quoted = serde_json::Value::from(value).to_string();
+        written.push_str(quoted.trim_matches('"'));
+        rest = tail;
+    }
+    written.push_str(rest);
+    written
+}
+
+/// The status and body `stand_in` answers `method` at `path` asked with `query` with.
+fn answer<'a>(
+    stand_in: &'a StandIn,
+    method: &str,
+    path: &str,
+    query: &str,
+) -> (u16, Option<&'a str>) {
+    let held = |name: &str, value: &str| pairs(query).any(|pair| pair == (name, value));
     stand_in
         .answers
         .iter()
-        .find(|(named, _)| Some(named.as_str()) == asked)
-        .map_or(("404 Not Found", REFUSED), |(_, said)| ("200 OK", said))
+        .find(|said| {
+            said.method == method
+                && said.path.eq_ignore_ascii_case(path)
+                && said
+                    .query
+                    .as_ref()
+                    .is_none_or(|(name, value)| held(name, value))
+        })
+        .map_or((404, Some(REFUSED)), |said| {
+            (said.status, said.body.as_deref())
+        })
 }
 
 #[cfg(test)]

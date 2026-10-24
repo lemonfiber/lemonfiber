@@ -30,7 +30,7 @@
         "watched": {
           "api_key": "{minted}",
           "host": "conformance-curator",
-          "port": 80,
+          "port": 58989,
           "which": "tv"
         }
       },

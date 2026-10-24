@@ -18,9 +18,6 @@ use crate::conformance::Placeholder;
 /// Where the conformance cases say the indexer is reached from an application.
 const INDEXER_URL: &str = "http://conformance-indexer";
 
-/// Where the conformance cases say an application is reached.
-const APPLICATION_URL: &str = "http://conformance-curator";
-
 /// Where the conformance cases say an aggregator is reached.
 const AGGREGATOR_URL: &str = "http://conformance-aggregator";
 
@@ -48,7 +45,7 @@ crate::contract! {
                     name: NAMED.to_owned(),
                     kind: ApplicationKind::Tv,
                     indexer_url: INDEXER_URL.to_owned(),
-                    base_url: APPLICATION_URL.to_owned(),
+                    base_url: crate::capabilities::curator_address(),
                     api_key: Placeholder::Minted.written(),
                 },
             };

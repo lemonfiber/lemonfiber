@@ -264,7 +264,7 @@ async fn every_case_the_adapter_speaks_is_asked_of_it_beside_its_upstream_and_wr
         Some(json!({"watched": {
             "api_key": MINTED,
             "host": "conformance-curator",
-            "port": 80,
+            "port": 58989,
             "which": "tv",
         }}))
     );
@@ -674,10 +674,38 @@ async fn a_curator_is_recorded_with_its_download_client_answered_where_its_upstr
 }
 
 #[tokio::test]
-async fn an_adapter_of_another_contract_is_recorded_with_nothing_answering_beside_it() {
-    let at = source("fronted-no-client", FRONTED);
+async fn an_adapter_whose_cases_hand_its_upstream_a_curator_is_recorded_with_one_answering() {
+    let at = source("fronted-curator", FRONTED);
     let serving = engine();
     let _ = recorded(&at, &serving, &answering(), Some(7)).await;
+
+    let stood: Vec<u16> = serving.stood_in().iter().map(|one| one.port).collect();
+    assert_eq!(stood, vec![58989]);
+    assert_eq!(
+        serving
+            .asked()
+            .first()
+            .map(|upstream| upstream.reaching.clone()),
+        Some(vec!["conformance-curator".to_owned()])
+    );
+}
+
+#[tokio::test]
+async fn an_adapter_whose_cases_name_no_party_is_recorded_with_nothing_answering_beside_it() {
+    let at = source(
+        "fronted-no-party",
+        &FRONTED
+            .replace(
+                "speaks      = [\"subtitles.fetch@1\"]",
+                "speaks      = [\"download.usenet@1\"]",
+            )
+            .replace(
+                "provides    = [\"subtitles.fetch\"]",
+                "provides    = [\"download.usenet\"]",
+            ),
+    );
+    let serving = engine();
+    let _ = read(&at, &serving, &answering(), Some(7)).await;
 
     assert!(serving.stood_in().is_empty());
     assert!(serving.asked().iter().all(|one| one.reaching.is_empty()));

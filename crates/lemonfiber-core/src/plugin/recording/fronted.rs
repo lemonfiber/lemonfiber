@@ -133,13 +133,12 @@ pub(super) async fn answers(
         log: Vec::new(),
     };
     let prepared = Prepared::of(recorder, root, upstream, adapter).map_err(failing)?;
-    let answering = client(recorder, adapter, upstream).await.map_err(failing)?;
+    let (reaching, answering) = parties(recorder, adapter, upstream)
+        .await
+        .map_err(failing)?;
     let serve = Serve {
         alias: Some(upstream.service.clone()),
-        reaching: answering
-            .iter()
-            .map(|_| lemonfiber_contract::capabilities::library::CLIENT_HOST.to_owned())
-            .collect(),
+        reaching,
         ..settled(upstream, &prepared.copy, prepared.data.as_deref())
     };
     let served = recorder
@@ -212,32 +211,33 @@ pub(super) async fn answers(
     finished
 }
 
-/// The download client the curator's cases register, answering where `adapter` speaks that
-/// contract until it is dropped, and nothing for any other adapter.
-async fn client(
+/// Every party the cases of each contract `adapter` speaks point the upstream at, by the
+/// host they name it on, each answering until it is dropped.
+async fn parties(
     recorder: Recorder<'_>,
     adapter: Fronting<'_>,
     upstream: &Placed,
-) -> Result<Option<Box<dyn crate::ports::serving::Answering>>, Faulted> {
-    if !curates(adapter.service) {
-        return Ok(None);
+) -> Result<(Vec<String>, Vec<Box<dyn crate::ports::serving::Answering>>), Faulted> {
+    let asked: Vec<String> = contracts(adapter.service)
+        .iter()
+        .flat_map(|(_, capability)| filed(capability, &upstream.media_types))
+        .map(|case| case.asks.to_string())
+        .collect();
+    let mut reaching = Vec::new();
+    let mut answering = Vec::new();
+    for party in lemonfiber_contract::capabilities::parties(&upstream.media_types) {
+        if !asked.iter().any(|asks| asks.contains(party.host)) {
+            continue;
+        }
+        let answered = recorder
+            .serving
+            .stand_in(&party.answering)
+            .await
+            .map_err(|unran| Faulted::new(party.named, unran.to_string(), Vec::new()))?;
+        reaching.push(party.host.to_owned());
+        answering.push(answered);
     }
-    let stand_in =
-        lemonfiber_contract::capabilities::library::client_answering(&upstream.media_types);
-    recorder
-        .serving
-        .stand_in(&stand_in)
-        .await
-        .map(Some)
-        .map_err(|unran| Faulted::new("download client", unran.to_string(), Vec::new()))
-}
-
-/// Whether `adapter` speaks the curator's contract, whose cases register a download client
-/// the curator tests before it saves it.
-fn curates(adapter: &lemonfiber_plugin::Service) -> bool {
-    contracts(adapter).iter().any(|(_, capability)| {
-        capability.name == lemonfiber_contract::capabilities::library::capability().name
-    })
+    Ok((reaching, answering))
 }
 
 /// A step that failed, why, and every credential the run had made by then.

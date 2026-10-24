@@ -37,6 +37,7 @@ mod invite;
 mod library;
 mod media;
 mod network;
+mod parties;
 mod proxy;
 mod quality;
 mod request;
