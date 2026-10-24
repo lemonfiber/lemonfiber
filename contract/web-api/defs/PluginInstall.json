@@ -35,6 +35,13 @@
         "$ref": "WiringContest.json"
       }
     },
+    "granting": {
+      "description": "Every credential of another service that would cross to the plugin, each approved\napart from the offer as its `approval` names it.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginGranting.json"
+      }
+    },
     "overrides": {
       "description": "Every bundled thing the plugin declares it will change.\n\nThe full extent rather than a sample of it: a manifest may change a bundled\nsetting only through a recipe, and a recipe reaching one no `[[override]]`\nnames is refused before anything is written.",
       "type": "array",
@@ -103,6 +110,7 @@
     "asks",
     "overrides",
     "recipes_ran",
-    "taking"
+    "taking",
+    "granting"
   ]
 }

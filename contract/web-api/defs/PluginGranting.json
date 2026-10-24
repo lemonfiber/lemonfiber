@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One credential that would cross to a plugin, as the reading states it.",
+  "type": "object",
+  "properties": {
+    "approval": {
+      "description": "What approving it is written as, apart from the offer.",
+      "type": "string"
+    },
+    "credential": {
+      "description": "The setting the credential is held under, as the credentials read names it.",
+      "type": "string"
+    },
+    "for": {
+      "description": "The capability of the plugin's own it would be granted to fill.",
+      "type": "string"
+    },
+    "of": {
+      "description": "The service whose credential it is.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "credential",
+    "of",
+    "for",
+    "approval"
+  ]
+}

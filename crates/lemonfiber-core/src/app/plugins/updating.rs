@@ -247,6 +247,7 @@ fn started(
             reversed: None,
             recipes_ran: Vec::new(),
             taking,
+            granting: crate::plugin::granting(would),
         },
         stopped: None,
         restored: None,

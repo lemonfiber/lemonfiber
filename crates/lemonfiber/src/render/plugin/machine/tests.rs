@@ -85,6 +85,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         contests: Vec::new(),
         recipes_ran: Vec::new(),
         taking: Vec::new(),
+        granting: Vec::new(),
     }
 }
 

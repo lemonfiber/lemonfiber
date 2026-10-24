@@ -83,6 +83,9 @@ pub struct Install {
     /// Every service taking a privileged shape, with what it is given, each approved
     /// apart from the offer.
     pub taking: Vec<super::Taking>,
+    /// Every credential of another service that would cross to the plugin, each approved
+    /// apart from the offer as its `approval` names it.
+    pub granting: Vec<super::Granting>,
 }
 
 /// A capability that would have nothing filling it.
