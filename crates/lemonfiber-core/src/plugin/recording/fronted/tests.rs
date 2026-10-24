@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 
 use super::super::{record, Failed, Recorded, Recorder, Took};
 use super::unfinished;
-use crate::ports::http::{Http, Request};
+use crate::ports::http::{Http, Request, PROBLEM};
 use crate::ports::program::Unran;
 use crate::ports::serving::Served;
 
@@ -546,7 +546,7 @@ fn identifying() -> String {
         )
 }
 
-fn identity(startup: Vec<Answer>, created: Answer) -> Arc<Fake> {
+fn identity(startup: Vec<Answer>, created: Vec<Answer>) -> Arc<Fake> {
     let json = |body: &str| Answer::served(200, "application/json", body);
     Fake::by_path_in_turn(vec![
         ("/health", vec![Answer::reply(200, "ok")]),
@@ -556,7 +556,7 @@ fn identity(startup: Vec<Answer>, created: Answer) -> Arc<Fake> {
         ),
         ("/System/Info/Public", vec![json("{}")]),
         ("/startup_completed", startup),
-        ("/create_admin", vec![created]),
+        ("/create_admin", created),
         ("/household", vec![json("[{\"id\": \"m1\"}]")]),
         (
             "/whoever",
@@ -574,11 +574,10 @@ async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_i
     let http = identity(
         vec![
             json("false"),
-            json("false"),
             Answer::served(401, "text/plain", "Unauthorized"),
             json("false"),
         ],
-        json("null"),
+        vec![json("null")],
     );
     let read = recorded(&at, &engine(), &http, Some(7)).await;
     assert_eq!(failed_at(&read), Vec::new());
@@ -608,26 +607,50 @@ async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_i
     );
 }
 
-#[tokio::test]
+fn unavailable() -> Answer {
+    Answer::served(
+        503,
+        PROBLEM,
+        r#"{"type": "unavailable", "detail": "jellyfin is not answering"}"#,
+    )
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_first_run_waits_while_the_upstream_is_still_starting() {
     let at = source("fronted-identity-starting", &identifying());
     let json = |body: &str| Answer::served(200, "application/json", body);
-    let starting = || Answer::served(503, "text/html", "Jellyfin is starting up");
     let http = identity(
         vec![
-            starting(),
-            starting(),
+            json("false"),
             json("false"),
             json("false"),
             Answer::served(401, "text/plain", "Unauthorized"),
             json("false"),
         ],
-        json("null"),
+        vec![unavailable(), unavailable(), json("null")],
     );
     let read = recorded(&at, &engine(), &http, Some(7)).await;
 
     assert_eq!(failed_at(&read), Vec::new());
-    assert_eq!(posted(&http, "/startup_completed").len(), 6);
+    assert_eq!(read.recordings.len(), 21);
+    assert_eq!(posted(&http, "/create_admin").len(), 4);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_first_run_still_not_answered_at_its_limit_fails_the_service_at_it() {
+    let at = source("fronted-identity-never-up", &identifying());
+    let json = |body: &str| Answer::served(200, "application/json", body);
+    let http = identity(vec![json("false")], vec![unavailable()]);
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "first run".to_owned(),
+            crate::seed::NOT_ANSWERING.to_owned()
+        )]
+    );
+    assert!(posted(&http, "/create_admin").len() > 1);
 }
 
 #[tokio::test]
@@ -642,12 +665,14 @@ async fn a_first_run_that_does_not_finish_fails_the_service_at_it() {
         ),
     ] {
         let at = source("fronted-unfinished", &identifying());
-        let read = recorded(&at, &engine(), &identity(vec![startup], created), Some(7)).await;
+        let http = identity(vec![startup], vec![created]);
+        let read = recorded(&at, &engine(), &http, Some(7)).await;
         let failed = failed_at(&read);
         assert!(
             matches!(failed.first(), Some((step, said)) if step == "first run" && said.contains(why)),
             "{failed:?}"
         );
+        assert_eq!(posted(&http, "/startup_completed").len(), 1);
     }
     assert_eq!(unfinished(crate::seed::State::Wired), "Wired");
 }
