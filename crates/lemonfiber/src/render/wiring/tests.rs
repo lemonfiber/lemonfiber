@@ -43,6 +43,27 @@ fn an_ask_names_the_capability_rather_than_the_service_it_reaches() {
 }
 
 #[test]
+fn an_ask_in_an_upstreams_own_api_names_the_api_after_the_capability() {
+    let mut link = asking(
+        "finder",
+        "library.curate",
+        &["series-upstream"],
+        Settled::Outright,
+    );
+    if let Reaches::Asked { native, .. } = &mut link.reaches {
+        *native = Some("servarr".to_owned());
+    }
+    let said = shown(&WiringReport {
+        wired: vec![link],
+        unfilled: Vec::new(),
+    });
+    assert!(
+        said.contains("finder asks for library.curate in servarr"),
+        "{said}"
+    );
+}
+
+#[test]
 fn a_plugins_ask_names_the_plugin_beside_the_service_that_asks() {
     let said = shown(&WiringReport {
         wired: vec![Wired {

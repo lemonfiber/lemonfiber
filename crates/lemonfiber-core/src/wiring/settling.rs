@@ -144,7 +144,9 @@ fn asked(
 pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<Wired> {
     let stack = manifest.wirings.iter().filter_map(|wiring| {
         let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
-            (Some(capability), None) => reached(manifest, installed, wiring, capability, chosen),
+            (Some(capability), None) => {
+                reached(manifest, installed, wiring, capability, None, chosen)
+            }
             (None, Some(service)) => Reaches::ByName {
                 service: service.to_owned(),
                 why: wiring.why.clone().unwrap_or_default(),
@@ -161,16 +163,19 @@ pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> 
         one.services.iter().flat_map(move |placed| {
             placed.asks.iter().map(move |ask| {
                 let wiring = plugins_ask(manifest, &placed.service, ask);
-                let reaches = reached(manifest, installed, &wiring, &ask.capability, chosen);
                 Wired {
                     by: placed.service.clone(),
                     origin: Origin::Plugin {
                         named: one.plugin.clone(),
                     },
-                    reaches: match ask.native.as_deref() {
-                        Some(api) => in_native(installed, reaches, api),
-                        None => reaches,
-                    },
+                    reaches: reached(
+                        manifest,
+                        installed,
+                        &wiring,
+                        &ask.capability,
+                        ask.native.as_deref(),
+                        chosen,
+                    ),
                 }
             })
         })
@@ -178,53 +183,47 @@ pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> 
     stack.chain(brought).collect()
 }
 
-/// What an ask for `capability` reaches, against everything installed that claims it.
+/// What an ask for `capability` reaches, against everything installed that claims it,
+/// talking in the upstream's own API `native` where it names one.
 fn reached(
     manifest: &Manifest,
     installed: &[Installed],
     wiring: &Wiring,
     capability: &str,
+    native: Option<&str>,
     chosen: &Chosen,
 ) -> Reaches {
     let held = claimants(manifest, installed, capability);
     let (services, settled) = asked(wiring, capability, &held, chosen);
+    let (services, settled) = match native {
+        Some(api) => in_native(installed, &services, settled, api),
+        None => (services, settled),
+    };
     Reaches::Asked {
         capability: capability.to_owned(),
         services,
         settled,
         origins: origins(&held),
-        native: None,
+        native: native.map(str::to_owned),
     }
 }
 
-/// What an ask in the API `api` reaches: the upstream each adapter it settled on fronts,
-/// where that upstream declares `api`, and nothing where none does.
-fn in_native(installed: &[Installed], reaches: Reaches, api: &str) -> Reaches {
-    let Reaches::Asked {
-        capability,
-        services,
-        settled,
-        origins,
-        ..
-    } = reaches
-    else {
-        return reaches;
-    };
+/// What an ask in the API `api` settles on: the upstream each adapter in `services`
+/// fronts, where that upstream declares `api`, and unfilled where none does.
+fn in_native(
+    installed: &[Installed],
+    services: &[String],
+    settled: Settled,
+    api: &str,
+) -> (Vec<String>, Settled) {
     let upstreams: Vec<String> = services
         .iter()
         .filter_map(|adapter| fronted_in(installed, adapter, api))
         .collect();
-    let settled = if upstreams.is_empty() && !services.is_empty() {
-        Settled::Unfilled
+    if upstreams.is_empty() && !services.is_empty() {
+        (upstreams, Settled::Unfilled)
     } else {
-        settled
-    };
-    Reaches::Asked {
-        capability,
-        services: upstreams,
-        settled,
-        origins,
-        native: Some(api.to_owned()),
+        (upstreams, settled)
     }
 }
 

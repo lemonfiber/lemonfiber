@@ -49,3 +49,6 @@ pub(super) async fn read_curator_key(ctx: &Ctx, config: &Path) -> Option<String>
         crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), config, within).await?;
     crate::servarr::api_key(&text)
 }
+
+#[cfg(test)]
+mod tests;

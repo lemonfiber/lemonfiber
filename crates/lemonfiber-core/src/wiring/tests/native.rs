@@ -1,24 +1,7 @@
 use super::{service, written};
 use crate::plugin::{Asking, Installed};
+use crate::test_support::{a_minting_curator, A_MINTED_KEY};
 use crate::wiring::{settle, unfilled, Chosen, Reaches, Settled, Unfilled};
-
-/// A curator plugin: its adapter provides `library.curate` and fronts its upstream,
-/// which talks `servarr` and holds a key lemonfiber minted for it.
-fn a_curator() -> Installed {
-    let mut adapter = crate::test_support::a_placed("series", &["library.curate"], None, None);
-    adapter.fronts = Some("series-upstream".to_owned());
-    let mut upstream = crate::test_support::a_placed("series-upstream", &[], None, Some(8989));
-    upstream.native = Some("servarr".to_owned());
-    let mut curator = crate::test_support::an_installed("series", vec![adapter, upstream]);
-    curator.declared.secrets = vec![crate::plugin::Secret {
-        id: "upstream-key".to_owned(),
-        of: "series-upstream".to_owned(),
-        why: "The key the adapter signs in with".to_owned(),
-        minted: true,
-        serves: None,
-    }];
-    curator
-}
 
 /// A plugin whose one service asks for `library.curate` in `native`.
 fn an_asker(native: Option<&str>) -> Installed {
@@ -36,7 +19,7 @@ fn reached(native: Option<&str>) -> Option<Reaches> {
     let manifest = written(&service("asker", ""))?;
     settle(
         &manifest,
-        &[a_curator(), an_asker(native)],
+        &[a_minting_curator(), an_asker(native)],
         &Chosen::default(),
     )
     .into_iter()
@@ -73,7 +56,7 @@ fn an_ask_in_an_api_no_upstream_talks_is_unfilled_naming_the_api() {
     };
     let wired = settle(
         &manifest,
-        &[a_curator(), an_asker(Some("sabnzbd"))],
+        &[a_minting_curator(), an_asker(Some("sabnzbd"))],
         &Chosen::default(),
     );
 
@@ -103,7 +86,7 @@ fn an_upstream_is_reached_with_the_key_lemonfiber_minted_for_it_where_it_crosses
     let Some(manifest) = written(&service("asker", "")) else {
         return;
     };
-    let installed = [a_curator(), an_asker(Some("servarr"))];
+    let installed = [a_minting_curator(), an_asker(Some("servarr"))];
     let trusted = crate::wiring::Fillers::trusting(
         &manifest,
         &installed,
@@ -115,7 +98,7 @@ fn an_upstream_is_reached_with_the_key_lemonfiber_minted_for_it_where_it_crosses
 
     assert_eq!(
         upstream.and_then(|one| one.minted.clone()),
-        Some("series:upstream-key".to_owned())
+        Some(A_MINTED_KEY.to_owned())
     );
     assert_eq!(
         upstream.and_then(crate::wiring::Filler::talks_in),
@@ -123,6 +106,6 @@ fn an_upstream_is_reached_with_the_key_lemonfiber_minted_for_it_where_it_crosses
     );
     assert_eq!(
         upstream.and_then(|one| trusted.credential(one)),
-        Some("series:upstream-key".to_owned())
+        Some(A_MINTED_KEY.to_owned())
     );
 }

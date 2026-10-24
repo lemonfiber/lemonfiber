@@ -2,7 +2,7 @@ use crate::app::Ctx;
 use crate::config::env::quoted;
 use crate::config::store;
 use crate::plugin::{Holding, Variable};
-use crate::test_support::{a_context, env_without_password};
+use crate::test_support::{a_context, env_without_password, A_MINTED_KEY};
 
 fn machine(name: &str) -> Ctx {
     let env = env_without_password(&format!("files-{name}"));
@@ -107,4 +107,40 @@ fn a_stack_credential_does_not_cross_to_a_plugin_nobody_vouched_for() {
     );
     assert_eq!(resolved.crossing("comics", "comics-reader"), None);
     assert_eq!(resolved.crossing("comics", "nothing-here"), None);
+}
+
+#[test]
+fn a_minted_key_crosses_by_its_secret_name_only_to_a_plugin_granted_it() {
+    let ctx = machine("minted-crossing");
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let finder = |granted: &[&str]| {
+        let mut finder = crate::test_support::an_installed(
+            "finder",
+            vec![crate::test_support::a_placed("finder", &[], None, None)],
+        );
+        finder.granted = granted
+            .iter()
+            .map(|credential| crate::plugin::Grant {
+                credential: (*credential).to_owned(),
+                of: "series-upstream".to_owned(),
+                serves: "library.curate".to_owned(),
+                at: String::new(),
+            })
+            .collect();
+        finder
+    };
+    let crossing = |finder: crate::plugin::Installed| {
+        crate::settings::Resolved::of(
+            &ctx,
+            manifest.as_ref(),
+            &[crate::test_support::a_minting_curator(), finder],
+        )
+        .crossing("finder", "series-upstream")
+    };
+
+    assert_eq!(crossing(finder(&[])), Some(Holding::Withheld));
+    assert_eq!(
+        crossing(finder(&[A_MINTED_KEY])),
+        Some(Holding::Store(A_MINTED_KEY.to_owned()))
+    );
 }
