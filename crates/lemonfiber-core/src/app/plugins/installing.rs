@@ -124,13 +124,7 @@ pub(super) async fn install(
         let (standing, before) = verifying::looked(ctx).await?;
 
         writing::unlinked(ctx, &would, stack)?;
-        super::minting::minted(
-            ctx,
-            &would,
-            &read.manifest,
-            &stamp,
-            crate::plugin::first_party::EMBEDDED,
-        )?;
+        super::minting::minted(ctx, &would, &read.manifest, &stamp, trusted)?;
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
         super::granting::journalled(ctx, &would.plugin, &[], &would.granted, &stamp)?;
 
