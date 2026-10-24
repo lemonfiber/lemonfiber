@@ -3,9 +3,12 @@
 //! everything else.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bollard::Docker;
+use futures_util::{Stream, StreamExt as _};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -27,6 +30,12 @@ const DESKTOP: &str = "Docker Desktop";
 
 /// What a stand-in answers anything it was not given.
 const REFUSED: &str = r#"{"status":false,"error":"not answered here"}"#;
+
+/// How long a stand-in waits after a connection it could not take before the next.
+const AFTER_A_FAILED_ACCEPT: Duration = Duration::from_millis(100);
+
+/// Each connection a stand-in is asked on, as it is taken.
+type Accepted = Pin<Box<dyn Stream<Item = std::io::Result<TcpStream>> + Send>>;
 
 /// The task answering a stand-in, stopped when it is dropped.
 struct Answered(tokio::task::JoinHandle<()>);
@@ -56,15 +65,30 @@ pub(super) async fn stood_in(
         .map_err(|error| Unran::Refused {
             reason: format!("{at} could not be taken to answer on: {error}"),
         })?;
-    let stand_in = Arc::new(stand_in.clone());
-    Ok(Box::new(Answered(tokio::spawn(async move {
-        while let Ok((stream, _)) = listener.accept().await {
-            let stand_in = Arc::clone(&stand_in);
-            tokio::spawn(async move {
-                let _ = answered(stream, &stand_in).await;
-            });
+    let accepted = futures_util::stream::unfold(listener, |listener| async move {
+        let taken = listener.accept().await.map(|(stream, _)| stream);
+        Some((taken, listener))
+    });
+    Ok(Box::new(Answered(tokio::spawn(answering(
+        Box::pin(accepted),
+        Arc::new(stand_in.clone()),
+    )))))
+}
+
+/// Answer each connection `accepted` yields as `stand_in` says, pausing after one that
+/// could not be taken.
+async fn answering(mut accepted: Accepted, stand_in: Arc<StandIn>) {
+    while let Some(taken) = accepted.next().await {
+        match taken {
+            Ok(stream) => {
+                let stand_in = Arc::clone(&stand_in);
+                tokio::spawn(async move {
+                    let _ = answered(stream, &stand_in).await;
+                });
+            }
+            Err(_) => tokio::time::sleep(AFTER_A_FAILED_ACCEPT).await,
         }
-    }))))
+    }
 }
 
 /// Where the engine resolves `host-gateway` to on this machine: its loopback interface
