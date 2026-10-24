@@ -30,6 +30,7 @@ use crate::error::Code;
 
 mod chosen;
 mod fillers;
+mod handing;
 pub(crate) mod run;
 pub use run::listing;
 mod settling;
