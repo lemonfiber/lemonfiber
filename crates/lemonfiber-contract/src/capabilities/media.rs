@@ -65,7 +65,7 @@ crate::contract! {
     pub mod serve = "media.serve" @ 1 {
         impl Screening {
             /// Open a session on one member's account for one of their devices.
-            fn signed_in(str member: &str, str device: &str) -> Option<String> where asks = Asked {
+            fn signed_in(str member: &str, str device: &str) -> Option<String> where secret = &[""], asks = Asked {
                 member: member(),
                 device: DEVICE.to_owned(),
             };
@@ -120,7 +120,7 @@ crate::contract! {
             /// Every key filed under an app's name.
             fn filed_as(str app: &str) -> Vec<String> where asks = Asked { app: APP.to_owned() };
             /// Mint a key filed under an app's name.
-            fn mint(str app: &str) -> String where asks = Asked { app: APP.to_owned() };
+            fn mint(str app: &str) -> String where secret = &[""], asks = Asked { app: APP.to_owned() };
             /// When each key filed under an app's name was made and last used.
             fn dated(str app: &str) -> Vec<Dated> where asks = Asked { app: APP.to_owned() };
             /// Whether it answers to a key alone.

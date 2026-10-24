@@ -129,3 +129,40 @@ fn an_operation_publishes_the_bound_its_answer_is_held_to() {
         .and_then(|bound| bound.as_u64())
         .is_some_and(|bound| bound > 2 * 1024 * 1024 * 4 / 3));
 }
+
+/// Where an answer holds a credential the upstream issues is published with its operation,
+/// and an operation whose answer holds none publishes nothing about it.
+#[test]
+fn an_operation_publishes_where_its_answer_holds_a_credential() {
+    let mut secret = Vec::new();
+    for capability in crate::capabilities::all() {
+        for operation in &capability.operations {
+            if let Some(pointers) = path_item(operation)
+                .get("post")
+                .and_then(|post| post.get("x-lemonfiber-secret"))
+            {
+                secret.push((
+                    crate::spoken(capability.name, capability.major),
+                    operation.name,
+                    pointers.clone(),
+                ));
+            }
+        }
+    }
+    assert_eq!(
+        secret,
+        vec![
+            (
+                "identity.source@1".to_owned(),
+                "whoever",
+                serde_json::json!(["/token"])
+            ),
+            (
+                "media.serve@1".to_owned(),
+                "signed_in",
+                serde_json::json!([""])
+            ),
+            ("media.serve@1".to_owned(), "mint", serde_json::json!([""])),
+        ]
+    );
+}

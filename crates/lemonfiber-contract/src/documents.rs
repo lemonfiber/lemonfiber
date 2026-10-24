@@ -116,7 +116,7 @@ pub fn openapi(capability: &Capability) -> Value {
 #[must_use]
 pub fn path_item(operation: &crate::Operation) -> Value {
     let refused = json!({ "$ref": REFUSED });
-    json!({
+    let mut item = json!({
         "post": {
             "operationId": operation.name,
             "x-lemonfiber-largest": operation.largest,
@@ -139,7 +139,14 @@ pub fn path_item(operation: &crate::Operation) -> Value {
                 "503": refused
             }
         }
-    })
+    });
+    if let (false, Some(post)) = (
+        operation.secret.is_empty(),
+        item.get_mut("post").and_then(Value::as_object_mut),
+    ) {
+        post.insert("x-lemonfiber-secret".to_owned(), json!(operation.secret));
+    }
+    item
 }
 
 /// The cases an adapter's recordings and its live pass must answer for one capability,
