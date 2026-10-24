@@ -257,6 +257,7 @@ async fn recorded(
                     },
                     response,
                 },
+                recorder.taking,
             )
         })
         .collect();
@@ -274,6 +275,7 @@ async fn recorded(
                         request: case.asked,
                         response: case.answer,
                     },
+                    recorder.taking,
                 ),
                 fixture: Some(fixture),
             }

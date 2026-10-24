@@ -64,12 +64,6 @@ impl Limits {
     };
 }
 
-/// How long to wait after the listener fails to accept, before asking it again.
-///
-/// A failure to accept is usually the process out of descriptors, and asking again at
-/// once would spin on it.
-const AFTER_A_FAILED_ACCEPT: Duration = Duration::from_millis(100);
-
 /// Where connections arrive from.
 ///
 /// A trait object rather than the listener itself so a test can stand in a listener
@@ -109,7 +103,7 @@ pub(super) async fn answering(
             _ = stop.changed() => break,
         };
         let Ok((socket, peer)) = accepted else {
-            tokio::time::sleep(AFTER_A_FAILED_ACCEPT).await;
+            tokio::time::sleep(lemonfiber_adapters::AFTER_A_FAILED_ACCEPT).await;
             continue;
         };
         let Some(slot) = room.taken(peer.ip()) else {

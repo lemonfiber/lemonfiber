@@ -1,8 +1,9 @@
 //! A service an adapter of the plugin fronts, recorded with that adapter beside it: the
-//! upstream served fresh from its pin, the adapter started from its own pin on the same
-//! network with the key lemonfiber mints for it, the first run performed through the
-//! adapter, the upstream's own requests asked, and every case of each contract the
-//! adapter speaks asked of it in the order the contract publishes them.
+//! upstream served fresh from its pin, the adapter started from its own pin, or the image
+//! a check names in its place, on the same network with the key lemonfiber mints for it,
+//! the first run performed through the adapter, the upstream's own requests asked, and
+//! every case of each contract the adapter speaks asked of it in the order the contract
+//! publishes them.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -153,13 +154,15 @@ pub(super) async fn answers(
             ids: (uid.to_string(), gid.to_string()),
             ..Operator::recording()
         });
-    let beside = recorder
-        .serving
-        .beside(
-            &served,
-            &settled_as(adapter.placed, &prepared.held, None, &operator),
-        )
-        .await;
+    let started = settled_as(adapter.placed, &prepared.held, None, &operator);
+    let started = Serve {
+        image: recorder
+            .taking
+            .adapter()
+            .map_or_else(|| started.image.clone(), str::to_owned),
+        ..started
+    };
+    let beside = recorder.serving.beside(&served, &started).await;
     let outcome = match &beside {
         Ok(fronting) => {
             Asking {

@@ -105,6 +105,7 @@ async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>) -> Option<Recor
             serving,
             transport: &shared,
             random: &FixedRandom(Some(vec![7; 32])),
+            taking: &crate::plugin::Retaking::Written,
         },
     )
     .await
