@@ -313,6 +313,9 @@ impl Report {
     }
 }
 
+/// Why a connection to a service that is not answering is skipped.
+pub(crate) const NOT_ANSWERING: &str = "the service is not answering; a later run will complete it";
+
 /// A failure as the state it leaves a connection in: a service not answering is
 /// skipped and retried; one that refuses is a failure, carrying its own words; one
 /// that does not serve this build's API version is refused, since a re-run against
@@ -320,7 +323,7 @@ impl Report {
 pub(super) fn unreached(failure: &Failure) -> State {
     match failure {
         Failure::Unavailable { .. } => State::Skipped {
-            reason: "the service is not answering; a later run will complete it".to_owned(),
+            reason: NOT_ANSWERING.to_owned(),
         },
         Failure::Unauthorised { service } => State::Failed {
             detail: format!("{service} refused the credential"),

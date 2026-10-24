@@ -18,7 +18,7 @@ use serde_json::Value;
 use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
-use super::served::{healthy, settled, settled_as, LOG_LINES};
+use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::{ASKED_WITH, RECORDINGS};
 use crate::plugin::container::LOOPBACK;
@@ -468,7 +468,8 @@ impl Asking<'_> {
     }
 
     /// The upstream's first run, performed through the adapter as the seed performs it,
-    /// and the administrator's password it left in the adapter's `upstream.json`.
+    /// tried again while the upstream is not answering within its health's limit, and
+    /// the administrator's password it left in the adapter's `upstream.json`.
     async fn first_run(&self, reached: &Reached) -> Result<String, String> {
         let source = lemonfiber_contract::capabilities::identity::source::Adapter(Contracted::new(
             Arc::clone(&reached.adapter),
@@ -488,9 +489,26 @@ impl Asking<'_> {
                 ],
             )
         };
-        crate::seed::wire_media_server_admin(&source, self.recorder.random, None, false, &keep)
+        let until = tokio::time::Instant::now() + allowed(self.health);
+        loop {
+            match crate::seed::wire_media_server_admin(
+                &source,
+                self.recorder.random,
+                None,
+                false,
+                &keep,
+            )
             .await
-            .map_err(unfinished)
+            {
+                Err(crate::seed::State::Skipped { reason })
+                    if reason == crate::seed::NOT_ANSWERING
+                        && tokio::time::Instant::now() < until =>
+                {
+                    tokio::time::sleep(POLL).await;
+                }
+                left => return left.map_err(unfinished),
+            }
+        }
     }
 }
 

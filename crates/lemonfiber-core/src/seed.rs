@@ -50,6 +50,7 @@ pub use clients::{client_field, wire_download_clients, Baselines, CLIENT};
 pub(crate) use drift::observe_client;
 use drift::{canonical_root, same_base_url, same_path};
 pub use drift::{intent, reconcile, same_endpoint, wholesale_drift, Intent, Observed};
+pub(crate) use report::NOT_ANSWERING;
 use report::{observe_or_skip, observe_or_untold, record_outcome, unreached, unread};
 pub use report::{Assessment, Report, Severity, State, Wiring};
 pub(crate) use roots::on_host;
