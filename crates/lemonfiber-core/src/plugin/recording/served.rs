@@ -1,9 +1,10 @@
 //! One service served for its recordings: started fresh from its pin, waited on until
 //! its health passes, first-run, asked each request, and removed whatever happened.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use lemonfiber_contract::capabilities::FOLDER;
 use lemonfiber_manifest::container::STREAM_GUARD;
 use lemonfiber_plugin::{Health, HealthKind};
 use tokio::time::Instant;
@@ -36,6 +37,9 @@ const REFUSALS: [u16; 2] = [401, 403];
 /// Where the library a service takes lands inside its container.
 const LIBRARY: &str = "/data";
 
+/// The library a service takes, beside its starting files.
+const DATA: &str = "data";
+
 /// What one served service answered each of its requests, scrubbed.
 pub(super) async fn answers(
     recorder: Recorder<'_>,
@@ -61,11 +65,7 @@ pub(super) async fn answers(
     )
     .map_err(failing("starting files"))?;
     certified(placed, &copy).map_err(failing("certificate"))?;
-    let data = if placed.takes_data {
-        Some(copy.emptied("data").map_err(failing("data"))?)
-    } else {
-        None
-    };
+    let data = library(placed, &copy).map_err(failing("data"))?;
     let before = first::before(placed, recorder.random).map_err(failing("first run"))?;
     let mut serve = settled(placed, &copy, data.as_deref());
     serve.env.extend(before.env.iter().cloned());
@@ -104,15 +104,30 @@ pub(super) async fn answers(
 }
 
 /// A throwaway certificate and its key written into `copy` as the core writes them for a
-/// filler of a capability it hands a certificate, where `placed` provides one; nothing
-/// otherwise.
+/// filler of a capability it hands a certificate, and readable by whoever that filler runs
+/// as, where `placed` provides one; nothing otherwise.
 pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<(), String> {
     if !placed.provides.iter().any(|name| name == STREAM_GUARD) {
         return Ok(());
     }
-    crate::certificate::replaced(copy.path())
-        .map(|_| ())
-        .map_err(|unkept| unkept.to_string())
+    crate::certificate::replaced(copy.path()).map_err(|unkept| unkept.to_string())?;
+    crate::certificate::FILES
+        .iter()
+        .try_for_each(|named| copy.readable(named))
+}
+
+/// An empty library beside `copy` holding the folder the conformance cases file into,
+/// where `placed` takes one; nothing otherwise.
+pub(super) fn library(placed: &Placed, copy: &Throwaway) -> Result<Option<PathBuf>, String> {
+    if !placed.takes_data {
+        return Ok(None);
+    }
+    let data = copy.emptied(Path::new(DATA))?;
+    let folder = Path::new(FOLDER)
+        .strip_prefix(LIBRARY)
+        .unwrap_or(Path::new(""));
+    copy.emptied(&Path::new(DATA).join(folder))?;
+    Ok(Some(data))
 }
 
 /// The container a service's recordings are taken from: as lemonfiber runs it, with

@@ -136,10 +136,12 @@ pub(super) async fn answers(
     let (reaching, answering) = parties(recorder, adapter, upstream)
         .await
         .map_err(failing)?;
+    let settled = settled(upstream, &prepared.copy, prepared.data.as_deref());
     let serve = Serve {
         alias: Some(upstream.service.clone()),
         reaching,
-        ..settled(upstream, &prepared.copy, prepared.data.as_deref())
+        env: settled.env.iter().chain(&prepared.env).cloned().collect(),
+        ..settled
     };
     let served = recorder
         .serving

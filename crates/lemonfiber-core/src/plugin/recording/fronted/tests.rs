@@ -642,6 +642,47 @@ async fn an_adapter_fronting_a_minted_upstream_credential_is_handed_it_and_recor
     assert_eq!(read.recordings.len(), 4);
 }
 
+#[tokio::test]
+async fn an_upstream_given_its_minted_key_in_its_environment_holds_the_one_its_adapter_presents() {
+    let minting = FRONTED
+        .replace(
+            "fronts      = \"jellyfin\"\n",
+            "fronts      = \"jellyfin\"\nupstream    = { api_key = { secret = \"upstream-key\" } }\n",
+        )
+        .replace(
+            "replaces    = \"jellyfin\"\n",
+            "replaces    = \"jellyfin\"\nenv         = { JELLYFIN_API_KEY = { secret = \"upstream-key\" } }\n",
+        )
+        + "\n[[secret]]\nid     = \"upstream-key\"\nof     = \"jellyfin\"\nminted = true\nwhy    = \
+           \"The key the adapter signs in to Jellyfin with\"\n";
+    let at = source("fronted-minted-environment", &minting);
+    let serving = engine();
+    let read = recorded(&at, &serving, &answering(), Some(7)).await;
+
+    assert_eq!(failed_at(&read), Vec::new());
+    let given: Vec<String> = serving
+        .asked()
+        .first()
+        .map(|upstream| upstream.env.clone())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|one| one.starts_with("JELLYFIN_API_KEY="))
+        .collect();
+    let key = given
+        .first()
+        .and_then(|one| one.strip_prefix("JELLYFIN_API_KEY="))
+        .unwrap_or_default()
+        .to_owned();
+    assert_eq!(given.len(), 1, "{given:?}");
+    assert!(
+        !key.is_empty() && key.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "{key}"
+    );
+    assert!(read.recordings.iter().all(|one| !serde_json::to_string(one)
+        .unwrap_or_default()
+        .contains(&key)));
+}
+
 /// The fixture's adapter speaking the curator's contract in place of its own.
 fn curating() -> String {
     FRONTED

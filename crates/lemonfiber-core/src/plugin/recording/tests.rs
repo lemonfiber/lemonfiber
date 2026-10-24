@@ -375,6 +375,20 @@ fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
         assert!(super::served::certified(&placed, &copy).is_ok());
         let held = crate::certificate::kept(copy.path()).is_ok_and(|kept| kept.is_some() == holds);
         assert!(held, "{provides}");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let modes: Vec<Option<u32>> = crate::certificate::FILES
+                .iter()
+                .map(|named| {
+                    std::fs::metadata(copy.path().join(named))
+                        .ok()
+                        .map(|file| file.permissions().mode() & 0o777)
+                })
+                .collect();
+            let readable = if holds { Some(0o644) } else { None };
+            assert_eq!(modes, vec![readable, readable], "{provides}");
+        }
     }
 }
 

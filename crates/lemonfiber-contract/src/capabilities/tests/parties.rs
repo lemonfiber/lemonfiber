@@ -129,3 +129,64 @@ fn the_curator_answers_what_an_upstream_tests_a_curator_with_and_says_its_releas
         Some(serde_json::json!({}))
     );
 }
+
+fn fields_of(curator: &StandIn, implementation: &str) -> Vec<Value> {
+    said(curator, "GET", "/api/v3/indexer/schema")
+        .and_then(|schemas| schemas.as_array().cloned())
+        .unwrap_or_default()
+        .into_iter()
+        .find(|schema| schema.get("implementation") == Some(&Value::from(implementation)))
+        .and_then(|schema| schema.get("fields")?.as_array().cloned())
+        .unwrap_or_default()
+}
+
+fn field<'a>(fields: &'a [Value], name: &str) -> Option<&'a Value> {
+    fields
+        .iter()
+        .find(|field| field.get("name") == Some(&Value::from(name)))
+}
+
+#[test]
+fn every_indexer_schema_the_curator_answers_holds_each_field_a_curator_of_series_does() {
+    use serde_json::json;
+    let curator = curator_answering();
+    let newznab = fields_of(&curator, "Newznab");
+    let torznab = fields_of(&curator, "Torznab");
+
+    for fields in [&newznab, &torznab] {
+        assert_eq!(
+            field(fields, "animeCategories"),
+            Some(&json!({ "order": 4, "name": "animeCategories", "value": [] }))
+        );
+        assert_eq!(
+            field(fields, "animeStandardFormatSearch").and_then(|field| field.get("value")),
+            Some(&Value::from(false))
+        );
+        assert!(field(fields, "additionalParameters").is_some());
+        let mut orders: Vec<u64> = fields
+            .iter()
+            .filter_map(|field| field.get("order")?.as_u64())
+            .collect();
+        orders.dedup();
+        assert_eq!(orders, (0..fields.len() as u64).collect::<Vec<_>>());
+    }
+    assert_eq!(newznab.len(), 7);
+    assert_eq!(
+        field(&torznab, "minimumSeeders").and_then(|field| field.get("value")),
+        Some(&Value::from(1))
+    );
+    for seeding in [
+        "seedCriteria.seedRatio",
+        "seedCriteria.seedTime",
+        "seedCriteria.seasonPackSeedTime",
+    ] {
+        assert!(field(&torznab, seeding).is_some(), "{seeding}");
+        assert!(field(&newznab, seeding).is_none(), "{seeding}");
+    }
+    assert_eq!(
+        field(&torznab, "rejectBlocklistedTorrentHashesWhileGrabbing")
+            .and_then(|field| field.get("value")),
+        Some(&Value::from(false))
+    );
+    assert_eq!(torznab.len(), 12);
+}
