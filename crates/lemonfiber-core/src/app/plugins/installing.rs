@@ -193,6 +193,7 @@ pub(super) async fn install(
         removal: None,
         installed: standing.installed().to_vec(),
         install: Some(Box::new(Install {
+            granting: crate::plugin::granting(&would),
             would,
             recorded,
             changes,

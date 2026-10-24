@@ -24,6 +24,12 @@
       ],
       "required": true
     },
+    "granting": {
+      "type": [
+        "array[ref:PluginGranting]"
+      ],
+      "required": true
+    },
     "overrides": {
       "type": [
         "array[ref:PluginOverriding]"
