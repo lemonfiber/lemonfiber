@@ -119,16 +119,8 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
     }
 }
 
-/// How a key the service wrote for itself is presented by a service of `kind`.
-fn presenting(kind: ApiKind, key: String) -> Presented {
-    match kind {
-        ApiKind::Bazarr => Presented(crate::bazarr::KEY, key),
-        _ => Presented(crate::endpoint::API_KEY_HEADER, key),
-    }
-}
-
 /// The key the service wrote to the file `api` names, read with `reader` from the copy
-/// once it is there, and presented as a service of its kind presents it.
+/// once it is there, and presented in the key header.
 async fn read(
     reaching: &Reaching<'_>,
     api: &Api,
@@ -161,7 +153,7 @@ async fn read(
         )
     })?;
     Ok(Held {
-        presented: presenting(api.kind, key.clone()),
+        presented: Presented(crate::endpoint::API_KEY_HEADER, key.clone()),
         made: vec![key],
     })
 }

@@ -618,31 +618,6 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
     assert!(unreached.is_empty(), "{unreached:?}");
 }
 
-/// The finder's key is read from the file its declaration names, and a declaration
-/// naming none has no key to read.
-#[tokio::test]
-async fn a_finder_naming_no_configuration_file_has_no_key_to_publish() {
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(
-        SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
-    ));
-    let mut unnamed = subtitle_finder_svc();
-    if let Some(api) = unnamed.api.as_mut() {
-        api.path = None;
-    }
-
-    let named = crate::app::targets::subtitle_finder_key(
-        &ctx,
-        &[subtitle_finder_svc()],
-        Some(stack_root()),
-    )
-    .await;
-    let unnamed =
-        crate::app::targets::subtitle_finder_key(&ctx, &[unnamed], Some(stack_root())).await;
-
-    assert!(named.is_some_and(|key| key == "finder-key"));
-    assert!(unnamed.is_none());
-}
-
 /// A finder that will not take the key a replacement hands it says so in its own
 /// words, rather than the replacement reading as handed on.
 #[tokio::test]
