@@ -28,6 +28,14 @@ pub(super) struct Prepared {
     pub(super) env: Vec<String>,
 }
 
+/// Each secret either copy's files name, with the value written for it.
+fn written(copy: &Throwaway, held: &Throwaway) -> BTreeMap<String, String> {
+    held.written()
+        .chain(copy.written())
+        .map(|(secret, value)| (secret.to_owned(), value.to_owned()))
+        .collect()
+}
+
 /// The value of `secret` for this run: the one already written for it, or one minted now
 /// and kept, so the upstream's files, its environment and the adapter all hold the same.
 fn valued(
@@ -113,11 +121,7 @@ impl Prepared {
             .chain(copy.made().map(str::to_owned))
             .chain(held.made().map(str::to_owned))
             .collect();
-        let mut secrets: BTreeMap<String, String> = held
-            .written()
-            .chain(copy.written())
-            .map(|(secret, value)| (secret.to_owned(), value.to_owned()))
-            .collect();
+        let mut secrets = written(&copy, &held);
         let env = environment(recorder.random, &mut secrets, upstream, &mut made)
             .map_err(refused("upstream's environment"))?;
         let handed = handed(recorder.random, &mut secrets, adapter.placed, &mut made)
