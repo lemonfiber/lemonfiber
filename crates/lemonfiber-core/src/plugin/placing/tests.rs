@@ -69,6 +69,7 @@ fn placed(service: &str) -> Placed {
 /// An installed plugin holding the named services.
 fn installed(plugin: &str, services: &[&str]) -> Installed {
     Installed {
+        granted: Vec::new(),
         plugin: plugin.to_owned(),
         version: "1.2.0".to_owned(),
         name: None,

@@ -7,7 +7,7 @@ use super::Settings;
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS_FILES, SETTINGS};
 use crate::plugin::{Holding, Installed, Reading};
-use crate::wiring::{crosses, Fillers};
+use crate::wiring::Fillers;
 
 pub(crate) struct Resolved {
     recorded: Recorded,
@@ -143,7 +143,7 @@ fn crossed(
 ) -> Holding {
     fillers
         .setting(owner, crate::config::API_KEY_SUFFIX)
-        .filter(|_| recipient.is_some_and(|recipient| crosses(owner.holder(), recipient.holder())))
+        .filter(|_| recipient.is_some_and(|recipient| fillers.hands(owner, recipient)))
         .map_or(Holding::Withheld, Holding::Crossing)
 }
 

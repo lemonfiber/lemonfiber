@@ -16,11 +16,11 @@ mod unwanted;
 
 pub use takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING,
-    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD,
-    TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN,
-    TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST,
-    TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE,
-    TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
+    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION,
+    TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING,
+    TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -68,6 +68,9 @@ pub struct Arguments {
     /// The setting to change or put back to its default, by the name the settings read
     /// lists it under.
     pub setting: Option<String>,
+    /// The credential a grant to a third-party plugin is of, by the setting the
+    /// credentials read lists it under.
+    pub credential: Option<String>,
     /// The quality preset, or the music format, as it is written.
     pub preset: Option<String>,
     /// The media type a quality choice applies to.
@@ -226,6 +229,7 @@ impl Arguments {
             key: Some("DATA_ROOT".to_owned()),
             value: Some("/srv".to_owned()),
             setting: Some("gluetun:countries".to_owned()),
+            credential: Some("SONARR_API_KEY".to_owned()),
             preset: Some("balanced".to_owned()),
             media_type: Some("tv".to_owned()),
             archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),

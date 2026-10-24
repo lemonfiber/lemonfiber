@@ -188,6 +188,7 @@ pub const TAKES_CONSENT: &[&str] = &[
     "plugin-remove",
     "plugin-prove",
     "plugin-run",
+    "credentials-revoke",
     "settings-set",
     "settings-clear",
 ];
@@ -502,7 +503,12 @@ pub const TAKES_PLUGIN: &[&str] = &[
     "plugin-remove",
     "plugin-prove",
     "plugin-run",
+    "credentials-revoke",
 ];
+
+/// The action whose command carries the credential a grant is of, by the setting the
+/// credentials read lists it under: ending one grant to a third-party plugin.
+pub const TAKES_CREDENTIAL: &[&str] = &["credentials-revoke"];
 
 /// The action whose command carries which demand recipe of the plugin is run.
 pub const TAKES_RECIPE: &[&str] = &["plugin-run"];

@@ -389,6 +389,65 @@ async fn an_update_whose_record_cannot_be_written_puts_the_old_version_back() {
     assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
 }
 
+/// A runner answering every call as a plain one does, which makes the journal impossible
+/// to rewrite once a service is started.
+struct JournalLostOnceUp {
+    journal: PathBuf,
+    answering: Recording,
+}
+
+#[async_trait::async_trait]
+impl crate::ports::Runner for JournalLostOnceUp {
+    async fn run(
+        &self,
+        argv: &[String],
+    ) -> Result<lemonfiber_ports::process::Output, lemonfiber_ports::process::Failure> {
+        if argv.iter().any(|word| word == "up") {
+            let _ = unrewritable(&self.journal);
+        }
+        self.answering.run(argv).await
+    }
+}
+
+/// A grant the version being replaced holds and the new one does not ask is journalled as
+/// ended, and an update that cannot journal it is stopped and the old version put back on.
+#[tokio::test]
+async fn an_update_whose_ended_grant_cannot_be_journalled_puts_the_old_version_back() {
+    let mut ctx = proving(
+        "update-unjournalled",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("update-unjournalled", PROVING)).await),
+        Some(1)
+    );
+    let mut register =
+        crate::app::plugins::read(&ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    assert!(register.regrant("komga", &crate::test_support::a_grant(), true));
+    assert!(std::fs::write(
+        record_of(&ctx),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    ctx.seams.runner = Arc::new(JournalLostOnceUp {
+        journal: journal.clone(),
+        answering: Recording::answering(Ok(spoke(""))),
+    });
+
+    let failed = update(updating(&ctx, &source("update-unjournalled-next", &next())).await);
+
+    let _ = std::fs::remove_dir_all(staging_of(&journal));
+    assert!(failed
+        .as_ref()
+        .is_some_and(|one| one.stopped.is_some() && !one.install.recorded));
+    assert!(failed.is_some_and(|one| one.restored.is_some()));
+    assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
+}
+
 /// The refusals an update gives before anything moves, each its own: a source this
 /// build cannot read, a machine with no stack, and a stack that cannot be read.
 #[tokio::test]

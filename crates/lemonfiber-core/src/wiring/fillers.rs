@@ -75,6 +75,9 @@ pub struct Filler {
     pub contracts: Vec<String>,
     /// Whether the plugin that brought it is one this build embeds as first-party.
     pub first_party: bool,
+    /// The setting of each credential of another service the operator granted the plugin
+    /// that brought it.
+    pub granted: Vec<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
@@ -212,7 +215,7 @@ impl Fillers {
             let first_party = crate::plugin::first_party::holds(trusted, one);
             one.services
                 .iter()
-                .map(move |placed| brought(&one.plugin, placed, project, first_party))
+                .map(move |placed| brought(one, placed, project, first_party))
         });
         let mut services: Vec<Filler> = bundled.chain(brought).collect();
         for one in services
@@ -408,6 +411,19 @@ pub fn crosses(owner: Holder<'_>, recipient: Holder<'_>) -> bool {
     }
 }
 
+impl Fillers {
+    /// Whether `owner`'s credential may be handed to `recipient`: where [`crosses`] lets
+    /// it, or where the operator granted it to `recipient`'s plugin by the setting it is
+    /// held under.
+    #[must_use]
+    pub fn hands(&self, owner: &Filler, recipient: &Filler) -> bool {
+        crosses(owner.holder(), recipient.holder())
+            || self
+                .setting(owner, crate::config::API_KEY_SUFFIX)
+                .is_some_and(|setting| recipient.granted.contains(&setting))
+    }
+}
+
 /// Who holds a credential, as whether it may cross to another is judged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Holder<'a> {
@@ -458,6 +474,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         provides: service.provides.clone(),
         contracts: Vec::new(),
         first_party: false,
+        granted: Vec::new(),
         majors: service.majors(),
         fronts: None,
         native: None,
@@ -470,7 +487,8 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
 ///
 /// Reached at its own id until [`Fillers::trusting`] places one taking `network.via` at
 /// the service whose network it runs inside.
-fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: bool) -> Filler {
+fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party: bool) -> Filler {
+    let plugin = one.plugin.as_str();
     Filler {
         id: placed.service.clone(),
         name: placed.called().to_owned(),
@@ -491,6 +509,11 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: b
         provides: placed.provides.clone(),
         contracts: placed.speaks.clone(),
         first_party,
+        granted: one
+            .granted
+            .iter()
+            .map(|grant| grant.credential.clone())
+            .collect(),
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),
@@ -509,6 +532,18 @@ fn host(service: &Service, services: &[Service]) -> String {
     service
         .inside(services)
         .map_or_else(|| service.id.clone(), |host| host.id.clone())
+}
+
+#[cfg(test)]
+impl Fillers {
+    /// The services `services` alone, asking nothing and linking nothing by name.
+    pub(crate) fn holding(services: Vec<Filler>) -> Self {
+        Self {
+            services,
+            asks: Vec::new(),
+            named: Vec::new(),
+        }
+    }
 }
 
 #[cfg(test)]

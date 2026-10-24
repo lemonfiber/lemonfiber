@@ -229,12 +229,12 @@ pub(crate) async fn setting_up(
     // check below would see its half-written settings and call the machine done.
     let progress = core_setup::progress_at(&paths.setup_progress());
     match Status::of(progress.as_ref()) {
-        Status::FailedApply => recover_setup(ctx, paths, surface, progress).await,
+        Status::FailedApply => Box::pin(recover_setup(ctx, paths, surface, progress)).await,
         // A run that quit mid-question saved where it reached; pick it back up.
-        Status::InProgress => resume_gather(ctx, paths, surface, progress, flags).await,
+        Status::InProgress => Box::pin(resume_gather(ctx, paths, surface, progress, flags)).await,
         // Absent and applied are neither a stopped apply nor a saved run, so they
         // begin, or decline, a fresh one.
-        _ => fresh_setup(ctx, paths, surface, flags).await,
+        _ => Box::pin(fresh_setup(ctx, paths, surface, flags)).await,
     }
 }
 

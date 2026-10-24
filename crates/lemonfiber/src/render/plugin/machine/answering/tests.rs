@@ -1,7 +1,7 @@
 use lemonfiber_core::plugin::{Adapter, Owner, Pair, Recipe, Step, Taking};
 use lemonfiber_manifest::ApiKind;
 
-use super::{recipes, taking, unanswered};
+use super::{granting, recipes, taking, unanswered};
 
 /// A recipe with one call through lemonfiber's adapter, one to a host outside, and a
 /// value carried there.
@@ -247,4 +247,32 @@ fn a_shape_given_is_said_without_asking_for_it_again() {
 #[test]
 fn a_plugin_taking_no_shape_draws_nothing() {
     assert!(taking(&[], false).text().is_empty());
+}
+
+#[test]
+fn each_grant_names_its_credential_whose_it_is_and_what_it_is_for_and_how_to_approve_it() {
+    let mut would = super::super::tests::recorded("comics", None);
+    would.granted = vec![lemonfiber_core::plugin::Grant {
+        credential: "SONARR_API_KEY".to_owned(),
+        of: "sonarr".to_owned(),
+        serves: "media.serve".to_owned(),
+        at: String::new(),
+    }];
+
+    let asked = granting(&would, false).text();
+    let given = granting(&would, true).text();
+    would.granted.clear();
+
+    assert!(asked.contains("would be granted"), "{asked}");
+    assert!(
+        asked.contains(
+            "SONARR_API_KEY, sonarr's, for media.serve — approve with --approve SONARR_API_KEY@comics"
+        ),
+        "{asked}"
+    );
+    assert!(
+        given.contains("was granted") && !given.contains("--approve"),
+        "{given}"
+    );
+    assert!(granting(&would, false).text().is_empty());
 }

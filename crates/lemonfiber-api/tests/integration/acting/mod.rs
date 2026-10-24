@@ -5,12 +5,12 @@
 //! same question differently the first time one of them was updated.
 pub(crate) use lemonfiber_api::actions::{
     named, Arguments, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED,
-    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE,
-    TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME,
-    TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
-    TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
-    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING,
-    TAKES_WISH,
+    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL,
+    TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY,
+    TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS,
+    TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES,
+    TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE,
+    TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -71,6 +71,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         key: takes(TAKES_KEY).then(|| "DATA_ROOT".to_owned()),
         value: takes(TAKES_VALUE).then(|| "/srv".to_owned()),
         setting: takes(TAKES_SETTING).then(|| "gluetun:countries".to_owned()),
+        credential: takes(TAKES_CREDENTIAL).then(|| CREDENTIAL.to_owned()),
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
         archive: takes(TAKES_ARCHIVE).then(|| ARCHIVE.to_owned()),
@@ -171,6 +172,10 @@ pub(crate) const CAPABILITY: &str = "indexer.search";
 
 /// A plugin an update or a removal acts on.
 pub(crate) const PLUGIN: &str = "komga";
+
+/// A credential granted to a third-party plugin, by the setting the credentials read lists
+/// it under.
+pub(crate) const CREDENTIAL: &str = "SONARR_API_KEY";
 
 /// A demand recipe the plugin is asked to run.
 pub(crate) const RECIPE: &str = "rescan";

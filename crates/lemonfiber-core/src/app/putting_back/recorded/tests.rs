@@ -105,3 +105,14 @@ fn moving_state_back_is_recorded_as_the_move_the_other_way() {
         })
     );
 }
+
+#[test]
+fn putting_a_grant_back_is_recorded_as_the_grant_the_other_way() {
+    let granted = |given: bool| Kind::Granted {
+        plugin: "reader".to_owned(),
+        grant: crate::test_support::a_grant(),
+        given,
+    };
+    assert_eq!(inverted(&granted(true)), Some(granted(false)));
+    assert_eq!(inverted(&granted(false)), Some(granted(true)));
+}

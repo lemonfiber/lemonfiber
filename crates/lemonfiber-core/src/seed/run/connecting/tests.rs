@@ -400,8 +400,8 @@ fn a_plugin_asker_is_connected_to_nothing() {
     assert_eq!(said.len(), made.len(), "{said:?}");
     assert!(said.contains(
         &"Sonarr fills library.curate, which prowlarr the stand-in asks for, and prowlarr the \
-          stand-in is a third-party plugin's service, which lemonfiber never hands another \
-          service's credential"
+          stand-in is a third-party plugin's service, which is handed another service's \
+          credential only where the operator granted it in an install or update"
             .to_owned()
     ));
 }
@@ -413,6 +413,7 @@ fn a_service(
     kind: lemonfiber_manifest::ApiKind,
 ) -> crate::wiring::Filler {
     crate::wiring::Filler {
+        granted: Vec::new(),
         id: id.to_owned(),
         name: id.to_owned(),
         origin: origin.clone(),
@@ -490,7 +491,8 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
                 capability: capability.to_owned(),
                 fillers: vec![filler.clone()],
             };
-            let came = made(&asker, &ask, &filler);
+            let fillers = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
+            let came = made(&fillers, &asker, &ask, &filler);
             let expected = if both_ways {
                 refused_both_ways
             } else {
@@ -521,4 +523,35 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
         kinds.len(),
         "a connection kind was never made: {seen:?}"
     );
+}
+
+#[test]
+fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection() {
+    use crate::origin::Origin;
+    use lemonfiber_manifest::ApiKind;
+
+    let stranger = Origin::Plugin {
+        named: "comics".to_owned(),
+    };
+    let filler = a_service("sonarr", &Origin::Bundled, ApiKind::Servarr);
+    let asker = a_service("finder", &stranger, ApiKind::Bazarr);
+    let ask = crate::wiring::Ask {
+        by: asker.id.clone(),
+        capability: "library.curate".to_owned(),
+        fillers: vec![filler.clone()],
+    };
+    let ungranted = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
+    let came = made(&ungranted, &asker, &ask, &filler).map(|(made, ..)| made);
+    assert_eq!(came, Err(Unmade::Asked));
+
+    let credential = ungranted
+        .setting(&filler, crate::config::API_KEY_SUFFIX)
+        .unwrap_or_default();
+    let granted = crate::wiring::Filler {
+        granted: vec![credential],
+        ..asker
+    };
+    let fillers = crate::wiring::Fillers::holding(vec![granted.clone(), filler.clone()]);
+    let came = made(&fillers, &granted, &ask, &filler).map(|(made, ..)| made);
+    assert!(came.is_ok(), "{came:?}");
 }

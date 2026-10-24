@@ -125,6 +125,9 @@ const LIFECYCLE: &[Kind] = &[kind::LIFECYCLE];
 /// What putting a plugin on, taking one off or moving one along reports under.
 const PLUGINS: &[Kind] = &[kind::PLUGINS];
 
+/// What replacing a credential or ending a grant reports under.
+const CREDENTIALS: &[Kind] = &[kind::CREDENTIALS];
+
 /// What changing what the household may ask for, or deciding what it asked, reports under.
 const HOUSEHOLD: &[Kind] = &[kind::HOUSEHOLD];
 
@@ -329,7 +332,8 @@ pub const fn asked(command: &Command) -> Asked {
         // still need doing before every consumer held the new one. No replacement is
         // generated: a value minted to describe a rotation is a secret that exists
         // because somebody asked a question, and it would have to go somewhere.
-        Command::Credentials(_) => reports("credentials --rotate", &[kind::CREDENTIALS]),
+        Command::Credentials(Asking::Revoke { .. }) => reports("credentials revoke", CREDENTIALS),
+        Command::Credentials(_) => reports("credentials --rotate", CREDENTIALS),
         // What a capture would hold, how large it would be, and the exact path it
         // would be written to — read off the same room check a real capture makes
         // before it writes anything.

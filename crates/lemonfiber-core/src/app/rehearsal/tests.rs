@@ -105,6 +105,13 @@ fn reading_a_credential_is_not_read_the_way_rotating_one_is() {
         .rehearsal
             == Rehearsal::Reports
     );
+    let revoke = asked(&Command::Credentials(Asking::Revoke {
+        plugin: "komga".to_owned(),
+        credential: "SONARR_API_KEY".to_owned(),
+        agreement: None,
+    }));
+    assert!(revoke.rehearsal == Rehearsal::Reports);
+    assert_eq!(revoke.named, "credentials revoke");
 }
 
 /// The reason a verdict gives, where it gives one.

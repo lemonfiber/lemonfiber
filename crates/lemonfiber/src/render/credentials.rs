@@ -10,7 +10,8 @@
 //! operator reading this list is exactly the operator about to decide whether a copy
 //! of that file is safe to put somewhere, and the answer is longer than "yes".
 
-use lemonfiber_core::credential::{Inventory, Reach, Revealed, Rotation, Settled};
+use lemonfiber_core::credential::{Inventory, Reach, Revealed, Revoked, Rotation, Settled};
+use lemonfiber_core::text::plain;
 
 use super::Lines;
 
@@ -28,7 +29,19 @@ pub(crate) fn listing(inventory: &Inventory) -> Lines {
         for consumer in &held.consumers {
             lines.put(format!("    used by      {consumer}"));
         }
+        for grant in inventory
+            .grants
+            .iter()
+            .filter(|grant| grant.credential == held.setting)
+        {
+            lines.put(format!(
+                "    granted to   the plugin {}, for {}",
+                plain(&grant.plugin),
+                plain(&grant.serves)
+            ));
+        }
     }
+    lines.extend(granted_elsewhere(inventory));
     lines.extend(advisories(inventory));
     lines.extend(protection(inventory));
     if let Some(rotated) = &inventory.rotated {
@@ -37,6 +50,86 @@ pub(crate) fn listing(inventory: &Inventory) -> Lines {
     if let Some(revealed) = &inventory.revealed {
         lines.extend(reveal(revealed));
     }
+    if let Some(revoked) = &inventory.revoked {
+        lines.extend(revoking(revoked, inventory.rehearsed));
+    }
+    lines
+}
+
+/// Every grant of a credential the inventory lists no line for.
+fn granted_elsewhere(inventory: &Inventory) -> Lines {
+    let mut lines = Lines::default();
+    let unlisted: Vec<_> = inventory
+        .grants
+        .iter()
+        .filter(|grant| {
+            !inventory
+                .held
+                .iter()
+                .any(|held| held.setting == grant.credential)
+        })
+        .collect();
+    if unlisted.is_empty() {
+        return lines;
+    }
+    lines.spaced("Granted to third-party plugins:");
+    for grant in unlisted {
+        lines.put(format!(
+            "  {}, {}'s, to the plugin {}, for {}",
+            plain(&grant.credential),
+            plain(&grant.of),
+            plain(&grant.plugin),
+            plain(&grant.serves)
+        ));
+    }
+    lines
+}
+
+/// What ending a grant came to, or would come to, and how the reading is answered.
+fn revoking(revoked: &Revoked, rehearsed: bool) -> Lines {
+    let mut lines = Lines::default();
+    let grant = &revoked.grant;
+    let (plugin, credential) = (plain(&grant.plugin), plain(&grant.credential));
+    let restarts = if revoked.restarts.is_empty() {
+        "restart nothing, since no service of it reads it".to_owned()
+    } else {
+        format!("restart {}", revoked.restarts.join(", "))
+    };
+    if !revoked.ended {
+        lines.spaced(format!(
+            "Revoking {plugin}'s grant of {credential}, for {}, would write it out of \
+             {plugin}'s secrets file and {restarts}.",
+            plain(&grant.serves)
+        ));
+        lines.spaced(if rehearsed {
+            "Nothing was written, because this was a rehearsal. To revoke it, run the same \
+             command again without --dry-run, answering this offer by name:"
+        } else {
+            "Nothing has been changed. To revoke it, run the same command again, answering \
+             this offer by name:"
+        });
+        lines.put(format!("  --offer {}", plain(&revoked.agreement)));
+        return lines;
+    }
+    lines.spaced(format!(
+        "{plugin}'s grant of {credential} is ended: it no longer crosses to {plugin}, and \
+         {} is unfilled for it until it is granted again.",
+        plain(&grant.serves)
+    ));
+    match &revoked.unrestarted {
+        Some(why) => lines.put(format!(
+            "  Its services did not restart: {}; lemonfiber restart finishes it.",
+            plain(why)
+        )),
+        None if !revoked.restarts.is_empty() => {
+            lines.put(format!("  Restarted {}.", revoked.restarts.join(", ")));
+        }
+        None => {}
+    }
+    lines.spaced(format!(
+        "{plugin} may have kept the value it was handed while it held the grant. Replace it \
+         with lemonfiber credentials --rotate {credential} to take it back."
+    ));
     lines
 }
 

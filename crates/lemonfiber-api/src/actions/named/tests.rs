@@ -26,6 +26,7 @@ fn everything(confirm: bool) -> Arguments {
         key: Some("DATA_ROOT".to_owned()),
         value: Some("/srv".to_owned()),
         setting: Some("gluetun:countries".to_owned()),
+        credential: Some("SONARR_API_KEY".to_owned()),
         preset: Some("balanced".to_owned()),
         media_type: Some("tv".to_owned()),
         archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),
@@ -206,6 +207,28 @@ fn progress_without_a_position_and_a_grant_without_a_device_are_refused_by_name(
     assert_eq!(
         super::viewing::asked_for("grant", Arguments::default()).err(),
         Some(missing("grant", "device"))
+    );
+}
+
+/// Ending a grant without the plugin that holds it, or without the credential it is of,
+/// is refused by the argument it lacks.
+#[test]
+fn a_revoke_without_its_plugin_or_its_credential_is_refused_by_name() {
+    let missing = |argument: &str| crate::actions::Refused::Missing {
+        action: "credentials-revoke".to_owned(),
+        argument: argument.to_owned(),
+    };
+    let held = Arguments {
+        plugin: Some("reader".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        super::extending::asked_for("credentials-revoke", Arguments::default()).err(),
+        Some(missing("plugin"))
+    );
+    assert_eq!(
+        super::extending::asked_for("credentials-revoke", held).err(),
+        Some(missing("credential"))
     );
 }
 

@@ -21,6 +21,16 @@ pub enum Asking {
         /// Which one, by the name the inventory gives it.
         credential: String,
     },
+    /// End one grant of another service's credential to a third-party plugin, read first
+    /// and carried out on the offer that reading named.
+    Revoke {
+        /// The plugin holding the grant.
+        plugin: String,
+        /// The credential granted, by the setting the inventory names it by.
+        credential: String,
+        /// The offer being answered, or nothing for the reading.
+        agreement: Option<String>,
+    },
     /// Print one stored value, which is a thing to be asked for twice.
     Reveal {
         /// Which one, by the name the inventory gives it.

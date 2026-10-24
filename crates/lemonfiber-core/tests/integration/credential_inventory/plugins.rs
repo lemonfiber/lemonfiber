@@ -238,3 +238,64 @@ async fn a_register_that_will_not_read_refuses_the_inventory() {
         Some("PLUGIN-4".to_owned())
     );
 }
+
+/// The setting sonarr's credential is held under, granted to the plugin in [`granted`].
+const GRANTED: &str = "SONARR_API_KEY";
+
+/// The register beside [`WITH_A_SECRET`] with its secret sonarr's credential and that
+/// credential granted to the plugin.
+fn granted() -> String {
+    WITH_A_SECRET
+        .replace(
+            r#""of": "komga""#,
+            r#""of": "sonarr", "for": "media.serve""#,
+        )
+        .replace(
+            r#""declared": {"#,
+            &format!(
+                r#""granted": [
+        {{ "credential": "{GRANTED}", "of": "sonarr", "for": "media.serve", "at": "1" }}
+      ],
+      "declared": {{"#
+            ),
+        )
+}
+
+/// A grant ended through the credentials ask is offered first and ends only over that
+/// offer, leaving the inventory with no grant; a grant the plugin does not hold is refused.
+#[tokio::test]
+async fn a_grant_is_revoked_over_its_offer_and_one_not_held_is_refused() {
+    let env = beside("pluginrevoke", &granted());
+    assert!(store::set(&env, GRANTED, "abc").is_ok());
+    let ctx = ctx(env, Files::empty(), silent());
+    let revoking = |credential: &str, agreement: Option<String>| Asking::Revoke {
+        plugin: "comics".to_owned(),
+        credential: credential.to_owned(),
+        agreement,
+    };
+
+    let offered = asked(&ctx, revoking(GRANTED, None)).await;
+    let agreement = offered
+        .revoked
+        .as_ref()
+        .map(|revoked| revoked.agreement.clone());
+    let ended = asked(&ctx, revoking(GRANTED, agreement)).await;
+    let refused = dispatch(Command::Credentials(revoking("RADARR_API_KEY", None)), &ctx).await;
+
+    assert!(
+        offered.grants.len() == 1
+            && offered
+                .revoked
+                .as_ref()
+                .is_some_and(|revoked| !revoked.ended),
+        "{offered:?}"
+    );
+    assert!(
+        ended.grants.is_empty() && ended.revoked.as_ref().is_some_and(|revoked| revoked.ended),
+        "{ended:?}"
+    );
+    assert_eq!(
+        refused.err().map(|problem| problem.code),
+        Some(lemonfiber_core::error::codes::plugin::NO_GRANT)
+    );
+}

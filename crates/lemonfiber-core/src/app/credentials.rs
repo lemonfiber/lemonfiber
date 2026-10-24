@@ -74,6 +74,26 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
             credential,
             confirmed,
         } => showing(ctx, held, &credential, confirmed).await,
+        Asking::Revoke {
+            plugin,
+            credential,
+            agreement,
+        } => {
+            let (revoked, after) =
+                super::plugins::granting::revoke(ctx, &plugin, &credential, agreement.as_deref())
+                    .await?;
+            let held = reading::taken(
+                ctx,
+                &manifest.services,
+                &fillers,
+                project.as_deref(),
+                after.installed(),
+            )
+            .await;
+            return Ok(Inventory::of(held)
+                .granting(after.installed())
+                .revoking(revoked));
+        }
         Asking::Rotate { credential } => {
             replacing(
                 ctx,
@@ -89,7 +109,7 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
             .await
         }
     };
-    Ok(inventory)
+    Ok(inventory.granting(installed))
 }
 
 /// The inventory with one value printed, or with the reason there is nothing to print.

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A credential of another service the operator granted a third-party plugin, named by\nthe setting it is held under and never by its value.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When the operator approved it, as the record stamps every change.",
+      "type": "string"
+    },
+    "credential": {
+      "description": "The setting the credential is held under, as the credentials read names it.",
+      "type": "string"
+    },
+    "for": {
+      "description": "The capability of the plugin's own it was granted to fill.",
+      "type": "string"
+    },
+    "of": {
+      "description": "The service whose credential it is.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "credential",
+    "of",
+    "for",
+    "at"
+  ]
+}

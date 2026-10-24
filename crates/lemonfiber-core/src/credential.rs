@@ -19,12 +19,14 @@
 //!
 //! See `.docs/architecture/module-layout.md`.
 
+mod granting;
 mod held;
 mod protection;
 mod rotation;
 
 pub use lemonfiber_ports::fingerprint::fingerprint;
 
+pub use granting::{Granted, Revoked};
 pub use held::{catalogue, Consumer, Entry, Needed, Origin, Reached, CATALOGUE, VPN_PRIVATE_KEY};
 pub use protection::Protection;
 pub use rotation::{Propagation, Reach, Rotation, Settled};
@@ -190,6 +192,11 @@ pub struct Inventory {
     /// One value, where one was asked for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revealed: Option<Revealed>,
+    /// Every credential granted to a third-party plugin.
+    pub grants: Vec<Granted>,
+    /// What became of revoking a grant, where one was asked for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoked: Option<Revoked>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by
@@ -207,7 +214,23 @@ impl Inventory {
             protection: Protection::stated(),
             rotated: None,
             revealed: None,
+            grants: Vec::new(),
+            revoked: None,
         }
+    }
+
+    /// The same inventory, listing every grant `installed` holds.
+    #[must_use]
+    pub fn granting(mut self, installed: &[crate::plugin::Installed]) -> Self {
+        self.grants = Granted::every(installed);
+        self
+    }
+
+    /// The same inventory, carrying what became of revoking a grant.
+    #[must_use]
+    pub fn revoking(mut self, revoked: Revoked) -> Self {
+        self.revoked = Some(revoked);
+        self
     }
 
     /// The same inventory, carrying what became of a rotation.

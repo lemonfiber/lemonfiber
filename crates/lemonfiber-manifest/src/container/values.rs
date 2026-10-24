@@ -58,6 +58,9 @@ pub struct Secret {
     /// entering it.
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub minted: bool,
+    /// The capability of the plugin's own that a credential crossing to it is needed to fill.
+    #[serde(default, rename = "for", skip_serializing_if = "Option::is_none")]
+    pub serves: Option<String>,
 }
 
 /// A secret the manifest declares.

@@ -3,6 +3,13 @@
   "description": "The whole answer to a question about credentials.\n\nEvery ask answers with the inventory as it now stands, and adds what became of\nwhatever else was asked for. An operator who has just rotated something wants to\nsee the inventory that rotation produced, not a receipt they have to go and check\nagainst one.",
   "type": "object",
   "properties": {
+    "grants": {
+      "description": "Every credential granted to a third-party plugin.",
+      "type": "array",
+      "items": {
+        "$ref": "CredentialGranted.json"
+      }
+    },
     "held": {
       "description": "Every credential, whether or not it is present.",
       "type": "array",
@@ -29,6 +36,17 @@
         }
       ]
     },
+    "revoked": {
+      "description": "What became of revoking a grant, where one was asked for.",
+      "anyOf": [
+        {
+          "$ref": "CredentialRevoked.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "rotated": {
       "description": "What became of a rotation, where one was asked for.",
       "anyOf": [
@@ -44,6 +62,7 @@
   "required": [
     "held",
     "protection",
+    "grants",
     "rehearsed"
   ]
 }

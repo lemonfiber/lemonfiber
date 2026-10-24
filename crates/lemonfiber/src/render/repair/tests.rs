@@ -312,6 +312,38 @@ fn a_setting_or_a_secret_put_back_is_said_by_its_name() {
     );
 }
 
+#[test]
+fn a_grant_put_back_is_said_by_its_credential_and_plugin() {
+    let regrant = |give: bool| Undo {
+        target: "SONARR_API_KEY".to_owned(),
+        action: Action::Regrant {
+            plugin: "komga".to_owned(),
+            grant: lemonfiber_core::plugin::Grant {
+                credential: "SONARR_API_KEY".to_owned(),
+                of: "sonarr".to_owned(),
+                serves: "media.serve".to_owned(),
+                at: "1".to_owned(),
+            },
+            give,
+        },
+    };
+
+    let said = reversed(&putting_back(
+        vec![regrant(true), regrant(false)],
+        Vec::new(),
+    ))
+    .text();
+
+    assert!(
+        said.contains("SONARR_API_KEY granted to komga again"),
+        "{said}"
+    );
+    assert!(
+        said.contains("komga's grant of SONARR_API_KEY ended, as it was"),
+        "{said}"
+    );
+}
+
 /// A reversal that was carried out, over these two lists.
 fn putting_back(reversed: Vec<Undo>, left: Vec<Left>) -> Reversal {
     Reversal {

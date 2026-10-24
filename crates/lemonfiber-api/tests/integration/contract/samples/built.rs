@@ -309,6 +309,7 @@ fn komga_placed() -> lemonfiber_core::plugin::Placed {
 /// one of them absent would compare the shape of the other to nothing.
 pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
     let one = lemonfiber_core::plugin::Installed {
+        granted: Vec::new(),
         plugin: "komga".to_owned(),
         version: "1.2.0".to_owned(),
         name: None,

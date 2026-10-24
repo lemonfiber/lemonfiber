@@ -19,12 +19,23 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
     reader.manifest = super::CONTRACTED_MANIFEST.to_owned();
     reader.tree = super::A_TREE.to_owned();
     reader.declared.secrets = vec![crate::plugin::Secret {
+        serves: None,
         id: "sonarr-key".to_owned(),
         of: "sonarr".to_owned(),
         why: "Asks the series service".to_owned(),
         minted: false,
     }];
     reader
+}
+
+/// The grant of the series curator's key to the reader, for the capability it fills.
+pub(crate) fn a_grant() -> crate::plugin::Grant {
+    crate::plugin::Grant {
+        credential: "SONARR_API_KEY".to_owned(),
+        of: "sonarr".to_owned(),
+        serves: "media.serve".to_owned(),
+        at: "1".to_owned(),
+    }
 }
 
 /// The reader, under the name of a plugin the machine trusts, so its files are written.

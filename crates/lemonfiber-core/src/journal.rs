@@ -253,6 +253,16 @@ pub enum Kind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filed: Option<String>,
     },
+    /// A credential of another service was granted to a third-party plugin, or a grant
+    /// it held was ended, recorded by the setting the credential is held under.
+    Granted {
+        /// The plugin it was granted to.
+        plugin: String,
+        /// The grant, by the setting the credential is held under.
+        grant: crate::plugin::Grant,
+        /// Whether it was given, rather than ended.
+        given: bool,
+    },
     /// The operator's overlay was written, changed or taken away, recorded by the
     /// fingerprint of what it held. Nothing undoes it: the file is the operator's.
     Overlaid {
@@ -420,6 +430,15 @@ pub enum Action {
         recorded: Option<String>,
         /// The environment file's setting it goes back to, where it was moved out of one.
         filed: Option<String>,
+    },
+    /// Give a grant back to a plugin, or end one it was given.
+    Regrant {
+        /// The plugin the grant is of.
+        plugin: String,
+        /// The grant, by the setting the credential is held under.
+        grant: crate::plugin::Grant,
+        /// Whether to give it, rather than end it.
+        give: bool,
     },
     /// Put a secret in the secret store back to the value it held.
     Rehold {

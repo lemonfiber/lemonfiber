@@ -5,6 +5,7 @@ use crate::plugin::Installed;
 /// it that this rule reads.
 fn filling(plugin: &str, provides: &[&str]) -> Installed {
     Installed {
+        granted: Vec::new(),
         plugin: plugin.to_owned(),
         version: "1.0.0".to_owned(),
         name: None,

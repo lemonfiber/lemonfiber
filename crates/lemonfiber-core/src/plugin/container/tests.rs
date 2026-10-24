@@ -83,6 +83,7 @@ fn placed() -> Placed {
 /// The record one such service is held in.
 fn installed(services: Vec<Placed>) -> Installed {
     Installed {
+        granted: Vec::new(),
         plugin: "komga".to_owned(),
         version: "1.0.0".to_owned(),
         name: None,

@@ -542,3 +542,25 @@ fn a_move_put_back_and_a_copy_kept_say_what_was_done() {
         "kept /stack/mounts/komga/cache"
     );
 }
+
+/// A grant given back and a grant ended each say which credential and which plugin.
+#[test]
+fn a_grant_put_back_is_said_by_its_credential_and_plugin() {
+    let undone = |give: bool| {
+        super::super::undone(&Undo {
+            target: "SONARR_API_KEY".to_owned(),
+            action: Action::Regrant {
+                plugin: "komga".to_owned(),
+                grant: lemonfiber_core::plugin::Grant {
+                    credential: "SONARR_API_KEY".to_owned(),
+                    of: "sonarr".to_owned(),
+                    serves: "media.serve".to_owned(),
+                    at: "1".to_owned(),
+                },
+                give,
+            },
+        })
+    };
+    assert_eq!(undone(true), "granted SONARR_API_KEY to komga again");
+    assert_eq!(undone(false), "ended komga's grant of SONARR_API_KEY");
+}

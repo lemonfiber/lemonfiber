@@ -68,6 +68,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(overriding(&install.overrides, install.recorded));
         lines.extend(answering::recipes(&install.would.recipes));
         lines.extend(answering::taking(&install.taking, acted));
+        lines.extend(answering::granting(&install.would, acted));
         lines.extend(container(&install.would));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
@@ -76,7 +77,10 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "install",
                 report.agreement.as_deref(),
-                &asked(&install.would, &install.taking),
+                &asked(&install.would, &install.taking)
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
                 report.rehearsed,
             ));
         }
@@ -121,7 +125,10 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "update",
                 report.agreement.as_deref(),
-                &asked(&one.install.would, &one.install.taking),
+                &asked(&one.install.would, &one.install.taking)
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
                 report.rehearsed,
             ));
         }
@@ -360,6 +367,14 @@ fn undone(undo: &Undo) -> String {
         Action::ReinstateDevice { name } => format!("made the device key {name} good again"),
         Action::Resettle { name, .. } => format!("put the setting {name} back"),
         Action::Rehold { name, .. } => format!("put the secret {name} back"),
+        Action::Regrant {
+            plugin,
+            grant,
+            give: true,
+        } => format!("granted {} to {plugin} again", grant.credential),
+        Action::Regrant { plugin, grant, .. } => {
+            format!("ended {plugin}'s grant of {}", grant.credential)
+        }
         Action::Leave { path } => format!("left the overlay {path} as it is"),
     }
 }

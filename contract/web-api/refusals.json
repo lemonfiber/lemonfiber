@@ -504,6 +504,16 @@
     "status": 409,
     "description": "Raised when the manifest kept for an installed plugin is missing or is not the one that was installed, so its demand recipes cannot be read."
   },
+  "PLUGIN-46": {
+    "name": "UNAIMED_CROSSING",
+    "status": 403,
+    "description": "Raised when a third-party plugin declares a secret of another service that names no capability of its own it is for."
+  },
+  "PLUGIN-47": {
+    "name": "NO_GRANT",
+    "status": 404,
+    "description": "Raised when a grant asked to be revoked is not one the plugin holds."
+  },
   "PLUGIN-5": {
     "name": "ALREADY",
     "status": 400,

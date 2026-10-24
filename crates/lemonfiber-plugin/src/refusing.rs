@@ -34,6 +34,7 @@ mod colliding;
 mod evidence;
 mod failing;
 mod fronting;
+mod granting;
 mod installing;
 mod leaving;
 mod minting;
@@ -75,6 +76,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     colliding::with_the_stack(manifest, &mut found);
     reaching::beyond(manifest, &mut found);
     minting::minted(manifest, &mut found);
+    granting::aimed(manifest, &mut found);
     naming::wired(manifest, &mut found);
     asking::asked(manifest, &mut found);
     naming::about(manifest, &mut found);

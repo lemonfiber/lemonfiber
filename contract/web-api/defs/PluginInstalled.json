@@ -45,6 +45,13 @@
       "type": "string",
       "default": ""
     },
+    "granted": {
+      "description": "Each credential of another service the operator granted it, as a third-party plugin.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginGrant.json"
+      }
+    },
     "installed_at": {
       "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Empty where the record predates\nit; a rehearsal's account carries the moment it was asked, which is the stamp\nthe install would have run under.",
       "type": "string",

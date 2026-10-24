@@ -388,6 +388,7 @@ fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
     let declared = Installed {
         declared: crate::plugin::Declaration {
             secrets: vec![crate::plugin::Secret {
+                serves: None,
                 id: "key".to_owned(),
                 of: "sonarr".to_owned(),
                 why: "reads the curator".to_owned(),
@@ -430,6 +431,7 @@ fn a_crossing_secret_whose_holder_nothing_here_names_is_withheld_and_an_own_one_
         Installed {
             declared: crate::plugin::Declaration {
                 secrets: vec![crate::plugin::Secret {
+                    serves: None,
                     id: "key".to_owned(),
                     of: of.to_owned(),
                     why: "reads it".to_owned(),

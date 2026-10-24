@@ -295,3 +295,102 @@ fn listing_what_is_held_prints_no_value_even_when_one_is_recorded() {
         "a recorded value was printed in the listing"
     );
 }
+
+/// The grant of the torrent client's password to the comics plugin.
+fn a_grant() -> lemonfiber_core::credential::Granted {
+    lemonfiber_core::credential::Granted {
+        plugin: "comics".to_owned(),
+        credential: "QBITTORRENT_PASSWORD".to_owned(),
+        of: "qbittorrent".to_owned(),
+        serves: "download.torrent".to_owned(),
+        at: "1".to_owned(),
+    }
+}
+
+/// Revoking that grant, ended or not, restarting `restarts`.
+fn revoked(ended: bool, restarts: &[&str]) -> lemonfiber_core::credential::Revoked {
+    lemonfiber_core::credential::Revoked {
+        grant: a_grant(),
+        restarts: restarts.iter().map(|one| (*one).to_owned()).collect(),
+        agreement: "1a2b3c4d".to_owned(),
+        ended,
+        unrestarted: None,
+    }
+}
+
+#[test]
+fn a_grant_is_listed_beside_the_credential_it_crosses_and_apart_where_none_is_listed() {
+    let mut inventory = Inventory::of(vec![held(State::Active, None)]);
+    inventory.grants = vec![a_grant()];
+    let beside = drawn(inventory.clone());
+    inventory.held.clear();
+    let apart = drawn(inventory);
+
+    assert!(
+        beside.contains("granted to   the plugin comics, for download.torrent"),
+        "{beside}"
+    );
+    assert!(
+        !beside.contains("Granted to third-party plugins"),
+        "{beside}"
+    );
+    assert!(apart.contains("Granted to third-party plugins:"), "{apart}");
+    assert!(
+        apart.contains("QBITTORRENT_PASSWORD, qbittorrent's, to the plugin comics"),
+        "{apart}"
+    );
+}
+
+#[test]
+fn a_revoke_not_yet_answered_says_what_it_would_restart_and_the_offer_that_ends_it() {
+    let text = drawn(Inventory::of(Vec::new()).revoking(revoked(false, &["comics"])));
+
+    assert!(
+        text.contains("would write it out of comics's secrets file"),
+        "{text}"
+    );
+    assert!(text.contains("restart comics"), "{text}");
+    assert!(text.contains("--offer 1a2b3c4d"), "{text}");
+}
+
+#[test]
+fn an_ended_grant_says_what_restarted_and_how_to_take_back_what_was_handed() {
+    let text = drawn(Inventory::of(Vec::new()).revoking(revoked(true, &["comics"])));
+    let mut unrestarted = revoked(true, &["comics"]);
+    unrestarted.unrestarted = Some("the engine did not answer".to_owned());
+    let stalled = drawn(Inventory::of(Vec::new()).revoking(unrestarted));
+
+    assert!(
+        text.contains("comics's grant of QBITTORRENT_PASSWORD is ended"),
+        "{text}"
+    );
+    assert!(text.contains("Restarted comics."), "{text}");
+    assert!(
+        text.contains("lemonfiber credentials --rotate QBITTORRENT_PASSWORD"),
+        "{text}"
+    );
+    assert!(
+        stalled.contains("did not restart: the engine did not answer"),
+        "{stalled}"
+    );
+}
+
+#[test]
+fn a_rehearsed_revoke_of_a_grant_nothing_reads_restarts_nothing_and_writes_nothing() {
+    let mut rehearsed = Inventory::of(Vec::new()).revoking(revoked(false, &[]));
+    rehearsed.rehearsed = true;
+    let text = drawn(rehearsed);
+    let ended = drawn(Inventory::of(Vec::new()).revoking(revoked(true, &[])));
+
+    assert!(
+        text.contains("restart nothing, since no service of it reads it"),
+        "{text}"
+    );
+    assert!(
+        text.contains("Nothing was written, because this was a rehearsal"),
+        "{text}"
+    );
+    assert!(text.contains("without --dry-run"), "{text}");
+    assert!(!ended.contains("Restarted"), "{ended}");
+    assert!(!ended.contains("did not restart"), "{ended}");
+}

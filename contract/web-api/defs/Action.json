@@ -354,6 +354,34 @@
       ]
     },
     {
+      "description": "Give a grant back to a plugin, or end one it was given.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "regrant"
+        },
+        "give": {
+          "description": "Whether to give it, rather than end it.",
+          "type": "boolean"
+        },
+        "grant": {
+          "description": "The grant, by the setting the credential is held under.",
+          "$ref": "PluginGrant.json"
+        },
+        "plugin": {
+          "description": "The plugin the grant is of.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "plugin",
+        "grant",
+        "give"
+      ]
+    },
+    {
       "description": "Put a secret in the secret store back to the value it held.",
       "type": "object",
       "properties": {

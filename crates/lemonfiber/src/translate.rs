@@ -9,8 +9,8 @@ use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::plugins;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    AlertAction, Asking, BandwidthAsked, Command, Diagnosing, Filling, Gathering, Hostable,
-    Keeping, LettingGo, Linking, MigrateAction, QualityAction, Removing, Setting, Tracing,
+    AlertAction, BandwidthAsked, Command, Diagnosing, Filling, Gathering, Hostable, Keeping,
+    LettingGo, Linking, MigrateAction, QualityAction, Removing, Setting, Tracing,
 };
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::bandwidth::Pausing;
@@ -31,14 +31,16 @@ use crate::say::complain;
 use lemonfiber::cli::{
     AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
     HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, QualityCommand, RawBandwidth,
-    RawCompanion, RawCredentials, RawDownloads, RawKey, RawRemoval, RawRemoving, RawRestart,
-    UpdateCommand, WiringCommand,
+    RawCompanion, RawDownloads, RawKey, RawRemoval, RawRemoving, RawRestart, UpdateCommand,
+    WiringCommand,
 };
 use lemonfiber_core::app::Restarting;
 
+mod credentials;
 mod people;
 mod settling;
 
+pub(crate) use credentials::credentials;
 pub(crate) use people::{held, household, invitation};
 pub(crate) use settling::settings;
 
@@ -341,26 +343,6 @@ fn narrowed(only: Option<&str>) -> Result<Narrowing, u8> {
         Some(Some(narrowing)) => Ok(narrowing),
         None => Ok(Narrowing::Suite),
     }
-}
-
-/// What is being asked about the credentials this stack holds.
-///
-/// Naming nothing is the reading. Naming one to reveal or one to rotate is an act on
-/// a line of that reading, and the two cannot arrive together — the command line
-/// refuses the pair, so there is no order of precedence here to get wrong.
-///
-/// The confirmation belongs to the reveal and to nothing else. Carried through
-/// rather than acted on here, because what an unconfirmed reveal answers with is a
-/// warning that has to be written once, where the value would otherwise be.
-pub(crate) fn credentials(asked: RawCredentials) -> Command {
-    Command::Credentials(match (asked.reveal, asked.rotate) {
-        (Some(credential), _) => Asking::Reveal {
-            credential,
-            confirmed: asked.confirm,
-        },
-        (None, Some(credential)) => Asking::Rotate { credential },
-        (None, None) => Asking::Read,
-    })
 }
 
 /// The one thing a walk was asked for, or nothing at all.

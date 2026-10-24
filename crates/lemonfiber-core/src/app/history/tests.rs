@@ -216,6 +216,20 @@ fn a_setting_reads_with_its_values_and_a_secret_by_its_name_alone() {
 }
 
 #[test]
+fn a_grant_reads_as_given_or_ended_by_its_credential_and_plugin() {
+    let granted = |given: bool| crate::journal::Kind::Granted {
+        plugin: "reader".to_owned(),
+        grant: crate::test_support::a_grant(),
+        given,
+    };
+    assert_eq!(did(&granted(true)), "granted SONARR_API_KEY to reader");
+    assert_eq!(
+        did(&granted(false)),
+        "ended reader's grant of SONARR_API_KEY"
+    );
+}
+
+#[test]
 fn a_setting_recorded_since_is_read_off_the_settings_store() {
     let root = lemonfiber_fixtures::scratch::Scratch::named("history-setting").kept();
     let _ = std::fs::remove_dir_all(&root);

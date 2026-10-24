@@ -344,6 +344,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-43` | `PROOF_ASKED_FAILED` | error | 1 | 409 | 0.18.0 | Raised when a proof an installed plugin declares, asked of its service, does not hold in the doctor. |
 | `PLUGIN-44` | `NOTHING_TO_RUN` | error | 1 | 404 | 0.18.0 | Raised when a run names a plugin that is not installed, or a demand recipe the plugin does not declare. |
 | `PLUGIN-45` | `MANIFEST_UNKEPT` | error | 1 | 409 | 0.18.0 | Raised when the manifest kept for an installed plugin is missing or is not the one that was installed, so its demand recipes cannot be read. |
+| `PLUGIN-46` | `UNAIMED_CROSSING` | error | 1 | 403 | 0.18.0 | Raised when a third-party plugin declares a secret of another service that names no capability of its own it is for. |
+| `PLUGIN-47` | `NO_GRANT` | error | 1 | 404 | 0.18.0 | Raised when a grant asked to be revoked is not one the plugin holds. |
 
 ## `PROC` — the program underneath
 

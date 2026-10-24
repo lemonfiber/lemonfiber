@@ -8,6 +8,7 @@
     "bandwidth": "actions/bandwidth.json",
     "companion-pair": "actions/companion-pair.json",
     "config-set": "actions/config-set.json",
+    "credentials-revoke": "actions/credentials-revoke.json",
     "diagnose": "actions/diagnose.json",
     "down": "actions/down.json",
     "downloads-pause": "actions/downloads-pause.json",

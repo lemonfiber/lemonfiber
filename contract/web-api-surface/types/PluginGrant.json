@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "credential": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "for": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "of": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

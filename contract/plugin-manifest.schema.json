@@ -855,6 +855,10 @@
       "description": "A value a service holds, declared before anything captures or enters it.",
       "type": "object",
       "properties": {
+        "for": {
+          "description": "The capability of the plugin's own that a credential crossing to it is needed to fill.",
+          "type": ["string", "null"]
+        },
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
         "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it.", "type": "boolean"},
         "of": {"description": "Whose credential it is.", "type": "string"},
