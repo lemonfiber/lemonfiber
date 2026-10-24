@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_contract::adapter::{ready_path, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
-use lemonfiber_contract::conformance::{cases, filed, Placeholder};
+use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
 use lemonfiber_plugin::{Health, HealthKind};
 use serde_json::Value;
@@ -21,7 +21,7 @@ use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
 use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
 use super::{Failed, Recorder};
-use crate::plugin::conforming::{ASKED_WITH, RECORDINGS};
+use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::Placed;
 use crate::plugin::program::{Operator, Starting, Throwaway};
@@ -30,11 +30,15 @@ use crate::ports::http::{Http, Method, Request, Response, JSON};
 use crate::ports::serving::{Serve, Served};
 use filling::Filling;
 use preparing::Prepared;
+use speaking::{contracts, fixture, named};
 use tapped::Tapped;
 
 mod filling;
 mod preparing;
+mod speaking;
 mod tapped;
+
+pub(super) use speaking::fixtures;
 
 /// The contract whose first run the adapter performs, as the seed performs it.
 fn identity() -> String {
@@ -67,33 +71,6 @@ impl Case {
     }
 }
 
-/// What names the case `case` of the contract `contract`.
-fn named(contract: &str, case: &str) -> String {
-    format!("conformance {contract}/{case}")
-}
-
-/// Where the recording of the case `case` of the contract `contract` sits.
-fn fixture(contract: &str, case: &str) -> String {
-    format!("{RECORDINGS}/{contract}/{case}.json")
-}
-
-/// What names each case of every contract `adapter` speaks that an upstream filing `files`
-/// is asked, and where its recording sits.
-pub(super) fn fixtures(
-    adapter: &lemonfiber_plugin::Service,
-    files: &[String],
-) -> Vec<(String, String)> {
-    contracts(adapter)
-        .iter()
-        .flat_map(|(spoken, capability)| {
-            filed(capability, files)
-                .into_iter()
-                .map(|case| (named(spoken, &case.case), fixture(spoken, &case.case)))
-                .collect::<Vec<_>>()
-        })
-        .collect()
-}
-
 /// The adapter that fronts a service, and how it is placed.
 #[derive(Clone, Copy)]
 pub(super) struct Fronting<'a> {
@@ -101,64 +78,6 @@ pub(super) struct Fronting<'a> {
     pub(super) service: &'a lemonfiber_plugin::Service,
     /// How installing it places it.
     pub(super) placed: &'a Placed,
-}
-
-/// Every contract `adapter` speaks, in the order it lists them, except that each comes
-/// after every contract whose answers its cases' placeholders read.
-pub(super) fn contracts(
-    adapter: &lemonfiber_plugin::Service,
-) -> Vec<(String, lemonfiber_contract::Capability)> {
-    let published = lemonfiber_contract::capabilities::all();
-    let mut left: Vec<(String, lemonfiber_contract::Capability)> = adapter
-        .speaks
-        .iter()
-        .filter_map(|spoken| {
-            published
-                .iter()
-                .find(|one| lemonfiber_contract::spoken(one.name, one.major) == *spoken)
-                .map(|one| (spoken.clone(), one.clone()))
-        })
-        .collect();
-    let mut ordered = Vec::with_capacity(left.len());
-    while !left.is_empty() {
-        let next = left
-            .iter()
-            .position(|(spoken, capability)| {
-                reads(capability)
-                    .iter()
-                    .all(|read| read == spoken || !left.iter().any(|(waiting, _)| waiting == read))
-            })
-            .unwrap_or_default();
-        ordered.push(left.remove(next));
-    }
-    ordered
-}
-
-/// Every contract, as `<capability>@<major>`, whose answers a case of `capability` reads.
-fn reads(capability: &lemonfiber_contract::Capability) -> Vec<String> {
-    let mut read = Vec::new();
-    for case in cases(capability) {
-        answered_in(&case.asks, &mut read);
-    }
-    read
-}
-
-/// The contract of each earlier answer a placeholder in `asks` reads, into `read`.
-fn answered_in(asks: &Value, read: &mut Vec<String>) {
-    match asks {
-        Value::String(text) => {
-            if let Some(Placeholder::Answered { case, .. }) = Placeholder::read(text) {
-                if let Some((contract, _)) = case.split_once('/') {
-                    read.push(contract.to_owned());
-                }
-            }
-        }
-        Value::Array(items) => items.iter().for_each(|item| answered_in(item, read)),
-        Value::Object(members) => members
-            .values()
-            .for_each(|member| answered_in(member, read)),
-        _ => {}
-    }
 }
 
 /// What the upstream answered each of its requests and the adapter each case, scrubbed.

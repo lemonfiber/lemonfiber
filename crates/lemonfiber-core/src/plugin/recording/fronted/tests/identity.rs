@@ -218,7 +218,11 @@ async fn a_media_server_listed_before_its_identity_source_is_asked_after_it_its_
     assert_eq!(failed_at(&read), Vec::new());
     let urls: Vec<String> = http.requests().into_iter().map(|asked| asked.url).collect();
     let first = |fragment: &str| urls.iter().position(|url| url.ends_with(fragment));
-    assert!(first("/household") < first("/signed_in"), "{urls:?}");
+    let order = (first("/household"), first("/signed_in"));
+    assert!(
+        matches!(order, (Some(read), Some(reading)) if read < reading),
+        "{urls:?}"
+    );
     for issued in ["signed_in", "mint"] {
         assert_eq!(
             json_at(
