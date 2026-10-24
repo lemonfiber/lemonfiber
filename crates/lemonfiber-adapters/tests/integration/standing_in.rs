@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use lemonfiber_adapters::Daemon;
 use lemonfiber_ports::program::Unran;
-use lemonfiber_ports::serving::{Serving as _, StandIn};
+use lemonfiber_ports::serving::{Said, Serving as _, StandIn};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::TcpStream;
 
@@ -25,8 +25,11 @@ fn a_free_port() -> u16 {
 fn stand_in(port: u16) -> StandIn {
     StandIn {
         port,
-        asked_by: "mode".to_owned(),
-        answers: vec![("version".to_owned(), VERSION.to_owned())],
+        headers: Vec::new(),
+        answers: vec![Said {
+            query: Some(("mode".to_owned(), "version".to_owned())),
+            ..Said::json("GET", "/api", VERSION.to_owned())
+        }],
     }
 }
 
@@ -89,7 +92,7 @@ async fn under_docker_desktop_it_answers_on_loopback_what_it_was_given_until_dro
     let given = asked(port, "/api?apikey=k&mode=version&output=json")
         .await
         .unwrap_or_default();
-    assert!(given.starts_with("HTTP/1.1 200 OK\r\n"), "{given}");
+    assert!(given.starts_with("HTTP/1.1 200 \r\n"), "{given}");
     assert!(
         given.contains("Content-Type: application/json\r\n"),
         "{given}"
@@ -100,7 +103,7 @@ async fn under_docker_desktop_it_answers_on_loopback_what_it_was_given_until_dro
     );
     assert!(given.ends_with(&format!("\r\n\r\n{VERSION}")), "{given}");
     let other = asked(port, "/api?mode=shutdown").await.unwrap_or_default();
-    assert!(other.starts_with("HTTP/1.1 404 Not Found\r\n"), "{other}");
+    assert!(other.starts_with("HTTP/1.1 404 \r\n"), "{other}");
     assert!(other.ends_with(r#"{"status":false,"error":"not answered here"}"#));
     assert!(!engine
         .asked_for()
@@ -108,6 +111,24 @@ async fn under_docker_desktop_it_answers_on_loopback_what_it_was_given_until_dro
         .any(|path| path.contains("/networks/bridge")));
     drop(answering);
     assert!(refused_once_dropped(port).await);
+    engine.stop().await;
+}
+
+#[tokio::test]
+async fn under_orbstack_it_answers_on_loopback_without_asking_for_the_bridge() {
+    let mut engine = fake::engine("standing-in-orbstack", vec![info("OrbStack")]);
+    let port = a_free_port();
+
+    let answering = Daemon::at(&engine.socket).stand_in(&stand_in(port)).await;
+
+    assert!(answering.is_ok(), "{:?}", answering.as_ref().err());
+    let given = asked(port, "/api?mode=version").await.unwrap_or_default();
+    assert!(given.ends_with(&format!("\r\n\r\n{VERSION}")), "{given}");
+    assert!(!engine
+        .asked_for()
+        .iter()
+        .any(|path| path.contains("/networks/bridge")));
+    drop(answering);
     engine.stop().await;
 }
 
@@ -131,11 +152,8 @@ async fn a_request_it_cannot_read_is_refused_and_one_cut_short_is_answered_as_fa
     .unwrap_or_default();
 
     assert!(answering.is_ok(), "{:?}", answering.as_ref().err());
-    assert!(
-        unreadable.starts_with("HTTP/1.1 404 Not Found\r\n"),
-        "{unreadable}"
-    );
-    assert!(cut_short.starts_with("HTTP/1.1 200 OK\r\n"), "{cut_short}");
+    assert!(unreadable.starts_with("HTTP/1.1 404 \r\n"), "{unreadable}");
+    assert!(cut_short.starts_with("HTTP/1.1 200 \r\n"), "{cut_short}");
     assert!(cut_short.ends_with(VERSION), "{cut_short}");
     drop(answering);
     engine.stop().await;
@@ -146,7 +164,7 @@ async fn elsewhere_it_answers_on_the_gateway_of_the_engine_bridge_network() {
     let mut engine = fake::engine(
         "standing-in-bridge",
         vec![
-            info("OrbStack"),
+            info("Ubuntu 24.04.1 LTS"),
             bridge(r#"[{"Subnet":"fd00::/64"},{"Subnet":"127.0.0.0/8","Gateway":"127.0.0.1"}]"#),
         ],
     );
@@ -170,7 +188,7 @@ async fn a_bridge_network_naming_no_gateway_it_can_read_is_refused() {
     let engine = fake::engine(
         "standing-in-no-gateway",
         vec![
-            info("OrbStack"),
+            info("Ubuntu 24.04.1 LTS"),
             bridge(r#"[{"Gateway":"not an address"}]"#),
         ],
     );
@@ -196,7 +214,7 @@ async fn an_engine_that_will_not_describe_itself_or_its_bridge_is_refused() {
             fake::Reply::Body(500, r#"{"message":"no info"}"#.to_owned()),
         )],
     );
-    let no_bridge = fake::engine("standing-in-no-bridge", vec![info("OrbStack")]);
+    let no_bridge = fake::engine("standing-in-no-bridge", vec![info("Ubuntu 24.04.1 LTS")]);
 
     let unsaid = Daemon::at(&silent.socket)
         .stand_in(&stand_in(a_free_port()))
@@ -254,4 +272,39 @@ async fn an_engine_that_cannot_be_reached_answers_nothing() {
         "{:?}",
         answering.as_ref().err()
     );
+}
+
+#[tokio::test]
+async fn what_one_request_says_is_answered_back_to_a_later_one() {
+    let engine = fake::engine("standing-in-heard", vec![info("Docker Desktop")]);
+    let port = a_free_port();
+    let keys = StandIn {
+        port,
+        headers: Vec::new(),
+        answers: vec![
+            Said::empty("POST", "/Auth/Keys"),
+            Said::json(
+                "GET",
+                "/Auth/Keys",
+                r#"{"Items":[{"AppName":"{query:App}"}]}"#.to_owned(),
+            ),
+        ],
+    };
+    let answering = Daemon::at(&engine.socket).stand_in(&keys).await;
+
+    let made = sent(
+        port,
+        b"POST /Auth/Keys?App=conformance HTTP/1.1\r\nHost: conformance-identity\r\n\r\n",
+    )
+    .await
+    .unwrap_or_default();
+    let listed = asked(port, "/Auth/Keys").await.unwrap_or_default();
+
+    assert!(answering.is_ok(), "{:?}", answering.as_ref().err());
+    assert_eq!(made, "HTTP/1.1 204 \r\nConnection: close\r\n\r\n");
+    assert!(
+        listed.ends_with(r#"{"Items":[{"AppName":"conformance"}]}"#),
+        "{listed}"
+    );
+    drop(answering);
 }

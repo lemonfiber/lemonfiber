@@ -16,14 +16,14 @@
     {
       "asked": {
         "source": {
-          "at": "http://conformance-identity",
+          "at": "http://conformance-identity:58096",
           "credential": {
             "user-pass": {
               "password": "{minted}",
               "username": "conformance"
             }
           },
-          "protocol": "conformance"
+          "protocol": "jellyfin"
         }
       },
       "case": "establish-answers",
@@ -47,14 +47,14 @@
     {
       "asked": {
         "source": {
-          "at": "http://conformance-identity",
+          "at": "http://conformance-identity:58096",
           "credential": {
             "user-pass": {
               "password": "{minted}",
               "username": "conformance"
             }
           },
-          "protocol": "conformance"
+          "protocol": "jellyfin"
         }
       },
       "case": "configure_identity-answers",
@@ -181,7 +181,7 @@
           "at": {
             "base": "",
             "host": "conformance-curator",
-            "port": 80
+            "port": 58989
           },
           "folder": "/data/conformance",
           "key": "{minted}",
@@ -217,13 +217,13 @@
         "at": {
           "base": "",
           "host": "conformance-curator",
-          "port": 80
+          "port": 58989
         },
         "held": {
           "at": {
             "base": "",
             "host": "conformance-curator",
-            "port": 80
+            "port": 58989
           },
           "id": "{request.intake@1/fulfilment_targets-answers#/0/id}",
           "key": "{request.intake@1/fulfilment_targets-answers#/0/key}",
@@ -244,7 +244,7 @@
         "at": {
           "base": "",
           "host": "conformance-curator",
-          "port": 80
+          "port": 58989
         },
         "key": "{minted}",
         "kind": "tv"
@@ -271,8 +271,8 @@
       "asked": {
         "at": {
           "base": "",
-          "host": "conformance-curator",
-          "port": 80
+          "host": "conformance-identity",
+          "port": 58096
         },
         "key": "{minted}"
       },

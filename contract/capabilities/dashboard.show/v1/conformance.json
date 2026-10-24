@@ -20,10 +20,10 @@
             {
               "entries": [
                 {
-                  "check": "http://conformance-curator:80",
+                  "check": "http://conformance-curator:58989",
                   "description": "conformance",
                   "icon": "conformance",
-                  "link": "http://conformance-curator:80",
+                  "link": "http://conformance-curator:58989",
                   "name": "conformance",
                   "widget": null
                 }

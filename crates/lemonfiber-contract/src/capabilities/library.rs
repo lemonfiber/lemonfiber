@@ -13,10 +13,11 @@ use lemonfiber_ports::service::{
     MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue, QueueItem, Queues,
     Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TraceEvent,
 };
+use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
 use serde_json::Value;
 
-use super::{FOLDER, NAMED};
+use super::{FOLDER, NAMED, PROFILE};
 use crate::conformance::Placeholder;
 
 /// The host the conformance cases name a download client on.
@@ -30,6 +31,12 @@ const CLIENT_VERSION: &str = "4.5.1";
 
 /// The folder the client the cases register says it finishes downloads in.
 const CLIENT_FINISHED: &str = "/downloads/complete";
+
+/// Where the client the cases register is asked.
+const CLIENT_API: &str = "/api";
+
+/// The query parameter that names what the client the cases register is asked.
+const ASKED_BY: &str = "mode";
 
 /// The protocol the conformance cases register their download client in: the native API
 /// of the download filler the bundle ships, as the core names the clients it registers.
@@ -58,9 +65,6 @@ const BY_FOLDER: &str = "register_root_folder";
 
 /// The field the conformance cases set on a download client.
 const FIELD: &str = "category";
-
-/// The quality profile the conformance cases add under.
-const PROFILE: i64 = 1;
 
 /// An item no curator holds.
 const NO_ITEM: i64 = 0;
@@ -100,10 +104,13 @@ pub fn client_answering(media_types: &[String]) -> lemonfiber_ports::serving::St
     ];
     lemonfiber_ports::serving::StandIn {
         port: CLIENT_PORT,
-        asked_by: "mode".to_owned(),
+        headers: Vec::new(),
         answers: answers
             .into_iter()
-            .map(|(mode, said)| (mode.to_owned(), said.to_string()))
+            .map(|(mode, said)| Said {
+                query: Some((ASKED_BY.to_owned(), mode.to_owned())),
+                ..Said::json("GET", CLIENT_API, said.to_string())
+            })
             .collect(),
     }
 }
@@ -209,7 +216,7 @@ crate::contract! {
                 },
                 plan: AddPlan {
                     root_folder: FOLDER.to_owned(),
-                    quality_profile: PROFILE,
+                    quality_profile: i64::from(PROFILE),
                 },
             };
             /// How many indexers it searches.

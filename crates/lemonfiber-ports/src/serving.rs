@@ -51,10 +51,54 @@ pub struct Serve {
 pub struct StandIn {
     /// The port it answers on.
     pub port: u16,
-    /// The query parameter whose value names what is asked.
-    pub asked_by: String,
-    /// Each answer, as JSON text, by the value of that parameter; any other is refused.
-    pub answers: Vec<(String, String)>,
+    /// Each header every answer carries, as a name and its value.
+    pub headers: Vec<(String, String)>,
+    /// Each question it answers; any other is refused.
+    pub answers: Vec<Said>,
+}
+
+/// One question a stand-in answers, and what it answers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Said {
+    /// The method it is asked with.
+    pub method: String,
+    /// The path it is asked at, matched without regard to case.
+    pub path: String,
+    /// A query parameter it is asked with and the value it holds, where one names what is
+    /// asked at that path.
+    pub query: Option<(String, String)>,
+    /// The status it answers with.
+    pub status: u16,
+    /// What it answers, as JSON text, where the answer has a body; each `{query:<name>}` in
+    /// it is the value the query parameter `<name>` held the last time a request to the
+    /// stand-in carried it, and empty where none has.
+    pub body: Option<String>,
+}
+
+impl Said {
+    /// `body`, JSON text, answered with `200` to `method` at `path`.
+    #[must_use]
+    pub fn json(method: &str, path: &str, body: String) -> Self {
+        Self {
+            method: method.to_owned(),
+            path: path.to_owned(),
+            query: None,
+            status: 200,
+            body: Some(body),
+        }
+    }
+
+    /// `204` and no body, answered to `method` at `path`.
+    #[must_use]
+    pub fn empty(method: &str, path: &str) -> Self {
+        Self {
+            method: method.to_owned(),
+            path: path.to_owned(),
+            query: None,
+            status: 204,
+            body: None,
+        }
+    }
 }
 
 /// A stand-in answering, which stops answering when it is dropped.

@@ -17,7 +17,7 @@
       "asked": {
         "curators": [
           {
-            "address": "http://conformance-curator:80",
+            "address": "http://conformance-curator:58989",
             "folder": "/data/conformance",
             "key": "{minted}",
             "media_type": "tv"
