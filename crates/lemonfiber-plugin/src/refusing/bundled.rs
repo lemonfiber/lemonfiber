@@ -26,7 +26,8 @@ const STACK: &str = lemonfiber_bundled::STACK;
 /// The hostnames are here and not in the stack description because they are the
 /// proxy's own vocabulary — a label in front of the operator's domain rather than a
 /// property of a service — and the shipped file is where they are written.
-const PROXY: &str = include_str!("../../../../assets/media-stack/config/caddy/Caddyfile");
+const PROXY: &str =
+    include_str!("../../../../assets/plugins/bundle/plugins/caddy/config/caddy/Caddyfile");
 
 /// What a proxied name is written in front of, in the shipped configuration.
 const DOMAIN: &str = ".{$DOMAIN";

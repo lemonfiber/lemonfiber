@@ -1,16 +1,21 @@
 use super::{is_one_line, EnvFile};
 
 /// The file this stack ships as its documented starting point.
-const EXAMPLE: &str = include_str!("../../../../../assets/media-stack/.env.example");
+fn example() -> &'static str {
+    lemonfiber_bundled::CARRIED
+        .get_file(".env.example")
+        .and_then(include_dir::File::contents_utf8)
+        .unwrap_or_default()
+}
 
 #[test]
 fn the_stack_s_own_example_round_trips_byte_for_byte() {
-    assert_eq!(EnvFile::parse(EXAMPLE).render(), EXAMPLE);
+    assert_eq!(EnvFile::parse(example()).render(), example());
 }
 
 #[test]
 fn reads_every_setting_the_example_declares() {
-    let file = EnvFile::parse(EXAMPLE);
+    let file = EnvFile::parse(example());
     assert_eq!(file.keys().len(), 22);
     assert_eq!(file.get("DATA_ROOT"), Some("./data"));
     assert_eq!(file.get("TZ"), Some("Europe/Amsterdam"));
@@ -26,7 +31,7 @@ fn a_key_carrying_a_digit_is_read_as_a_key() {
 
 #[test]
 fn an_empty_value_is_a_value_rather_than_an_absence() {
-    let file = EnvFile::parse(EXAMPLE);
+    let file = EnvFile::parse(example());
     assert_eq!(
         file.get("WIREGUARD_PRIVATE_KEY"),
         Some(""),
@@ -80,7 +85,7 @@ fn removing_a_duplicated_key_drops_the_one_that_takes_effect() {
 
 #[test]
 fn changing_a_value_leaves_everything_around_it_alone() {
-    let mut file = EnvFile::parse(EXAMPLE);
+    let mut file = EnvFile::parse(example());
     file.set("TZ", "Pacific/Auckland");
 
     let rendered = file.render();
@@ -90,7 +95,7 @@ fn changing_a_value_leaves_everything_around_it_alone() {
     );
     assert_eq!(
         rendered.lines().count(),
-        EXAMPLE.lines().count(),
+        example().lines().count(),
         "no line was added or removed"
     );
     assert!(

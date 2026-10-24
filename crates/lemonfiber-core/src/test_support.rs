@@ -538,10 +538,10 @@ pub(crate) fn carried_stack() -> crate::stack::Source {
     ))))
 }
 
-/// The repository's media stack carried inside the build, as a machine that has chosen
-/// no stack directory yet holds it.
+/// The stack the tests are written against carried inside the build, as a machine that
+/// has chosen no stack directory yet holds it.
 pub(crate) fn embedded() -> crate::stack::Source {
     static STACK: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     crate::stack::Source::Embedded(&STACK)
 }

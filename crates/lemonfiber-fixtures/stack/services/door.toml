@@ -1,0 +1,30 @@
+# Caddy, the same pinned image as the proxy's, standing in front of Jellyfin in
+# every form that runs it. It publishes the household's two Jellyfin ports and
+# asks Jellyfin, before any item's bytes leave, whether the session presented
+# may see that item. Its configuration is config/door/Caddyfile.
+[[service]]
+id = "door"
+name = "Door"
+profile = "media"
+image = "caddy"
+tag = "2.11.6"
+digest = "sha256:3422ce6de165df66534f9b9ba50efaf457114ec961763cc52f5dbdaac2972d73"
+port = 8096
+bind = "lan"
+criticality = "important"
+memory_mib = 50
+license = "Apache-2.0"
+upstream = "https://github.com/caddyserver/caddy"
+last_release = "2026-10-03"
+describes = "Lets the household reach Jellyfin, and lets an item's stream or picture out only to someone allowed to see it"
+without_it = "Jellyfin answers on this machine only, and nothing else in the house can play from it"
+reaches = ""
+asks_for = "Nothing beyond this machine. It asks Jellyfin, beside it, whether the session a request presents may see the item it asks for, and fetches no certificate: it serves the one lemonfiber writes beside its configuration."
+health = { kind = "tcp", timeout_s = 30 }
+config_path = "/etc/caddy"
+config_ro = true
+tmpfs = ["/data", "/config"]
+user_mode = "uid"
+
+[[service.publish]]
+port = 8920

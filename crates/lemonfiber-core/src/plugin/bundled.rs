@@ -13,7 +13,7 @@
 //! probe with no readable recording of its request establishes nothing either way: it
 //! is reported as unproven, never counted as shown, and refuses nothing.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
@@ -79,32 +79,10 @@ impl Bundled {
     }
 }
 
-/// Where the embedded stack's recordings are kept: an assembled part's in the bundle's
-/// copy of it, and every other service's in the media stack.
-#[derive(Debug, Clone, Copy)]
-pub struct Kept<'a> {
-    /// The media stack's directory.
-    pub media: &'a Path,
-    /// The directory holding the bundle's copy of each part, under its id.
-    pub copies: &'a Path,
-}
-
-impl Kept<'_> {
-    /// The directory `fixture`, a recording of `service`, is read beneath: the part's
-    /// copy where the copy holds it, and the media stack otherwise.
-    fn root(&self, service: &str, fixture: &str) -> PathBuf {
-        let copy = self.copies.join(service);
-        if copy.join(fixture).is_file() {
-            copy
-        } else {
-            self.media.to_path_buf()
-        }
-    }
-}
-
-/// Judge every bundled claim in `manifest` against the recordings `kept` holds.
+/// Judge every bundled claim in `manifest` against the recordings the stack carried at
+/// `carried` holds, each at the path its claim names.
 #[must_use]
-pub fn judged(manifest: &Manifest, kept: Kept<'_>) -> Bundled {
+pub fn judged(manifest: &Manifest, carried: &Path) -> Bundled {
     let mut report = Bundled::default();
     for service in &manifest.services {
         let read = lemonfiber_plugin::claiming::bundled(service);
@@ -126,7 +104,7 @@ pub fn judged(manifest: &Manifest, kept: Kept<'_>) -> Bundled {
                             asks,
                             &probe.expect,
                             &pinned,
-                            &kept.root(&service.id, &probe.fixture),
+                            carried,
                             &mut report.refused,
                         )
                     });

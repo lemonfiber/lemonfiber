@@ -1,0 +1,107 @@
+# Homepage services.
+#
+# Up to two URLs per entry, and the difference matters:
+#
+#   href    where your browser goes. Admin services are bound to loopback, so
+#           their links only resolve on the machine running the stack.
+#           Household services use ${HOMEPAGE_VAR_LAN_HOST} so a phone on the
+#           sofa reaches them too.
+#   siteMonitor
+#           a reachability check Homepage makes over the Compose network, on an
+#           endpoint each service answers without a key.
+#
+# No panel holds a credential. This page is published to the LAN, and every key
+# a widget would read figures with administers the service it belongs to
+# (C6-R20). Never paste a key into this file — it is committed.
+#
+# A group whose services aren't in the running form just shows them as down.
+# That is correct: the form is the statement of what should be running.
+
+- Watch:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: http://{{HOMEPAGE_VAR_LAN_HOST}}:8096
+        description: Films and television
+        siteMonitor: http://jellyfin:8096/health
+
+    - Seerr:
+        icon: overseerr.png
+        href: http://{{HOMEPAGE_VAR_LAN_HOST}}:5055
+        description: Ask for something
+        siteMonitor: http://seerr:5055/api/v1/status
+
+- Library:
+    - Calibre-Web:
+        icon: calibre-web.png
+        href: http://{{HOMEPAGE_VAR_LAN_HOST}}:8083
+        description: Ebooks
+
+    - Audiobookshelf:
+        icon: audiobookshelf.png
+        href: http://{{HOMEPAGE_VAR_LAN_HOST}}:13378
+        description: Audiobooks
+        siteMonitor: http://audiobookshelf:80/healthcheck
+
+    - Navidrome:
+        icon: navidrome.png
+        href: http://{{HOMEPAGE_VAR_LAN_HOST}}:4533
+        description: Music
+        siteMonitor: http://navidrome:4533/ping
+
+- Automation:
+    - Sonarr:
+        icon: sonarr.png
+        href: http://localhost:8989
+        description: Television
+        siteMonitor: http://sonarr:8989/ping
+
+    - Radarr:
+        icon: radarr.png
+        href: http://localhost:7878
+        description: Film
+        siteMonitor: http://radarr:7878/ping
+
+    - Lidarr:
+        icon: lidarr.png
+        href: http://localhost:8686
+        description: Music
+        siteMonitor: http://lidarr:8686/ping
+
+    - Bazarr:
+        icon: bazarr.png
+        href: http://localhost:6767
+        description: Subtitles
+        siteMonitor: http://bazarr:6767/api/system/ping
+
+    - Bindery:
+        icon: mdi-book-open-variant
+        href: http://localhost:8787
+        description: Books and audiobooks
+
+- Acquisition:
+    - Prowlarr:
+        icon: prowlarr.png
+        href: http://localhost:9696
+        description: Indexers
+        siteMonitor: http://prowlarr:9696/ping
+
+    - NZBHydra2:
+        icon: nzbhydra2.png
+        href: http://localhost:5076
+        description: Usenet search
+
+    - SABnzbd:
+        icon: sabnzbd.png
+        href: http://localhost:8085
+        description: Usenet downloads
+        siteMonitor: http://sabnzbd:8080/api?mode=version
+
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: http://localhost:8081
+        # Reached through Gluetun: qBittorrent has no network namespace of its
+        # own, so on the Compose network it answers on the tunnel's name. Every
+        # path it serves asks for a sign-in and answers 401 without one, which
+        # Homepage counts as up: the server answered.
+        description: Torrents, via the VPN
+        siteMonitor: http://gluetun:8081/

@@ -7,17 +7,6 @@
 
 use std::path::Path;
 
-use lemonfiber_core::plugin::bundled::Kept;
-
-/// The media stack the bundle keeps its installed parts from, beside the crates.
-const MEDIA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
-
-/// The bundle's copy of each part, beside the crates.
-const COPIES: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../assets/plugins/bundle/plugins"
-);
-
 fn main() {
     let manifest = match lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK) {
         Ok(manifest) => manifest,
@@ -26,11 +15,10 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let kept = Kept {
-        media: Path::new(MEDIA),
-        copies: Path::new(COPIES),
-    };
-    let report = lemonfiber_core::plugin::bundled::judged(&manifest, kept);
+    let report = lemonfiber_core::plugin::bundled::judged(
+        &manifest,
+        Path::new(lemonfiber_bundled::CARRIED_AT),
+    );
     for said in lemonfiber_core::plugin::bundled::said(&report) {
         println!("{said}");
     }

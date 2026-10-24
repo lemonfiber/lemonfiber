@@ -11,6 +11,10 @@ license-file = "../../LICENSE"
 publish = false
 build = "build.rs"
 
+[dependencies]
+# What runs of the stack, embedded whole as the build wrote it.
+include_dir = { workspace = true }
+
 [build-dependencies]
 # The same assembly every other reader uses, so the text compiled in here is the
 # manifest lemonfiber reads at run time and not a second idea of it.
@@ -18,6 +22,8 @@ lemonfiber-manifest = { workspace = true }
 # The default bundle's reader, which holds every copy to its pin before the pins are
 # compiled in.
 lemonfiber-bundle = { workspace = true }
+# Reading which recordings the stack's claims name, to carry what runs and nothing else.
+toml = { workspace = true }
 
 [lints]
 workspace = true

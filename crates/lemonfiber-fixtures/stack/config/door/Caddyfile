@@ -1,0 +1,286 @@
+# The door: Jellyfin's household ports, and the guard on every byte it serves.
+#
+# Jellyfin answers its byte endpoints (a stream, a segment, a subtitle, an
+# attachment, an item's image) without asking who is there; its own policy holds
+# only for discovery. So the household reaches Jellyfin only through here.
+# Jellyfin publishes on loopback alone, and this publishes:
+#
+#   8096  plain HTTP, the address TVs and players already use for Jellyfin
+#   8920  TLS, with the certificate lemonfiber writes beside this file
+#
+# Before a request for an item's bytes goes on, the door asks Jellyfin for that
+# item, `GET /Items/{id}`, with the token the request presented (a member's
+# bearer grant put in Jellyfin's own form first, below), and Jellyfin
+# answers it as that token's own user sees it. A 2xx passes the request on.
+# Anything else is handed back as the refusal: 404 for an item the session may
+# not see, 401 for a token that is absent, ended or wrong, 403 for a member
+# Jellyfin will not serve from where the request came from, and 502 or 504
+# where Jellyfin does not answer. A picture Jellyfin finds by a name rather than
+# an id, and its splash screen, are refused, since no question about an item
+# covers them. Every other path goes to Jellyfin unchanged, and Jellyfin holds
+# the member to their policy there itself.
+#
+# The paths below are Jellyfin's routes at its root, and under /emby and
+# /mediabrowser, which Jellyfin strips and serves the same. Jellyfin here carries
+# no base URL: with one, its routes move out from under these matchers.
+{
+	# Nothing is configured at run time and no certificate is fetched.
+	admin off
+	persist_config off
+	auto_https off
+	servers {
+		# Only TCP is published, so there is no HTTP/3 listener to offer.
+		protocols h1 h2
+		# The proxy's fixed address on the network of the door's ask of the
+		# proxy, and no other, may say which client a request came from.
+		# Anybody else's X-Forwarded-For is ignored, and the client is who
+		# connected.
+		trusted_proxies static 10.80.96.3
+		trusted_proxies_strict
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+# What Jellyfin is told about the client. The door reaches it from its fixed
+# address on `door-upstream`, which Jellyfin trusts as its one proxy, and names
+# the client it resolved above as the whole of X-Forwarded-For. Jellyfin's
+# local-network rules, a member's remote access among them, then judge the
+# household device rather than the door.
+(client) {
+	header_up X-Forwarded-For {client_ip}
+}
+
+(guard) {
+	# A member's player presents its grant as `Authorization: Bearer <token>`,
+	# which names no media server; Jellyfin reads a token only in its own
+	# `MediaBrowser Token="…"` form. A bearer value of exactly the shape
+	# Jellyfin issues, 32 lower-case hexadecimal digits, is put in that form
+	# before anything else reads the request. Any other bearer value is left as
+	# it came, which Jellyfin does not read as a token, so nothing written after
+	# `Bearer` can reach the header's other fields.
+	request_header Authorization "^(?i:bearer) ([0-9a-f]{32})$" "MediaBrowser Token=\"${1}\""
+
+	# An item id is 32 hexadecimal digits, with or without the dashes Jellyfin
+	# also accepts, and only those digits reach the question's path.
+	#
+	# Everything Jellyfin serves under /Videos/{id}/ and /Audio/{id}/ (streams,
+	# HLS playlists and segments, subtitles, attachments, trickplay, lyrics) and
+	# the two live-TV file routes.
+	# The guard decides on the path Caddy has cleaned and decoded, but reverse_proxy
+	# forwards the request's own bytes, and Jellyfin decodes, folds case and collapses
+	# them again its own way. A path that normalises to one route here and another
+	# there would be asked about under the wrong name, so a request is refused before
+	# any route reads it unless its forwarded path is already in the one normal form
+	# every one of them agrees on. The route matchers below all carry `(?i)`, so case
+	# is that form's; the refusals below take everything else that is not already it.
+	#
+	# Everywhere: a `.` or `..` segment, a doubled slash, a `;` parameter, or a
+	# percent-encoded backslash. Jellyfin's own routes carry none, Caddy would collapse
+	# the first two out of the path it matches on while forwarding them as they came,
+	# and some servers read a backslash as a separator; a raw one is not a path
+	# character, and the rule below refuses it.
+	@abnormal expression `{http.request.orig_uri}.matches("(?i)^[^?]*(/[.][.]?(/|$|[?])|//|;|%5c)")`
+
+	# Everywhere: a token in the query that is not exactly one `ApiKey` or `api_key`
+	# of 32 lower-case hexadecimal digits, the shape Jellyfin issues, or a query
+	# parameter whose name holds a percent-encoding. Jellyfin reads the token's name in
+	# any case and from an encoded name, while the question below carries only those
+	# two names as written, so any other spelling would ask Jellyfin about one session
+	# and hand it another.
+	@token_query expression `{http.request.uri.query}.matches("(^|&)[^=&]*%") || ({http.request.uri.query}.matches("(?i)(^|&)api_?key(=|&|$)") && !({http.request.uri.query}.matches("^(.*&)?(ApiKey|api_key)=[0-9a-f]{32}(&.*)?$") && !{http.request.uri.query}.matches("(?i)(^|&)api_?key(=|&|$).*&api_?key(=|&|$)")))`
+
+	# Everywhere: any percent-encoding of an unreserved character (a letter, a digit,
+	# `-`, `.`, `_` or `~`) or of `%` itself. None needs encoding, so an encoded one is
+	# there only to hide a route letter (`/%56ideos`), a dot segment (`%2e%2e`) or a
+	# second layer of encoding (`%252f`) that this guard would read as text and
+	# Jellyfin would decode. Reserved delimiters stay legal off the byte routes, so a
+	# name holding a `/` (an artist, `AC%2FDC`) still reaches Jellyfin.
+	@encoded_unreserved expression `{http.request.orig_uri}.matches("(?i)^[^?]*%(2[5de]|3[0-9]|4[1-9a-f]|5[0-9af]|6[1-9a-f]|7[0-9ae])")`
+
+	# On the guarded byte routes, any percent-encoding at all. A stream, segment,
+	# subtitle, attachment or image path is letters, a hexadecimal id and `/`, so a
+	# `%` on one is only ever a delimiter or a character dressed up to read as one
+	# route here and another at Jellyfin. The route is recognised on the raw path,
+	# tolerating an encoded first separator, so `/Videos%2F…` is still seen as one.
+	@encoded_on_bytes expression `{http.request.orig_uri}.matches("(?i)^[^?]*/(?:emby/|mediabrowser/)?(?:Videos|Audio|LiveTv/LiveStreamFiles|LiveTv/LiveRecordings|Items/[^/?]+/(?:Images|Download|File))(?:/|%|[?]|$)") && {http.request.orig_uri}.matches("^[^?]*%")`
+
+	# Everywhere: a path byte Caddy re-escapes before forwarding, so the bytes Jellyfin
+	# receives are the bytes these refusals read. A path carries only the characters a
+	# URL path is made of (RFC 3986 pchar, `/` and `%`); anything else above ASCII or a
+	# `` ` ``, `<`, `"` or `^` Go rewrites as it forwards (an `ö` becomes `%C3%B6`), so
+	# the request is refused rather than read one way and sent another. A raw control
+	# byte or space never reaches here: Caddy answers the request line itself.
+	@nonpchar_path expression `{http.request.orig_uri}.matches("^[A-Za-z0-9._~:@!$&'()*+,;=%/-]*[^A-Za-z0-9._~:@!$&'()*+,;=%/?-]")`
+
+	# On the guarded byte routes, a `LiveStreamId`. Jellyfin serves the bytes of the
+	# live stream that id names, not of the item in the path the question asks about,
+	# so an id for a stream opened on another item would hand its bytes out under this
+	# one. Live TV through the door is a feature of its own, not these file routes.
+	@live_stream_on_bytes expression `{http.request.orig_uri}.matches("(?i)^[^?]*/(?:emby/|mediabrowser/)?(?:Videos|Audio|LiveTv/LiveStreamFiles|LiveTv/LiveRecordings|Items/[^/?]+/(?:Images|Download|File))(?:/|%|[?]|$)") && {http.request.uri.query}.matches("(?i)(^|&)livestreamid=")`
+
+	# On the guarded byte routes, an `itemId` in the query, in any case. Jellyfin's
+	# subtitle routes take the item from it in place of the one in the path, and serve
+	# that item without asking who is there, so a subtitle of an item the session may
+	# not see would be handed out under the name of one it may. A parameter name
+	# holding anything but ASCII letters, digits, `_`, `-` and `.` is refused here too,
+	# so no encoding, `+` or bracket spells `itemId` past this match on its own.
+	@item_in_query expression `{http.request.orig_uri}.matches("(?i)^[^?]*/(?:emby/|mediabrowser/)?(?:Videos|Audio|LiveTv/LiveStreamFiles|LiveTv/LiveRecordings|Items/[^/?]+/(?:Images|Download|File))(?:/|%|[?]|$)") && ({http.request.uri.query}.matches("(?i)(^|&)itemid(=|&|$)") || {http.request.uri.query}.matches("(^|&)[A-Za-z0-9_.-]*[^A-Za-z0-9_.=&-]"))`
+
+	# Everywhere: a picture Jellyfin finds by a name rather than an id, an artist's, a
+	# genre's, a music genre's, a person's or a studio's. The door cannot ask Jellyfin
+	# about a name, and Jellyfin answers these without asking who is there: an artist's
+	# from the artist's own folder in a library, whatever the session may see, and a
+	# name it does not hold it first writes into its library. The same pictures are
+	# served by the item's id under /Items/{id}/Images, which the door asks about. The
+	# route is read on the raw path, so a name holding an encoded `/` is still seen,
+	# and wherever it ends the path, so a request naming its host first is too.
+	@by_name_image expression `{http.request.orig_uri}.matches("(?i)^[^?]*/(?:emby/|mediabrowser/)?(?:Artists|Genres|MusicGenres|Persons|Studios)/[^/?]+/Images(?:/|[?]|$)")`
+
+	# Everywhere: Jellyfin's splash screen, which it composes from the posters of films
+	# and series in every library, unrated ones among them, and serves without asking
+	# who is there once its own setting turns it on.
+	@splashscreen expression `{http.request.orig_uri}.matches("(?i)^[^?]*/(?:emby/|mediabrowser/)?Branding/Splashscreen/?(?:[?]|$)")`
+
+	# On a video's trickplay playlist and its tiles, a `MediaSourceId`, which Jellyfin
+	# writes into the playlists and tile addresses it hands out itself. Jellyfin serves
+	# the playlist or tile of whichever item that names, so the door asks about it as
+	# well as about the item in the path, below. One it cannot ask about, under another
+	# spelling, in another shape than the 32 lower-case hexadecimal digits Jellyfin
+	# writes, or given twice, is refused, as is any parameter name holding anything but
+	# ASCII letters, digits, `_`, `-` and `.`, which could spell it past these matches.
+	@trickplay_source_unaskable {
+		path_regexp (?i)^(?:/emby|/mediabrowser)?/Videos/[^/]+/Trickplay(?:/|$)
+		expression `{http.request.uri.query}.matches("(^|&)[A-Za-z0-9_.-]*[^A-Za-z0-9_.=&-]") || {http.request.uri.query}.matches("(?i)(^|&)mediasourceid(=|&|$)") && !({http.request.uri.query}.matches("^(.*&)?MediaSourceId=[0-9a-f]{32}(&.*)?$") && !{http.request.uri.query}.matches("(?i)(^|&)mediasourceid(=|&|$).*&mediasourceid(=|&|$)"))`
+	}
+
+	@trickplay_source {
+		path_regexp trickplay (?i)^(?:/emby|/mediabrowser)?/Videos/([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})/Trickplay(?:/|$)
+		expression `{http.request.uri.query}.matches("(?i)(^|&)mediasourceid(=|&|$)")`
+	}
+
+	@keyed path_regexp keyed (?i)^(?:/emby|/mediabrowser)?/(?:Videos|Audio|LiveTv/LiveStreamFiles|LiveTv/LiveRecordings)/([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:/|$)
+
+	# An item's images, and the item's file itself.
+	@owned path_regexp owned (?i)^(?:/emby|/mediabrowser)?/Items/([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})/(?:Images|Download|File)(?:/|$)
+
+	# The same routes naming anything else. Jellyfin also reads an id in braces,
+	# in parentheses or padded with spaces, so a shape the door cannot ask about
+	# is refused rather than passed. Two routes under /Videos name no item and
+	# stay open; Jellyfin requires a session for both.
+	@unkeyed {
+		path_regexp (?i)^(?:/emby|/mediabrowser)?/(?:(?:Videos|Audio|LiveTv/LiveStreamFiles|LiveTv/LiveRecordings)/[^/]|Items/[^/]+/(?:Images|Download|File)(?:/|$))
+		not path_regexp (?i)^(?:/emby|/mediabrowser)?/Videos/(?:ActiveEncodings|MergeVersions)$
+	}
+
+	handle @abnormal {
+		respond 403
+	}
+
+	handle @encoded_unreserved {
+		respond 403
+	}
+
+	handle @token_query {
+		respond 403
+	}
+
+	handle @encoded_on_bytes {
+		respond 403
+	}
+
+	handle @nonpchar_path {
+		respond 403
+	}
+
+	handle @live_stream_on_bytes {
+		respond 403
+	}
+
+	handle @item_in_query {
+		respond 403
+	}
+
+	handle @by_name_image {
+		respond 403
+	}
+
+	handle @splashscreen {
+		respond 403
+	}
+
+	handle @trickplay_source_unaskable {
+		respond 403
+	}
+
+	handle @trickplay_source {
+		forward_auth jellyfin:8096 {
+			uri /Items/{re.trickplay.1}?ApiKey={query.ApiKey}&api_key={query.api_key}
+			import question
+		}
+		forward_auth jellyfin:8096 {
+			uri /Items/{query.MediaSourceId}?ApiKey={query.ApiKey}&api_key={query.api_key}
+			import question
+		}
+		reverse_proxy jellyfin:8096 {
+			import client
+		}
+	}
+
+	handle @keyed {
+		forward_auth jellyfin:8096 {
+			uri /Items/{re.keyed.1}?ApiKey={query.ApiKey}&api_key={query.api_key}
+			import question
+		}
+		reverse_proxy jellyfin:8096 {
+			import client
+		}
+	}
+
+	handle @owned {
+		forward_auth jellyfin:8096 {
+			uri /Items/{re.owned.1}?ApiKey={query.ApiKey}&api_key={query.api_key}
+			import question
+		}
+		reverse_proxy jellyfin:8096 {
+			import client
+		}
+	}
+
+	handle @unkeyed {
+		respond 403
+	}
+
+	handle {
+		reverse_proxy jellyfin:8096 {
+			import client
+		}
+	}
+}
+
+# How the question is put. The request's headers carry over, a token among them;
+# a token in the query is placed in the question's own query above, which Caddy
+# escapes. What would make the answer anything but a yes or a no about the item
+# is taken off, since a range or a condition turns a yes into a 206 or a 304.
+(question) {
+	import client
+	header_up Accept application/json
+	header_up -Range
+	header_up -If-Range
+	header_up -If-Match
+	header_up -If-None-Match
+	header_up -If-Modified-Since
+	header_up -If-Unmodified-Since
+	transport http {
+		dial_timeout 5s
+		response_header_timeout 15s
+	}
+}
+
+http://:8096 {
+	import guard
+}
+
+https://:8920 {
+	tls /etc/caddy/certificate.pem /etc/caddy/key.pem
+	import guard
+}

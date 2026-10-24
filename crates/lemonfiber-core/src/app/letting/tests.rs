@@ -232,7 +232,7 @@ async fn a_client_that_will_not_let_it_go_is_reported_rather_than_called_done() 
 #[tokio::test]
 async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
     static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     let project = Scratch::new("letting-contracted");
     let mut register = crate::plugin::Register::empty();
     assert!(register

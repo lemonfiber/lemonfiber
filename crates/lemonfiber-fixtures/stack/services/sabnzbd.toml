@@ -1,0 +1,39 @@
+[[service]]
+id = "sabnzbd"
+name = "SABnzbd"
+profile = "usenet"
+image = "lscr.io/linuxserver/sabnzbd"
+tag = "4.5.5-ls250"
+digest = "sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04"
+port = 8085
+bind = "loopback"
+criticality = "core"
+memory_mib = 150
+license = "GPL-2.0-only"
+upstream = "https://github.com/sabnzbd/sabnzbd"
+last_release = "2026-09-08"
+describes = "Downloads from Usenet"
+without_it = "No Usenet downloads"
+reaches = "your Usenet provider"
+asks_for = "Signs in with your account and fetches the articles a download is made of."
+provides = ["download.usenet"]
+health = { kind = "http", path = "/api?mode=version", timeout_s = 60 }
+api = { kind = "sabnzbd", key_source = "config-ini", path = "/config/sabnzbd.ini" }
+listens = 8080
+takes_data = true
+user_mode = "puid-env"
+
+[[service.claim]]
+capability = "download.usenet"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/api?mode=queue&output=json" }
+expect = { status = 403 }
+fixture = "recordings/sabnzbd/download-usenet-guarded.json"
+
+[[service.claim.probe]]
+id = "queue"
+request = { method = "GET", path = "/api?mode=queue&output=json" }
+expect = { status = 200, json_types = { "/queue/slots" = "list" } }
+fixture = "recordings/sabnzbd/download-usenet-queue.json"

@@ -1,0 +1,39 @@
+[[service]]
+id = "nzbhydra2"
+name = "NZBHydra2"
+profile = "search"
+image = "lscr.io/linuxserver/nzbhydra2"
+tag = "v8.9.0-ls104"
+digest = "sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516"
+port = 5076
+bind = "loopback"
+criticality = "enhancing"
+memory_mib = 400
+license = "Apache-2.0"
+upstream = "https://github.com/theotherp/nzbhydra2"
+last_release = "2026-09-24"
+describes = "A search box across all your Usenet indexers at once"
+without_it = "Search one indexer at a time"
+reaches = "the Usenet indexers you configured"
+asks_for = "Searches several indexers at once and merges what they answer, with the keys you gave it."
+provides = ["indexer.search"]
+health = { kind = "http", path = "/internalapi/userinfos", timeout_s = 60 }
+api = { kind = "nzbhydra2", key_source = "config-yaml", path = "/config/nzbhydra.yml" }
+listens = 5076
+takes_data = true
+user_mode = "puid-env"
+
+[[service.claim]]
+capability = "indexer.search"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/internalapi/config" }
+expect = { status = 401 }
+fixture = "recordings/nzbhydra2/indexer-search-guarded.json"
+
+[[service.claim.probe]]
+id = "indexers"
+request = { method = "GET", path = "/internalapi/config" }
+expect = { status = 200, json_types = { indexers = "list" } }
+fixture = "recordings/nzbhydra2/indexer-search-indexers.json"

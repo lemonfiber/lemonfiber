@@ -5,21 +5,12 @@
 //! tool, the stack and the app in separate repositories. An incompatible pairing
 //! cannot ship, because it cannot compile.
 //!
-//! The stack's manifest is the one `lemonfiber-bundled` assembles from the bundle,
-//! whose build refuses one the runtime's own parser does not read; this build carries
-//! it with what runs beside it (`build/carried.rs`).
+//! The stack is the one `lemonfiber-bundled` assembles and carries from the bundle,
+//! whose build refuses one the runtime's own parser does not read; this build holds
+//! the app to the wire version this binary serves.
 
 use std::path::{Path, PathBuf};
 use std::process::exit;
-
-#[path = "build/carried.rs"]
-mod carried;
-
-/// Where the media stack the bundle replaces lives, from the workspace root.
-const STACK: &str = "assets/media-stack";
-
-/// Where the catalogue holding the default bundle lives, from the workspace root.
-const CATALOGUE: &str = "assets/plugins";
 
 /// Where the embedded app lives, from the workspace root.
 const APP: &str = "assets/web";
@@ -32,34 +23,7 @@ const DECLARED: &str = "app.json";
 include!("../lemonfiber-api/src/contract/path.rs");
 
 fn main() {
-    let root = workspace_root();
-    let media = root.join(STACK);
-    let copies = root.join(CATALOGUE).join(lemonfiber_bundle::COPIES);
-
-    for (submodule, held) in [
-        (&media, media.join(carried::LICENCE)),
-        (&copies, copies.clone()),
-    ] {
-        if !held.exists() {
-            refuse(&[
-                &format!(
-                    "the stack this build carries is missing at {}",
-                    submodule.display()
-                ),
-                "",
-                "It is a git submodule, and a fresh clone does not populate it.",
-                "",
-                "  git submodule update --init --recursive",
-            ]);
-        }
-    }
-
     app_speaks_this_version();
-    carried::stack(
-        &media,
-        &copies,
-        &PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()),
-    );
 }
 
 /// Refuse to build against an app speaking a wire version this binary does not.

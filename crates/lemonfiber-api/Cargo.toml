@@ -33,6 +33,8 @@ tokio = { workspace = true, features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
 lemonfiber-error = { workspace = true, features = ["testing"] }
+# The stack this build ships, as a directory the reads are driven against.
+lemonfiber-bundled = { workspace = true }
 # The real seams, for the tests that drive a context against this machine.
 lemonfiber-adapters = { workspace = true }
 # The fakes a command is driven through, so an endpoint is exercised against the

@@ -4,12 +4,12 @@ use crate::{validate, Manifest};
 /// The stack this build ships.
 const SHIPPED: &str = lemonfiber_bundled::STACK;
 
-/// The manifest of the media stack the bundle replaces, which the rules are exercised
-/// on by editing it, so a change to the shipped stack moves no test written against it.
+/// A stack kept beside these tests, which the rules are exercised on by editing it, so
+/// a change to the shipped stack moves no test written against it.
 static FIXTURE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     crate::read(std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
+        "/../lemonfiber-fixtures/stack"
     )))
     .unwrap_or_default()
 });

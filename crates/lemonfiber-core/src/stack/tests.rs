@@ -9,7 +9,7 @@ use crate::test_support::frozen_day as today;
 
 /// The same stack the binary embeds, so both variants are exercised against
 /// the real thing rather than against a fixture that could drift from it.
-static EMBEDDED: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+use lemonfiber_bundled::CARRIED as EMBEDDED;
 
 /// A directory that is certainly not a stack.
 ///
@@ -21,12 +21,9 @@ static NOT_A_STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/config");
 /// A stack naming a lemonfiber far newer than any this build could be.
 static NEEDS_NEWER: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stack-needs-newer");
 
-/// The stack this repository carries as a submodule, read from disk.
+/// The stack this build carries, written as a stack directory holds it.
 fn checked_out() -> Source {
-    Source::External(Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    )))
+    Source::External(lemonfiber_fixtures::stack::on_disk())
 }
 
 #[test]
@@ -39,12 +36,17 @@ fn reads_a_manifest_compiled_into_the_binary() {
 }
 
 #[test]
-fn the_embedded_and_external_readings_agree() {
-    assert_eq!(
-        Source::Embedded(&EMBEDDED).manifest_text().ok(),
-        checked_out().manifest_text().ok(),
-        "the same stack read two ways is the same stack"
+fn a_stack_directory_reads_as_the_embedded_stack_but_for_the_secrets_it_holds_none_of() {
+    let mut read = checked_out()
+        .manifest_text()
+        .ok()
+        .and_then(|text| toml::from_str::<toml::Table>(&text).ok())
+        .unwrap_or_default();
+    assert!(
+        read.remove("include").is_some(),
+        "a directory names its service files"
     );
+    assert_eq!(read, lemonfiber_fixtures::stack::carried());
 }
 
 #[test]

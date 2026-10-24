@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_manifest::{Claimed, Manifest};
 
-use super::{judged, said, Kept};
+use super::{judged, said};
 use crate::plugin::Verdict;
 
 const STACK: &str = lemonfiber_bundled::STACK;
@@ -67,14 +67,6 @@ fn recorded(tag: &str, from: &str, answers: &[(&str, u16, &str)]) -> PathBuf {
     root
 }
 
-/// Recordings kept in the media stack at `root` alone, no part's copy holding any.
-fn media(root: &Path) -> Kept<'_> {
-    Kept {
-        media: root,
-        copies: root,
-    }
-}
-
 /// Remove a scratch stack directory.
 fn gone(root: &Path) {
     let _ = std::fs::remove_dir_all(root);
@@ -92,7 +84,7 @@ fn recordings_that_answer_as_claimed_demonstrate_it() {
             ("catalogue.json", 200, r#"{"Items":[]}"#),
         ],
     );
-    let report = judged(&manifest, media(&root));
+    let report = judged(&manifest, &root);
     gone(&root);
 
     assert!(report.holds(), "{report:?}");
@@ -115,7 +107,7 @@ fn a_recording_that_contradicts_its_probe_refutes_the_claim() {
             ("catalogue.json", 200, r#"{"Items":[]}"#),
         ],
     );
-    let report = judged(&manifest, media(&root));
+    let report = judged(&manifest, &root);
     gone(&root);
 
     assert!(!report.holds());
@@ -132,7 +124,7 @@ fn a_probe_with_no_recording_is_unproven_and_refuses_nothing() {
         &pinned(&manifest),
         &[("guarded.json", 401, "null")],
     );
-    let report = judged(&manifest, media(&root));
+    let report = judged(&manifest, &root);
     gone(&root);
 
     assert!(report.holds(), "{report:?}");
@@ -152,7 +144,7 @@ fn a_recording_of_another_image_is_refused() {
             ("catalogue.json", 200, r#"{"Items":[]}"#),
         ],
     );
-    let report = judged(&manifest, media(&root));
+    let report = judged(&manifest, &root);
     gone(&root);
 
     assert!(!report.holds());
@@ -170,7 +162,7 @@ fn a_claim_the_contract_will_not_bind_is_refused() {
         .join("[[probe]]");
     let manifest = claiming(&one_probe);
     let root = recorded("bundled-unbound", &pinned(&manifest), &[]);
-    let report = judged(&manifest, media(&root));
+    let report = judged(&manifest, &root);
     gone(&root);
 
     assert!(!report.holds());
@@ -188,7 +180,7 @@ fn a_capability_with_no_claim_refuses_the_stack() {
     for service in &mut manifest.services {
         service.claim = Vec::new();
     }
-    let report = judged(&manifest, media(Path::new("/lemonfiber/no/such/stack")));
+    let report = judged(&manifest, Path::new("/lemonfiber/no/such/stack"));
 
     assert!(!report.holds(), "{report:?}");
     assert!(
@@ -220,7 +212,7 @@ fn the_report_says_each_answer_worst_first_with_a_count() {
         &pinned(&manifest),
         &[("guarded.json", 200, r#"{"Items":[]}"#)],
     );
-    let mut report = judged(&manifest, media(&root));
+    let mut report = judged(&manifest, &root);
     gone(&root);
     report.unclaimed.push(super::Unclaimed {
         service: "sonarr".to_owned(),
@@ -272,7 +264,7 @@ fn a_probe_the_recording_answers_is_said_as_demonstrated() {
             ("catalogue.json", 200, r#"{"Items":[]}"#),
         ],
     );
-    let lines = said(&judged(&manifest, media(&root)));
+    let lines = said(&judged(&manifest, &root));
     gone(&root);
 
     assert!(lines
@@ -312,7 +304,7 @@ expect = { status = 200"#,
             pinned(&manifest)
         ),
     );
-    let report = judged(&manifest, media(&root));
+    let report = judged(&manifest, &root);
     gone(&root);
 
     let verdicts: Vec<(&str, &Verdict)> = report
@@ -332,42 +324,4 @@ expect = { status = 200"#,
             ),
         ]
     );
-}
-
-/// A recording the part's copy holds is the one judged, ahead of one the media stack
-/// holds at the same path.
-#[test]
-fn a_recording_in_the_parts_copy_is_judged_ahead_of_the_media_stacks() {
-    let manifest = claiming(CLAIM);
-    let media_root = recorded(
-        "bundled-media",
-        &pinned(&manifest),
-        &[
-            ("guarded.json", 200, "null"),
-            ("catalogue.json", 200, r#"{"Items":[]}"#),
-        ],
-    );
-    let copies = recorded(
-        "bundled-copies",
-        &pinned(&manifest),
-        &[("guarded.json", 401, "null")],
-    );
-    let copy = copies.join("jellyfin");
-    let _ = std::fs::create_dir_all(&copy);
-    let _ = std::fs::rename(copies.join("recordings"), copy.join("recordings"));
-    let report = judged(
-        &manifest,
-        Kept {
-            media: &media_root,
-            copies: &copies,
-        },
-    );
-    gone(&media_root);
-    gone(&copies);
-
-    assert!(report.holds(), "{report:?}");
-    assert!(report
-        .judged
-        .iter()
-        .all(|one| one.verdict == Verdict::Passed));
 }

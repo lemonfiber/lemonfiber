@@ -26,15 +26,7 @@ use lemonfiber_fixtures::ports::Stopped;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
-/// The media stack this repository carries, read from disk.
-const REPOSITORY_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
-
-/// What of the repository's media stack a run reads: its manifest, the file describing
-/// each service, the settings it declares it reads, and the starting files of every
-/// service's configuration.
-const CARRIED: [&str; 4] = ["stack.toml", "services", ".env.example", "config"];
-
-/// The media stack this repository carries, copied into a directory of its own, so a run
+/// The stack the tests are written against, copied into a directory of its own, so a run
 /// that writes the project beside it never writes into the repository. Held one level
 /// down, so what a test puts beside the stack stays the test's own too.
 #[must_use]
@@ -46,24 +38,8 @@ pub fn repository_stack() -> Source {
     ))
     .kept()
     .join("stack");
-    let _ = std::fs::create_dir_all(&copy);
-    for name in CARRIED {
-        copied(&Path::new(REPOSITORY_STACK).join(name), &copy.join(name));
-    }
+    lemonfiber_fixtures::stack::fixture_into(&copy);
     Source::External(Box::leak(copy.into_boxed_path()))
-}
-
-/// Copy the file or the tree at `from` to `to`, links left behind.
-fn copied(from: &Path, to: &Path) {
-    let kind = std::fs::symlink_metadata(from).map(|found| found.file_type());
-    if kind.as_ref().is_ok_and(std::fs::FileType::is_dir) {
-        let _ = std::fs::create_dir_all(to);
-        for entry in std::fs::read_dir(from).into_iter().flatten().flatten() {
-            copied(&entry.path(), &to.join(entry.file_name()));
-        }
-    } else if kind.is_ok_and(|kind| kind.is_file()) {
-        let _ = std::fs::copy(from, to);
-    }
 }
 
 /// What the engine a test leaves unnamed says when asked for its images.

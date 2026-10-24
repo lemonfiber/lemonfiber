@@ -1430,6 +1430,7 @@ dependencies = [
  "form_urlencoded",
  "futures-util",
  "lemonfiber-adapters",
+ "lemonfiber-bundled",
  "lemonfiber-core",
  "lemonfiber-error",
  "lemonfiber-fixtures",
@@ -1458,6 +1459,7 @@ dependencies = [
 name = "lemonfiber-bundled"
 version = "0.17.0"
 dependencies = [
+ "include_dir",
  "lemonfiber-bundle",
  "lemonfiber-manifest",
  "toml",

@@ -32,12 +32,9 @@ fn given() -> Chance {
     Chance::cycling()
 }
 
-/// The stack this repository carries, read from disk.
+/// The stack the tests are written against, read from disk.
 fn stack() -> Source {
-    Source::External(Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    )))
+    Source::External(lemonfiber_fixtures::stack::fixture_on_disk())
 }
 
 /// The world a follow runs against: what the engine says, and nothing else.

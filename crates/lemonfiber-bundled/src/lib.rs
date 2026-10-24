@@ -14,6 +14,14 @@
 /// assembled ones in the bundle's order and the installed ones after them.
 pub const STACK: &str = include_str!(concat!(env!("OUT_DIR"), "/stack.toml"));
 
+/// What runs of the embedded stack, as a stack directory holds it: the manifest written
+/// apart, each part's starting configuration and every recording a claim names, and
+/// nothing that only builds, tests or describes the repositories it comes from.
+pub static CARRIED: include_dir::Dir<'_> = include_dir::include_dir!("$OUT_DIR/stack");
+
+/// Where this build wrote [`CARRIED`], for a test that runs the stack from a directory.
+pub const CARRIED_AT: &str = concat!(env!("OUT_DIR"), "/stack");
+
 /// One first-party plugin, as the signed default bundle names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FirstParty {

@@ -1,28 +1,28 @@
 use super::{identifiers, validate, Date, Violation, OSI};
 use crate::Manifest;
 
-/// The stack's own copy of the same list, which this one follows.
-const THEIRS: &str = include_str!("../../../../assets/media-stack/scripts/spdx_osi.txt");
+/// The plugin catalogue's copy of the same list, which this one follows.
+const THEIRS: &str = include_str!("../../../../assets/plugins/registry/spdx_osi.txt");
 
 /// Two copies of one list, and a sentence at the top of ours saying they agree.
 ///
 /// They do today. Nothing made them, and the drift is silent in the direction it
-/// would actually happen: the stack adds a licence, ships a service under it, and
-/// this validator refuses a manifest the stack's own validator accepted — with an
+/// would actually happen: the catalogue adds a licence, pins a plugin under it, and
+/// this validator refuses a manifest the catalogue's own validator accepted — with an
 /// error naming the licence, which is the one thing that is not wrong.
 ///
 /// The submodule is pinned, so this asks at the moment it is worth asking: when
-/// the stack this binary carries is moved forward.
+/// the bundle this binary carries is moved forward.
 #[test]
-fn the_licence_list_holds_what_the_stack_s_own_copy_holds() {
+fn the_licence_list_holds_what_the_catalogue_s_own_copy_holds() {
     let ours = identifiers(OSI);
     let theirs = identifiers(THEIRS);
     let only_ours: Vec<&str> = ours.difference(&theirs).copied().collect();
     let only_theirs: Vec<&str> = theirs.difference(&ours).copied().collect();
     assert!(
         only_ours.is_empty() && only_theirs.is_empty(),
-        "the two vendored licence lists have drifted, and the stack's copy is the \
-             one a maintainer edits: here and not there {only_ours:?}, there and not \
+        "the two vendored licence lists have drifted, and the catalogue's copy is \
+             the one a maintainer edits: here and not there {only_ours:?}, there and not \
              here {only_theirs:?}"
     );
 }
@@ -30,12 +30,12 @@ fn the_licence_list_holds_what_the_stack_s_own_copy_holds() {
 /// The stack this build ships.
 const SHIPPED: &str = lemonfiber_bundled::STACK;
 
-/// The manifest of the media stack the bundle replaces, which the rules are exercised
-/// on by editing it, so a change to the shipped stack moves no test written against it.
+/// A stack kept beside these tests, which the rules are exercised on by editing it, so
+/// a change to the shipped stack moves no test written against it.
 static FIXTURE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     crate::read(std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
+        "/../lemonfiber-fixtures/stack"
     )))
     .unwrap_or_default()
 });
