@@ -12,15 +12,16 @@ const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugi
 const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
 
 /// Services the media stack runs that the bundle installs rather than assembles.
-const NOT_ASSEMBLED: [&str; 1] = ["jellyfin"];
+const NOT_ASSEMBLED: [&str; 2] = ["jellyfin", "sabnzbd"];
 
 /// Fields of a service that differ between the two, by service and field: the guarded
 /// door and the proxy run the images lemonfiber builds for them, a part released here
 /// is tagged by its release without the `v`, and the gate is pinned at a commit on its
 /// main branch past the release the media stack holds. Each part filling a capability
 /// the media stack's own service does not declare provides and claims it in its plugin;
-/// the proxy runs as its own user; and the gate says the port it listens on.
-const DIFFERING: [(&str, &str); 23] = [
+/// the proxy runs as its own user; the gate says the port it listens on; and the door
+/// says it asks the pass service about a live stream.
+const DIFFERING: [(&str, &str); 24] = [
     ("caddy", "claim"),
     ("caddy", "digest"),
     ("caddy", "image"),
@@ -30,6 +31,7 @@ const DIFFERING: [(&str, &str); 23] = [
     ("decline", "claim"),
     ("decline", "provides"),
     ("decline", "tag"),
+    ("door", "asks_for"),
     ("door", "claim"),
     ("door", "digest"),
     ("door", "image"),
@@ -50,7 +52,7 @@ const DIFFERING: [(&str, &str); 23] = [
 /// capability: each service given a household hostname asks the proxy, each whose
 /// dashboard panel reads it asks the dashboard, the request service asks the gate, and
 /// the gate, quality sync, decline and the guarded door ask what they act on.
-const ASKED_HERE: [(&str, &str); 21] = [
+const ASKED_HERE: [(&str, &str); 20] = [
     ("audiobookshelf", "dashboard.show"),
     ("audiobookshelf", "proxy.front"),
     ("bazarr", "dashboard.show"),
@@ -67,7 +69,6 @@ const ASKED_HERE: [(&str, &str); 21] = [
     ("recyclarr", "library.curate"),
     ("request-gate", "identity.source"),
     ("request-gate", "library.curate"),
-    ("sabnzbd", "dashboard.show"),
     ("seerr", "dashboard.show"),
     ("seerr", "proxy.front"),
     ("seerr", "request.gate"),
