@@ -293,7 +293,7 @@ Options:
       --adapter <IMAGE>
           Start each adapter from this image the engine holds, in place of its pin.
 
-          The image the plugin's CI built from its own `Dockerfile`. Taken only with `--check`, so a recording is only ever written from a pin.
+          The image the plugin's CI built from its own `Dockerfile`. A pull request that changes what its adapter answers writes its recordings this way, and the pull request moving the adapter's pin to the published image holds them to that pin.
 
       --dry-run
           Say what would happen, and change nothing

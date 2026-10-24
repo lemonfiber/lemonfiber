@@ -31,7 +31,7 @@ fn a_recording_no_case_asked_is_removed() {
     put(&at, STRAY);
     put(&at, "conformance/notes.txt");
 
-    let strays = taken(&at, &asked(), &Retaking::Written);
+    let strays = taken(&at, &asked(), &Retaking::default());
 
     assert_eq!(
         strays,
@@ -52,7 +52,14 @@ fn a_check_names_a_recording_no_case_asked_and_leaves_it() {
     put(&at, ASKED);
     put(&at, STRAY);
 
-    let strays = taken(&at, &asked(), &Retaking::Checked { adapter: None });
+    let strays = taken(
+        &at,
+        &asked(),
+        &Retaking {
+            check: true,
+            adapter: None,
+        },
+    );
 
     assert_eq!(
         strays
@@ -68,7 +75,7 @@ fn a_check_names_a_recording_no_case_asked_and_leaves_it() {
 fn a_plugin_with_no_conformance_recordings_has_nothing_unasked() {
     let at = Scratch::new("unasked-none");
 
-    assert!(taken(&at, &asked(), &Retaking::Written).is_empty());
+    assert!(taken(&at, &asked(), &Retaking::default()).is_empty());
 }
 
 #[cfg(unix)]
@@ -83,7 +90,7 @@ fn a_recording_reached_through_a_link_is_not_followed() {
         at.join("conformance/library.curate@1"),
     );
 
-    assert!(taken(&at, &[], &Retaking::Written).is_empty());
+    assert!(taken(&at, &[], &Retaking::default()).is_empty());
     assert!(elsewhere.join("kept/other.json").exists());
 }
 
@@ -95,7 +102,7 @@ fn recordings_that_are_themselves_a_link_are_not_followed() {
     put(&elsewhere, "library.curate@1/other.json");
     let _ = std::os::unix::fs::symlink(&*elsewhere, at.join("conformance"));
 
-    assert!(taken(&at, &[], &Retaking::Written).is_empty());
+    assert!(taken(&at, &[], &Retaking::default()).is_empty());
     assert!(elsewhere.join("library.curate@1/other.json").exists());
 }
 
@@ -108,7 +115,7 @@ fn a_recording_that_cannot_be_removed_says_why() {
     let folder = at.join("conformance/library.curate@1");
     let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o555));
 
-    let strays = taken(&at, &[], &Retaking::Written);
+    let strays = taken(&at, &[], &Retaking::default());
     let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755));
 
     assert!(
@@ -127,7 +134,14 @@ fn a_folder_that_cannot_be_read_is_passed_over() {
     let folder = at.join("conformance/library.curate@1");
     let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o000));
 
-    let strays = taken(&at, &[], &Retaking::Checked { adapter: None });
+    let strays = taken(
+        &at,
+        &[],
+        &Retaking {
+            check: true,
+            adapter: None,
+        },
+    );
     let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755));
 
     assert_eq!(

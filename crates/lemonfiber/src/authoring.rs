@@ -103,14 +103,11 @@ pub(crate) async fn published(
 /// How a recording run asked for by `read` keeps what it takes.
 pub(crate) fn taking(read: &Authoring) -> Retaking {
     match read {
-        Authoring::Record {
-            check: true,
-            adapter,
-            ..
-        } => Retaking::Checked {
+        Authoring::Record { check, adapter, .. } => Retaking {
+            check: *check,
             adapter: adapter.clone(),
         },
-        _ => Retaking::Written,
+        _ => Retaking::default(),
     }
 }
 

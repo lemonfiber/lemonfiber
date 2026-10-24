@@ -16,7 +16,8 @@ const STRAY: &str = "conformance/subtitles.fetch@1/retired-case.json";
 async fn checked(at: &Path, serving: &Serves, http: &Arc<Fake>, adapter: Option<&str>) -> Recorded {
     let program = Proving::unreachable();
     let shared = || -> Arc<dyn Http> { Arc::clone(http) as Arc<dyn Http> };
-    let taking = Retaking::Checked {
+    let taking = Retaking {
+        check: true,
         adapter: adapter.map(str::to_owned),
     };
     let read = record(
@@ -154,4 +155,37 @@ async fn a_check_names_a_recording_taken_again_that_holds_no_note() {
     assert!(!read.holds);
     assert_eq!(outcomes(&read), vec![Took::Unnoted; 4]);
     assert_eq!(texts(&at), before);
+}
+
+#[tokio::test]
+async fn writing_from_the_adapter_it_names_writes_what_that_adapter_answered() {
+    let at = source("fronted-written-from-built", FRONTED);
+    let serving = engine();
+    let program = Proving::unreachable();
+    let http = answering();
+    let shared = || -> Arc<dyn Http> { Arc::clone(&http) as Arc<dyn Http> };
+    let taking = Retaking {
+        check: false,
+        adapter: Some(BUILT.to_owned()),
+    };
+    let read = record(
+        &at,
+        Recorder {
+            program: program.as_ref(),
+            serving: &serving,
+            transport: &shared,
+            random: &FixedRandom(Some(vec![7; 32])),
+            taking: &taking,
+        },
+    )
+    .await;
+
+    assert!(
+        read.as_ref().is_ok_and(|read| read.failed.is_empty()),
+        "{read:?}"
+    );
+    assert!(at.join(WATCH).exists(), "the adapter's answers are written");
+    let images: Vec<String> = serving.asked().into_iter().map(|one| one.image).collect();
+    assert_eq!(images.get(1).map(String::as_str), Some(BUILT));
+    assert_eq!(images.first().map(String::as_str), Some(super::PINNED));
 }

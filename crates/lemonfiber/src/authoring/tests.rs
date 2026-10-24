@@ -94,7 +94,7 @@ async fn published(
             serving: &serving,
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
-            taking: &Retaking::Written,
+            taking: &Retaking::default(),
         },
     )
     .await
@@ -546,13 +546,27 @@ fn a_check_holds_what_it_takes_and_starts_the_adapter_it_names() {
             adapter: adapter.map(str::to_owned),
         })
     };
-    assert_eq!(asked(false, None), Retaking::Written);
-    assert_eq!(asked(true, None), Retaking::Checked { adapter: None });
+    assert_eq!(asked(false, None), Retaking::default());
+    assert_eq!(
+        asked(true, None),
+        Retaking {
+            check: true,
+            adapter: None
+        }
+    );
     assert_eq!(
         asked(true, Some("plugin-sonarr:pr")),
-        Retaking::Checked {
+        Retaking {
+            check: true,
             adapter: Some("plugin-sonarr:pr".to_owned())
         }
     );
-    assert_eq!(taking(&Authoring::Capabilities), Retaking::Written);
+    assert_eq!(
+        asked(false, Some("plugin-seerr:pr")),
+        Retaking {
+            check: false,
+            adapter: Some("plugin-seerr:pr".to_owned())
+        }
+    );
+    assert_eq!(taking(&Authoring::Capabilities), Retaking::default());
 }

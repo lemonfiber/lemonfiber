@@ -32,26 +32,20 @@ use crate::ports::program::Program;
 use crate::ports::random::Random;
 use crate::ports::serving::Serving;
 
-/// How a recording run keeps what it takes.
+/// How a recording run keeps what it takes, and what it takes it from.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum Retaking {
-    /// Each recording written from its pin, and each no case asked removed.
-    #[default]
-    Written,
-    /// Each recording held to what was taken, and nothing written or removed.
-    Checked {
-        /// An image the engine holds, each adapter started from in place of its pin.
-        adapter: Option<String>,
-    },
+pub struct Retaking {
+    /// Whether each recording is held to what was taken, and nothing written or removed,
+    /// rather than each written and each no case asked removed.
+    pub check: bool,
+    /// An image the engine holds, each adapter started from in place of its pin.
+    pub adapter: Option<String>,
 }
 
 impl Retaking {
     /// The image each adapter is started from in place of its pin, where one is named.
     fn adapter(&self) -> Option<&str> {
-        match self {
-            Self::Written => None,
-            Self::Checked { adapter } => adapter.as_deref(),
-        }
+        self.adapter.as_deref()
     }
 }
 
