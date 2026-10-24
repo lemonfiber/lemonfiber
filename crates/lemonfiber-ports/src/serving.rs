@@ -41,7 +41,24 @@ pub struct Serve {
     pub listens: Option<u16>,
     /// The name every other container on its network reaches it by, where it has one.
     pub alias: Option<String>,
+    /// Each name it resolves to the machine lemonfiber runs on, where a stand-in answers.
+    pub reaching: Vec<String>,
 }
+
+/// What lemonfiber answers itself while it serves, at a port on its own machine that the
+/// containers it serves reach by a name in [`Serve::reaching`], and nothing else reaches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StandIn {
+    /// The port it answers on.
+    pub port: u16,
+    /// The query parameter whose value names what is asked.
+    pub asked_by: String,
+    /// Each answer, as JSON text, by the value of that parameter; any other is refused.
+    pub answers: Vec<(String, String)>,
+}
+
+/// A stand-in answering, which stops answering when it is dropped.
+pub trait Answering: Send + Sync {}
 
 /// A directory on the engine's machine, mounted at a path inside the container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,4 +135,13 @@ pub trait Serving: Send + Sync {
 
     /// Take the container off the engine, and its network once nothing else is on it.
     async fn removed(&self, served: &Served);
+
+    /// Answer `stand_in` on this machine, at the one address the containers this serves
+    /// reach it by, until what this returns is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`Unran`] where the engine cannot be reached or will not say where its containers
+    /// reach this machine, or the port there cannot be taken.
+    async fn stand_in(&self, stand_in: &StandIn) -> Result<Box<dyn Answering>, Unran>;
 }

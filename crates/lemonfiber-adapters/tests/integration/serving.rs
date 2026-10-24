@@ -10,6 +10,7 @@ use lemonfiber_ports::serving::{Serve, Serving as _, Standing};
 
 fn serve() -> Serve {
     Serve {
+        reaching: Vec::new(),
         image: "lscr.io/linuxserver/sonarr@sha256:dffc".to_owned(),
         env: vec!["TZ=UTC".to_owned()],
         user: None,

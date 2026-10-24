@@ -640,3 +640,65 @@ async fn an_adapter_fronting_a_minted_upstream_credential_is_handed_it_and_recor
     assert_eq!(failed_at(&read), Vec::new());
     assert_eq!(read.recordings.len(), 4);
 }
+
+/// The fixture's adapter speaking the curator's contract in place of its own.
+fn curating() -> String {
+    FRONTED
+        .replace(
+            "speaks      = [\"subtitles.fetch@1\"]",
+            "speaks      = [\"library.curate@1\"]",
+        )
+        .replace(
+            "provides    = [\"subtitles.fetch\"]",
+            "provides    = [\"library.curate\"]",
+        )
+}
+
+#[tokio::test]
+async fn a_curator_is_recorded_with_its_download_client_answered_where_its_upstream_reaches_it() {
+    let at = source("fronted-curating", &curating());
+    let serving = engine();
+    let _ = read(&at, &serving, &answering(), Some(7)).await;
+
+    let stood: Vec<u16> = serving.stood_in().iter().map(|one| one.port).collect();
+    assert_eq!(stood, vec![8080]);
+    assert!(
+        serving
+            .asked()
+            .first()
+            .is_some_and(|upstream| upstream.reaching == vec!["conformance-download".to_owned()]),
+        "{:?}",
+        serving.asked()
+    );
+}
+
+#[tokio::test]
+async fn an_adapter_of_another_contract_is_recorded_with_nothing_answering_beside_it() {
+    let at = source("fronted-no-client", FRONTED);
+    let serving = engine();
+    let _ = recorded(&at, &serving, &answering(), Some(7)).await;
+
+    assert!(serving.stood_in().is_empty());
+    assert!(serving.asked().iter().all(|one| one.reaching.is_empty()));
+}
+
+#[tokio::test]
+async fn a_curator_whose_download_client_cannot_answer_fails_at_it_and_starts_nothing() {
+    let at = source("fronted-client-unanswered", &curating());
+    let serving = engine().unanswering(Unran::Refused {
+        reason: "127.0.0.1:8080 could not be taken to answer on".to_owned(),
+    });
+    let read = recorded(&at, &serving, &answering(), Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read)
+            .first()
+            .map(|(step, why)| (step.as_str(), why.as_str())),
+        Some((
+            "download client",
+            "the container engine refused the run: 127.0.0.1:8080 could not be taken to answer on"
+        ))
+    );
+    assert_eq!(serving.stood_in().len(), 1);
+    assert!(serving.asked().is_empty());
+}
