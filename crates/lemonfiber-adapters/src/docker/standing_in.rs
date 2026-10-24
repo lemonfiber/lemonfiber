@@ -82,9 +82,7 @@ async fn answering(mut accepted: Accepted, stand_in: Arc<StandIn>) {
         match taken {
             Ok(stream) => {
                 let stand_in = Arc::clone(&stand_in);
-                tokio::spawn(async move {
-                    let _ = answered(stream, &stand_in).await;
-                });
+                tokio::spawn(async move { answered(stream, &stand_in).await });
             }
             Err(_) => tokio::time::sleep(AFTER_A_FAILED_ACCEPT).await,
         }
@@ -118,15 +116,22 @@ async fn gateway(docker: &Docker) -> Result<IpAddr, Unran> {
 }
 
 /// Read one request from `stream`, its headers to their end, and answer it as `stand_in`
-/// says, closing after.
-async fn answered(mut stream: TcpStream, stand_in: &StandIn) -> std::io::Result<()> {
+/// says, closing after; what cannot be read is answered as far as it was read, and a
+/// connection that cannot be written to is left.
+async fn answered(mut stream: TcpStream, stand_in: &StandIn) {
     let mut reading = BufReader::new((&mut stream).take(MOST));
-    let mut first = String::new();
-    reading.read_line(&mut first).await?;
-    let mut header = String::new();
-    while reading.read_line(&mut header).await? > 0 && !header.trim().is_empty() {
+    let mut first = Vec::new();
+    let mut header = Vec::new();
+    let _ = reading.read_until(b'\n', &mut first).await;
+    while reading
+        .read_until(b'\n', &mut header)
+        .await
+        .is_ok_and(|read| read > 0)
+        && !header.trim_ascii().is_empty()
+    {
         header.clear();
     }
+    let first = String::from_utf8_lossy(&first);
     let target = first.split(' ').nth(1).unwrap_or_default();
     let (status, body) = answer(stand_in, target);
     let response = format!(
@@ -134,8 +139,8 @@ async fn answered(mut stream: TcpStream, stand_in: &StandIn) -> std::io::Result<
          Connection: close\r\n\r\n{body}",
         body.len()
     );
-    stream.write_all(response.as_bytes()).await?;
-    stream.shutdown().await
+    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = stream.shutdown().await;
 }
 
 /// The status and body `stand_in` answers `target` with.

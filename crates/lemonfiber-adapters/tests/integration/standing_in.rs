@@ -50,17 +50,22 @@ fn bridge(config: &str) -> (&'static str, fake::Reply) {
     )
 }
 
-async fn asked(port: u16, target: &str) -> std::io::Result<String> {
+async fn sent(port: u16, request: &[u8]) -> std::io::Result<String> {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).await?;
-    stream
-        .write_all(
-            format!("GET {target} HTTP/1.1\r\nHost: conformance-download\r\nAccept: */*\r\n\r\n")
-                .as_bytes(),
-        )
-        .await?;
+    stream.write_all(request).await?;
+    stream.shutdown().await?;
     let mut said = String::new();
     stream.read_to_string(&mut said).await?;
     Ok(said)
+}
+
+async fn asked(port: u16, target: &str) -> std::io::Result<String> {
+    sent(
+        port,
+        format!("GET {target} HTTP/1.1\r\nHost: conformance-download\r\nAccept: */*\r\n\r\n")
+            .as_bytes(),
+    )
+    .await
 }
 
 async fn refused_once_dropped(port: u16) -> bool {
@@ -103,6 +108,36 @@ async fn under_docker_desktop_it_answers_on_loopback_what_it_was_given_until_dro
         .any(|path| path.contains("/networks/bridge")));
     drop(answering);
     assert!(refused_once_dropped(port).await);
+    engine.stop().await;
+}
+
+#[tokio::test]
+async fn a_request_it_cannot_read_is_refused_and_one_cut_short_is_answered_as_far_as_it_went() {
+    let engine = fake::engine("standing-in-unread", vec![info("Docker Desktop")]);
+    let port = a_free_port();
+    let answering = Daemon::at(&engine.socket).stand_in(&stand_in(port)).await;
+
+    let unreadable = sent(
+        port,
+        b"GET /api?mode=\xffversion HTTP/1.1\r\nHost: \xfe\r\n\r\n",
+    )
+    .await
+    .unwrap_or_default();
+    let cut_short = sent(
+        port,
+        b"GET /api?mode=version HTTP/1.1\r\nHost: conformance-",
+    )
+    .await
+    .unwrap_or_default();
+
+    assert!(answering.is_ok(), "{:?}", answering.as_ref().err());
+    assert!(
+        unreadable.starts_with("HTTP/1.1 404 Not Found\r\n"),
+        "{unreadable}"
+    );
+    assert!(cut_short.starts_with("HTTP/1.1 200 OK\r\n"), "{cut_short}");
+    assert!(cut_short.ends_with(VERSION), "{cut_short}");
+    drop(answering);
     engine.stop().await;
 }
 

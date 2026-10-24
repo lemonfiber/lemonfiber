@@ -24,6 +24,10 @@ fn what_was_given_is_answered_by_the_value_of_its_parameter_and_nothing_else_is(
     assert_eq!(answer(&stand_in, "/api?mode=shutdown").0, "404 Not Found");
     assert_eq!(answer(&stand_in, "/api").0, "404 Not Found");
     assert_eq!(answer(&stand_in, "/api?modes=version").0, "404 Not Found");
+    assert_eq!(
+        answer(&stand_in, "/api?verbose&mode=version").1,
+        r#"{"version":"4.5.1"}"#
+    );
 }
 
 #[tokio::test(start_paused = true)]
