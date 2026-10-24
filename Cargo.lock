@@ -1430,7 +1430,6 @@ dependencies = [
  "form_urlencoded",
  "futures-util",
  "lemonfiber-adapters",
- "lemonfiber-bundled",
  "lemonfiber-core",
  "lemonfiber-error",
  "lemonfiber-fixtures",
