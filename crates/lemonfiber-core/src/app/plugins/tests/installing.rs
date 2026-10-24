@@ -361,6 +361,7 @@ async fn an_install_says_what_its_services_would_ask_for_and_reach() {
         .map(|mut would| {
             let _ = would.services.first_mut().map(|placed| {
                 placed.asks = vec![crate::plugin::Asking {
+                    native: None,
                     capability: "library.curate".to_owned(),
                     each: true,
                 }];

@@ -137,6 +137,7 @@ fn what_this_stack_wires_to_what_and_one_change_to_it_render_apart() {
                 by: "seerr".to_owned(),
                 origin: lemonfiber_core::origin::Origin::Bundled,
                 reaches: lemonfiber_core::wiring::Reaches::Asked {
+                    native: None,
                     capability: "identity.source".to_owned(),
                     services: vec!["jellyfin".to_owned()],
                     settled: lemonfiber_core::wiring::Settled::Outright,

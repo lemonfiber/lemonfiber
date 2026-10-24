@@ -14,6 +14,7 @@ fn beside_contracted_requests(
     let mut intake = contracted("intake", CONTRACTED_REQUESTS, "request.intake");
     for placed in &mut intake.services {
         placed.asks = vec![crate::plugin::Asking {
+            native: None,
             capability: crate::app::targets::IDENTITY.to_owned(),
             each: false,
         }];

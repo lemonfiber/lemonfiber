@@ -15,6 +15,7 @@ fn is_would_wire(wiring: &crate::seed::Wiring) -> bool {
 /// The stack's torrent client, as the lookup resolves it.
 fn torrent_client() -> crate::wiring::Filler {
     crate::wiring::Filler {
+        minted: None,
         granted: Vec::new(),
         id: "qbittorrent".to_owned(),
         name: "qBittorrent".to_owned(),

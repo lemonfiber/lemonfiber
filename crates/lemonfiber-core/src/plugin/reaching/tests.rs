@@ -150,6 +150,7 @@ async fn an_engine_that_will_not_list_is_said() {
 /// is given.
 fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
     crate::wiring::Filler {
+        minted: None,
         granted: Vec::new(),
         id: ADAPTER.to_owned(),
         name: ADAPTER.to_owned(),

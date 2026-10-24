@@ -24,13 +24,16 @@
 
 use std::collections::BTreeMap;
 
-use lemonfiber_manifest::container::{Fields, Value};
+use lemonfiber_manifest::container::Fields;
 use lemonfiber_plugin::{Manifest, Service};
 use serde::{Deserialize, Serialize};
 
+mod asking;
 mod proved;
 mod reached;
 
+use asking::asks;
+pub use asking::Asking;
 pub use proved::{RequestProof, RunProof};
 pub use reached::Reached;
 
@@ -134,49 +137,6 @@ pub struct Placed {
     /// The digest of the starting files kept for its run proofs, where it has any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub starting: Option<String>,
-}
-
-/// Every capability a service asks for: each `[[ask]]` it makes, then each capability a
-/// variable asks the address of, narrowed by no medium and no API, that no `[[ask]]`
-/// names, once.
-fn asks(manifest: &Manifest, service: &Service) -> Vec<Asking> {
-    let mut asks: Vec<Asking> = manifest
-        .asking
-        .iter()
-        .filter(|ask| {
-            manifest
-                .asks(ask.service.as_deref())
-                .is_some_and(|asker| asker.id == service.id)
-        })
-        .map(|ask| Asking {
-            capability: ask.capability.clone(),
-            each: ask.each,
-        })
-        .collect();
-    for value in service.env.values() {
-        if let Value::Url(url) = value {
-            let narrowed = url.files.is_some() || url.native.is_some();
-            if !narrowed && !asks.iter().any(|ask| ask.capability == url.url_of) {
-                asks.push(Asking {
-                    capability: url.url_of.clone(),
-                    each: false,
-                });
-            }
-        }
-    }
-    asks
-}
-
-/// One capability a placed service asks for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginAsking")]
-pub struct Asking {
-    /// The core capability asked for.
-    pub capability: String,
-    /// Whether every service that fills it is reached rather than one.
-    #[serde(default)]
-    pub each: bool,
 }
 
 impl Placed {

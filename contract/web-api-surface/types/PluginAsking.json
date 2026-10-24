@@ -11,6 +11,12 @@
         "boolean"
       ],
       "required": false
+    },
+    "native": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     }
   },
   "variants": []

@@ -30,6 +30,7 @@ use crate::error::Code;
 
 mod chosen;
 mod fillers;
+mod handing;
 pub(crate) mod run;
 pub use run::listing;
 mod settling;
@@ -133,6 +134,10 @@ pub enum Reaches {
         /// reaches nothing and is exactly where an operator most needs to know which of
         /// the names in front of them is not the stack's.
         origins: BTreeMap<String, crate::origin::Origin>,
+        /// The upstream's own API the ask talks in, where it reaches the upstream an
+        /// adapter fronts rather than the adapter.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        native: Option<String>,
     },
     /// A link deliberately kept to a named service, shown as the exception it is.
     ByName {
@@ -179,15 +184,25 @@ pub struct Unfilled {
     pub by: String,
     /// What it asked for.
     pub capability: String,
+    /// The upstream's own API it asked in, where no upstream filling it declares that API.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native: Option<String>,
 }
 
 impl std::fmt::Display for Unfilled {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} asks for {} and nothing fills it",
-            self.by, self.capability
-        )
+        match &self.native {
+            Some(api) => write!(
+                f,
+                "{} asks for {} in {api} and nothing filling it talks {api}",
+                self.by, self.capability
+            ),
+            None => write!(
+                f,
+                "{} asks for {} and nothing fills it",
+                self.by, self.capability
+            ),
+        }
     }
 }
 

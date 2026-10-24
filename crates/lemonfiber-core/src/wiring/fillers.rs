@@ -21,6 +21,7 @@ use lemonfiber_manifest::{Api, ApiKind, Manifest, Service};
 use crate::origin::Origin;
 use crate::plugin::{Installed, Placed};
 
+pub use super::handing::{crosses, Holder};
 use super::{settle, Chosen, Reaches};
 
 /// Where a service answers inside the stack's network.
@@ -78,6 +79,9 @@ pub struct Filler {
     /// The setting of each credential of another service the operator granted the plugin
     /// that brought it.
     pub granted: Vec<String>,
+    /// The secret lemonfiber minted as its credential, by the name the secret store holds it
+    /// under, where its plugin declares one.
+    pub minted: Option<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
@@ -117,6 +121,16 @@ impl Filler {
     #[must_use]
     pub fn stands_in(&self) -> bool {
         self.first_party && self.replaces.as_deref() == Some(self.id.as_str())
+    }
+
+    /// The API lemonfiber speaks to it in: its adapter's, or the upstream's own it declares
+    /// in `native` where it names no adapter.
+    #[must_use]
+    pub fn talks_in(&self) -> Option<ApiKind> {
+        self.adapter
+            .as_ref()
+            .map(|api| api.kind)
+            .or_else(|| self.native.as_deref().and_then(ApiKind::named))
     }
 
     /// Who holds what it holds, as a credential crossing to or from it is judged.
@@ -391,52 +405,6 @@ impl Fillers {
     }
 }
 
-/// Whether a credential `owner` holds may be handed to `recipient`: the one gate every
-/// credential crosses between two services here.
-///
-/// **To the stack's own, to the owner's own plugin, and to a first-party plugin from
-/// the stack or another first-party plugin.** Any other plugin's service is a stranger's
-/// code: what it is handed it can keep, and nothing could take it back. A plugin's
-/// credential reaching the stack's own service is a plugin standing in for a bundled one
-/// being wired, which is what it was installed for.
-#[must_use]
-pub fn crosses(owner: Holder<'_>, recipient: Holder<'_>) -> bool {
-    match (owner, recipient) {
-        (_, Holder::Stack) | (Holder::Stack | Holder::FirstParty(_), Holder::FirstParty(_)) => true,
-        (
-            Holder::FirstParty(owner) | Holder::ThirdParty(owner),
-            Holder::FirstParty(recipient) | Holder::ThirdParty(recipient),
-        ) => owner == recipient,
-        _ => false,
-    }
-}
-
-impl Fillers {
-    /// Whether `owner`'s credential may be handed to `recipient`: where [`crosses`] lets
-    /// it, or where the operator granted it to `recipient`'s plugin by the setting it is
-    /// held under.
-    #[must_use]
-    pub fn hands(&self, owner: &Filler, recipient: &Filler) -> bool {
-        crosses(owner.holder(), recipient.holder())
-            || self
-                .setting(owner, crate::config::API_KEY_SUFFIX)
-                .is_some_and(|setting| recipient.granted.contains(&setting))
-    }
-}
-
-/// Who holds a credential, as whether it may cross to another is judged.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Holder<'a> {
-    /// The stack's own services.
-    Stack,
-    /// A plugin this build embeds as first-party.
-    FirstParty(&'a str),
-    /// Any other plugin.
-    ThirdParty(&'a str),
-    /// Nothing that can be named as holding it.
-    Nobody,
-}
-
 /// The name a credential `filler` holds would be kept under, ending in `holds`, before
 /// anything is refused: the stack's own name for a service a first-party plugin stands
 /// in for.
@@ -475,6 +443,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         contracts: Vec::new(),
         first_party: false,
         granted: Vec::new(),
+        minted: None,
         majors: service.majors(),
         fronts: None,
         native: None,
@@ -514,6 +483,12 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .iter()
             .map(|grant| grant.credential.clone())
             .collect(),
+        minted: one
+            .declared
+            .secrets
+            .iter()
+            .find(|secret| secret.minted && secret.of == placed.service)
+            .map(|secret| crate::settings::named(plugin, &secret.id)),
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),

@@ -52,6 +52,7 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
 fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
     for placed in &mut installed.services {
         placed.asks = vec![crate::plugin::Asking {
+            native: None,
             capability: "library.curate".to_owned(),
             each: true,
         }];

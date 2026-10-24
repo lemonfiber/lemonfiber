@@ -4,12 +4,19 @@
 use super::{Ctx, Path};
 use crate::ports::filesystem::Beneath;
 
-/// The API key a service of the curator shape wrote for itself, read from the file
-/// its own declaration names — beneath its own directory where a plugin brought it.
+/// The API key a service of the curator shape answers to: the one lemonfiber minted for
+/// it where its plugin declares one, and otherwise the one it wrote for itself, read from
+/// the file its own declaration names — beneath its own directory where a plugin brought it.
 ///
 /// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
 /// written, and a file refused stays refused, so the caller can say so.
 pub(super) async fn curator_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
+    if let Some(minted) = &filler.minted {
+        return crate::settings::secrets_at(ctx)
+            .and_then(|at| crate::settings::Secrets::at(&at).ok())
+            .and_then(|secrets| secrets.value(minted).map(str::to_owned))
+            .map_or(Beneath::Absent, Beneath::Read);
+    }
     match crate::app::targets::credential_file(ctx, filler).await {
         Beneath::Read(text) => {
             crate::servarr::api_key(&text).map_or(Beneath::Absent, Beneath::Read)
@@ -42,3 +49,6 @@ pub(super) async fn read_curator_key(ctx: &Ctx, config: &Path) -> Option<String>
         crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), config, within).await?;
     crate::servarr::api_key(&text)
 }
+
+#[cfg(test)]
+mod tests;

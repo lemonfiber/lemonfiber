@@ -43,11 +43,21 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
         if service.provides.contains(&ask.capability) {
             found.push(Violation {
-                location,
+                location: location.clone(),
                 message: format!(
                     "{} asks for {}, which it provides itself; nothing asks itself",
                     service.id, ask.capability
                 ),
+            });
+        }
+        if let Some(api) = ask
+            .native
+            .as_deref()
+            .filter(|api| !lemonfiber_manifest::container::is_api_name(api))
+        {
+            found.push(Violation {
+                location: format!("{location}.native"),
+                message: format!("{api} is not one lowercase word"),
             });
         }
         if ask.each {

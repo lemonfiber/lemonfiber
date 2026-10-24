@@ -14,6 +14,13 @@
           "type": "string",
           "const": "asked"
         },
+        "native": {
+          "description": "The upstream's own API the ask talks in, where it reaches the upstream an\nadapter fronts rather than the adapter.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "origins": {
           "description": "Where each service that claims it came from: this build's stack, or a\nnamed plugin.\n\nEvery claimant rather than only what the ask reaches, because a contest\nreaches nothing and is exactly where an operator most needs to know which of\nthe names in front of them is not the stack's.",
           "type": "object",

@@ -50,8 +50,13 @@ fn entry(link: &Wired) -> Lines {
             services,
             settled,
             origins,
+            native,
         } => {
-            lines.spaced(format!("  {} asks for {capability}", asker(link)));
+            lines.spaced(format!(
+                "  {} asks for {capability}{}",
+                asker(link),
+                talking(native.as_deref())
+            ));
             lines.put(format!("    reaches  {}", reached(services, origins)));
             for said in settling(settled) {
                 lines.put(format!("    {said}"));
@@ -63,6 +68,11 @@ fn entry(link: &Wired) -> Lines {
         }
     }
     lines
+}
+
+/// The upstream's own API an ask talks in, as the words following what it asks for.
+pub(super) fn talking(native: Option<&str>) -> String {
+    native.map_or_else(String::new, |api| format!(" in {api}"))
 }
 
 /// The service an ask runs from, beside the plugin that brought it where one did.

@@ -97,6 +97,12 @@ impl ApiKind {
         }
     }
 
+    /// The adapter the manifest writes as `name`, where lemonfiber implements one.
+    #[must_use]
+    pub fn named(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.name() == name)
+    }
+
     /// Every adapter lemonfiber implements, which is the whole of what a plugin's
     /// service may name.
     pub const ALL: [Self; 9] = [

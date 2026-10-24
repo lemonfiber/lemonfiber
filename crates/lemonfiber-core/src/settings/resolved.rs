@@ -141,10 +141,14 @@ fn crossed(
     owner: &crate::wiring::Filler,
     recipient: Option<&crate::wiring::Filler>,
 ) -> Holding {
-    fillers
-        .setting(owner, crate::config::API_KEY_SUFFIX)
-        .filter(|_| recipient.is_some_and(|recipient| fillers.hands(owner, recipient)))
-        .map_or(Holding::Withheld, Holding::Crossing)
+    let held = match &owner.minted {
+        Some(minted) => Some(Holding::Store(minted.clone())),
+        None => fillers
+            .setting(owner, crate::config::API_KEY_SUFFIX)
+            .map(Holding::Crossing),
+    };
+    held.filter(|_| recipient.is_some_and(|recipient| fillers.hands(owner, recipient)))
+        .unwrap_or(Holding::Withheld)
 }
 
 /// The variables of the operator's environment file the project is written with: none of

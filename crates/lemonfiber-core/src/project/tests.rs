@@ -678,6 +678,7 @@ fn a_plugin_service_the_household_reaches_shares_a_network_with_the_proxy() {
 fn a_plugin_services_ask_joins_it_to_that_asks_network_and_no_other() {
     let mut asker = a_placed("subs", &[], None, None);
     asker.asks = vec![crate::plugin::Asking {
+        native: None,
         capability: "media.serve".to_owned(),
         each: false,
     }];

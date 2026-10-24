@@ -138,6 +138,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
     };
     let asking = Placed {
         asks: vec![crate::plugin::Asking {
+            native: None,
             capability: "indexer.search".to_owned(),
             each: false,
         }],

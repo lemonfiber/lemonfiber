@@ -183,3 +183,18 @@ fn a_variable_asking_the_address_of_anything_but_a_core_capability_is_refused() 
     );
     assert_eq!(addressing("library.curate"), Vec::<String>::new());
 }
+
+#[test]
+fn an_ask_names_the_upstreams_own_api_as_one_lowercase_word() {
+    let plain = asking("[[ask]]\ncapability = \"library.curate\"\nnative = \"servarr\"\n");
+    let spaced = asking("[[ask]]\ncapability = \"library.curate\"\nnative = \"Servarr API\"\n");
+
+    assert!(!plain.iter().any(|one| one.contains("native")), "{plain:?}");
+    assert!(
+        names(
+            &spaced,
+            &["ask #1.native", "Servarr API is not one lowercase word"]
+        ),
+        "{spaced:?}"
+    );
+}

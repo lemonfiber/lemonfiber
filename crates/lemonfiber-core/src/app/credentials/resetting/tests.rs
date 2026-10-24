@@ -67,6 +67,7 @@ async fn a_reset_key_is_handed_to_a_quality_sync_holding_the_curator() {
     let mut sync = crate::test_support::contracted("syncer", "sync", "quality.sync");
     for placed in &mut sync.services {
         placed.asks = vec![crate::plugin::Asking {
+            native: None,
             capability: "library.curate".to_owned(),
             each: true,
         }];

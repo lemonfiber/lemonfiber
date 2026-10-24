@@ -36,6 +36,7 @@ fn asker(service: &str, kind: ApiKind, listens: u16, asks: &[(&str, bool)]) -> P
     placed.asks = asks
         .iter()
         .map(|(capability, each)| Asking {
+            native: None,
             capability: (*capability).to_owned(),
             each: *each,
         })

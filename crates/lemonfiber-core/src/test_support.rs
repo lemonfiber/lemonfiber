@@ -248,6 +248,29 @@ pub(crate) fn moved_household(
     ctx
 }
 
+/// The name the secret store holds the key lemonfiber minted for [`a_minting_curator`]'s
+/// upstream under.
+pub(crate) const A_MINTED_KEY: &str = "series:upstream-key";
+
+/// A curator plugin: its adapter `series` provides `library.curate` and fronts its
+/// upstream `series-upstream`, which talks `servarr` and holds the key lemonfiber minted
+/// for it as [`A_MINTED_KEY`].
+pub(crate) fn a_minting_curator() -> crate::plugin::Installed {
+    let mut adapter = a_placed("series", &["library.curate"], None, None);
+    adapter.fronts = Some("series-upstream".to_owned());
+    let mut upstream = a_placed("series-upstream", &[], None, Some(8989));
+    upstream.native = Some("servarr".to_owned());
+    let mut curator = an_installed("series", vec![adapter, upstream]);
+    curator.declared.secrets = vec![crate::plugin::Secret {
+        id: "upstream-key".to_owned(),
+        of: "series-upstream".to_owned(),
+        why: "The key the adapter signs in with".to_owned(),
+        minted: true,
+        serves: None,
+    }];
+    curator
+}
+
 /// An installed plugin holding these services.
 pub(crate) fn an_installed(
     plugin: &str,

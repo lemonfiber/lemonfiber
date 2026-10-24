@@ -144,7 +144,9 @@ fn asked(
 pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<Wired> {
     let stack = manifest.wirings.iter().filter_map(|wiring| {
         let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
-            (Some(capability), None) => reached(manifest, installed, wiring, capability, chosen),
+            (Some(capability), None) => {
+                reached(manifest, installed, wiring, capability, None, chosen)
+            }
             (None, Some(service)) => Reaches::ByName {
                 service: service.to_owned(),
                 why: wiring.why.clone().unwrap_or_default(),
@@ -166,7 +168,14 @@ pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> 
                     origin: Origin::Plugin {
                         named: one.plugin.clone(),
                     },
-                    reaches: reached(manifest, installed, &wiring, &ask.capability, chosen),
+                    reaches: reached(
+                        manifest,
+                        installed,
+                        &wiring,
+                        &ask.capability,
+                        ask.native.as_deref(),
+                        chosen,
+                    ),
                 }
             })
         })
@@ -174,22 +183,64 @@ pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> 
     stack.chain(brought).collect()
 }
 
-/// What an ask for `capability` reaches, against everything installed that claims it.
+/// What an ask for `capability` reaches, against everything installed that claims it,
+/// talking in the upstream's own API `native` where it names one.
 fn reached(
     manifest: &Manifest,
     installed: &[Installed],
     wiring: &Wiring,
     capability: &str,
+    native: Option<&str>,
     chosen: &Chosen,
 ) -> Reaches {
     let held = claimants(manifest, installed, capability);
     let (services, settled) = asked(wiring, capability, &held, chosen);
+    let (services, settled) = match native {
+        Some(api) => in_native(installed, &services, settled, api),
+        None => (services, settled),
+    };
     Reaches::Asked {
         capability: capability.to_owned(),
         services,
         settled,
         origins: origins(&held),
+        native: native.map(str::to_owned),
     }
+}
+
+/// What an ask in the API `api` settles on: the upstream each adapter in `services`
+/// fronts, where that upstream declares `api`, and unfilled where none does.
+fn in_native(
+    installed: &[Installed],
+    services: &[String],
+    settled: Settled,
+    api: &str,
+) -> (Vec<String>, Settled) {
+    let upstreams: Vec<String> = services
+        .iter()
+        .filter_map(|adapter| fronted_in(installed, adapter, api))
+        .collect();
+    if upstreams.is_empty() && !services.is_empty() {
+        (upstreams, Settled::Unfilled)
+    } else {
+        (upstreams, settled)
+    }
+}
+
+/// The upstream `adapter` fronts, where it declares the API `api`.
+fn fronted_in(installed: &[Installed], adapter: &str, api: &str) -> Option<String> {
+    installed.iter().find_map(|one| {
+        let upstream = one
+            .services
+            .iter()
+            .find(|placed| placed.service == adapter)?
+            .fronts
+            .as_deref()?;
+        one.services
+            .iter()
+            .find(|placed| placed.service == upstream && placed.native.as_deref() == Some(api))
+            .map(|placed| placed.service.clone())
+    })
 }
 
 /// A plugin's ask as a link of the stack's, carrying the stack's own choice for that
@@ -279,10 +330,12 @@ pub fn unfilled(wired: &[Wired]) -> Vec<Unfilled> {
             Reaches::Asked {
                 capability,
                 settled: Settled::Unfilled,
+                native,
                 ..
             } => Some(Unfilled {
                 by: one.by.clone(),
                 capability: capability.clone(),
+                native: native.clone(),
             }),
             _ => None,
         })

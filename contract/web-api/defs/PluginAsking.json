@@ -11,6 +11,13 @@
       "description": "Whether every service that fills it is reached rather than one.",
       "type": "boolean",
       "default": false
+    },
+    "native": {
+      "description": "The upstream's own API it talks in, which it reaches in place of the adapter.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "additionalProperties": false,

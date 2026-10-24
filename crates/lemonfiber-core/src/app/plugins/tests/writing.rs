@@ -532,6 +532,7 @@ fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
     let ctx = ctx("addressed");
     let mut placed = crate::test_support::a_placed("subfinder", &[], None, None);
     placed.asks = vec![crate::plugin::Asking {
+        native: None,
         capability: "indexer.search".to_owned(),
         each: false,
     }];

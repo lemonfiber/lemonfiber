@@ -413,6 +413,7 @@ fn a_service(
     kind: lemonfiber_manifest::ApiKind,
 ) -> crate::wiring::Filler {
     crate::wiring::Filler {
+        minted: None,
         granted: Vec::new(),
         id: id.to_owned(),
         name: id.to_owned(),

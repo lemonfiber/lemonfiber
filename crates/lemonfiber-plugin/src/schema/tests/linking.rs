@@ -18,6 +18,7 @@ fn reads_what_a_service_asks_for() {
     assert_eq!(
         read,
         Some(vec![crate::schema::Ask {
+            native: None,
             service: Some("komga".to_owned()),
             capability: "library.curate".to_owned(),
             each: true,

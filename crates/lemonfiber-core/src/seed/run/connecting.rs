@@ -263,7 +263,7 @@ fn made<'a>(
     if !fillers.hands(filler, asker) {
         return Err(Unmade::Asked);
     }
-    let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
+    let speaks = filler.talks_in().ok_or(Unmade::NoAdapter)?;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
     let asks = asking(asker).ok_or(Unmade::Unpaired)?;
     let made = connection(asks, &ask.capability, speaks, &filler.media_types)?;
