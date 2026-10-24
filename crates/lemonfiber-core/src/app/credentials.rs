@@ -79,10 +79,9 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
             credential,
             agreement,
         } => {
-            let revoked =
+            let (revoked, after) =
                 super::plugins::granting::revoke(ctx, &plugin, &credential, agreement.as_deref())
                     .await?;
-            let after = super::plugins::read(ctx)?;
             let held = reading::taken(
                 ctx,
                 &manifest.services,

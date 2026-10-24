@@ -9,7 +9,7 @@ use crate::error::codes::plugin::{NO_GRANT, UNAIMED_CROSSING};
 use crate::error::{Problem, Remedy, State};
 use crate::journal::{Change, Kind};
 use crate::plugin::first_party::{holds, FirstParty};
-use crate::plugin::{Grant, Installed};
+use crate::plugin::{Grant, Installed, Register};
 
 use super::super::Ctx;
 
@@ -164,7 +164,8 @@ fn change(plugin: &str, grant: &Grant, given: bool, stamp: &str) -> Change {
 pub(super) const REVOKING: [&str; 2] = ["the grant it ends", "what it would restart"];
 
 /// End `plugin`'s grant of `credential`, or say what ending it would do where no offer
-/// is answered or this is a rehearsal.
+/// is answered or this is a rehearsal, with the record of what is installed as it then
+/// stands.
 ///
 /// The credential is written out of every secrets file that read it and the plugin's
 /// services reading it restart, journalled as one operation an undo reverses. What the
@@ -180,7 +181,7 @@ pub(crate) async fn revoke(
     plugin: &str,
     credential: &str,
     agreement: Option<&str>,
-) -> Result<Revoked, Box<Problem>> {
+) -> Result<(Revoked, Register), Box<Problem>> {
     let held = super::read(ctx)?;
     let one = held.holds(plugin);
     let grant = one.and_then(|one| {
@@ -208,18 +209,19 @@ pub(crate) async fn revoke(
         unrestarted: None,
     };
     if !super::offering::acting(ctx, &consent, plugin, &offer, &REVOKING, &[])? {
-        return Ok(revoked);
+        return Ok((revoked, held));
     }
+    let grant = grant.clone();
     let stamp = ctx.stamp();
-    journalled(ctx, plugin, std::slice::from_ref(grant), &[], &stamp)?;
-    let mut after = held.clone();
-    after.regrant(plugin, grant, false);
+    journalled(ctx, plugin, std::slice::from_ref(&grant), &[], &stamp)?;
+    let mut after = held;
+    after.regrant(plugin, &grant, false);
     super::super::record::keep(super::kept_at(ctx).as_deref(), &after)?;
     crate::settings::files::reread_now(ctx, &crate::plugin::Holding::Withheld)?;
     let running = crate::settings::running(ctx, &revoked.restarts).await;
     revoked.unrestarted = crate::settings::restarted(ctx, &running).await;
     revoked.ended = true;
-    Ok(revoked)
+    Ok((revoked, after))
 }
 
 /// Each service of `one` whose environment reads a secret of `of`.

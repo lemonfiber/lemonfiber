@@ -210,6 +210,28 @@ fn progress_without_a_position_and_a_grant_without_a_device_are_refused_by_name(
     );
 }
 
+/// Ending a grant without the plugin that holds it, or without the credential it is of,
+/// is refused by the argument it lacks.
+#[test]
+fn a_revoke_without_its_plugin_or_its_credential_is_refused_by_name() {
+    let missing = |argument: &str| crate::actions::Refused::Missing {
+        action: "credentials-revoke".to_owned(),
+        argument: argument.to_owned(),
+    };
+    let held = Arguments {
+        plugin: Some("reader".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        super::extending::asked_for("credentials-revoke", Arguments::default()).err(),
+        Some(missing("plugin"))
+    );
+    assert_eq!(
+        super::extending::asked_for("credentials-revoke", held).err(),
+        Some(missing("credential"))
+    );
+}
+
 /// An ask without the title or its kind is refused by the argument it lacks, a kind that
 /// is neither is refused naming both, and an ask naming nobody is the core's to refuse.
 #[test]

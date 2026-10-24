@@ -160,10 +160,13 @@ async fn a_revoke_is_read_first_then_ends_the_grant_rewrites_and_restarts_what_r
     )
     .await;
     assert!(read.is_ok(), "{read:?}");
-    let Ok(read) = read else {
+    let Ok((read, unchanged)) = read else {
         return;
     };
     assert!(!read.ended);
+    assert!(unchanged
+        .holds("reader")
+        .is_some_and(|one| one.granted == vec![the_grant()]));
     assert_eq!(read.restarts, vec!["reader", "reader-worker"]);
     assert_eq!(recorded(&machine), vec![the_grant()]);
 
@@ -175,7 +178,13 @@ async fn a_revoke_is_read_first_then_ends_the_grant_rewrites_and_restarts_what_r
     )
     .await;
 
-    assert!(ended.as_ref().is_ok_and(|ended| ended.ended), "{ended:?}");
+    assert!(
+        ended.as_ref().is_ok_and(|(ended, after)| ended.ended
+            && after
+                .holds("reader")
+                .is_some_and(|one| one.granted.is_empty())),
+        "{ended:?}"
+    );
     assert!(recorded(&machine).is_empty());
     assert_eq!(journalled(&machine), vec![(CROSSING.to_owned(), false)]);
     assert!(std::fs::read_to_string(file).is_ok_and(|text| !text.contains("series-key")));
@@ -194,13 +203,13 @@ async fn a_revoke_writes_the_credential_out_of_a_reader_that_is_not_running() {
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=series-key\n").is_ok());
     let read = crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, None).await;
-    let agreement = read.map(|read| read.agreement).unwrap_or_default();
+    let agreement = read.map(|(read, _)| read.agreement).unwrap_or_default();
 
     let ended =
         crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, Some(&agreement))
             .await;
 
-    assert!(ended.is_ok_and(|ended| ended.ended && ended.unrestarted.is_none()));
+    assert!(ended.is_ok_and(|(ended, _)| ended.ended && ended.unrestarted.is_none()));
     assert!(std::fs::read_to_string(file).is_ok_and(|text| !text.contains("series-key")));
 }
 
@@ -331,7 +340,7 @@ fn a_grant_change_with_no_journal_to_take_it_is_refused() {
 async fn a_revoke_whose_reader_cannot_be_rewritten_ends_the_grant_and_says_so() {
     let machine = granting("granted-unreached", reader(vec![the_grant()]));
     let read = crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, None).await;
-    let agreement = read.map(|read| read.agreement).unwrap_or_default();
+    let agreement = read.map(|(read, _)| read.agreement).unwrap_or_default();
     unwritable_files(&machine);
 
     let refused =
@@ -372,6 +381,24 @@ async fn a_revoke_asked_of_the_credentials_answers_with_every_grant_as_it_then_s
     );
 }
 
+#[tokio::test]
+async fn a_revoke_asked_of_the_credentials_for_a_grant_not_held_is_refused_and_ends_nothing() {
+    let machine = granting("granted-inventoried-unheld", reader(vec![the_grant()]));
+
+    let refused = crate::app::credentials::credentials(
+        &machine.ctx,
+        crate::app::Asking::Revoke {
+            plugin: "reader".to_owned(),
+            credential: "RADARR_API_KEY".to_owned(),
+            agreement: None,
+        },
+    )
+    .await;
+
+    assert!(refused.is_err_and(|problem| problem.code == crate::error::codes::plugin::NO_GRANT));
+    assert_eq!(recorded(&machine), vec![the_grant()]);
+}
+
 /// The stamp of the newest change the journal on `machine` holds.
 fn newest(machine: &Machine) -> String {
     crate::app::targets::layout(&machine.ctx)
@@ -396,11 +423,11 @@ async fn an_undone_revoke_gives_the_grant_back_and_it_crosses_again() {
     );
     let file = handed(&machine);
     let read = crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, None).await;
-    let agreement = read.map(|read| read.agreement).unwrap_or_default();
+    let agreement = read.map(|(read, _)| read.agreement).unwrap_or_default();
     let ended =
         crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, Some(&agreement))
             .await;
-    assert!(ended.is_ok_and(|ended| ended.ended));
+    assert!(ended.is_ok_and(|(ended, _)| ended.ended));
     assert!(std::fs::read_to_string(&file).is_ok_and(|text| !text.contains("series-key")));
 
     let undone = crate::app::putting_back::undo(&machine.ctx, Some(&newest(&machine))).await;
