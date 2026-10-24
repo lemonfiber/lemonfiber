@@ -535,7 +535,7 @@
         },
         {
           "path": "identity.source/v1/operations/whoever.json",
-          "sha256": "26e62a25b20e9de0bc234a624d927e49c6b895b9cf664c460c991ef62137cd9b"
+          "sha256": "24abdc2de183cdc983c8211f8f00a2195aafd872cd20ef4256e8e692258e4279"
         },
         {
           "path": "identity.source/v1/operations/standing.json",
@@ -614,7 +614,7 @@
         },
         {
           "path": "media.serve/v1/operations/signed_in.json",
-          "sha256": "159d870127a60abcdd10fa0ed32f8525262c208624bec7a2f983bed246714b58"
+          "sha256": "a43bbb882f419a04e1bd91a6224ed27cc77eeb6f236e810967aac7a51ad5b73a"
         },
         {
           "path": "media.serve/v1/operations/title.json",
@@ -666,7 +666,7 @@
         },
         {
           "path": "media.serve/v1/operations/mint.json",
-          "sha256": "de5a620d2c7761cfd3928c24399ac393c9d4c41bc52dbb675b5e7a3957b70470"
+          "sha256": "cb7018f449cd6e3eb6d811117d2b1f6c44cbe669750dc3476994f919d8dec711"
         },
         {
           "path": "media.serve/v1/operations/dated.json",

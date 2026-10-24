@@ -3,7 +3,8 @@
 //! a check names in its place, on the same network with the key lemonfiber mints for it,
 //! the first run performed through the adapter, the upstream's own requests asked, and
 //! every case of each contract the adapter speaks asked of it in the order the contract
-//! publishes them.
+//! publishes them, a contract after every one whose answers its cases read and a case the
+//! first run already asked answered by what the first run heard.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -20,18 +21,24 @@ use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
 use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
 use super::{Failed, Recorder};
-use crate::plugin::conforming::{ASKED_WITH, RECORDINGS};
+use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::Placed;
 use crate::plugin::program::{Operator, Starting, Throwaway};
 use crate::plugin::recorded::{Answer, Asked};
-use crate::ports::http::{Http, Method, Request, JSON};
+use crate::ports::http::{Http, Method, Request, Response, JSON};
 use crate::ports::serving::{Serve, Served};
 use filling::Filling;
 use preparing::Prepared;
+use speaking::{contracts, fixture, named};
+use tapped::Tapped;
 
 mod filling;
 mod preparing;
+mod speaking;
+mod tapped;
+
+pub(super) use speaking::fixtures;
 
 /// The contract whose first run the adapter performs, as the seed performs it.
 fn identity() -> String {
@@ -64,33 +71,6 @@ impl Case {
     }
 }
 
-/// What names the case `case` of the contract `contract`.
-fn named(contract: &str, case: &str) -> String {
-    format!("conformance {contract}/{case}")
-}
-
-/// Where the recording of the case `case` of the contract `contract` sits.
-fn fixture(contract: &str, case: &str) -> String {
-    format!("{RECORDINGS}/{contract}/{case}.json")
-}
-
-/// What names each case of every contract `adapter` speaks that an upstream filing `files`
-/// is asked, and where its recording sits.
-pub(super) fn fixtures(
-    adapter: &lemonfiber_plugin::Service,
-    files: &[String],
-) -> Vec<(String, String)> {
-    contracts(adapter)
-        .iter()
-        .flat_map(|(spoken, capability)| {
-            filed(capability, files)
-                .into_iter()
-                .map(|case| (named(spoken, &case.case), fixture(spoken, &case.case)))
-                .collect::<Vec<_>>()
-        })
-        .collect()
-}
-
 /// The adapter that fronts a service, and how it is placed.
 #[derive(Clone, Copy)]
 pub(super) struct Fronting<'a> {
@@ -98,23 +78,6 @@ pub(super) struct Fronting<'a> {
     pub(super) service: &'a lemonfiber_plugin::Service,
     /// How installing it places it.
     pub(super) placed: &'a Placed,
-}
-
-/// Every contract's case `adapter` speaks, in the order each publishes them.
-pub(super) fn contracts(
-    adapter: &lemonfiber_plugin::Service,
-) -> Vec<(String, lemonfiber_contract::Capability)> {
-    let published = lemonfiber_contract::capabilities::all();
-    adapter
-        .speaks
-        .iter()
-        .filter_map(|spoken| {
-            published
-                .iter()
-                .find(|one| lemonfiber_contract::spoken(one.name, one.major) == *spoken)
-                .map(|one| (spoken.clone(), one.clone()))
-        })
-        .collect()
 }
 
 /// What the upstream answered each of its requests and the adapter each case, scrubbed.
@@ -296,12 +259,14 @@ impl Asking<'_> {
             .await
             .map_err(|(step, why)| Faulted::new(step, why, made.clone()))?;
         let contracts = contracts(self.adapter.service);
+        let mut heard = BTreeMap::new();
         if contracts.iter().any(|(spoken, _)| *spoken == identity()) {
-            let password = self
+            let (password, first) = self
                 .first_run(&reached)
                 .await
                 .map_err(|why| Faulted::new("first run", why, made.clone()))?;
             made.push(password);
+            heard = first;
         }
         let mut upstream = Vec::new();
         for item in items {
@@ -329,7 +294,7 @@ impl Asking<'_> {
             for case in filed(capability, &self.upstream.media_types) {
                 let step = named(spoken, &case.case);
                 let one = self
-                    .case(&reached, &mut filling, spoken, &case)
+                    .case(&reached, &mut filling, spoken, &case, &heard)
                     .await
                     .map_err(|why| Faulted::new(&step, why, filling.made.clone()))?;
                 asked.push(one);
@@ -378,14 +343,49 @@ impl Asking<'_> {
         })
     }
 
-    /// One case asked of the adapter with its placeholders filled, and what it answered.
+    /// One case and what the adapter answered it: what the first run heard where it asked
+    /// the case under the key already, and the case asked with its placeholders filled
+    /// otherwise. Every credential the contract says the answer holds is kept among what
+    /// the run made, so it is scrubbed.
     async fn case(
         &self,
         reached: &Reached,
         filling: &mut Filling<'_>,
         spoken: &str,
         case: &lemonfiber_contract::conformance::Case<'_>,
+        heard: &BTreeMap<String, Response>,
     ) -> Result<Case, String> {
+        let url = format!("{}{}", reached.base, case.operation.path());
+        let response = match heard.get(&url).filter(|_| case.keyed) {
+            Some(first) => first.clone(),
+            None => self.posted(reached, filling, case, url).await?,
+        };
+        let answer: Value = serde_json::from_str(&response.body).unwrap_or(Value::Null);
+        filling.made.extend(issued(case.operation.secret, &answer));
+        filling
+            .answers
+            .insert(format!("{spoken}/{}", case.case), answer);
+        Ok(Case {
+            contract: spoken.to_owned(),
+            called: case.case.clone(),
+            asked: Asked {
+                method: ASKED_WITH.to_owned(),
+                path: case.operation.path(),
+                accept: Some(JSON.to_owned()),
+            },
+            answer: kept(&response),
+        })
+    }
+
+    /// `case` posted to the adapter at `url` with its placeholders filled, and what it
+    /// answered.
+    async fn posted(
+        &self,
+        reached: &Reached,
+        filling: &mut Filling<'_>,
+        case: &lemonfiber_contract::conformance::Case<'_>,
+        url: String,
+    ) -> Result<Response, String> {
         let filled = filling.filled(&case.asks)?;
         let key = case.keyed.then(|| {
             (
@@ -395,7 +395,7 @@ impl Asking<'_> {
         });
         let request = Request {
             method: Method::Post,
-            url: format!("{}{}", reached.base, case.operation.path()),
+            url,
             headers: [
                 ("Content-Type".to_owned(), JSON.to_owned()),
                 ("Accept".to_owned(), JSON.to_owned()),
@@ -414,20 +414,7 @@ impl Asking<'_> {
         if (200..300).contains(&response.status) {
             filling.keep_minted(&filled.minted)?;
         }
-        filling.answers.insert(
-            format!("{spoken}/{}", case.case),
-            serde_json::from_str(&response.body).unwrap_or(Value::Null),
-        );
-        Ok(Case {
-            contract: spoken.to_owned(),
-            called: case.case.clone(),
-            asked: Asked {
-                method: ASKED_WITH.to_owned(),
-                path: case.operation.path(),
-                accept: Some(JSON.to_owned()),
-            },
-            answer: kept(&response),
-        })
+        Ok(response)
     }
 
     /// Every answer scrubbed of what the run made and both containers' identity, or
@@ -468,11 +455,16 @@ impl Asking<'_> {
     }
 
     /// The upstream's first run, performed through the adapter as the seed performs it,
-    /// tried again while the upstream is not answering within its health's limit, and
-    /// the administrator's password it left in the adapter's `upstream.json`.
-    async fn first_run(&self, reached: &Reached) -> Result<String, String> {
+    /// tried again while the upstream is not answering within its health's limit; the
+    /// administrator's password it left in the adapter's `upstream.json`, and the last
+    /// answer the adapter gave to each address the first run asked.
+    async fn first_run(
+        &self,
+        reached: &Reached,
+    ) -> Result<(String, BTreeMap<String, Response>), String> {
+        let tapped = Arc::new(Tapped::through(Arc::clone(&reached.adapter)));
         let source = lemonfiber_contract::capabilities::identity::source::Adapter(Contracted::new(
-            Arc::clone(&reached.adapter),
+            Arc::clone(&tapped) as Arc<dyn Http>,
             &reached.base,
             &self.adapter.placed.service,
             self.key,
@@ -506,10 +498,23 @@ impl Asking<'_> {
                 {
                     tokio::time::sleep(POLL).await;
                 }
-                left => return left.map_err(unfinished),
+                left => {
+                    return left
+                        .map(|password| (password, tapped.heard()))
+                        .map_err(unfinished)
+                }
             }
         }
     }
+}
+
+/// The string at each of `secret`'s pointers in `answer`, where it holds one.
+fn issued(secret: &[&str], answer: &Value) -> Vec<String> {
+    secret
+        .iter()
+        .filter_map(|pointer| answer.pointer(pointer).and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Why a first run that left the upstream without its administrator did.

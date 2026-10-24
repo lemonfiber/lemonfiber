@@ -69,11 +69,13 @@ impl Endpoint {
         }
     }
 
-    /// A non-success response: a refused credential, or an answer that cannot be used.
+    /// A non-success response: a refused credential, a service not answering yet, or an
+    /// answer that cannot be used.
     #[must_use]
     pub fn refusal(&self, response: &Response) -> Failure {
         match response.status {
             401 | 403 => self.unauthorised(),
+            503 => self.unavailable(),
             _ => self.refused(&describe(response)),
         }
     }

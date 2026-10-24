@@ -74,6 +74,9 @@ pub struct Operation {
     pub answered: schemars::Schema,
     /// The most its answer may carry, in bytes.
     pub largest: usize,
+    /// Each place its answer holds a credential the upstream issues, as a JSON pointer,
+    /// `""` where the whole answer is one.
+    pub secret: &'static [&'static str],
     /// What its conformance case posts, its placeholders still to be filled.
     pub asks: serde_json::Value,
     /// For an operation bound to a kind of media, what its case for each media type posts
@@ -98,6 +101,7 @@ impl Operation {
             asked: schemars::schema_for!(A),
             answered: schemars::schema_for!(R),
             largest: client::LARGEST,
+            secret: &[],
             asks: serde_json::Value::Null,
             filed: Vec::new(),
             reads: read_as::<R>,
@@ -125,6 +129,13 @@ impl Operation {
     #[must_use]
     pub const fn within(mut self, largest: usize) -> Self {
         self.largest = largest;
+        self
+    }
+
+    /// The same operation, its answer holding a credential at each pointer of `secret`.
+    #[must_use]
+    pub const fn holding(mut self, secret: &'static [&'static str]) -> Self {
+        self.secret = secret;
         self
     }
 

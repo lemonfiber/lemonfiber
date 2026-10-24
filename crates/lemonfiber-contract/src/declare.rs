@@ -15,7 +15,9 @@
 //! After its return type every operation says what its conformance case posts, as
 //! `where asks = Asked { … }`: a value of the request it crosses as, any string of which
 //! may be a [`crate::conformance::Placeholder`]. One whose answer may be larger than
-//! [`crate::client::LARGEST`] says so first, as `where largest = BYTES, asks = …`.
+//! [`crate::client::LARGEST`] says so first, as `where largest = BYTES, asks = …`, and one
+//! whose answer holds a credential the upstream issues names each place as a JSON pointer
+//! before `asks`, as `where secret = &["/token"], asks = …`.
 //!
 //! The port's own type is written out, rather than derived from the mark, because the
 //! trait implementations go through `#[async_trait]`, which gives every reference in a
@@ -39,7 +41,7 @@ macro_rules! contract {
                 impl $Trait:path {
                     $(
                         $(#[$op_meta:meta])*
-                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? asks = $asks:expr;
+                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? $(secret = $secret:expr,)? asks = $asks:expr;
                     )*
                 }
             )*
@@ -175,6 +177,7 @@ macro_rules! contract {
                                 stringify!($op),
                             )
                             .within($crate::contract!(@largest $($largest)?))
+                            .holding($crate::contract!(@secret $($secret)?))
                             .asking(&$op::asks()),
                         )*)*
                     ],
@@ -185,6 +188,9 @@ macro_rules! contract {
 
     (@largest) => { $crate::client::LARGEST };
     (@largest $largest:expr) => { $largest };
+
+    (@secret) => { &[] };
+    (@secret $secret:expr) => { $secret };
 
     (@wire str $p:ty) => { ::std::string::String };
     (@wire opt_str $p:ty) => { ::core::option::Option<::std::string::String> };
