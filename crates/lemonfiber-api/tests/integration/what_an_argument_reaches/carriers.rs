@@ -9,7 +9,7 @@ use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::Restarting;
-use lemonfiber_core::app::{Answer, Chosen, Decision, Filling, Keeping, Linking};
+use lemonfiber_core::app::{Answer, Asking, Chosen, Decision, Filling, Keeping, Linking};
 use lemonfiber_core::app::{Command, MigrateAction, QualityAction, Setting, Waiting};
 use lemonfiber_core::app::{Diagnosing, Gathering, Restoring, Teardown, Tracing};
 use lemonfiber_core::app::{Inviting, LettingGo};
@@ -22,8 +22,9 @@ use lemonfiber_core::uninstall::Tier;
 
 mod plugins;
 use plugins::{
-    carries_approved, carries_inputs, carries_plugin, carries_recipe, carries_source,
-    give_approved, give_inputs, give_plugin, give_recipe, give_source,
+    carries_approved, carries_credential, carries_inputs, carries_plugin, carries_recipe,
+    carries_source, give_approved, give_credential, give_inputs, give_plugin, give_recipe,
+    give_source,
 };
 
 mod settling;
@@ -209,12 +210,14 @@ fn carries_offer(command: &Command) -> bool {
         // only yes it takes: dropped, it is a removal nobody could ask for; kept
         // silently, one nobody read the cost of.
         Command::Uninstall(asked) => asked.agreement.as_deref() == Some(OFFER),
-        // And taking somebody out of the household, reverting the operator's edits, or
-        // choosing what fills a capability, where the offer's own name is the only yes:
-        // dropped, nothing could be done; kept silently, one nobody read the cost of.
+        // And taking somebody out of the household, reverting the operator's edits,
+        // choosing what fills a capability, or ending a grant of a credential, where the
+        // offer's own name is the only yes: dropped, nothing could be done; kept silently,
+        // one nobody read the cost of.
         Command::Remove { agreement, .. }
         | Command::Reset { agreement }
-        | Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
+        | Command::Wiring(Linking::Fill(Filling { agreement, .. }))
+        | Command::Credentials(Asking::Revoke { agreement, .. }) => {
             agreement.as_deref() == Some(OFFER)
         }
         // And standing in place of a setup, where the offer's own name is the only yes:
@@ -657,7 +660,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 55] = [
+pub(super) const SWEEPS: [Sweep; 56] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -694,6 +697,7 @@ pub(super) const SWEEPS: [Sweep; 55] = [
     ("reason", give_reason, carries_reason),
     ("capability", give_capability, carries_capability),
     ("plugin", give_plugin, carries_plugin),
+    ("credential", give_credential, carries_credential),
     ("recipe", give_recipe, carries_recipe),
     ("source", give_source, carries_source),
     ("approved", give_approved, carries_approved),

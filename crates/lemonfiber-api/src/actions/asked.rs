@@ -229,6 +229,7 @@ impl Arguments {
             key: Some("DATA_ROOT".to_owned()),
             value: Some("/srv".to_owned()),
             setting: Some("gluetun:countries".to_owned()),
+            credential: Some("SONARR_API_KEY".to_owned()),
             preset: Some("balanced".to_owned()),
             media_type: Some("tv".to_owned()),
             archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),

@@ -374,3 +374,23 @@ fn an_ended_grant_says_what_restarted_and_how_to_take_back_what_was_handed() {
         "{stalled}"
     );
 }
+
+#[test]
+fn a_rehearsed_revoke_of_a_grant_nothing_reads_restarts_nothing_and_writes_nothing() {
+    let mut rehearsed = Inventory::of(Vec::new()).revoking(revoked(false, &[]));
+    rehearsed.rehearsed = true;
+    let text = drawn(rehearsed);
+    let ended = drawn(Inventory::of(Vec::new()).revoking(revoked(true, &[])));
+
+    assert!(
+        text.contains("restart nothing, since no service of it reads it"),
+        "{text}"
+    );
+    assert!(
+        text.contains("Nothing was written, because this was a rehearsal"),
+        "{text}"
+    );
+    assert!(text.contains("without --dry-run"), "{text}");
+    assert!(!ended.contains("Restarted"), "{ended}");
+    assert!(!ended.contains("did not restart"), "{ended}");
+}

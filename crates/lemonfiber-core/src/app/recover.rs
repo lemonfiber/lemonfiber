@@ -246,9 +246,10 @@ pub(crate) fn carrying_out(
 pub(crate) fn reheld(ctx: &Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
     for holding in carried.done.iter().filter_map(|undo| match &undo.action {
         Action::Rehold { name, .. } => Some(crate::plugin::Holding::Store(name.clone())),
-        Action::Regrant { grant, .. } => {
-            Some(crate::plugin::Holding::Crossing(grant.credential.clone()))
-        }
+        Action::Regrant {
+            grant, give: true, ..
+        } => Some(crate::plugin::Holding::Crossing(grant.credential.clone())),
+        Action::Regrant { .. } => Some(crate::plugin::Holding::Withheld),
         Action::Restore { key, .. } => Some(crate::settings::files::holding_of(key)),
         _ => None,
     }) {

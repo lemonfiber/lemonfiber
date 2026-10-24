@@ -58,3 +58,23 @@ fn a_secret_of_the_plugins_own_names_nothing_it_is_for() {
         "{said:?}"
     );
 }
+
+#[test]
+fn a_crossing_secret_of_a_plugin_providing_nothing_is_told_it_provides_nothing() {
+    let providing_nothing = INSTALLABLE.replace(
+        r#"provides    = ["media.serve", "komga:kobo-sync"]"#,
+        "provides    = []",
+    );
+    let said = said(&(providing_nothing + &crossing("series-key", "sonarr", "media.serve")));
+    assert!(
+        names(
+            &said,
+            &[
+                "secret series-key.for",
+                "media.serve",
+                "it provides nothing"
+            ]
+        ),
+        "{said:?}"
+    );
+}

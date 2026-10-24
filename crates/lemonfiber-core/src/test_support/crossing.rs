@@ -28,6 +28,16 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
     reader
 }
 
+/// The grant of the series curator's key to the reader, for the capability it fills.
+pub(crate) fn a_grant() -> crate::plugin::Grant {
+    crate::plugin::Grant {
+        credential: "SONARR_API_KEY".to_owned(),
+        of: "sonarr".to_owned(),
+        serves: "media.serve".to_owned(),
+        at: "1".to_owned(),
+    }
+}
+
 /// The reader, under the name of a plugin the machine trusts, so its files are written.
 pub(crate) fn a_trusted_crossing_reader() -> crate::plugin::Installed {
     let mut embedded = a_crossing_reader();

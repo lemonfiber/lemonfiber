@@ -388,13 +388,13 @@ async fn a_crossing_key_put_back_by_an_undo_reaches_every_file_that_reads_it() {
 }
 
 /// Where the files that read them live, under `machine`, made a file so none can be written.
-fn unwritable_files(machine: &Machine) {
+pub(super) fn unwritable_files(machine: &Machine) {
     assert!(std::fs::write(machine.env.with_file_name("env"), "not a directory").is_ok());
 }
 
 /// Whether `refused` says a file reading the changed value could not be written, and that
 /// the value changed all the same.
-fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) -> bool {
+pub(super) fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) -> bool {
     refused.is_some_and(|problem| {
         problem.code == crate::error::codes::config::CONFIG_NOT_WRITTEN
             && problem.meaning == crate::settings::files::UNREACHED

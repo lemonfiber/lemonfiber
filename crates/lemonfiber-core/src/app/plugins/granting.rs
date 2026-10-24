@@ -215,10 +215,7 @@ pub(crate) async fn revoke(
     let mut after = held.clone();
     after.regrant(plugin, grant, false);
     super::super::record::keep(super::kept_at(ctx).as_deref(), &after)?;
-    crate::settings::files::reread_now(
-        ctx,
-        &crate::plugin::Holding::Crossing(grant.credential.clone()),
-    )?;
+    crate::settings::files::reread_now(ctx, &crate::plugin::Holding::Withheld)?;
     let running = crate::settings::running(ctx, &revoked.restarts).await;
     revoked.unrestarted = crate::settings::restarted(ctx, &running).await;
     revoked.ended = true;

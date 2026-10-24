@@ -71,7 +71,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         key: takes(TAKES_KEY).then(|| "DATA_ROOT".to_owned()),
         value: takes(TAKES_VALUE).then(|| "/srv".to_owned()),
         setting: takes(TAKES_SETTING).then(|| "gluetun:countries".to_owned()),
-        credential: takes(TAKES_CREDENTIAL).then(|| "SONARR_API_KEY".to_owned()),
+        credential: takes(TAKES_CREDENTIAL).then(|| CREDENTIAL.to_owned()),
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
         archive: takes(TAKES_ARCHIVE).then(|| ARCHIVE.to_owned()),
@@ -172,6 +172,10 @@ pub(crate) const CAPABILITY: &str = "indexer.search";
 
 /// A plugin an update or a removal acts on.
 pub(crate) const PLUGIN: &str = "komga";
+
+/// A credential granted to a third-party plugin, by the setting the credentials read lists
+/// it under.
+pub(crate) const CREDENTIAL: &str = "SONARR_API_KEY";
 
 /// A demand recipe the plugin is asked to run.
 pub(crate) const RECIPE: &str = "rescan";

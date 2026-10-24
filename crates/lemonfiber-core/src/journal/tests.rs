@@ -575,3 +575,24 @@ fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left
         }
     );
 }
+
+#[test]
+fn undoing_a_grant_gives_back_what_it_ended_and_ends_what_it_gave() {
+    let granted = |given: bool| Change {
+        at: "1".to_owned(),
+        operation: "plugin:reader".to_owned(),
+        target: "SONARR_API_KEY".to_owned(),
+        kind: Kind::Granted {
+            plugin: "reader".to_owned(),
+            grant: crate::test_support::a_grant(),
+            given,
+        },
+    };
+    let regrant = |give: bool| Action::Regrant {
+        plugin: "reader".to_owned(),
+        grant: crate::test_support::a_grant(),
+        give,
+    };
+    assert_eq!(granted(true).undo().action, regrant(false));
+    assert_eq!(granted(false).undo().action, regrant(true));
+}

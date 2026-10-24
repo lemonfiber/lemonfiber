@@ -1,20 +1,13 @@
 use super::changing::{machine, running, Machine};
+use super::reaching::{refused_as_unreached, unwritable_files};
 use crate::config::store;
 use crate::journal::Kind;
 use crate::plugin::{Grant, Installed, Register};
 use crate::settings::Resolved;
+use crate::test_support::a_grant as the_grant;
+use lemonfiber_fixtures::support::Reporting;
 
 const CROSSING: &str = "SONARR_API_KEY";
-
-/// The grant of the series curator's key to the reader, for the capability it fills.
-fn the_grant() -> Grant {
-    Grant {
-        credential: CROSSING.to_owned(),
-        of: "sonarr".to_owned(),
-        serves: "media.serve".to_owned(),
-        at: "1".to_owned(),
-    }
-}
 
 /// The reader, its crossing secret naming what it is for, and holding `granted`.
 fn reader(granted: Vec<Grant>) -> Installed {
@@ -26,9 +19,16 @@ fn reader(granted: Vec<Grant>) -> Installed {
     reader
 }
 
-/// A machine holding the curator's key, with `installed` the one plugin recorded on it.
+/// A machine holding the curator's key, with `installed` the one plugin recorded on it
+/// and the reader running.
 fn granting(name: &str, installed: Installed) -> Machine {
-    let machine = machine(name, running(&["reader"]));
+    granting_on(name, installed, running(&["reader"]))
+}
+
+/// A machine holding the curator's key, with `installed` the one plugin recorded on it and
+/// the engine reporting `engine`.
+fn granting_on(name: &str, installed: Installed, engine: Reporting) -> Machine {
+    let machine = machine(name, engine);
     assert!(store::set(&machine.env, CROSSING, "series-key").is_ok());
     let mut register = Register::empty();
     assert!(register.record(installed).is_ok());
@@ -149,6 +149,8 @@ fn a_third_party_secret_of_another_service_naming_nothing_it_is_for_is_refused()
 #[tokio::test]
 async fn a_revoke_is_read_first_then_ends_the_grant_rewrites_and_restarts_what_read_it() {
     let machine = granting("granted-revoked", reader(vec![the_grant()]));
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=series-key\n").is_ok());
 
     let read = crate::app::plugins::granting::revoke(
         &machine.ctx,
@@ -176,11 +178,30 @@ async fn a_revoke_is_read_first_then_ends_the_grant_rewrites_and_restarts_what_r
     assert!(ended.as_ref().is_ok_and(|ended| ended.ended), "{ended:?}");
     assert!(recorded(&machine).is_empty());
     assert_eq!(journalled(&machine), vec![(CROSSING.to_owned(), false)]);
-    let file = machine.env.with_file_name("env").join("reader.env");
     assert!(std::fs::read_to_string(file).is_ok_and(|text| !text.contains("series-key")));
     assert!(machine.runner.seen().iter().any(
         |argv| argv.iter().any(|word| word == "up") && argv.iter().any(|word| word == "reader")
     ));
+}
+
+#[tokio::test]
+async fn a_revoke_writes_the_credential_out_of_a_reader_that_is_not_running() {
+    let machine = granting_on(
+        "granted-revoked-stopped",
+        reader(vec![the_grant()]),
+        Reporting::absent(),
+    );
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=series-key\n").is_ok());
+    let read = crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, None).await;
+    let agreement = read.map(|read| read.agreement).unwrap_or_default();
+
+    let ended =
+        crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, Some(&agreement))
+            .await;
+
+    assert!(ended.is_ok_and(|ended| ended.ended && ended.unrestarted.is_none()));
+    assert!(std::fs::read_to_string(file).is_ok_and(|text| !text.contains("series-key")));
 }
 
 #[tokio::test]
@@ -194,6 +215,12 @@ async fn a_revoke_of_a_grant_not_held_or_over_a_moved_offer_is_refused_and_ends_
             .await;
 
     let unheld = unheld.err();
+    let elsewhere =
+        crate::app::plugins::granting::revoke(&machine.ctx, "elsewhere", CROSSING, None).await;
+    assert!(elsewhere
+        .err()
+        .and_then(|problem| problem.detail)
+        .is_some_and(|detail| detail == "it holds none"));
     assert_eq!(
         unheld.as_ref().map(|problem| problem.code.as_str()),
         Some("PLUGIN-47")
@@ -241,4 +268,222 @@ fn a_grant_is_journalled_as_ended_where_an_act_drops_it_and_given_where_it_adds_
         journalled(&machine),
         vec![(CROSSING.to_owned(), false), (CROSSING.to_owned(), true)]
     );
+}
+
+#[test]
+fn a_grant_is_asked_once_for_each_credential_held_here_and_never_for_an_aimless_secret() {
+    let machine = granting("granted-asked-once", reader(Vec::new()));
+    let Ok(manifest) = machine.ctx.stack.checked_manifest(machine.ctx.today()) else {
+        return;
+    };
+    let mut would = reader(Vec::new());
+    let first = would.declared.secrets.first().cloned();
+    for (id, of, serves) in [
+        ("sonarr-again", "sonarr", Some("media.read")),
+        ("sonarr-aimless", "sonarr", None),
+        ("nowhere-key", "nowhere", Some("media.find")),
+    ] {
+        if let Some(mut secret) = first.clone() {
+            id.clone_into(&mut secret.id);
+            of.clone_into(&mut secret.of);
+            secret.serves = serves.map(str::to_owned);
+            would.declared.secrets.push(secret);
+        }
+    }
+
+    let asked = crate::app::plugins::granting::asked(&machine.ctx, &manifest, &[], &would, &[]);
+
+    assert_eq!(
+        asked,
+        vec![Grant {
+            at: String::new(),
+            ..the_grant()
+        }]
+    );
+}
+
+#[test]
+fn an_approved_grant_is_stamped_when_it_was_approved() {
+    let asked = Grant {
+        at: String::new(),
+        ..the_grant()
+    };
+
+    assert_eq!(
+        crate::app::plugins::granting::approved(&[asked], "1"),
+        vec![the_grant()]
+    );
+}
+
+#[test]
+fn a_grant_change_with_no_journal_to_take_it_is_refused() {
+    let given = crate::app::plugins::granting::journalled;
+    let homeless = crate::test_support::a_context().build();
+    let machine = granting("granted-unjournalled", reader(Vec::new()));
+    let journal = crate::app::targets::layout(&machine.ctx).map(|paths| paths.journal());
+    assert!(journal.is_some_and(|journal| std::fs::create_dir_all(journal).is_ok()));
+
+    assert!(given(&homeless, "reader", &[], &[the_grant()], "3").is_err());
+    assert!(given(&machine.ctx, "reader", &[], &[the_grant()], "3").is_err());
+}
+
+#[tokio::test]
+async fn a_revoke_whose_reader_cannot_be_rewritten_ends_the_grant_and_says_so() {
+    let machine = granting("granted-unreached", reader(vec![the_grant()]));
+    let read = crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, None).await;
+    let agreement = read.map(|read| read.agreement).unwrap_or_default();
+    unwritable_files(&machine);
+
+    let refused =
+        crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, Some(&agreement))
+            .await;
+
+    assert!(refused_as_unreached(refused.err()));
+    assert!(recorded(&machine).is_empty());
+}
+
+#[tokio::test]
+async fn a_revoke_asked_of_the_credentials_answers_with_every_grant_as_it_then_stands() {
+    let machine = granting("granted-inventoried", reader(vec![the_grant()]));
+    let asked = |agreement: Option<String>| crate::app::Asking::Revoke {
+        plugin: "reader".to_owned(),
+        credential: CROSSING.to_owned(),
+        agreement,
+    };
+
+    let read = crate::app::credentials::credentials(&machine.ctx, asked(None)).await;
+    let agreement = read
+        .as_ref()
+        .ok()
+        .and_then(|read| read.revoked.as_ref())
+        .map(|revoked| revoked.agreement.clone());
+    let ended = crate::app::credentials::credentials(&machine.ctx, asked(agreement)).await;
+
+    assert!(
+        read.as_ref().is_ok_and(|read| read.grants
+            == vec![crate::credential::Granted::of("reader", &the_grant())]
+            && read.revoked.as_ref().is_some_and(|revoked| !revoked.ended)),
+        "{read:?}"
+    );
+    assert!(
+        ended.as_ref().is_ok_and(|ended| ended.grants.is_empty()
+            && ended.revoked.as_ref().is_some_and(|revoked| revoked.ended)),
+        "{ended:?}"
+    );
+}
+
+/// The stamp of the newest change the journal on `machine` holds.
+fn newest(machine: &Machine) -> String {
+    crate::app::targets::layout(&machine.ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+        .unwrap_or_default()
+}
+
+/// The reader's secrets file on `machine`, holding the curator's key as it was handed over.
+fn handed(machine: &Machine) -> std::path::PathBuf {
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=series-key\n").is_ok());
+    file
+}
+
+#[tokio::test]
+async fn an_undone_revoke_gives_the_grant_back_and_it_crosses_again() {
+    let machine = granting_on(
+        "granted-undone",
+        reader(vec![the_grant()]),
+        Reporting::absent(),
+    );
+    let file = handed(&machine);
+    let read = crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, None).await;
+    let agreement = read.map(|read| read.agreement).unwrap_or_default();
+    let ended =
+        crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, Some(&agreement))
+            .await;
+    assert!(ended.is_ok_and(|ended| ended.ended));
+    assert!(std::fs::read_to_string(&file).is_ok_and(|text| !text.contains("series-key")));
+
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some(&newest(&machine))).await;
+
+    assert!(undone.is_ok(), "{undone:?}");
+    assert_eq!(recorded(&machine), vec![the_grant()]);
+    assert!(std::fs::read_to_string(&file).is_ok_and(|text| text.contains("series-key")));
+    assert_eq!(
+        journalled(&machine),
+        vec![(CROSSING.to_owned(), false), (CROSSING.to_owned(), true)]
+    );
+}
+
+#[tokio::test]
+async fn an_undone_grant_ends_it_and_writes_the_credential_out() {
+    let machine = granting_on(
+        "granted-given-undone",
+        reader(vec![the_grant()]),
+        Reporting::absent(),
+    );
+    let file = handed(&machine);
+    assert!(crate::app::plugins::granting::journalled(
+        &machine.ctx,
+        "reader",
+        &[],
+        &[the_grant()],
+        "2"
+    )
+    .is_ok());
+
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some("2")).await;
+
+    assert!(undone.is_ok(), "{undone:?}");
+    assert!(recorded(&machine).is_empty());
+    assert!(std::fs::read_to_string(&file).is_ok_and(|text| !text.contains("series-key")));
+}
+
+#[test]
+fn a_grant_given_back_that_is_already_held_is_left_as_it_stands() {
+    let machine = granting("granted-held", reader(vec![the_grant()]));
+    let record = machine.env.with_file_name(crate::config::paths::PLUGINS);
+    let before = std::fs::read_to_string(&record).unwrap_or_default();
+    let regrant = crate::journal::Undo {
+        target: CROSSING.to_owned(),
+        action: crate::journal::Action::Regrant {
+            plugin: "reader".to_owned(),
+            grant: the_grant(),
+            give: true,
+        },
+    };
+
+    let carried = crate::app::recover::carrying_out(
+        &lemonfiber_adapters::Disk,
+        &[regrant],
+        &machine.env,
+        Vec::new(),
+    );
+
+    assert_eq!(carried.map(|carried| carried.done.len()).ok(), Some(1));
+    assert_eq!(std::fs::read_to_string(&record).unwrap_or_default(), before);
+}
+
+#[test]
+fn every_grant_a_record_holds_is_kept_in_the_order_of_its_credentials() {
+    let mut register = Register::empty();
+    assert!(register.record(reader(Vec::new())).is_ok());
+    let film = Grant {
+        credential: "RADARR_API_KEY".to_owned(),
+        of: "radarr".to_owned(),
+        ..the_grant()
+    };
+
+    assert!(register.regrant("reader", &the_grant(), true));
+    assert!(register.regrant("reader", &film, true));
+
+    let held: Vec<String> = register
+        .holds("reader")
+        .map(|one| {
+            one.granted
+                .iter()
+                .map(|grant| grant.credential.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(held, vec!["RADARR_API_KEY", CROSSING]);
 }

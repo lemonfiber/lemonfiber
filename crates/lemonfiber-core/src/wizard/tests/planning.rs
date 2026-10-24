@@ -676,6 +676,23 @@ fn a_device_key_is_named_as_a_key_is() {
 }
 
 #[test]
+fn a_grant_is_named_by_its_plugin_and_credential() {
+    assert_eq!(
+        described(&Change {
+            at: String::new(),
+            operation: "plugin:reader".to_owned(),
+            target: "SONARR_API_KEY".to_owned(),
+            kind: Kind::Granted {
+                plugin: "reader".to_owned(),
+                grant: crate::test_support::a_grant(),
+                given: true,
+            },
+        }),
+        "reader's grant of SONARR_API_KEY"
+    );
+}
+
+#[test]
 fn a_move_and_a_copy_are_said_plainly_enough_to_recognise() {
     let change = |kind| Change {
         at: String::new(),

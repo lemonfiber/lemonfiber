@@ -1,9 +1,9 @@
 //! Where each argument a plugin action takes is carried in the command it reaches.
 
-use super::super::acting::{APPROVAL, INPUT, PLUGIN, RECIPE, SOURCE};
+use super::super::acting::{APPROVAL, CREDENTIAL, INPUT, PLUGIN, RECIPE, SOURCE};
 use lemonfiber_api::actions::Arguments;
 use lemonfiber_core::app::plugins::{Asked as Installing, Inputs};
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Asking, Command};
 
 /// Whether the command has the plugin it was told to act on.
 pub(super) fn carries_plugin(command: &Command) -> bool {
@@ -14,8 +14,20 @@ pub(super) fn carries_plugin(command: &Command) -> bool {
                 | Installing::Remove { plugin, .. }
                 | Installing::Prove { plugin, .. }
                 | Installing::Run { plugin, .. }
-        ) if plugin == PLUGIN
+        ) | Command::Credentials(Asking::Revoke { plugin, .. }) if plugin == PLUGIN
     )
+}
+
+/// Whether the command has the credential whose grant it ends.
+pub(super) fn carries_credential(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Credentials(Asking::Revoke { credential, .. }) if credential == CREDENTIAL
+    )
+}
+
+pub(super) fn give_credential(given: &mut Arguments) {
+    given.credential = Some(CREDENTIAL.to_owned());
 }
 
 pub(super) fn give_plugin(given: &mut Arguments) {

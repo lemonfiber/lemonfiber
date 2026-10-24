@@ -46,7 +46,7 @@
       "default": ""
     },
     "granted": {
-      "description": "Each credential of another service the operator granted it, where it is\nthird-party (`F14-R20`).",
+      "description": "Each credential of another service the operator granted it, as a third-party plugin.",
       "type": "array",
       "items": {
         "$ref": "PluginGrant.json"

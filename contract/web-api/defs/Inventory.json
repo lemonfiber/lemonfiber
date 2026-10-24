@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "grants": {
-      "description": "Every credential granted to a third-party plugin (`ARCH-R325`).",
+      "description": "Every credential granted to a third-party plugin.",
       "type": "array",
       "items": {
         "$ref": "CredentialGranted.json"
