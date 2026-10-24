@@ -142,3 +142,16 @@ async fn writing_removes_what_no_case_asks() {
     assert_eq!(outcomes(&read).last(), Some(&Took::Removed));
     assert!(!at.join(STRAY).exists());
 }
+
+#[tokio::test]
+async fn a_check_names_a_recording_taken_again_that_holds_no_note() {
+    let at = source("fronted-checked-unnoted", FRONTED);
+    let _ = recorded(&at, &engine(), &answering(), Some(7)).await;
+    let before = texts(&at);
+
+    let read = checked(&at, &engine(), &answering(), Some(BUILT)).await;
+
+    assert!(!read.holds);
+    assert_eq!(outcomes(&read), vec![Took::Unnoted; 4]);
+    assert_eq!(texts(&at), before);
+}

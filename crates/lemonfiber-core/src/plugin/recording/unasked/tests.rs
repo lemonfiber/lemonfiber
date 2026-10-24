@@ -116,3 +116,26 @@ fn a_recording_that_cannot_be_removed_says_why() {
         "{strays:?}"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_folder_that_cannot_be_read_is_passed_over() {
+    use std::os::unix::fs::PermissionsExt;
+    let at = Scratch::new("unasked-unreadable");
+    put(&at, STRAY);
+    put(&at, "conformance/library.serve@1/kinds-answers-music.json");
+    let folder = at.join("conformance/library.curate@1");
+    let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o000));
+
+    let strays = taken(&at, &[], &Retaking::Checked { adapter: None });
+    let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755));
+
+    assert_eq!(
+        strays
+            .iter()
+            .map(|one| one.fixture.as_deref())
+            .collect::<Vec<_>>(),
+        vec![Some("conformance/library.serve@1/kinds-answers-music.json")]
+    );
+    assert!(at.join(STRAY).exists());
+}

@@ -1,8 +1,9 @@
 //! A service an adapter of the plugin fronts, recorded with that adapter beside it: the
 //! upstream served fresh from its pin, the adapter started from its own pin, or the image
-//! a check names in its place, on the same network with the key lemonfiber mints for it, the first run performed through the
-//! adapter, the upstream's own requests asked, and every case of each contract the
-//! adapter speaks asked of it in the order the contract publishes them.
+//! a check names in its place, on the same network with the key lemonfiber mints for it,
+//! the first run performed through the adapter, the upstream's own requests asked, and
+//! every case of each contract the adapter speaks asked of it in the order the contract
+//! publishes them.
 
 use std::collections::BTreeMap;
 use std::path::Path;
