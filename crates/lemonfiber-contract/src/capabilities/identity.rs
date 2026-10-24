@@ -58,7 +58,7 @@ crate::contract! {
             /// Every account.
             fn household() -> Vec<Member> where asks = Asked {};
             /// Who somebody is, by name and password, signing in from one device.
-            fn whoever(str name: &str, str password: &str, str device: &str) -> Option<Signed> where asks = Asked {
+            fn whoever(str name: &str, str password: &str, str device: &str) -> Option<Signed> where secret = &["/token"], asks = Asked {
                 name: Placeholder::Upstream("username".to_owned()).written(),
                 password: Placeholder::Upstream("password".to_owned()).written(),
                 device: device("whoever"),
