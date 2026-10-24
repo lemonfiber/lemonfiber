@@ -192,7 +192,10 @@ fn filled(body: &str, heard: &Heard) -> String {
         };
         let value = heard.get(name).map(String::as_str).unwrap_or_default();
         let quoted = serde_json::Value::from(value).to_string();
-        written.push_str(quoted.trim_matches('"'));
+        let content = quoted
+            .strip_prefix('"')
+            .and_then(|open| open.strip_suffix('"'));
+        written.push_str(content.unwrap_or_default());
         rest = tail;
     }
     written.push_str(rest);

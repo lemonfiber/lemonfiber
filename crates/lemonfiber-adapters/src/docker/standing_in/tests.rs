@@ -78,6 +78,7 @@ fn a_body_takes_what_a_request_said_earlier_written_as_json_and_nothing_where_no
     let heard = Heard::from([
         ("App".to_owned(), "conformance".to_owned()),
         ("odd".to_owned(), "a\"b".to_owned()),
+        ("quoted".to_owned(), "\"a\"".to_owned()),
     ]);
 
     assert_eq!(
@@ -88,6 +89,7 @@ fn a_body_takes_what_a_request_said_earlier_written_as_json_and_nothing_where_no
         r#"{"AppName":"conformance","Other":""}"#
     );
     assert_eq!(filled(r#"["{query:odd}"]"#, &heard), r#"["a\"b"]"#);
+    assert_eq!(filled(r#"["{query:quoted}"]"#, &heard), r#"["\"a\""]"#);
     assert_eq!(filled(r#"["{query:App"]"#, &heard), r#"["{query:App"]"#);
 }
 
