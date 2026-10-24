@@ -35,7 +35,7 @@
           },
           "host": "conformance-download",
           "name": "conformance",
-          "port": 80,
+          "port": 8080,
           "protocol": "sabnzbd"
         }
       },
@@ -69,7 +69,7 @@
           },
           "host": "conformance-download",
           "name": "conformance",
-          "port": 80,
+          "port": 8080,
           "protocol": "sabnzbd"
         },
         "id": "{library.curate@1/download_clients-answers#/0/id}"

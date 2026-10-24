@@ -44,6 +44,7 @@ mod presence;
 mod program;
 mod refusal;
 mod serving;
+mod standing_in;
 mod translate;
 mod volumes;
 
@@ -238,6 +239,14 @@ impl lemonfiber_ports::serving::Serving for Daemon {
 
     async fn removed(&self, served: &lemonfiber_ports::serving::Served) {
         serving::removed(self, served).await;
+    }
+
+    async fn stand_in(
+        &self,
+        stand_in: &lemonfiber_ports::serving::StandIn,
+    ) -> Result<Box<dyn lemonfiber_ports::serving::Answering>, lemonfiber_ports::program::Unran>
+    {
+        standing_in::stood_in(self, stand_in).await
     }
 }
 

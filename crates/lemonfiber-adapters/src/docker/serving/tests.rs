@@ -13,6 +13,7 @@ use super::{body, left_behind, machine, named, read_off, stood, PROOF_LABEL};
 
 fn serve() -> Serve {
     Serve {
+        reaching: Vec::new(),
         image: "lscr.io/linuxserver/sonarr@sha256:dffc".to_owned(),
         env: vec!["TZ=UTC".to_owned(), "PUID=1000".to_owned()],
         user: None,

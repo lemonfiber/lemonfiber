@@ -20,10 +20,16 @@ use super::{FOLDER, NAMED};
 use crate::conformance::Placeholder;
 
 /// The host the conformance cases name a download client on.
-const CLIENT_HOST: &str = "conformance-download";
+pub const CLIENT_HOST: &str = "conformance-download";
 
-/// The port the conformance cases name a download client on.
-const CLIENT_PORT: u16 = 80;
+/// The port the conformance cases name a download client on: `SABnzbd`'s own.
+const CLIENT_PORT: u16 = 8080;
+
+/// The version the client the cases register answers it is.
+const CLIENT_VERSION: &str = "4.5.1";
+
+/// The folder the client the cases register says it finishes downloads in.
+const CLIENT_FINISHED: &str = "/downloads/complete";
 
 /// The protocol the conformance cases register their download client in: the native API
 /// of the download filler the bundle ships, as the core names the clients it registers.
@@ -58,6 +64,49 @@ const PROFILE: i64 = 1;
 
 /// An item no curator holds.
 const NO_ITEM: i64 = 0;
+
+/// What answers as the download client the conformance cases register while a curator is
+/// recorded: `SABnzbd`'s answers to the queries a curator tests a client with before it saves
+/// one, filing under the category the cases name and each of `media_types`, and nothing
+/// more.
+#[must_use]
+pub fn client_answering(media_types: &[String]) -> lemonfiber_ports::serving::StandIn {
+    let categories: Vec<Value> = ["*", NAMED]
+        .into_iter()
+        .chain(media_types.iter().map(String::as_str))
+        .map(|name| serde_json::json!({ "name": name, "dir": "" }))
+        .collect();
+    let answers = [
+        ("version", serde_json::json!({ "version": CLIENT_VERSION })),
+        (
+            "get_config",
+            serde_json::json!({ "config": {
+                "misc": {
+                    "complete_dir": CLIENT_FINISHED,
+                    "pre_check": false,
+                    "enable_tv_sorting": false,
+                    "enable_movie_sorting": false,
+                    "enable_date_sorting": false,
+                },
+                "categories": categories,
+                "sorters": [],
+            } }),
+        ),
+        (
+            "queue",
+            serde_json::json!({ "queue": { "slots": [], "paused": false } }),
+        ),
+        ("history", serde_json::json!({ "history": { "slots": [] } })),
+    ];
+    lemonfiber_ports::serving::StandIn {
+        port: CLIENT_PORT,
+        asked_by: "mode".to_owned(),
+        answers: answers
+            .into_iter()
+            .map(|(mode, said)| (mode.to_owned(), said.to_string()))
+            .collect(),
+    }
+}
 
 /// The download client the conformance cases register.
 fn client() -> DownloadClient {

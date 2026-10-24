@@ -304,3 +304,33 @@ async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process(
         ]
     );
 }
+
+#[test]
+fn the_client_the_cases_register_answers_a_curators_tests_and_files_under_each_category() {
+    let answering =
+        crate::capabilities::library::client_answering(&["tv".to_owned(), "movies".to_owned()]);
+    let said = |mode: &str| {
+        answering
+            .answers
+            .iter()
+            .find(|(asked, _)| asked == mode)
+            .and_then(|(_, text)| serde_json::from_str::<serde_json::Value>(text).ok())
+    };
+    let categories: Vec<String> = said("get_config")
+        .and_then(|config| config.pointer("/config/categories")?.as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|one| one.get("name")?.as_str().map(str::to_owned))
+        .collect();
+
+    assert_eq!(
+        (answering.port, answering.asked_by.as_str()),
+        (8080, "mode")
+    );
+    assert_eq!(categories, vec!["*", "conformance", "tv", "movies"]);
+    assert!(said("version").is_some_and(|version| version
+        .get("version")
+        .is_some_and(serde_json::Value::is_string)));
+    assert!(said("queue").is_some() && said("history").is_some());
+    assert_eq!(answering.answers.len(), 4);
+}

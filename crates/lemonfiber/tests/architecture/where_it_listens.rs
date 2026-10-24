@@ -108,6 +108,12 @@ const LISTENS: &[(&str, &str)] = &[
          ask for at all",
     ),
     (
+        "crates/lemonfiber-adapters/src/docker/standing_in.rs",
+        "the download client a curator registers while it is recorded, answered by this \
+         binary on the one address the engine's containers reach this machine by, refusing \
+         every query it was not given, for as long as that recording runs",
+    ),
+    (
         "crates/lemonfiber/src/passing.rs",
         "the pass service answering the stream guard, in its own container, at the one \
          address the core gives it on the network it shares with the guard alone",

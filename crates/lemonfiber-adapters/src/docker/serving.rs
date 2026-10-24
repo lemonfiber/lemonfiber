@@ -28,6 +28,9 @@ const NAMED: &str = "lemonfiber-record-";
 /// The interface the one port is published on.
 const LOOPBACK: &str = "127.0.0.1";
 
+/// What the engine resolves to the machine it runs containers for.
+const HOST_GATEWAY: &str = "host-gateway";
+
 /// Told apart across the networks one process makes.
 static COUNTED: AtomicU64 = AtomicU64::new(0);
 
@@ -201,6 +204,13 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
         host_config: Some(HostConfig {
             network_mode: Some(network.to_owned()),
             port_bindings: published,
+            extra_hosts: (!serve.reaching.is_empty()).then(|| {
+                serve
+                    .reaching
+                    .iter()
+                    .map(|name| format!("{name}:{HOST_GATEWAY}"))
+                    .collect()
+            }),
             security_opt: Some(serve.security_opt.clone()),
             cap_drop: Some(serve.cap_drop.clone()),
             cap_add: Some(serve.cap_add.clone()),

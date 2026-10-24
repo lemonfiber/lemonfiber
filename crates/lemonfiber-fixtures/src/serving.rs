@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lemonfiber_ports::program::Unran;
-use lemonfiber_ports::serving::{Serve, Served, Serving, Standing};
+use lemonfiber_ports::serving::{Answering, Serve, Served, Serving, StandIn, Standing};
 
 /// Serves every service the same way, and keeps what it was asked.
 pub struct Serves {
@@ -16,7 +16,13 @@ pub struct Serves {
     writes: Vec<(String, String)>,
     asked: Mutex<Vec<Serve>>,
     removed: Mutex<Vec<Served>>,
+    stood_in: Mutex<Vec<StandIn>>,
 }
+
+/// A stand-in that answers nothing, standing for one the engine would answer.
+struct Answers;
+
+impl Answering for Answers {}
 
 impl Serves {
     /// Every service is served as `served`, and stands running with no health check.
@@ -30,7 +36,25 @@ impl Serves {
             writes: Vec::new(),
             asked: Mutex::new(Vec::new()),
             removed: Mutex::new(Vec::new()),
+            stood_in: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Keep `stand_in` as asked, and answer for it with nothing.
+    fn standing_in(&self, stand_in: &StandIn) -> Box<dyn Answering> {
+        if let Ok(mut held) = self.stood_in.lock() {
+            held.push(stand_in.clone());
+        }
+        Box::new(Answers)
+    }
+
+    /// Every stand-in it was asked to answer, in the order asked.
+    #[must_use]
+    pub fn stood_in(&self) -> Vec<StandIn> {
+        self.stood_in
+            .lock()
+            .map(|held| held.clone())
+            .unwrap_or_default()
     }
 
     /// A container known as a test's, reached on the loopback interface at `port`.
@@ -183,5 +207,9 @@ impl Serving for Serves {
 
     async fn removed(&self, served: &Served) {
         self.removing(served);
+    }
+
+    async fn stand_in(&self, stand_in: &StandIn) -> Result<Box<dyn Answering>, Unran> {
+        Ok(self.standing_in(stand_in))
     }
 }

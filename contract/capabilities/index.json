@@ -283,7 +283,7 @@
         },
         {
           "path": "library.curate/v1/conformance.json",
-          "sha256": "e419e0341726f9c5fad3f708de9232a629f1c83e45cbfb7cb322fc5f1b8131af"
+          "sha256": "80f13c8ce03e50d8d040d2ffe31d2b8f10d4a109d8f04c01f05d0dd785d362aa"
         }
       ],
       "majors": [

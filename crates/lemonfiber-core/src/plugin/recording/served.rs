@@ -148,6 +148,7 @@ pub(super) fn settled_as(
         target: LIBRARY.to_owned(),
     }));
     Serve {
+        reaching: Vec::new(),
         image: format!("{}@{}", placed.image, placed.digest),
         env,
         user,
