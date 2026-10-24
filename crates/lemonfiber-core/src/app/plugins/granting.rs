@@ -85,7 +85,7 @@ pub(crate) fn asked(
         let Some(credential) = fillers
             .service(&secret.of)
             .filter(|owner| owner.brought_by() != Some(would.plugin.as_str()))
-            .and_then(|owner| fillers.setting(owner, crate::config::API_KEY_SUFFIX))
+            .and_then(|owner| fillers.credential(owner))
         else {
             continue;
         };

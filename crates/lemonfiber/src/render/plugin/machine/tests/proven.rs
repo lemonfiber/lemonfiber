@@ -397,6 +397,7 @@ fn asked(
             named: "komga".to_owned(),
         },
         reaches: lemonfiber_core::wiring::Reaches::Asked {
+            native: None,
             capability: "library.curate".to_owned(),
             services: services.iter().map(|one| (*one).to_owned()).collect(),
             settled,

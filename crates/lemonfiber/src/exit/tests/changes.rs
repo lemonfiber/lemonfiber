@@ -608,6 +608,7 @@ fn a_listing_with_an_ask_nothing_fills_exits_as_a_configuration_problem() {
     let broken = lemonfiber_core::model::WiringReport {
         wired: Vec::new(),
         unfilled: vec![lemonfiber_core::wiring::Unfilled {
+            native: None,
             by: "seerr".to_owned(),
             capability: "identity.source".to_owned(),
         }],

@@ -10,6 +10,13 @@
     "capability": {
       "description": "What it asked for.",
       "type": "string"
+    },
+    "native": {
+      "description": "The upstream's own API it asked in, where no upstream filling it declares that API.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [

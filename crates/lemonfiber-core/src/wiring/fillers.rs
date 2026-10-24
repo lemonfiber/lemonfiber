@@ -78,6 +78,9 @@ pub struct Filler {
     /// The setting of each credential of another service the operator granted the plugin
     /// that brought it.
     pub granted: Vec<String>,
+    /// The secret lemonfiber minted as its credential, by the name the secret store holds it
+    /// under, where its plugin declares one.
+    pub minted: Option<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
@@ -117,6 +120,16 @@ impl Filler {
     #[must_use]
     pub fn stands_in(&self) -> bool {
         self.first_party && self.replaces.as_deref() == Some(self.id.as_str())
+    }
+
+    /// The API lemonfiber speaks to it in: its adapter's, or the upstream's own it declares
+    /// in `native` where it names no adapter.
+    #[must_use]
+    pub fn talks_in(&self) -> Option<ApiKind> {
+        self.adapter
+            .as_ref()
+            .map(|api| api.kind)
+            .or_else(|| self.native.as_deref().and_then(ApiKind::named))
     }
 
     /// Who holds what it holds, as a credential crossing to or from it is judged.
@@ -419,8 +432,18 @@ impl Fillers {
     pub fn hands(&self, owner: &Filler, recipient: &Filler) -> bool {
         crosses(owner.holder(), recipient.holder())
             || self
-                .setting(owner, crate::config::API_KEY_SUFFIX)
-                .is_some_and(|setting| recipient.granted.contains(&setting))
+                .credential(owner)
+                .is_some_and(|credential| recipient.granted.contains(&credential))
+    }
+
+    /// The name `owner`'s credential is held under: the secret lemonfiber minted for it,
+    /// or the setting its API key is kept as.
+    #[must_use]
+    pub fn credential(&self, owner: &Filler) -> Option<String> {
+        owner
+            .minted
+            .clone()
+            .or_else(|| self.setting(owner, crate::config::API_KEY_SUFFIX))
     }
 }
 
@@ -475,6 +498,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         contracts: Vec::new(),
         first_party: false,
         granted: Vec::new(),
+        minted: None,
         majors: service.majors(),
         fronts: None,
         native: None,
@@ -514,6 +538,12 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .iter()
             .map(|grant| grant.credential.clone())
             .collect(),
+        minted: one
+            .declared
+            .secrets
+            .iter()
+            .find(|secret| secret.minted && secret.of == placed.service)
+            .map(|secret| crate::settings::named(plugin, &secret.id)),
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),

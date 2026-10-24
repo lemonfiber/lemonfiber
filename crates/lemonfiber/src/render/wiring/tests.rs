@@ -9,6 +9,7 @@ fn asking(by: &str, capability: &str, services: &[&str], settled: Settled) -> Wi
         by: by.to_owned(),
         origin: lemonfiber_core::origin::Origin::Bundled,
         reaches: Reaches::Asked {
+            native: None,
             capability: capability.to_owned(),
             services: services.iter().map(|one| (*one).to_owned()).collect(),
             settled,
@@ -66,6 +67,7 @@ fn what_an_ask_reaches_says_where_each_service_came_from() {
         by: "seerr".to_owned(),
         origin: lemonfiber_core::origin::Origin::Bundled,
         reaches: Reaches::Asked {
+            native: None,
             capability: "media.serve".to_owned(),
             services: vec!["kavita".to_owned(), "stray".to_owned()],
             settled: Settled::Each,
@@ -199,6 +201,7 @@ fn what_nothing_fills_is_listed_again_naming_what_asked() {
     let said = shown(&WiringReport {
         wired: vec![asking("seerr", "identity.source", &[], Settled::Unfilled)],
         unfilled: vec![Unfilled {
+            native: None,
             by: "seerr".to_owned(),
             capability: "identity.source".to_owned(),
         }],
@@ -305,6 +308,7 @@ fn a_choice_made_gives_no_name_to_answer_with() {
 #[test]
 fn what_a_substitution_would_leave_unfilled_is_said_in_the_conditional() {
     let leaves = vec![Unfilled {
+        native: None,
         by: "seerr".to_owned(),
         capability: "identity.source".to_owned(),
     }];

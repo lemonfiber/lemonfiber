@@ -67,6 +67,7 @@ fn a_plugins_ask_follows_the_stacks_and_says_whose_service_asked() {
     assert_eq!(
         wired.last().map(|one| &one.reaches),
         Some(&Reaches::Asked {
+            native: None,
             capability: "media.serve".to_owned(),
             services: vec!["one".to_owned(), "two".to_owned()],
             settled: Settled::Each,
@@ -85,6 +86,7 @@ fn a_plugins_ask_for_one_of_several_takes_the_stacks_own_choice_and_its_reason()
     assert_eq!(
         wired.first().map(|one| &one.reaches),
         Some(&Reaches::Asked {
+            native: None,
             capability: "media.serve".to_owned(),
             services: vec!["two".to_owned()],
             settled: Settled::Chosen {
@@ -134,6 +136,7 @@ fn a_plugins_ask_nothing_fills_is_reported_naming_the_plugins_service() {
     assert_eq!(
         missing,
         Some(vec![Unfilled {
+            native: None,
             by: "subfinder".to_owned(),
             capability: "subtitles.fetch".to_owned(),
         }])
