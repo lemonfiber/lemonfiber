@@ -6,14 +6,11 @@ use include_dir::{include_dir, Dir};
 /// The stack this binary carries.
 ///
 /// Embedding it means the common install has one thing to fetch rather than
-/// two, and `build.rs` has already refused to produce this binary if the
-/// manifest is one it could not read.
-///
-/// What runs of it, rather than the whole submodule: `build/carried.rs` chooses the
-/// files and copies them beside this build's other outputs, and that copy is what is
-/// embedded — so an operator's stack directory is written with the stack and not
-/// with the CI, scripts and hooks of the repository it is published from.
-pub static STACK: Dir<'_> = include_dir!("$OUT_DIR/stack");
+/// two, and `lemonfiber-bundled` has already refused to build if the manifest is one
+/// it could not read. What is embedded is what runs of it, so an operator's stack
+/// directory is written with the stack and not with the CI, scripts and hooks of the
+/// repositories it comes from.
+pub use lemonfiber_bundled::CARRIED as STACK;
 
 /// The app this binary serves a browser.
 ///

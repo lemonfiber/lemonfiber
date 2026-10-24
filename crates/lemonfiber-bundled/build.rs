@@ -7,11 +7,15 @@
 //! compile time — the vocabulary the bundled services publish, the names a plugin may
 //! not take — reads that text, and a stack the manifest reader refuses is refused
 //! here, while it is still a compile error. The pins and the first-party set the core
-//! trusts are written out beside it, so neither is typed by hand.
+//! trusts are written out beside it, so neither is typed by hand, and so is what runs
+//! of the stack (`build/carried.rs`), which the binary embeds.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::exit;
+
+#[path = "build/carried.rs"]
+mod carried;
 
 /// Where the media stack the bundle replaces lives, from this crate.
 const STACK: &str = "../../assets/media-stack";
@@ -19,28 +23,33 @@ const STACK: &str = "../../assets/media-stack";
 /// Where the catalogue holding the default bundle lives, from this crate.
 const CATALOGUE: &str = "../../assets/plugins";
 
+/// Where what runs of the stack is written, beneath this build's output.
+const CARRIED: &str = "stack";
+
 fn main() {
     let out = PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
     let catalogue = Path::new(env!("CARGO_MANIFEST_DIR")).join(CATALOGUE);
+    let media = Path::new(env!("CARGO_MANIFEST_DIR")).join(STACK);
+    println!("cargo::rerun-if-changed={}", media.display());
     let held = bundle(&catalogue, &out);
-    stack(&catalogue, &held, &out);
+    let text = stack(&media, &catalogue, &held, &out);
+    carried::stack(
+        &media,
+        &catalogue.join(lemonfiber_bundle::COPIES),
+        &text,
+        &held,
+        &out,
+    );
 }
 
 /// The stack the bundle at `catalogue` declares, with each part it installs kept as the
-/// media stack declares it, assembled into `stack.toml` in `out`.
-fn stack(catalogue: &Path, held: &[lemonfiber_bundle::Held], out: &Path) {
-    let media = Path::new(env!("CARGO_MANIFEST_DIR")).join(STACK);
-    for path in [
-        media.join(lemonfiber_manifest::assembly::ROOT),
-        media.join(lemonfiber_manifest::assembly::SERVICES),
-    ] {
-        println!("cargo::rerun-if-changed={}", path.display());
-    }
-    let frozen = lemonfiber_manifest::read(&media).unwrap_or_else(|refused| {
+/// media stack at `media` declares it, assembled into `stack.toml` in `out`.
+fn stack(media: &Path, catalogue: &Path, held: &[lemonfiber_bundle::Held], out: &Path) -> String {
+    let frozen = lemonfiber_manifest::read(media).unwrap_or_else(|refused| {
         refuse(
             "the media stack cannot be assembled",
             &refused.to_string(),
-            &media,
+            media,
         )
     });
     let declared =
@@ -63,10 +72,11 @@ fn stack(catalogue: &Path, held: &[lemonfiber_bundle::Held], out: &Path) {
             catalogue,
         );
     }
-    if let Err(unwritten) = std::fs::write(out.join("stack.toml"), text) {
+    if let Err(unwritten) = std::fs::write(out.join("stack.toml"), &text) {
         eprintln!("error: the assembled manifest could not be written: {unwritten}");
         exit(1);
     }
+    text
 }
 
 /// Stop the build, saying `what` and why, at `at`.

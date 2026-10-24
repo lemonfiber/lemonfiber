@@ -45,12 +45,9 @@ pub(crate) fn bound() -> Binding {
     Binding::here(8471)
 }
 
-/// The stack this repository carries, read from disk.
+/// The stack the tests are written against, read from disk.
 pub(crate) fn stack() -> Source {
-    Source::External(Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    )))
+    Source::External(lemonfiber_fixtures::stack::fixture_on_disk())
 }
 
 /// A stack source pointing nowhere, for the reads that are about a refusal.

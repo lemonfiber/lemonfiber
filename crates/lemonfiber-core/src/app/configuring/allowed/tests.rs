@@ -4,9 +4,9 @@ use super::{declared, identity, refusal};
 use crate::config::env::EnvFile;
 use crate::test_support::a_context;
 
-/// The stack lemonfiber ships, compiled in.
+/// The stack the tests are written against, compiled in.
 static SHIPPED: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
 
 /// A stack compiled in that declares nothing.
 static STACKLET: include_dir::Dir<'_> =

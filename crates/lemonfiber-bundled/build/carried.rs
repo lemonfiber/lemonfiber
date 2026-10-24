@@ -1,9 +1,9 @@
-//! The stack this binary carries: what runs, and nothing that only builds, tests or
+//! The stack a build carries: what runs, and nothing that only builds, tests or
 //! describes the repositories it is published from.
 //!
 //! An operator's stack directory is written from whatever is carried, so what is
-//! carried is chosen here and written beside this build's other outputs, and the
-//! binary embeds that copy:
+//! carried is chosen here and written beside this build's other outputs, and that copy
+//! is what is embedded and what every test of the shipped stack reads:
 //!
 //! - **The manifest:** the stack the bundle declares, written apart as a root and a
 //!   file per service, as a stack directory holds it.
@@ -20,7 +20,7 @@
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
-use lemonfiber_bundled::{Stage, PINNED, STACK};
+use lemonfiber_bundle::{Held, Stage};
 
 /// The licence the media stack is published under, relative to its root.
 pub const LICENCE: &str = "LICENSE";
@@ -39,14 +39,12 @@ enum Carried {
     Text(String),
 }
 
-/// Write what runs of the stack the bundle declares into `out/stack`: the parts'
-/// copies from `copies`, and the rest from the media stack at `media`.
-pub fn stack(media: &Path, copies: &Path, out: &Path) {
-    println!("cargo::rerun-if-changed={}", media.display());
-    println!("cargo::rerun-if-changed={}", copies.display());
-    let into = out.join("stack");
+/// Write what runs of the stack `text` the bundle declares into `out/stack`: the copies
+/// of the parts `held` from `copies`, and the rest from the media stack at `media`.
+pub fn stack(media: &Path, copies: &Path, text: &str, held: &[Held], out: &Path) {
+    let into = out.join(super::CARRIED);
     let _ = std::fs::remove_dir_all(&into);
-    for (relative, from) in runtime(media, copies) {
+    for (relative, from) in runtime(media, copies, text, held) {
         let target = into.join(&relative);
         let made = target
             .parent()
@@ -56,39 +54,44 @@ pub fn stack(media: &Path, copies: &Path, out: &Path) {
                 Carried::Text(text) => std::fs::write(&target, text),
             });
         if let Err(error) = made {
-            super::refuse(&[
-                &format!("{} could not be carried: {error}", relative.display()),
-                &format!("Into: {}", into.display()),
-            ]);
+            super::refuse(
+                &format!("{} could not be carried", relative.display()),
+                &error.to_string(),
+                &into,
+            );
         }
     }
 }
 
 /// Every file of the stack that runs, by its path in a stack directory, with where its
 /// bytes come from.
-fn runtime(media: &Path, copies: &Path) -> BTreeMap<PathBuf, Carried> {
-    let mut carried = manifest();
+fn runtime(media: &Path, copies: &Path, text: &str, held: &[Held]) -> BTreeMap<PathBuf, Carried> {
+    let mut carried = manifest(text, copies);
     for relative in WHOLE_FILES.iter().map(PathBuf::from) {
         if media.join(&relative).is_file() {
             carried.insert(relative.clone(), Carried::File(media.join(relative)));
         }
     }
-    for pinned in PINNED {
-        let id = pinned.first_party.plugin;
+    for one in held {
+        let id = &one.pin.id;
         let starting = Path::new(CONFIG).join(id);
-        match pinned.stage {
+        match one.pin.stage {
             Some(Stage::Assembled) => from(&copies.join(id), &starting, &mut carried),
             _ => from(media, &starting, &mut carried),
         }
     }
-    carried.extend(proven(media, copies));
+    carried.extend(proven(media, copies, text));
     carried
 }
 
-/// The stack the bundle declares, written apart as a stack directory holds it.
-fn manifest() -> BTreeMap<PathBuf, Carried> {
-    let Ok((root, services)) = lemonfiber_manifest::assembly::split(STACK) else {
-        super::refuse(&["the stack the bundle declares cannot be written apart"]);
+/// The stack `text` the bundle declares, written apart as a stack directory holds it.
+fn manifest(text: &str, copies: &Path) -> BTreeMap<PathBuf, Carried> {
+    let Ok((root, services)) = lemonfiber_manifest::assembly::split(text) else {
+        super::refuse(
+            "the stack the bundle declares cannot be written apart",
+            "",
+            copies,
+        );
     };
     let mut carried = BTreeMap::from([(
         PathBuf::from(lemonfiber_manifest::assembly::ROOT),
@@ -132,9 +135,9 @@ fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, Carried>) {
 /// Every recording the manifest's claims are proven against, by its path in a stack
 /// directory: from the copy of the part whose recordings it is where the copy holds it,
 /// and from the media stack at `media` otherwise.
-fn proven(media: &Path, copies: &Path) -> BTreeMap<PathBuf, Carried> {
+fn proven(media: &Path, copies: &Path, text: &str) -> BTreeMap<PathBuf, Carried> {
     let mut named = Vec::new();
-    if let Ok(document) = STACK.parse::<toml::Table>() {
+    if let Ok(document) = text.parse::<toml::Table>() {
         fixtures(&toml::Value::Table(document), &mut named);
     }
     let mut proven = BTreeMap::new();
@@ -158,10 +161,15 @@ fn proven(media: &Path, copies: &Path) -> BTreeMap<PathBuf, Carried> {
         }
     }
     if !missing.is_empty() {
-        let mut said = vec!["the stack's claims name recordings it does not hold".to_owned()];
-        said.extend(missing.iter().map(|fixture| format!("Missing: {fixture}")));
-        let lines: Vec<&str> = said.iter().map(String::as_str).collect();
-        super::refuse(&lines);
+        let said: Vec<String> = missing
+            .iter()
+            .map(|fixture| format!("Missing: {fixture}"))
+            .collect();
+        super::refuse(
+            "the stack's claims name recordings it does not hold",
+            &said.join("\n"),
+            copies,
+        );
     }
     proven
 }

@@ -1,0 +1,32 @@
+[[service]]
+id = "flaresolverr"
+name = "FlareSolverr"
+profile = "search"
+image = "ghcr.io/flaresolverr/flaresolverr"
+tag = "v3.5.2"
+digest = "sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767"
+port = 8191
+bind = "loopback"
+criticality = "enhancing"
+memory_mib = 300
+license = "MIT"
+upstream = "https://github.com/FlareSolverr/FlareSolverr"
+last_release = "2026-09-12"
+describes = "Gets past bot-protection on some indexers"
+without_it = "Those indexers return nothing"
+reaches = "the indexer sites that challenge it"
+asks_for = "Fetches a page through a headless browser when an indexer sits behind bot protection, which means it visits that indexer directly."
+provides = ["indexer.proxy"]
+health = { kind = "tcp", timeout_s = 60 }
+
+[service.env]
+LOG_LEVEL = { setting = "flaresolverr:log-level", default = "info" }
+
+[[service.claim]]
+capability = "indexer.proxy"
+
+[[service.claim.probe]]
+id = "identifies"
+request = { method = "GET", path = "/" }
+expect = { status = 200, json = { msg = "FlareSolverr is ready!" }, json_types = { version = "str" } }
+fixture = "recordings/flaresolverr/indexer-proxy-identifies.json"

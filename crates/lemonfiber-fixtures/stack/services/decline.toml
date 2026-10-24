@@ -1,0 +1,25 @@
+# lemonfiber's own image, built by lemonfiber-decline and pinned at the tag the
+# release train published (ADR-0033). It answers the decline address an
+# invitation carries, at the household tier (ADR-0029).
+[[service]]
+id = "decline"
+name = "Decline service"
+profile = "media"
+image = "ghcr.io/lemonfiber/decline"
+tag = "v0.17.0"
+digest = "sha256:814d551113e93135259ac8e92586938bf88c3bb03bc8ce75b8e0d7e4d14a8147"
+port = 5056
+bind = "lan"
+criticality = "enhancing"
+memory_mib = 32
+license = "Hippocratic-3.0"
+upstream = "https://github.com/lemonfiber/lemonfiber-decline"
+last_release = "2026-10-06"
+describes = "Lets somebody you invited turn the invitation down, and switches the account off the moment they do"
+without_it = "An invitation carries no way to refuse it, and stays claimable until it lapses"
+reaches = ""
+asks_for = "Nothing beyond this machine. When an invitee refuses, it switches that one account off in Jellyfin, over a network the two share alone, and records the refusal for lemonfiber."
+health = { kind = "http", path = "/health", timeout_s = 30 }
+listens = 8080
+posture = "confined"
+mem_limit_mib = 64

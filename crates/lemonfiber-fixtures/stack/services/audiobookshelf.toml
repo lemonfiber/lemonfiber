@@ -1,0 +1,46 @@
+[[service]]
+id = "audiobookshelf"
+name = "Audiobookshelf"
+profile = "media"
+image = "ghcr.io/advplyr/audiobookshelf"
+tag = "2.37.1"
+digest = "sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b"
+port = 13378
+bind = "lan"
+criticality = "enhancing"
+memory_mib = 200
+license = "GPL-3.0-only"
+upstream = "https://github.com/advplyr/audiobookshelf"
+last_release = "2026-09-29"
+describes = "Listening to audiobooks, with progress synced"
+without_it = "No audiobook player"
+reaches = "audiobook metadata providers"
+asks_for = "Reads covers, chapters and descriptions for the audiobooks in your library when you ask it to."
+provides = ["media.serve"]
+health = { kind = "http", path = "/healthcheck", timeout_s = 90 }
+# It starts with no account at all and refuses everything until one exists, so
+# lemonfiber makes the first one — the same shape as the media server's. The token
+# its dashboard panel uses is handed back on sign-in and is the same every time,
+# so what is kept is the password rather than the token.
+api = { kind = "audiobookshelf", key_source = "generated" }
+listens = 80
+takes_data = true
+
+[[service.mount]]
+from = "metadata"
+to = "/metadata"
+
+[[service.claim]]
+capability = "media.serve"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/api/libraries" }
+expect = { status = 401 }
+fixture = "recordings/audiobookshelf/media-serve-guarded.json"
+
+[[service.claim.probe]]
+id = "catalogue"
+request = { method = "GET", path = "/api/libraries" }
+expect = { status = 200, json_types = { libraries = "list" } }
+fixture = "recordings/audiobookshelf/media-serve-catalogue.json"

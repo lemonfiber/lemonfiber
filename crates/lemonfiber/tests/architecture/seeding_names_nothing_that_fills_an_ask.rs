@@ -12,7 +12,7 @@ use std::path::Path;
 
 use lemonfiber_manifest::Manifest;
 
-use crate::source_tree::{production, sources, test_only, workspace_root};
+use crate::source_tree::{production, sources, test_only};
 
 /// Where seeding lives.
 const SEEDING: &str = "crates/lemonfiber-core/src/seed/";
@@ -21,17 +21,9 @@ const SEEDING: &str = "crates/lemonfiber-core/src/seed/";
 /// not a consumer naming what fills its ask.
 const SPELLED: [(&str, &str); 0] = [];
 
-/// The pinned stack, read the way lemonfiber reads it.
+/// The stack this build ships, read the way lemonfiber reads it.
 fn pinned() -> Option<Manifest> {
-    let path = workspace_root().join("assets/media-stack");
-    let text = lemonfiber_manifest::read(&path).unwrap_or_default();
-    assert!(
-        !text.is_empty(),
-        "the pinned stack is not at {} — the submodule is not checked out, so this \
-         guard would be looking for nothing",
-        path.display()
-    );
-    Manifest::from_toml(&text).ok()
+    Manifest::from_toml(lemonfiber_bundled::STACK).ok()
 }
 
 /// Every one of the stack's services that fills something an ask asks for, with the

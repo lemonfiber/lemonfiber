@@ -8,7 +8,7 @@ use crate::servarr::Shape as _;
 /// templates, which makes it the fixture the rewriter is checked against.
 const SHIPPED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../assets/media-stack/config/recyclarr/recyclarr.yml"
+    "/../../assets/plugins/bundle/plugins/recyclarr/config/recyclarr/recyclarr.yml"
 ));
 
 /// Every preset names a file the stack actually ships, for the right service.
@@ -27,8 +27,8 @@ fn every_preset_names_an_include_the_stack_ships_for_that_service() {
                 file.starts_with(section(kind)),
                 "{path} is not a {kind:?} include"
             );
-            let shipped = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../assets/media-stack/config/recyclarr/includes")
+            let shipped = std::path::Path::new(lemonfiber_bundled::CARRIED_AT)
+                .join("config/recyclarr/includes")
                 .join(file);
             assert!(shipped.is_file(), "{path} is named but not shipped");
         }

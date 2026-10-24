@@ -19,7 +19,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use crate::source_tree::{sources, workspace_root};
+use crate::source_tree::sources;
 
 /// The form every one of these fixtures is about.
 ///
@@ -31,23 +31,15 @@ const FORM: &str = "library";
 /// How a fixture names it.
 const DECLARED: &str = "const LIBRARY: [&str;";
 
-/// Every service the stack's `library` form holds, read from the pinned manifest.
+/// Every service the shipped stack's `library` form holds, read from its manifest.
 ///
 /// Through the manifest reader rather than by matching text, so a stack that renames a
 /// profile or moves a service between them is read the way lemonfiber reads it.
 fn declared() -> BTreeSet<String> {
-    let path = workspace_root().join("assets/media-stack");
-    let text = lemonfiber_manifest::read(&path).unwrap_or_default();
-    assert!(
-        !text.is_empty(),
-        "the pinned stack is not at {} — the submodule is not checked out, so this \
-         guard would be comparing every fixture against nothing",
-        path.display()
-    );
-    // Read through the iterators rather than out of them, because an arm for a pinned
+    // Read through the iterators rather than out of them, because an arm for a
     // stack that does not parse, or that declares no such form, is a line no run can
     // enter — and the count below is what notices either.
-    lemonfiber_manifest::Manifest::from_toml(&text)
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
         .into_iter()
         .flat_map(|manifest| {
             let profiles: BTreeSet<String> = manifest

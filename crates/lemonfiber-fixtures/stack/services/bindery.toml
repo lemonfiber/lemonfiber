@@ -1,0 +1,49 @@
+[[service]]
+id = "bindery"
+name = "Bindery"
+profile = "books"
+image = "ghcr.io/vavallee/bindery"
+tag = "v1.43.1"
+digest = "sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489"
+port = 8787
+bind = "loopback"
+criticality = "core"
+memory_mib = 150
+license = "MIT"
+upstream = "https://github.com/vavallee/bindery"
+last_release = "2026-10-18"
+describes = "Watches for books and audiobooks and fetches them"
+without_it = "No book automation (Readarr is discontinued)"
+reaches = "book and audiobook metadata providers"
+asks_for = "Reads author, title and cover information for the books it watches for."
+media_types = ["books"]
+provides = ["library.curate"]
+health = { kind = "http", path = "/", timeout_s = 90 }
+# Its key is one lemonfiber mints and this service adopts, rather than one it
+# writes for lemonfiber to read: given BINDERY_API_KEY on its first start it
+# takes that value, and without one it generates its own into a database that
+# nothing outside the container can read.
+api = { kind = "bindery", key_source = "generated" }
+listens = 8787
+takes_data = true
+user_mode = "uid"
+
+[service.env]
+BINDERY_LIBRARY_DIR = "/data/media/books"
+BINDERY_AUDIOBOOK_DIR = "/data/media/audiobooks"
+BINDERY_DOWNLOAD_DIR = "/data/downloads"
+
+[[service.claim]]
+capability = "library.curate"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/api/v1/wanted/missing" }
+expect = { status = 401 }
+fixture = "recordings/bindery/library-curate-guarded.json"
+
+[[service.claim.probe]]
+id = "wanted"
+request = { method = "GET", path = "/api/v1/wanted/missing" }
+expect = { status = 200, json_array_min = 0 }
+fixture = "recordings/bindery/library-curate-wanted.json"

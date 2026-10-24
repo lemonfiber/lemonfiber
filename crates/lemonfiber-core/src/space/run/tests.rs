@@ -358,7 +358,7 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
     // so there is no directory the services keep their own files in to measure —
     // which is a volume absent from the report rather than one reported as empty.
     static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
 
     let ctx = a_context()
         .over(crate::stack::Source::Embedded(&EMBEDDED))

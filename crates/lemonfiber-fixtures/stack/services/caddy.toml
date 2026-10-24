@@ -1,0 +1,37 @@
+[[service]]
+id = "caddy"
+name = "Caddy"
+profile = "proxy"
+image = "caddy"
+tag = "2.11.6"
+digest = "sha256:3422ce6de165df66534f9b9ba50efaf457114ec961763cc52f5dbdaac2972d73"
+port = 80
+bind = "lan"
+criticality = "optional"
+memory_mib = 50
+license = "Apache-2.0"
+upstream = "https://github.com/caddyserver/caddy"
+last_release = "2026-10-03"
+describes = "Friendly hostnames instead of ports"
+without_it = "Use localhost:8989 and friends"
+reaches = ""
+asks_for = "Nothing. It answers names on this machine and forwards to the services beside it; no certificate is fetched, because nothing here is published to the internet."
+health = { kind = "tcp", timeout_s = 30 }
+listens = 8080
+config_path = "/etc/caddy"
+config_ro = true
+
+[[service.publish]]
+port = 443
+listens = 8443
+
+[[service.mount]]
+from = "data"
+to = "/data"
+
+[[service.mount]]
+from = "config"
+to = "/config"
+
+[service.env]
+DOMAIN = { setting = "domain", default = "home.local" }

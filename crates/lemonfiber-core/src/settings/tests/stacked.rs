@@ -13,7 +13,7 @@ use crate::settings::legacy;
 
 /// Every key the template an operator's environment file was made from names.
 fn template_keys() -> BTreeSet<String> {
-    let at = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack/.env.example");
+    let at = Path::new(lemonfiber_bundled::CARRIED_AT).join(".env.example");
     std::fs::read_to_string(at)
         .unwrap_or_default()
         .lines()

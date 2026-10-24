@@ -1,0 +1,58 @@
+[[service]]
+id = "jellyfin"
+name = "Jellyfin"
+profile = "media"
+image = "jellyfin/jellyfin"
+tag = "10.11.11"
+digest = "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db"
+port = 8095
+bind = "loopback"
+criticality = "important"
+memory_mib = 600
+license = "GPL-2.0-only"
+upstream = "https://github.com/jellyfin/jellyfin"
+last_release = "2026-09-15"
+describes = "Plays your library on TVs, phones and browsers"
+without_it = "Files on disk, no way to watch them"
+reaches = "metadata providers and its own plugin repository"
+asks_for = "Reads artwork and descriptions for what is in your library, and checks its plugin repository for updates unless you turn that off in its own settings."
+provides = ["media.serve", "identity.source"]
+health = { kind = "http", path = "/health", timeout_s = 120 }
+api = { kind = "jellyfin", key_source = "generated" }
+listens = 8096
+takes_data = true
+user_mode = "uid"
+
+[[service.mount]]
+from = "cache"
+to = "/cache"
+
+[[service.claim]]
+capability = "media.serve"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/Items" }
+expect = { status = 401 }
+fixture = "recordings/jellyfin/media-serve-guarded.json"
+
+[[service.claim.probe]]
+id = "catalogue"
+request = { method = "GET", path = "/Items" }
+expect = { status = 200, json_types = { Items = "list", TotalRecordCount = "int" } }
+fixture = "recordings/jellyfin/media-serve-catalogue.json"
+
+[[service.claim]]
+capability = "identity.source"
+
+[[service.claim.probe]]
+id = "identifies"
+request = { method = "GET", path = "/System/Info/Public" }
+expect = { status = 200, json = { ProductName = "Jellyfin Server" }, json_types = { Id = "str", Version = "str" } }
+fixture = "recordings/jellyfin/identity-source-identifies.json"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/Users" }
+expect = { status = 401 }
+fixture = "recordings/jellyfin/identity-source-guarded.json"

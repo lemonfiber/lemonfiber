@@ -4,18 +4,14 @@
 //! a real command needs a real stack to drive it against and the path is relative to the
 //! crate rather than to the test. One copy, so a stack that moves moves once.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lemonfiber_core::stack::Source;
 
-/// The media stack this repository carries, as an absolute path.
-///
-/// Resolved once and kept: every caller wants the same directory, and `CARGO_MANIFEST_DIR`
-/// is fixed at compile time, so there is nothing to recompute.
+/// The stack the tests are written against, as a stack directory holds it, copied once
+/// and kept.
 pub fn project() -> &'static Path {
-    static PROJECT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    PROJECT
-        .get_or_init(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack"))
+    lemonfiber_fixtures::stack::fixture_on_disk()
 }
 
 /// The same stack, as the source a context reads.

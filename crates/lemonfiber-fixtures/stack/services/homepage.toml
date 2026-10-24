@@ -1,0 +1,35 @@
+[[service]]
+id = "homepage"
+name = "Homepage"
+profile = "dash"
+image = "ghcr.io/gethomepage/homepage"
+tag = "v1.13.2"
+digest = "sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28"
+port = 3000
+bind = "lan"
+criticality = "enhancing"
+memory_mib = 150
+license = "GPL-3.0-only"
+upstream = "https://github.com/gethomepage/homepage"
+last_release = "2026-09-17"
+describes = "One page linking everything, with live status"
+without_it = "Remember a dozen URLs and ports"
+reaches = ""
+asks_for = "Nothing beyond this machine. It reads the other services' own APIs over the stack's internal network to draw their status."
+health = { kind = "http", path = "/", timeout_s = 60 }
+user_mode = "puid-env"
+config_path = "/app/config"
+provides = ["dashboard.show"]
+
+[service.env]
+HOMEPAGE_ALLOWED_HOSTS = { setting = "homepage:allowed-hosts", default = "localhost:3000" }
+HOMEPAGE_VAR_LAN_HOST = { setting = "lan-host", default = "localhost" }
+
+[[service.claim]]
+capability = "dashboard.show"
+
+[[service.claim.probe]]
+id = "shows"
+request = { method = "GET", path = "/api/services" }
+expect = { status = 200, json_array_min = 0 }
+fixture = "recordings/homepage/dashboard-show-shows.json"

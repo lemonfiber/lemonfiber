@@ -8,7 +8,7 @@
 //! service drops what reached it, and one that kept those links would be refused for
 //! naming a service it no longer declares.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lemonfiber_manifest::assembly::{split, ROOT, SERVICES};
 use toml::{Table, Value};
@@ -48,6 +48,70 @@ pub fn carried() -> Table {
 /// there.
 pub fn manifest_into(into: &Path) {
     written_apart(into, &toml::to_string(&carried()).unwrap_or_default());
+}
+
+/// What the carried stack holds beside its manifest that a run reads: the settings it
+/// declares and the starting files of every service's configuration.
+const BESIDE: [&str; 2] = [".env.example", "config"];
+
+/// A whole stack kept beside the tests, as the media stack declared it before its parts
+/// moved into plugins: its manifest, the settings it declares and every service's
+/// starting files. A test about what lemonfiber does with a stack runs against it, so a
+/// change to the stack this build ships moves none of them.
+pub const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/stack");
+
+/// [`FIXTURE`] copied whole into `into`, so a run that writes beside it writes into the
+/// copy and never into the repository.
+pub fn fixture_into(into: &Path) {
+    copied(Path::new(FIXTURE), into);
+}
+
+/// [`FIXTURE`] copied once into a directory kept for the whole run.
+#[must_use]
+pub fn fixture_on_disk() -> &'static Path {
+    static WRITTEN: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
+        let into = crate::scratch::Scratch::new("fixture-stack").kept();
+        fixture_into(&into);
+        into
+    });
+    &WRITTEN
+}
+
+/// The carried stack written into `into` as a stack directory holds it: its manifest
+/// without the secrets an assembled part declares, and what a run reads beside it.
+fn directory_into(into: &Path) {
+    manifest_into(into);
+    for name in BESIDE {
+        copied(
+            &Path::new(lemonfiber_bundled::CARRIED_AT).join(name),
+            &into.join(name),
+        );
+    }
+}
+
+/// The carried stack as a stack directory holds it, written once into a directory kept
+/// for the whole run, for the tests that read it and write nothing beside it.
+#[must_use]
+pub fn on_disk() -> &'static Path {
+    static WRITTEN: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
+        let into = crate::scratch::Scratch::new("carried-stack").kept();
+        directory_into(&into);
+        into
+    });
+    &WRITTEN
+}
+
+/// Copy the file or the tree at `from` to `to`, links left behind.
+fn copied(from: &Path, to: &Path) {
+    let kind = std::fs::symlink_metadata(from).map(|found| found.file_type());
+    if kind.as_ref().is_ok_and(std::fs::FileType::is_dir) {
+        let _ = std::fs::create_dir_all(to);
+        for entry in std::fs::read_dir(from).into_iter().flatten().flatten() {
+            copied(&entry.path(), &to.join(entry.file_name()));
+        }
+    } else if kind.is_ok_and(|kind| kind.is_file()) {
+        let _ = std::fs::copy(from, to);
+    }
 }
 
 /// The carried stack's manifest written into `into` without `service`.

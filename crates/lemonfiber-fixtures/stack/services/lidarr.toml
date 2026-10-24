@@ -1,0 +1,40 @@
+[[service]]
+id = "lidarr"
+name = "Lidarr"
+profile = "music"
+image = "lscr.io/linuxserver/lidarr"
+tag = "2.14.5.4836-ls9"
+digest = "sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0"
+port = 8686
+bind = "loopback"
+criticality = "core"
+memory_mib = 300
+license = "GPL-3.0-only"
+upstream = "https://github.com/Lidarr/Lidarr"
+last_release = "2025-11-16"
+describes = "Watches for music and fetches it"
+without_it = "Find and download music yourself"
+reaches = "music metadata providers"
+asks_for = "Reads artist, album and track information for the music in your library."
+media_types = ["music"]
+provides = ["library.curate"]
+health = { kind = "http", path = "/ping", timeout_s = 90 }
+api = { kind = "servarr", key_source = "config-xml", path = "/config/config.xml", version = 1 }
+listens = 8686
+takes_data = true
+user_mode = "puid-env"
+
+[[service.claim]]
+capability = "library.curate"
+
+[[service.claim.probe]]
+id = "guarded"
+request = { method = "GET", path = "/api/v1/wanted/missing" }
+expect = { status = 401 }
+fixture = "recordings/lidarr/library-curate-guarded.json"
+
+[[service.claim.probe]]
+id = "wanted"
+request = { method = "GET", path = "/api/v1/wanted/missing" }
+expect = { status = 200, json_types = { records = "list", totalRecords = "int" } }
+fixture = "recordings/lidarr/library-curate-wanted.json"

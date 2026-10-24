@@ -1458,6 +1458,7 @@ dependencies = [
 name = "lemonfiber-bundled"
 version = "0.17.0"
 dependencies = [
+ "include_dir",
  "lemonfiber-bundle",
  "lemonfiber-manifest",
  "toml",

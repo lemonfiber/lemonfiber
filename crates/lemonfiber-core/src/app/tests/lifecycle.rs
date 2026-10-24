@@ -272,7 +272,7 @@ async fn an_unreadable_stack_is_reported_before_anything_is_started() {
 #[tokio::test]
 async fn an_embedded_stack_with_nowhere_to_go_stops_before_starting_anything() {
     static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
 
     let settings = Settings {
         protocols: crate::config::Protocols::both(),
