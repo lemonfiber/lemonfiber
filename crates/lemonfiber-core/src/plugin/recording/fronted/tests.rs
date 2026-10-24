@@ -146,7 +146,7 @@ async fn read(
             serving,
             transport: &shared,
             random: &FixedRandom(random.map(|byte| vec![byte; 32])),
-            taking: &crate::plugin::Retaking::Written,
+            taking: &crate::plugin::Retaking::default(),
         },
     )
     .await

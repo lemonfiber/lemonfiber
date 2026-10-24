@@ -27,9 +27,10 @@ pub(super) fn taken(root: &Path, taken: &[Taken], taking: &Retaking) -> Vec<Take
         .filter(|fixture| !asked.contains(fixture.as_str()))
         .map(|fixture| Taken {
             named: NAMED.to_owned(),
-            took: match taking {
-                Retaking::Written => removed(root, &fixture),
-                Retaking::Checked { .. } => Took::Unasked,
+            took: if taking.check {
+                Took::Unasked
+            } else {
+                removed(root, &fixture)
             },
             fixture: Some(fixture),
         })

@@ -50,7 +50,7 @@ pub(super) fn written(root: &Path, fixture: &str, pinned: &str, of: Of, taking: 
     };
     let unnoted = recording.note.is_empty();
     let held = std::fs::read_to_string(&at).ok();
-    if matches!(taking, Retaking::Checked { .. }) {
+    if taking.check {
         return checked(fixture, held.as_deref(), &recording, unnoted);
     }
     let made = crate::plugin::rendered(&recording)

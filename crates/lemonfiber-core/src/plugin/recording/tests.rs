@@ -61,7 +61,7 @@ async fn ran(
             serving: &serving,
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
-            taking: &crate::plugin::Retaking::Written,
+            taking: &crate::plugin::Retaking::default(),
         },
     )
     .await
@@ -329,7 +329,7 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
         serving: &serving,
         transport: &silent,
         random: &chance,
-        taking: &crate::plugin::Retaking::Written,
+        taking: &crate::plugin::Retaking::default(),
     };
     let mut took = Vec::new();
     for running in runs {

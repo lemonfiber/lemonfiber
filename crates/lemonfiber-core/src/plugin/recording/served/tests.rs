@@ -145,7 +145,7 @@ async fn health_of(
             serving: &serving,
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
-            taking: &crate::plugin::Retaking::Written,
+            taking: &crate::plugin::Retaking::default(),
         },
         http,
         health,
