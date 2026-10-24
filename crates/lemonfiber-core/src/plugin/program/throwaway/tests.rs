@@ -322,7 +322,7 @@ fn a_further_directory_beside_the_copy_is_open_to_the_service_and_goes_with_it()
     else {
         return;
     };
-    let data = copy.emptied("data");
+    let data = copy.emptied(Path::new("data"));
     let Ok(data) = data else {
         return;
     };
@@ -338,7 +338,10 @@ fn a_further_directory_beside_the_copy_is_open_to_the_service_and_goes_with_it()
             Some(0o777)
         );
     }
-    assert!(copy.emptied("data").is_err(), "a name is made once");
+    assert!(
+        copy.emptied(Path::new("data")).is_err(),
+        "a name is made once"
+    );
     drop(copy);
     assert!(!data.exists());
 }

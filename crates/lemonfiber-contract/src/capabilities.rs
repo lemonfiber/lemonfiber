@@ -35,7 +35,7 @@ const PROFILE: u32 = 1;
 const NAMED: &str = "conformance";
 
 /// The folder the conformance cases file into and download to.
-const FOLDER: &str = "/data/conformance";
+pub const FOLDER: &str = "/data/conformance";
 
 /// An id no media server holds anything under.
 const NOWHERE: &str = "00000000000000000000000000000000";
@@ -59,7 +59,17 @@ fn curator_address() -> String {
 pub fn curator_answering() -> lemonfiber_ports::serving::StandIn {
     use lemonfiber_ports::serving::Said;
     use serde_json::json;
-    let schema = |implementation: &str, protocol: &str| {
+    let schema = |implementation: &str, protocol: &str, seeding: &[serde_json::Value]| {
+        let mut fields = vec![
+            json!({ "order": 0, "name": "baseUrl", "value": "" }),
+            json!({ "order": 1, "name": "apiPath", "value": "/api" }),
+            json!({ "order": 2, "name": "apiKey" }),
+            json!({ "order": 3, "name": "categories", "value": [] }),
+            json!({ "order": 4, "name": "animeCategories", "value": [] }),
+            json!({ "order": 5, "name": "animeStandardFormatSearch", "value": false }),
+            json!({ "order": 6, "name": "additionalParameters" }),
+        ];
+        fields.extend_from_slice(seeding);
         json!({
             "name": "",
             "implementation": implementation,
@@ -68,12 +78,7 @@ pub fn curator_answering() -> lemonfiber_ports::serving::StandIn {
             "protocol": protocol,
             "supportsRss": true,
             "supportsSearch": true,
-            "fields": [
-                { "order": 0, "name": "baseUrl", "value": "" },
-                { "order": 1, "name": "apiPath", "value": "/api" },
-                { "order": 2, "name": "apiKey" },
-                { "order": 3, "name": "categories", "value": [] },
-            ],
+            "fields": fields,
             "tags": [],
         })
     };
@@ -101,7 +106,21 @@ pub fn curator_answering() -> lemonfiber_ports::serving::StandIn {
             Said::json(
                 "GET",
                 "/api/v3/indexer/schema",
-                json!([schema("Newznab", "usenet"), schema("Torznab", "torrent")]).to_string(),
+                json!([
+                    schema("Newznab", "usenet", &[]),
+                    schema(
+                        "Torznab",
+                        "torrent",
+                        &[
+                            json!({ "order": 7, "name": "minimumSeeders", "value": 1 }),
+                            json!({ "order": 8, "name": "seedCriteria.seedRatio" }),
+                            json!({ "order": 9, "name": "seedCriteria.seedTime" }),
+                            json!({ "order": 10, "name": "seedCriteria.seasonPackSeedTime" }),
+                            json!({ "order": 11, "name": "rejectBlocklistedTorrentHashesWhileGrabbing", "value": false }),
+                        ],
+                    ),
+                ])
+                .to_string(),
             ),
             Said::json("GET", "/api/v3/indexer", json!([]).to_string()),
             Said::json("POST", "/api/v3/indexer/test", json!({}).to_string()),

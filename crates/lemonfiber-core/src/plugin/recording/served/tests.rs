@@ -6,7 +6,7 @@ use lemonfiber_plugin::{Health, HealthKind};
 
 use super::super::tests::asking::SERVED;
 use super::super::Recorder;
-use super::{healthy, settled};
+use super::{healthy, library, settled};
 use crate::plugin::installed::{Installed, Placed};
 use crate::plugin::program::{Starting, Throwaway};
 use crate::ports::serving::{Served, Standing};
@@ -15,6 +15,41 @@ fn placed(text: &str) -> Option<Placed> {
     lemonfiber_plugin::Manifest::from_toml(text)
         .ok()
         .and_then(|manifest| Installed::of(&manifest).services.into_iter().next())
+}
+
+#[test]
+fn a_library_a_service_takes_holds_the_folder_the_cases_file_into_open_to_the_service() {
+    let Ok(copy) = Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()) else {
+        return;
+    };
+    let Some(sonarr) = placed(SERVED) else {
+        return;
+    };
+    let data = library(&sonarr, &copy).ok().flatten().unwrap_or_default();
+    let folder = data.join(
+        std::path::Path::new(lemonfiber_contract::capabilities::FOLDER)
+            .strip_prefix(super::LIBRARY)
+            .unwrap_or(std::path::Path::new("")),
+    );
+
+    assert_ne!(folder, data);
+    assert!(folder.is_dir(), "{}", folder.display());
+    assert!(std::fs::read_dir(&folder).is_ok_and(|mut entries| entries.next().is_none()));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        assert_eq!(
+            std::fs::metadata(&folder)
+                .map(|kind| kind.permissions().mode() & 0o777)
+                .ok(),
+            Some(0o777)
+        );
+    }
+    assert!(library(&sonarr, &copy).is_err(), "a library is made once");
+    let Some(bare) = placed(&SERVED.replace("takes_data  = true\n", "")) else {
+        return;
+    };
+    assert_eq!(library(&bare, &copy), Ok(None));
 }
 
 #[test]
@@ -32,7 +67,7 @@ fn a_service_is_served_as_lemonfiber_runs_it_with_throwaway_files_and_its_port()
     let Some(sonarr) = placed(SERVED) else {
         return;
     };
-    let data = copy.emptied("data").ok();
+    let data = library(&sonarr, &copy).ok().flatten();
     let serve = settled(&sonarr, &copy, data.as_deref());
     assert_eq!(
         serve.image,

@@ -165,12 +165,19 @@ impl Throwaway {
 
     /// A further empty directory beside the copy, open to whoever the service is, and
     /// removed with it.
-    pub(crate) fn emptied(&self, named: &str) -> Result<PathBuf, String> {
+    pub(crate) fn emptied(&self, named: &Path) -> Result<PathBuf, String> {
         let at = self.root.join(named);
         std::fs::create_dir(&at)
             .and_then(|()| opened(&at, 0o777))
             .map(|()| at.clone())
             .map_err(|why| unmade(&at, &why))
+    }
+
+    /// The file `named` directly beneath the copy made readable by whoever the service runs
+    /// as, which the copy's owner-only directory keeps from anybody else on the machine.
+    pub(crate) fn readable(&self, named: &str) -> Result<(), String> {
+        let at = self.copy.join(named);
+        opened(&at, 0o644).map_err(|why| unmade(&at, &why))
     }
 
     /// `text` held at `named` directly beneath the copy, readable by its owner alone,

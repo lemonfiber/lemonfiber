@@ -95,11 +95,7 @@ impl Prepared {
             recorder.random,
         )
         .map_err(refused("starting files"))?;
-        let data = if upstream.takes_data {
-            Some(copy.emptied("data").map_err(refused("data"))?)
-        } else {
-            None
-        };
+        let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
         let held = Throwaway::of(
             Some(Starting {
                 root,

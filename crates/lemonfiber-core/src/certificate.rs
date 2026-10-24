@@ -26,6 +26,9 @@ const CERTIFICATE: &str = "certificate.pem";
 /// The private key it was made with, readable by its owner alone.
 const KEY: &str = "key.pem";
 
+/// Every file a certificate and its key are written down in.
+pub(crate) const FILES: [&str; 2] = [KEY, CERTIFICATE];
+
 /// The label a PEM block holding a certificate carries.
 const CERTIFIED: &str = "CERTIFICATE";
 
@@ -186,7 +189,7 @@ fn made(directory: &Path) -> Result<Kept, Unkept> {
         pem(CERTIFIED, made.cert.der()),
         pem(PRIVATE_KEY, &made.signing_key.serialize_der()),
     );
-    for (name, text) in [(KEY, &key), (CERTIFICATE, &certificate)] {
+    for (name, text) in FILES.into_iter().zip([&key, &certificate]) {
         crate::config::store::write(&directory.join(name), text)
             .map_err(|why| Unkept::Unmade(format!("{name} could not be written: {why}")))?;
     }
