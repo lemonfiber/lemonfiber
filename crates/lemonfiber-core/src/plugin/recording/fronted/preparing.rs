@@ -1,7 +1,11 @@
 //! What both containers of a recording are given before either starts: the throwaway
-//! copies of their starting files, the adapter's key and its upstream's credentials.
+//! copies of their starting files, the adapter's key and its upstream's credentials, each
+//! secret one value wherever it is written.
 
+use std::collections::BTreeMap;
 use std::path::Path;
+
+use lemonfiber_manifest::container::Value;
 
 use lemonfiber_contract::adapter::KEY_FILE;
 
@@ -20,28 +24,57 @@ pub(super) struct Prepared {
     pub(super) key: String,
     /// Every credential minted for the run so far, which every answer is scrubbed of.
     pub(super) made: Vec<String>,
+    /// Each variable of the upstream's environment that names a secret, as `NAME=value`.
+    pub(super) env: Vec<String>,
 }
 
-/// Each field of the adapter's `upstream`, holding the value its upstream's starting files
-/// were written with, or one minted for the run where they name none.
+/// The value of `secret` for this run: the one already written for it, or one minted now
+/// and kept, so the upstream's files, its environment and the adapter all hold the same.
+fn valued(
+    random: &dyn Random,
+    secrets: &mut BTreeMap<String, String>,
+    secret: &str,
+    made: &mut Vec<String>,
+) -> Result<String, String> {
+    if let Some(held) = secrets.get(secret) {
+        return Ok(held.clone());
+    }
+    let fresh = crate::plugin::seeding::mint(random)
+        .ok_or_else(|| crate::plugin::seeding::UNMINTED.to_owned())?;
+    made.push(fresh.clone());
+    secrets.insert(secret.to_owned(), fresh.clone());
+    Ok(fresh)
+}
+
+/// Each variable of `upstream`'s environment that names a secret, as `NAME=value`.
+fn environment(
+    random: &dyn Random,
+    secrets: &mut BTreeMap<String, String>,
+    upstream: &Placed,
+    made: &mut Vec<String>,
+) -> Result<Vec<String>, String> {
+    let mut env = Vec::new();
+    for (name, value) in &upstream.fields.env {
+        if let Value::Secret(of) = value {
+            env.push(format!(
+                "{name}={}",
+                valued(random, secrets, &of.secret, made)?
+            ));
+        }
+    }
+    Ok(env)
+}
+
+/// Each field of the adapter's `upstream`, holding the value its upstream was given.
 fn handed(
     random: &dyn Random,
-    copy: &Throwaway,
-    held: &Throwaway,
+    secrets: &mut BTreeMap<String, String>,
     adapter: &Placed,
     made: &mut Vec<String>,
 ) -> Result<Vec<(String, String)>, String> {
     let mut handed = Vec::new();
     for (field, secret) in &adapter.upstream {
-        let value = if let Some(seeded) = copy.minted(secret).or_else(|| held.minted(secret)) {
-            seeded.to_owned()
-        } else {
-            let fresh = crate::plugin::seeding::mint(random)
-                .ok_or_else(|| crate::plugin::seeding::UNMINTED.to_owned())?;
-            made.push(fresh.clone());
-            fresh
-        };
-        handed.push((field.clone(), value));
+        handed.push((field.clone(), valued(random, secrets, secret, made)?));
     }
     Ok(handed)
 }
@@ -84,7 +117,14 @@ impl Prepared {
             .chain(copy.made().map(str::to_owned))
             .chain(held.made().map(str::to_owned))
             .collect();
-        let handed = handed(recorder.random, &copy, &held, adapter.placed, &mut made)
+        let mut secrets: BTreeMap<String, String> = held
+            .written()
+            .chain(copy.written())
+            .map(|(secret, value)| (secret.to_owned(), value.to_owned()))
+            .collect();
+        let env = environment(recorder.random, &mut secrets, upstream, &mut made)
+            .map_err(refused("upstream's environment"))?;
+        let handed = handed(recorder.random, &mut secrets, adapter.placed, &mut made)
             .map_err(refused("adapter's upstream credentials"))?;
         if !handed.is_empty() {
             super::filling::handed_over(&held, &handed)
@@ -96,6 +136,7 @@ impl Prepared {
             held,
             key,
             made,
+            env,
         })
     }
 }

@@ -151,9 +151,11 @@ impl Throwaway {
         &self.copy
     }
 
-    /// The value minted for `secret` where the copy's files name it.
-    pub(crate) fn minted(&self, secret: &str) -> Option<&str> {
-        self.minted.get(secret).map(String::as_str)
+    /// Each secret the copy's files name, with the value written for it.
+    pub(crate) fn written(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.minted
+            .iter()
+            .map(|(secret, value)| (secret.as_str(), value.as_str()))
     }
 
     /// Every value minted for the copy, which whatever ran with it is to be scrubbed of.

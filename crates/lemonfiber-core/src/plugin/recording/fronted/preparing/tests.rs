@@ -4,7 +4,9 @@ use lemonfiber_contract::adapter::UPSTREAM_FILE;
 use lemonfiber_fixtures::ports::Chance;
 
 use super::super::filling::handed_over;
-use super::handed;
+use std::collections::BTreeMap;
+
+use super::{environment, handed};
 use crate::plugin::program::{Starting, Throwaway};
 
 /// An adapter handing `api_key` the plugin's `upstream-key`, and `other` its `other-key`.
@@ -45,17 +47,19 @@ fn the_adapter_is_handed_the_value_its_upstream_was_seeded_with_or_one_minted_an
     let (Some(copy), Some(held)) = (copy, held) else {
         return;
     };
-    let seeded_as = copy.minted("upstream-key").map(str::to_owned);
+    let mut secrets: BTreeMap<String, String> = copy
+        .written()
+        .map(|(secret, value)| (secret.to_owned(), value.to_owned()))
+        .collect();
     assert_eq!(
-        seeded_as.as_deref(),
+        secrets.get("upstream-key").map(String::as_str),
         Some("11111111111111111111111111111111")
     );
 
     let mut made = Vec::new();
     let handed = handed(
         &Chance::exactly(Some(vec![0x22; 16])),
-        &copy,
-        &held,
+        &mut secrets,
         &adapter(),
         &mut made,
     )
@@ -92,16 +96,61 @@ fn the_adapter_is_handed_the_value_its_upstream_was_seeded_with_or_one_minted_an
 
 #[test]
 fn an_adapter_is_handed_nothing_where_the_machine_supplies_no_random_bytes() {
-    let held = Throwaway::of(None, &Chance::cycling()).ok();
-    assert!(held.is_some(), "the copy was not made");
-    let Some(held) = held else {
-        return;
-    };
     let refused = handed(
         &Chance::exactly(None),
-        &held,
-        &held,
+        &mut BTreeMap::new(),
         &adapter(),
+        &mut Vec::new(),
+    );
+    assert_eq!(refused, Err(crate::plugin::seeding::UNMINTED.to_owned()));
+}
+
+/// An upstream reading `upstream-key` from `API_KEY` and a constant from `TZ_NAME`.
+fn keyed_by_environment() -> crate::plugin::Placed {
+    use lemonfiber_manifest::container::{SecretOf, Value};
+    let mut placed = crate::test_support::a_placed("seerr", &[], None, Some(5055));
+    placed.fields.env = [
+        (
+            "API_KEY".to_owned(),
+            Value::Secret(SecretOf {
+                secret: "upstream-key".to_owned(),
+            }),
+        ),
+        (
+            "LOG_LEVEL".to_owned(),
+            Value::Constant(lemonfiber_manifest::container::Constant::Text(
+                "info".to_owned(),
+            )),
+        ),
+    ]
+    .into();
+    placed
+}
+
+#[test]
+fn an_upstream_given_its_key_in_its_environment_and_its_adapter_hold_the_same_value() {
+    let mut secrets = BTreeMap::new();
+    let mut made = Vec::new();
+    let random = Chance::exactly(Some(vec![0x33; 16]));
+
+    let env = environment(&random, &mut secrets, &keyed_by_environment(), &mut made);
+    let handed = handed(&random, &mut secrets, &adapter(), &mut made);
+
+    let key = "33333333333333333333333333333333".to_owned();
+    assert_eq!(env, Ok(vec![format!("API_KEY={key}")]));
+    assert_eq!(
+        handed.ok().and_then(|handed| handed.first().cloned()),
+        Some(("api_key".to_owned(), key.clone()))
+    );
+    assert_eq!(made.first(), Some(&key));
+}
+
+#[test]
+fn an_upstream_whose_environment_names_a_secret_is_given_nothing_without_random_bytes() {
+    let refused = environment(
+        &Chance::exactly(None),
+        &mut BTreeMap::new(),
+        &keyed_by_environment(),
         &mut Vec::new(),
     );
     assert_eq!(refused, Err(crate::plugin::seeding::UNMINTED.to_owned()));

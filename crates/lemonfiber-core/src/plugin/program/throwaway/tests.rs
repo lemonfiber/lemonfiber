@@ -455,7 +455,11 @@ fn a_secret_named_in_two_starting_files_is_minted_once_for_the_copy() {
     let minted = copy
         .as_ref()
         .ok()
-        .and_then(|copy| copy.minted("api-key"))
+        .and_then(|copy| {
+            copy.written()
+                .find(|(secret, _)| *secret == "api-key")
+                .map(|(_, value)| value)
+        })
         .map(str::to_owned)
         .unwrap_or_default();
     let read = |relative: &str| {
