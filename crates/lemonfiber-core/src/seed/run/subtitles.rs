@@ -52,7 +52,7 @@ fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
 /// has not written a key yet — a service still starting rather than a fault, so a later
 /// run completes it — or its file is not one it may be read from.
 async fn finder(ctx: &Ctx, asker: Cleared<'_>) -> Option<Box<dyn fetch::Fills>> {
-    match spoken(ctx, &asker, fetch::CAPABILITY, fetch::MAJOR).await {
+    match spoken(ctx, asker.answering(), fetch::CAPABILITY, fetch::MAJOR).await {
         Spoken::Over(adapter) => return Some(Box::new(fetch::Adapter(adapter))),
         Spoken::Unanswered => return None,
         Spoken::Not => {}

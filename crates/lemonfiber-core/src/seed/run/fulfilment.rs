@@ -185,7 +185,8 @@ async fn handed(
     curators: &[Fulfils<'_>],
     project: Option<&Path>,
 ) -> Vec<Wiring> {
-    let Some(requests) = crate::app::targets::requests_as_owner(ctx, &asker).await else {
+    let Some(requests) = crate::app::targets::requests_as_owner(ctx, asker.answering()).await
+    else {
         return Vec::new();
     };
     let (wanted, refused) = wanted_targets(ctx, curators).await;

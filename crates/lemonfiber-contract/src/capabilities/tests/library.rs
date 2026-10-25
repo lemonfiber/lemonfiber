@@ -333,5 +333,9 @@ fn the_client_the_cases_register_answers_a_curators_tests_and_files_under_each_c
         .get("version")
         .is_some_and(serde_json::Value::is_string)));
     assert!(said("queue").is_some() && said("history").is_some());
-    assert_eq!(answering.answers.len(), 4);
+    assert_eq!(
+        said("get_cats").and_then(|cats| cats.get("categories").cloned()),
+        Some(serde_json::json!(["*", "conformance", "tv", "movies"]))
+    );
+    assert_eq!(answering.answers.len(), 5);
 }

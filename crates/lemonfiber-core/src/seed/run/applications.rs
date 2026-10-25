@@ -54,7 +54,7 @@ enum Asked {
 /// The indexer as the core asks it: over `indexer.search` where it speaks the contract,
 /// otherwise as the bundled indexer holding its own key.
 async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Asked {
-    match spoken(ctx, asker, search::CAPABILITY, search::MAJOR).await {
+    match spoken(ctx, asker.answering(), search::CAPABILITY, search::MAJOR).await {
         Spoken::Over(adapter) => return Asked::By(Box::new(search::Adapter(adapter))),
         Spoken::Unanswered => return Asked::Nobody,
         Spoken::Not => {}

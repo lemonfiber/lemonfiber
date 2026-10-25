@@ -493,7 +493,7 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
                 fillers: vec![filler.clone()],
             };
             let fillers = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
-            let came = made(&fillers, &asker, &ask, &filler);
+            let came = made(&fillers, &asker, &asker, &ask, &filler);
             let expected = if both_ways {
                 refused_both_ways
             } else {
@@ -542,7 +542,7 @@ fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection()
         fillers: vec![filler.clone()],
     };
     let ungranted = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
-    let came = made(&ungranted, &asker, &ask, &filler).map(|(made, ..)| made);
+    let came = made(&ungranted, &asker, &asker, &ask, &filler).map(|(made, ..)| made);
     assert_eq!(came, Err(Unmade::Asked));
 
     let credential = ungranted
@@ -553,6 +553,6 @@ fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection()
         ..asker
     };
     let fillers = crate::wiring::Fillers::holding(vec![granted.clone(), filler.clone()]);
-    let came = made(&fillers, &granted, &ask, &filler).map(|(made, ..)| made);
+    let came = made(&fillers, &granted, &granted, &ask, &filler).map(|(made, ..)| made);
     assert!(came.is_ok(), "{came:?}");
 }
