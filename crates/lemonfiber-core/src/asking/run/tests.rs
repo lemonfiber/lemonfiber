@@ -128,8 +128,7 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
     let mut context = a_context()
         .build()
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED), None)
-                .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
+            SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
         ))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));

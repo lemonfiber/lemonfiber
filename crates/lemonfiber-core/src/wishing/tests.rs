@@ -120,8 +120,8 @@ pub(super) fn ctx_engine(transport: Arc<Transport>, tag: &str, engine: Reporting
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("wishing-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let disk = SeedFs::keyed(Some(KEYED), None)
-        .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
+    let disk =
+        SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
     let mut context = a_context()
         .engine(Arc::new(engine.alongside(media::running())))
         .build()

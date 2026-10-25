@@ -372,8 +372,7 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
         .engine(Arc::new(crate::test_support::media::running()))
         .build()
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED), None)
-                .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
+            SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
         ))
         .with_http(held);
     ctx.settings.env_file = Some(env_at(name, &a_password()));

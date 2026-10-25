@@ -17,7 +17,7 @@ fn subtitle_stack() -> Vec<lemonfiber_manifest::Service> {
 /// A context whose filesystem answers both the curators' keys and the finder's.
 fn subtitle_ctx(http: Arc<Fake>, finder: Option<&'static str>) -> Ctx {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let mut fs = SeedFs::keyed(Some(KEYED), None);
+    let mut fs = SeedFs::keyed(Some(KEYED));
     if let Some(config) = finder {
         fs = fs.with_subtitle_finder(config);
     }
@@ -291,7 +291,7 @@ async fn a_curator_with_no_key_yet_is_skipped_rather_than_wired() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_subtitle_finder(FINDER_CONFIG),
+            SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
         ));
 
     let wirings =
@@ -548,7 +548,7 @@ async fn a_replaced_key_rewatches_each_finder_and_refuses_one_read_from_a_file_l
     let unkeyed = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_subtitle_finder(FINDER_CONFIG),
+            SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
         ));
     let fillers = beside_a_stand_in(
         vec![curator("sonarr", 8989, "tv"), subtitle_finder_svc()],
@@ -580,9 +580,9 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
     const NOT_ITS_OWN: &str = "sonarr:\n  apikey: someone-elses\n";
     let watched = |finder: Option<&'static str>| {
         let fs = match finder {
-            Some(config) => SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"), None)
+            Some(config) => SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"))
                 .with_subtitle_finder(config),
-            None => SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"), None),
+            None => SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>")),
         };
         seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(fs))
     };
@@ -623,7 +623,7 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
 #[tokio::test]
 async fn a_finder_naming_no_configuration_file_has_no_key_to_publish() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_subtitle_finder(FINDER_CONFIG),
+        SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
     ));
     let mut unnamed = subtitle_finder_svc();
     if let Some(api) = unnamed.api.as_mut() {

@@ -122,7 +122,7 @@ fn queued(stage: Stage, stuck: bool) -> Vec<QueueItem> {
 fn ctx_with(fake: &Fake) -> Ctx {
     a_context()
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(fake.transport())
 }
 

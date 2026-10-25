@@ -198,10 +198,7 @@ fn ctx_with(fs: SeedFs, http: Arc<Fake>) -> Ctx {
 
 #[tokio::test]
 async fn the_queue_panel_fills_with_each_curators_depth_and_stuck_count() {
-    let ctx = ctx_with(
-        SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
-        answering(QUEUE_JSON),
-    );
+    let ctx = ctx_with(SeedFs::keyed(Some(CONFIG_WITH_KEY)), answering(QUEUE_JSON));
     let snapshot = gather(&ctx, None).await;
     assert!(
         matches!(snapshot.queue, Panel::Ready(ref queues)
@@ -214,17 +211,14 @@ async fn the_queue_panel_fills_with_each_curators_depth_and_stuck_count() {
 async fn a_service_still_starting_with_no_key_is_left_out_of_the_queue() {
     // No config to read: the ordinary first-start case, skipped so the panel is
     // ready-but-empty rather than failed.
-    let ctx = ctx_with(SeedFs::keyed(None, None), answering(QUEUE_JSON));
+    let ctx = ctx_with(SeedFs::keyed(None), answering(QUEUE_JSON));
     let snapshot = gather(&ctx, None).await;
     assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
 }
 
 #[tokio::test]
 async fn a_service_whose_config_holds_no_key_is_left_out_of_the_queue() {
-    let ctx = ctx_with(
-        SeedFs::keyed(Some(CONFIG_NO_KEY), None),
-        answering(QUEUE_JSON),
-    );
+    let ctx = ctx_with(SeedFs::keyed(Some(CONFIG_NO_KEY)), answering(QUEUE_JSON));
     let snapshot = gather(&ctx, None).await;
     assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
 }
@@ -234,7 +228,7 @@ async fn a_service_that_will_not_answer_its_queue_is_left_out() {
     // The key reads, but the queue answer is unreadable, so that service is
     // dropped from the panel rather than failing it.
     let ctx = ctx_with(
-        SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
+        SeedFs::keyed(Some(CONFIG_WITH_KEY)),
         answering("not a queue"),
     );
     let snapshot = gather(&ctx, None).await;
@@ -281,9 +275,7 @@ async fn a_machine_with_no_data_root_reads_as_unconfigured() {
 #[tokio::test]
 async fn storage_reports_the_free_space_when_the_volume_reads() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let ctx = ctx(engine).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_facts(facts(42, 100)),
-    ));
+    let ctx = ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(42, 100))));
     let snapshot = gather(&ctx, None).await;
     assert!(
         matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Known(42)),
@@ -296,8 +288,7 @@ async fn an_unreadable_volume_reports_free_space_unknown_not_zero() {
     // A volume attributed to no mount reports a zero total; its free space is
     // unknown, not a confident zero that reads as a full disk.
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let ctx =
-        ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
+    let ctx = ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(0, 0))));
     let snapshot = gather(&ctx, None).await;
     assert!(
         matches!(snapshot.storage, Panel::Ready(storage) if storage.free == Reading::Unknown),
@@ -332,7 +323,7 @@ fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> 
 async fn the_transfers_panel_fills_from_each_download_client() {
     let http: Arc<dyn Http> = usenet::beside_torrents(QBIT_TORRENTS, &[usenet::carrying()]);
     let ctx = ctx_downloads(
-        SeedFs::keyed(None, None),
+        SeedFs::keyed(None),
         http,
         Some(env_at("transfers-fill", &a_password())),
     );
@@ -368,7 +359,7 @@ async fn the_transfers_panel_fills_from_each_download_client() {
 #[tokio::test]
 async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
-    let ctx = ctx_downloads(SeedFs::keyed(None, None), http, None);
+    let ctx = ctx_downloads(SeedFs::keyed(None), http, None);
     let snapshot = gather(&ctx, None).await;
     assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
 }
@@ -380,7 +371,7 @@ async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
 async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
     let http = Fake::scripted(Vec::new());
     let ctx = ctx_downloads(
-        SeedFs::keyed(None, None),
+        SeedFs::keyed(None),
         Arc::clone(&http) as Arc<dyn Http>,
         Some(env_without_password("transfers-unkeyed")),
     );
@@ -396,7 +387,7 @@ async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
 async fn a_download_client_that_will_not_answer_is_left_out() {
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
     let ctx = ctx_downloads(
-        SeedFs::keyed(None, None),
+        SeedFs::keyed(None),
         http,
         Some(env_at("transfers-silent", &a_password())),
     );

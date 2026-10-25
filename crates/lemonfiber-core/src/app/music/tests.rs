@@ -41,7 +41,7 @@ fn recording_ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>, tag: &str) 
 
 #[tokio::test]
 async fn a_rehearsal_records_nothing_and_applies_nothing() {
-    let mut context = ctx(Arc::new(SeedFs::keyed(None, None)), vec![]);
+    let mut context = ctx(Arc::new(SeedFs::keyed(None)), vec![]);
     context.dry_run = true;
     let report = music(&context, Format::Lossless).await.unwrap_or_default();
     assert_eq!(report.disposition, Disposition::Rehearsed);
@@ -54,7 +54,7 @@ async fn a_recorded_choice_is_applied_to_the_music_service() {
     // The profile GET is answered, then the PUT; the music curator accepts both.
     let report = music(
         &recording_ctx(
-            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(SeedFs::keyed(Some(KEYED))),
             vec![(200, PROFILE), (200, "")],
             "applied",
         ),
@@ -71,7 +71,7 @@ async fn a_service_not_yet_started_is_reported_not_started() {
     // No key on disk: the target does not open, so nothing is applied — but the
     // choice is still recorded.
     let report = music(
-        &recording_ctx(Arc::new(SeedFs::keyed(None, None)), vec![], "not-started"),
+        &recording_ctx(Arc::new(SeedFs::keyed(None)), vec![], "not-started"),
         Format::Compact,
     )
     .await
@@ -84,7 +84,7 @@ async fn a_service_not_yet_started_is_reported_not_started() {
 async fn a_service_that_refuses_the_change_is_reported_failed() {
     let report = music(
         &recording_ctx(
-            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(SeedFs::keyed(Some(KEYED))),
             vec![(200, PROFILE), (500, "boom")],
             "refused",
         ),
@@ -102,7 +102,7 @@ async fn an_unreadable_stack_records_the_choice_and_reports_not_started() {
     let mut context = a_context()
         .over(nowhere())
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
     context.settings.env_file = Some(dir.join(".env"));
     let report = music(&context, Format::Lossless).await.unwrap_or_default();
     assert_eq!(report.disposition, Disposition::Recorded);

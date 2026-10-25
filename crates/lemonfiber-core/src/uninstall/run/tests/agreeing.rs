@@ -387,15 +387,13 @@ async fn what_is_still_coming_down_is_reported_before_anything_stops() {
                 .alongside(usenet::running()),
         ))
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(
-            StorageFacts {
-                point: PathBuf::from(ROOT),
-                kind: FsKind::Linking("apfs".to_owned()),
-                removable: false,
-                available: 100,
-                total: 1_000,
-            },
-        )))
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
+            point: PathBuf::from(ROOT),
+            kind: FsKind::Linking("apfs".to_owned()),
+            removable: false,
+            available: 100,
+            total: 1_000,
+        })))
         .with_http(usenet::beside_torrents(
             lemonfiber_fixtures::downloads::QBIT_TORRENTS,
             &[usenet::carrying()],

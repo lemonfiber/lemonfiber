@@ -1,6 +1,11 @@
 use lemonfiber_core::ports::http::{Method, Request};
 
-use super::{asked, asked_about, served};
+use lemonfiber_core::config::Settings;
+use lemonfiber_core::ports::filesystem::Beneath;
+use lemonfiber_fixtures::scratch::Scratch;
+
+use super::super::context::a_context;
+use super::{asked, asked_about, key_at, keyed_in, moved, served, ADAPTER, KEY, PLUGIN};
 
 fn sent(url: &str, body: Option<&str>) -> Request {
     Request {
@@ -37,4 +42,32 @@ fn what_was_asked_is_read_per_operation_in_order() {
         vec![serde_json::json!({"id": "4"})]
     );
     assert!(asked(&requests, "refresh").is_empty());
+}
+
+#[test]
+fn the_media_server_moved_in_is_jellyfins_plugin_keyed_wherever_its_stack_is() {
+    let directory = Scratch::new("media-keyed-in-moved");
+    let mut ctx = a_context()
+        .settings(Settings {
+            stack_dir: Some(directory.to_path_buf()),
+            ..Settings::default()
+        })
+        .build();
+    ctx.settings.env_file = Some(directory.join(".env"));
+
+    let ctx = keyed_in(ctx);
+
+    assert_eq!(
+        moved().map(|installed| installed.plugin),
+        Some(PLUGIN.to_owned())
+    );
+    let key = key_at(&ctx).unwrap_or_default();
+    assert_eq!(std::fs::read_to_string(&key).unwrap_or_default(), KEY);
+    assert_eq!(
+        ctx.seams.confined.read(
+            &lemonfiber_core::plugin::key_file(&Scratch::new("media-elsewhere"), ADAPTER),
+            &directory
+        ),
+        Beneath::Read(KEY.to_owned())
+    );
 }

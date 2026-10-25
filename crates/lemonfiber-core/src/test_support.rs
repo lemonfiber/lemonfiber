@@ -239,10 +239,7 @@ pub(crate) fn moved_household(
     let mut ctx = a_context()
         .engine(std::sync::Arc::new(media::running()))
         .build()
-        .with_filesystem(std::sync::Arc::new(SeedFs::keyed(
-            Some(KEYED_CURATOR),
-            None,
-        )))
+        .with_filesystem(std::sync::Arc::new(SeedFs::keyed(Some(KEYED_CURATOR))))
         .with_http(http);
     ctx.settings.env_file = Some(dir.join(".env"));
     media::moved_in(&ctx);

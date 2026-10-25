@@ -227,7 +227,7 @@ async fn a_curator_whose_key_is_not_written_yet_holds_the_whole_watch_back() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("extract-unkeyed");
     let http = watching(Answer::reply(204, ""));
     let ctx = contracted_ctx(&project, "extractor", true, http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let wirings = super::super::extraction::seed_extraction(
         &ctx,
@@ -268,7 +268,7 @@ async fn a_curator_whose_key_file_leads_away_is_refused_and_nobody_is_handed() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("extract-leading-away");
     let http = watching(Answer::reply(204, ""));
     let ctx = contracted_ctx(&project, "extractor", true, http.clone()).with_filesystem(Arc::new(
-        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"), None)
+        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
             .leading_away(vec!["config/radarr/"]),
     ));
 

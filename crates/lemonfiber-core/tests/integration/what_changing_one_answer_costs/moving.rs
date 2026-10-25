@@ -101,7 +101,7 @@ async fn a_move_is_refused_where_the_services_have_not_written_their_keys_yet() 
         Fake::by_path(seeding_routes()),
         Vec::new(),
     )
-    .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let review = changing(&ctx, DATA_ROOT, "/srv/new", AGREED).await;
 

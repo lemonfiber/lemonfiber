@@ -78,7 +78,7 @@ fn a_filesystem() -> Arc<SeedFs> {
 
 /// A filesystem reporting the data location on a given sort of volume.
 fn over(kind: FsKind, removable: bool) -> Arc<SeedFs> {
-    Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
+    Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
         point: PathBuf::from(ROOT),
         kind,
         removable,

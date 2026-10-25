@@ -129,7 +129,7 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
                     .alongside(media::running()),
             ))
             .filesystem(Arc::new(
-                SeedFs::keyed(None, None)
+                SeedFs::keyed(None)
                     .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
                     .with_facts(facts),
             ))

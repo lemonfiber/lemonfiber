@@ -439,7 +439,7 @@ async fn a_later_seed_offers_the_torrent_client_from_its_recorded_password() {
     let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()))
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();

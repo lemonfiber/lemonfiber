@@ -191,7 +191,7 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
     a_context()
         .settings(over_usenet())
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(fake.transport())
         // No waiting: every test would otherwise sit through the real poll, and what the wait
         // does at its bound is exactly what the tests are about.

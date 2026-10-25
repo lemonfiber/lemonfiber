@@ -12,7 +12,7 @@ use super::{
 };
 use crate::config::Settings;
 use crate::dashboard::Protocol;
-use crate::ports::service::{Download, Seeded, UsenetAccount};
+use crate::ports::service::{Download, Filed, Seeded, UsenetAccount};
 use crate::test_support::{
     a_context, a_password, a_placed, an_installed, contracted, contracted_context, env_at,
     first_party, json, stack, CONTRACTED_KEY,
@@ -457,6 +457,42 @@ async fn a_usenet_client_speaking_its_contract_is_read_over_it_with_its_own_key(
     let asked = to_the_fetcher(&http);
     assert_eq!(asked.len(), 2, "{asked:?}");
     assert!(over_the_contract(&asked, usenet::CAPABILITY), "{asked:?}");
+}
+
+#[tokio::test]
+async fn a_usenet_client_speaking_its_contract_says_where_it_files_over_it() {
+    let filed = Filed {
+        category: "tv".to_owned(),
+        folder: "/data/downloads/complete/tv".to_owned(),
+    };
+    let http = Fake::by_path(vec![(
+        "download.usenet/v1/filed",
+        Answer::reply(200, json(&vec![filed.clone()])),
+    )]);
+    let (_project, ctx, fillers) = speaking(
+        "downloads-contracted-filing",
+        usenet::CAPABILITY,
+        true,
+        http.clone(),
+    );
+
+    let mut read = Vec::new();
+    for target in fetching(download_targets(&ctx, &fillers).await) {
+        read.extend(
+            target
+                .client(&ctx)
+                .filing()
+                .filed()
+                .await
+                .unwrap_or_default(),
+        );
+    }
+
+    assert_eq!(read, vec![filed]);
+    assert!(over_the_contract(
+        &to_the_fetcher(&http),
+        usenet::CAPABILITY
+    ));
 }
 
 #[tokio::test]

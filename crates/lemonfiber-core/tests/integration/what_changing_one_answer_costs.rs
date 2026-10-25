@@ -132,7 +132,7 @@ fn stood_up(settings: Settings, stack: Source, http: Arc<Fake>, missing: Vec<&'s
             Lifecycle::Running,
             Health::Healthy,
         )))
-        .filesystem(Arc::new(SeedFs::keyed(Some(CONFIG), None).missing(missing)))
+        .filesystem(Arc::new(SeedFs::keyed(Some(CONFIG)).missing(missing)))
         .over(stack)
         .settings(settings)
         .build()

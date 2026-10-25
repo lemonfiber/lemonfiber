@@ -241,7 +241,7 @@ async fn a_plugins_credential_is_read_only_from_beneath_its_directory() {
 #[tokio::test]
 async fn a_confined_read_comes_to_read_refused_or_absent() {
     let context = ctx().with_filesystem(std::sync::Arc::new(
-        lemonfiber_fixtures::support::SeedFs::keyed(Some("held"), None)
+        lemonfiber_fixtures::support::SeedFs::keyed(Some("held"))
             .missing(vec!["gone"])
             .leading_away(vec!["away"]),
     ));

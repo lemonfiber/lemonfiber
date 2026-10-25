@@ -32,7 +32,7 @@ async fn confirming_records_where_each_service_listens_in_the_settings_and_nothi
         400,
         &["media"],
     )]);
-    let files = Arc::new(SeedFs::keyed(None, None));
+    let files = Arc::new(SeedFs::keyed(None));
     let mut ctx = over_files(somebody_elses(), images, Arc::clone(&files));
     ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|config| config.join("data").join("stack"));

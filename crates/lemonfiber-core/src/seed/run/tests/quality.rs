@@ -230,7 +230,7 @@ async fn a_curator_with_no_key_yet_is_skipped_and_owes_the_sync_nothing() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-unkeyed-curator");
     let http = syncing(NOTHING_APPLIED);
     let ctx = contracted_ctx(&project, "sync", true, http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
     let fillers = a_sync(&project, &first_party("syncer"), true);
 
     let wirings = super::super::quality::seed_quality(&ctx, &fillers).await;
@@ -252,7 +252,7 @@ async fn a_curator_whose_key_file_leads_away_is_refused_and_never_handed_to_the_
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-leading-away");
     let http = syncing(NOTHING_APPLIED);
     let ctx = contracted_ctx(&project, "sync", true, http.clone()).with_filesystem(Arc::new(
-        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"), None)
+        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
             .leading_away(vec!["config/radarr/"]),
     ));
     let fillers = a_sync(&project, &first_party("syncer"), true);

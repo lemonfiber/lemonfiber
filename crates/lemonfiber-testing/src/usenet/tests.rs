@@ -5,7 +5,12 @@ use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::super::context::a_context;
-use super::{carrying, moved, operation, transfers, unkeyed, ADAPTER, CARRIED, PLUGIN};
+use lemonfiber_core::ports::filesystem::Beneath;
+use lemonfiber_core::stack::Source;
+
+use super::{
+    carrying, keyed, moved, moved_in, operation, transfers, unkeyed, ADAPTER, CARRIED, PLUGIN,
+};
 
 #[test]
 fn the_moved_plugin_is_sabnzbds_with_an_adapter_speaking_the_usenet_contract() {
@@ -79,4 +84,31 @@ fn what_is_coming_down_is_answered_on_the_transfers_path_as_the_contract_carries
         }),
         Some(vec![CARRIED.to_owned()])
     );
+}
+
+#[test]
+fn a_client_moved_in_is_keyed_where_its_stack_is_and_one_keyed_holds_its_key_unwritten() {
+    let over = |directory: &Scratch| {
+        Source::External(Box::leak(directory.to_path_buf().into_boxed_path()))
+    };
+    let written = Scratch::new("usenet-moved-in");
+    let mut ctx = a_context().over(over(&written)).build();
+    ctx.settings.env_file = Some(written.join(".env"));
+    moved_in(&ctx);
+
+    let shared = Scratch::new("usenet-keyed");
+    let mut beside = a_context().over(over(&shared)).build();
+    beside.settings.env_file = Some(shared.join(".env"));
+    let beside = keyed(beside);
+
+    let at = |directory: &Scratch| lemonfiber_core::plugin::key_file(directory, ADAPTER);
+    assert!(at(&written).exists());
+    assert!(!at(&shared).exists());
+    assert_eq!(
+        beside.seams.confined.read(&at(&shared), &shared),
+        Beneath::Read(super::super::adapted::KEY.to_owned())
+    );
+    assert!(shared
+        .join(lemonfiber_core::config::paths::PLUGINS)
+        .exists());
 }

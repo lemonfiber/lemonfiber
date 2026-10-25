@@ -55,9 +55,7 @@ fn measuring_a_volume(available: u64) -> crate::app::Ctx {
     a_context()
         .settings(measuring())
         .build()
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_facts(facts(available)),
-        ))
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(available))))
         .with_occupancy(Walking::holding(a_tree()))
 }
 
@@ -75,7 +73,7 @@ async fn a_data_location_that_will_not_be_read_is_a_refusal_rather_than_an_empty
     let ctx = a_context()
         .settings(measuring())
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(500))))
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(500))))
         .with_occupancy(Walking::refusing("permission denied"));
     let refused = space(&ctx, None).await;
     assert!(
@@ -159,7 +157,7 @@ fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
         .build()
         .with_http(http)
         .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
+            SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
         ))
         .with_occupancy(Walking::holding(a_tree()))
 }
@@ -316,7 +314,7 @@ async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
         .build()
         .with_http(http)
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED), None).with_facts(facts(900_000_000_000)),
+            SeedFs::keyed(Some(KEYED)).with_facts(facts(900_000_000_000)),
         ))
         .with_occupancy(Walking::holding(a_tree()));
 
@@ -346,7 +344,7 @@ async fn a_stack_that_cannot_be_read_at_all_is_a_refusal_rather_than_an_empty_on
         .settings(measuring())
         .build()
         .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
+            SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
         ))
         .with_occupancy(Walking::holding(a_tree()));
     assert!(space(&ctx, None).await.is_err());
@@ -365,7 +363,7 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
         .settings(measuring())
         .build()
         .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_facts(facts(900_000_000_000)),
+            SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
         ))
         .with_occupancy(Walking::holding(a_tree()));
     let reckoned = space(&ctx, None).await;

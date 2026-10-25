@@ -323,10 +323,9 @@ fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: A
     crate::test_support::contracted_context(project, service, keyed)
         .build()
         .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(
+            "<Config><ApiKey>the-key</ApiKey></Config>",
+        ))))
 }
 
 /// The stack's `services` beside a plugin's curator, `kept`, filing `media` and keeping
@@ -366,7 +365,7 @@ fn asked_by_a_plugin(
 /// A filesystem holding every curator key, the stand-in's resolving away from beneath
 /// the directory its container owns.
 fn leading_away_from_the_stand_in() -> SeedFs {
-    SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"), None)
+    SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
         .leading_away(vec!["config/kept/"])
 }
 

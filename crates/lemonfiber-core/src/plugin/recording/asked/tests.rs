@@ -1,6 +1,7 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_plugin::{Manifest, Request};
 
+use super::super::first::Presented;
 use super::super::tests::asking::SERVED;
 use super::{answered, items, kept, unrecorded, Item};
 use crate::ports::http::Response;
@@ -70,6 +71,68 @@ fn every_request_recording_is_named_in_order_and_only_an_operators_probe_is_keye
                 Some("recordings/sonarr/ping.json"),
                 false
             ),
+        ]
+    );
+}
+
+#[test]
+fn a_claim_probe_asking_nothing_of_the_service_is_no_request_recording() {
+    let text = format!("{SERVED}{PROVED}");
+    let Ok(mut manifest) = Manifest::from_toml(&text) else {
+        return;
+    };
+    for claim in &mut manifest.claims {
+        for probe in claim
+            .probes
+            .iter_mut()
+            .filter(|probe| probe.id == "guarded")
+        {
+            probe.request = None;
+        }
+    }
+
+    let named: Vec<String> = items(&manifest)
+        .into_iter()
+        .map(|item| item.named)
+        .collect();
+
+    assert_eq!(
+        named,
+        vec![
+            "proof sonarr.answers".to_owned(),
+            "claim library.curate probe wanted".to_owned(),
+            "check sonarr:answers".to_owned(),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_key_presented_in_a_header_is_sent_in_it_and_nothing_is_presented_without_one() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let held = Presented::Header("X-Api-Key", "the-key".to_owned());
+    let asked = request("/api/v3/system/status", Some("application/json"));
+
+    let _ = answered(http.as_ref(), 8, &item(&asked, true), Some(&held)).await;
+    let _ = answered(http.as_ref(), 8, &item(&asked, false), None).await;
+
+    let sent: Vec<(String, Vec<(String, String)>)> = http
+        .requests()
+        .into_iter()
+        .map(|one| (one.url, one.headers))
+        .collect();
+    let accept = ("Accept".to_owned(), "application/json".to_owned());
+    let url = "http://127.0.0.1:8/api/v3/system/status".to_owned();
+    assert_eq!(
+        sent,
+        vec![
+            (
+                url.clone(),
+                vec![
+                    accept.clone(),
+                    ("X-Api-Key".to_owned(), "the-key".to_owned())
+                ]
+            ),
+            (url, vec![accept]),
         ]
     );
 }

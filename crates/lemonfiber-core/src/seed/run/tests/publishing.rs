@@ -32,7 +32,7 @@ async fn the_curators_in_the_stack_are_handed_to_the_request_service() {
     ]);
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -69,7 +69,7 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("published");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let wiring = super::super::published::publish_keys(
         &ctx,
@@ -184,7 +184,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED), None)
+            SeedFs::keyed(Some(KEYED))
                 .with_subtitle_finder(FINDER_CONFIG)
                 .with_requests(r#"{"main":{"apiKey":"request-key"}}"#),
         ));
@@ -256,7 +256,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     let http = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let _ = super::super::published::publish_keys(
         &ctx,
@@ -295,7 +295,7 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
     ]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let _ = super::super::published::publish_keys(
         &ctx,
@@ -330,7 +330,7 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
 async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
     let env = config_scratch("publish-rehearsed");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(None)))
         .rehearsing();
 
     let wiring = super::super::published::publish_keys(
@@ -366,7 +366,7 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
     let http = Fake::always(Answer::reply(200, r#"{"isInit":false}"#));
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .rehearsing();
 
     let wiring = super::super::published::publish_keys(
@@ -409,7 +409,7 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
 async fn a_service_whose_entry_names_no_file_publishes_no_key() {
     let env = recorded_admin("no-file-named");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_requests(r#"{"main":{"apiKey":"unreachable"}}"#),
+        SeedFs::keyed(None).with_requests(r#"{"main":{"apiKey":"unreachable"}}"#),
     ));
     let mut pathless = requests_with_settings();
     pathless.api = Some(lemonfiber_manifest::Api {
@@ -446,7 +446,7 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
 async fn nothing_is_published_where_no_service_has_written_a_key() {
     let env = recorded_admin("unpublished");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let wiring = super::super::published::publish_keys(
         &ctx,
