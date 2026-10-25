@@ -37,6 +37,19 @@ fn a_moment_made_afresh_is_held_to_its_shape() {
 }
 
 #[test]
+fn a_moment_inside_a_string_holding_json_is_held_to_its_shape() {
+    assert!(alike(
+        &json!({"value": "{\"FirstStart\":\"2026-10-24T05:12:33Z\",\"runs\":1}"}),
+        &json!({"value": "{\"FirstStart\":\"2026-10-25T01:00:00+02:00\",\"runs\":1}"})
+    ));
+    assert!(!alike(
+        &json!("{\"FirstStart\":\"2026-10-24T05:12:33Z\",\"runs\":1}"),
+        &json!("{\"FirstStart\":\"2026-10-24T05:12:33Z\",\"runs\":2}")
+    ));
+    assert!(!alike(&json!("1"), &json!("2")));
+}
+
+#[test]
 fn one_shape_does_not_stand_for_another() {
     assert!(!alike(
         &json!("3f2b8c1e-9a4d-4f6b-8e2a-1c5d7e9f0a3b"),

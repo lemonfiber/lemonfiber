@@ -7,7 +7,7 @@
           "schema": {
             "$defs": {
               "Record": {
-                "description": "A kind of record a service holds, for carrying a setup across.\n\nFour, because four are what an operator would miss: where things are found, and the\nthree libraries the *arrs keep. Each is a path under the same API and behaves the\nsame way, which is why one port serves all of them.",
+                "description": "A kind of record a service holds, for carrying a setup across.\n\nFive, because five are what an operator would miss: where things are found, and the\nfour libraries the *arrs keep. Each is a path under the same API and behaves the\nsame way, which is why one port serves all of them.",
                 "oneOf": [
                   {
                     "const": "indexer",
@@ -27,6 +27,11 @@
                   {
                     "const": "artist",
                     "description": "Music the service is following.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "author",
+                    "description": "Books the service is following.",
                     "type": "string"
                   }
                 ]

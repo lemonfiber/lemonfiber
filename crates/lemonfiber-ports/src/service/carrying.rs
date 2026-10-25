@@ -12,8 +12,8 @@ use super::Failure;
 
 /// A kind of record a service holds, for carrying a setup across.
 ///
-/// Four, because four are what an operator would miss: where things are found, and the
-/// three libraries the *arrs keep. Each is a path under the same API and behaves the
+/// Five, because five are what an operator would miss: where things are found, and the
+/// four libraries the *arrs keep. Each is a path under the same API and behaves the
 /// same way, which is why one port serves all of them.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
@@ -28,6 +28,8 @@ pub enum Record {
     Film,
     /// Music the service is following.
     Artist,
+    /// Books the service is following.
+    Author,
 }
 
 impl Record {
@@ -39,6 +41,7 @@ impl Record {
             Self::Series => "/series",
             Self::Film => "/movie",
             Self::Artist => "/artist",
+            Self::Author => "/author",
         }
     }
 
@@ -50,6 +53,7 @@ impl Record {
             Self::Series => "series",
             Self::Film => "films",
             Self::Artist => "artists",
+            Self::Author => "authors",
         }
     }
 }

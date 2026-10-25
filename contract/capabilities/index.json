@@ -7,7 +7,7 @@
       "files": [
         {
           "path": "download.usenet/v1/openapi.json",
-          "sha256": "f0143da73cd4917b2e2998cf38fba663d8897da02babc3ac335fc8ed43484d23"
+          "sha256": "c4caac8a260f15aa1b89c5bf322e3018d149a6cf453159c65b7afde45fbd99e4"
         },
         {
           "path": "download.usenet/v1/operations/transfers.json",
@@ -71,7 +71,7 @@
       "files": [
         {
           "path": "download.torrent/v1/openapi.json",
-          "sha256": "2586f80a083937f524f5c5b8bf6cb56907f0ec966a1780d4427332a772f4ee98"
+          "sha256": "0aceaf4620e209262d9753c3837117fbb74e50eeaf41908444f6f9336c371e11"
         },
         {
           "path": "download.torrent/v1/operations/transfers.json",
@@ -147,7 +147,7 @@
       "files": [
         {
           "path": "network.egress-guard/v1/openapi.json",
-          "sha256": "445e74467e83ad0137bbe24c466290a54e12d86640cf57e4dd732fbbda1c8395"
+          "sha256": "25afdc153a6492850b5379022a6b499172a1286ddde6e720df102bba059dae02"
         },
         {
           "path": "network.egress-guard/v1/operations/up.json",
@@ -175,7 +175,7 @@
       "files": [
         {
           "path": "library.curate/v1/openapi.json",
-          "sha256": "6ed9452bc7d29b7d61c073e9563e5afe1bf91db4537e69c6e878d4e4b32609bd"
+          "sha256": "849f7f6ff83f296d294ef472efb0368ab7aa8feb6272641530e2b69519d6880a"
         },
         {
           "path": "library.curate/v1/operations/identity.json",
@@ -227,11 +227,11 @@
         },
         {
           "path": "library.curate/v1/operations/records.json",
-          "sha256": "0b6ab146488fd4114374a694c2abd636c9045b7c0546ec373d094022bf68783d"
+          "sha256": "6dda89d6ef03d8f3a236ac66627a4499975c4f62c7b8f3892d602f05bfd9372d"
         },
         {
           "path": "library.curate/v1/operations/carry.json",
-          "sha256": "7febd61174969d083a3602f515a25501549fe944c1305160a5c778779fc5e999"
+          "sha256": "1f34c4b0d2fe4ee963a2a440da6fffdce62a33e56ac573e91035c2c5a4479187"
         },
         {
           "path": "library.curate/v1/operations/lookup.json",
@@ -287,7 +287,7 @@
         },
         {
           "path": "library.curate/v1/conformance.json",
-          "sha256": "80f13c8ce03e50d8d040d2ffe31d2b8f10d4a109d8f04c01f05d0dd785d362aa"
+          "sha256": "70a7e513396cc7d079d88c7de820c811a80293f59006f9bb9d45e725141f8f4b"
         }
       ],
       "majors": [
@@ -303,7 +303,7 @@
       "files": [
         {
           "path": "indexer.search/v1/openapi.json",
-          "sha256": "df8cf68d8b72c83d977dfcdce036c0254c52c328be905892825096ea3f4f0493"
+          "sha256": "cc71b0d567aa2659194a8cf643f86a7c0a655c85e3163fab7a41e386e2a807a2"
         },
         {
           "path": "indexer.search/v1/operations/register_application.json",
@@ -351,7 +351,7 @@
       "files": [
         {
           "path": "indexer.pull/v1/openapi.json",
-          "sha256": "5e6139d139784db05e800dfe0baf5156019e84667822c80664bebb51477b3aed"
+          "sha256": "b8e03379f9b7e215b9b054035a93fa7dd8892309fb4c0f209447b2620ce23f24"
         },
         {
           "path": "indexer.pull/v1/operations/aggregators.json",
@@ -379,7 +379,7 @@
       "files": [
         {
           "path": "subtitles.fetch/v1/openapi.json",
-          "sha256": "be5659876c4b9072fc01e107c80bf45f0ee1c5551533d4801052657545f7d9a1"
+          "sha256": "fe3effdbcac8957e1591af5cc050f6a0483ca1f237579ff7f9f1b8be1e7117df"
         },
         {
           "path": "subtitles.fetch/v1/operations/watching.json",
@@ -407,7 +407,7 @@
       "files": [
         {
           "path": "request.intake/v1/openapi.json",
-          "sha256": "c75836af2e1dbea086d72ccf30c86e88004ad4a581bb3987edddf77cdb9f258b"
+          "sha256": "88aa197ee3f6d1dfb955c93bae0c0e199621bfa19b939df807f1511fb7455cd6"
         },
         {
           "path": "request.intake/v1/operations/establish.json",
@@ -551,7 +551,7 @@
       "files": [
         {
           "path": "identity.source/v1/openapi.json",
-          "sha256": "973260050ee6de5f00dbb8092326b9b7616d1a8d62cd959c72651c4066da6680"
+          "sha256": "d75a0f1fca7cd8308971152fd1c0b75ed18583a62bda7daa934ec2e038a32ee0"
         },
         {
           "path": "identity.source/v1/operations/startup_completed.json",
@@ -647,7 +647,7 @@
       "files": [
         {
           "path": "media.serve/v1/openapi.json",
-          "sha256": "b03be1c38fcf1bb72c1985eb4752fc74bac5f9b659ea13cb577c780972255fc2"
+          "sha256": "820cf453469171f14edd4421e08d64878e5347794484735ea700ab136a153ce5"
         },
         {
           "path": "media.serve/v1/operations/signed_in.json",
@@ -759,7 +759,7 @@
       "files": [
         {
           "path": "proxy.front/v1/openapi.json",
-          "sha256": "15e5c1b35beaf9b9e4710dfee928efafaac8934b5aee13fe53544e8350d5997e"
+          "sha256": "ebb6717810d427756bd7c3f225667d02ca44570ea66b422404d731db6c158928"
         },
         {
           "path": "proxy.front/v1/operations/apply.json",
@@ -791,7 +791,7 @@
       "files": [
         {
           "path": "quality.sync/v1/openapi.json",
-          "sha256": "f789ab3ff08ee90688d4182ba47a6863ce4d88f4bd4a6549965f24ed07e8d491"
+          "sha256": "97386808f4e8bacaaafb3fef40c34bfff4cc14ea81c7edf6db26ff693d6aa057"
         },
         {
           "path": "quality.sync/v1/operations/apply.json",
@@ -819,7 +819,7 @@
       "files": [
         {
           "path": "dashboard.show/v1/openapi.json",
-          "sha256": "99ab91ff55a2cf1263a89ccd5bd054be7399f4c43c89ee836740659728741b92"
+          "sha256": "0311e4e025182fb4f634e2738b873ccbb1bb2ae8c02b6a04fb23d7496144bb65"
         },
         {
           "path": "dashboard.show/v1/operations/apply.json",
@@ -847,7 +847,7 @@
       "files": [
         {
           "path": "archive.extract/v1/openapi.json",
-          "sha256": "ae83f298d42fe8ebc861d9e0c1ed9cd6a0888e3a650db6bd9eee6582652e9207"
+          "sha256": "d154a59c60124dc70c5ab6823a87b0d31dc5e293d47c1b2136da5e1722056866"
         },
         {
           "path": "archive.extract/v1/operations/watch.json",
@@ -875,7 +875,7 @@
       "files": [
         {
           "path": "stream.guard/v1/openapi.json",
-          "sha256": "950f9034f1e76ab82beb72d2d70b173d8995e97fe9d72cfe1a0bff52ec9b29ff"
+          "sha256": "48aaab62cb8d12e4a16d1e6c5ece0e6bd1ac8a149961b7fcdceeee73781eaf28"
         },
         {
           "path": "stream.guard/v1/operations/guard.json",
@@ -907,7 +907,7 @@
       "files": [
         {
           "path": "invite.decline/v1/openapi.json",
-          "sha256": "bdd2568eaef1fdef6ffb518660415568b98ec4a73ace70d87a27ba51c0b8b9ad"
+          "sha256": "31f6181e61577e34f691a03bc43fe4fb8863b853500d27c570cb87bd0650ff0a"
         },
         {
           "path": "invite.decline/v1/operations/hold.json",
@@ -939,7 +939,7 @@
       "files": [
         {
           "path": "request.gate/v1/openapi.json",
-          "sha256": "2163c561accc79c968f6ef4761302ac2dcab6be6b0187c37cace910af2daeecf"
+          "sha256": "ef58fefc9d945212fe186be98f8bcdf3766f51f09c831077d7cb94693356783c"
         },
         {
           "path": "request.gate/v1/operations/admit.json",
@@ -967,7 +967,7 @@
       "files": [
         {
           "path": "owner.claim/v1/openapi.json",
-          "sha256": "16fc3a466b434e777ea633925bfbbc41bb2918938832aec9fe54075a3fa3f44a"
+          "sha256": "d579c0d523bbed74bf0d294547ba9bd91aed832975a09eaa0a0c6e8aabb6ecf8"
         },
         {
           "path": "owner.claim/v1/operations/owner.json",

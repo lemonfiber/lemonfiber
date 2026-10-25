@@ -38,6 +38,9 @@ pub enum Kind {
 /// The media type a service declares for music.
 pub const MUSIC: &str = "music";
 
+/// The media type a service declares for books.
+pub const BOOKS: &str = "books";
+
 /// `words` as one choice is offered from them: `a, b, or c`.
 #[must_use]
 pub fn offered<T: AsRef<str>>(words: &[T]) -> String {

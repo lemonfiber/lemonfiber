@@ -680,3 +680,4 @@ async fn a_curator_whose_download_client_cannot_answer_fails_at_it_and_starts_no
 mod checking;
 mod claiming;
 mod identity;
+mod unoffered;

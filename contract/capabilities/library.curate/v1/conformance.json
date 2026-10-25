@@ -155,6 +155,22 @@
       "operation": "register_root_folder"
     },
     {
+      "asked": {
+        "folder": {
+          "media_type": "books",
+          "path": "/data/conformance"
+        }
+      },
+      "case": "register_root_folder-answers-books",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "books",
+      "operation": "register_root_folder"
+    },
+    {
       "asked": {},
       "case": "root_folders-answers",
       "expect": {
@@ -263,6 +279,19 @@
     },
     {
       "asked": {
+        "sort": "author"
+      },
+      "case": "records-answers-books",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "books",
+      "operation": "records"
+    },
+    {
+      "asked": {
         "item": {
           "folder": null,
           "name": "conformance",
@@ -316,6 +345,25 @@
       "keyed": true,
       "live": false,
       "media_type": "music",
+      "operation": "carry"
+    },
+    {
+      "asked": {
+        "item": {
+          "folder": null,
+          "name": "conformance",
+          "profile": null,
+          "rest": ""
+        },
+        "sort": "author"
+      },
+      "case": "carry-answers-books",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "books",
       "operation": "carry"
     },
     {
