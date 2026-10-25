@@ -111,8 +111,8 @@ fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
     }
 }
 
-/// A rehearsal of an update names every move the bundle offers, the media server's and
-/// each download client's, and takes none.
+/// A rehearsal of an update names every move the bundle offers, the media server's, each
+/// download client's and the subtitle finder's, and takes none.
 #[tokio::test]
 async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
@@ -130,6 +130,7 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     assert_eq!(
         offered,
         vec![
+            "bazarr".to_owned(),
             BUNDLED.to_owned(),
             "qbittorrent".to_owned(),
             "sabnzbd".to_owned()
@@ -151,7 +152,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((3, 0))
+        Some((4, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -170,7 +171,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     );
     assert_eq!(
         report.map(|report| report.moves.iter().map(|one| one.plugin.as_str()).collect()),
-        Some(vec!["qbittorrent", "sabnzbd"])
+        Some(vec!["bazarr", "qbittorrent", "sabnzbd"])
     );
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
@@ -189,7 +190,7 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
             .as_ref()
             .ok()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((3, 0)),
+        Some((4, 0)),
         "{confirmed:?}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));

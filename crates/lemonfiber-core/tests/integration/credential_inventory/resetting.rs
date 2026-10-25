@@ -17,7 +17,6 @@ use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
 
 /// A curator's status body, as a healthy service answers `system/status` with.
@@ -37,12 +36,9 @@ fn replaced_config() -> String {
     format!("<Config><ApiKey>{}</ApiKey></Config>", the_new_key())
 }
 
-/// The subtitle finder's configuration, holding its own key under `auth`.
-const SUBTITLE_FINDER_CONFIG: &str = "auth:\n  apikey: bazarrkeybazarrkey\n";
-
 /// A filesystem holding each curator's configuration as it was until the transport was
-/// asked to reset a key and as the reset left it after, the subtitle finder's
-/// configuration, and whatever `rest` holds everywhere else.
+/// asked to reset a key and as the reset left it after, and whatever `rest` holds
+/// everywhere else.
 struct Resetting {
     asked: Arc<Fake>,
     rest: Arc<dyn FileSystem>,
@@ -103,9 +99,6 @@ impl FileSystem for Resetting {
             } else {
                 SERVICE_CONFIG.to_owned()
             });
-        }
-        if name.ends_with("config.yaml") {
-            return Some(SUBTITLE_FINDER_CONFIG.to_owned());
         }
         self.now().read(path).await
     }
@@ -298,8 +291,8 @@ fn gate_routes(key: &str) -> String {
     .written()
 }
 
-/// The subtitle finder and the request gate's route each get the new key in the same
-/// run as the reset.
+/// The subtitle finder moved into its plugin and the request gate's route each get the
+/// new key in the same run as the reset, the finder over its contract.
 #[tokio::test]
 async fn a_reset_key_reaches_the_subtitle_finder_and_the_gate() {
     let env = crate::common::household::recorded_admin("reset-copies");
@@ -334,8 +327,8 @@ async fn a_reset_key_reaches_the_subtitle_finder_and_the_gate() {
         ),
         (
             Method::Post,
-            "/api/system/settings",
-            vec![Answer::reply(204, "")],
+            lemonfiber_testing::subtitles::operation("watch"),
+            vec![lemonfiber_testing::subtitles::taken()],
         ),
         (Method::Get, "/applications", vec![Answer::reply(200, "[]")]),
         (
@@ -344,16 +337,17 @@ async fn a_reset_key_reaches_the_subtitle_finder_and_the_gate() {
             vec![Answer::reply(201, "{}")],
         ),
     ]);
-    let ctx = lemonfiber_testing::a_context()
-        .over(Source::External(stack))
-        .engine(Arc::new(Reporting::default()))
-        .filesystem(Resetting::beside(&http, Arc::new(Disk)))
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http.clone());
+    let ctx = lemonfiber_testing::subtitles::reaching(
+        lemonfiber_testing::a_context()
+            .over(Source::External(stack))
+            .filesystem(Resetting::beside(&http, Arc::new(Disk)))
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http.clone()),
+    );
 
     let inventory = asked(
         &ctx,
@@ -390,15 +384,13 @@ async fn a_reset_key_reaches_the_subtitle_finder_and_the_gate() {
         routed.contains(&the_new_key()),
         "the gate's route kept the old key"
     );
-    let watched = http
-        .requests()
+    let told: Vec<String> = lemonfiber_testing::subtitles::told(&http.requests())
         .into_iter()
-        .find(|request| request.url.ends_with("/api/system/settings"))
-        .and_then(|request| request.body)
-        .unwrap_or_default();
+        .map(|watched| watched.api_key)
+        .collect();
     assert!(
-        watched.contains(&the_new_key()),
-        "the finder was not given the new key"
+        told == vec![the_new_key()],
+        "the finder was not given the new key alone"
     );
 }
 

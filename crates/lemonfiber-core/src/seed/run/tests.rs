@@ -371,12 +371,9 @@ fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: A
         ))))
 }
 
-/// The stack's `services` beside a plugin's curator, `kept`, filing `media` and keeping
-/// its key in a file beneath the directory its container owns.
-fn beside_a_stand_in(
-    services: Vec<lemonfiber_manifest::Service>,
-    media: &str,
-) -> crate::wiring::Fillers {
+/// A plugin's curator, `kept`, filing `media` and keeping its key in a file beneath the
+/// directory its container owns.
+fn a_stand_in(media: &str) -> crate::plugin::Installed {
     let mut stand_in = crate::test_support::a_placed(
         "kept",
         &["library.curate"],
@@ -384,11 +381,15 @@ fn beside_a_stand_in(
         Some(8990),
     );
     stand_in.media_types = vec![media.to_owned()];
-    fillers_beside(
-        services,
-        &[crate::test_support::an_installed("kept", vec![stand_in])],
-        stack_root(),
-    )
+    crate::test_support::an_installed("kept", vec![stand_in])
+}
+
+/// The stack's `services` beside [`a_stand_in`] filing `media`.
+fn beside_a_stand_in(
+    services: Vec<lemonfiber_manifest::Service>,
+    media: &str,
+) -> crate::wiring::Fillers {
+    fillers_beside(services, &[a_stand_in(media)], stack_root())
 }
 
 /// The stack's `services` beside a plugin's service standing where `asker`, one of the
@@ -565,7 +566,7 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
     env
 }
 
-/// The subtitle finder as a manifest service: a key in a YAML of its own.
+/// The stack's own subtitle finder as a manifest service, naming the YAML it writes its key to.
 fn subtitle_finder_svc() -> lemonfiber_manifest::Service {
     manifest_service(
         "bazarr",
@@ -578,10 +579,6 @@ fn subtitle_finder_svc() -> lemonfiber_manifest::Service {
         Some(6767),
     )
 }
-
-/// The finder's configuration as it writes it — its own key under `auth`, and
-/// one under each curator it has been pointed at.
-const FINDER_CONFIG: &str = "auth:\n  apikey: finder-key\nsonarr:\n  apikey: someone-elses\n";
 
 fn stack_root() -> &'static std::path::Path {
     std::path::Path::new("/opt/lemonfiber/stack")

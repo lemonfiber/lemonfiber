@@ -23,6 +23,7 @@ mod granting;
 mod held;
 mod protection;
 mod rotation;
+pub(crate) mod written;
 
 pub use lemonfiber_ports::fingerprint::fingerprint;
 

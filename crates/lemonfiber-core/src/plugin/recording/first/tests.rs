@@ -335,29 +335,6 @@ async fn a_key_file_the_container_made_a_link_is_refused_rather_than_followed() 
     );
 }
 
-#[tokio::test]
-async fn a_subtitle_finders_key_is_read_from_its_configuration_and_presented_in_its_header() {
-    let Some((_source, copy)) = copy("first-bazarr") else {
-        return;
-    };
-    let written = "7".repeat(32);
-    let _ = std::fs::create_dir_all(copy.path().join("config"));
-    let _ = std::fs::write(
-        copy.path().join("config/config.yaml"),
-        format!("auth:\n  apikey: {written}\n"),
-    );
-    let Some(placed) = placed(
-        "api         = { kind = \"bazarr\", key_source = \"config-yaml\", path = \"/config/config/config.yaml\" }",
-    ) else {
-        return;
-    };
-    let held = first_run(&placed, &copy, Fake::silent()).await;
-    assert_eq!(
-        held.map(|held| held.map(|held| held.presented)),
-        Ok(Some(Presented(crate::bazarr::KEY, written)))
-    );
-}
-
 #[tokio::test(start_paused = true)]
 async fn a_key_never_written_fails_the_first_run_at_its_limit() {
     let Some((_source, copy)) = copy("first-unwritten") else {

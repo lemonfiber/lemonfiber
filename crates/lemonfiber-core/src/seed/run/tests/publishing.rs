@@ -107,7 +107,6 @@ fn every_keyed_service() -> Vec<lemonfiber_manifest::Service> {
     vec![
         curator("sonarr", 8989, "tv"),
         aggregator_svc(),
-        subtitle_finder_svc(),
         requests_with_settings(),
         media_server_svc(),
         listening_server_svc(),
@@ -118,7 +117,7 @@ fn every_keyed_service() -> Vec<lemonfiber_manifest::Service> {
 ///
 /// The media-filing curators are the right set for root folders and download clients and
 /// the wrong one here: the indexer aggregator manages no media and so declares no media
-/// types, and the subtitle finder is not curator-shaped at all, and both have a key.
+/// types, and the request service is not curator-shaped at all, and both have a key.
 ///
 /// **What nothing reads is retired on the way.** The media server's key
 /// filed under lemonfiber's name is revoked and forgotten, and the listening server's
@@ -150,9 +149,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
     let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED))
-                .with_subtitle_finder(FINDER_CONFIG)
-                .with_requests(r#"{"main":{"apiKey":"request-key"}}"#),
+            SeedFs::keyed(Some(KEYED)).with_requests(r#"{"main":{"apiKey":"request-key"}}"#),
         ));
 
     let services = every_keyed_service();
@@ -169,7 +166,6 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
     for expected in [
         "SONARR_API_KEY=the-key",
         "PROWLARR_API_KEY=the-key",
-        "BAZARR_API_KEY=finder-key",
         "SEERR_API_KEY=request-key",
     ] {
         assert!(

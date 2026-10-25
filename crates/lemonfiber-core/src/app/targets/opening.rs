@@ -332,27 +332,5 @@ pub(crate) async fn stack_requests_key(
     crate::seerr::api_key(&read_owned(ctx.seams.filesystem.as_ref(), &path, &within).await?)
 }
 
-/// The subtitle finder's own key, read from the configuration it writes.
-///
-/// Its own rather than shared with a curator read: the file is a YAML holding an
-/// `apikey` under several sections, so which one is this service's is decided by the
-/// section it sits under. Nothing where the stack has no subtitle finder, or where it
-/// has not written a key yet.
-pub(crate) async fn subtitle_finder_key(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&std::path::Path>,
-) -> Option<String> {
-    let addr = service_addr(services, ApiKind::Bazarr)?;
-    let service = services.iter().find(|service| service.id == addr.id)?;
-    let path = crate::app::targets::config_path(
-        project?,
-        service,
-        service.api.as_ref().and_then(|api| api.path.as_deref()),
-    )?;
-    let within = service_config_dir(project?, &service.id);
-    crate::bazarr::api_key(&read_owned(ctx.seams.filesystem.as_ref(), &path, &within).await?)
-}
-
 #[cfg(test)]
 mod tests;

@@ -12,7 +12,7 @@ const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugi
 const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
 
 /// Services the media stack runs that the bundle installs rather than assembles.
-const NOT_ASSEMBLED: [&str; 3] = ["jellyfin", "qbittorrent", "sabnzbd"];
+const NOT_ASSEMBLED: [&str; 4] = ["bazarr", "jellyfin", "qbittorrent", "sabnzbd"];
 
 /// Fields of a service that differ between the two, by service and field: the guarded
 /// door and the proxy run the images lemonfiber builds for them, a part released here
@@ -52,10 +52,9 @@ const DIFFERING: [(&str, &str); 24] = [
 /// capability: each service given a household hostname asks the proxy, each whose
 /// dashboard panel reads it asks the dashboard, the request service asks the gate, and
 /// the gate, quality sync, decline and the guarded door ask what they act on.
-const ASKED_HERE: [(&str, &str); 19] = [
+const ASKED_HERE: [(&str, &str); 18] = [
     ("audiobookshelf", "dashboard.show"),
     ("audiobookshelf", "proxy.front"),
-    ("bazarr", "dashboard.show"),
     ("calibre-web-automated", "proxy.front"),
     ("decline", "identity.source"),
     ("door", "media.serve"),

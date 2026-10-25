@@ -153,22 +153,22 @@ fn declared(
 
 /// The reader that takes one service's own key out of the file it wrote it into.
 ///
-/// Four shapes and one question. A curator-shape service keeps its key in XML, the
-/// subtitle finder in YAML, the request service in JSON and the Usenet client in an
-/// INI — and every one of them is a file under the service's own configuration
-/// directory, named by the manifest, so the shape decides only which reader opens it.
+/// Two shapes and one question. A curator-shape service keeps its key in XML and the
+/// request service in JSON, each a file under the service's own configuration directory,
+/// named by the manifest, so the shape decides only which reader opens it.
 ///
-/// The rest are not read here. Two of them have no account at all until lemonfiber
-/// makes one, the download clients are reached through their plugins' adapters with what
-/// lemonfiber minted for them, and the Usenet indexer aggregator is reached with the
-/// administrator lemonfiber gives it rather than with the key it writes; all of those are
-/// on the declared list instead, which is where a credential lemonfiber minted belongs.
+/// The rest are not read here. The subtitle finder is reached through its plugin, whose
+/// key lemonfiber mints; two have no account at all until lemonfiber makes one, the
+/// download clients are reached through their plugins' adapters with what lemonfiber
+/// minted for them, and the Usenet indexer aggregator is reached with the administrator
+/// lemonfiber gives it rather than with the key it writes; all of those are on the
+/// declared list instead, which is where a credential lemonfiber minted belongs.
 pub(crate) fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
     match kind {
         ApiKind::Servarr => Some(crate::servarr::api_key),
-        ApiKind::Bazarr => Some(crate::bazarr::api_key),
         ApiKind::Seerr => Some(crate::seerr::api_key),
-        ApiKind::Sabnzbd
+        ApiKind::Bazarr
+        | ApiKind::Sabnzbd
         | ApiKind::Qbittorrent
         | ApiKind::Bindery
         | ApiKind::Jellyfin

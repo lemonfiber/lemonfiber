@@ -13,7 +13,6 @@ mod an_invitation_sets_nobodys_password;
 mod an_invitation_taken_back_at_its_lapse;
 mod audiobookshelf;
 mod bandwidth;
-mod bazarr;
 mod before_a_takeover;
 mod bindery;
 mod bundle;

@@ -58,7 +58,6 @@ pub mod autostart;
 pub mod backup;
 pub mod bandwidth;
 pub mod baseline;
-pub mod bazarr;
 pub mod bindery;
 pub mod bundle;
 pub mod bytes;

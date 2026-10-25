@@ -155,8 +155,8 @@ fn under_its_service(
 /// Every curator-shaped service, not only the ones that file media: the indexer aggregator
 /// manages none and so declares no media types, which is what keeps it out of the curator
 /// list used for root folders and download clients — but it has a key like the rest, and a
-/// service added to the stack is given it by a secret its declaration names. The other
-/// two are not curator-shaped and each keeps its key in a file of its own shape.
+/// service added to the stack is given it by a secret its declaration names. The request
+/// service is not curator-shaped and keeps its key in a file of its own shape.
 async fn written_down(
     ctx: &Ctx,
     services: &[Service],
@@ -171,12 +171,6 @@ async fn written_down(
             found.push((published_as(&target.id), key));
         }
     }
-    let subtitle_finder = crate::app::targets::subtitle_finder_key(ctx, services, project).await;
-    found.extend(under_its_service(
-        services,
-        lemonfiber_manifest::ApiKind::Bazarr,
-        subtitle_finder,
-    ));
     let requests = crate::app::targets::stack_requests_key(ctx, services, project).await;
     found.extend(under_its_service(
         services,
