@@ -8,7 +8,7 @@
 
 use super::super::Ctx;
 use super::waiting;
-use crate::docker::{condition, survey, unsettled, Service};
+use crate::docker::{condition, survey_beside, unsettled, Service};
 use crate::error::Problem;
 use crate::error::{Diagnose, Remedy, State};
 use crate::model::LifecycleReport;
@@ -42,6 +42,7 @@ async fn settle(
     // How much of the wait has already been spoken for, which is what keeps the
     // narration on its own interval rather than on the poll's.
     let mut spoken = 0;
+    let beside = crate::app::plugins::profiled(ctx);
 
     loop {
         let containers = ctx
@@ -50,8 +51,9 @@ async fn settle(
             .list(&ctx.settings.project)
             .await
             .map_err(|err| Box::new(err.problem()))?;
-        let services = survey(
+        let services = survey_beside(
             manifest,
+            &beside,
             profiles,
             &containers,
             &super::halted::load(ctx),
@@ -229,8 +231,9 @@ pub(crate) async fn fell_short_into(
         return;
     };
     let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
-    let read = survey(
+    let read = survey_beside(
         manifest,
+        &crate::app::plugins::profiled(ctx),
         &profiles,
         &containers,
         &super::halted::load(ctx),

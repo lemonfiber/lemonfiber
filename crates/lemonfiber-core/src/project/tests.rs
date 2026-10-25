@@ -612,6 +612,35 @@ fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
     assert_eq!(configuration(&project), configuration(&standing));
 }
 
+/// Every service of a plugin the bundle installs is written into the stack profile its
+/// bundle entry names, so the forms holding that profile start and stop it,
+/// and a third-party plugin's into a profile of its own.
+#[test]
+fn a_plugin_the_bundle_installs_is_written_into_the_profile_its_entry_names() {
+    let moved: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
+    let stranger = an_installed(
+        "comics",
+        vec![a_placed("comics", &["library.read"], None, Some(25600))],
+    );
+    let written = project(&carried(), &[moved.clone(), vec![stranger]].concat());
+    let profile: Vec<String> = moved.iter().map(crate::plugin::profile_of).collect();
+
+    for id in [
+        crate::test_support::media::PLUGIN,
+        crate::test_support::media::ADAPTER,
+    ] {
+        assert_eq!(sequence(&entry(&written, id), "profiles"), profile, "{id}");
+    }
+    assert_ne!(
+        profile,
+        vec![crate::plugin::profile(crate::test_support::media::PLUGIN)]
+    );
+    assert_eq!(
+        sequence(&entry(&written, "comics"), "profiles"),
+        vec![crate::plugin::profile("comics")]
+    );
+}
+
 /// The project of the stack this build carries, with nothing installed.
 fn project_of_the_stack_alone() -> Project {
     project(&carried(), &[])

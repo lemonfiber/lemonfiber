@@ -11,7 +11,8 @@ use crate::project::entry::{self, literal, Tier, Unit};
 /// The word in front of a plugin's id, which is the profile its services sit in.
 const PROFILE: &str = "plugin-";
 
-/// The Compose profile this plugin's services sit in.
+/// The Compose profile a plugin's services sit in where the bundle places them in none of
+/// the stack's.
 #[must_use]
 pub fn profile(plugin: &str) -> String {
     format!("{PROFILE}{plugin}")
@@ -65,13 +66,17 @@ impl Reading<'_> {
     }
 }
 
-/// One of a plugin's services as its entry needs it.
-pub(crate) fn unit<'a>(plugin: &str, placed: &'a Placed, reading: &Reading<'_>) -> Unit<'a> {
+/// One of `installed`'s services as its entry needs it, in the profile its services sit in.
+pub(crate) fn unit<'a>(
+    installed: &Installed,
+    placed: &'a Placed,
+    reading: &Reading<'_>,
+) -> Unit<'a> {
     let fields = &placed.fields;
     Unit {
         id: &placed.service,
         namespace: &placed.service,
-        profile: profile(plugin),
+        profile: super::profile_of(installed),
         image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
         published: published(placed),
         contract: placed.listens.filter(|_| !placed.speaks.is_empty()),

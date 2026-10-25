@@ -110,7 +110,7 @@ pub fn generated(
             };
             one.services
                 .iter()
-                .map(move |placed| plugin::unit(&one.plugin, placed, &secrets))
+                .map(move |placed| plugin::unit(one, placed, &secrets))
         }))
         .chain(pass_unit(
             manifest,
@@ -212,7 +212,7 @@ pub fn hosting(
 }
 
 /// The profile the named service starts with: its own where the stack declares it, and
-/// its plugin's where a plugin brings it.
+/// the one its plugin's services sit in where a plugin brings it.
 fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<String> {
     manifest
         .services
@@ -223,7 +223,7 @@ fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<
             installed
                 .iter()
                 .find(|one| one.services.iter().any(|placed| placed.service == id))
-                .map(|one| plugin::profile(&one.plugin))
+                .map(plugin::profile_of)
         })
 }
 

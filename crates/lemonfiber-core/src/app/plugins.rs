@@ -420,6 +420,14 @@ pub(crate) fn read(ctx: &Ctx) -> Result<Register, Box<Problem>> {
     }
 }
 
+/// The services of every installed plugin that sit in one of the stack's profiles,
+/// or none where the record cannot be read.
+pub(crate) fn profiled(ctx: &Ctx) -> Vec<crate::plugin::Profiled> {
+    read(ctx)
+        .map(|register| crate::plugin::profiled(register.installed()))
+        .unwrap_or_default()
+}
+
 /// Where the record is kept: beside the environment file, in the configuration
 /// directory a backup captures, or nowhere when nothing is configured. Equal to
 /// [`crate::config::paths::Paths::plugins`].

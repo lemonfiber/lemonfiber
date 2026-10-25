@@ -161,3 +161,38 @@ async fn a_service_a_form_filtered_out_is_listed_as_filtered_and_not_as_absent()
     assert!(listed.contains(&"sabnzbd"), "{listed:?}");
     assert_eq!(report.condition, crate::docker::Condition::Active);
 }
+
+/// The media server moved into its plugin sits in the stack profile its bundle entry names:
+/// its adapter is a service of the form bringing that profile, and not a
+/// container the stack never declared.
+#[tokio::test]
+async fn a_moved_media_servers_adapter_is_a_service_of_its_form_and_not_a_stranger() {
+    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+        .alongside(media::running());
+    let mut ctx = watching(engine);
+    ctx.settings.env_file = Some(crate::test_support::env_without_password("status-moved"));
+    media::moved_in(&ctx);
+
+    let answered = dispatch(
+        Command::Status {
+            forms: vec!["library".to_owned()],
+        },
+        &ctx,
+    )
+    .await;
+    let Ok(Outcome::Status(report)) = answered else {
+        unreachable!("a status answers with a status");
+    };
+
+    let adapter = report
+        .services
+        .iter()
+        .find(|service| service.id == media::ADAPTER);
+    assert!(
+        adapter.is_some_and(|service| service.state == ServiceState::Healthy
+            && service.forms.contains(&"library".to_owned())),
+        "{:?}",
+        report.services
+    );
+    assert!(report.undeclared.iter().all(|one| one.id != media::ADAPTER));
+}

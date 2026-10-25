@@ -21,7 +21,7 @@
 
 use lemonfiber_manifest::Manifest;
 
-use crate::docker::survey;
+use crate::docker::survey_beside;
 use crate::error::{Diagnose, Problem};
 use crate::journal::{Change as Journalled, Kind};
 use crate::stack::compose::Action;
@@ -369,6 +369,7 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
         .map(|one| one.profile.clone())
         .collect();
     let deadline = ctx.seams.clock.now() + ctx.patience;
+    let beside = crate::app::plugins::profiled(ctx);
     loop {
         let Ok(containers) = ctx.seams.engine.list(&ctx.settings.project).await else {
             return (
@@ -376,8 +377,9 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
                 Some("the container engine stopped answering".to_owned()),
             );
         };
-        let seen = survey(
+        let seen = survey_beside(
             manifest,
+            &beside,
             &profiles,
             &containers,
             &engine::halted::load(ctx),

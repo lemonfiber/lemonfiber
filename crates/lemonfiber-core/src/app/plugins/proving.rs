@@ -137,7 +137,7 @@ pub(crate) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> b
 fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -> Vec<String> {
     let plan = Plan {
         forms: Vec::new(),
-        profiles: std::iter::once(crate::plugin::profile(&installed.plugin))
+        profiles: std::iter::once(crate::plugin::profile_of(installed))
             .chain(super::super::project::hosting_with(ctx, installed))
             .collect(),
         services: installed
