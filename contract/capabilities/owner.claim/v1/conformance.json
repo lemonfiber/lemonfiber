@@ -1,0 +1,38 @@
+{
+  "capability": "owner.claim",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "owner"
+    },
+    {
+      "asked": {},
+      "case": "owner-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "owner"
+    },
+    {
+      "asked": {},
+      "case": "claim-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "claim"
+    }
+  ],
+  "major": 1
+}

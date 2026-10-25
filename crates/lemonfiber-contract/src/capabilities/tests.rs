@@ -17,11 +17,12 @@ use super::archive::extract;
 use super::dashboard::show;
 use super::download::{torrent, usenet};
 use super::identity::source;
-use super::indexer::search;
+use super::indexer::{pull, search};
 use super::invite::decline;
 use super::library::curate;
 use super::media::serve;
 use super::network::egress;
+use super::owner::claim;
 use super::proxy::front;
 use super::quality::sync;
 use super::request::{gate, intake};
@@ -37,6 +38,7 @@ mod invite;
 mod library;
 mod media;
 mod network;
+mod owner;
 mod parties;
 mod proxy;
 mod quality;
@@ -248,6 +250,7 @@ impl Http for Served {
             usenet::CAPABILITY => usenet::dispatch(&Client, operation, body).await,
             curate::CAPABILITY => curate::dispatch(&*self.upstream, operation, body).await,
             search::CAPABILITY => search::dispatch(&*self.upstream, operation, body).await,
+            pull::CAPABILITY => pull::dispatch(&*self.upstream, operation, body).await,
             fetch::CAPABILITY => fetch::dispatch(&*self.upstream, operation, body).await,
             intake::CAPABILITY => intake::dispatch(&*self.upstream, operation, body).await,
             source::CAPABILITY => source::dispatch(&*self.upstream, operation, body).await,
@@ -259,6 +262,7 @@ impl Http for Served {
             guard::CAPABILITY => guard::dispatch(&*self.upstream, operation, body).await,
             decline::CAPABILITY => decline::dispatch(&*self.upstream, operation, body).await,
             gate::CAPABILITY => gate::dispatch(&*self.upstream, operation, body).await,
+            claim::CAPABILITY => claim::dispatch(&*self.upstream, operation, body).await,
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
         Ok(match served {
@@ -418,6 +422,7 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             egress::CAPABILITY,
             curate::CAPABILITY,
             search::CAPABILITY,
+            pull::CAPABILITY,
             fetch::CAPABILITY,
             intake::CAPABILITY,
             source::CAPABILITY,
@@ -429,6 +434,7 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             guard::CAPABILITY,
             decline::CAPABILITY,
             gate::CAPABILITY,
+            claim::CAPABILITY,
         ]
     );
 }

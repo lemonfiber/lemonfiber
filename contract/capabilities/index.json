@@ -3,6 +3,7 @@
     {
       "capability": "download.usenet",
       "conformance": "download.usenet/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "download.usenet/v1/openapi.json",
@@ -66,6 +67,7 @@
     {
       "capability": "download.torrent",
       "conformance": "download.torrent/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "download.torrent/v1/openapi.json",
@@ -141,6 +143,7 @@
     {
       "capability": "network.egress-guard",
       "conformance": "network.egress-guard/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "network.egress-guard/v1/openapi.json",
@@ -168,6 +171,7 @@
     {
       "capability": "library.curate",
       "conformance": "library.curate/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "library.curate/v1/openapi.json",
@@ -295,6 +299,7 @@
     {
       "capability": "indexer.search",
       "conformance": "indexer.search/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "indexer.search/v1/openapi.json",
@@ -340,8 +345,37 @@
       "operations": 7
     },
     {
+      "capability": "indexer.pull",
+      "conformance": "indexer.pull/v1/conformance.json",
+      "facet": true,
+      "files": [
+        {
+          "path": "indexer.pull/v1/openapi.json",
+          "sha256": "5e6139d139784db05e800dfe0baf5156019e84667822c80664bebb51477b3aed"
+        },
+        {
+          "path": "indexer.pull/v1/operations/aggregators.json",
+          "sha256": "554751aa7c6b2bd5dac79b0e57cc6d43ce7ca10c20b87cd4374411ecf8e24511"
+        },
+        {
+          "path": "indexer.pull/v1/operations/add_aggregator.json",
+          "sha256": "4b98dd6787677b407b00931a4ad4e87c9b61374ed4bfa814b4571fcc0ba515fe"
+        },
+        {
+          "path": "indexer.pull/v1/conformance.json",
+          "sha256": "fb5c1bcf90441d7c3b3d8277afaec6cea10c7f7563517b273224d554258c9095"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "indexer.pull/v1/openapi.json",
+      "operations": 2
+    },
+    {
       "capability": "subtitles.fetch",
       "conformance": "subtitles.fetch/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "subtitles.fetch/v1/openapi.json",
@@ -369,6 +403,7 @@
     {
       "capability": "request.intake",
       "conformance": "request.intake/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "request.intake/v1/openapi.json",
@@ -512,6 +547,7 @@
     {
       "capability": "identity.source",
       "conformance": "identity.source/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "identity.source/v1/openapi.json",
@@ -607,6 +643,7 @@
     {
       "capability": "media.serve",
       "conformance": "media.serve/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "media.serve/v1/openapi.json",
@@ -718,6 +755,7 @@
     {
       "capability": "proxy.front",
       "conformance": "proxy.front/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "proxy.front/v1/openapi.json",
@@ -749,6 +787,7 @@
     {
       "capability": "quality.sync",
       "conformance": "quality.sync/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "quality.sync/v1/openapi.json",
@@ -776,6 +815,7 @@
     {
       "capability": "dashboard.show",
       "conformance": "dashboard.show/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "dashboard.show/v1/openapi.json",
@@ -803,6 +843,7 @@
     {
       "capability": "archive.extract",
       "conformance": "archive.extract/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "archive.extract/v1/openapi.json",
@@ -830,6 +871,7 @@
     {
       "capability": "stream.guard",
       "conformance": "stream.guard/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "stream.guard/v1/openapi.json",
@@ -861,6 +903,7 @@
     {
       "capability": "invite.decline",
       "conformance": "invite.decline/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "invite.decline/v1/openapi.json",
@@ -892,6 +935,7 @@
     {
       "capability": "request.gate",
       "conformance": "request.gate/v1/conformance.json",
+      "facet": false,
       "files": [
         {
           "path": "request.gate/v1/openapi.json",
@@ -914,6 +958,34 @@
         1
       ],
       "openapi": "request.gate/v1/openapi.json",
+      "operations": 2
+    },
+    {
+      "capability": "owner.claim",
+      "conformance": "owner.claim/v1/conformance.json",
+      "facet": true,
+      "files": [
+        {
+          "path": "owner.claim/v1/openapi.json",
+          "sha256": "16fc3a466b434e777ea633925bfbbc41bb2918938832aec9fe54075a3fa3f44a"
+        },
+        {
+          "path": "owner.claim/v1/operations/owner.json",
+          "sha256": "2e8e7144e48fcc0f86ca053bf5aaeb86e86e538222af39cbd478544e63b60d85"
+        },
+        {
+          "path": "owner.claim/v1/operations/claim.json",
+          "sha256": "af86cfb2917e650f15269f88894ae55962ff1388d5d8d2656a817bcc5bd4b05f"
+        },
+        {
+          "path": "owner.claim/v1/conformance.json",
+          "sha256": "e5a00b8068cda61163518739bba75db6ff768fb39ff29f0630f93f7d821032cf"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "owner.claim/v1/openapi.json",
       "operations": 2
     }
   ]

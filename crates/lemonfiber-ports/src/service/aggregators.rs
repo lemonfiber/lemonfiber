@@ -9,7 +9,7 @@
 //! A port of its own for the same reason the subtitle finder has one — this is a
 //! service told about another, rather than one of the family the shared client covers.
 
-use super::Failure;
+use super::{Failure, Protocol};
 use async_trait::async_trait;
 
 /// An aggregator, as the service pulling from it needs to be told about it.
@@ -63,4 +63,38 @@ pub trait Aggregators: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn add_aggregator(&self, aggregator: &Aggregator) -> Result<(), Failure>;
+}
+
+/// An aggregator a curator pulls its indexers from, reached in its own native API.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct AggregatorAt {
+    /// What it is called where somebody reads the list.
+    pub name: String,
+    /// Where it is reached, on the stack's own network.
+    pub url: String,
+    /// Its native API, so a curator is never handed an aggregator it cannot read.
+    pub protocol: Protocol,
+    /// The aggregator's own key, which is what lets the list be read at all.
+    pub key: String,
+}
+
+/// A curator that pulls its indexers from an aggregator it is told about.
+#[async_trait]
+pub trait PullsIndexers: Send + Sync {
+    /// The aggregators it already reads from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn aggregators(&self) -> Result<Vec<KnownAggregator>, Failure>;
+
+    /// Read its indexers from one more aggregator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses.
+    async fn add_aggregator(&self, aggregator: &AggregatorAt) -> Result<(), Failure>;
 }

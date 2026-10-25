@@ -4,15 +4,18 @@
 //! The applications it searches for, each named by the media it files; the sources it
 //! searches and how hard they are used; and the aggregators a curator that pulls rather
 //! than being pushed to reads from it.
+//!
+//! `indexer.pull` beside it is a facet, asked of every curator that speaks it: where it
+//! pulls its indexers from, each aggregator named in its native API.
 
 use std::time::{Duration, SystemTime};
 
 use lemonfiber_ports::service::{
-    Aggregator, Aggregators, AppSync, Application, ApplicationKind, IndexerUse, Indexers,
-    KnownAggregator, RegisteredApplication,
+    Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, IndexerUse,
+    Indexers, KnownAggregator, Protocol, PullsIndexers, RegisteredApplication,
 };
 
-use super::NAMED;
+use super::{AGGREGATOR, AGGREGATOR_PORT, AGGREGATOR_PROTOCOL, NAMED};
 use crate::conformance::Placeholder;
 
 /// Where the conformance cases say the indexer is reached from an application.
@@ -73,6 +76,25 @@ crate::contract! {
                 aggregator: Aggregator {
                     name: NAMED.to_owned(),
                     url: AGGREGATOR_URL.to_owned(),
+                    key: Placeholder::Minted.written(),
+                },
+            };
+        }
+    }
+}
+
+crate::contract! {
+    /// `indexer.pull`: a curator that pulls its indexers from an aggregator.
+    pub mod pull = "indexer.pull" @ 1 {
+        impl PullsIndexers {
+            /// The aggregators it reads its indexers from.
+            fn aggregators() -> Vec<KnownAggregator> where asks = Asked {};
+            /// Read its indexers from one more aggregator, in that aggregator's native API.
+            fn add_aggregator(refer aggregator: &AggregatorAt as AggregatorAt) -> () where asks = Asked {
+                aggregator: AggregatorAt {
+                    name: NAMED.to_owned(),
+                    url: format!("http://{AGGREGATOR}:{AGGREGATOR_PORT}"),
+                    protocol: Protocol(AGGREGATOR_PROTOCOL.to_owned()),
                     key: Placeholder::Minted.written(),
                 },
             };

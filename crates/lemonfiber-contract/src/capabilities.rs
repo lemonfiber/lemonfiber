@@ -12,6 +12,7 @@ pub mod invite;
 pub mod library;
 pub mod media;
 pub mod network;
+pub mod owner;
 pub mod proxy;
 pub mod quality;
 pub mod request;
@@ -27,6 +28,19 @@ const CURATOR_PORT: u16 = 58989;
 
 /// The release of the curator of series the recorder's stand-in answers it is.
 const CURATOR_VERSION: &str = "4.0.15.2941";
+
+/// The host the conformance cases name an aggregator a curator pulls from on.
+const AGGREGATOR: &str = "conformance-aggregator";
+
+/// The port the conformance cases name that aggregator on, where the recorder's stand-in
+/// for it answers.
+const AGGREGATOR_PORT: u16 = 59696;
+
+/// The native API the conformance cases name that aggregator by.
+const AGGREGATOR_PROTOCOL: &str = "servarr";
+
+/// The release of the aggregator the recorder's stand-in answers it is.
+const AGGREGATOR_VERSION: &str = "1.24.3.4754";
 
 /// The quality profile the conformance cases hand a curator and add under.
 const PROFILE: u32 = 1;
@@ -128,6 +142,29 @@ pub fn curator_answering() -> lemonfiber_ports::serving::StandIn {
     }
 }
 
+/// What answers as the aggregator the conformance cases have a curator pull from while it
+/// is recorded: the aggregator's answers to what a curator reads of one before it saves
+/// it, and nothing more.
+#[must_use]
+pub fn aggregator_answering() -> lemonfiber_ports::serving::StandIn {
+    use lemonfiber_ports::serving::Said;
+    use serde_json::json;
+    lemonfiber_ports::serving::StandIn {
+        port: AGGREGATOR_PORT,
+        headers: vec![("X-Application-Version".to_owned(), AGGREGATOR_VERSION.to_owned())],
+        answers: vec![
+            Said::json(
+                "GET",
+                "/api/v1/system/status",
+                json!({ "appName": "Prowlarr", "instanceName": NAMED, "version": AGGREGATOR_VERSION, "urlBase": "" })
+                    .to_string(),
+            ),
+            Said::json("GET", "/api/v1/indexer", json!([]).to_string()),
+            Said::json("GET", "/api/v1/health", json!([]).to_string()),
+        ],
+    }
+}
+
 /// A party the conformance cases point an upstream at, and what answers as it while the
 /// upstream is recorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,7 +197,22 @@ pub fn parties(media_types: &[String]) -> Vec<Party> {
             host: CURATOR,
             answering: curator_answering(),
         },
+        Party {
+            named: "aggregator",
+            host: AGGREGATOR,
+            answering: aggregator_answering(),
+        },
     ]
+}
+
+/// Every facet: a contract the core asks of every service that speaks it, never one a
+/// filler is chosen for, so a service speaks it and does not provide it.
+pub const FACETS: [&str; 2] = [indexer::pull::CAPABILITY, owner::claim::CAPABILITY];
+
+/// Whether the capability `name` is a facet.
+#[must_use]
+pub fn is_facet(name: &str) -> bool {
+    FACETS.contains(&name)
 }
 
 /// Every capability this build speaks, in the vocabulary's order.
@@ -172,6 +224,7 @@ pub fn all() -> Vec<crate::Capability> {
         network::egress::capability(),
         library::capability(),
         indexer::search::capability(),
+        indexer::pull::capability(),
         subtitles::fetch::capability(),
         request::intake::capability(),
         identity::source::capability(),
@@ -183,6 +236,7 @@ pub fn all() -> Vec<crate::Capability> {
         stream::guard::capability(),
         invite::decline::capability(),
         request::gate::capability(),
+        owner::claim::capability(),
     ]
 }
 

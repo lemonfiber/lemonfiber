@@ -129,3 +129,29 @@ fn an_adapter_that_says_neither_where_it_answers_nor_one_way_to_ask_it_is_refuse
         "{said:?}"
     );
 }
+
+#[test]
+fn a_facet_is_spoken_without_being_provided() {
+    let text = speaking(
+        r#"["media.serve@1", "owner.claim@1"]"#,
+        "listens     = 8080\n",
+    );
+    assert_eq!(said(&text), Vec::<String>::new());
+}
+
+#[test]
+fn a_facet_named_among_what_a_service_provides_is_refused_by_name() {
+    let text = speaking(
+        r#"["media.serve@1", "owner.claim@1"]"#,
+        "listens     = 8080\n",
+    )
+    .replace(
+        "provides    = [\"media.serve\", \"komga:kobo-sync\"]",
+        "provides    = [\"media.serve\", \"komga:kobo-sync\", \"owner.claim\"]",
+    );
+    let said = said(&text);
+    assert!(
+        names(&said, &["service komga.provides", "owner.claim, a facet"]),
+        "{said:?}"
+    );
+}

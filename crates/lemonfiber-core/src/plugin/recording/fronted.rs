@@ -33,6 +33,7 @@ use preparing::Prepared;
 use speaking::{contracts, fixture, named};
 use tapped::Tapped;
 
+mod claiming;
 mod filling;
 mod preparing;
 mod speaking;
@@ -267,6 +268,16 @@ impl Asking<'_> {
                 .map_err(|why| Faulted::new("first run", why, made.clone()))?;
             made.push(password);
             heard = first;
+        }
+        if contracts
+            .iter()
+            .any(|(spoken, _)| *spoken == claiming::owning())
+        {
+            heard.extend(
+                self.claimed(&reached)
+                    .await
+                    .map_err(|why| Faulted::new("claim", why, made.clone()))?,
+            );
         }
         let mut upstream = Vec::new();
         for item in items {

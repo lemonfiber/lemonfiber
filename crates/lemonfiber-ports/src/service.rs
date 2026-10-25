@@ -29,6 +29,7 @@ mod guarding;
 mod household;
 mod metering;
 mod notices;
+mod ownership;
 mod peering;
 mod providers;
 mod proxying;
@@ -46,7 +47,7 @@ mod tunnelling;
 mod upkeep;
 
 pub use addressing::{Address, Addressing};
-pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
+pub use aggregators::{Aggregator, AggregatorAt, Aggregators, KnownAggregator, PullsIndexers};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
 pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
 pub use carrying::{Carried, Carrying, Record};
@@ -74,6 +75,7 @@ pub use household::{
 };
 pub use metering::{Metering, Moved};
 pub use notices::Noticing;
+pub use ownership::{Owner, Ownership};
 pub use peering::Peering;
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
