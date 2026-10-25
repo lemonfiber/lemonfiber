@@ -389,6 +389,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     );
     let telling = deferring::telling(ctx, manifest);
     let guarded = guarded(ctx, &manifest.services);
+    let owned = deferring::owned(ctx, manifest);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
     let decline = deferring::declined(ctx, manifest, project.as_deref());
     let moves = crate::doctor::moving::MovesCheck::new(Arc::new(
@@ -427,6 +428,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(seasons),
         Box::new(telling),
         Box::new(guarded),
+        Box::new(owned),
         Box::new(gate),
         Box::new(decline),
         Box::new(moves),

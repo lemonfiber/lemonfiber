@@ -113,4 +113,19 @@ codes! {
         remedy: "Move whatever the file changed into overlay.yml in lemonfiber's configuration \
             directory, then delete the file. The message names each one.",
     }
+    /// Raised where a part that belongs to whoever claims it first is held by nobody, is
+    /// held by somebody other than lemonfiber, or could not be asked who holds it.
+    PART_UNCLAIMED = "CONFIG-11" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "A service that belongs to whoever claims it first is not held with the \
+            credential lemonfiber minted for it: nobody holds it, so whoever reaches it first can \
+            take it; somebody else holds it; or it could not be asked. Nothing has been changed \
+            — this is the doctor reporting what it found.",
+        remedy: "Run lemonfiber seed to claim a service nobody holds, or lemonfiber reset where \
+            lemonfiber claimed it before. Where somebody else holds it and that was not you, \
+            reset its configuration and run lemonfiber seed. The message names the service and \
+            the secret lemonfiber holds for it.",
+    }
 }

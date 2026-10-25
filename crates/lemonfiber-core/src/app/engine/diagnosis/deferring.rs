@@ -13,13 +13,14 @@ use crate::app::targets::{committed_bytes, host_fillers};
 use crate::app::Ctx;
 use crate::doctor::declining::{Dating, Decline, DeclineKeyCheck, KeyDates};
 use crate::doctor::deferred::Deferred;
+use crate::doctor::owned::{OwnedCheck, Part};
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::seasons::SeasonsCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::{budget_for, VpnCheck};
 use crate::doctor::wiring::WiringCheck;
 use crate::doctor::{Category, Check, CHECK_BUDGET, FILESYSTEM_BUDGET};
-use crate::ports::service::Indexers;
+use crate::ports::service::{Indexers, Ownership};
 
 use super::Stack;
 
@@ -183,6 +184,33 @@ pub(super) fn wired(ctx: &Ctx, stack: &Stack, project: Option<&Path>) -> Deferre
                 wirings,
                 ctx.stamp(),
             )) as Box<dyn Check>
+        }
+    })
+}
+
+/// Who holds every part that belongs to whoever claims it first, built when it runs, so
+/// each is asked over its contract.
+pub(super) fn owned(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    Deferred::new(Category::Config, CHECK_BUDGET, move || {
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
+        async move {
+            let fillers = crate::app::targets::fillers_here(&ctx, &manifest);
+            let parts = crate::seed::run::owning::parts(&ctx, &fillers)
+                .await
+                .into_iter()
+                .map(|(filler, part)| {
+                    (
+                        Part {
+                            id: filler.id.clone(),
+                            name: filler.name.clone(),
+                            secrets: filler.upstream.clone(),
+                        },
+                        part.map(|part| Arc::new(part) as Arc<dyn Ownership>),
+                    )
+                })
+                .collect();
+            Box::new(OwnedCheck::new(parts)) as Box<dyn Check>
         }
     })
 }

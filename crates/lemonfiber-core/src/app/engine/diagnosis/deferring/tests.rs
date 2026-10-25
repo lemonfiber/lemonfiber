@@ -1,6 +1,6 @@
 //! Each deferred check declares the family and budget of the check it builds.
 
-use super::{providing, seasons, stored, tunnel, wired, Stack};
+use super::{owned, providing, seasons, stored, tunnel, wired, Stack};
 use crate::doctor::deferred::Deferred;
 use crate::doctor::Check;
 use crate::test_support::a_context;
@@ -40,6 +40,7 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
             providing(&ctx, manifest, None),
             wired(&ctx, stack, None),
             seasons(&ctx, manifest),
+            owned(&ctx, manifest),
         ] {
             assert!(
                 declared_what_it_built(&deferred).await,
@@ -49,4 +50,51 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
         }
     }
     assert_eq!(stacks.len(), 1, "the embedded stack parses");
+}
+
+/// Every installed service speaking `owner.claim` is a part the claimed check asks after
+/// over its contract.
+#[tokio::test]
+async fn the_claimed_check_asks_every_installed_part_claimed_first_over_its_contract() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("deferring-owned");
+    let mut ctx = crate::test_support::contracted_context(&project, "claimed-part", false)
+        .build()
+        .with_http(lemonfiber_fixtures::http::Fake::by_path(vec![(
+            "/lemonfiber/owner.claim/v1/owner",
+            lemonfiber_fixtures::http::Answer::reply(200, "\"ours\""),
+        )]));
+    ctx.settings.env_file = Some(crate::test_support::env_without_password("deferring-owned"));
+    let key = crate::plugin::key_file(
+        &crate::app::project::directory(&ctx).unwrap_or_default(),
+        "claimed-part",
+    );
+    assert!(std::fs::create_dir_all(key.parent().unwrap_or(&key)).is_ok());
+    assert!(std::fs::write(&key, crate::test_support::CONTRACTED_KEY).is_ok());
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::contracted(
+            "claimer",
+            "claimed-part",
+            lemonfiber_contract::capabilities::owner::claim::CAPABILITY,
+        ))
+        .is_ok());
+    assert!(
+        crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register).is_ok()
+    );
+    let manifests: Vec<_> = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .into_iter()
+        .collect();
+    let mut findings = Vec::new();
+    for manifest in &manifests {
+        findings.extend(owned(&ctx, manifest).run().await);
+    }
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.check == "config.claimed.claimed-part"
+                && matches!(finding.verdict, crate::doctor::Verdict::Pass { .. })),
+        "{findings:?}"
+    );
 }

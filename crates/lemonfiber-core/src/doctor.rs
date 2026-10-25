@@ -35,6 +35,7 @@ pub mod indexer;
 pub mod moving;
 pub mod narrowing;
 pub mod overlay;
+pub mod owned;
 pub mod permissions;
 pub(crate) mod proved;
 pub mod providers;

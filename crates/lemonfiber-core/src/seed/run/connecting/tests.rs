@@ -414,6 +414,7 @@ fn a_service(
 ) -> crate::wiring::Filler {
     crate::wiring::Filler {
         minted: None,
+        upstream: Vec::new(),
         granted: Vec::new(),
         id: id.to_owned(),
         name: id.to_owned(),

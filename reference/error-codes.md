@@ -98,6 +98,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `CONFIG-8` | `OVERLAY_UNVETTED` | warning | 1 | 500 | 0.18.0 | Raised where the operator's overlay changes services, merged over the project lemonfiber writes and held to nothing it vets. |
 | `CONFIG-9` | `OVERLAY_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where a path is still recorded under the retired overlay setting, which is no longer read. |
 | `CONFIG-10` | `COMPOSE_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where the project directory still holds a Compose file of the stack's own that lemonfiber no longer reads. |
+| `CONFIG-11` | `PART_UNCLAIMED` | warning | 1 | 500 | 0.18.0 | Raised where a part that belongs to whoever claims it first is held by nobody, is held by somebody other than lemonfiber, or could not be asked who holds it. |
 
 ## `CRED` — credentials a service refuses
 

@@ -24,6 +24,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
+use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_plugin::Manifest;
 
 use crate::error::{Problem, Remedy, State};
@@ -338,9 +339,35 @@ async fn held_to(
         }
     }
     if faults.is_empty() {
+        faults.extend(claiming(adapter, installed, placed).await);
+    }
+    if faults.is_empty() {
         Verdict::Passed
     } else {
         Verdict::Failed { faults }
+    }
+}
+
+/// Why the part an adapter speaking `owner.claim` stands in front of is not lemonfiber's
+/// once claimed with the credential its plugin minted, where it is not; nothing where the
+/// adapter speaks no such contract.
+async fn claiming(
+    adapter: &lemonfiber_contract::Contracted,
+    installed: &Installed,
+    placed: &crate::plugin::Placed,
+) -> Option<String> {
+    let spoken = lemonfiber_contract::spoken(claim::CAPABILITY, claim::MAJOR);
+    if !placed.speaks.contains(&spoken) {
+        return None;
+    }
+    let part = claim::Adapter(adapter.clone());
+    match crate::seed::run::owning::claimed(&part).await {
+        Ok(owner) => crate::seed::run::owning::unclaimed(
+            placed.called(),
+            owner,
+            &placed.upstream_settings(&installed.plugin),
+        ),
+        Err(failure) => Some(format!("{spoken}: claim: {failure}")),
     }
 }
 
