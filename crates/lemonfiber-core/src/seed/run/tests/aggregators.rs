@@ -355,7 +355,7 @@ async fn a_book_curator_that_is_not_answering_is_skipped() {
     let env = recorded_admin("bindery-silent");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::Silent)]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
