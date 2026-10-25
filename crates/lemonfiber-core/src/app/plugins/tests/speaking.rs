@@ -220,3 +220,63 @@ async fn an_adapter_not_recorded_at_its_upstream_or_answering_without_the_key_is
         );
     }
 }
+
+/// The speaking manifest, its adapter also speaking `owner.claim`.
+fn claiming() -> String {
+    speaking().replace(
+        r#"speaks      = ["media.serve@1"]"#,
+        r#"speaks      = ["media.serve@1", "owner.claim@1"]"#,
+    )
+}
+
+/// A context the claiming manifest installs into, its adapter answering `claim` with
+/// `claimed`.
+fn claimed_as(name: &str, claimed: lemonfiber_fixtures::http::Answer) -> Ctx {
+    let refused = || lemonfiber_fixtures::http::Answer::reply(401, "");
+    let http = Fake::by_path(vec![
+        (
+            "/api/v1/libraries",
+            lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+        ),
+        (
+            "/lemonfiber/adapter/v1/about",
+            lemonfiber_fixtures::http::Answer::reply(
+                200,
+                about(r#"["media.serve@1","owner.claim@1"]"#, UPSTREAM),
+            ),
+        ),
+        (UNKEYED, refused()),
+        ("/lemonfiber/owner.claim/v1/owner", refused()),
+        ("/lemonfiber/owner.claim/v1/claim", claimed),
+    ]);
+    let mut ctx = proving(name, Arc::new(Recording::answering(Ok(spoke("")))), http);
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+    ctx
+}
+
+#[tokio::test]
+async fn an_adapter_speaking_owner_claim_is_installed_only_where_its_part_is_claimed_for_lemonfiber(
+) {
+    for (name, owner, fault) in [
+        ("claimed-ours", "ours", None),
+        ("claimed-theirs", "theirs", Some("is held by somebody")),
+        ("claimed-open", "open", Some("answers Open")),
+    ] {
+        let ctx = claimed_as(
+            name,
+            lemonfiber_fixtures::http::Answer::reply(200, format!("\"{owner}\"")),
+        );
+        let said = verdicts(installing(&ctx, &source(name, &claiming())).await);
+        let last = said.last().cloned().flatten();
+        match fault {
+            None => assert!(matches!(last, Some(Verdict::Passed)), "{name}: {said:?}"),
+            Some(fault) => assert!(
+                matches!(&last, Some(Verdict::Failed { faults }) if faults.iter().any(|one| one.contains(fault))),
+                "{name}: {said:?}"
+            ),
+        }
+    }
+}

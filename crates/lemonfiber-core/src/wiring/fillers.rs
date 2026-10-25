@@ -82,6 +82,9 @@ pub struct Filler {
     /// The secret lemonfiber minted as its credential, by the name the secret store holds it
     /// under, where its plugin declares one.
     pub minted: Option<String>,
+    /// The settings of the secrets lemonfiber writes into its `upstream.json`, where it is
+    /// an adapter whose plugin hands it any.
+    pub upstream: Vec<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
@@ -452,6 +455,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         first_party: false,
         granted: Vec::new(),
         minted: None,
+        upstream: Vec::new(),
         majors: service.majors(),
         fronts: None,
         native: None,
@@ -497,6 +501,11 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .iter()
             .find(|secret| secret.minted && secret.of == placed.service)
             .map(|secret| crate::settings::named(plugin, &secret.id)),
+        upstream: placed
+            .upstream
+            .values()
+            .map(|secret| crate::settings::named(plugin, secret))
+            .collect(),
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),

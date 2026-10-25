@@ -173,6 +173,7 @@ fn the_sum_saturates_rather_than_wrapping() {
 fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
     crate::wiring::Filler {
         minted: None,
+        upstream: Vec::new(),
         granted: Vec::new(),
         id: "stand-in".to_owned(),
         name: "Stand-in".to_owned(),

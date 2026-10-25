@@ -36,6 +36,7 @@ mod claiming;
 mod guarding;
 mod keys;
 mod minted;
+pub(crate) mod owning;
 mod published;
 pub(crate) use published::published_as;
 mod quality;
@@ -250,6 +251,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // The Usenet indexer aggregator's authentication, without which it hands the indexer
     // accounts it holds to anything that can reach it.
     wirings.extend(guarding::guarded(ctx, &fillers, &mut baseline).await);
+
+    // Every part that belongs to whoever claims it first, claimed over its contract with
+    // the credential its plugin minted before anybody else takes it.
+    wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
 
     // The subtitle finder, told which curators to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly
