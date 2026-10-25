@@ -348,6 +348,23 @@ async fn a_book_curator_that_refuses_is_reported() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
+/// A book curator that is not answering is skipped for a later run.
+#[tokio::test]
+async fn a_book_curator_that_is_not_answering_is_skipped() {
+    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let env = recorded_admin("bindery-silent");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
+    let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::Silent)]);
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+        .with_http(http)
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+
+    let wirings = told(&ctx).await;
+
+    assert!(wirings.first().is_some_and(is_skipped), "{wirings:?}");
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
 /// A registration the service refuses is reported rather than counted as made.
 ///
 /// The read succeeding says nothing about the write. A key the service will not

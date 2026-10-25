@@ -118,10 +118,9 @@ pub enum State {
         detail: String,
     },
     /// Refused by lemonfiber's own policy, carrying the reason a re-run will not
-    /// resolve — such as two curators pointed at one root folder, or a service that
-    /// does not serve the API version this build speaks. Either way nothing it
-    /// names was written, whether it was refused before the write or the write
-    /// itself found nothing to land in.
+    /// resolve — such as two curators pointed at one root folder. Nothing it names
+    /// was written, whether it was refused before the write or the write itself
+    /// found nothing to land in.
     Refused {
         /// Why it was refused, in lemonfiber's own words.
         reason: String,
@@ -318,8 +317,8 @@ pub(crate) const NOT_ANSWERING: &str = "the service is not answering; a later ru
 
 /// A failure as the state it leaves a connection in: a service not answering is
 /// skipped and retried; one that refuses is a failure, carrying its own words; one
-/// that does not serve this build's API version is refused, since a re-run against
-/// the same service will not resolve it — the operator must align the versions.
+/// that answers `unsupported` does not offer what was asked, which leaves the
+/// connection unmatched, by the answer's type alone.
 pub(super) fn unreached(failure: &Failure) -> State {
     match failure {
         Failure::Unavailable { .. } => State::Skipped {
@@ -331,8 +330,8 @@ pub(super) fn unreached(failure: &Failure) -> State {
         Failure::Refused { detail, .. } => State::Failed {
             detail: detail.clone(),
         },
-        Failure::Unsupported { service, detail } => State::Refused {
-            reason: format!("{service} does not serve the API version this build speaks: {detail}"),
+        Failure::Unsupported { service, detail } => State::Unmatched {
+            reason: format!("{service} does not offer this: {detail}"),
         },
     }
 }
