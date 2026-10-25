@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD};
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-use super::{pending, settle, Minted, Opens};
+use super::{pending, settle, settled};
 use crate::app::targets::{record_secret, recorded_secret, service_config_dir, MediaServer};
 use crate::config;
 use crate::test_support::{a_contracted_media_server, contracted_context, MEDIA_ADAPTER};
@@ -51,14 +51,7 @@ async fn settled_over_its_contract(name: &str, signs_in: Vec<Answer>) -> Settled
     let _ = record_secret(&ctx, &setting, "in-force");
     let _ = record_secret(&ctx, &pending(&setting), "replacement");
 
-    settle(
-        &ctx,
-        &Minted {
-            setting: setting.clone(),
-            opens: Opens::Media(Box::new(server)),
-        },
-    )
-    .await;
+    settle(&ctx, &server).await;
 
     let upstream = service_config_dir(&project, MEDIA_ADAPTER).join(UPSTREAM_FILE);
     let settled = Settled {
@@ -118,4 +111,58 @@ async fn a_contracted_server_that_will_not_answer_leaves_both_for_later() {
     assert_eq!(settled.recorded.as_deref(), Some("in-force"));
     assert_eq!(settled.left_pending.as_deref(), Some("replacement"));
     assert!(settled.handed.is_empty(), "{:?}", settled.handed);
+}
+
+/// What [`settled`] leaves pending under `setting`, where `ctx`'s settings file holds a
+/// replacement for it.
+async fn left_pending(ctx: &crate::app::Ctx, setting: &str) -> Option<String> {
+    let _ = record_secret(ctx, &pending(setting), "replacement");
+    settled(ctx).await;
+    recorded_secret(ctx, &pending(setting))
+}
+
+/// A context keeping its settings in a scratch file unique to `name`.
+fn pending_in(name: &str) -> crate::test_support::context::Context {
+    crate::test_support::a_context().settings(config::Settings {
+        env_file: Some(crate::test_support::env_without_password(name)),
+        ..config::Settings::default()
+    })
+}
+
+/// A replacement left pending over a stack that cannot be read has no server to ask, so
+/// it stays for a later run.
+#[tokio::test]
+async fn a_replacement_pending_over_an_unreadable_stack_stays_for_later() {
+    let ctx = pending_in("pending-unreadable")
+        .over(crate::test_support::nowhere())
+        .build();
+
+    let left = left_pending(&ctx, config::MEDIA_SERVER_ADMIN_PASSWORD_KEY).await;
+
+    assert_eq!(left.as_deref(), Some("replacement"));
+}
+
+/// A stack whose media server speaks no contract has no server to settle with, so a
+/// replacement left pending stays for a later run.
+#[tokio::test]
+async fn a_replacement_pending_where_no_media_server_is_reached_stays_for_later() {
+    let ctx = pending_in("pending-unhosted").build();
+
+    let left = left_pending(&ctx, config::MEDIA_SERVER_ADMIN_PASSWORD_KEY).await;
+
+    assert_eq!(left.as_deref(), Some("replacement"));
+}
+
+/// Only the media server's own setting is settled: a pending copy of anything else is
+/// asked of no service and left where it is.
+#[tokio::test]
+async fn a_pending_copy_of_another_setting_is_asked_of_nobody() {
+    let ctx = pending_in("pending-another")
+        .build()
+        .with_http(Fake::silent());
+    crate::test_support::media::moved_in(&ctx);
+
+    let left = left_pending(&ctx, config::PROVIDER_PASS_KEY).await;
+
+    assert_eq!(left.as_deref(), Some("replacement"));
 }

@@ -25,10 +25,8 @@
 
 use lemonfiber_manifest::Service;
 
-use super::clients::Held;
 use super::keys::read_curator_key;
 use super::Ctx;
-use crate::ports::service::Credential;
 
 /// What this connection is called where it is reported.
 const CONNECTION: &str = "Keys the stack's own services read";
@@ -46,27 +44,21 @@ pub(crate) fn published_as(id: &str) -> String {
 }
 
 /// Put every key this pass could read where the stack's own services read it.
-///
-/// `held` is what was already gathered for the download-client registration, passed
-/// in rather than read again — the same files, and a second read could only fail where
-/// the first had.
 pub(super) async fn publish_keys(
     ctx: &Ctx,
     services: &[Service],
     fillers: &crate::wiring::Fillers,
     project: Option<&std::path::Path>,
-    held: &Held,
 ) -> crate::seed::Wiring {
-    let mut published = written_down(ctx, services, project).await;
+    let published = written_down(ctx, services, project).await;
 
     // Before anything is written: retiring revokes a key, so a rehearsal that got past
     // here would have changed the very thing it promised only to describe.
     if ctx.dry_run {
-        return would_publish(published, held);
+        return would_publish(published);
     }
 
     retired(ctx, services, fillers).await;
-    published.extend(from_the_clients(held));
 
     let state = if published.is_empty() {
         nothing_to_publish()
@@ -129,9 +121,8 @@ fn nothing_to_publish() -> crate::seed::State {
 /// Every pair gathered here is a setting and the credential destined for it, and the
 /// report is serialized — so the names are the whole of what an operator is deciding
 /// about, and the values are the one thing a question must never make a second copy of.
-fn would_publish(written: Vec<(String, String)>, held: &Held) -> crate::seed::Wiring {
+fn would_publish(written: Vec<(String, String)>) -> crate::seed::Wiring {
     let mut settings: Vec<String> = written.into_iter().map(|(name, _)| name).collect();
-    settings.extend(from_the_clients(held).into_iter().map(|(name, _)| name));
     settings.sort();
     settings.dedup();
     let state = if settings.is_empty() {
@@ -229,21 +220,6 @@ async fn retired(ctx: &Ctx, services: &[Service], fillers: &crate::wiring::Fille
     {
         let _ = crate::config::store::unset(env, &setting);
     }
-}
-
-/// What the stack's own download clients' credentials publish: each Usenet client's key
-/// under its own name.
-///
-/// A torrent client publishes nothing here: its password is already recorded under its
-/// own setting by the run that minted it, and lemonfiber signs in with it under
-/// [`crate::config::TORRENT_USER`].
-fn from_the_clients(held: &Held) -> Vec<(String, String)> {
-    held.stacks()
-        .filter_map(|(service, credential)| match credential {
-            Credential::ApiKey(key) => Some((published_as(service), key.clone())),
-            Credential::UserPass { .. } => None,
-        })
-        .collect()
 }
 
 #[cfg(test)]

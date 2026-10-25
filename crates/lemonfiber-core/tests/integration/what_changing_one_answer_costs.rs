@@ -57,19 +57,12 @@ const AGREED: Said = Said {
     waiting: Waiting::Never,
 };
 
-/// A scratch environment file, holding the data location a move starts from and the
-/// download client's recorded password — without which nothing can ask the torrent client
-/// what is still coming down.
+/// A scratch environment file, holding the data location a move starts from.
 fn env_at(name: &str, from: &Path) -> PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("change-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let env = dir.join(".env");
     let _ = lemonfiber_core::config::store::set(&env, DATA_ROOT, &from.display().to_string());
-    let _ = lemonfiber_core::config::store::set(
-        &env,
-        lemonfiber_core::config::TORRENT_PASSWORD_KEY,
-        &["minted", "-earlier"].concat(),
-    );
     env
 }
 

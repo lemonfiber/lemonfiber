@@ -303,9 +303,8 @@ pub(super) async fn answered(
     if let Some(accept) = &asked.accept {
         headers.push(("Accept".to_owned(), accept.clone()));
     }
-    match presented {
-        Some(Presented::Header(name, value)) => headers.push(((*name).to_owned(), value.clone())),
-        Some(Presented::Session) | None => {}
+    if let Some(Presented(name, value)) = presented {
+        headers.push(((*name).to_owned(), value.clone()));
     }
     let request = crate::ports::http::Request {
         method,

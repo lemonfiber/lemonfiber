@@ -27,7 +27,7 @@ const GOVERNED: [&str; 2] = [
 /// The media server's administrator's password is read as a method of the server the
 /// lookup resolved, which names the request service it is handed to only where the gate
 /// lets it cross; [`the_media_server_names_its_asker_through_the_gate`] holds that.
-const READERS: [&str; 3] = ["curator_key(", "usenet_key(", "recorded_password("];
+const READERS: [&str; 3] = ["curator_key(", "minted_key(", "minted_account("];
 
 /// Whether `line` calls one of [`READERS`] as a function rather than as a method.
 fn reads(line: &str) -> bool {
@@ -42,12 +42,17 @@ const FROM_THE_GATE: [&str; 2] = ["pairings(", "fulfilling("];
 
 /// The seed passes that read another service's credential without taking pairs from the
 /// table themselves, each with why that is still the gate's answer.
-const BESIDE_THE_GATE: [(&str, &str); 2] = [
+const BESIDE_THE_GATE: [(&str, &str); 3] = [
     (
         "crates/lemonfiber-core/src/seed/run/clients.rs",
-        "reads every download client's credential into the map the stack's own published \
-         keys and the refused report are made from; it is handed to an asker only by \
-         curating.rs, through the table's pairings",
+        "reads every download client's minted credential into the map a curator is told \
+         about it from; it is handed to an asker only by curating.rs, through the table's \
+         pairings",
+    ),
+    (
+        "crates/lemonfiber-core/src/seed/run/keys.rs",
+        "holds the readers themselves, one calling another for a service of its own; it hands \
+         nothing to any asker",
     ),
     (
         "crates/lemonfiber-core/src/seed/run/published.rs",

@@ -7,7 +7,7 @@
 //!
 //! Naming a credential is a lookup rather than an identifier, on purpose. What the
 //! inventory prints is what the operator types back — matched loosely enough that
-//! `qbittorrent` finds the web UI password, because a product that prints one string
+//! `jellyfin` finds the administrator password, because a product that prints one string
 //! and demands another is one that has to be read twice.
 //!
 //! Nothing here can answer without the stack, and that is deliberate. Most of the

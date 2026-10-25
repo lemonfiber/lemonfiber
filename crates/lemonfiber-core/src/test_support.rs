@@ -17,6 +17,8 @@ pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 mod adapted;
 #[path = "../../lemonfiber-testing/src/media.rs"]
 pub mod media;
+#[path = "../../lemonfiber-testing/src/torrent.rs"]
+pub mod torrent;
 #[path = "../../lemonfiber-testing/src/usenet.rs"]
 pub mod usenet;
 
@@ -90,13 +92,10 @@ pub(crate) fn env_without_password(name: &str) -> std::path::PathBuf {
     recorded(name, None)
 }
 
-/// A private env file recording the torrent client's password, at a scratch path unique to
-/// the test so concurrent tests do not share one.
+/// A private env file recording the stack's torrent client's password, at a scratch path
+/// unique to the test so concurrent tests do not share one.
 ///
-/// Here rather than beside any one test because more than one needs a client that can
-/// be logged into: the dashboard, to fill its transfers panel, and a teardown, to find
-/// out what stopping would interrupt. It names `config::store`, which is why it is on
-/// this side of the fixtures boundary.
+/// It names `config::store`, which is why it is on this side of the fixtures boundary.
 #[track_caller]
 pub(crate) fn env_at(name: &str, password: &str) -> std::path::PathBuf {
     recorded(name, Some(password))

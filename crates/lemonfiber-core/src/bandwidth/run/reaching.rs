@@ -11,7 +11,6 @@
 //! there is no second rendering to fall out of step with the first.
 
 use crate::app::targets::{DownloadTarget, Downloading};
-use crate::app::Ctx;
 use crate::bandwidth::{Answer, Held, Holding, Period, Pulling};
 use crate::ports::service::{
     Failure, Fetching, Hours, Metering, Moved, Rates, Throttled, Throttling, Wanted,
@@ -78,15 +77,15 @@ impl Client {
 /// A client lemonfiber cannot authenticate to is not among the targets at all, rather
 /// than reported as unlimited: it is not a client with no limits, it is a client
 /// nothing here can see, and the two must not render alike.
-pub(super) fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
-    targets.iter().map(|target| open(ctx, target)).collect()
+pub(super) fn opened(targets: &[DownloadTarget]) -> Vec<Client> {
+    targets.iter().map(open).collect()
 }
 
 /// One download client, opened as the protocol it moves.
-pub(super) fn open(ctx: &Ctx, target: &DownloadTarget) -> Client {
+pub(super) fn open(target: &DownloadTarget) -> Client {
     Client {
         service: target.service.clone(),
-        client: target.client(ctx),
+        client: target.client(),
     }
 }
 

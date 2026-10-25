@@ -1,10 +1,9 @@
 //! Generating a secret lemonfiber has to mint itself.
 //!
 //! Almost every credential in the stack is read, not made — a service generates its own key
-//! and lemonfiber reads it. The bundled torrent client is the exception: it mints a
-//! throwaway web UI password on each start and asks for it to be replaced, so there is
-//! nothing durable to read and lemonfiber must supply one. This is where that value is
-//! made.
+//! and lemonfiber reads it. The exceptions are the accounts a service starts without, such
+//! as the media server's administrator: there is nothing durable to read, so lemonfiber
+//! must supply one. This is where that value is made.
 //!
 //! The randomness comes through the [`crate::ports::random::Random`] port, so the
 //! rendering here — bytes to a recordable string — is tested against a fixed

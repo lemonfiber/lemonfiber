@@ -209,13 +209,20 @@ impl Placed {
         }
     }
 
+    /// Each field of the `upstream.json` lemonfiber writes for it, to the setting of the
+    /// secret of `plugin` that field holds.
+    #[must_use]
+    pub fn upstream_held(&self, plugin: &str) -> BTreeMap<String, String> {
+        self.upstream
+            .iter()
+            .map(|(field, secret)| (field.clone(), crate::settings::named(plugin, secret)))
+            .collect()
+    }
+
     /// The settings of the secrets of `plugin` lemonfiber writes into its `upstream.json`.
     #[must_use]
     pub fn upstream_settings(&self, plugin: &str) -> Vec<String> {
-        self.upstream
-            .values()
-            .map(|secret| crate::settings::named(plugin, secret))
-            .collect()
+        self.upstream_held(plugin).into_values().collect()
     }
 
     /// The icon its dashboard entry shows: the one its wiring named, or its id's.

@@ -34,8 +34,9 @@ pub(super) fn withheld(
 /// The same, for the services installed plugins brought: each one the operator declared
 /// unmanaged is taken out of its plugin's record for the pass, and said.
 ///
-/// A plugin's service is one this pass can write to — a torrent client's password is set
-/// on the client itself — so the promise is the same one, and kept the same way.
+/// A plugin's service is one this pass can write to — a plugin's curator is told about
+/// its download clients as the stack's is — so the promise is the same one, and kept the
+/// same way.
 pub(super) fn withheld_brought(
     installed: &[crate::plugin::Installed],
     declared: &[(String, String)],

@@ -359,21 +359,5 @@ pub fn eta(remaining: u64, speed: u64) -> Option<Duration> {
     remaining.checked_div(speed).map(Duration::from_secs)
 }
 
-/// How far `done` is through `total`, as a percentage from zero to a hundred.
-///
-/// Kept in whole percent and integer arithmetic — a progress bar needs no more,
-/// and it sidesteps the precision a float cast of a byte count would quietly lose.
-/// A `total` of zero is complete rather than undefined — there is nothing left to
-/// do — and a `done` past `total`, which clock or accounting skew can produce, is
-/// clamped to a hundred rather than reported as more-than-finished.
-#[must_use]
-pub(crate) fn percent(done: u64, total: u64) -> u8 {
-    let pct = u128::from(done)
-        .saturating_mul(100)
-        .checked_div(u128::from(total))
-        .map_or(100, |ratio| ratio.min(100));
-    u8::try_from(pct).unwrap_or(100)
-}
-
 #[cfg(test)]
 mod tests;

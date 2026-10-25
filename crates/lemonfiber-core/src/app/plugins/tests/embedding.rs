@@ -112,7 +112,7 @@ fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
 }
 
 /// A rehearsal of an update names every move the bundle offers, the media server's and
-/// the Usenet client's, and takes none.
+/// each download client's, and takes none.
 #[tokio::test]
 async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
@@ -127,12 +127,19 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
         .flat_map(|report| report.moves.iter().map(|one| one.plugin.clone()))
         .collect();
     offered.sort();
-    assert_eq!(offered, vec![BUNDLED.to_owned(), "sabnzbd".to_owned()]);
+    assert_eq!(
+        offered,
+        vec![
+            BUNDLED.to_owned(),
+            "qbittorrent".to_owned(),
+            "sabnzbd".to_owned()
+        ]
+    );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
 /// A confirmed update of the moved service takes its move, answering the move's own
-/// install offer, and leaves the other move on offer; a rehearsal of it takes nothing.
+/// install offer, and leaves the other moves on offer; a rehearsal of it takes nothing.
 #[tokio::test]
 async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     let serving = Arc::new(Serving::listing(""));
@@ -144,7 +151,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((2, 0))
+        Some((3, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -163,12 +170,12 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     );
     assert_eq!(
         report.map(|report| report.moves.iter().map(|one| one.plugin.as_str()).collect()),
-        Some(vec!["sabnzbd"])
+        Some(vec!["qbittorrent", "sabnzbd"])
     );
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
-/// A confirmed update narrowed to another service takes no move: both moves stay on
+/// A confirmed update narrowed to another service takes no move: every move stays on
 /// offer and nothing is installed.
 #[tokio::test]
 async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
@@ -182,7 +189,7 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
             .as_ref()
             .ok()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((2, 0)),
+        Some((3, 0)),
         "{confirmed:?}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));

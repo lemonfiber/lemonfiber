@@ -5,12 +5,10 @@ use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 use lemonfiber_contract::Contracted;
 
 use super::{answer, holding, opened, said, DownloadTarget, Fetch};
-use crate::app::targets::DownloadKind;
 use crate::bandwidth::{Answer, Held, Period, Pulling, Verdict};
-use crate::config::Settings;
 use crate::dashboard::Protocol;
 use crate::ports::service::{Failure, Hours, Moved, Pulling as Answered, Rates, Throttled, Wanted};
-use crate::test_support::{a_context, a_password, env_at, json, usenet};
+use crate::test_support::{json, torrent, usenet};
 
 /// The three parts of an answer, where the client answered at all.
 fn parts(answer: &Answer) -> Option<(Held, Held, Option<Period>)> {
@@ -117,62 +115,43 @@ fn a_client_with_no_schedule_of_its_own_is_judged_against_the_active_figure() {
     );
 }
 
-/// The torrent client as a read target, holding the password recorded for it.
-fn torrent() -> DownloadTarget {
+/// The torrent client's service.
+const TORRENT: &str = torrent::PLUGIN;
+
+/// The torrent client as a read target, over its contract through `http`.
+fn torrent_over(http: Arc<Fake>) -> DownloadTarget {
     DownloadTarget {
-        service: crate::qbittorrent::SERVICE.to_owned(),
-        kind: DownloadKind::Torrent {
-            base: "http://127.0.0.1:8081".to_owned(),
-            password: a_password(),
-        },
+        service: TORRENT.to_owned(),
+        protocol: Protocol::Torrent,
+        adapter: Contracted::new(http, "http://127.0.0.1:8080", TORRENT, "torrent-key"),
     }
 }
 
 /// The Usenet client's service.
-const USENET: &str = "sabnzbd";
+const USENET: &str = usenet::PLUGIN;
 
-/// The Usenet client as a read target, holding the key it wrote.
-fn usenet() -> DownloadTarget {
+/// The Usenet client as a read target, over its contract through `http`.
+fn usenet_over(http: Arc<Fake>) -> DownloadTarget {
     DownloadTarget {
         service: USENET.to_owned(),
-        kind: DownloadKind::Over {
-            protocol: Protocol::Usenet,
-            adapter: Contracted::new(
-                Fake::silent(),
-                "http://127.0.0.1:8080",
-                USENET,
-                "usenet-key",
-            ),
-        },
+        protocol: Protocol::Usenet,
+        adapter: Contracted::new(http, "http://127.0.0.1:8080", USENET, "usenet-key"),
     }
 }
 
-/// Both clients as read targets, in the order the manifest declares them.
-fn both() -> Vec<DownloadTarget> {
-    vec![torrent(), usenet()]
-}
-
 #[test]
-fn both_kinds_of_client_are_opened_by_what_each_authenticates_with() {
-    let ctx = a_context().build();
-    let opened = opened(&ctx, &both());
+fn both_kinds_of_client_are_opened_in_the_order_they_are_declared() {
+    let opened = opened(&[torrent_over(Fake::silent()), usenet_over(Fake::silent())]);
     let names: Vec<&str> = opened
         .iter()
         .map(|client| client.service.as_str())
         .collect();
-    assert_eq!(names, ["qbittorrent", "sabnzbd"]);
+    assert_eq!(names, [TORRENT, USENET]);
 }
 
 #[tokio::test]
 async fn a_client_that_would_not_answer_is_reported_with_what_it_said() {
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env_at("bandwidth-silent-client", &a_password())),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(Fake::silent());
-    let clients = opened(&ctx, &[torrent()]);
+    let clients = opened(&[torrent_over(Fake::silent())]);
     assert_eq!(clients.len(), 1, "the torrent client opened");
 
     for client in &clients {
@@ -188,84 +167,55 @@ async fn a_client_that_would_not_answer_is_reported_with_what_it_said() {
     }
 }
 
-/// A torrent client answering every question, with `running` torrents and this
-/// standing on whether it would start another.
-fn a_client_that_answers(running: &'static str, would_start: &'static str) -> Arc<Fake> {
+/// A torrent client answering over its contract that it is `pulling`, before and after
+/// a stop or a resume.
+fn a_client_that_answers(pulling: Answered) -> Arc<Fake> {
     Fake::by_path(vec![
-        ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
-        ("/api/v2/torrents/info", Replies::reply(200, running)),
         (
-            "/api/v2/app/setPreferences",
-            Replies::reply(200, String::new()),
+            torrent::operation("pulling"),
+            Replies::reply(200, json(&pulling)),
         ),
         (
-            "/api/v2/app/preferences",
-            Replies::reply(
-                200,
-                format!(
-                    r#"{{"dl_limit":0,"up_limit":0,"alt_dl_limit":0,"alt_up_limit":0,
-                        "scheduler_enabled":false,"add_stopped_enabled":{would_start}}}"#
-                ),
-            ),
+            torrent::operation("stop"),
+            Replies::reply(200, json(&pulling)),
         ),
-        ("/api/v2/transfer/speedLimitsMode", Replies::reply(200, "0")),
         (
-            "/api/v2/transfer/info",
-            Replies::reply(200, r#"{"dl_info_speed":0,"up_info_speed":0}"#),
+            torrent::operation("resume"),
+            Replies::reply(200, json(&pulling)),
         ),
-        ("/api/v2/torrents/stop", Replies::reply(200, String::new())),
-        ("/api/v2/torrents/start", Replies::reply(200, String::new())),
     ])
-}
-
-/// The stack that client belongs to.
-fn a_stack(scratch: &str, http: Arc<Fake>) -> crate::app::Ctx {
-    a_context()
-        .settings(Settings {
-            env_file: Some(env_at(scratch, &a_password())),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
 }
 
 #[tokio::test]
 async fn a_cap_makes_whether_the_client_is_fetching_part_of_what_it_answers() {
-    // Both readings, because the two are what a spent cap is judged by: a
-    // client still running something has not stopped, and one running nothing
-    // that would start the next thing handed to it has not either.
-    let ctx = a_stack("bandwidth-pulling", a_client_that_answers("[{}]", "false"));
-    let clients = &opened(&ctx, &[torrent()]);
-    assert!(
-        !clients.is_empty(),
-        "no client answered, so nothing below was asked"
-    );
-    for client in clients {
-        let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
-        assert_eq!(asked.pulling, Some(Pulling::Fetching));
-    }
-
-    let idle = a_stack("bandwidth-idle", a_client_that_answers("[]", "true"));
-    let clients = &opened(&idle, &[torrent()]);
-    assert!(
-        !clients.is_empty(),
-        "no client answered, so nothing below was asked"
-    );
-    for client in clients {
-        let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
-        assert_eq!(asked.pulling, Some(Pulling::Stopped));
+    // Both readings, because the two are what a spent cap is judged by: a client still
+    // fetching has not stopped, and one that says it is stopped has.
+    for (said, judged) in [
+        (Answered::Fetching, Pulling::Fetching),
+        (Answered::Stopped, Pulling::Stopped),
+    ] {
+        let clients = &opened(&[torrent_over(a_client_that_answers(said))]);
         assert!(
-            asked.worth_saying(),
-            "a stopped client is always worth saying"
+            !clients.is_empty(),
+            "no client answered, so nothing below was asked"
         );
+        for client in clients {
+            let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
+            assert_eq!(asked.pulling, Some(judged));
+            if judged == Pulling::Stopped {
+                assert!(
+                    asked.worth_saying(),
+                    "a stopped client is always worth saying"
+                );
+            }
+        }
     }
 }
 
 #[tokio::test]
 async fn stopping_and_starting_are_two_named_requests_rather_than_one_flag() {
-    let http = a_client_that_answers("[]", "true");
-    let ctx = a_stack("bandwidth-stopping", http.clone());
-    let clients = &opened(&ctx, &[torrent()]);
+    let http = a_client_that_answers(Answered::Stopped);
+    let clients = &opened(&[torrent_over(http.clone())]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -285,16 +235,15 @@ async fn stopping_and_starting_are_two_named_requests_rather_than_one_flag() {
             "what it reports afterwards, not what it was asked for"
         );
     }
-    assert!(http.asked_for("/torrents/stop"));
-    assert!(http.asked_for("/torrents/start"));
+    assert!(http.asked_for(torrent::operation("stop")));
+    assert!(http.asked_for(torrent::operation("resume")));
 }
 
 #[tokio::test]
 async fn a_client_that_will_not_say_whether_it_is_fetching_reports_nothing_rather_than_a_guess() {
     // "Stopped" is exactly the wrong thing to say about a client nobody could
     // reach: it is the answer that reads as a cap being kept.
-    let ctx = a_stack("bandwidth-unfetchable", Fake::silent());
-    let clients = &opened(&ctx, &[torrent()]);
+    let clients = &opened(&[torrent_over(Fake::silent())]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -309,14 +258,7 @@ async fn a_client_that_will_not_say_whether_it_is_fetching_reports_nothing_rathe
 
 #[tokio::test]
 async fn what_a_client_has_moved_is_nothing_where_it_would_not_say() {
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env_at("bandwidth-unmoved", &a_password())),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(Fake::silent());
-    let clients = &opened(&ctx, &[torrent()]);
+    let clients = &opened(&[torrent_over(Fake::silent())]);
     assert!(
         !clients.is_empty(),
         "no client answered, so nothing below was asked"
@@ -370,13 +312,7 @@ fn the_usenet_client_over_its_contract() -> DownloadTarget {
             Replies::reply(200, json(&Answered::Fetching)),
         ),
     ]);
-    DownloadTarget {
-        service: USENET.to_owned(),
-        kind: DownloadKind::Over {
-            protocol: Protocol::Usenet,
-            adapter: Contracted::new(http, "http://127.0.0.1:8080", USENET, "usenet-key"),
-        },
-    }
+    usenet_over(http)
 }
 
 /// The Usenet client is judged as one that has no upload and keeps no hours, and is asked
@@ -384,8 +320,7 @@ fn the_usenet_client_over_its_contract() -> DownloadTarget {
 /// the household to an upload limit nothing had ever put on it.
 #[tokio::test]
 async fn the_usenet_client_is_judged_with_no_upload_and_no_hours_over_its_contract() {
-    let ctx = a_context().build();
-    let clients = opened(&ctx, &[the_usenet_client_over_its_contract()]);
+    let clients = opened(&[the_usenet_client_over_its_contract()]);
     assert_eq!(clients.len(), 1, "the Usenet client opened");
 
     for client in &clients {
@@ -472,23 +407,20 @@ fn speaking_its_contract(protocol: Protocol, uploads: bool) -> (DownloadTarget, 
     ]);
     let target = DownloadTarget {
         service: "fetcher".to_owned(),
-        kind: DownloadKind::Over {
-            protocol,
-            adapter: Contracted::new(http.clone(), "http://127.0.0.1:8080", "fetcher", "the-key"),
-        },
+        protocol,
+        adapter: Contracted::new(http.clone(), "http://127.0.0.1:8080", "fetcher", "the-key"),
     };
     (target, http)
 }
 
 #[tokio::test]
 async fn a_client_speaking_its_protocols_contract_is_limited_and_metered_over_it() {
-    let ctx = a_context().build();
     for (protocol, capability, uploads) in [
         (Protocol::Torrent, "download.torrent", true),
         (Protocol::Usenet, "download.usenet", false),
     ] {
         let (target, http) = speaking_its_contract(protocol, uploads);
-        let clients = opened(&ctx, &[target]);
+        let clients = opened(&[target]);
         assert_eq!(clients.len(), 1, "the contracted client opened");
         for client in &clients {
             let reported = holding(client, &wanted(), Some(Fetch::Ask), true).await;

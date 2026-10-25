@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_fixtures::serving::Serves;
 use lemonfiber_fixtures::support::FixedRandom;
 
 use super::super::tests::asking::SERVED;
@@ -54,16 +53,14 @@ fn served() -> Served {
 async fn first_run(
     placed: &Placed,
     copy: &Throwaway,
-    serving: &Serves,
     http: Arc<Fake>,
 ) -> Result<Option<Held>, String> {
-    first_run_on(placed, copy, serving, http, &served()).await
+    first_run_on(placed, copy, http, &served()).await
 }
 
 async fn first_run_on(
     placed: &Placed,
     copy: &Throwaway,
-    serving: &Serves,
     http: Arc<Fake>,
     served: &Served,
 ) -> Result<Option<Held>, String> {
@@ -73,7 +70,6 @@ async fn first_run_on(
         placed,
         copy,
         served,
-        serving,
         keyed: http as Arc<dyn Http>,
         random: &random,
         before: &settled,
@@ -95,9 +91,9 @@ async fn a_service_writing_its_own_key_is_first_run_by_reading_it_and_presented_
         return;
     };
     assert_eq!(
-        first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await,
+        first_run(&placed, &copy, Fake::silent()).await,
         Ok(Some(Held {
-            presented: Presented::Header("X-Api-Key", "abc123abc123".to_owned()),
+            presented: Presented("X-Api-Key", "abc123abc123".to_owned()),
             made: vec!["abc123abc123".to_owned()],
         }))
     );
@@ -114,7 +110,7 @@ async fn a_service_with_no_api_or_no_credential_has_no_first_run() {
     ] {
         if let Some(placed) = placed(api) {
             assert_eq!(
-                first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await,
+                first_run(&placed, &copy, Fake::silent()).await,
                 Ok(None),
                 "{api}"
             );
@@ -139,9 +135,9 @@ async fn a_book_curator_is_handed_a_key_lemonfiber_mints_before_it_starts() {
         return;
     };
     assert_eq!(
-        first_run(&curator, &copy, &Serves::on(1), Fake::silent()).await,
+        first_run(&curator, &copy, Fake::silent()).await,
         Ok(Some(Held {
-            presented: Presented::Header("X-Api-Key", MINTED.to_owned()),
+            presented: Presented("X-Api-Key", MINTED.to_owned()),
             made: vec![MINTED.to_owned()],
         }))
     );
@@ -151,50 +147,27 @@ async fn a_book_curator_is_handed_a_key_lemonfiber_mints_before_it_starts() {
     assert_eq!(before(&other, &random), Ok(Before::default()));
 }
 
+/// A service naming an API whose first run is an adapter's, such as a torrent client's or
+/// a media server's, has none performed here: it is refused, asking nothing of it.
 #[tokio::test]
-async fn a_torrent_clients_announced_password_is_replaced_and_its_session_carries_the_operator() {
-    let Some((_source, copy)) = copy("first-qbittorrent") else {
+async fn a_service_whose_first_run_is_an_adapters_is_refused_asking_nothing() {
+    let Some((_source, copy)) = copy("first-adapters") else {
         return;
     };
-    let Some(placed) =
-        placed("api         = { kind = \"qbittorrent\", key_source = \"generated\" }")
-    else {
-        return;
-    };
-    let serving = Serves::on(1)
-        .logging("starting\nA temporary password is provided for this session: tmpPass123\n");
-    let http = Fake::by_route(vec![
-        (
-            Method::Post,
-            "/api/v2/auth/login",
-            Answer::reply(200, "Ok."),
-        ),
-        (
-            Method::Post,
-            "/api/v2/app/setPreferences",
-            Answer::reply(200, ""),
-        ),
-    ]);
-    let held = first_run(&placed, &copy, &serving, Arc::clone(&http)).await;
-    assert_eq!(
-        held,
-        Ok(Some(Held {
-            presented: Presented::Session,
-            made: vec!["tmpPass123".to_owned(), MINTED.to_owned()],
-        }))
-    );
-    let bodies: Vec<String> = http
-        .requests()
-        .into_iter()
-        .map(|asked| asked.body.unwrap_or_default())
-        .collect();
-    assert_eq!(bodies.len(), 3);
-    assert!(bodies
-        .first()
-        .is_some_and(|body| body.contains("password=tmpPass123")));
-    assert!(bodies
-        .get(2)
-        .is_some_and(|body| body.contains(&format!("password={MINTED}"))));
+    for kind in ["qbittorrent", "sabnzbd", "jellyfin"] {
+        let Some(placed) = placed(&format!(
+            "api         = {{ kind = \"{kind}\", key_source = \"generated\" }}"
+        )) else {
+            return;
+        };
+        let http = Fake::always(Answer::reply(200, "Ok."));
+        let held = first_run(&placed, &copy, Arc::clone(&http)).await;
+        assert!(
+            held.as_ref().is_err_and(|why| why.contains("adapter")),
+            "{kind}: {held:?}"
+        );
+        assert!(http.requests().is_empty(), "{kind}");
+    }
 }
 
 #[tokio::test]
@@ -220,11 +193,11 @@ async fn a_listening_servers_root_account_is_made_and_signed_in_as() {
             ),
         ),
     ]);
-    let held = first_run(&placed, &copy, &Serves::on(1), Arc::clone(&http)).await;
+    let held = first_run(&placed, &copy, Arc::clone(&http)).await;
     assert_eq!(
         held,
         Ok(Some(Held {
-            presented: Presented::Header("Authorization", "Bearer acc.ess.token".to_owned()),
+            presented: Presented("Authorization", "Bearer acc.ess.token".to_owned()),
             made: vec![
                 MINTED.to_owned(),
                 "acc.ess.token".to_owned(),
@@ -244,7 +217,7 @@ async fn a_listening_servers_root_account_is_made_and_signed_in_as() {
         "/status",
         Answer::reply(200, "{\"isInit\": true}"),
     )]);
-    assert!(first_run(&placed, &copy, &Serves::on(1), claimed)
+    assert!(first_run(&placed, &copy, claimed)
         .await
         .is_err_and(|why| why.contains("already holds an account")));
 }
@@ -283,7 +256,7 @@ async fn an_aggregators_authentication_is_turned_on_and_its_restart_waited_out()
             vec![Answer::reply(200, "")],
         ),
     ]);
-    let held = first_run(&placed, &copy, &Serves::on(1), Arc::clone(&http)).await;
+    let held = first_run(&placed, &copy, Arc::clone(&http)).await;
     let pair = base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
         format!("{}:{MINTED}", crate::config::USENET_AGGREGATOR_ADMIN_USER),
@@ -291,7 +264,7 @@ async fn an_aggregators_authentication_is_turned_on_and_its_restart_waited_out()
     assert_eq!(
         held,
         Ok(Some(Held {
-            presented: Presented::Header("Authorization", format!("Basic {pair}")),
+            presented: Presented("Authorization", format!("Basic {pair}")),
             made: vec![MINTED.to_owned(), "INSTANCEKEY123".to_owned(), pair],
         }))
     );
@@ -314,7 +287,7 @@ async fn a_media_servers_first_run_is_its_adapters_and_refused_without_one() {
     else {
         return;
     };
-    let said = first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await;
+    let said = first_run(&placed, &copy, Fake::silent()).await;
     assert!(
         said.as_ref().is_err_and(|why| why.contains("adapter")),
         "{said:?}"
@@ -331,7 +304,7 @@ async fn a_key_file_outside_the_configuration_directory_is_refused() {
     ) else {
         return;
     };
-    let said = first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await;
+    let said = first_run(&placed, &copy, Fake::silent()).await;
     assert!(
         said.as_ref()
             .is_err_and(|why| why.contains("not beneath its configuration directory")),
@@ -354,7 +327,7 @@ async fn a_key_file_the_container_made_a_link_is_refused_rather_than_followed() 
     let Some(placed) = placed(SERVARR) else {
         return;
     };
-    let said = first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await;
+    let said = first_run(&placed, &copy, Fake::silent()).await;
     assert!(
         said.as_ref()
             .is_err_and(|why| why.contains("is a link or a device")),
@@ -378,10 +351,10 @@ async fn a_subtitle_finders_key_is_read_from_its_configuration_and_presented_in_
     ) else {
         return;
     };
-    let held = first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await;
+    let held = first_run(&placed, &copy, Fake::silent()).await;
     assert_eq!(
         held.map(|held| held.map(|held| held.presented)),
-        Ok(Some(Presented::Header(crate::bazarr::KEY, written)))
+        Ok(Some(Presented(crate::bazarr::KEY, written)))
     );
 }
 
@@ -393,34 +366,10 @@ async fn a_key_never_written_fails_the_first_run_at_its_limit() {
     let Some(placed) = placed(SERVARR) else {
         return;
     };
-    let said = first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await;
+    let said = first_run(&placed, &copy, Fake::silent()).await;
     assert!(
         said.as_ref()
             .is_err_and(|why| why.contains("wrote no key to /config/config.xml within 60")),
-        "{said:?}"
-    );
-}
-
-#[tokio::test(start_paused = true)]
-async fn a_torrent_client_that_announces_no_password_fails_at_its_limit() {
-    let Some((_source, copy)) = copy("first-unannounced") else {
-        return;
-    };
-    let Some(placed) =
-        placed("api         = { kind = \"qbittorrent\", key_source = \"generated\" }")
-    else {
-        return;
-    };
-    let said = first_run(
-        &placed,
-        &copy,
-        &Serves::on(1).logging("started"),
-        Fake::silent(),
-    )
-    .await;
-    assert!(
-        said.as_ref()
-            .is_err_and(|why| why.contains("announced no temporary password within 60")),
         "{said:?}"
     );
 }
@@ -451,7 +400,7 @@ async fn an_aggregator_that_will_not_take_its_authentication_fails_the_first_run
                 Answer::reply(status, "{\"message\": \"no\"}"),
             ),
         ]);
-        let said = first_run(&placed, &copy, &Serves::on(1), http).await;
+        let said = first_run(&placed, &copy, http).await;
         assert!(said.is_err(), "{status}: {said:?}");
     }
 }
@@ -478,7 +427,7 @@ async fn an_aggregator_still_answering_anybody_after_its_restart_fails_at_its_li
             Answer::reply(200, ""),
         ),
     ]);
-    let said = first_run(&placed, &copy, &Serves::on(1), http).await;
+    let said = first_run(&placed, &copy, http).await;
     assert!(
         said.as_ref()
             .is_err_and(|why| why.contains("still answered its configuration to anybody 60")),
@@ -501,9 +450,7 @@ async fn a_listening_server_that_will_not_make_the_account_or_hand_back_a_token_
         "/status",
         Answer::reply(200, "{\"isInit\": false}"),
     )]);
-    assert!(first_run(&placed, &copy, &Serves::on(1), unreachable)
-        .await
-        .is_err());
+    assert!(first_run(&placed, &copy, unreachable).await.is_err());
     let tokenless = Fake::by_route(vec![
         (
             Method::Get,
@@ -513,7 +460,7 @@ async fn a_listening_server_that_will_not_make_the_account_or_hand_back_a_token_
         (Method::Post, "/init", Answer::reply(200, "")),
         (Method::Post, "/login", Answer::reply(200, "{\"user\": {}}")),
     ]);
-    let said = first_run(&placed, &copy, &Serves::on(1), tokenless).await;
+    let said = first_run(&placed, &copy, tokenless).await;
     assert!(
         said.as_ref().is_err_and(|why| why.contains("no token")),
         "{said:?}"
@@ -533,7 +480,7 @@ async fn a_service_publishing_no_port_cannot_be_first_run() {
         ..served()
     };
     assert_eq!(
-        first_run_on(&placed, &copy, &Serves::on(1), Fake::silent(), &portless).await,
+        first_run_on(&placed, &copy, Fake::silent(), &portless).await,
         Err("it publishes no port, so its first run cannot reach it".to_owned())
     );
 }
@@ -549,7 +496,7 @@ async fn a_key_its_adapter_names_no_file_for_cannot_be_read() {
         return;
     };
     assert_eq!(
-        first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await,
+        first_run(&placed, &copy, Fake::silent()).await,
         Err("its adapter names no file its key is written to".to_owned())
     );
 }

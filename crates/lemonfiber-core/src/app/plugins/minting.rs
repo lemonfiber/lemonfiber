@@ -3,8 +3,11 @@
 //! Made before anything is written, because the plugin's secrets files, starting files
 //! and adapters' `upstream.json` are written from the store. One already held is kept,
 //! so a reinstall or an update hands the upstream the credential it already answers to,
-//! and a part moved in place is filed the key the stack already published for it.
+//! and a part moved in place is filed the credential the stack already holds for it.
 
+use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
+use lemonfiber_manifest::container::Secret;
+use lemonfiber_manifest::ApiKind;
 use lemonfiber_plugin::Manifest;
 
 use super::super::Ctx;
@@ -15,8 +18,8 @@ use crate::plugin::first_party::FirstParty;
 use crate::plugin::Installed;
 
 /// Hold a freshly minted value for each secret `manifest` mints that `would` holds none
-/// of yet, journalling each by its fingerprint; for a plugin `trusted` names, the key the
-/// stack already published for a part it moves in place of instead.
+/// of yet, journalling each by its fingerprint; for a plugin `trusted` names, the
+/// credential the stack already holds for a part it moves in place of instead.
 ///
 /// # Errors
 ///
@@ -44,7 +47,7 @@ pub(super) fn minted(
         .filter(|secret| secret.minted)
         .map(|secret| {
             first_party
-                .then(|| moved(ctx, manifest, &secret.of))
+                .then(|| moved(ctx, manifest, secret))
                 .flatten()
                 .or_else(|| crate::plugin::seeding::mint(ctx.seams.random.as_ref()))
                 .map(|value| (crate::settings::named(plugin, &secret.id), value))
@@ -87,19 +90,44 @@ pub(super) fn minted(
     .map_err(|failure| diagnosed(&failure))
 }
 
-/// The credential the stack's own service `of` moves in place of already answers to, as
-/// lemonfiber published it for what reads it, where `of` moves in place of one.
+/// What the stack's own service the service `secret` is of moves in place of already
+/// answers to, for the part of an adapter's upstream credential `secret` holds, where
+/// that service moves in place of one.
 ///
-/// A part moved in place keeps its configuration, so its upstream answers to the key it
-/// had; one minted afresh would be a key nothing seeded into it. Asked only of a
-/// first-party plugin: the stack's own key goes to nothing else.
-fn moved(ctx: &Ctx, manifest: &Manifest, of: &str) -> Option<String> {
-    manifest
+/// A part moved in place keeps its configuration, so its upstream answers to the
+/// credential it had; one minted afresh would be one nothing set on it. A username or a
+/// password is the account lemonfiber set up on the stack's service answering in the API
+/// the moved service answers in, and anything else the key lemonfiber published for the
+/// stack's service. Asked only of a first-party plugin: the stack's own credential goes to
+/// nothing else.
+fn moved(ctx: &Ctx, manifest: &Manifest, secret: &Secret) -> Option<String> {
+    let of = manifest
         .services
         .iter()
-        .filter(|service| service.id == of)
-        .find_map(|service| service.replaces.as_deref())
-        .and_then(|reserved| {
-            crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
-        })
+        .find(|service| service.id == secret.of)?;
+    let reserved = of.replaces.as_deref()?;
+    let account = || {
+        of.native
+            .as_deref()
+            .and_then(ApiKind::named)
+            .and_then(crate::credential::account)
+    };
+    match held_as(manifest, secret) {
+        Some(UPSTREAM_USERNAME) => account().map(|account| account.username.to_owned()),
+        Some(UPSTREAM_PASSWORD) => account()
+            .and_then(|account| crate::app::targets::recorded_secret(ctx, account.password)),
+        _ => crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved)),
+    }
+}
+
+/// The part of an adapter's upstream credential `secret` holds, where an adapter of
+/// `manifest` hands it to its upstream.
+fn held_as<'a>(manifest: &'a Manifest, secret: &Secret) -> Option<&'a str> {
+    manifest.services.iter().find_map(|service| {
+        service
+            .upstream
+            .iter()
+            .find(|(_, held)| held.secret == secret.id)
+            .map(|(part, _)| part.as_str())
+    })
 }

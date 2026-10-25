@@ -27,6 +27,7 @@ mod rotation;
 pub use lemonfiber_ports::fingerprint::fingerprint;
 
 pub use granting::{Granted, Revoked};
+pub(crate) use held::account;
 pub use held::{catalogue, Consumer, Entry, Needed, Origin, Reached, CATALOGUE, VPN_PRIVATE_KEY};
 pub use protection::Protection;
 pub use rotation::{Propagation, Reach, Rotation, Settled};
@@ -89,7 +90,7 @@ impl State {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "CredentialHeld")]
 pub struct Held {
-    /// What it is, in the operator's words — `qBittorrent web UI password`.
+    /// What it is, in the operator's words — `Jellyfin administrator password`.
     pub name: String,
     /// The setting it is recorded under, which is a name and never a value.
     pub setting: String,

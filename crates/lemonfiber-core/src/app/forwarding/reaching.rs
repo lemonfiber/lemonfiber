@@ -3,7 +3,7 @@
 use lemonfiber_contract::capabilities::download::torrent;
 use lemonfiber_contract::capabilities::network::egress;
 
-use crate::app::targets::{declared_downloads, spoken, Spoken};
+use crate::app::targets::{declared_downloads, spoken, DownloadTarget, Spoken};
 use crate::app::Ctx;
 use crate::doctor::vpn::Gluetun;
 use crate::origin::Origin;
@@ -49,7 +49,7 @@ pub(crate) async fn inside(ctx: &Ctx, fillers: &Fillers) -> Vec<Inside> {
                 .iter()
                 .find(|one| one.id == filler.id)
                 .and_then(|one| one.target.as_ref())
-                .and_then(|target| target.torrent(ctx)),
+                .and_then(DownloadTarget::torrent),
         })
         .collect()
 }

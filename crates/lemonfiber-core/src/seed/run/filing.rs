@@ -33,8 +33,8 @@ fn field(category: &str) -> String {
     format!("completed:{category}")
 }
 
-/// Every download client a curator hands downloads to, by id, with the categories it is
-/// handed them under.
+/// Every download client a curator hands downloads to, by the id it is asked under — the
+/// adapter in front of it, where one is — with the categories it is handed them under.
 fn categories(fillers: &Fillers) -> BTreeMap<String, BTreeSet<String>> {
     let mut wanted: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for pairing in pairings(fillers) {
@@ -49,8 +49,9 @@ fn categories(fillers: &Fillers) -> BTreeMap<String, BTreeSet<String>> {
         else {
             continue;
         };
+        let asked = fillers.fronting(pairing.filler).unwrap_or(pairing.filler);
         wanted
-            .entry(pairing.filler.id.clone())
+            .entry(asked.id.clone())
             .or_default()
             .insert(category.value);
     }
@@ -77,8 +78,9 @@ pub(super) async fn seed_completed_folders(
         };
         let name = fillers
             .service(&target.service)
+            .map(|filler| fillers.fronted_by(filler).unwrap_or(filler))
             .map_or(target.service.as_str(), |filler| filler.name.as_str());
-        let client = target.client(ctx);
+        let client = target.client();
         let (state, now) = filed(ctx, client.filing(), &target.service, categories, baseline).await;
         for category in categories {
             if let Some(folder) = now.get(category) {

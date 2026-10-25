@@ -98,6 +98,9 @@ struct Machine {
     /// be able to say which. Refusing "the stack" without saying when would always
     /// refuse the stop, and the two leave the machine in opposite states.
     stack_actions: Mutex<usize>,
+    /// What else is running until the run first acts on the whole stack, where a test
+    /// reaches a service the run does not start.
+    beside: Mutex<Option<Arc<dyn Engine>>>,
 }
 
 impl Machine {
@@ -113,7 +116,33 @@ impl Machine {
             bringing_back: Mutex::new(None),
             fetch: Mutex::new(None),
             stack_actions: Mutex::new(0),
+            beside: Mutex::new(None),
         })
+    }
+
+    /// The same machine, with `running` listed beside what it starts until the run first
+    /// acts on the whole stack.
+    fn beside(self: Arc<Self>, running: Arc<dyn Engine>) -> Arc<Self> {
+        if let Ok(mut beside) = self.beside.lock() {
+            *beside = Some(running);
+        }
+        self
+    }
+
+    /// What is running beside what the run starts: nothing once the run has acted on the
+    /// whole stack.
+    async fn running_beside(&self, project: &str) -> Vec<Container> {
+        let untouched = self.stack_actions.lock().is_ok_and(|acted| *acted == 0);
+        let beside = self
+            .beside
+            .lock()
+            .ok()
+            .and_then(|beside| beside.clone())
+            .filter(|_| untouched);
+        match beside {
+            Some(engine) => engine.list(project).await.unwrap_or_default(),
+            None => Vec::new(),
+        }
     }
 
     /// The same machine, with Compose failing the fetch in front of the stop.
@@ -242,14 +271,14 @@ impl Runner for Machine {
 
 #[async_trait]
 impl Engine for Machine {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, EngineFailure> {
+    async fn list(&self, project: &str) -> Result<Vec<Container>, EngineFailure> {
         // Counted only once something has been started, because what the count stands
         // for is how long a started service has been coming up. A listing taken while
         // the stack is down — the stop reading back what it stopped — is not a look at
         // anything starting.
         let started = self.started();
         if started.is_empty() {
-            return Ok(Vec::new());
+            return Ok(self.running_beside(project).await);
         }
         let listings = self.asked.lock().map_or(0, |mut asked| {
             *asked += 1;

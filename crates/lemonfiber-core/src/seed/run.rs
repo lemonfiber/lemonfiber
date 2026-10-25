@@ -1,8 +1,9 @@
 //! Wiring the stack's services to each other, idempotently.
 //!
-//! One connection lemonfiber mints (the torrent client's web UI password); the rest it
-//! reads and writes. The orchestration lives here so [`crate::app::dispatch`] stays a
-//! table of one-line calls rather than carrying the whole graph.
+//! Each connection reads a credential and writes it where another service needs it, and
+//! the accounts a service starts without are made here. The orchestration lives here so
+//! [`crate::app::dispatch`] stays a table of one-line calls rather than carrying the whole
+//! graph.
 
 use std::path::Path;
 
@@ -10,7 +11,6 @@ use crate::app::targets::{project_directory, target_for};
 use crate::app::Ctx;
 use crate::error::Diagnose;
 use crate::error::Problem;
-use crate::ports::docker::LogQuery;
 
 mod aggregators;
 mod applications;
@@ -61,7 +61,7 @@ use curating::{contested, seed_curator, wanted_clients, CuratorSeeding};
 // second reader beside this one that could disagree with it.
 pub(crate) use applications::resync_application;
 pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
-use clients::{category_for, held, seed_passwords, Held};
+use clients::{category_for, held, Held};
 pub(crate) use curating::curators;
 pub(crate) use gate::reroute;
 pub(crate) use guarding::exposure;
@@ -79,15 +79,13 @@ use withholding::{withheld, withheld_brought};
 /// **A rehearsal issues nothing but reads, and that is the rule rather than a summary
 /// of one.** It is stricter than "registers no connection", because several of the
 /// things this pass would call reading are `POST`s: a sign-in opens a session on
-/// somebody else's service, a torrent client answers a password test the same way, and
-/// two of the keys published at the end are read by being minted. Each is state left
-/// behind by a run that promised to leave none, so none of them is made.
+/// somebody else's service, and two of the keys published at the end are read by being
+/// minted. Each is state left behind by a run that promised to leave none, so none of
+/// them is made.
 ///
-/// Four things the rule costs, each reported as something this pass could not tell
+/// Three things the rule costs, each reported as something this pass could not tell
 /// rather than told wrong:
 ///
-/// - whether the torrent password lemonfiber recorded is still the one in force, which
-///   is answered by signing in;
 /// - what the household is told, and which curators the request service hands a request
 ///   to — both read as the owner, and the owner's session is a sign-in;
 /// - whether a drifted download client still reaches anything, which the curator answers
@@ -107,11 +105,7 @@ use withholding::{withheld, withheld_brought};
 /// say, and one that surveyed separately would be a second opinion about what
 /// lemonfiber intends — and the one nobody runs is the one that goes wrong.
 ///
-/// One connection is unlike the rest: the torrent client's web UI password, the
-/// credential lemonfiber mints rather than reads — its temporary password is
-/// read from the container's log, replaced with a generated one, and the
-/// generated one recorded where lemonfiber reads it back. The rest of
-/// the graph reads a credential and writes a connection: each curator's root
+/// The graph reads a credential and writes a connection: each curator's root
 /// folders and its download clients, each curator registered into the indexer so
 /// it pushes them indexers, the aggregator a book curator pulls from, the media
 /// server as the request service's identity so the household signs in once, the
@@ -140,14 +134,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let fillers = crate::wiring::Fillers::of(&manifest, &installed, &chosen, project.as_deref());
 
-    // Each torrent client's password, the one credential lemonfiber mints. A later run
-    // mints nothing — the password in force is the one already set — so the value
-    // recorded on the run that minted it stands in. Without that a curator that came up
-    // after the first seed would never learn about the client, since its password
-    // cannot be read back from the client itself.
-    let (minted, passwords) = seed_passwords(ctx, &fillers).await;
-    wirings.extend(minted);
-    let held = held(ctx, &fillers, &passwords).await;
+    let held = held(ctx, &fillers);
 
     // Root folders and download clients for each curator, and the
     // pairs that come to no connection at all, said rather than left out.
@@ -241,9 +228,8 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // configured that way and by no other means — the quality sync and the archive
     // extractor — so without this they run with nothing, and the quality sync refuses
     // its whole configuration over a single undefined name.
-    wirings.push(
-        published::publish_keys(ctx, &manifest.services, &fillers, project.as_deref(), &held).await,
-    );
+    wirings
+        .push(published::publish_keys(ctx, &manifest.services, &fillers, project.as_deref()).await);
 
     // The listening server's first account, which is anybody's until somebody makes it.
     wirings.extend(claiming::claimed(ctx, &manifest.services).await);
@@ -372,8 +358,7 @@ pub(crate) async fn managed_wirings(
     managed
 }
 
-/// Who fills each ask and the credential each download client answers to, as a pass
-/// that mints nothing reads them: every torrent client's password is the one recorded.
+/// Who fills each ask and the credential each download client answers to.
 async fn reading(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
@@ -382,29 +367,8 @@ async fn reading(
 ) -> (crate::wiring::Fillers, Held) {
     let chosen = crate::app::targets::chosen_fillers(ctx);
     let fillers = crate::wiring::Fillers::of(manifest, installed, &chosen, project);
-    let held = held(ctx, &fillers, &std::collections::BTreeMap::new()).await;
+    let held = held(ctx, &fillers);
     (fillers, held)
-}
-
-/// The temporary password the torrent client announced in its log, if it has.
-async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
-    let mut lines = ctx
-        .seams
-        .engine
-        .logs(
-            &ctx.settings.project,
-            &[service.to_owned()],
-            LogQuery::recent(TEMP_PASSWORD_LOG_LINES),
-        )
-        .await
-        .ok()?;
-
-    let mut log = String::new();
-    while let Some(line) = lines.recv().await {
-        log.push_str(&line.line);
-        log.push('\n');
-    }
-    crate::qbittorrent::temporary_password(&log)
 }
 
 /// The curators the request service hands a request to. Without this the household can
@@ -426,11 +390,6 @@ async fn seed_requests(
     wirings.extend(taken_back::seed_taken_back(ctx, services, fillers, project, baseline).await);
     wirings
 }
-
-/// How many lines back to read for the torrent client's start-up announcement. Its
-/// temporary password is printed once, early, so a generous tail finds it well
-/// after start without pulling the whole log.
-const TEMP_PASSWORD_LOG_LINES: u32 = 200;
 
 /// The media server's administrator, and everything that signs in with it: who may
 /// read the server from a browser, the decline service's key, the request gate's

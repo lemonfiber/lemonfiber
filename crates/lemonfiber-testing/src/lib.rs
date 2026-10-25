@@ -10,6 +10,7 @@ pub mod adapted;
 pub mod context;
 pub mod media;
 pub mod placeholder;
+pub mod torrent;
 pub mod usenet;
 
 pub use context::{a_context, a_live_context, nowhere, repository_stack, Context};

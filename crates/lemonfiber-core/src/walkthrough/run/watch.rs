@@ -131,7 +131,7 @@ async fn speed_of(ctx: &Ctx, title: &str) -> Option<Speed> {
     let needle = first_word(title).to_lowercase();
     let fillers = host_fillers(ctx, &manifest, project.as_deref());
     for target in download_targets(ctx, &fillers).await {
-        let carrying = read_transfers(ctx, &target)
+        let carrying = read_transfers(&target)
             .await
             .into_iter()
             .find(|download| download.name.to_lowercase().contains(&needle));

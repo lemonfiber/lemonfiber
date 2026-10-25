@@ -32,7 +32,7 @@ async fn the_registration_carries_the_request_services_own_key() {
             ],
         ),
     ]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
@@ -102,7 +102,7 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
         ("/auth/jellyfin", Answer::reply(200, "")),
         ("/settings", Answer::reply(200, "[]")),
     ]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .rehearsing();
@@ -144,7 +144,7 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
 #[tokio::test]
 async fn a_stack_with_no_request_service_is_handed_nothing() {
     let http = Fake::silent();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -176,7 +176,7 @@ async fn a_curator_that_will_not_say_where_it_files_is_left_out() {
         ("/settings/radarr", vec![Answer::reply(200, "[]")]),
         ("/settings/sonarr", vec![Answer::reply(200, "[]")]),
     ]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -200,7 +200,7 @@ async fn a_curator_publishing_no_port_is_left_out() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let mut portless = curator("sonarr", 8989, "tv");
     portless.port = None;
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let wirings = super::super::seed_fulfilment_targets(
@@ -217,7 +217,7 @@ async fn a_curator_publishing_no_port_is_left_out() {
 /// A stack with no request service has nobody to tell.    /// A stack with no request service has nobody to tell.
 #[tokio::test]
 async fn nothing_is_handed_over_where_there_is_no_request_service() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, Vec::new(), None, None);
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -238,8 +238,7 @@ async fn nothing_is_handed_over_where_there_is_no_request_service() {
 #[tokio::test]
 async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
     // No key on disk, so nothing can be read from it and nothing is offered.
-    let ctx =
-        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -259,7 +258,7 @@ async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
 /// than left out, so the operator sees why the request service was not handed it.
 #[tokio::test]
 async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(Fake::silent())
         .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
     let services = vec![requests_svc()];

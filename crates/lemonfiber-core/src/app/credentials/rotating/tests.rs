@@ -21,22 +21,29 @@ fn rehearsed(rotation: &Rotation) -> Option<(String, Vec<String>)> {
 }
 
 #[test]
-fn the_torrent_password_reaches_its_own_service_and_leaves_the_rest_pending() {
-    let consumers = reached(config::TORRENT_PASSWORD_KEY);
+fn the_usenet_password_reaches_its_service_and_lemonfibers_own_check_at_once() {
+    let consumers = reached(config::PROVIDER_PASS_KEY);
 
-    assert_eq!(consumers.len(), 3, "{consumers:?}");
-    assert_eq!(
-        consumers.first().map(|one| &one.reach),
-        Some(&Reach::Updated)
+    assert_eq!(consumers.len(), 2, "{consumers:?}");
+    assert!(
+        consumers.iter().all(|one| one.reach == Reach::Updated),
+        "{consumers:?}"
     );
-    let waiting: Vec<&str> = consumers
-        .iter()
-        .filter_map(|one| match &one.reach {
-            Reach::Pending { detail } => Some(detail.as_str()),
-            Reach::Updated | Reach::Failed { .. } => None,
-        })
+}
+
+#[test]
+fn the_book_key_waits_on_the_restart_that_makes_its_container_again() {
+    let waiting: Vec<Reach> = reached(config::BOOK_CURATOR_API_KEY)
+        .into_iter()
+        .map(|one| one.reach)
         .collect();
-    assert_eq!(waiting, ["lemonfiber seed"]);
+
+    assert_eq!(
+        waiting,
+        [Reach::Pending {
+            detail: "lemonfiber restart books".to_owned()
+        }]
+    );
 }
 
 /// A key the catalogue does not declare has no consumers to report, rather than
@@ -47,21 +54,14 @@ fn a_setting_the_catalogue_does_not_declare_reports_no_consumers() {
 }
 
 /// Every credential this cannot replace itself says where a replacement comes
-/// from, by name. The torrent client's and the media server's administrator passwords
-/// are left out because they are the two this *does* replace, so they never reach this
-/// sentence.
+/// from, by name. The media server's administrator password is left out because it is
+/// the one this *does* replace, so it never reaches this sentence.
 #[test]
 fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from() {
     let asked: Vec<&str> = CATALOGUE
         .iter()
         .map(|entry| entry.setting)
-        .filter(|setting| {
-            ![
-                config::TORRENT_PASSWORD_KEY,
-                config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            ]
-            .contains(setting)
-        })
+        .filter(|setting| *setting != config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
         .collect();
 
     assert_eq!(asked.len(), 6, "{asked:?}");
@@ -77,8 +77,8 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
 #[test]
 fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
     let held = crate::credential::Held {
-        name: "qBittorrent web UI password".to_owned(),
-        setting: config::TORRENT_PASSWORD_KEY.to_owned(),
+        name: "Book library API key".to_owned(),
+        setting: config::BOOK_CURATOR_API_KEY.to_owned(),
         consumers: Vec::new(),
         location: "the environment file".to_owned(),
         origin: crate::credential::Origin::Lemonfiber,
@@ -87,7 +87,7 @@ fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
         fingerprint: None,
         advisory: None,
     };
-    let said = super::would_rotate(&held, super::MINTING);
+    let said = super::would_rotate(&held, super::REPUBLISHING);
 
     assert!(said.kept_the_existing(), "nothing was replaced");
     assert!(said.rehearsed(), "and it is not a rotation that failed");
@@ -103,8 +103,31 @@ fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
     assert!(
         settled.is_some_and(|(_, afterwards)| afterwards
             .iter()
-            .any(|step| step.contains("lemonfiber seed"))),
+            .any(|step| step.contains("lemonfiber restart books"))),
         "the consumers that need a further command are named"
+    );
+}
+
+/// A rehearsal owes nothing for a consumer a rotation reaches by itself, so a
+/// credential every consumer of which is reached at once is left with no steps after.
+#[test]
+fn a_rehearsal_leaves_out_every_consumer_a_rotation_reaches_by_itself() {
+    let held = crate::credential::Held {
+        name: "Usenet password".to_owned(),
+        setting: config::PROVIDER_PASS_KEY.to_owned(),
+        consumers: Vec::new(),
+        location: "the environment file".to_owned(),
+        origin: crate::credential::Origin::Operator,
+        from: crate::origin::Origin::Bundled,
+        state: crate::credential::State::Active,
+        fingerprint: None,
+        advisory: None,
+    };
+    let said = super::would_rotate(&held, super::REPUBLISHING);
+
+    assert_eq!(
+        rehearsed(&said).map(|(_, afterwards)| afterwards),
+        Some(Vec::new())
     );
 }
 
@@ -129,9 +152,9 @@ fn a_setting_nothing_knows_still_gets_an_answer_rather_than_nothing() {
 #[test]
 fn a_rotation_that_was_stopped_is_not_read_as_one_that_was_rehearsed() {
     let stopped = Rotation::stopped(
-        "qBittorrent web UI password",
+        "Jellyfin administrator password",
         Settled::Refused {
-            detail: "the client refused the password lemonfiber holds".to_owned(),
+            detail: "the server refused the password lemonfiber holds".to_owned(),
         },
     );
 

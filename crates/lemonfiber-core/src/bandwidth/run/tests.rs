@@ -1,4 +1,4 @@
-use lemonfiber_contract::capabilities::download::usenet;
+use lemonfiber_contract::capabilities::download::{torrent, usenet};
 use lemonfiber_contract::Contracted;
 use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
@@ -10,14 +10,14 @@ use crate::bandwidth::{
     Rhythm, WhenExceeded, LIMIT_UNREADABLE, NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE,
 };
 use crate::config::Settings;
-use crate::ports::service::Rates;
-use crate::test_support::{a_context, a_password, env_at};
+use crate::ports::service::{Moved, Pulling as Answered, Rates, Throttled};
+use crate::test_support::{a_context, env_without_password, json};
 
 /// A moment every case here reads against.
 const NOW: u64 = 1_790_812_800;
 
-/// A stack whose torrent client answers about its limits, keeping its own files
-/// in a directory of this run's own.
+/// A stack whose torrent client, moved into its plugin, answers about its limits, keeping
+/// its own files in a directory of this run's own.
 ///
 /// Every caller passes a different name: the record and the environment file
 /// are written to a real disk and these cases run at the same time, so two
@@ -28,49 +28,72 @@ fn a_stack(scratch: &str, tz: Option<&str>) -> crate::app::Ctx {
 
 /// The same stack, over a transport the case can read its requests back from.
 fn stacked(scratch: &str, tz: Option<&str>, http: std::sync::Arc<Fake>) -> crate::app::Ctx {
-    let env = env_at(&format!("bandwidth-{scratch}"), &a_password());
+    let env = env_without_password(&format!("bandwidth-{scratch}"));
     if let Some(zone) = tz {
         assert!(crate::config::store::set(&env, "TZ", zone).is_ok());
     }
-    a_context()
-        .settings(Settings {
-            env_file: Some(env),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    crate::test_support::torrent::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    )
 }
 
-/// What the torrent client answers every question this command asks it.
+/// What the torrent client answers over its contract to every question this command asks
+/// it: limited to nothing whatever it is told, moving twenty megabytes a second down and
+/// two up, with nine hundred bytes down and eighty up moved since it last started, and
+/// stopped.
 fn a_transport() -> std::sync::Arc<Fake> {
+    let unlimited = json(&Throttled {
+        rates: Rates::default(),
+        uploads: true,
+        hours: None,
+    });
+    let at = crate::test_support::torrent::operation;
     Fake::by_path(vec![
-        ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
+        (at("restrain"), Replies::reply(200, unlimited.clone())),
+        (at("throttled"), Replies::reply(200, unlimited)),
         (
-            "/api/v2/app/setPreferences",
-            Replies::reply(200, String::new()),
-        ),
-        (
-            "/api/v2/app/preferences",
+            at("moving"),
             Replies::reply(
                 200,
-                r#"{"dl_limit":0,"up_limit":0,"alt_dl_limit":0,
-                        "alt_up_limit":0,"scheduler_enabled":false,
-                        "add_stopped_enabled":true}"#,
+                json(&Rates {
+                    down: Some(20 * 1024 * 1024),
+                    up: Some(2 * 1024 * 1024),
+                }),
             ),
         ),
-        ("/api/v2/torrents/info", Replies::reply(200, "[]")),
-        ("/api/v2/torrents/stop", Replies::reply(200, String::new())),
-        ("/api/v2/torrents/start", Replies::reply(200, String::new())),
-        ("/api/v2/transfer/speedLimitsMode", Replies::reply(200, "0")),
-        (
-            "/api/v2/transfer/info",
-            Replies::reply(
-                200,
-                r#"{"dl_info_speed":20971520,"up_info_speed":2097152,
-                    "dl_info_data":900,"up_info_data":80}"#,
-            ),
-        ),
+        (at("moved"), Replies::reply(200, json(&moved_since_start()))),
+        (at("pulling"), Replies::reply(200, json(&Answered::Stopped))),
+        (at("stop"), Replies::reply(200, json(&Answered::Stopped))),
+        (at("resume"), Replies::reply(200, json(&Answered::Stopped))),
     ])
+}
+
+/// Nine hundred bytes down and eighty up, moved since the client last started.
+const fn moved_since_start() -> Moved {
+    Moved {
+        down: 900,
+        up: 80,
+        since_start: true,
+    }
+}
+
+/// The torrent client's service.
+const TORRENT: &str = crate::test_support::torrent::PLUGIN;
+
+/// The torrent client over its contract through `http`.
+fn torrent_over(http: std::sync::Arc<Fake>) -> Downloading {
+    Downloading::Torrent(Box::new(torrent::Adapter(Contracted::new(
+        http,
+        "http://127.0.0.1:8080",
+        TORRENT,
+        "the-key",
+    ))))
 }
 
 /// A request naming one thing.
@@ -94,7 +117,7 @@ fn a_line() -> Capacity {
 /// A client reporting these figures in both directions.
 fn client(down: Held, up: Held) -> Holding {
     Holding {
-        client: "qbittorrent".to_owned(),
+        client: TORRENT.to_owned(),
         answer: Answer::Held {
             down,
             up,
@@ -246,11 +269,8 @@ fn a_respite_lifts_the_limits_rather_than_changing_them() {
 /// the one about having none.
 fn a_client() -> Vec<super::reaching::Client> {
     vec![super::reaching::Client {
-        service: crate::qbittorrent::SERVICE.to_owned(),
-        client: Downloading::Torrent(Box::new(crate::qbittorrent::Qbittorrent::new(
-            Fake::silent(),
-            "http://127.0.0.1:8081",
-        ))),
+        service: TORRENT.to_owned(),
+        client: torrent_over(Fake::silent()),
     }]
 }
 
@@ -369,27 +389,16 @@ fn a_cap() -> Declared {
 /// own so the client beside it can be given a different one.
 fn a_client_that_says_what_it_moved() -> super::reaching::Client {
     super::reaching::Client {
-        service: crate::qbittorrent::SERVICE.to_owned(),
-        client: Downloading::Torrent(Box::new(crate::qbittorrent::Qbittorrent::authenticated(
-            Fake::by_path(vec![
-                ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
-                (
-                    "/api/v2/transfer/info",
-                    Replies::reply(
-                        200,
-                        r#"{"dl_info_speed":0,"up_info_speed":0,
-                            "dl_info_data":900,"up_info_data":80}"#,
-                    ),
-                ),
-            ]),
-            "http://127.0.0.1:8081",
-            a_password(),
-        ))),
+        service: TORRENT.to_owned(),
+        client: torrent_over(Fake::by_path(vec![(
+            crate::test_support::torrent::operation("moved"),
+            Replies::reply(200, json(&moved_since_start())),
+        )])),
     }
 }
 
 /// The Usenet client's service.
-const USENET: &str = "sabnzbd";
+const USENET: &str = crate::test_support::usenet::PLUGIN;
 
 /// The Usenet client on the same stack, which is not there.
 fn a_client_that_will_not_say() -> super::reaching::Client {
@@ -561,13 +570,7 @@ async fn a_stack_with_no_download_client_has_nothing_to_hold_to_a_limit() {
 async fn a_client_that_will_not_answer_is_a_line_of_its_own_rather_than_an_absence() {
     // An unknown limit rendered as no limit is a report reading better than the
     // stack is.
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env_at("bandwidth-silent", &a_password())),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(Fake::silent());
+    let ctx = stacked("silent", None, Fake::silent());
     let shared = bandwidth(&ctx, &Asked::default()).await;
     assert!(shared.is_ok_and(|shared| shared
         .clients
@@ -659,14 +662,14 @@ async fn what_lemonfiber_stopped_is_what_it_lets_fetch_again() {
     )
     .await
     .is_ok());
-    assert!(transport.asked_for("/torrents/stop"));
+    assert!(transport.asked_for(crate::test_support::torrent::operation("stop")));
 
     // The allowance is raised, so the month is no longer over and what was
     // stopped for that reason is let go again.
     let shared = bandwidth(&ctx, &asking(|asked| asked.cap = Some("1TiB".to_owned()))).await;
     assert!(shared
         .is_ok_and(|shared| shared.reached == Some(Reached::Within) && shared.acting.is_none()));
-    assert!(transport.asked_for("/torrents/start"));
+    assert!(transport.asked_for(crate::test_support::torrent::operation("resume")));
 }
 
 #[tokio::test]
@@ -677,8 +680,8 @@ async fn a_stack_with_no_cap_is_never_asked_whether_it_is_fetching() {
     let ctx = stacked("uncapped", None, transport.clone());
     let shared = bandwidth(&ctx, &asking(|asked| asked.down = Some("2MiB".to_owned()))).await;
     assert!(shared.is_ok_and(|shared| shared.clients.iter().all(|client| client.pulling.is_none())));
-    assert!(!transport.asked_for("/torrents/stop"));
-    assert!(!transport.asked_for("filter=running"));
+    assert!(!transport.asked_for(crate::test_support::torrent::operation("stop")));
+    assert!(!transport.asked_for(crate::test_support::torrent::operation("pulling")));
 }
 
 #[test]

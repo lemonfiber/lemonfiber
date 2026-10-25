@@ -50,13 +50,13 @@ pub(crate) async fn pausing(
     // Asked first what each is doing, where an offer is answered: no client is told
     // anything unless what they all said is what was agreed to.
     if let Some(answered) = offer {
-        let standing = offered(&each(ctx, &running, asked, false).await);
+        let standing = offered(&each(&running, asked, false).await);
         if answered != standing {
             return Err(Box::new(moved(answered, &standing)));
         }
     }
     let asking = !ctx.dry_run;
-    let clients = each(ctx, &running, asked, asking).await;
+    let clients = each(&running, asked, asking).await;
     let offer = offered(&clients);
     let declared = super::recorded(ctx);
     let caution =
@@ -162,21 +162,16 @@ pub(crate) async fn standing(ctx: &Ctx) -> Result<Vec<Paused>, Box<Problem>> {
         .map_err(|err| Box::new(err.problem()))?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let running = declared_downloads(ctx, &host_fillers(ctx, &stack, project.as_deref())).await;
-    Ok(each(ctx, &running, Pausing::Pause, false).await)
+    Ok(each(&running, Pausing::Pause, false).await)
 }
 
 /// What each client came to: told `asked` where `asking`, and otherwise only asked
 /// what it is doing. A client nothing here can open is named with why.
-async fn each(
-    ctx: &Ctx,
-    running: &[DeclaredDownload],
-    asked: Pausing,
-    asking: bool,
-) -> Vec<Paused> {
+async fn each(running: &[DeclaredDownload], asked: Pausing, asking: bool) -> Vec<Paused> {
     let mut clients = Vec::new();
     for client in running {
         let paused = match &client.target {
-            Some(target) => told(&client.id, &open(ctx, target), asked, asking).await,
+            Some(target) => told(&client.id, &open(target), asked, asking).await,
             None => Paused {
                 client: client.id.clone(),
                 was: None,

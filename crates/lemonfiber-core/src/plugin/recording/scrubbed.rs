@@ -53,13 +53,6 @@ impl Scrub {
         Self::ordered(spellings)
     }
 
-    /// The same, with every spelling of each of `more` besides.
-    pub(super) fn and(self, more: &[String]) -> Self {
-        let mut spellings = self.spellings;
-        spellings.extend(Self::of(more, None).spellings);
-        Self::ordered(spellings)
-    }
-
     /// `spellings` once each, the longest first so that none is left half replaced.
     fn ordered(mut spellings: Vec<String>) -> Self {
         spellings.sort_by(|one, other| other.len().cmp(&one.len()).then(one.cmp(other)));

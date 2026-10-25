@@ -61,7 +61,7 @@ pub(crate) use services::{
 };
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_media_server_admin,
-    wire_request_identity, wire_torrent_password, Keep, IDENTITY,
+    wire_request_identity, Keep, IDENTITY,
 };
 
 use std::collections::BTreeMap;
@@ -74,7 +74,6 @@ use crate::ports::service::{
     AppSync, Application, Client, DownloadClient, Failure, MediaServer, RegisteredClient, Requests,
     RootFolder,
 };
-use crate::qbittorrent::Qbittorrent;
 
 /// The operation a seeding run's changes are journalled under.
 pub const OPERATION: &str = "seed";

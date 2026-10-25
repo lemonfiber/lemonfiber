@@ -14,6 +14,7 @@
 //! traffic goes to. The port is the one it says it listens on inside the network, never
 //! the one it publishes on the host and never one this build's source names.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use lemonfiber_manifest::{Api, ApiKind, Manifest, Service};
@@ -82,14 +83,14 @@ pub struct Filler {
     /// The secret lemonfiber minted as its credential, by the name the secret store holds it
     /// under, where its plugin declares one.
     pub minted: Option<String>,
-    /// The settings of the secrets lemonfiber writes into its `upstream.json`, where it is
-    /// an adapter whose plugin hands it any.
-    pub upstream: Vec<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
     /// The service of the same plugin it stands in front of, where it is an adapter.
     pub fronts: Option<String>,
+    /// Each part of the credential it hands that service, where it is an adapter, to the
+    /// name the secret store holds that part under.
+    pub upstream: BTreeMap<String, String>,
     /// The API it answers the stack's other services in, where it names one.
     pub native: Option<String>,
     /// The id of the stack's service it takes the place of, where it names one.
@@ -161,6 +162,13 @@ impl Filler {
     pub fn contracted(&self, capability: &str, major: u32) -> bool {
         self.contracts
             .contains(&lemonfiber_contract::spoken(capability, major))
+    }
+
+    /// The settings of the secrets lemonfiber writes into its `upstream.json`, where it is
+    /// an adapter whose plugin hands it any.
+    #[must_use]
+    pub fn upstream_settings(&self) -> Vec<String> {
+        self.upstream.values().cloned().collect()
     }
 
     /// Whether lemonfiber speaks to it through this adapter.
@@ -455,9 +463,9 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         first_party: false,
         granted: Vec::new(),
         minted: None,
-        upstream: Vec::new(),
         majors: service.majors(),
         fronts: None,
+        upstream: BTreeMap::new(),
         native: None,
         replaces: None,
         via: service.network.as_ref().map(|network| network.via.clone()),
@@ -501,9 +509,9 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .iter()
             .find(|secret| secret.minted && secret.of == placed.service)
             .map(|secret| crate::settings::named(plugin, &secret.id)),
-        upstream: placed.upstream_settings(plugin),
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
+        upstream: placed.upstream_held(plugin),
         native: placed.native.clone(),
         replaces: placed.replaces.clone(),
         via: placed

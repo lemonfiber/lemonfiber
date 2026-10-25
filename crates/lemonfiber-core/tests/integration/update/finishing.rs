@@ -6,17 +6,16 @@ use super::{
 use lemonfiber_core::app::{dispatch, Ctx, Waiting};
 use lemonfiber_core::archive::{Archiving, Vault};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{store, Protocols, Settings, TORRENT_PASSWORD_KEY};
+use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::ports::docker::Engine;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::process::Runner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::update::State;
-use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
 use lemonfiber_fixtures::files::Files;
-use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::pulled::Pulled;
-use lemonfiber_fixtures::support::a_password;
+use lemonfiber_testing::torrent;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -54,30 +53,26 @@ async fn a_confirmed_run_records_what_it_moved_and_where_the_capture_went() {
     );
 }
 
-/// A private environment file recording the torrent client's password, at a scratch path
-/// unique to this case so concurrent tests do not share one.
+/// A private environment file, at a scratch path unique to this case so concurrent tests
+/// do not share one.
 fn env_at(name: &str) -> PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("update-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
-    assert!(
-        store::set(&path, TORRENT_PASSWORD_KEY, &a_password()).is_ok(),
-        "the scratch environment file is written"
-    );
-    path
+    dir.join(".env")
 }
 
-/// The same context, reaching the download clients over `http` and holding a key for
-/// the one of them that needs one.
+/// The same context, reaching the torrent client moved into its plugin over `http`, its
+/// adapter running beside the stack until the run stops it.
 fn transferring(
     machine: &Arc<Machine>,
     archive: &Arc<Kept>,
     http: Arc<dyn Http>,
     name: &str,
 ) -> Ctx {
-    lemonfiber_testing::a_context()
-        .runner(Arc::clone(machine) as Arc<dyn Runner>)
-        .engine(Arc::clone(machine) as Arc<dyn Engine>)
+    let machine = Arc::clone(machine).beside(Arc::new(torrent::running()));
+    let ctx = lemonfiber_testing::a_context()
+        .runner(Arc::clone(&machine) as Arc<dyn Runner>)
+        .engine(machine as Arc<dyn Engine>)
         .filesystem(Files::empty())
         .settings(Settings {
             protocols: Protocols::both(),
@@ -91,15 +86,15 @@ fn transferring(
             paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),
             vault: Arc::clone(archive) as Arc<dyn Vault>,
         })
-        .with_patience(Duration::ZERO)
+        .with_patience(Duration::ZERO);
+    torrent::moved_in(&ctx);
+    ctx
 }
 
 /// A torrent client still working on something, answering the same way every time.
 fn still_coming_down() -> Arc<Fake> {
-    Fake::by_path_in_turn(vec![
-        ("/auth/login", vec![Answer::reply(200, "Ok.")]),
-        ("/torrents/info", vec![Answer::reply(200, QBIT_TORRENTS)]),
-    ])
+    let (at, coming) = torrent::transfers(&[torrent::carrying()]);
+    Fake::by_path_in_turn(vec![(at, vec![coming])])
 }
 
 #[tokio::test]
@@ -120,17 +115,9 @@ async fn a_run_that_would_interrupt_a_transfer_is_refused_rather_than_carried_ou
 async fn a_run_asked_to_wait_lets_what_is_coming_down_finish_first() {
     // Coming down twice and finished on the third look: something to wait for, a look
     // with no news, and an end.
-    let http = Fake::by_path_in_turn(vec![
-        ("/auth/login", vec![Answer::reply(200, "Ok.")]),
-        (
-            "/torrents/info",
-            vec![
-                Answer::reply(200, QBIT_TORRENTS),
-                Answer::reply(200, QBIT_TORRENTS),
-                Answer::reply(200, QBIT_FINISHED),
-            ],
-        ),
-    ]);
+    let (at, coming) = torrent::transfers(&[torrent::carrying()]);
+    let (_, finished) = torrent::transfers(&[torrent::finished()]);
+    let http = Fake::by_path_in_turn(vec![(at, vec![coming.clone(), coming, finished])]);
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
     let context = transferring(&machine, &archive, http, "waited");

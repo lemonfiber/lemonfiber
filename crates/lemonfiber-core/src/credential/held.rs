@@ -6,13 +6,13 @@
 //! that ought to be there and is not.
 //!
 //! **The consumer list is the load-bearing column.** Rotation walks it, and anything
-//! left off it is something a rotation strands without saying so. The torrent client's
-//! password is the case that proves it: the obvious consumer is the torrent client, but
-//! every library service it is registered in signs in to the same web UI with a copy of
-//! its own, which only a seed replaces. A list naming services rather than consumers
-//! would have one entry there and would leave each of those copies signing in with a
-//! password the client no longer takes.
+//! left off it is something a rotation strands without saying so. The Usenet provider's
+//! password is a case of it: the obvious consumer is the Usenet client, but lemonfiber's
+//! own provider check reads the same password. A list naming services rather than
+//! consumers would have one entry there and would leave the check reading a password
+//! the provider no longer takes.
 
+use lemonfiber_manifest::ApiKind;
 use serde::Serialize;
 
 use super::rotation::{Propagation, Reach};
@@ -49,14 +49,6 @@ impl Consumer {
         }
     }
 
-    /// One consumer lemonfiber hands the value to over an API.
-    const fn by_seeding(name: &'static str) -> Self {
-        Self {
-            name,
-            reached: Reached::BySeeding,
-        }
-    }
-
     /// One consumer that is lemonfiber itself, reading what it recorded.
     const fn read_by_lemonfiber(name: &'static str) -> Self {
         Self {
@@ -87,8 +79,6 @@ pub enum Reached {
         /// The command that makes the container again.
         restart: &'static str,
     },
-    /// lemonfiber hands it the value over an API, which is what seeding does.
-    BySeeding,
     /// It is lemonfiber, reading back what it recorded each time it needs it — so a
     /// recorded replacement is one it already has.
     WhenLemonfiberReadsIt,
@@ -102,9 +92,6 @@ impl Reached {
             Self::AtTheService | Self::WhenLemonfiberReadsIt => Reach::Updated,
             Self::FromItsEnvironment { restart } => Reach::Pending {
                 detail: restart.to_owned(),
-            },
-            Self::BySeeding => Reach::Pending {
-                detail: "lemonfiber seed".to_owned(),
             },
         }
     }
@@ -246,23 +233,6 @@ const INDEXER: Entry = Entry {
     proven_by: Some(config::INDEXER_VALIDATED_KEY),
 };
 
-/// The torrent client's web UI password, and the reason the consumer column exists.
-const TORRENT_CLIENT: Entry = Entry {
-    name: "qBittorrent web UI password",
-    setting: config::TORRENT_PASSWORD_KEY,
-    consumers: &[
-        Consumer::at_the_service("the torrent client's own web UI"),
-        Consumer::read_by_lemonfiber(
-            "lemonfiber's own port forwarding, which signs in to hand the client the \
-             tunnel's forwarded port",
-        ),
-        Consumer::by_seeding("each library service's download-client registration"),
-    ],
-    origin: Origin::Lemonfiber,
-    needed: Needed::Torrenting,
-    proven_by: None,
-};
-
 /// The media server's administrator password.
 const MEDIA_SERVER: Entry = Entry {
     name: "Jellyfin administrator password",
@@ -312,6 +282,39 @@ const BOOK_CURATOR: Entry = Entry {
     proven_by: None,
 };
 
+/// An account lemonfiber set up on one of the stack's own services: the name it signs in
+/// under, and the setting the password lemonfiber minted for it is recorded under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Account {
+    /// The name it signs in under.
+    pub(crate) username: &'static str,
+    /// The setting its password is recorded under.
+    pub(crate) password: &'static str,
+}
+
+/// The account lemonfiber sets up on the stack's own service answering in `kind`, where
+/// it sets one up.
+#[must_use]
+pub(crate) const fn account(kind: ApiKind) -> Option<Account> {
+    let (username, password) = match kind {
+        ApiKind::Qbittorrent => (config::TORRENT_USER, config::TORRENT_PASSWORD_KEY),
+        ApiKind::Jellyfin => (
+            config::MEDIA_SERVER_ADMIN_USER,
+            config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        ),
+        ApiKind::Audiobookshelf => (
+            config::LISTENING_SERVER_USER,
+            config::LISTENING_SERVER_PASSWORD_KEY,
+        ),
+        ApiKind::Nzbhydra2 => (
+            config::USENET_AGGREGATOR_ADMIN_USER,
+            config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
+        ),
+        _ => return None,
+    };
+    Some(Account { username, password })
+}
+
 /// Every credential named ahead of looking at the stack.
 ///
 /// The keys the services mint for themselves are not here: which of them exist is a
@@ -320,7 +323,6 @@ pub const CATALOGUE: &[Entry] = &[
     VPN,
     USENET,
     INDEXER,
-    TORRENT_CLIENT,
     MEDIA_SERVER,
     LISTENING_SERVER,
     USENET_AGGREGATOR,

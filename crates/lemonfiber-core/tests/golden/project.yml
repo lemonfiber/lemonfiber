@@ -268,7 +268,6 @@ services:
     - ./config/gluetun:/config
     networks:
     - ask__bindery__download.torrent__gluetun
-    - ask__gluetun__dashboard.show__homepage
     - ask__lidarr__download.torrent__gluetun
     - ask__radarr__download.torrent__gluetun
     - ask__sonarr__download.torrent__gluetun
@@ -306,7 +305,6 @@ services:
     networks:
     - ask__audiobookshelf__dashboard.show__homepage
     - ask__bazarr__dashboard.show__homepage
-    - ask__gluetun__dashboard.show__homepage
     - ask__homepage__proxy.front__caddy
     - ask__jellyfin__dashboard.show__homepage
     - ask__lidarr__dashboard.show__homepage
@@ -448,35 +446,6 @@ services:
     - ask__prowlarr__library.curate__radarr
     - ask__prowlarr__library.curate__sonarr
     - own__prowlarr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480@sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed
-    profiles:
-    - torrent
-    restart: unless-stopped
-    environment:
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-      WEBUI_PORT: '8081'
-    volumes:
-    - ./data:/data
-    - ./config/qbittorrent:/config
-    network_mode: service:gluetun
-    depends_on:
-      gluetun:
-        condition: service_healthy
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -717,6 +686,35 @@ services:
     - ask__seerr__identity.source__jellyfin
     - link__decline__jellyfin
     - own__jellyfin
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480@sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed
+    profiles:
+    - torrent
+    restart: unless-stopped
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+      WEBUI_PORT: '8081'
+    volumes:
+    - ./data:/data
+    - ./config/qbittorrent:/config
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
     security_opt:
     - no-new-privileges:true
     cap_drop:

@@ -5,57 +5,58 @@ use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 use super::pausing;
 use crate::bandwidth::{Declared, Pausing, Pulling};
 use crate::config::Settings;
-use crate::test_support::{a_context, a_password, env_at};
+use crate::ports::service::Pulling as Answered;
+use crate::test_support::{a_context, env_without_password, json, torrent};
 
-/// What the torrent client says about whether it would start the next thing it is handed.
-const ADDS_STOPPED: &str = r#"{"add_stopped_enabled":true}"#;
-
-/// The same, where it would start it.
-const ADDS_RUNNING: &str = r#"{"add_stopped_enabled":false}"#;
-
-/// A torrent client that answers every question this asks, reading back `preferences`
-/// after being told, with the torrents named in `running` still going.
-fn a_client(preferences: &'static str, running: &'static str) -> Arc<Fake> {
+/// A torrent client answering over its contract that it is `pulling` whatever it is told,
+/// before and after a stop or a resume.
+fn a_client(pulling: Answered) -> Arc<Fake> {
     Fake::by_path(vec![
-        ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
         (
-            "/api/v2/app/setPreferences",
-            Replies::reply(200, String::new()),
+            torrent::operation("pulling"),
+            Replies::reply(200, json(&pulling)),
         ),
-        ("/api/v2/app/preferences", Replies::reply(200, preferences)),
-        ("/api/v2/torrents/info", Replies::reply(200, running)),
-        ("/api/v2/torrents/stop", Replies::reply(200, String::new())),
-        ("/api/v2/torrents/start", Replies::reply(200, String::new())),
+        (
+            torrent::operation("stop"),
+            Replies::reply(200, json(&pulling)),
+        ),
+        (
+            torrent::operation("resume"),
+            Replies::reply(200, json(&pulling)),
+        ),
     ])
 }
 
-/// A stack over `http`, keeping its files in a directory of this case's own.
+/// A stack over `http`, its torrent client moved into its plugin, keeping its files in a
+/// directory of this case's own.
 fn a_stack(scratch: &str, http: Arc<Fake>) -> crate::app::Ctx {
-    let env = env_at(&format!("pausing-{scratch}"), &a_password());
-    a_context()
-        .settings(Settings {
-            env_file: Some(env),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    let env = env_without_password(&format!("pausing-{scratch}"));
+    torrent::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    )
 }
 
 /// The torrent client's line of a report.
-fn torrent(pauses: &crate::bandwidth::Pauses) -> Option<&crate::bandwidth::Paused> {
+fn torrent_line(pauses: &crate::bandwidth::Pauses) -> Option<&crate::bandwidth::Paused> {
     pauses
         .clients
         .iter()
-        .find(|client| client.client == crate::qbittorrent::SERVICE)
+        .find(|client| client.client == torrent::ADAPTER)
 }
 
 #[tokio::test]
 async fn a_pause_asks_every_client_and_reports_what_each_read_back() {
-    let transport = a_client(ADDS_STOPPED, "[]");
+    let transport = a_client(Answered::Stopped);
     let ctx = a_stack("paused", transport.clone());
     let paused = pausing(&ctx, Pausing::Pause, None).await;
-    assert!(transport.asked_for("/torrents/stop"));
-    assert!(paused.is_ok_and(|paused| torrent(&paused)
+    assert!(transport.asked_for(torrent::operation("stop")));
+    assert!(paused.is_ok_and(|paused| torrent_line(&paused)
         .is_some_and(|client| client.now == Some(Pulling::Stopped) && client.unreached.is_none())
         && !paused.rehearsed));
 }
@@ -64,34 +65,33 @@ async fn a_pause_asks_every_client_and_reports_what_each_read_back() {
 async fn a_client_that_reads_back_fetching_is_named_as_fetching_rather_than_counted_paused() {
     // The read-back is the answer, never an echo of the request: a client that took
     // the request and went on starting what it was handed has not been paused.
-    let transport = a_client(ADDS_RUNNING, "[]");
+    let transport = a_client(Answered::Fetching);
     let ctx = a_stack("ignored", transport);
     let paused = pausing(&ctx, Pausing::Pause, None).await;
-    assert!(paused.is_ok_and(|paused| torrent(&paused)
+    assert!(paused.is_ok_and(|paused| torrent_line(&paused)
         .is_some_and(|client| client.now == Some(Pulling::Fetching))
         && !paused.whole()));
 }
 
 #[tokio::test]
 async fn a_resume_lets_every_client_fetch_again() {
-    let transport = a_client(ADDS_RUNNING, "[]");
+    let transport = a_client(Answered::Fetching);
     let ctx = a_stack("resumed", transport.clone());
     let resumed = pausing(&ctx, Pausing::Resume, None).await;
-    assert!(transport.asked_for("/torrents/start"));
-    assert!(!transport.asked_for("/torrents/stop"));
-    assert!(resumed.is_ok_and(|resumed| torrent(&resumed)
+    assert!(transport.asked_for(torrent::operation("resume")));
+    assert!(!transport.asked_for(torrent::operation("stop")));
+    assert!(resumed.is_ok_and(|resumed| torrent_line(&resumed)
         .is_some_and(|client| client.now == Some(Pulling::Fetching))
         && resumed.caution.is_none()));
 }
 
 #[tokio::test]
 async fn a_rehearsal_asks_each_client_what_it_is_doing_and_tells_it_nothing() {
-    let transport = a_client(ADDS_RUNNING, "[]");
+    let transport = a_client(Answered::Fetching);
     let ctx = a_stack("rehearsed", transport.clone()).rehearsing();
     let rehearsed = pausing(&ctx, Pausing::Pause, None).await;
-    assert!(!transport.asked_for("/torrents/stop"));
-    assert!(!transport.asked_for("setPreferences"));
-    assert!(rehearsed.is_ok_and(|rehearsed| torrent(&rehearsed)
+    assert!(!transport.asked_for(torrent::operation("stop")));
+    assert!(rehearsed.is_ok_and(|rehearsed| torrent_line(&rehearsed)
         .is_some_and(|client| client.was == Some(Pulling::Fetching) && client.now.is_none())));
 }
 
@@ -99,7 +99,7 @@ async fn a_rehearsal_asks_each_client_what_it_is_doing_and_tells_it_nothing() {
 async fn a_client_nothing_here_can_open_is_named_as_not_reached() {
     // The fixture stack declares a Usenet client whose key this machine never wrote
     // down. An answer that left it out would read as every client paused.
-    let ctx = a_stack("unopened", a_client(ADDS_STOPPED, "[]"));
+    let ctx = a_stack("unopened", a_client(Answered::Stopped));
     let paused = pausing(&ctx, Pausing::Pause, None).await;
     assert!(paused.is_ok_and(|paused| paused
         .clients
@@ -113,7 +113,7 @@ async fn a_client_nothing_here_can_open_is_named_as_not_reached() {
 async fn a_client_that_will_not_answer_is_named_in_its_own_words() {
     let ctx = a_stack("silent", Fake::silent());
     let paused = pausing(&ctx, Pausing::Pause, None).await;
-    assert!(paused.is_ok_and(|paused| torrent(&paused)
+    assert!(paused.is_ok_and(|paused| torrent_line(&paused)
         .is_some_and(|client| client.unreached.is_some() && client.now.is_none())
         && !paused.whole()));
 }
@@ -122,7 +122,7 @@ async fn a_client_that_will_not_answer_is_named_in_its_own_words() {
 async fn a_pause_is_the_operators_so_a_month_turning_over_starts_nothing() {
     // The cap had stopped the clients. Pausing takes that stop over, so the run that
     // starts again what lemonfiber stopped finds nothing of its own to start.
-    let transport = a_client(ADDS_STOPPED, "[]");
+    let transport = a_client(Answered::Stopped);
     let ctx = a_stack("taken-over", transport);
     crate::app::record::keep_beside(
         &ctx,
@@ -138,7 +138,7 @@ async fn a_pause_is_the_operators_so_a_month_turning_over_starts_nothing() {
 
 #[tokio::test]
 async fn a_rehearsed_pause_leaves_the_caps_stop_where_it_was() {
-    let ctx = a_stack("taken-over-rehearsed", a_client(ADDS_STOPPED, "[]")).rehearsing();
+    let ctx = a_stack("taken-over-rehearsed", a_client(Answered::Stopped)).rehearsing();
     crate::app::record::keep_beside(
         &ctx,
         super::super::RECORD,
@@ -153,7 +153,7 @@ async fn a_rehearsed_pause_leaves_the_caps_stop_where_it_was() {
 
 #[tokio::test]
 async fn a_resume_says_where_a_spent_cap_will_stop_the_clients_again() {
-    let ctx = a_stack("resumed-at-the-cap", a_client(ADDS_RUNNING, "[]"));
+    let ctx = a_stack("resumed-at-the-cap", a_client(Answered::Fetching));
     crate::app::record::keep_beside(
         &ctx,
         super::super::RECORD,
@@ -189,7 +189,7 @@ fn a_stack_declaring_no_download_client_asks_nobody() {
 #[tokio::test]
 async fn a_stack_that_cannot_be_read_asks_nobody() {
     let nowhere = crate::stack::Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
-    let transport = a_client(ADDS_STOPPED, "[]");
+    let transport = a_client(Answered::Stopped);
     let ctx = a_context()
         .over(nowhere)
         .build()
@@ -198,21 +198,21 @@ async fn a_stack_that_cannot_be_read_asks_nobody() {
     assert!(
         refused.is_err_and(|problem| problem.code == crate::error::codes::stack::STACK_UNREADABLE)
     );
-    assert!(!transport.asked_for("/torrents/start"));
+    assert!(!transport.asked_for(torrent::operation("resume")));
 }
 
 #[tokio::test]
 async fn a_rehearsal_names_a_client_that_will_not_say_what_it_is_doing() {
     let ctx = a_stack("silent-rehearsed", Fake::silent()).rehearsing();
     let rehearsed = pausing(&ctx, Pausing::Pause, None).await;
-    assert!(rehearsed.is_ok_and(|rehearsed| torrent(&rehearsed)
+    assert!(rehearsed.is_ok_and(|rehearsed| torrent_line(&rehearsed)
         .is_some_and(|client| client.unreached.is_some() && client.was.is_none())));
 }
 
 /// The offer a rehearsal answered, carried back unchanged, is acted on.
 #[tokio::test]
 async fn a_pause_answering_the_offer_it_was_rehearsed_with_is_carried_out() {
-    let transport = a_client(ADDS_STOPPED, "[]");
+    let transport = a_client(Answered::Stopped);
     let ctx = a_stack("answered", transport.clone());
     let rehearsed = pausing(&ctx, Pausing::Pause, None)
         .await
@@ -220,18 +220,18 @@ async fn a_pause_answering_the_offer_it_was_rehearsed_with_is_carried_out() {
     let offer = rehearsed.unwrap_or_default();
     let paused = pausing(&ctx, Pausing::Pause, Some(&offer)).await;
     assert!(paused.is_ok_and(|paused| paused.offer == offer));
-    assert!(transport.asked_for("/torrents/stop"));
+    assert!(transport.asked_for(torrent::operation("stop")));
 }
 
 /// An offer for clients as they no longer are tells no client anything.
 #[tokio::test]
 async fn a_pause_answering_an_offer_that_moved_tells_no_client_anything() {
-    let transport = a_client(ADDS_STOPPED, "[]");
+    let transport = a_client(Answered::Stopped);
     let ctx = a_stack("moved", transport.clone());
     let refused = pausing(&ctx, Pausing::Pause, Some("ffffffff")).await.err();
     assert_eq!(
         refused.map(|problem| problem.code),
         Some(crate::error::codes::rate::PAUSING_MOVED)
     );
-    assert!(!transport.asked_for("/torrents/stop"));
+    assert!(!transport.asked_for(torrent::operation("stop")));
 }

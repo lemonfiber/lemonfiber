@@ -85,7 +85,7 @@ fn settings_file(name: &str, password: Option<&str>) -> std::path::PathBuf {
 /// A seeding context over `http`, keeping its settings in `env` where there is one, and
 /// with randomness to mint from.
 fn guarding_ctx(http: Arc<Fake>, env: Option<std::path::PathBuf>) -> Ctx {
-    seed_ctx(None, true, Vec::new(), Some(vec![7; 32]), env).with_http(http)
+    seed_ctx(true, Vec::new(), Some(vec![7; 32]), env).with_http(http)
 }
 
 /// The stack with its aggregator, as the pass reaches it.
@@ -244,7 +244,6 @@ async fn each_way_turning_it_on_stops_is_said() {
     )
     .await;
     let unrandom = seed_ctx(
-        None,
         true,
         Vec::new(),
         None,

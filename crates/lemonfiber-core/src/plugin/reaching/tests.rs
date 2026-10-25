@@ -151,7 +151,6 @@ async fn an_engine_that_will_not_list_is_said() {
 fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
     crate::wiring::Filler {
         minted: None,
-        upstream: Vec::new(),
         granted: Vec::new(),
         id: ADAPTER.to_owned(),
         name: ADAPTER.to_owned(),
@@ -177,6 +176,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
         first_party: false,
         majors: Vec::new(),
         fronts: None,
+        upstream: std::collections::BTreeMap::new(),
         native: None,
         replaces: None,
         via: None,

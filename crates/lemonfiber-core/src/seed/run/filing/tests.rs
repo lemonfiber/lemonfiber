@@ -8,7 +8,7 @@ use super::{categories, completed, field, filed};
 use crate::baseline::Baseline;
 use crate::ports::service::{Failure, Filed, Filing};
 use crate::seed::State;
-use crate::test_support::a_context;
+use crate::test_support::{a_context, torrent};
 
 /// The id the client is recorded under.
 const CLIENT: &str = "sabnzbd";
@@ -129,19 +129,33 @@ fn shipped(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Filler
     crate::test_support::stack_fillers(services, &[], None, crate::plugin::first_party::EMBEDDED)
 }
 
-/// A context reaching the shipped stack's torrent client with its password recorded,
-/// over `http`.
-fn reaching_the_torrent_client(name: &str, http: Arc<Fake>) -> crate::app::Ctx {
-    a_context()
-        .settings(crate::config::Settings {
-            env_file: Some(crate::test_support::env_at(
-                name,
-                &crate::test_support::a_password(),
-            )),
-            ..crate::config::Settings::default()
-        })
-        .build()
-        .with_http(http)
+/// A context reaching the shipped stack's torrent client moved into its plugin, over
+/// `http`, with the stack's fillers as it is written.
+fn reaching_the_torrent_client(
+    name: &str,
+    services: Vec<lemonfiber_manifest::Service>,
+    http: Arc<Fake>,
+) -> (crate::app::Ctx, crate::wiring::Fillers) {
+    let ctx = torrent::reaching(
+        a_context()
+            .settings(crate::config::Settings {
+                env_file: Some(crate::test_support::env_without_password(name)),
+                ..crate::config::Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
+    let project = match ctx.stack {
+        crate::stack::Source::External(project) => Some(project),
+        crate::stack::Source::Embedded(_) => None,
+    };
+    let fillers = crate::test_support::stack_fillers(
+        services,
+        &torrent::moved().into_iter().collect::<Vec<_>>(),
+        project,
+        crate::plugin::first_party::EMBEDDED,
+    );
+    (ctx, fillers)
 }
 
 #[tokio::test]
@@ -417,75 +431,49 @@ fn a_category_completes_into_the_one_folder_both_clients_share() {
     assert_eq!(completed("tv"), "/data/downloads/complete/tv");
 }
 
-/// The shipped stack's torrent client, its password recorded, holding no category until
-/// it is told and then every one it was told, and managing torrents by hand until it is
-/// switched over.
+/// The shipped stack's torrent client, moved into its plugin, holding no category until
+/// it is told and then every one it was told, over its contract.
 #[tokio::test]
-async fn the_stacks_torrent_client_is_told_and_read_back_through_its_adapter() {
-    let fillers = shipped(shipped_services());
-    let wanted = categories(&fillers);
-    let Some((client, handed)) = wanted.iter().find(|(id, _)| {
-        fillers
-            .service(id)
-            .is_some_and(|filler| filler.speaks(lemonfiber_manifest::ApiKind::Qbittorrent))
-    }) else {
-        unreachable!("the shipped stack hands its torrent client a category")
-    };
-    let filed_now: BTreeMap<&str, serde_json::Value> = handed
-        .iter()
-        .map(|category| {
-            (
-                category.as_str(),
-                serde_json::json!({ "savePath": completed(category) }),
-            )
+async fn the_moved_torrent_client_is_told_and_read_back_over_its_contract() {
+    let filed_now: Vec<Filed> = ["movies", "music", "tv"]
+        .into_iter()
+        .map(|category| Filed {
+            category: category.to_owned(),
+            folder: completed(category),
         })
         .collect();
-    let by_hand = r#"{"save_path":"/data/downloads/torrents/complete","auto_tmm_enabled":false}"#;
     let http = Fake::by_path_in_turn(vec![
-        ("auth/login", vec![Answer::reply(200, "Ok.")]),
         (
-            "torrents/categories",
+            torrent::operation("filed"),
             vec![
-                Answer::reply(200, "{}"),
-                Answer::reply(200, "{}"),
-                Answer::reply(200, serde_json::json!(filed_now).to_string()),
+                torrent::answered(&Vec::<Filed>::new()),
+                torrent::answered(&filed_now),
             ],
         ),
-        (
-            "app/preferences",
-            vec![
-                Answer::reply(200, by_hand),
-                Answer::reply(200, by_hand),
-                Answer::reply(
-                    200,
-                    r#"{"save_path":"/data/downloads/torrents/complete","auto_tmm_enabled":true}"#,
-                ),
-            ],
-        ),
-        ("Category", vec![Answer::reply(200, "")]),
-        ("app/setPreferences", vec![Answer::reply(200, "")]),
+        (torrent::operation("file_under"), vec![torrent::taken()]),
     ]);
-    let ctx = reaching_the_torrent_client("filing-torrent", http.clone());
+    let (ctx, fillers) =
+        reaching_the_torrent_client("filing-torrent", shipped_services(), http.clone());
+    let wanted = categories(&fillers);
+    let handed = wanted.get(torrent::ADAPTER).cloned().unwrap_or_default();
     let mut baseline = Baseline::new();
 
     let (wirings, completed_now) =
         super::seed_completed_folders(&ctx, &fillers, &mut baseline).await;
 
-    let torrent = wirings
+    assert!(!handed.is_empty(), "{wanted:?}");
+    let told = wirings
         .iter()
         .find(|wiring| wiring.connection.starts_with("qBittorrent"));
     assert_eq!(
-        torrent.map(|wiring| (&wiring.connection, &wiring.state)),
+        told.map(|wiring| (&wiring.connection, &wiring.state)),
         Some((&"qBittorrent completed folders".to_owned(), &State::Wired)),
         "{wirings:?}"
     );
     assert!(handed.iter().all(|category| baseline
-        .expected(client, &field(category))
+        .expected(torrent::ADAPTER, &field(category))
         .is_some_and(|recorded| recorded == completed(category))));
-    assert!(http
-        .requests()
-        .iter()
-        .any(|asked| asked.url.ends_with("/torrents/createCategory")));
+    assert!(http.asked_for(torrent::operation("file_under")));
     assert!(handed.iter().all(|category| completed_now
         .get(category)
         .is_some_and(|folders| folders.contains(&completed(category)))));
@@ -499,9 +487,9 @@ async fn a_client_no_curator_hands_a_category_is_told_nothing() {
             service.media_types = vec!["books".to_owned()];
         }
     }
-    let fillers = shipped(services);
     let http = Fake::always(Answer::reply(200, "{}"));
-    let ctx = reaching_the_torrent_client("filing-uncategorised", http.clone());
+    let (ctx, fillers) =
+        reaching_the_torrent_client("filing-uncategorised", services, http.clone());
 
     let (wirings, completed_now) =
         super::seed_completed_folders(&ctx, &fillers, &mut Baseline::new()).await;

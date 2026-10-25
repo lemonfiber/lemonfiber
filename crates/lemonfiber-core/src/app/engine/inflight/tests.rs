@@ -6,8 +6,7 @@ use super::{in_flight, stopped_beside};
 use crate::app::Ctx;
 use crate::config::{Protocols, Settings};
 use crate::ports::http::Http;
-use crate::test_support::{a_context, a_password, env_at, nowhere, usenet};
-use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
+use crate::test_support::{a_context, env_without_password, nowhere, torrent, usenet};
 use lemonfiber_fixtures::http::Fake;
 
 /// The forms an operator names, as the engine takes them.
@@ -15,16 +14,16 @@ fn named(forms: &[&str]) -> Vec<String> {
     forms.iter().map(|form| (*form).to_owned()).collect()
 }
 
-/// A context that can reach both download clients: the Usenet client moved into its
-/// plugin where `env_file` gives it somewhere to be recorded, the torrent client's
-/// password in that scratch env file, and both protocols in play so a plan holds both.
+/// A context that can reach both download clients: each moved into its plugin where
+/// `env_file` gives it somewhere to be recorded, and both protocols in play so a plan
+/// holds both.
 fn reaching(http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
     let settings = Settings {
         protocols: Protocols::both(),
         env_file,
         ..Settings::default()
     };
-    usenet::reaching(
+    usenet::reaching_beside_torrents(
         a_context()
             .settings(settings)
             .build()
@@ -51,10 +50,10 @@ async fn a_form_holding_no_client_asks_nothing_at_all() {
 
 #[tokio::test]
 async fn both_clients_say_what_they_are_working_on() {
-    let fake = usenet::beside_torrents(QBIT_TORRENTS, &[usenet::carrying()]);
+    let fake = usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
     let ctx = reaching(
         Arc::clone(&fake) as Arc<dyn Http>,
-        Some(env_at("in-flight", &a_password())),
+        Some(env_without_password("in-flight")),
     );
 
     let found = in_flight(&ctx, &named(&["dl"])).await;
@@ -63,17 +62,17 @@ async fn both_clients_say_what_they_are_working_on() {
         .iter()
         .map(|download| download.name.as_str())
         .collect();
-    assert!(names.contains(&"Ubuntu.iso"), "{names:?}");
+    assert!(names.contains(&torrent::CARRIED), "{names:?}");
     assert!(names.contains(&usenet::CARRIED), "{names:?}");
 }
 
 /// Naming a finished download would be warning about work stopping cannot undo.
 #[tokio::test]
 async fn a_download_that_has_finished_is_not_in_flight() {
-    let fake = usenet::beside_torrents(QBIT_FINISHED, &[]);
+    let fake = usenet::beside_torrents(&[torrent::finished()], &[]);
     let ctx = reaching(
         Arc::clone(&fake) as Arc<dyn Http>,
-        Some(env_at("finished", &a_password())),
+        Some(env_without_password("finished")),
     );
 
     assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());

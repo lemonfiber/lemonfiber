@@ -159,10 +159,10 @@ fn declared(
 /// directory, named by the manifest, so the shape decides only which reader opens it.
 ///
 /// The rest are not read here. Two of them have no account at all until lemonfiber
-/// makes one, the torrent client authenticates with a password rather than a key, and
-/// the Usenet indexer aggregator is reached with the administrator lemonfiber gives it
-/// rather than with the key it writes; all of those are on the declared list instead,
-/// which is where a credential lemonfiber minted belongs.
+/// makes one, the download clients are reached through their plugins' adapters with what
+/// lemonfiber minted for them, and the Usenet indexer aggregator is reached with the
+/// administrator lemonfiber gives it rather than with the key it writes; all of those are
+/// on the declared list instead, which is where a credential lemonfiber minted belongs.
 pub(crate) fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
     match kind {
         ApiKind::Servarr => Some(crate::servarr::api_key),

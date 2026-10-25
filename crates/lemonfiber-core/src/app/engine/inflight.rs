@@ -35,9 +35,7 @@
 
 use std::time::Duration;
 
-use crate::app::targets::{
-    chosen_fillers, download_targets, project_directory, protocol_of, read_transfers,
-};
+use crate::app::targets::{chosen_fillers, download_targets, project_directory, read_transfers};
 use crate::app::Ctx;
 use crate::dashboard::Protocol;
 use crate::error::Problem;
@@ -133,9 +131,11 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
     // dashboard and the diagnosis both are: these are independent HTTP calls, and an
     // operator waiting to be told whether they can stop should wait for the slowest
     // client rather than for the sum of them. An empty list asks nothing at all.
-    let read = futures_util::future::join_all(targets.iter().map(|target| async move {
-        (protocol_of(&target.kind), read_transfers(ctx, target).await)
-    }))
+    let read = futures_util::future::join_all(
+        targets
+            .iter()
+            .map(|target| async move { (target.protocol, read_transfers(target).await) }),
+    )
     .await;
 
     read.into_iter()

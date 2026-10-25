@@ -414,7 +414,6 @@ fn a_service(
 ) -> crate::wiring::Filler {
     crate::wiring::Filler {
         minted: None,
-        upstream: Vec::new(),
         granted: Vec::new(),
         id: id.to_owned(),
         name: id.to_owned(),
@@ -433,6 +432,7 @@ fn a_service(
         first_party: false,
         majors: Vec::new(),
         fronts: None,
+        upstream: std::collections::BTreeMap::new(),
         native: None,
         replaces: None,
         via: None,

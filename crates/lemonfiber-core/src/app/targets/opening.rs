@@ -21,7 +21,7 @@ use crate::wiring::{Filler, Fillers, Holder};
 use crate::recyclarr::Kind;
 
 use super::curators::{curator_targets, target_for};
-use super::downloads::download_targets;
+use super::downloads::{download_targets, DownloadTarget};
 use super::filled::{spoken, Spoken};
 use super::layout::{project_directory, read_owned, service_config_dir};
 
@@ -264,7 +264,7 @@ pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dy
     let client: Box<dyn UsenetAccounts> = download_targets(ctx, fillers)
         .await
         .iter()
-        .find_map(|target| target.usenet(ctx))?;
+        .find_map(DownloadTarget::usenet)?;
     Some(Arc::from(client))
 }
 

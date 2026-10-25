@@ -103,25 +103,19 @@ fn is_skipped(wiring: &crate::seed::Wiring) -> bool {
     matches!(wiring.state, crate::seed::State::Skipped { .. })
 }
 
-/// A context whose engine says the given torrent client log line, and runs the media
-/// server's adapter where it is `reachable`, answering seeding's HTTP from `replies` and
-/// its randomness from `bytes`.
+/// A context whose engine runs the media server's adapter where it is `reachable`,
+/// answering seeding's HTTP from `replies` and its randomness from `bytes`.
 fn seed_ctx(
-    log: Option<&str>,
     reachable: bool,
     replies: Vec<(u16, &'static str)>,
     bytes: Option<Vec<u8>>,
     env: Option<std::path::PathBuf>,
 ) -> Ctx {
-    let mut engine = if reachable {
-        Reporting::holding(&["qbittorrent"], Lifecycle::Running, Health::Healthy)
-            .alongside(crate::test_support::media::running())
+    let engine = if reachable {
+        crate::test_support::media::running()
     } else {
         Reporting::absent()
     };
-    if let Some(line) = log {
-        engine = engine.saying("qbittorrent", line);
-    }
     let settings = Settings {
         env_file: env,
         ..Settings::default()
@@ -139,6 +133,51 @@ fn seed_ctx(
     ctx
 }
 
+/// Each secret `installed` mints, kept in `ctx`'s secret store holding what `value` says
+/// for the part of an adapter's upstream credential it holds, or for nothing where it
+/// holds none.
+fn keeping_minted(
+    ctx: &Ctx,
+    installed: Option<crate::plugin::Installed>,
+    value: fn(Option<&str>) -> &'static str,
+) {
+    let Some(installed) = installed else {
+        return;
+    };
+    let part = |secret: &str| {
+        installed.services.iter().find_map(|placed| {
+            placed
+                .upstream
+                .iter()
+                .find(|(_, held)| held.as_str() == secret)
+                .map(|(part, _)| part.as_str())
+        })
+    };
+    let minted: Vec<(String, &str)> = installed
+        .declared
+        .secrets
+        .iter()
+        .filter(|secret| secret.minted)
+        .map(|secret| {
+            (
+                crate::settings::named(&installed.plugin, &secret.id),
+                value(part(&secret.id)),
+            )
+        })
+        .collect();
+    let keeping: Vec<crate::settings::Keeping<'_>> = minted
+        .iter()
+        .map(|(name, value)| crate::settings::Keeping {
+            name,
+            value,
+            from: crate::settings::Source::Minted,
+            at: 1,
+        })
+        .collect();
+    let at = crate::settings::secrets_at(ctx).unwrap_or_default();
+    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+}
+
 /// The key lemonfiber minted for the Usenet client moved into its plugin.
 const MINTED_USENET_KEY: &str = "the-minted-usenet-key";
 
@@ -146,29 +185,33 @@ const MINTED_USENET_KEY: &str = "the-minted-usenet-key";
 /// its secret store as the key lemonfiber minted for it.
 fn minting_usenet(ctx: Ctx) -> Ctx {
     crate::test_support::usenet::moved_in(&ctx);
-    let minted = crate::test_support::usenet::moved()
-        .and_then(|installed| {
-            installed
-                .declared
-                .secrets
-                .iter()
-                .find(|secret| secret.minted)
-                .map(|secret| crate::settings::named(&installed.plugin, &secret.id))
-        })
-        .unwrap_or_default();
-    let keeping = [crate::settings::Keeping {
-        name: &minted,
-        value: MINTED_USENET_KEY,
-        from: crate::settings::Source::Minted,
-        at: 1,
-    }];
-    let at = crate::settings::secrets_at(&ctx).unwrap_or_default();
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    keeping_minted(&ctx, crate::test_support::usenet::moved(), |_| {
+        MINTED_USENET_KEY
+    });
     ctx
 }
 
-/// The line the torrent client logs its temporary password on.
-const TEMP_LOG: &str = "A temporary password is provided for this session: read-from-log";
+/// The name of the account lemonfiber minted for the torrent client moved into its plugin.
+const MINTED_TORRENT_USER: &str = "the-minted-torrent-user";
+
+/// That account's password.
+const MINTED_TORRENT_PASSWORD: &str = "the-minted-torrent-password";
+
+/// `ctx` with its torrent client moved into its plugin, and the account
+/// [`MINTED_TORRENT_USER`] with [`MINTED_TORRENT_PASSWORD`] kept in its secret store as the
+/// one lemonfiber minted for it.
+fn minting_torrent(ctx: Ctx) -> Ctx {
+    crate::test_support::torrent::moved_in(&ctx);
+    keeping_minted(
+        &ctx,
+        crate::test_support::torrent::moved(),
+        |part| match part {
+            Some(lemonfiber_contract::adapter::UPSTREAM_USERNAME) => MINTED_TORRENT_USER,
+            _ => MINTED_TORRENT_PASSWORD,
+        },
+    );
+    ctx
+}
 
 fn config_scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     lemonfiber_fixtures::scratch::Scratch::unmade(name).within(".env")
@@ -578,7 +621,7 @@ mod identity;
 mod intake;
 mod linking;
 mod owning;
-mod passwords;
+mod passes;
 mod proxies;
 mod publishing;
 mod quality;

@@ -13,41 +13,35 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Teardown, Waiting};
-use lemonfiber_core::config::{store, Protocols, Settings, TORRENT_PASSWORD_KEY};
+use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::Narrator;
-use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
 use lemonfiber_fixtures::heard::Heard;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::{a_password, Reporting};
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_fixtures::support::Reporting;
+use lemonfiber_testing::torrent;
 
 /// The services the `dl` form declares — the two download clients and the tunnel
 /// one of them runs behind.
 const DOWNLOADING: [&str; 3] = ["sabnzbd", "gluetun", "qbittorrent"];
 
-/// A private environment file recording the torrent client's password, at a scratch path
-/// unique to this case so concurrent tests do not share one.
+/// A private environment file, at a scratch path unique to this case so concurrent tests
+/// do not share one.
 fn env_at(name: &str) -> PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("drain-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
-    assert!(
-        store::set(&path, TORRENT_PASSWORD_KEY, &a_password()).is_ok(),
-        "the scratch environment file is written"
-    );
-    path
+    dir.join(".env")
 }
 
-/// A context reaching the download clients over `http`, against the stack this
-/// repository carries, saying what it waits for through `heard`.
+/// A context reaching the torrent client, moved into its plugin, over `http`, against the
+/// stack this repository carries, saying what it waits for through `heard`.
 fn ctx(http: Arc<dyn Http>, name: &str, heard: &Arc<Heard>) -> Ctx {
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &DOWNLOADING,
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
+    let ctx = lemonfiber_testing::a_context()
+        .engine(Arc::new(
+            Reporting::holding(&DOWNLOADING, Lifecycle::Running, Health::Healthy)
+                .alongside(torrent::running()),
+        ))
         .filesystem(lemonfiber_fixtures::files::Files::empty())
         // Faked so a start's port pre-flight never reaches a real daemon: what else is
         // running on the machine a test happens to run on is not a fact the test is about.
@@ -60,7 +54,9 @@ fn ctx(http: Arc<dyn Http>, name: &str, heard: &Arc<Heard>) -> Ctx {
         .build()
         .with_http(http)
         .with_narrator(Arc::clone(heard) as Arc<dyn Narrator>)
-        .with_patience(Duration::ZERO)
+        .with_patience(Duration::ZERO);
+    torrent::moved_in(&ctx);
+    ctx
 }
 
 /// The forms an operator names.
@@ -80,17 +76,9 @@ async fn a_teardown_asked_to_wait_holds_on_until_nothing_is_coming_down() {
     // The torrent client answers with the same torrent still coming down twice, and then
     // with one that has finished: something to wait for, a look that has no news,
     // and an end.
-    let fake = Fake::by_path_in_turn(vec![
-        ("/auth/login", vec![Answer::reply(200, "Ok.")]),
-        (
-            "/torrents/info",
-            vec![
-                Answer::reply(200, QBIT_TORRENTS),
-                Answer::reply(200, QBIT_TORRENTS),
-                Answer::reply(200, QBIT_FINISHED),
-            ],
-        ),
-    ]);
+    let (at, coming) = torrent::transfers(&[torrent::carrying()]);
+    let (_, finished) = torrent::transfers(&[torrent::finished()]);
+    let fake = Fake::by_path_in_turn(vec![(at, vec![coming.clone(), coming, finished])]);
     let heard = Arc::new(Heard::default());
     let context = ctx(Arc::clone(&fake) as Arc<dyn Http>, "waiting", &heard);
 

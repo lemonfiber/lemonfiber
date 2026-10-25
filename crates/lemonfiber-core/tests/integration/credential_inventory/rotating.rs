@@ -1,50 +1,16 @@
 //! Seeing a credential once, and replacing one.
 
-use super::{asked, ctx, env_at, recorded, sealed, silent, the_torrent_password, Sealing};
+use super::{asked, ctx, env_at, recorded, sealed, silent, the_recorded_password, Sealing};
 use lemonfiber_contract::wire::Kind;
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::config::{MEDIA_SERVER_ADMIN_PASSWORD_KEY, TORRENT_PASSWORD_KEY};
-use lemonfiber_core::credential::Rotation;
+use lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::FixedRandom;
 use lemonfiber_testing::media;
 use std::sync::Arc;
-
-/// The heart of it: a replacement the service refuses leaves the credential that was
-/// working before recorded exactly as it was.
-#[tokio::test]
-async fn a_refused_rotation_leaves_the_recorded_password_exactly_as_it_was() {
-    let password = the_torrent_password();
-    let env = env_at("refused", &[(TORRENT_PASSWORD_KEY, &password)]);
-    // The client authenticates with the password it holds before it sets anything.
-    // Refused there, nothing is set and nothing is written.
-    let http = Fake::by_path(vec![("/auth/login", Answer::reply(200, "Fails."))]);
-    let ctx = ctx(env.clone(), Files::empty(), http);
-
-    let inventory = asked(
-        &ctx,
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-
-    let rotated = inventory.rotated.clone();
-    assert!(rotated.is_some(), "a rotation was asked for and answered");
-    let kept = rotated.as_ref().is_some_and(Rotation::kept_the_existing);
-    assert!(
-        kept,
-        "the credential that was working is still the one in force"
-    );
-    let refused = format!("{:?}", rotated.map(|one| one.settled));
-    assert!(refused.starts_with("Some(Refused"), "{refused}");
-    // The file, not the report. A report claiming the old value survived proves
-    // nothing about whether it did.
-    assert_eq!(recorded(&env, TORRENT_PASSWORD_KEY), Some(password));
-}
 
 #[tokio::test]
 async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_says_where() {
@@ -68,8 +34,8 @@ async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_say
 
 #[tokio::test]
 async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
-    let password = the_torrent_password();
-    let env = env_at("unknown", &[(TORRENT_PASSWORD_KEY, &password)]);
+    let password = the_recorded_password();
+    let env = env_at("unknown", &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
     let ctx = ctx(env.clone(), Files::empty(), silent());
 
     let inventory = asked(
@@ -80,24 +46,30 @@ async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
     )
     .await;
 
-    assert!(inventory.held.len() >= 7, "{}", inventory.held.len());
+    assert!(inventory.held.len() >= 6, "{}", inventory.held.len());
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     assert!(said.starts_with("Some(Unknown"), "{said}");
-    assert!(said.contains("qBittorrent web UI password"), "{said}");
+    assert!(said.contains("Jellyfin administrator password"), "{said}");
     assert!(said.contains("Indexer API key"), "{said}");
-    assert_eq!(recorded(&env, TORRENT_PASSWORD_KEY), Some(password));
+    assert_eq!(
+        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        Some(password)
+    );
 }
 
 #[tokio::test]
 async fn asking_to_see_a_credential_once_prints_the_warning_and_not_the_value() {
-    let password = the_torrent_password();
-    let env = env_at("unconfirmed", &[(TORRENT_PASSWORD_KEY, &password)]);
+    let password = the_recorded_password();
+    let env = env_at(
+        "unconfirmed",
+        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+    );
     let ctx = ctx(env, Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
         Asking::Reveal {
-            credential: "qBittorrent web UI password".to_owned(),
+            credential: "Jellyfin administrator password".to_owned(),
             confirmed: false,
         },
     )
@@ -112,14 +84,14 @@ async fn asking_to_see_a_credential_once_prints_the_warning_and_not_the_value() 
 
 #[tokio::test]
 async fn asking_again_prints_the_value_and_the_warning_stays_beside_it() {
-    let password = the_torrent_password();
-    let env = env_at("confirmed", &[(TORRENT_PASSWORD_KEY, &password)]);
+    let password = the_recorded_password();
+    let env = env_at("confirmed", &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
     let ctx = ctx(env, Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
         Asking::Reveal {
-            credential: "qbittorrent".to_owned(),
+            credential: "jellyfin".to_owned(),
             confirmed: true,
         },
     )
@@ -136,152 +108,6 @@ async fn asking_again_prints_the_value_and_the_warning_stays_beside_it() {
     // And the listing beside it still holds none of it.
     let listed = serde_json::to_string(&inventory.held).unwrap_or_default();
     assert!(!listed.contains("Clear your scrollback"));
-}
-
-/// A landed replacement: the torrent client takes the new password and signs in with it,
-/// and only then is anything written.
-#[tokio::test]
-async fn a_proven_replacement_is_recorded_and_every_consumer_is_accounted_for() {
-    let password = the_torrent_password();
-    let env = env_at("landed", &[(TORRENT_PASSWORD_KEY, &password)]);
-    // The client signs in with the password it holds, sets the new one, and signs in
-    // again with that — three calls, all of which this answers.
-    let http = Fake::by_path(vec![
-        ("/auth/login", Answer::reply(200, "Ok.")),
-        ("/app/setPreferences", Answer::reply(200, "")),
-    ]);
-    let ctx = ctx(env.clone(), Files::empty(), http);
-
-    let inventory = asked(
-        &ctx,
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-
-    let rotated = inventory.rotated.clone();
-    assert!(rotated.is_some(), "a rotation was asked for and answered");
-    let landed = rotated.as_ref().is_some_and(|one| !one.kept_the_existing());
-    assert!(landed, "the replacement is the value in force");
-    // Every consumer is named, including the ones a restart still has to reach.
-    assert_eq!(rotated.map(|one| one.consumers.len()), Some(3));
-    // The record moved, and what it moved to is not what it was.
-    let now = recorded(&env, TORRENT_PASSWORD_KEY);
-    assert!(now.is_some(), "a password is still recorded");
-    assert_ne!(now, Some(password), "and it is not the one it was");
-    assert_eq!(
-        recorded(&env, "QBITTORRENT_PASSWORD_PENDING"),
-        None,
-        "the replacement was moved into place, not left beside it"
-    );
-}
-
-/// A rotation the service could not be reached for leaves the existing password in
-/// force, and says which it kept.
-///
-/// The distinction the whole feature turns on: a replacement that was never proven is
-/// not written down, so what was working is still what works. A refusal is one thing
-/// and a service that did not answer is another, and neither may end with the operator
-/// holding a password nothing accepts.
-#[tokio::test]
-async fn a_rotation_that_could_not_reach_the_service_keeps_the_existing_password() {
-    let password = the_torrent_password();
-    let env = env_at("unreachable", &[(TORRENT_PASSWORD_KEY, &password)]);
-    let ctx = ctx(env.clone(), Files::empty(), silent());
-
-    let inventory = asked(
-        &ctx,
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-
-    let rotated = inventory.rotated.clone();
-    let kept = rotated.as_ref().is_some_and(Rotation::kept_the_existing);
-    assert!(kept, "{rotated:?}");
-    // Read back from the file rather than from the report: the guarantee is about what
-    // is in force, not about what was said.
-    assert_eq!(recorded(&env, TORRENT_PASSWORD_KEY), Some(password));
-}
-
-/// Without randomness there is nothing to generate, and a guessable password on the
-/// client the forwarded port authenticates to is worse than the one in force.
-#[tokio::test]
-async fn without_randomness_nothing_is_generated_and_nothing_is_written() {
-    let password = the_torrent_password();
-    let env = env_at("unlucky", &[(TORRENT_PASSWORD_KEY, &password)]);
-    let ctx = ctx(env.clone(), Files::empty(), silent()).with_random(Arc::new(FixedRandom(None)));
-
-    let inventory = asked(
-        &ctx,
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-
-    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-    assert!(said.starts_with("Some(Unproven"), "{said}");
-    assert!(said.contains("randomness"), "{said}");
-    assert_eq!(recorded(&env, TORRENT_PASSWORD_KEY), Some(password));
-}
-
-/// Nothing recorded and nothing to authenticate with is one situation, not two.
-#[tokio::test]
-async fn with_no_password_recorded_there_is_nothing_to_change_it_with() {
-    let env = env_at("nopassword", &[]);
-    let ctx = ctx(env, Files::empty(), silent());
-
-    let inventory = asked(
-        &ctx,
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-
-    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-    assert!(said.starts_with("Some(Unproven"), "{said}");
-    assert!(said.contains("lemonfiber seed"), "{said}");
-}
-
-/// A rehearsed rotation of the credential lemonfiber mints generates nothing and asks
-/// the client for nothing, and still names where the value lives.
-///
-/// It stops one line above the generating, and that line is the point. A password
-/// minted to describe a rotation is a secret that exists because somebody asked a
-/// question, and it would then have to be kept — put where the real one goes, which is
-/// the write — or thrown away, which is worse, because a thrown-away one may be the one
-/// the client has already taken. The client is scripted to accept a sign-in on purpose,
-/// so a run that reached it would land a replacement and this would catch it.
-#[tokio::test]
-async fn a_rehearsed_rotation_mints_nothing_and_asks_the_client_for_nothing() {
-    let password = the_torrent_password();
-    let env = env_at("rehearsed-mint", &[(TORRENT_PASSWORD_KEY, &password)]);
-    let http = Fake::by_path(vec![("/auth/login", Answer::reply(200, "Ok."))]);
-    let ctx = ctx(env.clone(), Files::empty(), http.clone()).rehearsing();
-
-    let inventory = asked(
-        &ctx,
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-
-    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-    assert!(said.starts_with("Some(Rehearsed"), "{said}");
-    assert!(said.contains("Nothing was generated"), "{said}");
-    // The file, not the report: a report claiming the recorded password survived proves
-    // nothing about whether it did.
-    assert_eq!(recorded(&env, TORRENT_PASSWORD_KEY), Some(password));
-    let reached = http.requests();
-    assert!(
-        reached.is_empty(),
-        "a rehearsal signed in to the client: {reached:?}"
-    );
 }
 
 /// A media server, moved into its plugin, answering the change of its administrator's
@@ -414,40 +240,6 @@ async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_i
     }
 }
 
-/// A replacement that cannot be recorded is never set, so no password is in force that
-/// nothing recorded.
-#[tokio::test]
-async fn a_replacement_that_cannot_be_recorded_is_never_set() {
-    let password = the_torrent_password();
-    // Written by a later lemonfiber, which this one reads and refuses to write over.
-    let env = env_at("unrecordable", &[(TORRENT_PASSWORD_KEY, &password)]);
-    let _ = std::fs::write(
-        &env,
-        format!("{TORRENT_PASSWORD_KEY}={password}\nLEMONFIBER_CONFIG_VERSION=999.0.0\n"),
-    );
-    let http = Fake::by_path(vec![
-        ("/auth/login", Answer::reply(200, "Ok.")),
-        ("/app/setPreferences", Answer::reply(200, "")),
-    ]);
-    let inventory = asked(
-        &ctx(env.clone(), Files::empty(), http.clone()),
-        Asking::Rotate {
-            credential: "qBittorrent web UI password".to_owned(),
-        },
-    )
-    .await;
-    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-    assert!(said.contains("could not be recorded"), "{said}");
-    assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|asked| asked.url.ends_with("/app/setPreferences")),
-        "a password was set that nothing recorded"
-    );
-    assert_eq!(recorded(&env, TORRENT_PASSWORD_KEY), Some(password));
-}
-
 /// A rehearsal says what a real run would do and asks the media server nothing.
 #[tokio::test]
 async fn a_rehearsed_administrator_rotation_asks_the_media_server_nothing() {
@@ -525,56 +317,36 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
 /// next command asks the service and moves it.
 #[tokio::test]
 async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
-    let torrent = the_torrent_password();
-    let administrator = the_administrator_password();
-    for (name, setting, password, credential, inner, at) in [
-        (
-            "unmoved-torrent",
-            TORRENT_PASSWORD_KEY,
-            torrent,
-            "qBittorrent web UI password",
-            Fake::by_path(vec![
-                ("/auth/login", Answer::reply(200, "Ok.")),
-                ("/app/setPreferences", Answer::reply(200, "")),
-            ]),
-            "/app/setPreferences",
-        ),
-        (
-            "unmoved-administrator",
-            MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            administrator,
-            "jellyfin",
-            administered(media::taken()),
-            media::identity("replace_admin_password"),
-        ),
-    ] {
-        let env = env_at(name, &[(setting, &password)]);
-        let http = Arc::new(Sealing {
-            inner,
-            env: env.clone(),
-            at,
-        });
+    let password = the_administrator_password();
+    let env = env_at(
+        "unmoved-administrator",
+        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+    );
+    let http = Arc::new(Sealing {
+        inner: administered(media::taken()),
+        env: env.clone(),
+        at: media::identity("replace_admin_password"),
+    });
 
-        let inventory = asked(
-            &moved(env.clone(), http),
-            Asking::Rotate {
-                credential: credential.to_owned(),
-            },
-        )
-        .await;
+    let inventory = asked(
+        &moved(env.clone(), http),
+        Asking::Rotate {
+            credential: "jellyfin".to_owned(),
+        },
+    )
+    .await;
 
-        let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-        assert!(said.starts_with("Some(ReplacedUnproven"), "{name}: {said}");
-        assert!(
-            said.contains("could not be moved into place"),
-            "{name}: {said}"
-        );
-        assert_eq!(recorded(&env, setting), Some(password), "{name}");
-        assert!(
-            recorded(&env, &format!("{setting}_PENDING")).is_some(),
-            "{name}: the replacement the service holds has no record"
-        );
-    }
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.starts_with("Some(ReplacedUnproven"), "{said}");
+    assert!(said.contains("could not be moved into place"), "{said}");
+    assert_eq!(
+        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        Some(password)
+    );
+    assert!(
+        recorded(&env, "JELLYFIN_ADMIN_PASSWORD_PENDING").is_some(),
+        "the replacement the service holds has no record"
+    );
 }
 
 /// One rotation of `credential` over this transport, against the settings at `env`.

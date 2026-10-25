@@ -1,8 +1,8 @@
 //! What the inventory lists, and what it never prints.
 
-use super::{asked, ctx, env_at, silent, the_service_key, the_torrent_password, SERVICE_CONFIG};
+use super::{asked, ctx, env_at, silent, the_recorded_password, the_service_key, SERVICE_CONFIG};
 use lemonfiber_core::app::{dispatch, Asking, Command};
-use lemonfiber_core::config::{Settings, TORRENT_PASSWORD_KEY};
+use lemonfiber_core::config::{Settings, MEDIA_SERVER_ADMIN_PASSWORD_KEY};
 use lemonfiber_core::credential::{fingerprint, State};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::support::Reporting;
@@ -55,12 +55,11 @@ async fn the_inventory_names_every_credential_the_operator_supplies_and_every_on
     let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
     let named: Vec<&str> = inventory.held.iter().map(|one| one.name.as_str()).collect();
 
-    assert!(named.len() >= 7, "{named:?}");
+    assert!(named.len() >= 6, "{named:?}");
     for expected in [
         "VPN private key",
         "Usenet provider password",
         "Indexer API key",
-        "qBittorrent web UI password",
         "Jellyfin administrator password",
     ] {
         assert!(named.contains(&expected), "{expected} is listed: {named:?}");
@@ -84,12 +83,12 @@ async fn every_line_says_what_uses_it_where_it_is_and_where_it_stands() {
 /// The property the whole shape exists for, asserted over the wire form.
 #[tokio::test]
 async fn no_recorded_value_appears_anywhere_in_the_answer() {
-    let password = the_torrent_password();
+    let password = the_recorded_password();
     let indexer = format!("{}{}", "9999aaaa", "bbbbccccdddd");
     let env = env_at(
         "secrecy",
         &[
-            (TORRENT_PASSWORD_KEY, &password),
+            (MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password),
             ("INDEXER_APIKEY", &indexer),
         ],
     );
@@ -100,7 +99,7 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
 
     // Asserted before the absences, because an empty answer holds no credential
     // either and would satisfy every one of them.
-    assert!(inventory.held.len() >= 7, "{}", inventory.held.len());
+    assert!(inventory.held.len() >= 6, "{}", inventory.held.len());
     assert!(
         sent.len() > 500,
         "the answer was serialised: {}",
@@ -108,7 +107,7 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
     );
     assert!(
         !sent.contains(&password),
-        "the torrent password is not in it"
+        "the administrator password is not in it"
     );
     assert!(!sent.contains(&indexer), "the indexer key is not in it");
     assert!(
@@ -185,7 +184,7 @@ async fn asking_to_see_something_this_stack_does_not_hold_says_what_it_does() {
         .map(|one| one.warning)
         .unwrap_or_default();
     assert!(said.contains("Nothing here is called"), "{said}");
-    assert!(said.contains("qBittorrent web UI password"), "{said}");
+    assert!(said.contains("Jellyfin administrator password"), "{said}");
 }
 
 /// A stack that cannot be read refuses rather than reporting that this machine holds

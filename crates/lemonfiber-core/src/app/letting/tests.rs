@@ -17,8 +17,8 @@ use crate::ports::service::Seeded;
 use crate::space::letting::agreement;
 use crate::space::{Candidate, Standing, RATIO_CONSEQUENCE};
 use crate::test_support::{
-    a_context, a_password, contracted, contracted_context, env_at, env_without_password, json,
-    SeedFs, CONTRACTED_KEY,
+    a_context, contracted, contracted_context, env_without_password, json, torrent, SeedFs,
+    CONTRACTED_KEY,
 };
 
 /// The download every case here names, and what it is called on both sides.
@@ -50,7 +50,7 @@ fn facts() -> StorageFacts {
 fn measuring(scratch: &str) -> Settings {
     Settings {
         data_root: Some(PathBuf::from("/srv/media")),
-        env_file: Some(env_at(scratch, &a_password())),
+        env_file: Some(env_without_password(scratch)),
         ..Settings::default()
     }
 }
@@ -64,9 +64,20 @@ fn a_tree() -> Vec<Occupant> {
     ]
 }
 
-/// The client's listing of that one completed torrent, at a ratio of 1.75.
-const LISTING: &str = r#"[{"hash":"a1","name":"Imported","size":8000,
-    "uploaded":14000,"downloaded":8000}]"#;
+/// The client's listing of that one completed torrent, at a ratio of 1.75, as its
+/// adapter answers it.
+fn listing() -> Answer {
+    torrent::answered(&vec![Seeded {
+        name: HELD.to_owned(),
+        bytes: 8_000,
+        ratio: 175,
+    }])
+}
+
+/// The client's listing of nothing completed, as its adapter answers it.
+fn listing_nothing() -> Answer {
+    torrent::answered(&Vec::<Seeded>::new())
+}
 
 /// The offer this stack's one download stands as, derived from the model rather
 /// than from a run — so what a case answers with is the name the offer *should*
@@ -80,31 +91,42 @@ fn standing() -> String {
     })
 }
 
-/// A context over that tree, whose transport answers from `routes`.
+/// A context over that tree, its torrent client moved into its plugin, whose transport
+/// answers from `routes`.
 fn over(scratch: &str, routes: Arc<Fake>) -> crate::app::Ctx {
-    a_context()
-        .settings(measuring(scratch))
-        .build()
-        .with_http(routes)
-        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts())))
-        .with_occupancy(Walking::holding(a_tree()))
+    torrent::reaching(
+        a_context()
+            .settings(measuring(scratch))
+            .build()
+            .with_http(routes)
+            .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts())))
+            .with_occupancy(Walking::holding(a_tree())),
+    )
 }
 
 /// The client's answer about what is still arriving, which is a different
 /// question from what has arrived — and one the account asks on its way past.
-const ARRIVING: &str = "/api/v2/torrents/info?filter=downloading";
+fn arriving() -> &'static str {
+    torrent::operation("transfers")
+}
 
 /// The client's answer about what it is still holding, which is this errand's.
-const COMPLETED: &str = "/api/v2/torrents/info?filter=completed";
+fn completed() -> &'static str {
+    torrent::operation("seeding")
+}
+
+/// The client letting a completed download go.
+fn letting_go() -> &'static str {
+    torrent::operation("stop_seeding")
+}
 
 /// A context whose client holds that download and answers every listing with it.
 fn holding(scratch: &str) -> crate::app::Ctx {
     over(
         scratch,
         Fake::by_path(vec![
-            ("/api/v2/auth/login", Answer::reply(200, "Ok.")),
-            (ARRIVING, Answer::reply(200, "[]")),
-            (COMPLETED, Answer::reply(200, LISTING)),
+            (arriving(), torrent::answered(&Vec::<Seeded>::new())),
+            (completed(), listing()),
         ]),
     )
 }
@@ -178,27 +200,20 @@ async fn a_rehearsal_says_what_would_go_and_asks_the_client_for_nothing() {
 #[tokio::test]
 async fn an_answered_offer_is_the_only_thing_that_reaches_the_client() {
     let asking = Fake::by_path_in_turn(vec![
-        ("/api/v2/auth/login", vec![Answer::reply(200, "Ok.")]),
-        ("/api/v2/torrents/delete", vec![Answer::reply(200, "")]),
-        (ARRIVING, vec![Answer::reply(200, "[]")]),
+        (letting_go(), vec![torrent::taken()]),
+        (arriving(), vec![torrent::answered(&Vec::<Seeded>::new())]),
         (
-            COMPLETED,
-            // Four readings, in order: the offer's own, the answered run's, the
-            // one the removal addresses the torrent by, and the read-back that
-            // says it has gone.
-            vec![
-                Answer::reply(200, LISTING),
-                Answer::reply(200, LISTING),
-                Answer::reply(200, LISTING),
-                Answer::reply(200, "[]"),
-            ],
+            completed(),
+            // Three readings, in order: the offer's own, the answered run's, and the
+            // read-back that says it has gone.
+            vec![listing(), listing(), listing_nothing()],
         ),
     ]);
     let ctx = over("letting-taken", Arc::clone(&asking));
 
     assert!(stop_seeding(&ctx, HELD.to_owned(), None).await.is_ok());
     assert!(
-        !asking.asked_for("torrents/delete"),
+        !asking.asked_for(letting_go()),
         "a reading removes nothing, whatever it found"
     );
 
@@ -209,7 +224,7 @@ async fn an_answered_offer_is_the_only_thing_that_reaches_the_client() {
             .is_some_and(|gone| !gone.rehearsed && gone.bytes == 8_000)),
         "answered by name, it goes, and the client is asked to take its files too"
     );
-    assert!(asking.asked_for("torrents/delete"));
+    assert!(asking.asked_for(letting_go()));
 }
 
 #[tokio::test]
@@ -219,10 +234,9 @@ async fn a_client_that_will_not_let_it_go_is_reported_rather_than_called_done() 
     let ctx = over(
         "letting-refused",
         Fake::by_path(vec![
-            ("/api/v2/auth/login", Answer::reply(200, "Ok.")),
-            ("/api/v2/torrents/delete", Answer::Silent),
-            (ARRIVING, Answer::reply(200, "[]")),
-            (COMPLETED, Answer::reply(200, LISTING)),
+            (letting_go(), Answer::Silent),
+            (arriving(), torrent::answered(&Vec::<Seeded>::new())),
+            (completed(), listing()),
         ]),
     );
     let refused = stop_seeding(&ctx, HELD.to_owned(), Some(standing())).await;

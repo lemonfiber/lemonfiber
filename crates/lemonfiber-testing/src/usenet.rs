@@ -101,13 +101,24 @@ pub fn transfers(downloads: &[Download]) -> (&'static str, Answer) {
     (operation("transfers"), answered(&downloads))
 }
 
-/// A transport answering the bundled torrent client with `torrents`, as qBittorrent lists
-/// them, and [`ADAPTER`] with `downloads` as what is coming down over Usenet.
+/// `ctx` reaching both download clients moved into their plugins: [`moved_in`] and the
+/// torrent client's, with the engine saying both adapters run.
 #[must_use]
-pub fn beside_torrents(torrents: &'static str, downloads: &[Download]) -> Arc<Fake> {
-    let mut routes = lemonfiber_fixtures::downloads::torrents(torrents);
-    routes.push(transfers(downloads));
-    Fake::by_path(routes)
+pub fn reaching_beside_torrents(mut ctx: Ctx) -> Ctx {
+    ctx.seams.engine = Arc::new(running().alongside(super::torrent::running()));
+    moved_in(&ctx);
+    super::torrent::moved_in(&ctx);
+    ctx
+}
+
+/// A transport answering the torrent client's adapter with `torrents` as what is coming
+/// down over torrent, and [`ADAPTER`] with `downloads` as what is coming down over Usenet.
+#[must_use]
+pub fn beside_torrents(torrents: &[Download], downloads: &[Download]) -> Arc<Fake> {
+    Fake::by_path(vec![
+        super::torrent::transfers(torrents),
+        transfers(downloads),
+    ])
 }
 
 #[cfg(test)]
