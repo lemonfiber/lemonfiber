@@ -52,11 +52,24 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
     assert_eq!(stacks.len(), 1, "the embedded stack parses");
 }
 
-/// Every installed service speaking `owner.claim` is a part the claimed check asks after.
+/// Every installed service speaking `owner.claim` is a part the claimed check asks after
+/// over its contract.
 #[tokio::test]
-async fn the_claimed_check_asks_after_every_installed_part_claimed_first() {
-    let mut ctx = a_context().build();
+async fn the_claimed_check_asks_every_installed_part_claimed_first_over_its_contract() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("deferring-owned");
+    let mut ctx = crate::test_support::contracted_context(&project, "claimed-part", false)
+        .build()
+        .with_http(lemonfiber_fixtures::http::Fake::by_path(vec![(
+            "/lemonfiber/owner.claim/v1/owner",
+            lemonfiber_fixtures::http::Answer::reply(200, "\"ours\""),
+        )]));
     ctx.settings.env_file = Some(crate::test_support::env_without_password("deferring-owned"));
+    let key = crate::plugin::key_file(
+        &crate::app::project::directory(&ctx).unwrap_or_default(),
+        "claimed-part",
+    );
+    assert!(std::fs::create_dir_all(key.parent().unwrap_or(&key)).is_ok());
+    assert!(std::fs::write(&key, crate::test_support::CONTRACTED_KEY).is_ok());
     let mut register = crate::plugin::Register::empty();
     assert!(register
         .record(crate::test_support::contracted(
@@ -80,7 +93,8 @@ async fn the_claimed_check_asks_after_every_installed_part_claimed_first() {
     assert!(
         findings
             .iter()
-            .any(|finding| finding.check == "config.claimed.claimed-part"),
+            .any(|finding| finding.check == "config.claimed.claimed-part"
+                && matches!(finding.verdict, crate::doctor::Verdict::Pass { .. })),
         "{findings:?}"
     );
 }

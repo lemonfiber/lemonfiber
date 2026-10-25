@@ -369,3 +369,15 @@ async fn a_reset_leaves_a_part_lemonfiber_holds_and_refuses_one_somebody_else_ho
         assert_eq!(asked_at(&http, CLAIM), 0, "{owner}");
     }
 }
+
+#[test]
+fn a_refusal_names_every_secret_lemonfiber_holds_for_the_part() {
+    for (secrets, named) in [
+        (Vec::new(), "the secret its plugin minted"),
+        (vec!["a".to_owned()], "the secret a,"),
+        (vec!["a".to_owned(), "b".to_owned()], "the secrets a, b,"),
+    ] {
+        let said = super::super::owning::refusal("Part", &secrets);
+        assert!(said.contains(named), "{said}");
+    }
+}
