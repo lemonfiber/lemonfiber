@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::in_flight;
+use super::{in_flight, stopped_beside};
 use crate::app::Ctx;
 use crate::config::{Protocols, Settings};
 use crate::ports::http::Http;
@@ -109,4 +109,26 @@ async fn a_form_the_stack_does_not_declare_finds_nothing() {
     let ctx = reaching(Fake::silent(), None);
 
     assert!(in_flight(&ctx, &named(&["no-such-form"])).await.is_empty());
+}
+
+/// A plugin the bundle installs stops with the stack profile its bundle entry names,
+/// so its clients are among those a teardown of that profile asks, and a
+/// teardown of any other leaves it out.
+#[test]
+fn a_moved_plugin_is_stopped_with_the_profile_its_bundle_entry_names() {
+    let mut ctx = a_context().build();
+    ctx.settings.env_file = Some(crate::test_support::env_without_password("in-flight-moved"));
+    crate::test_support::media::moved_in(&ctx);
+    let named: Vec<String> = crate::test_support::media::moved()
+        .map(|installed| crate::plugin::profile_of(&installed))
+        .into_iter()
+        .collect();
+
+    let stopping: Vec<String> = stopped_beside(&ctx, &named)
+        .into_iter()
+        .map(|installed| installed.plugin)
+        .collect();
+
+    assert_eq!(stopping, vec![crate::test_support::media::PLUGIN]);
+    assert!(stopped_beside(&ctx, &["search".to_owned()]).is_empty());
 }

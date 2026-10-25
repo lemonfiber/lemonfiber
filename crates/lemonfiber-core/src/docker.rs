@@ -23,6 +23,7 @@ use lemonfiber_manifest::Manifest;
 pub use lemonfiber_manifest::Criticality;
 use serde::Serialize;
 
+use crate::plugin::Profiled;
 use crate::ports::docker::{Container, Health, Lifecycle};
 
 /// What one service is actually doing.
@@ -228,25 +229,52 @@ pub fn survey(
     halted: &Halted,
     protocols: crate::config::Protocols,
 ) -> Vec<Service> {
-    let mut whole = surveyed(manifest, containers, halted);
+    survey_beside(manifest, &[], profiles, containers, halted, protocols)
+}
+
+/// The same, with `beside` among the stack's services: those of the plugins the bundle
+/// installs, each a service of the stack profile it sits in and up for every
+/// form that brings that profile. One under the id of a service the manifest declares is
+/// that service.
+#[must_use]
+pub fn survey_beside(
+    manifest: &Manifest,
+    beside: &[Profiled],
+    profiles: &[String],
+    containers: &[Container],
+    halted: &Halted,
+    protocols: crate::config::Protocols,
+) -> Vec<Service> {
+    let mut whole = surveyed(manifest, beside, containers, halted);
     let brought = crate::stack::standing::brought(manifest, protocols, &whole);
     whole.retain(|service| profiles.iter().any(|profile| profile == &service.profile));
     for service in &mut whole {
+        let alongside = beside.iter().any(|one| one.id == service.id);
         service.forms = brought
             .iter()
-            .filter(|(_, plan)| plan.services.contains(&service.id))
+            .filter(|(_, plan)| {
+                plan.services.contains(&service.id)
+                    || (alongside && plan.profiles.contains(&service.profile))
+            })
             .map(|(form, _)| form.clone())
             .collect();
     }
     whole
 }
 
-/// What every service the stack declares is doing, worst first.
-fn surveyed(manifest: &Manifest, containers: &[Container], halted: &Halted) -> Vec<Service> {
+/// What every service the stack declares is doing, and every service `beside` it under an
+/// id the stack does not declare, worst first.
+fn surveyed(
+    manifest: &Manifest,
+    beside: &[Profiled],
+    containers: &[Container],
+    halted: &Halted,
+) -> Vec<Service> {
     let found: BTreeMap<&str, &Container> = containers
         .iter()
         .map(|container| (container.service.as_str(), container))
         .collect();
+    let declared = declared(manifest, &[]);
 
     let mut services: Vec<Service> = manifest
         .services
@@ -273,6 +301,24 @@ fn surveyed(manifest: &Manifest, containers: &[Container], halted: &Halted) -> V
             exit: found.get(service.id.as_str()).and_then(|c| c.exit),
         })
         .collect();
+    services.extend(
+        beside
+            .iter()
+            .filter(|one| !declared.contains(one.id.as_str()))
+            .map(|one| Service {
+                id: one.id.clone(),
+                name: one.name.clone(),
+                describes: one.describes.clone(),
+                profile: one.profile.clone(),
+                forms: Vec::new(),
+                state: found
+                    .get(one.id.as_str())
+                    .map_or(State::Absent, |c| read(c, halted)),
+                criticality: one.criticality,
+                depends_on: Vec::new(),
+                exit: found.get(one.id.as_str()).and_then(|c| c.exit),
+            }),
+    );
 
     // Worst first, then by name. An operator reading top to bottom meets the
     // thing that needs them before the nineteen things that do not.
@@ -332,11 +378,19 @@ pub fn undeclared(
     containers: &[Container],
     halted: &Halted,
 ) -> Vec<Undeclared> {
-    let declared: BTreeSet<&str> = manifest
-        .services
-        .iter()
-        .map(|service| service.id.as_str())
-        .collect();
+    undeclared_beside(manifest, &[], containers, halted)
+}
+
+/// The same, where `beside` are services of the stack's profiles too, as [`survey_beside`]
+/// reports them.
+#[must_use]
+pub fn undeclared_beside(
+    manifest: &Manifest,
+    beside: &[Profiled],
+    containers: &[Container],
+    halted: &Halted,
+) -> Vec<Undeclared> {
+    let declared = declared(manifest, beside);
 
     let strangers: BTreeMap<&str, State> = containers
         .iter()
@@ -351,6 +405,16 @@ pub fn undeclared(
             state,
             describes: UNDESCRIBED.to_owned(),
         })
+        .collect()
+}
+
+/// The id of every service the manifest declares, and of every one `beside` it.
+fn declared<'a>(manifest: &'a Manifest, beside: &'a [Profiled]) -> BTreeSet<&'a str> {
+    manifest
+        .services
+        .iter()
+        .map(|service| service.id.as_str())
+        .chain(beside.iter().map(|one| one.id.as_str()))
         .collect()
 }
 

@@ -26,7 +26,12 @@ pub(crate) async fn opening(ctx: &Ctx, found: &mut Findings, key: &str, value: &
     found.opens = opened(before, after);
     found.keeps = kept(before, after, ctx.settings.data_root.as_deref());
     if let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) {
-        found.stops = stopped(&manifest, before, after);
+        found.stops = stopped(
+            &manifest,
+            &crate::app::plugins::profiled(ctx),
+            before,
+            after,
+        );
     }
     if reduces(before, after) {
         found.active = interrupted(ctx, before, after).await;

@@ -13,7 +13,7 @@ use lemonfiber_manifest::Manifest;
 
 use super::{compose, halted, lock, settled_into, Composed};
 use crate::app::Ctx;
-use crate::docker::{stopping_order, survey, Service, State};
+use crate::docker::{stopping_order, survey_beside, Service, State};
 use crate::error::{Diagnose, Problem};
 use crate::model::{LifecycleReport, Switched};
 use crate::stack::closure::Plan;
@@ -93,8 +93,9 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let running = survey(
+    let running = survey_beside(
         &manifest,
+        &crate::app::plugins::profiled(ctx),
         &declared,
         &containers,
         &halted::load(ctx),

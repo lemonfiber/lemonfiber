@@ -12,7 +12,7 @@
 use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
-use crate::docker::survey;
+use crate::docker::survey_beside;
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::stack::standing::needed_by;
 
@@ -45,8 +45,9 @@ pub(crate) async fn permitted(
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let running = survey(
+    let running = survey_beside(
         manifest,
+        &crate::app::plugins::profiled(ctx),
         &declared,
         &containers,
         &super::halted::load(ctx),

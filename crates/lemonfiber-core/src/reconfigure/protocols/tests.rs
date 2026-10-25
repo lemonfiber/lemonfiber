@@ -236,7 +236,7 @@ without_it = "No torrents"
 #[test]
 fn dropping_torrents_stops_its_own_services_and_leaves_the_library_running() {
     let stops = a_stack()
-        .map(|stack| stopped(&stack, Protocols::both(), Protocols::none()))
+        .map(|stack| stopped(&stack, &[], Protocols::both(), Protocols::none()))
         .unwrap_or_default();
     assert_eq!(stops, vec!["qbittorrent".to_owned()]);
 }
@@ -274,7 +274,7 @@ without_it = "No torrents"
 "#;
     let stops = lemonfiber_manifest::Manifest::from_toml(toml)
         .ok()
-        .map(|stack| stopped(&stack, Protocols::both(), Protocols::none()));
+        .map(|stack| stopped(&stack, &[], Protocols::both(), Protocols::none()));
     assert_eq!(stops, Some(vec!["qbittorrent".to_owned()]));
 }
 
@@ -287,6 +287,41 @@ fn a_stack_with_nothing_left_to_run_stops_nothing_it_cannot_name() {
         "schema_version = 1\nstack_version = \"0.1.0\"\nmin_cli_version = \"0.1.0\"\n",
     )
     .ok();
-    let stops = bare.map(|stack| stopped(&stack, Protocols::both(), Protocols::none()));
+    let stops = bare.map(|stack| stopped(&stack, &[], Protocols::both(), Protocols::none()));
     assert_eq!(stops, Some(Vec::new()));
+}
+
+/// A service of a plugin the bundle installs stops with the stack profile it sits in,
+/// and is said once, however the stack itself names it.
+#[test]
+fn dropping_a_protocol_names_a_moved_plugins_service_in_its_profile() {
+    let beside = |id: &str, profile: &str| crate::plugin::Profiled {
+        id: id.to_owned(),
+        name: id.to_owned(),
+        describes: String::new(),
+        profile: profile.to_owned(),
+        criticality: lemonfiber_manifest::Criticality::Core,
+    };
+    let moved = [
+        beside("sabnzbd", "usenet"),
+        beside("sabnzbd-adapter", "usenet"),
+        beside("jellyfin-adapter", "media"),
+    ];
+
+    let stops = crate::test_support::stack().manifest().ok().map(|stack| {
+        stopped(
+            &stack,
+            &moved,
+            Protocols::both(),
+            Protocols {
+                usenet: false,
+                torrent: true,
+            },
+        )
+    });
+
+    assert_eq!(
+        stops,
+        Some(vec!["sabnzbd".to_owned(), "sabnzbd-adapter".to_owned()])
+    );
 }

@@ -1,6 +1,7 @@
 //! The environment file Compose reads beside the project, holding only what plain Compose
 //! needs to run there as lemonfiber does: the profiles to start, those of the stack's last
-//! start and every installed plugin's, and the files to read, the project and the
+//! start, which hold the services of the plugins the bundle installs too,
+//! and every other installed plugin's own, and the files to read, the project and the
 //! operator's overlay after it where they wrote one.
 //!
 //! lemonfiber names its own environment file, its files and its profiles on every
@@ -46,7 +47,7 @@ pub(crate) fn kept(ctx: &Ctx, text: &str) -> Result<(), Failure> {
     written(ctx, &last, text)
 }
 
-/// Write the stack's profiles among `stack` and every plugin's profile in `text`.
+/// Write the stack's profiles among `stack` and every plugin's own profile in `text`.
 fn written(ctx: &Ctx, stack: &BTreeSet<String>, text: &str) -> Result<(), Failure> {
     let profiles: Vec<String> = stack
         .iter()

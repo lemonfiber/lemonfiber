@@ -40,6 +40,34 @@ fn a_start_names_its_profiles_and_a_later_write_keeps_them_beside_every_plugins(
     );
 }
 
+/// A project holding a service of a plugin the bundle installs, written into the stack's
+/// `media` profile, beside another plugin's service.
+const MOVED: &str = "services:\n  jellyfin-adapter:\n    profiles:\n    - media\n  komga:\n    profiles:\n    - plugin-komga\n";
+
+/// A plugin the bundle installs sits in a stack profile, so plain Compose starts it with
+/// that profile as it does the stack's own services, and not as every plugin's is.
+#[test]
+fn a_service_in_a_stack_profile_is_started_with_that_profile_alone() {
+    let (ctx, project) = machine("profiled-moved");
+    assert!(super::super::kept(&ctx, MOVED).is_ok());
+    assert_eq!(
+        beside(&project),
+        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+    );
+
+    let started = super::super::materialised_with(
+        &ctx,
+        &super::super::held(&ctx).unwrap_or_default(),
+        super::super::Pass::Write,
+        Some(&["media".to_owned()].into_iter().collect()),
+    );
+    assert!(started.is_ok(), "{started:?}");
+    assert_eq!(
+        beside(&project),
+        "COMPOSE_PROFILES=media,plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+    );
+}
+
 #[test]
 fn a_profiles_file_somebody_edited_is_kept() {
     let (ctx, project) = machine("profiled-edited");

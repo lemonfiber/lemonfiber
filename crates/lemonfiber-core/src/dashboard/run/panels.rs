@@ -11,7 +11,7 @@ use lemonfiber_manifest::Manifest;
 use crate::app::Ctx;
 use crate::condition::Conditions;
 use crate::dashboard::{eta, Hardlink, Panel, Queue, Reading, Snapshot, Storage, Transfer, Vpn};
-use crate::docker::{survey, Service};
+use crate::docker::{survey_beside, Service};
 use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
@@ -413,14 +413,16 @@ pub(super) async fn observe(
         .await
         .map_err(|err| err.problem().summary)?;
     let halted = crate::app::engine::halted::load(ctx);
+    let beside = crate::app::plugins::profiled(ctx);
     Ok((
-        survey(
+        survey_beside(
             manifest,
+            &beside,
             &profiles,
             &containers,
             &halted,
             ctx.settings.protocols,
         ),
-        crate::docker::undeclared(manifest, &containers, &halted),
+        crate::docker::undeclared_beside(manifest, &beside, &containers, &halted),
     ))
 }

@@ -15,7 +15,9 @@
 //! **Only the clients the plan would actually stop are asked.** A form holding no
 //! download client makes no requests whatsoever, which is what keeps this off the
 //! common path: `lemonfiber down tv` should not go to the network to discover it has
-//! nothing to go to the network about.
+//! nothing to go to the network about. A client a plugin the bundle installs brought sits
+//! in the stack profile its bundle entry names, so it is among them where
+//! that profile stops.
 //!
 //! **A client that will not answer contributes nothing rather than an alarm.** It is
 //! already being torn down, or was never up; either way the honest answer to "what is
@@ -117,10 +119,13 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
         stopping
             .services
             .retain(|service| profiles.contains(&service.profile));
-        // The stack's own services alone: a plugin's runs under a profile of its own that
-        // no form names, so stopping a form never stops it.
         let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-        let fillers = Fillers::of(&stopping, &[], &chosen_fillers(ctx), project.as_deref());
+        let fillers = Fillers::of(
+            &stopping,
+            &stopped_beside(ctx, &profiles),
+            &chosen_fillers(ctx),
+            project.as_deref(),
+        );
         download_targets(ctx, &fillers).await
     };
 
@@ -145,6 +150,22 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
                 })
         })
         .collect()
+}
+
+/// Every installed plugin whose services sit in one of `profiles`, and so stop with them:
+/// one the bundle installs, in the stack profile its bundle entry names.
+/// Any other plugin's services sit in a profile of its own that no form names.
+fn stopped_beside(ctx: &Ctx, profiles: &[String]) -> Vec<crate::plugin::Installed> {
+    crate::app::plugins::read(ctx)
+        .map(|register| {
+            register
+                .installed()
+                .iter()
+                .filter(|one| profiles.contains(&crate::plugin::profile_of(one)))
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Whether a download is still coming down.

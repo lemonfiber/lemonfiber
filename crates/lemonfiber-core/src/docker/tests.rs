@@ -676,5 +676,6 @@ fn a_service_no_form_asked_for_still_counts_while_it_is_there() {
     );
 }
 
+mod beside;
 mod depending;
 mod halted;

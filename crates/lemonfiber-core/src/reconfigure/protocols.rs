@@ -22,6 +22,7 @@ use lemonfiber_manifest::Manifest;
 
 use super::Opening;
 use crate::config::{reads_as_on, Protocols, TORRENT_KEY, USENET_KEY};
+use crate::plugin::Profiled;
 use crate::prerequisites::prerequisites;
 use crate::stack::closure::everything;
 use crate::wizard::opened_by;
@@ -69,7 +70,8 @@ pub fn opened(before: Protocols, after: Protocols) -> Vec<Opening> {
 }
 
 /// The services `after` stops that `before` was running, by the name the stack
-/// gives them.
+/// gives them, with each of `beside` that sits in a profile `after` stops: a service of a
+/// plugin the bundle installs, in the stack profile its bundle entry names.
 ///
 /// The stack's own answer: a profile declares the protocol it cannot run without,
 /// so what a reduction takes away is read from the manifest rather than from a list
@@ -77,16 +79,32 @@ pub fn opened(before: Protocols, after: Protocols) -> Vec<Opening> {
 /// leaves the stack with nothing to run at all, which the closure refuses to plan
 /// rather than answer.
 #[must_use]
-pub fn stopped(manifest: &Manifest, before: Protocols, after: Protocols) -> Vec<String> {
+pub fn stopped(
+    manifest: &Manifest,
+    beside: &[Profiled],
+    before: Protocols,
+    after: Protocols,
+) -> Vec<String> {
     let Ok(was) = everything(manifest, before) else {
         return Vec::new();
     };
-    let now = everything(manifest, after).map(|plan| plan.services);
-    let now = now.unwrap_or_default();
-    was.services
+    let (running, holding) = everything(manifest, after)
+        .map(|plan| (plan.services, plan.profiles))
+        .unwrap_or_default();
+    let mut stops: Vec<String> = was
+        .services
         .into_iter()
-        .filter(|service| !now.contains(service))
-        .collect()
+        .filter(|service| !running.contains(service))
+        .collect();
+    for one in beside {
+        if was.profiles.contains(&one.profile)
+            && !holding.contains(&one.profile)
+            && !stops.contains(&one.id)
+        {
+            stops.push(one.id.clone());
+        }
+    }
+    stops
 }
 
 /// What dropping a way of downloading leaves exactly as it is.
