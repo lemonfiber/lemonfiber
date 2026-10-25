@@ -65,26 +65,26 @@ fn connection(asker: &str) -> String {
 /// Tell each curator that pulls its indexers about the aggregator its ask for an indexer
 /// settles on, the stack's or a plugin's.
 ///
-/// Which service that is comes from what the stack says the book curator asks for, not
-/// from a name written here, and it is reached where it says it listens on the stack's
-/// network with the key it wrote for itself. Only a book curator the gate lets the
-/// aggregator's key reach is told, since it is handed that key: a third-party plugin's
-/// service is handed no credential that is not its own. A pair nothing here connects is
-/// reported by the table, never dropped.
+/// Which service that is comes from what the stack says the curator asks for, not from a
+/// name written here, and it is reached where it says it listens on the stack's network
+/// with the key it wrote for itself. Only a curator the gate lets the aggregator's key
+/// reach is told, since it is handed that key: a third-party plugin's service is handed
+/// no credential that is not its own. A pair nothing here connects is reported by the
+/// table, never dropped.
 ///
-/// Nothing for a book curator with no key yet — the key is minted on the run that first
-/// reaches it, and a service started before that is completed by a later run rather
-/// than failed — or for an aggregator that has not written its own key yet.
+/// Nothing for the stack's book curator with no key yet — the key is minted on the run
+/// that first reaches it, and a service started before that is completed by a later run
+/// rather than failed — or for an aggregator that has not written its own key yet.
 pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for pairing in pairings(fillers) {
         let Ok((Connection::Aggregator, at, asker)) = pairing.made else {
             continue;
         };
-        let Some(puller) = puller(ctx, fillers, asker.answering()).await else {
-            continue;
-        };
-        let Some(native) = pairing.filler.talks_in() else {
+        let (Some(puller), Some(native)) = (
+            puller(ctx, fillers, asker.answering()).await,
+            pairing.filler.talks_in(),
+        ) else {
             continue;
         };
         let connection = connection(&asker.name);

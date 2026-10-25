@@ -449,18 +449,23 @@ fn puller(media: &str) -> crate::plugin::Installed {
     installed
 }
 
+/// The stack's indexer beside [`puller`] filing `media`, written at `project`.
+fn beside_the_puller(project: &std::path::Path, media: &str) -> crate::wiring::Fillers {
+    fillers_trusting(
+        vec![indexer()],
+        &[puller(media)],
+        project,
+        &crate::test_support::first_party(PULLER),
+    )
+}
+
 /// What the pass tells [`puller`] filing `media`, beside the stack's indexer, with the
 /// adapter answering `added` to `add_aggregator`.
 async fn pulled(tag: &str, media: &str, added: Answer) -> (Vec<Wiring>, Arc<Fake>) {
     let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("pulled-{tag}"));
     let http = Fake::by_path(vec![(HELD, Answer::reply(200, "[]")), (ADD, added)]);
     let ctx = contracted_ctx(&project, PULLER_ADAPTER, true, http.clone());
-    let fillers = fillers_trusting(
-        vec![indexer()],
-        &[puller(media)],
-        &project,
-        &crate::test_support::first_party(PULLER),
-    );
+    let fillers = beside_the_puller(&project, media);
     (
         super::super::aggregators::seed_aggregators(&ctx, &fillers).await,
         http,
@@ -513,4 +518,32 @@ async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull() {
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+#[tokio::test]
+async fn a_curator_pulling_over_the_contract_its_adapter_does_not_answer_is_told_nothing() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("pulled-unanswered");
+    let http = Fake::always(Answer::reply(204, ""));
+    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(http.clone());
+
+    let wirings =
+        super::super::aggregators::seed_aggregators(&ctx, &beside_the_puller(&project, "books"))
+            .await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+#[test]
+fn a_curator_the_indexers_app_sync_serves_is_reported_as_synced() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("pulled-synced-said");
+
+    let unmatched = super::super::connecting::unmatched(&beside_the_puller(&project, "tv"));
+
+    assert!(
+        unmatched.iter().any(|one| matches!(&one.state,
+            crate::seed::State::Unmatched { reason }
+                if reason.contains(" and syncs the media ") && reason.contains(PULLER))),
+        "{unmatched:?}"
+    );
 }
