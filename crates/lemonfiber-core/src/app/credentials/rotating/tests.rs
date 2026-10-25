@@ -108,6 +108,29 @@ fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
     );
 }
 
+/// A rehearsal owes nothing for a consumer a rotation reaches by itself, so a
+/// credential every consumer of which is reached at once is left with no steps after.
+#[test]
+fn a_rehearsal_leaves_out_every_consumer_a_rotation_reaches_by_itself() {
+    let held = crate::credential::Held {
+        name: "Usenet password".to_owned(),
+        setting: config::PROVIDER_PASS_KEY.to_owned(),
+        consumers: Vec::new(),
+        location: "the environment file".to_owned(),
+        origin: crate::credential::Origin::Operator,
+        from: crate::origin::Origin::Bundled,
+        state: crate::credential::State::Active,
+        fingerprint: None,
+        advisory: None,
+    };
+    let said = super::would_rotate(&held, super::REPUBLISHING);
+
+    assert_eq!(
+        rehearsed(&said).map(|(_, afterwards)| afterwards),
+        Some(Vec::new())
+    );
+}
+
 #[test]
 fn a_setting_nothing_knows_still_gets_an_answer_rather_than_nothing() {
     let said = elsewhere("SOMETHING_ELSE");

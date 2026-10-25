@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{Reporting, Tunnel};
 
-use super::{after_start, pass, Asking, CameTo, Last, CHECK, RECORD};
+use super::{after_start, listening_port, pass, Asking, CameTo, Last, CHECK, RECORD};
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::journal::{Change, Kind};
@@ -326,4 +326,19 @@ async fn a_diagnosis_whose_guard_cannot_tell_passes_nothing() {
         .build();
     let ran = vpn(crate::doctor::Verdict::Pass { note: None });
     assert_eq!(diagnosed(&ctx, &[ran]).await, Some(Vec::new()));
+}
+
+#[tokio::test]
+async fn the_port_a_client_inside_the_guard_takes_peers_on_is_the_one_it_says() {
+    let (ctx, _) = holding("listening", Some("51999"), vec![holds(Some(51413))]);
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+
+    let listening = match manifest {
+        Some(manifest) => listening_port(&ctx, &manifest, project.as_deref()).await,
+        None => None,
+    };
+
+    assert_eq!(listening, Some(51413));
 }

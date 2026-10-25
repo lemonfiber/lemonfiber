@@ -9,7 +9,8 @@ use lemonfiber_core::ports::filesystem::Beneath;
 use lemonfiber_core::stack::Source;
 
 use super::{
-    carrying, keyed, moved, moved_in, operation, transfers, unkeyed, ADAPTER, CARRIED, PLUGIN,
+    carrying, keyed, moved, moved_in, operation, reaching_beside_torrents, transfers, unkeyed,
+    ADAPTER, CARRIED, PLUGIN,
 };
 
 #[test]
@@ -111,4 +112,31 @@ fn a_client_moved_in_is_keyed_where_its_stack_is_and_one_keyed_holds_its_key_unw
     assert!(shared
         .join(lemonfiber_core::config::paths::PLUGINS)
         .exists());
+}
+
+#[test]
+fn both_clients_reached_beside_each_other_are_recorded_and_keyed_where_the_stack_is() {
+    let directory = Scratch::new("usenet-beside-torrents");
+    let mut ctx = a_context()
+        .over(Source::External(Box::leak(
+            directory.to_path_buf().into_boxed_path(),
+        )))
+        .build();
+    ctx.settings.env_file = Some(directory.join(".env"));
+
+    let _ = reaching_beside_torrents(ctx);
+
+    let kept = std::fs::read_to_string(directory.join(lemonfiber_core::config::paths::PLUGINS))
+        .unwrap_or_default();
+    let register = Register::parse(&kept).unwrap_or_else(|_| Register::empty());
+    let mut recorded = register
+        .installed()
+        .iter()
+        .map(|one| one.plugin.clone())
+        .collect::<Vec<_>>();
+    recorded.sort();
+    assert_eq!(recorded, vec![super::super::torrent::PLUGIN, PLUGIN]);
+    for adapter in [ADAPTER, super::super::torrent::ADAPTER] {
+        assert!(lemonfiber_core::plugin::key_file(&directory, adapter).exists());
+    }
 }

@@ -478,3 +478,40 @@ async fn a_reset_over_a_stack_that_cannot_be_read_puts_back_nothing() {
 
     assert!(super::super::reset_connections(&ctx, true).await.is_empty());
 }
+
+#[tokio::test]
+async fn each_managed_wiring_carries_what_was_last_recorded_for_its_client() {
+    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("managed-recorded");
+    let _ = std::fs::remove_dir_all(&dir);
+    let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(Some(KEYED))), seeding());
+    let _ = crate::config::store::write(
+        &dir.join("baseline.json"),
+        r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
+    );
+    let installed = crate::app::plugins::read(&ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+
+    let managed = match ctx.stack.checked_manifest(ctx.today()) {
+        Ok(manifest) => {
+            super::super::managed_wirings(&ctx, &manifest, &installed, project.as_deref()).await
+        }
+        Err(_) => Vec::new(),
+    };
+
+    let recorded: Vec<(String, Option<&str>)> = managed
+        .iter()
+        .filter(|one| one.name == "Sonarr")
+        .flat_map(|one| one.clients.iter())
+        .map(|wired| {
+            (
+                format!("{}:{}", wired.want.host, wired.want.port),
+                wired.recorded.as_ref().map(|record| record.value.as_str()),
+            )
+        })
+        .collect();
+    assert_eq!(recorded, vec![("gluetun:8081".to_owned(), Some("tv"))]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
