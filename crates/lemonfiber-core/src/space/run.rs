@@ -193,7 +193,7 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
     // What the client is holding is read before the walk, because the walk keeps the
     // files of those downloads and of nothing else in particular.
     let fillers = host_fillers(ctx, &watched.stack, project);
-    let holder = torrent_client(ctx, &download_targets(ctx, &fillers).await);
+    let holder = torrent_client(&download_targets(ctx, &fillers).await);
     let held = holding(holder.as_deref()).await;
 
     let mut data = Survey::beneath(

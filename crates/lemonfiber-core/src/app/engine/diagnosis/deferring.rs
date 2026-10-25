@@ -204,7 +204,7 @@ pub(super) fn owned(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Defe
                         Part {
                             id: filler.id.clone(),
                             name: filler.name.clone(),
-                            secrets: filler.upstream.clone(),
+                            secrets: filler.upstream_settings(),
                         },
                         part.map(|part| Arc::new(part) as Arc<dyn Ownership>),
                     )

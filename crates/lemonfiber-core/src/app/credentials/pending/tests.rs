@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD};
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-use super::{pending, settle, Minted, Opens};
+use super::{pending, settle};
 use crate::app::targets::{record_secret, recorded_secret, service_config_dir, MediaServer};
 use crate::config;
 use crate::test_support::{a_contracted_media_server, contracted_context, MEDIA_ADAPTER};
@@ -51,14 +51,7 @@ async fn settled_over_its_contract(name: &str, signs_in: Vec<Answer>) -> Settled
     let _ = record_secret(&ctx, &setting, "in-force");
     let _ = record_secret(&ctx, &pending(&setting), "replacement");
 
-    settle(
-        &ctx,
-        &Minted {
-            setting: setting.clone(),
-            opens: Opens::Media(Box::new(server)),
-        },
-    )
-    .await;
+    settle(&ctx, &server).await;
 
     let upstream = service_config_dir(&project, MEDIA_ADAPTER).join(UPSTREAM_FILE);
     let settled = Settled {

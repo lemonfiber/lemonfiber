@@ -4,7 +4,7 @@ use super::{guard, inside};
 use lemonfiber_fixtures::scratch::Scratch;
 
 use crate::test_support::{
-    a_context, a_password, a_placed, an_installed, contracted, contracted_context, env_at,
+    a_context, a_placed, an_installed, contracted, contracted_context, env_without_password,
     first_party, stack,
 };
 use crate::wiring::{Chosen, Fillers};
@@ -29,10 +29,7 @@ fn fillers(installed: &[crate::plugin::Installed]) -> Fillers {
 fn ctx(name: &str) -> crate::app::Ctx {
     a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env_at(
-                &format!("forwarding-reaching-{name}"),
-                &a_password(),
-            )),
+            env_file: Some(env_without_password(&format!("forwarding-reaching-{name}"))),
             ..crate::config::Settings::default()
         })
         .build()
@@ -53,7 +50,7 @@ async fn only_torrent_fillers_taking_the_guard_are_inside_it() {
     assert_eq!(
         found,
         vec![
-            ("qbittorrent".to_owned(), true),
+            ("qbittorrent".to_owned(), false),
             ("deluge".to_owned(), false)
         ]
     );

@@ -47,7 +47,7 @@ async fn the_book_curator_is_told_where_the_aggregator_is() {
         "/api/v1/prowlarr",
         vec![Answer::reply(200, "[]"), Answer::reply(201, "{}")],
     )]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -77,7 +77,7 @@ async fn an_aggregator_already_known_is_not_registered_again() {
     let env = recorded_admin("bindery-known");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, HELD))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -111,7 +111,7 @@ async fn an_entry_the_service_kept_without_a_key_is_registered_again() {
         "/api/v1/prowlarr",
         vec![Answer::reply(200, KEYLESS), Answer::reply(201, "{}")],
     )]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -137,7 +137,7 @@ async fn nothing_is_told_where_a_book_curator_a_key_or_an_aggregator_is_missing(
     let env = recorded_admin("bindery-absent");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -147,7 +147,7 @@ async fn nothing_is_told_where_a_book_curator_a_key_or_an_aggregator_is_missing(
     );
 
     let bare = recorded_admin("bindery-unkeyed");
-    let unkeyed = seed_ctx(None, true, Vec::new(), None, Some(bare.clone()))
+    let unkeyed = seed_ctx(true, Vec::new(), None, Some(bare.clone()))
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
     assert!(
         told(&unkeyed).await.is_empty(),
@@ -161,7 +161,7 @@ async fn nothing_is_told_where_a_book_curator_a_key_or_an_aggregator_is_missing(
         "a stack with no aggregator wired something"
     );
 
-    let unwritten = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let unwritten = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_filesystem(Arc::new(SeedFs::keyed(None)));
     assert!(
         told(&unwritten).await.is_empty(),
@@ -181,7 +181,7 @@ async fn an_indexer_ask_settled_on_nothing_it_can_tell_registers_nobody() {
     let env = recorded_admin("bindery-unsettled");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
     // A searcher speaking an adapter nothing here tells the book curator about.
@@ -253,10 +253,10 @@ async fn a_plugin_aggregator_is_told_on_its_own_terms() {
         "/api/v1/prowlarr",
         vec![Answer::reply(200, "[]"), Answer::reply(201, "{}")],
     )]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
-    let escaping = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let escaping = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(Fake::by_path(vec![(
             "/api/v1/prowlarr",
             Answer::reply(200, "[]"),
@@ -310,7 +310,7 @@ async fn a_plugin_under_the_book_curators_id_is_never_told_the_indexers_key() {
     let env = recorded_admin("bindery-impostor");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
     let fillers = asked_by_a_plugin(&book_curator_svc(), vec![indexer()]);
@@ -333,7 +333,7 @@ async fn a_book_curator_that_refuses_is_reported() {
     let env = recorded_admin("bindery-refuses");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(401, ""))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -379,7 +379,7 @@ async fn a_registration_the_book_curator_refuses_is_reported() {
         "/api/v1/prowlarr",
         vec![Answer::reply(200, "[]"), Answer::reply(401, "")],
     )]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
@@ -408,7 +408,7 @@ async fn a_rehearsed_pass_names_the_aggregator_it_would_register_and_registers_n
     let env = recorded_admin("bindery-rehearsed");
     let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .rehearsing();
@@ -541,7 +541,7 @@ async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull() {
 async fn a_curator_pulling_over_the_contract_its_adapter_does_not_answer_is_told_nothing() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("pulled-unanswered");
     let http = Fake::always(Answer::reply(204, ""));
-    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
 
     let wirings =
         super::super::aggregators::seed_aggregators(&ctx, &beside_the_puller(&project, "books"))

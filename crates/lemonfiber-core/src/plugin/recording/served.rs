@@ -80,7 +80,6 @@ pub(super) async fn answers(
         placed,
         copy: &copy,
         served: &served,
-        serving: recorder.serving,
         keyed: Addressed::to((recorder.transport)(), LOOPBACK, serve.listens),
         random: recorder.random,
         before: &before,
@@ -90,7 +89,6 @@ pub(super) async fn answers(
         Ok(answers) => Ok(answers),
         Err((step, why)) => {
             let log = recorder.serving.log(&served, LOG_LINES).await;
-            let scrub = scrub.and(&first::announced(&log));
             Err(Failed {
                 service: placed.service.clone(),
                 step: scrub.text(&step),

@@ -12,31 +12,12 @@
 //! which one the service takes is then a question for the service: [`settled`] asks it
 //! at the start of the next command, before anything signs in with either.
 
-use lemonfiber_manifest::ApiKind;
-
-use crate::app::targets::{hosted, record_secret, recorded_secret, service_addr, MediaServer};
+use crate::app::targets::{hosted, record_secret, recorded_secret, MediaServer};
 use crate::app::Ctx;
 use crate::config;
-use crate::ports::service::Failure;
 
 /// What a replacement's name ends in, after the name of the credential it replaces.
 const PENDING: &str = "_PENDING";
-
-/// A credential lemonfiber mints and replaces itself, and the service it opens.
-struct Minted {
-    /// The setting it is kept under.
-    setting: String,
-    /// What it opens.
-    opens: Opens,
-}
-
-/// The service a minted credential opens, as it is asked whether it takes one.
-enum Opens {
-    /// The stack's torrent client's web UI, where the host reaches it.
-    Torrent(String),
-    /// Whatever media server fills the identity source.
-    Media(Box<MediaServer>),
-}
 
 /// The name a replacement for `setting` is kept under until the service has taken it.
 pub(crate) fn pending(setting: &str) -> String {
@@ -110,72 +91,41 @@ pub(crate) async fn settled(ctx: &Ctx) {
         let Ok(manifest) = ctx.stack.manifest() else {
             return;
         };
-        minted(ctx, &manifest)
+        hosted(ctx, &manifest)
     };
-    for minted in asked {
-        settle(ctx, &minted).await;
+    if let Some(server) = asked {
+        settle(ctx, &server).await;
     }
 }
 
-/// Settle one minted credential: the one in force stays where the service takes it, and
-/// the replacement moves into place, and to the server's adapter where it has one, where
-/// the service takes that instead.
-async fn settle(ctx: &Ctx, minted: &Minted) {
-    let Some(replacement) = recorded_secret(ctx, &pending(&minted.setting)) else {
+/// Settle the administrator's password of whatever media server fills the identity
+/// source, kept under that server's own setting: the one in force stays where the server
+/// takes it, and the replacement moves into place, and to the server's adapter, where
+/// the server takes that instead.
+async fn settle(ctx: &Ctx, server: &MediaServer) {
+    let Some(replacement) = recorded_secret(ctx, &pending(&server.setting)) else {
         return;
     };
-    let current = recorded_secret(ctx, &minted.setting).unwrap_or_default();
-    match taken(ctx, minted, &current).await {
-        Some(true) => forgotten(ctx, &minted.setting),
-        Some(false) if taken(ctx, minted, &replacement).await == Some(true) => {
-            let _ =
-                promoted(ctx, &minted.setting, &replacement).and_then(|()| match &minted.opens {
-                    Opens::Media(server) => server.hand_upstream(&replacement),
-                    Opens::Torrent(_) => Ok(()),
-                });
+    let current = recorded_secret(ctx, &server.setting).unwrap_or_default();
+    match taken(ctx, server, &current).await {
+        Some(true) => forgotten(ctx, &server.setting),
+        Some(false) if taken(ctx, server, &replacement).await == Some(true) => {
+            let _ = promoted(ctx, &server.setting, &replacement)
+                .and_then(|()| server.hand_upstream(&replacement));
         }
         Some(false) | None => {}
     }
 }
 
-/// The credentials lemonfiber mints and replaces itself: the stack's torrent client's
-/// web UI password, and the administrator's password of whatever media server fills the
-/// identity source, under that server's own setting.
-fn minted(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Minted> {
-    let torrent = service_addr(&manifest.services, ApiKind::Qbittorrent).map(|addr| Minted {
-        setting: config::TORRENT_PASSWORD_KEY.to_owned(),
-        opens: Opens::Torrent(addr.loopback),
-    });
-    let media = hosted(ctx, manifest).map(|server| Minted {
-        setting: server.setting.clone(),
-        opens: Opens::Media(Box::new(server)),
-    });
-    torrent.into_iter().chain(media).collect()
-}
-
-/// Whether the service signs in with `password`: yes, no, or nothing where it would
-/// not say.
-async fn taken(ctx: &Ctx, minted: &Minted, password: &str) -> Option<bool> {
-    match &minted.opens {
-        Opens::Torrent(loopback) => {
-            match crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), loopback)
-                .accepts(password)
-                .await
-            {
-                Ok(()) => Some(true),
-                Err(Failure::Unauthorised { .. }) => Some(false),
-                Err(_) => None,
-            }
-        }
-        Opens::Media(server) => {
-            let source = Box::pin(server.identifying(ctx)).await?;
-            source
-                .whoever(config::MEDIA_SERVER_ADMIN_USER, password, crate::PRODUCT)
-                .await
-                .ok()
-                .map(|signed| signed.is_some())
-        }
-    }
+/// Whether the server signs its administrator in with `password`: yes, no, or nothing
+/// where it would not say.
+async fn taken(ctx: &Ctx, server: &MediaServer, password: &str) -> Option<bool> {
+    let source = Box::pin(server.identifying(ctx)).await?;
+    source
+        .whoever(config::MEDIA_SERVER_ADMIN_USER, password, crate::PRODUCT)
+        .await
+        .ok()
+        .map(|signed| signed.is_some())
 }
 
 #[cfg(test)]

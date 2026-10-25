@@ -296,10 +296,9 @@ async fn an_unreadable_volume_reports_free_space_unknown_not_zero() {
     );
 }
 
-/// A context configured to read download clients: the library stack running beside the
-/// Usenet client's adapter, the given filesystem and transport, and an env file holding
-/// the torrent client's recorded password where it says, beside which the Usenet client is
-/// recorded as moved into its plugin.
+/// A context configured to read download clients: the library stack running beside both
+/// download clients' adapters, the given filesystem and transport, and the env file it
+/// says, beside which each client is recorded as moved into its plugin.
 fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
     let settings = Settings {
         protocols: Protocols::both(),
@@ -310,7 +309,8 @@ fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> 
     a_context()
         .engine(Arc::new(
             Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
-                .alongside(usenet::running()),
+                .alongside(usenet::running())
+                .alongside(torrent::running()),
         ))
         .settings(settings)
         .build()
@@ -321,19 +321,21 @@ fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> 
 
 #[tokio::test]
 async fn the_transfers_panel_fills_from_each_download_client() {
-    let http: Arc<dyn Http> = usenet::beside_torrents(QBIT_TORRENTS, &[usenet::carrying()]);
+    let http: Arc<dyn Http> =
+        usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
     let ctx = ctx_downloads(
         SeedFs::keyed(None),
         http,
-        Some(env_at("transfers-fill", &a_password())),
+        Some(env_without_password("transfers-fill")),
     );
     usenet::moved_in(&ctx);
+    torrent::moved_in(&ctx);
     let snapshot = gather(&ctx, None).await;
 
     assert!(
         matches!(&snapshot.transfers, Panel::Ready(active) if active.iter().any(|t|
             matches!(t.protocol, Protocol::Torrent)
-                && t.name == "Ubuntu.iso"
+                && t.name == torrent::CARRIED
                 && t.progress == 30
                 && matches!(t.speed, Reading::Known(4096))
                 && t.eta == Some(Duration::from_secs(120)))),
@@ -353,9 +355,8 @@ async fn the_transfers_panel_fills_from_each_download_client() {
     assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.len() == 2));
 }
 
-/// No recorded torrent client password and no Usenet client recorded as moved in: both
-/// are still finishing first start, so each is skipped and the panel is ready-but-empty
-/// rather than failed.
+/// Neither download client recorded as moved in: each is the stack's own, which nothing
+/// reaches, so the panel is ready-but-empty rather than failed.
 #[tokio::test]
 async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
@@ -364,9 +365,8 @@ async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
     assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
 }
 
-/// The Usenet client has moved in but its adapter holds no key yet, and the torrent
-/// client has no recorded password. Neither can be read, so neither appears, and neither
-/// is asked.
+/// Both download clients have moved in but neither adapter holds a key yet. Neither can
+/// be read, so neither appears, and neither is asked.
 #[tokio::test]
 async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
     let http = Fake::scripted(Vec::new());
@@ -376,22 +376,24 @@ async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
         Some(env_without_password("transfers-unkeyed")),
     );
     usenet::unkeyed(&ctx);
+    torrent::unkeyed(&ctx);
     let snapshot = gather(&ctx, None).await;
     assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// The password is recorded, but the torrent client's login goes unanswered, and so does
-/// the Usenet client's adapter, so both are dropped from the panel rather than failing it.
+/// Both download clients have moved in, but neither adapter answers, so both are dropped
+/// from the panel rather than failing it.
 #[tokio::test]
 async fn a_download_client_that_will_not_answer_is_left_out() {
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
     let ctx = ctx_downloads(
         SeedFs::keyed(None),
         http,
-        Some(env_at("transfers-silent", &a_password())),
+        Some(env_without_password("transfers-silent")),
     );
     usenet::moved_in(&ctx);
+    torrent::moved_in(&ctx);
     let snapshot = gather(&ctx, None).await;
     assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
 }

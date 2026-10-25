@@ -17,7 +17,7 @@ requirement = [
   { id = "D1-R13", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
   { id = "D1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
   { id = "D1-R15", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-core/src/app/engine/diagnosis.rs", "crates/lemonfiber-core/src/app/engine/settling.rs", "crates/lemonfiber-core/src/app/engine/streaming.rs"] },
-  { id = "D1-R16", state = "done", evidence = ["crates/lemonfiber-core/src/secret.rs", "crates/lemonfiber-ports/src/random.rs", "crates/lemonfiber-core/src/qbittorrent.rs", "crates/lemonfiber-core/src/seed.rs", "spec:20-architecture/contracts/prowlarr-application.md"] },
+  { id = "D1-R16", state = "done", evidence = ["crates/lemonfiber-core/src/secret.rs", "crates/lemonfiber-ports/src/random.rs", "crates/lemonfiber-core/src/app/plugins/minting.rs", "crates/lemonfiber-core/src/plugin/seeding.rs", "crates/lemonfiber-core/src/seed.rs", "spec:20-architecture/contracts/prowlarr-application.md"] },
   { id = "D1-R17", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/fulfilment.rs"] },
   { id = "D1-R18", state = "done", evidence = ["crates/lemonfiber-core/src/wiring.rs", "crates/lemonfiber-core/src/wiring/tests.rs", "crates/lemonfiber-core/tests/integration/wiring.rs"] },
   { id = "D1-R19", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/seed/run/taken_back.rs", "crates/lemonfiber-core/src/seed/run/fulfilment.rs", "crates/lemonfiber-core/src/seed/run/linking.rs"] },

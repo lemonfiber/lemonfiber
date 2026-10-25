@@ -20,9 +20,7 @@ use crate::ports::service::{QueueDepth, Queues};
 use crate::queue::run::Answered;
 use crate::storage::{test_link, Linked};
 
-use crate::app::targets::{
-    curator_targets, download_targets, host_fillers, protocol_of, read_transfers,
-};
+use crate::app::targets::{curator_targets, download_targets, host_fillers, read_transfers};
 
 /// What the household has asked for, for the panel beside the door.
 ///
@@ -210,9 +208,11 @@ pub(super) async fn transfers(
     // costs the slowest client rather than the sum of them — and this one happens
     // every second, where a diagnosis happens when it is asked for. `join_all` keeps
     // the order, so the panel reads the same as when they were read one at a time.
-    let read = futures_util::future::join_all(targets.iter().map(|target| async move {
-        (protocol_of(&target.kind), read_transfers(ctx, target).await)
-    }))
+    let read = futures_util::future::join_all(
+        targets
+            .iter()
+            .map(|target| async move { (target.protocol, read_transfers(target).await) }),
+    )
     .await;
 
     let mut active = Vec::new();

@@ -381,3 +381,120 @@ fn a_first_party_part_moved_in_place_keeps_the_key_the_stack_published_for_it() 
     assert_eq!(stranger.len(), 32, "{stranger:?}");
     assert_ne!(stranger, RECORDED);
 }
+
+/// The seeded manifest, its adapter handing its upstream an account lemonfiber mints and
+/// its upstream answering in `native` in place of the stack's service of that name.
+fn moving_an_account(native: &str) -> Option<lemonfiber_plugin::Manifest> {
+    let account = "upstream    = { username = { secret = \"upstream-username\" }, password = \
+                   { secret = \"upstream-password\" } }";
+    let text = seeded()
+        .replace(
+            "upstream    = { api_key = { secret = \"upstream-key\" } }",
+            account,
+        )
+        .replace(
+            "id     = \"upstream-key\"\nof     = \"komga\"\nminted = true\nwhy    = \"The key the \
+             adapter signs in to Komga with\"\n",
+            "id     = \"upstream-username\"\nof     = \"komga\"\nminted = true\nwhy    = \"The \
+             account the adapter signs in to Komga as\"\n\n[[secret]]\nid     = \
+             \"upstream-password\"\nof     = \"komga\"\nminted = true\nwhy    = \"That \
+             account's password\"\n",
+        )
+        .replacen(
+            "id          = \"komga\"\nname        = \"Komga\"\nimage",
+            &format!(
+                "id          = \"komga\"\nname        = \"Komga\"\nreplaces    = \
+                 \"{native}\"\nnative      = \"{native}\"\nimage"
+            ),
+            1,
+        );
+    lemonfiber_plugin::Manifest::from_toml(&text).ok()
+}
+
+/// The account minting the moving-an-account manifest leaves held for its upstream
+/// answering in `native`, `trusted` as first-party, in a stack that recorded `recorded` as
+/// its torrent client's password, or none.
+fn minted_account(
+    name: &str,
+    native: &str,
+    recorded: Option<&str>,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> Option<(String, String)> {
+    let ctx = seeding(name);
+    let manifest = moving_an_account(native)?;
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let _ = match recorded {
+        Some(password) => {
+            crate::config::store::set(&env, crate::config::TORRENT_PASSWORD_KEY, password)
+        }
+        None => crate::config::store::unset(&env, crate::config::TORRENT_PASSWORD_KEY),
+    };
+    let mut would = crate::plugin::Installed::of(&manifest);
+    would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    would.tree = crate::test_support::A_TREE.to_owned();
+
+    super::super::super::minting::minted(&ctx, &would, &manifest, "1", trusted).ok()?;
+    let held =
+        crate::settings::secrets_at(&ctx).and_then(|at| crate::settings::Secrets::at(&at).ok())?;
+    let part = |id: &str| held.value(&format!("komga:{id}")).map(str::to_owned);
+    Some((part("upstream-username")?, part("upstream-password")?))
+}
+
+/// A first-party upstream moved in place of the stack's torrent client keeps the account
+/// lemonfiber set up on it: the name the stack signs in under, and the password recorded
+/// for it.
+#[test]
+fn a_first_party_part_moved_in_place_keeps_the_account_the_stack_set_up_on_it() {
+    assert!(moving_an_account("qbittorrent").is_some());
+    let trusted = crate::test_support::first_party("komga");
+
+    let kept = minted_account(
+        "seeded-account-trusted",
+        "qbittorrent",
+        Some(RECORDED),
+        &trusted,
+    );
+    assert_eq!(kept, Some(("admin".to_owned(), RECORDED.to_owned())));
+
+    let stranger = minted_account(
+        "seeded-account-stranger",
+        "qbittorrent",
+        Some(RECORDED),
+        &[],
+    )
+    .unwrap_or_default();
+    assert_eq!((stranger.0.len(), stranger.1.len()), (32, 32));
+    assert_ne!(stranger.1, RECORDED);
+}
+
+/// An upstream answering in an API the stack sets up no account on has a fresh account
+/// minted, whatever the stack recorded.
+#[test]
+fn a_part_moved_in_place_of_a_service_with_no_account_is_minted_one() {
+    let minted = minted_account(
+        "seeded-account-none",
+        "servarr",
+        Some(RECORDED),
+        &crate::test_support::first_party("komga"),
+    )
+    .unwrap_or_default();
+
+    assert_eq!((minted.0.len(), minted.1.len()), (32, 32));
+    assert_ne!(minted.1, RECORDED);
+}
+
+/// A password the stack never recorded for the service a part moves in place of is minted
+/// afresh, while the name the stack signs in under is still kept.
+#[test]
+fn a_part_moved_in_place_of_a_service_with_no_password_recorded_is_minted_one() {
+    let minted = minted_account(
+        "seeded-account-unrecorded",
+        "qbittorrent",
+        None,
+        &crate::test_support::first_party("komga"),
+    )
+    .unwrap_or_default();
+
+    assert_eq!(minted.0, "admin");
+    assert_eq!(minted.1.len(), 32, "{:?}", minted.1.len());
+}

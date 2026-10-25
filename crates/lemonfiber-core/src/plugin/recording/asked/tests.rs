@@ -109,7 +109,7 @@ fn a_claim_probe_asking_nothing_of_the_service_is_no_request_recording() {
 #[tokio::test]
 async fn a_key_presented_in_a_header_is_sent_in_it_and_nothing_is_presented_without_one() {
     let http = Fake::always(Answer::reply(200, "{}"));
-    let held = Presented::Header("X-Api-Key", "the-key".to_owned());
+    let held = Presented("X-Api-Key", "the-key".to_owned());
     let asked = request("/api/v3/system/status", Some("application/json"));
 
     let _ = answered(http.as_ref(), 8, &item(&asked, true), Some(&held)).await;

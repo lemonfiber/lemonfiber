@@ -129,7 +129,7 @@ async fn seeded(
     rehearsing: bool,
 ) -> Vec<Wiring> {
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let mut ctx = seed_ctx(None, true, Vec::new(), bytes, None).with_http(http.clone());
+    let mut ctx = seed_ctx(true, Vec::new(), bytes, None).with_http(http.clone());
     ctx.dry_run = rehearsing;
     super::super::seed_fulfilment_targets(
         &ctx,
@@ -366,7 +366,7 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
     let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
     let http = serving(&[&at_the_gate("held")], 201, 200);
     let both = accepting(&["held", "older"]).written();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
             (

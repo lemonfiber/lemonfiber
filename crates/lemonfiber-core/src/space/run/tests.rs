@@ -9,8 +9,9 @@ use super::{admits, space};
 use crate::config::Settings;
 use crate::ports::filesystem::{FsKind, Identity, StorageFacts};
 use crate::ports::occupancy::Occupant;
+use crate::ports::service::Seeded;
 use crate::space::{Level, Standing};
-use crate::test_support::{a_context, a_password, env_at, nowhere, SeedFs};
+use crate::test_support::{a_context, env_without_password, nowhere, torrent, SeedFs};
 
 /// A walked file with a given number of names pointing at it.
 fn file(path: &str, bytes: u64, inode: u64, links: u64) -> Occupant {
@@ -135,31 +136,41 @@ async fn a_disk_nobody_could_measure_does_not_stop_work_on_a_guess() {
     assert!(admits(&ctx).await.is_ok());
 }
 
-/// A context whose torrent client answers with one completed download of that
-/// name, and whose disk is the tree above with room to spare.
+/// A context whose torrent client, moved into its plugin, answers with one completed
+/// download of that name, and whose disk is the tree above with room to spare.
 ///
 /// `scratch` names the directory this run keeps its own files in, and every
 /// caller passes a different one: those files are written to a real disk and
 /// the cases run at the same time, so two sharing a directory would be one
 /// wiping the other's while it was reading it.
 fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
-    let body =
-        format!("[{{\"hash\":\"aa\",\"name\":\"{name}\",\"size\":3000,\"uploaded\":0,\"downloaded\":3000}}]");
-    let http = Fake::by_path(vec![
-        ("/api/v2/auth/login", Answer::reply(200, "Ok.")),
-        ("/api/v2/torrents/info", Answer::reply(200, body)),
-    ]);
-    a_context()
-        .settings(Settings {
-            env_file: Some(env_at(scratch, &a_password())),
-            ..measuring()
-        })
-        .build()
-        .with_http(http)
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
-        ))
-        .with_occupancy(Walking::holding(a_tree()))
+    let http = Fake::by_path(vec![seeding(name)]);
+    torrent::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env_without_password(scratch)),
+                ..measuring()
+            })
+            .build()
+            .with_http(http)
+            .with_filesystem(Arc::new(
+                SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
+            ))
+            .with_occupancy(Walking::holding(a_tree())),
+    )
+}
+
+/// The route answering the torrent client's adapter's `seeding` with one completed
+/// download called `name`, three thousand bytes and nothing uploaded.
+fn seeding(name: &str) -> (&'static str, Answer) {
+    (
+        torrent::operation("seeding"),
+        torrent::answered(&vec![Seeded {
+            name: name.to_owned(),
+            bytes: 3_000,
+            ratio: 0,
+        }]),
+    )
 }
 
 #[tokio::test]
@@ -295,28 +306,23 @@ async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
     // report carries — verbatim, because a permission denial or a full disk in
     // its own words is worth more than any reading of one.
     let http = Fake::by_path(vec![
-        ("/api/v2/auth/login", Answer::reply(200, "Ok.")),
-        (
-            "/api/v2/torrents/info",
-            Answer::reply(
-                200,
-                r#"[{"hash":"aa","name":"Never.Taken","size":3000,"uploaded":0,"downloaded":3000}]"#,
-            ),
-        ),
+        seeding("Never.Taken"),
         ("/queue", Answer::reply(200, STALLED)),
         ("/history", Answer::reply(200, r#"{"records":[]}"#)),
     ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env_at("space-stalled", &a_password())),
-            ..measuring()
-        })
-        .build()
-        .with_http(http)
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED)).with_facts(facts(900_000_000_000)),
-        ))
-        .with_occupancy(Walking::holding(a_tree()));
+    let ctx = torrent::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env_without_password("space-stalled")),
+                ..measuring()
+            })
+            .build()
+            .with_http(http)
+            .with_filesystem(Arc::new(
+                SeedFs::keyed(Some(KEYED)).with_facts(facts(900_000_000_000)),
+            ))
+            .with_occupancy(Walking::holding(a_tree())),
+    );
 
     // A service still waiting for it is also what stops it being called waste,
     // whatever the filesystem says about how many names point at its file — so

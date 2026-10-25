@@ -110,7 +110,6 @@ pub mod prerequisites;
 pub mod project;
 pub mod provider;
 pub mod prowlarr;
-pub mod qbittorrent;
 pub mod quality;
 pub mod queue;
 pub mod rating;

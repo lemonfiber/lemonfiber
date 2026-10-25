@@ -19,14 +19,8 @@ async fn seed_wires_each_curators_root_folders() {
     // version is simply not learned — the folders are what this test reads.
     const FOLDERS: &str = r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#;
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(
-        None,
-        true,
-        vec![(200, FOLDERS); 6],
-        Some(vec![0x11; 24]),
-        None,
-    )
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+    let ctx = seed_ctx(true, vec![(200, FOLDERS); 6], Some(vec![0x11; 24]), None)
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
@@ -74,7 +68,7 @@ async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
 async fn seed_skips_curator_root_folders_when_the_key_is_not_readable() {
     // No configuration to read a key from, so the curators have not finished
     // starting: their folders are skipped for a re-run, not failed.
-    let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None)
+    let ctx = seed_ctx(true, Vec::new(), Some(vec![0x11; 24]), None)
         .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -290,11 +284,11 @@ fn a_curator_with_no_category_is_told_about_no_client() {
 #[test]
 fn a_recorded_password_is_read_back_or_read_as_absent() {
     // Nowhere to read from.
-    let ctx = seed_ctx(None, true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, Vec::new(), None, None);
     assert!(recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).is_none());
 
     let path = config_scratch("qbt-readback");
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
+    let ctx = seed_ctx(true, Vec::new(), None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
     let _ = store::set(&path, "SOMETHING_ELSE", "x");
     assert!(
@@ -317,12 +311,11 @@ fn a_recorded_password_is_read_back_or_read_as_absent() {
 
 #[tokio::test]
 async fn seed_leaves_each_curators_already_present_download_clients() {
-    // The torrent client announces a temporary password, so it is set and its value
-    // threaded to the download clients; each curator already holds both clients.
+    // Both download clients are moved into their plugins with what lemonfiber minted for
+    // each in hand; each curator already holds both clients.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
     let ctx = seed_ctx(
-        Some(TEMP_LOG),
         true,
         Vec::new(),
         Some(vec![0x11; 24]),
@@ -330,7 +323,7 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
     )
     .with_http(seeding())
     .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let ctx = minting_usenet(ctx);
+    let ctx = minting_torrent(minting_usenet(ctx));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -361,7 +354,6 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
     let ctx = seed_ctx(
-        Some(TEMP_LOG),
         true,
         Vec::new(),
         Some(vec![0x22; 24]),
@@ -369,7 +361,7 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     )
     .with_http(seeding())
     .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let ctx = minting_usenet(ctx);
+    let ctx = minting_torrent(minting_usenet(ctx));
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -390,7 +382,6 @@ async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     // their keys, so registration is skipped for a re-run rather than failed.
     let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
     let ctx = seed_ctx(
-        Some(TEMP_LOG),
         true,
         Vec::new(),
         Some(vec![0x11; 24]),
@@ -398,7 +389,7 @@ async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     )
     .with_http(seeding())
     .with_filesystem(Arc::new(SeedFs::keyed(None)));
-    let ctx = minting_usenet(ctx);
+    let ctx = minting_torrent(minting_usenet(ctx));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -524,9 +515,9 @@ async fn a_seed_over_a_record_of_plugins_that_will_not_read_is_refused() {
     let kept = env.with_file_name(crate::config::paths::PLUGINS);
     let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
     let _ = std::fs::write(&kept, "not a register");
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf())).with_filesystem(
-        Arc::new(SeedFs::keyed(Some(crate::test_support::KEYED_CURATOR))),
-    );
+    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_filesystem(Arc::new(
+        SeedFs::keyed(Some(crate::test_support::KEYED_CURATOR)),
+    ));
 
     let refused = dispatch(Command::Seed, &ctx).await;
 

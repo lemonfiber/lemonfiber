@@ -34,7 +34,7 @@ fn the_application_kind_follows_from_the_media() {
 
 #[tokio::test]
 async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, Vec::new(), None, None);
     // Only a media-filing curator, so nothing asks for it at all.
     let wirings =
         super::super::seed_applications(&ctx, &fillers_of(vec![curator("sonarr", 8989, "tv")]))
@@ -48,7 +48,7 @@ async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let mut unpublished = aggregator_svc();
@@ -77,7 +77,7 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
 async fn app_sync_never_registers_a_plugin_curator() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = beside_a_stand_in(
@@ -116,7 +116,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
 async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = asked_by_a_plugin(&aggregator_svc(), vec![curator("sonarr", 8989, "tv")]);
@@ -134,7 +134,7 @@ async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
 #[tokio::test]
 async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
@@ -156,8 +156,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
 /// replaced key, so a replacement owes it nothing yet.
 #[tokio::test]
 async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
-    let ctx =
-        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -171,7 +170,7 @@ async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
 async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = beside_a_stand_in(
@@ -190,8 +189,7 @@ async fn app_sync_skips_every_curator_until_the_aggregator_has_written_its_key()
     let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
     // The aggregator's key is not readable yet, so it is still starting: every
     // application is skipped for a re-run rather than failed.
-    let ctx =
-        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
@@ -211,7 +209,7 @@ async fn app_sync_skips_only_the_curator_that_has_not_written_its_key() {
     // The aggregator's key is readable but the curator's is not — the curator came up after
     // the aggregator — so the curator's application waits while the aggregator itself
     // proceeds.
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(CURATOR_CONFIG)).only_for_aggregator(),
@@ -227,7 +225,7 @@ async fn app_sync_registers_a_curator_whose_keys_are_all_readable() {
     let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
     // The seeding routes report the curator already registered — its baseUrl is in the
     // application list — so the connection reads back as already wired.
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let wirings = super::super::seed_applications(&ctx, &services).await;
@@ -270,7 +268,7 @@ async fn app_sync_registers_an_absent_curator_and_reads_it_back() {
     // The aggregator holds no applications, so the curator is genuinely written and then
     // read back — the write path a pre-populated list would hide.
     let http = registering_aggregator();
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
 
@@ -308,7 +306,7 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
     // The whole command against the real manifest: the indexer aggregator and the three
     // media-filing curators, each already registered by the seeding routes.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
+    let ctx = seed_ctx(true, Vec::new(), Some(vec![0x11; 24]), None)
         .with_http(seeding())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
 

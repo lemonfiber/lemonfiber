@@ -88,7 +88,6 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
             "lidarr",
             "navidrome",
             "prowlarr",
-            "qbittorrent",
             "radarr",
             "seerr",
             "sonarr"
@@ -96,26 +95,38 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
     );
 }
 
-/// The Usenet client the bundle installs rather than assembles asks the dashboard from its
-/// own plugin, as every service the stack carries whose panel reads it does from the stack.
+/// Each download client the bundle installs rather than assembles asks the dashboard from
+/// its own plugin, as every service the stack carries whose panel reads it does from the
+/// stack.
 #[test]
-fn the_installed_usenet_client_asks_the_dashboard_from_its_plugin() {
-    let asking: Vec<String> = lemonfiber_testing::usenet::moved()
-        .map(|installed| {
-            installed
-                .services
-                .into_iter()
-                .filter(|placed| {
-                    placed
-                        .asks
-                        .iter()
-                        .any(|ask| ask.capability == "dashboard.show")
-                })
-                .map(|placed| placed.service)
-                .collect()
-        })
-        .unwrap_or_default();
-    assert_eq!(asking, vec![lemonfiber_testing::usenet::PLUGIN.to_owned()]);
+fn each_installed_download_client_asks_the_dashboard_from_its_plugin() {
+    for (moved, plugin) in [
+        (
+            lemonfiber_testing::usenet::moved(),
+            lemonfiber_testing::usenet::PLUGIN,
+        ),
+        (
+            lemonfiber_testing::torrent::moved(),
+            lemonfiber_testing::torrent::PLUGIN,
+        ),
+    ] {
+        let asking: Vec<String> = moved
+            .map(|installed| {
+                installed
+                    .services
+                    .into_iter()
+                    .filter(|placed| {
+                        placed
+                            .asks
+                            .iter()
+                            .any(|ask| ask.capability == "dashboard.show")
+                    })
+                    .map(|placed| placed.service)
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert_eq!(asking, vec![plugin.to_owned()]);
+    }
 }
 
 #[test]

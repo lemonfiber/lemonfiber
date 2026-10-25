@@ -1,12 +1,12 @@
 //! The connections that are not download clients.
 //!
-//! Indexers pushed to the services that search them, a download client's own password,
-//! and the media server made the identity source for requests — each a one-off shape
-//! rather than a variation on wiring a client.
+//! Indexers pushed to the services that search them, and the media server made the
+//! identity source for requests — each a one-off shape rather than a variation on wiring
+//! a client.
 
 use super::{
     observe_or_skip, observe_or_untold, same_base_url, unreached, wire_one, AppSync, Application,
-    Journal, MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
+    Journal, MediaServer, Naming, Random, Requests, State, Wiring, ADMIN,
 };
 use crate::ports::media::Kind;
 use crate::ports::service::{
@@ -274,63 +274,6 @@ fn unkept(why: &str) -> State {
         "the password lemonfiber generated could not be recorded, so it was not set: {why}"
     );
     State::Failed { detail }
-}
-
-/// Replace the torrent client's temporary web UI password with a generated one, recorded
-/// through `keep` before the client is given it, and hand the generated value back for
-/// the connections that sign in with it next.
-///
-/// Unlike every other connection, this one is a credential lemonfiber mints
-/// rather than reads. Generating it needs randomness the operating system might
-/// withhold; without it there is nothing to set, and the connection fails rather
-/// than falling back to a guessable secret on the client the forwarded port
-/// authenticates to. The client sets the password and confirms it by
-/// authenticating again; only a confirmed change is wired and handed back. One that
-/// was recorded and then not taken is replaced by the next run, which finds the
-/// recorded password refused and starts again from the temporary one.
-pub async fn wire_torrent_password(
-    client: &Qbittorrent,
-    random: &dyn Random,
-    temporary: &str,
-    rehearsing: bool,
-    keep: Keep<'_>,
-) -> (Wiring, Option<String>) {
-    let connection = "qBittorrent web UI password".to_owned();
-    // Above the generating, not below it. A password minted to describe a rehearsal is
-    // a secret that exists because somebody asked a question, and it would then have to
-    // be kept — putting it where the real one goes — or thrown away, which is worse,
-    // because a thrown-away one may be the one the client has already taken.
-    if rehearsing {
-        return (
-            Wiring::settled(
-                connection,
-                State::WouldWire {
-                    yours: None,
-                    ours: None,
-                },
-            ),
-            None,
-        );
-    }
-    let Some(password) = secret::generate(random) else {
-        return (
-            Wiring::settled(
-                connection,
-                State::Failed {
-                    detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
-                },
-            ),
-            None,
-        );
-    };
-
-    if let Err(why) = keep(&password) {
-        return (Wiring::settled(connection, unkept(&why)), None);
-    }
-    match client.replace_password(temporary, &password).await {
-        Ok(()) => (Wiring::settled(connection, State::Wired), Some(password)),
-        Err(failure) => (Wiring::settled(connection, unreached(&failure)), None),
-    }
 }
 
 /// What the report calls the media server being the identity the request service signs

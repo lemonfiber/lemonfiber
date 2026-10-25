@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use super::{
-    eta, percent, Hardlink, Panel, Protocol, Queue, Reach, Reading, Snapshot, Storage, Telemetry,
-    Transfer, Vpn,
+    eta, Hardlink, Panel, Protocol, Queue, Reach, Reading, Snapshot, Storage, Telemetry, Transfer,
+    Vpn,
 };
 use crate::docker::{Service, State};
 use crate::health::Summary;
@@ -139,23 +139,6 @@ fn a_host_and_a_container_disagreeing_about_the_time_cannot_render_a_countdown()
 }
 
 #[test]
-fn a_percentage_stays_between_zero_and_a_hundred() {
-    assert_eq!(percent(0, 100), 0);
-    assert_eq!(percent(50, 100), 50);
-    assert_eq!(percent(100, 100), 100);
-    assert_eq!(
-        percent(150, 100),
-        100,
-        "past-total skew clamps to a hundred, never more than finished"
-    );
-    assert_eq!(
-        percent(5, 0),
-        100,
-        "nothing to do is complete, not undefined"
-    );
-}
-
-#[test]
 fn the_value_types_serialise_for_the_machine_readable_side() {
     let reading = Reading::Known(3_u64);
     let json = serde_json::to_string(&reading).unwrap_or_default();
@@ -185,7 +168,7 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
         transfers: Panel::Ready(vec![Transfer {
             name: "Some.Release".to_owned(),
             protocol: Protocol::Torrent,
-            progress: percent(3, 4),
+            progress: 75,
             speed: Reading::Known(1_048_576),
             eta: eta(5_000_000, 1_048_576),
         }]),

@@ -3,13 +3,12 @@
 use super::{
     changing, env_at, held, over, reaching, refusal, stance, Said, AGREED, TORRENT, UNSAID, USENET,
 };
-use lemonfiber_core::app::Waiting;
+use lemonfiber_core::app::{Ctx, Waiting};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::reconfigure::Stance;
-use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
 use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_testing::usenet;
+use lemonfiber_testing::{torrent, usenet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -19,6 +18,19 @@ const WAITING: Said = Said {
     waiting: Waiting::ForTheDownloads,
 };
 
+/// `ctx` reaching both download clients moved into their plugins, for a stack directory
+/// tests share: each recorded beside its env file and keyed wherever its configuration
+/// directory is, with the engine saying each adapter runs beside the curator.
+fn downloading(ctx: Ctx) -> Ctx {
+    let mut ctx = torrent::keyed(usenet::keyed(ctx));
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
+            .alongside(usenet::running())
+            .alongside(torrent::running()),
+    );
+    ctx
+}
+
 #[tokio::test]
 async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wait() {
     // Ninety-four per cent of the way down, and no tracker resumes that everywhere.
@@ -26,13 +38,13 @@ async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wai
     // typed, not about what is inside the client it takes away.
     let from = PathBuf::from("/srv/media");
     let env = env_at("in-flight", &from);
-    let ctx = over(
+    let ctx = downloading(over(
         env.clone(),
         &from,
         Protocols::both(),
-        usenet::beside_torrents(QBIT_TORRENTS, &[]),
+        usenet::beside_torrents(&[torrent::carrying()], &[]),
         Vec::new(),
-    );
+    ));
 
     let review = changing(&ctx, TORRENT, "off", UNSAID).await;
 
@@ -47,7 +59,7 @@ async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wai
                 .collect()
         })
         .unwrap_or_default();
-    assert!(named.contains(&"Ubuntu.iso".to_owned()), "{named:?}");
+    assert!(named.contains(&torrent::CARRIED.to_owned()), "{named:?}");
     assert_eq!(stance(review.as_ref()), Some(Stance::Blocked));
     let refusal = refusal(review.as_ref()).unwrap_or_default();
     assert!(refusal.contains("--wait"), "{refusal}");
@@ -67,17 +79,13 @@ async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wai
 async fn dropping_usenet_names_what_is_coming_down_over_usenet_and_not_the_torrents() {
     let from = PathBuf::from("/srv/media");
     let env = env_at("usenet-in-flight", &from);
-    let mut ctx = usenet::keyed(over(
+    let ctx = downloading(over(
         env.clone(),
         &from,
         Protocols::both(),
-        usenet::beside_torrents(QBIT_TORRENTS, &[usenet::carrying()]),
+        usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]),
         Vec::new(),
     ));
-    ctx.seams.engine = Arc::new(
-        Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
-            .alongside(usenet::running()),
-    );
 
     let review = changing(&ctx, USENET, "off", UNSAID).await;
 
@@ -109,13 +117,13 @@ async fn the_offer_to_wait_taken_up_lets_the_downloads_finish_and_then_makes_the
     // test can hang.
     let from = PathBuf::from("/srv/media");
     let env = env_at("waited", &from);
-    let ctx = over(
+    let ctx = downloading(over(
         env.clone(),
         &from,
         Protocols::both(),
-        usenet::beside_torrents(QBIT_FINISHED, &[]),
+        usenet::beside_torrents(&[torrent::finished()], &[]),
         Vec::new(),
-    );
+    ));
 
     let review = changing(
         &ctx,
@@ -139,8 +147,14 @@ async fn asking_a_change_that_takes_nothing_away_to_wait_waits_for_nothing() {
     // it must not sit down in front of every download on the machine.
     let from = PathBuf::from("/srv/media");
     let env = env_at("not-a-reduction", &from);
-    let fake = usenet::beside_torrents(QBIT_TORRENTS, &[]);
-    let ctx = over(env, &from, Protocols::none(), Arc::clone(&fake), Vec::new());
+    let fake = usenet::beside_torrents(&[torrent::carrying()], &[]);
+    let ctx = downloading(over(
+        env,
+        &from,
+        Protocols::none(),
+        Arc::clone(&fake),
+        Vec::new(),
+    ));
 
     let review = changing(&ctx, USENET, "on", WAITING).await;
 

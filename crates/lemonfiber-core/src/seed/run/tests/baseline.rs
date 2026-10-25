@@ -111,23 +111,25 @@ async fn a_reset_previews_then_reverts_a_drifted_connection() {
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
-    // A recorded torrent client password makes a torrent download client wanted; a
+    // The torrent client's minted account makes a torrent download client wanted; a
     // baseline recording lemonfiber's category for it, against the categoryless client
     // the service now reports, reads as the operator's drift to revert.
-    let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
+    let _ = std::fs::write(&env, "");
     let _ = crate::config::store::write(
         &dir.join("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
     );
 
-    let context = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            ..Settings::default()
-        })
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-        .with_http(seeding());
+    let context = minting_torrent(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
+            .with_http(seeding()),
+    );
 
     // Preview: the drifted connection is named, and nothing is written.
     let preview = super::super::reset_connections(&context, false).await;
@@ -186,22 +188,25 @@ fn clients_answering(clients: Answer) -> Arc<Fake> {
     ])
 }
 
-/// A context seeding the real stack over the given transport, with a
-/// torrent client password recorded and the given baseline written beside it.
+/// A context seeding the real stack over the given transport, with the torrent client
+/// moved into its plugin and its account minted, and the given baseline written beside
+/// it.
 fn schema_ctx(dir: &std::path::Path, baseline: &str, http: Arc<Fake>) -> Ctx {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let _ = std::fs::create_dir_all(dir);
     let env = dir.join(".env");
-    let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
+    let _ = std::fs::write(&env, "");
     let _ = crate::config::store::write(&dir.join("baseline.json"), baseline);
-    a_context()
-        .settings(Settings {
-            env_file: Some(env),
-            ..Settings::default()
-        })
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-        .with_http(http)
+    minting_torrent(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            })
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
+            .with_http(http),
+    )
 }
 
 /// The state of the torrent client's wiring into the curator in a seed report.
@@ -280,8 +285,9 @@ async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
 /// A transport whose download-client list is set per test — a body to return, or
 /// nothing to fail the read — with every other call answered plainly. For the
 /// reset-connection edge cases, where what the service holds decides the preview.
-/// A context for the reset-connection edge cases: the real stack, a recorded
-/// torrent client password so a client is wanted, keys per `filesystem`, over `http`.
+/// A context for the reset-connection edge cases: the real stack, the torrent client moved
+/// into its plugin with its account minted so a client is wanted, keys per `filesystem`,
+/// over `http`.
 fn reset_ctx(
     dir: &std::path::Path,
     filesystem: Arc<SeedFs>,
@@ -289,15 +295,17 @@ fn reset_ctx(
 ) -> Ctx {
     let _ = std::fs::create_dir_all(dir);
     let env = dir.join(".env");
-    let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
-    a_context()
-        .settings(Settings {
-            env_file: Some(env),
-            ..Settings::default()
-        })
-        .build()
-        .with_filesystem(filesystem)
-        .with_http(http)
+    let _ = std::fs::write(&env, "");
+    minting_torrent(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            })
+            .build()
+            .with_filesystem(filesystem)
+            .with_http(http),
+    )
 }
 
 /// A register of installed plugins that is there and will not read is a machine that
@@ -414,7 +422,7 @@ async fn a_lost_baseline_is_reported_and_left_for_a_deliberate_re_baseline() {
     let corrupt = "this is not the baseline you are looking for";
     let _ = crate::config::store::write(&baseline, corrupt);
 
-    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
 
@@ -435,7 +443,7 @@ async fn an_adopt_pass_re_baselines_over_a_lost_record() {
     let baseline = env.with_file_name("baseline.json");
     let _ = crate::config::store::write(&baseline, "not parseable");
 
-    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Assessed);
 
@@ -456,7 +464,7 @@ async fn a_baseline_whose_file_cannot_be_read_is_a_loss() {
     let baseline = env.with_file_name("baseline.json");
     let _ = std::fs::create_dir_all(&baseline);
 
-    let ctx = seed_ctx(None, false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));

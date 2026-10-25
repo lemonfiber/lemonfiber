@@ -58,10 +58,9 @@ pub enum State {
     /// Both values are serialized, so a secret-bearing field must not report through
     /// this variant carrying one. It does not have to: `ours` is absent exactly where
     /// a real run would generate the value rather than read it, which is the only
-    /// place a credential arises — the torrent client's web UI password and the media
-    /// server's admin account. A value minted to describe a rehearsal is a secret that
-    /// exists because somebody asked a question, and it would then have to be kept or
-    /// thrown away.
+    /// place a credential arises — the media server's admin account. A value minted to
+    /// describe a rehearsal is a secret that exists because somebody asked a question, and
+    /// it would then have to be kept or thrown away.
     ///
     /// `yours` is absent where the service holds nothing, and where this run could not
     /// ask without writing — reading the household's telling means signing in as the

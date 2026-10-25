@@ -366,9 +366,7 @@ async fn a_service_that_fails_anywhere_writes_none_of_its_recordings_and_is_remo
     let before = std::fs::read_to_string(at.join(GUARDED)).unwrap_or_default();
     let serving = sonarr()
         .standing(Standing::Exited(3))
-        .logging(
-            "starting\nA temporary password is provided for this session: s3tXuQKTH\n\u{1b}[31mcrashed in 4f1c2d3e5a6b7c8d9e0f\n",
-        );
+        .logging("starting\n\u{1b}[31mcrashed in 4f1c2d3e5a6b7c8d9e0f\n");
     let read = recorded(&at, &serving, &answering("{}")).await;
     let Some(read) = read else {
         return;
@@ -382,7 +380,6 @@ async fn a_service_that_fails_anywhere_writes_none_of_its_recordings_and_is_remo
             why: "it exited 3 before its health passed".to_owned(),
             log: vec![
                 "starting".to_owned(),
-                "A temporary password is provided for this session: <redacted>".to_owned(),
                 "[31mcrashed in <redacted>".to_owned(),
             ],
         }]

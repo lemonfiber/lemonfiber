@@ -155,9 +155,9 @@ pub(super) async fn put_back(
 fn answered(filler: &Filler, owner: Result<Owner, Failure>) -> State {
     match owner {
         Ok(Owner::Theirs) => State::Refused {
-            reason: refusal(&filler.name, &filler.upstream),
+            reason: refusal(&filler.name, &filler.upstream_settings()),
         },
-        Ok(owner) => unclaimed(&filler.name, owner, &filler.upstream)
+        Ok(owner) => unclaimed(&filler.name, owner, &filler.upstream_settings())
             .map_or(State::Wired, |detail| State::Failed { detail }),
         Err(failure) => crate::seed::unreached(&failure),
     }

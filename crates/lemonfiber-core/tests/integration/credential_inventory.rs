@@ -40,8 +40,8 @@ fn the_service_key() -> String {
     format!("{}{}", "aaaabbbb", "ccccddddeeee")
 }
 
-/// The password recorded for the torrent client, built the same way.
-fn the_torrent_password() -> String {
+/// A password recorded in the settings file, built the same way.
+fn the_recorded_password() -> String {
     format!("{}{}", "ffff0000", "111122223333")
 }
 

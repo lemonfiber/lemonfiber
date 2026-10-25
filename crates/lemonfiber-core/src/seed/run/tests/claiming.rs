@@ -5,7 +5,7 @@ use super::*;
 
 /// What claiming came to, against this server's answers and this settings file.
 async fn claiming(http: Arc<Fake>, env: Option<std::path::PathBuf>) -> Option<Wiring> {
-    let ctx = seed_ctx(None, true, Vec::new(), Some(vec![9; 32]), env).with_http(http);
+    let ctx = seed_ctx(true, Vec::new(), Some(vec![9; 32]), env).with_http(http);
     super::super::claiming::claimed(&ctx, &[listening_server_svc()]).await
 }
 
@@ -142,7 +142,7 @@ async fn an_account_lemonfiber_made_earlier_is_already_wired() {
 #[tokio::test]
 async fn nothing_is_claimed_without_a_listening_server_or_on_a_rehearsal() {
     let http = Fake::always(Answer::reply(200, r#"{"isInit":false}"#));
-    let ctx = seed_ctx(None, true, Vec::new(), Some(vec![9; 32]), None).with_http(http.clone());
+    let ctx = seed_ctx(true, Vec::new(), Some(vec![9; 32]), None).with_http(http.clone());
     assert!(super::super::claiming::claimed(&ctx, &[]).await.is_none());
     let rehearsing = ctx.rehearsing();
     assert!(

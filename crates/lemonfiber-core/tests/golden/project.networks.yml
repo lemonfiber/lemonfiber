@@ -71,11 +71,6 @@ networks:
       config:
       - subnet: 10.80.96.0/28
         ip_range: 10.80.96.8/29
-  ask__gluetun__dashboard.show__homepage:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.42.216/29
   ask__homepage__proxy.front__caddy:
     internal: true
     ipam:

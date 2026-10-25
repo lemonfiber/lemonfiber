@@ -15,7 +15,7 @@ use crate::plugin::installed::Placed;
 use crate::plugin::program::Throwaway;
 use crate::ports::http::Http;
 use crate::ports::random::Random;
-use crate::ports::serving::{Served, Serving};
+use crate::ports::serving::Served;
 
 /// How long a first run may take once the service is healthy.
 pub(super) const FIRST_RUN: Duration = Duration::from_secs(60);
@@ -23,17 +23,9 @@ pub(super) const FIRST_RUN: Duration = Duration::from_secs(60);
 /// Where `NZBHydra2`'s configuration holds the key the instance made for itself.
 const INSTANCE_KEY: &str = "/main/apiKey";
 
-/// How many of the last lines a service wrote are read for what it announces.
-const ANNOUNCED_WITHIN: usize = 200;
-
-/// Where a request presents the credential.
+/// A credential a request presents: in this header, holding this.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum Presented {
-    /// In this header, holding this.
-    Header(&'static str, String),
-    /// In the session the transport the first run signed in through carries.
-    Session,
-}
+pub(super) struct Presented(pub(super) &'static str, pub(super) String);
 
 /// The credential a first run left lemonfiber holding, how its adapter presents it, and
 /// every credential the run made or read.
@@ -63,8 +55,6 @@ pub(super) struct Reaching<'a> {
     pub(super) copy: &'a Throwaway,
     /// The container serving it.
     pub(super) served: &'a Served,
-    /// What reads the container's log.
-    pub(super) serving: &'a dyn Serving,
     /// The transport the first run signs in through, which its operator's requests are
     /// asked through after it.
     pub(super) keyed: Arc<dyn Http>,
@@ -120,23 +110,20 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
     }
     match api.kind {
         ApiKind::Bindery => Ok(reaching.before.key.clone().map(|key| Held {
-            presented: Presented::Header(crate::endpoint::API_KEY_HEADER, key.clone()),
+            presented: Presented(crate::endpoint::API_KEY_HEADER, key.clone()),
             made: vec![key],
         })),
-        ApiKind::Qbittorrent => torrenting(reaching, &base).await.map(Some),
         ApiKind::Audiobookshelf => listening(reaching, &base).await.map(Some),
         ApiKind::Nzbhydra2 => aggregating(reaching, &base).await.map(Some),
-        _ => Err(
-            "a media server's first run is its adapter's, and no adapter fronts it here".to_owned(),
-        ),
+        _ => Err("its first run is its adapter's, and no adapter fronts it here".to_owned()),
     }
 }
 
 /// How a key the service wrote for itself is presented by a service of `kind`.
 fn presenting(kind: ApiKind, key: String) -> Presented {
     match kind {
-        ApiKind::Bazarr => Presented::Header(crate::bazarr::KEY, key),
-        _ => Presented::Header(crate::endpoint::API_KEY_HEADER, key),
+        ApiKind::Bazarr => Presented(crate::bazarr::KEY, key),
+        _ => Presented(crate::endpoint::API_KEY_HEADER, key),
     }
 }
 
@@ -184,34 +171,6 @@ fn said(failure: impl std::fmt::Display) -> String {
     failure.to_string()
 }
 
-/// qBittorrent's first run: the temporary password it announces, replaced by one
-/// lemonfiber mints, signed in with through the transport its operator's requests take.
-async fn torrenting(reaching: &Reaching<'_>, base: &str) -> Result<Held, String> {
-    let announced = until_there(|| async {
-        let log = reaching
-            .serving
-            .log(reaching.served, ANNOUNCED_WITHIN)
-            .await;
-        Ok(crate::qbittorrent::temporary_password(&log))
-    })
-    .await?
-    .ok_or_else(|| {
-        format!(
-            "it announced no temporary password within {} seconds",
-            FIRST_RUN.as_secs()
-        )
-    })?;
-    let password = minted(reaching.random)?;
-    crate::qbittorrent::Qbittorrent::new(Arc::clone(&reaching.keyed), base)
-        .replace_password(&announced, &password)
-        .await
-        .map_err(said)?;
-    Ok(Held {
-        presented: Presented::Session,
-        made: vec![announced, password],
-    })
-}
-
 /// Audiobookshelf's first run: the root account lemonfiber names, made with a password it
 /// mints, and signed in as.
 async fn listening(reaching: &Reaching<'_>, base: &str) -> Result<Held, String> {
@@ -236,7 +195,7 @@ async fn listening(reaching: &Reaching<'_>, base: &str) -> Result<Held, String> 
     let mut made = vec![password];
     made.extend(tokens);
     Ok(Held {
-        presented: Presented::Header(crate::endpoint::AUTHORIZATION, format!("Bearer {bearer}")),
+        presented: Presented(crate::endpoint::AUTHORIZATION, format!("Bearer {bearer}")),
         made,
     })
 }
@@ -275,16 +234,9 @@ async fn aggregating(reaching: &Reaching<'_>, base: &str) -> Result<Held, String
     let pair = header.strip_prefix("Basic ").unwrap_or_default().to_owned();
     made.push(pair);
     Ok(Held {
-        presented: Presented::Header(crate::endpoint::AUTHORIZATION, header),
+        presented: Presented(crate::endpoint::AUTHORIZATION, header),
         made,
     })
-}
-
-/// Every credential a service announces in its log before anything takes it from it.
-pub(super) fn announced(log: &str) -> Vec<String> {
-    crate::qbittorrent::temporary_password(log)
-        .into_iter()
-        .collect()
 }
 
 /// What `look` finds once it finds anything, looked at again until it does or the first

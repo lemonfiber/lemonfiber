@@ -8,20 +8,19 @@
 //! leaves the operator with the credential they started with rather than with neither,
 //! and never with a password set on a service that nothing recorded.
 //!
-//! Two credentials can genuinely be replaced from here and the rest cannot, and the
-//! difference is not arbitrary. lemonfiber can replace what it minted and set itself — the
-//! torrent client's web UI password — and it can hand out afresh what a service minted for
-//! itself, which is the repair for a service that regenerated its key underneath a stack
-//! still handing out the old one. It cannot invent a Usenet password: a value this product
-//! made up would be one the provider has never heard of, so what is owed there is a
-//! sentence saying where a replacement comes from.
+//! Two kinds of credential can genuinely be replaced from here and the rest cannot, and
+//! the difference is not arbitrary. lemonfiber can replace what it minted and set itself —
+//! the media server's administrator password — and it can hand out afresh what a service
+//! minted for itself, which is the repair for a service that regenerated its key
+//! underneath a stack still handing out the old one. It cannot invent a Usenet password: a
+//! value this product made up would be one the provider has never heard of, so what is
+//! owed there is a sentence saying where a replacement comes from.
 
 use std::path::Path;
 
-use lemonfiber_manifest::{ApiKind, Service};
+use lemonfiber_manifest::Service;
 
-use super::pending::{forgotten, kept, pending, promoted};
-use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for, MediaServer};
+use crate::app::targets::{record_secret, recorded_secret, target_for, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
@@ -31,22 +30,11 @@ use crate::seed::run::published_as;
 mod replacing;
 pub(crate) use replacing::replace_admin_password;
 
-/// What a rehearsal says about replacing the credential lemonfiber mints itself.
-const MINTING: &str = "a real run would generate a new web UI password, record it beside \
-     the one in force, set it on the torrent client, sign in with it to prove the client had \
-     taken it, and only then put it in place of the old one. Nothing was generated here, and \
-     nothing was set.";
-
 /// What a rehearsal says about replacing the media server's administrator password.
 const ADMINISTERING: &str = "a real run would generate a new administrator password, record it \
      beside the one in force, set it on the media server, sign in with it to prove the server \
      took it, and only then put it in place of the old one. Nothing was generated here, and \
      nothing was set.";
-
-/// What a rotation the torrent client refused at its first sign-in left behind.
-const REFUSED_BY_THE_CLIENT: &str = "the torrent client refused the password lemonfiber holds, so \
-     there was nothing to change it with. Nothing was written; the recorded password is the one \
-     it was before.";
 
 /// What a rehearsal says about handing a service's own key back out.
 const REPUBLISHING: &str = "a real run would read the key the service wrote for itself, \
@@ -99,9 +87,6 @@ pub(crate) async fn rotate(
             }
             None => republished(ctx, held, services, project).await,
         },
-        Origin::Lemonfiber if held.setting == config::TORRENT_PASSWORD_KEY => {
-            replaced(ctx, held, services).await
-        }
         Origin::Lemonfiber if held.setting == config::MEDIA_SERVER_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await
         }
@@ -177,74 +162,6 @@ fn elsewhere(setting: &str) -> String {
          {afterwards}, which proves it against the live service before it keeps it. Until \
          then the existing credential is untouched and still in force."
     )
-}
-
-/// Replace the torrent client's web UI password with a freshly minted one.
-///
-/// The client sets the replacement and then signs in with it, so a set the service
-/// accepted but did not apply is caught rather than called done. The replacement is
-/// recorded under its pending name before it is set and moved into place only once it
-/// is proven — which is what leaves a failed rotation with the old password still
-/// recorded and still the one the service takes.
-async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
-    // The address and the password it authenticates with are one condition rather
-    // than two: a stack with no torrent client has no password recorded for one
-    // either, and telling those apart would be telling apart two ways of having
-    // nothing to change.
-    let Some((addr, current)) =
-        service_addr(services, ApiKind::Qbittorrent).zip(recorded_secret(ctx, &held.setting))
-    else {
-        return unproven(
-            held,
-            "there is no torrent client with a password recorded, so there is nothing to \
-             authenticate with in order to change one; run lemonfiber seed to set one",
-        );
-    };
-    // Below everything that can be told without acting and above everything that
-    // cannot. A rehearsal has already been through the same two conditions a real run
-    // is refused by, so what it reports is what this run would actually attempt — and
-    // it stops one line before the replacement is generated, because a password minted
-    // to describe a rotation is a secret that exists because somebody asked a question.
-    if ctx.dry_run {
-        return would_rotate(held, MINTING);
-    }
-    let Some(replacement) = crate::secret::generate(ctx.seams.random.as_ref()) else {
-        return unproven(
-            held,
-            "no randomness was available to generate a replacement, and a guessable password \
-             on the client the forwarded port authenticates to is worse than the one in force",
-        );
-    };
-
-    if let Err(failure) = record_secret(ctx, &pending(&held.setting), &replacement) {
-        return unproven(held, &unrecorded(&failure));
-    }
-    let client = crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), &addr.loopback);
-    match client.replace_password(&current, &replacement).await {
-        Ok(()) => match promoted(ctx, &held.setting, &replacement) {
-            Ok(()) => Rotation::landed(
-                &held.name,
-                "the torrent client took the replacement and signed in with it",
-                reached(&held.setting),
-            ),
-            Err(detail) => Rotation::stopped(&held.name, Settled::ReplacedUnproven { detail }),
-        },
-        Err(Failure::Unauthorised { .. }) => {
-            forgotten(ctx, &held.setting);
-            Rotation::stopped(
-                &held.name,
-                Settled::Refused {
-                    detail: REFUSED_BY_THE_CLIENT.to_owned(),
-                },
-            )
-        }
-        // The replacement stays under its pending name: whether the client took it is
-        // what the failure leaves unknown, and the next command asks.
-        Err(failure) => {
-            kept(ctx, &held.setting, &replacement);
-            unproven(held, &said(&failure))
-        }
-    }
 }
 
 /// Why a rotation that could not record its replacement set nothing.

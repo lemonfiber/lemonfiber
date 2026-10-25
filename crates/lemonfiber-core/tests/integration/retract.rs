@@ -154,18 +154,10 @@ async fn a_stack_with_a_baseline_has_its_wirings_read() {
     if let Some(dir) = paths.env_file().parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    // What lemonfiber last wrote into the curator, in the shape seeding saves, and the
-    // torrent client's recorded password: the wirings a diagnosis reads are the clients
-    // lemonfiber would write, and without a credential to write there is no client to
-    // compare.
+    // What lemonfiber last wrote into the curator, in the shape seeding saves.
     let _ = std::fs::write(
         paths.env_file().with_file_name("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv-sonarr","at":"1000","origin":"written"}}}}"#,
-    );
-    let _ = lemonfiber_core::config::store::set(
-        &paths.env_file(),
-        lemonfiber_core::config::TORRENT_PASSWORD_KEY,
-        &lemonfiber_fixtures::support::a_password(),
     );
 
     let report = diagnose(

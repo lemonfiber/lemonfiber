@@ -44,7 +44,6 @@ mod provenance;
 mod providers;
 mod prowlarr;
 mod putting_one_run_back;
-mod qbittorrent;
 mod releases;
 mod repair;
 mod retract;

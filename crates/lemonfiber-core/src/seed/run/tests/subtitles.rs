@@ -21,7 +21,7 @@ fn subtitle_ctx(http: Arc<Fake>, finder: Option<&'static str>) -> Ctx {
     if let Some(config) = finder {
         fs = fs.with_subtitle_finder(config);
     }
-    seed_ctx(None, true, Vec::new(), None, None)
+    seed_ctx(true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(fs))
 }
@@ -288,7 +288,7 @@ async fn a_curator_with_no_key_yet_is_skipped_rather_than_wired() {
         "/api/system/settings",
         Answer::reply(200, WATCHING_NOTHING),
     )]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(
             SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
@@ -503,7 +503,7 @@ async fn a_curator_whose_key_file_leads_away_is_refused_its_watch() {
         "/api/system/settings",
         Answer::reply(200, WATCHING_NOTHING),
     )]);
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(
             leading_away_from_the_stand_in().with_subtitle_finder(FINDER_CONFIG),
@@ -540,12 +540,12 @@ async fn a_replaced_key_rewatches_each_finder_and_refuses_one_read_from_a_file_l
         "/api/system/settings",
         Answer::reply(200, WATCHING_NOTHING),
     )]);
-    let refusing = seed_ctx(None, true, Vec::new(), None, None)
+    let refusing = seed_ctx(true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(
             leading_away_from_the_stand_in().with_subtitle_finder(FINDER_CONFIG),
         ));
-    let unkeyed = seed_ctx(None, true, Vec::new(), None, None)
+    let unkeyed = seed_ctx(true, Vec::new(), None, None)
         .with_http(http)
         .with_filesystem(Arc::new(
             SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
@@ -584,7 +584,7 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
                 .with_subtitle_finder(config),
             None => SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>")),
         };
-        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(fs))
+        seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(fs))
     };
     let stack = || {
         vec![
@@ -622,7 +622,7 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
 /// naming none has no key to read.
 #[tokio::test]
 async fn a_finder_naming_no_configuration_file_has_no_key_to_publish() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
+    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(
         SeedFs::keyed(None).with_subtitle_finder(FINDER_CONFIG),
     ));
     let mut unnamed = subtitle_finder_svc();

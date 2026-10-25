@@ -246,11 +246,8 @@ pub(crate) const PROVIDER_TLS_KEY: &str = "USENET_TLS";
 /// operator chose to proceed with unverified.
 pub(crate) const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
 
-/// The environment key holding the torrent client's web UI password.
-///
-/// Seeding generates this password and records it here, because lemonfiber's own port
-/// forwarding authenticates to the torrent client with it — the one credential
-/// lemonfiber mints and writes rather than reads from a service.
+/// The environment key holding the password of the stack's own torrent client's web UI
+/// account, which a first-party torrent client moved in its place answers to.
 pub const TORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 
 /// The environment key holding the media server's administrator password.
@@ -296,20 +293,16 @@ pub(crate) const LISTENING_SERVER_USER: &str = "admin";
 /// library read authenticates as it, all under the same name.
 pub(crate) const MEDIA_SERVER_ADMIN_USER: &str = "admin";
 
-/// The account name the torrent client's web UI is reached under.
+/// The name of the stack's own torrent client's web UI account.
 ///
-/// One source of truth for the name, so the client that logs in and the download-client
-/// registration that hands it to a curator present the same one. Separate from the media
-/// server's although both spell it `admin`: they are two services, and either may change
-/// without the other.
+/// Separate from the media server's although both spell it `admin`: they are two
+/// services, and either may change without the other.
 pub(crate) const TORRENT_USER: &str = "admin";
 
-/// What a torrent client's web UI password setting ends in, after the service it is
-/// for.
+/// What a setting holding the password a service is reached with ends in, after the
+/// service it is for; the stack's torrent client's is [`TORRENT_PASSWORD_KEY`].
 ///
-/// Per service, because the password is the one a particular client was set to, and a
-/// second client standing in for the first is a second password. The bundled client's
-/// comes out as [`TORRENT_PASSWORD_KEY`].
+/// One of the [`CREDENTIAL_SUFFIXES`], so no plugin's setting is spelled onto one.
 pub(crate) const PASSWORD_SUFFIX: &str = "_PASSWORD";
 
 /// What a setting holding the account a service is reached under ends in, after the

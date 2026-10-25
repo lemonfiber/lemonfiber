@@ -66,7 +66,7 @@ pub(crate) async fn bandwidth(ctx: &Ctx, asked: &Asked) -> Result<Sharing, Box<P
         .map_err(|err| Box::new(err.problem()))?;
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let targets = download_targets(ctx, &host_fillers(ctx, &stack, project.as_deref())).await;
-    let clients = reaching::opened(ctx, &targets);
+    let clients = reaching::opened(&targets);
     let zone = zone(ctx);
 
     let metered = counting(ctx, &clients, &declared).await;

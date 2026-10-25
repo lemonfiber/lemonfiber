@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use lemonfiber_fixtures::http::Fake;
+use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{Reporting, Tunnel};
 
 use super::{after_start, pass, Asking, CameTo, Last, CHECK, RECORD};
@@ -8,36 +8,37 @@ use crate::app::Ctx;
 use crate::config::Settings;
 use crate::journal::{Change, Kind};
 use crate::ports::docker::{Health, Lifecycle};
-use crate::test_support::{a_context, a_password, env_at};
+use crate::test_support::{a_context, env_without_password, torrent};
 
-const SIGNED_OUT: (u16, &str) = (403, "Forbidden");
-const LOGGED_IN: (u16, &str) = (200, "Ok.");
-const ON_51413: (u16, &str) = (200, r#"{"listen_port":51413}"#);
-const ON_51999: (u16, &str) = (200, r#"{"listen_port":51999}"#);
-const ON_NONE: (u16, &str) = (200, r#"{"listen_port":0}"#);
-const TOOK: (u16, &str) = (200, "");
+/// The route answering the torrent client's adapter's `peer_port` with `port`.
+fn holds(port: Option<u16>) -> (&'static str, Answer) {
+    (torrent::operation("peer_port"), torrent::answered(&port))
+}
 
-/// The stack's guard forwarding `forwarded` and its torrent client answering `replies`.
+/// The route answering the torrent client's adapter's `set_peer_port` with `answer`.
+fn sets(answer: Answer) -> (&'static str, Answer) {
+    (torrent::operation("set_peer_port"), answer)
+}
+
+/// The stack's guard forwarding `forwarded`, and its torrent client, moved into its
+/// plugin, answering over its contract as `routes` say.
 fn holding(
     name: &str,
     forwarded: Option<&'static str>,
-    replies: Vec<(u16, &'static str)>,
+    routes: Vec<(&'static str, Answer)>,
 ) -> (Ctx, Arc<Fake>) {
-    let engine = Reporting::holding(
-        &["gluetun", "qbittorrent"],
-        Lifecycle::Running,
-        Health::Healthy,
-    )
-    .with_tunnel(Tunnel {
-        gateway: "gluetun",
-        gateway_ip: None,
-        client_ip: None,
-        country: None,
-        port: forwarded,
-        second_opinion: None,
-    });
-    let http = Fake::scripted(replies);
-    let env = env_at(&format!("forwarding-{name}"), &a_password());
+    let engine = Reporting::holding(&["gluetun"], Lifecycle::Running, Health::Healthy)
+        .alongside(torrent::running())
+        .with_tunnel(Tunnel {
+            gateway: "gluetun",
+            gateway_ip: None,
+            client_ip: None,
+            country: None,
+            port: forwarded,
+            second_opinion: None,
+        });
+    let http = Fake::by_path(routes);
+    let env = env_without_password(&format!("forwarding-{name}"));
     let ctx = a_context()
         .engine(Arc::new(engine))
         .settings(Settings {
@@ -48,7 +49,7 @@ fn holding(
         })
         .build()
         .with_http(http.clone());
-    (ctx, http)
+    (torrent::keyed(ctx), http)
 }
 
 fn forwarding() -> crate::config::PortForward {
@@ -60,7 +61,9 @@ fn forwarding() -> crate::config::PortForward {
 
 async fn passed(ctx: &Ctx, asking: Asking) -> Option<super::Pass> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    pass(ctx, &manifest, None, asking).await
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    pass(ctx, &manifest, project.as_deref(), asking).await
 }
 
 async fn started(ctx: &Ctx) -> Option<Option<String>> {
@@ -88,14 +91,14 @@ async fn a_port_that_changed_is_set_on_the_client_inside_the_guard_and_journalle
     let (ctx, _) = holding(
         "changed",
         Some("51999"),
-        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
+        vec![holds(Some(51413)), sets(torrent::taken())],
     );
     remember(&ctx, Some(51413));
     let pass = passed(&ctx, Asking::Changed).await;
     assert_eq!(
         pass.as_ref().map(|pass| pass.clients.clone()),
         Some(vec![super::Client {
-            service: "qbittorrent".to_owned(),
+            service: torrent::ADAPTER.to_owned(),
             came_to: CameTo::Moved {
                 from: Some(Some(51413))
             },
@@ -130,29 +133,26 @@ async fn forwarding_that_ended_sets_the_client_back_to_none() {
     let (ctx, _) = holding(
         "ended",
         Some("0"),
-        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_NONE],
+        vec![holds(Some(51413)), sets(torrent::taken())],
     );
     remember(&ctx, Some(51413));
     let said = passed(&ctx, Asking::Changed).await.map(|pass| pass.said());
     assert_eq!(
         said,
-        Some(vec![
-            "forwarding ended, so qbittorrent was set back to no forwarded port".to_owned()
-        ])
+        Some(vec![format!(
+            "forwarding ended, so {} was set back to no forwarded port",
+            torrent::ADAPTER
+        )])
     );
     assert_eq!(last(&ctx), Last { port: None });
 }
 
 #[tokio::test]
 async fn starting_the_stack_compares_the_client_afresh_and_leaves_one_already_on_it() {
-    let (ctx, http) = holding(
-        "afresh",
-        Some("51413"),
-        vec![SIGNED_OUT, LOGGED_IN, ON_51413],
-    );
+    let (ctx, http) = holding("afresh", Some("51413"), vec![holds(Some(51413))]);
     remember(&ctx, Some(51413));
     assert_eq!(started(&ctx).await, Some(None));
-    assert_eq!(http.requests().len(), 3);
+    assert_eq!(http.requests().len(), 1);
     assert!(journal(&ctx).is_empty());
 }
 
@@ -168,12 +168,15 @@ async fn a_port_the_client_refused_is_said_raised_and_asked_again() {
     let (ctx, _) = holding(
         "refused",
         Some("51999"),
-        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, SIGNED_OUT],
+        vec![holds(Some(51413)), sets(torrent::refusing())],
     );
     remember(&ctx, Some(51413));
     let said = started(&ctx).await.flatten().unwrap_or_default();
     assert!(
-        said.starts_with("the forwarded port 51999 was not passed to qbittorrent"),
+        said.starts_with(&format!(
+            "the forwarded port 51999 was not passed to {}",
+            torrent::ADAPTER
+        )),
         "{said}"
     );
     assert!(crate::app::conditions::load(&ctx).get(CHECK).is_some());
@@ -249,15 +252,16 @@ async fn a_diagnosis_whose_vpn_check_ran_sets_a_client_off_the_forwarded_port() 
     let (ctx, _) = holding(
         "diagnosed",
         Some("51999"),
-        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
+        vec![holds(Some(51413)), sets(torrent::taken())],
     );
     remember(&ctx, Some(51999));
     let said = diagnosed(&ctx, &[vpn(crate::doctor::Verdict::Pass { note: None })]).await;
     assert_eq!(
         said,
-        Some(vec![
-            "qbittorrent takes peers on the forwarded port 51999".to_owned()
-        ])
+        Some(vec![format!(
+            "{} takes peers on the forwarded port 51999",
+            torrent::ADAPTER
+        )])
     );
     assert_eq!(journal(&ctx).len(), 1);
 }
@@ -277,7 +281,10 @@ async fn a_client_that_will_not_say_its_port_is_still_set() {
     let (ctx, _) = holding(
         "silent",
         Some("51999"),
-        vec![(500, "no"), LOGGED_IN, TOOK, ON_51999],
+        vec![
+            (torrent::operation("peer_port"), torrent::unavailable()),
+            sets(torrent::taken()),
+        ],
     );
     let pass = passed(&ctx, Asking::Afresh).await;
     assert_eq!(
@@ -295,7 +302,7 @@ async fn a_port_set_where_nothing_can_be_journalled_says_so() {
     let (mut ctx, _) = holding(
         "unrecorded",
         Some("51999"),
-        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
+        vec![holds(Some(51413)), sets(torrent::taken())],
     );
     ctx.settings.stack_dir = None;
     let said = passed(&ctx, Asking::Afresh)

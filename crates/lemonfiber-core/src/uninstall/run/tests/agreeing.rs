@@ -384,7 +384,8 @@ async fn what_is_still_coming_down_is_reported_before_anything_stops() {
         })
         .engine(Arc::new(
             Reporting::holding(&["sabnzbd"], Lifecycle::Running, Health::Healthy)
-                .alongside(usenet::running()),
+                .alongside(usenet::running())
+                .alongside(crate::test_support::torrent::running()),
         ))
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
@@ -395,23 +396,25 @@ async fn what_is_still_coming_down_is_reported_before_anything_stops() {
             total: 1_000,
         })))
         .with_http(usenet::beside_torrents(
-            lemonfiber_fixtures::downloads::QBIT_TORRENTS,
+            &[crate::test_support::torrent::carrying()],
             &[usenet::carrying()],
         ))
         .with_images(Pulled::holding(Vec::new()))
         .with_occupancy(Walking::holding(only_ours()))
         .with_eraser(Erasing::willing());
     usenet::moved_in(&ctx);
+    crate::test_support::torrent::moved_in(&ctx);
 
     let manifest = read(&ctx, Tier::Services).await;
 
-    assert!(
-        manifest.as_ref().is_some_and(|manifest| manifest
-            .coming
-            .iter()
-            .any(|one| one.name == usenet::CARRIED)),
-        "{manifest:?}"
-    );
+    for carried in [usenet::CARRIED, crate::test_support::torrent::CARRIED] {
+        assert!(
+            manifest
+                .as_ref()
+                .is_some_and(|manifest| manifest.coming.iter().any(|one| one.name == carried)),
+            "{carried}: {manifest:?}"
+        );
+    }
 }
 
 /// A reading touches nothing, whatever it found.

@@ -1,10 +1,12 @@
-use super::{catalogue, Consumer, Entry, Needed, Origin, CATALOGUE, TORRENT_CLIENT};
+use lemonfiber_manifest::ApiKind;
+
+use super::{account, catalogue, Consumer, Entry, Needed, Origin, CATALOGUE, USENET};
 use crate::config::Protocols;
 use crate::credential::Reach;
 
 #[test]
 fn every_entry_names_what_it_is_where_it_lives_and_who_uses_it() {
-    assert_eq!(CATALOGUE.len(), 8);
+    assert_eq!(CATALOGUE.len(), 7);
     for entry in CATALOGUE {
         assert!(!entry.name.is_empty(), "{}", entry.setting);
         assert!(!entry.setting.is_empty(), "{}", entry.name);
@@ -21,24 +23,42 @@ fn no_two_entries_are_recorded_under_the_same_setting() {
     assert_eq!(settings.len(), held, "{settings:?}");
 }
 
-/// The consumer this list exists for: a rotation reaching the torrent client alone leaves
-/// every library service registered in it signing in with the password it replaced.
+/// The consumer this list exists for: a rotation reaching the Usenet client alone leaves
+/// lemonfiber's own provider check reading the password it replaced.
 #[test]
-fn the_torrent_password_names_each_registration_as_well_as_the_client() {
-    let consumers: Vec<&str> = TORRENT_CLIENT
-        .consumers
-        .iter()
-        .map(|one| one.name)
-        .collect();
+fn the_usenet_password_names_lemonfibers_own_check_as_well_as_the_client() {
+    let consumers: Vec<&str> = USENET.consumers.iter().map(|one| one.name).collect();
     let consumers = consumers.join("; ");
 
-    assert!(
-        consumers.contains("download-client registration"),
-        "{consumers}"
+    assert!(consumers.contains("Usenet client"), "{consumers}");
+    assert!(consumers.contains("provider check"), "{consumers}");
+}
+
+/// Each account lemonfiber sets up on one of the stack's own services, by the API that
+/// service answers in, and nothing for a service it sets none up on.
+#[test]
+fn the_account_on_each_stack_service_names_its_user_and_where_its_password_is_recorded() {
+    let accounts: Vec<Option<(&str, &str)>> = [
+        ApiKind::Qbittorrent,
+        ApiKind::Jellyfin,
+        ApiKind::Audiobookshelf,
+        ApiKind::Nzbhydra2,
+        ApiKind::Servarr,
+    ]
+    .into_iter()
+    .map(|kind| account(kind).map(|one| (one.username, one.password)))
+    .collect();
+
+    assert_eq!(
+        accounts,
+        vec![
+            Some(("admin", "QBITTORRENT_PASSWORD")),
+            Some(("admin", "JELLYFIN_ADMIN_PASSWORD")),
+            Some(("admin", "AUDIOBOOKSHELF_PASSWORD")),
+            Some(("admin", "NZBHYDRA2_ADMIN_PASSWORD")),
+            None,
+        ]
     );
-    assert!(consumers.contains("port forwarding"), "{consumers}");
-    assert!(consumers.contains("web UI"), "{consumers}");
-    assert!(TORRENT_CLIENT.consumers.len() >= 3, "{consumers}");
 }
 
 #[test]
@@ -109,7 +129,7 @@ fn what_records_a_proof_is_recorded_only_where_proceeding_unproven_was_a_choice(
         .filter(|entry| entry.origin.mints_its_own())
         .map(|entry| entry.setting)
         .collect();
-    assert_eq!(minted.len(), 5, "{minted:?}");
+    assert_eq!(minted.len(), 4, "{minted:?}");
     assert!(CATALOGUE
         .iter()
         .filter(|entry| entry.origin.mints_its_own())
@@ -132,7 +152,6 @@ fn only_what_lemonfiber_minted_is_something_it_can_replace_by_itself() {
 fn each_way_of_reaching_a_consumer_carries_what_it_takes_to_get_there() {
     let at = Consumer::at_the_service("the service itself");
     let from = Consumer::from_its_environment("a container", "lemonfiber restart torrent");
-    let by = Consumer::by_seeding("a service lemonfiber writes to");
     let read = Consumer::read_by_lemonfiber("lemonfiber's own check");
 
     assert_eq!(at.reached().reach, Reach::Updated);
@@ -141,12 +160,6 @@ fn each_way_of_reaching_a_consumer_carries_what_it_takes_to_get_there() {
         from.reached().reach,
         Reach::Pending {
             detail: "lemonfiber restart torrent".to_owned()
-        }
-    );
-    assert_eq!(
-        by.reached().reach,
-        Reach::Pending {
-            detail: "lemonfiber seed".to_owned()
         }
     );
     assert_eq!(at.reached().consumer, "the service itself");

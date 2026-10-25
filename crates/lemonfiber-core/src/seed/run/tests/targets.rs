@@ -93,17 +93,18 @@ fn shipped_fillers(project: Option<&std::path::Path>) -> crate::wiring::Fillers 
 /// The Usenet client's service, which its plugin is named after.
 const USENET: &str = crate::test_support::usenet::PLUGIN;
 
-/// The shipped stack with its Usenet client moved into its plugin, written at the stack's
-/// root.
-fn moved_usenet_fillers() -> crate::wiring::Fillers {
+/// The torrent client's service, which its plugin is named after.
+const TORRENT: &str = crate::test_support::torrent::PLUGIN;
+
+/// The shipped stack with `moved` moved into its first-party plugin, written at the
+/// stack's root.
+fn moved_fillers(moved: Option<crate::plugin::Installed>) -> crate::wiring::Fillers {
     crate::test_support::stack()
         .manifest()
         .map(|manifest| {
             crate::wiring::Fillers::trusting(
                 &manifest,
-                &crate::test_support::usenet::moved()
-                    .into_iter()
-                    .collect::<Vec<_>>(),
+                &moved.into_iter().collect::<Vec<_>>(),
                 &crate::wiring::Chosen::default(),
                 Some(stack_root()),
                 crate::plugin::first_party::EMBEDDED,
@@ -112,25 +113,24 @@ fn moved_usenet_fillers() -> crate::wiring::Fillers {
         .unwrap_or_default()
 }
 
+/// The shipped stack with its Usenet client moved into its plugin.
+fn moved_usenet_fillers() -> crate::wiring::Fillers {
+    moved_fillers(crate::test_support::usenet::moved())
+}
+
+/// The shipped stack with its torrent client moved into its plugin.
+fn moved_torrent_fillers() -> crate::wiring::Fillers {
+    moved_fillers(crate::test_support::torrent::moved())
+}
+
 /// A Usenet client's key is the one lemonfiber minted for it, held against the moved
 /// client it was minted for rather than against its kind or the stack's own client.
 #[tokio::test]
 async fn a_usenet_clients_key_is_held_against_the_client_it_was_minted_for() {
     let env = config_scratch("held-usenet-minted");
-    let ctx = minting_usenet(seed_ctx(
-        None,
-        true,
-        Vec::new(),
-        None,
-        Some(env.to_path_buf()),
-    ));
+    let ctx = minting_usenet(seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())));
 
-    let held = super::super::clients::held(
-        &ctx,
-        &moved_usenet_fillers(),
-        &std::collections::BTreeMap::new(),
-    )
-    .await;
+    let held = super::super::clients::held(&ctx, &moved_usenet_fillers());
 
     assert_eq!(
         held.of(&holder(Some(USENET), USENET)),
@@ -148,33 +148,16 @@ async fn a_usenet_key_is_in_hand_only_once_minted() {
         config_scratch("held-usenet-unminted"),
         config_scratch("held-usenet-unmoved"),
     );
-    let unminted = seed_ctx(
-        None,
-        true,
-        Vec::new(),
-        None,
-        Some(unminted_env.to_path_buf()),
-    );
+    let unminted = seed_ctx(true, Vec::new(), None, Some(unminted_env.to_path_buf()));
     let unmoved = minting_usenet(seed_ctx(
-        None,
         true,
         Vec::new(),
         None,
         Some(unmoved_env.to_path_buf()),
     ));
 
-    let not_yet = super::super::clients::held(
-        &unminted,
-        &moved_usenet_fillers(),
-        &std::collections::BTreeMap::new(),
-    )
-    .await;
-    let never = super::super::clients::held(
-        &unmoved,
-        &shipped_fillers(Some(stack_root())),
-        &std::collections::BTreeMap::new(),
-    )
-    .await;
+    let not_yet = super::super::clients::held(&unminted, &moved_usenet_fillers());
+    let never = super::super::clients::held(&unmoved, &shipped_fillers(Some(stack_root())));
 
     assert!(
         !not_yet.keys.keys().any(|holder| holder.id == USENET),
@@ -186,194 +169,60 @@ async fn a_usenet_key_is_in_hand_only_once_minted() {
     );
 }
 
-/// A torrent client's password is the one minted for it this run where there is one,
-/// and otherwise the one recorded under its own setting.
+/// A torrent client's account is the one lemonfiber minted for it, held against the moved
+/// client it was minted for rather than against the stack's own client.
 #[tokio::test]
-async fn a_torrent_clients_password_is_the_one_minted_or_recorded_for_it() {
-    let path = config_scratch("held-torrent");
-    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
-    let fillers = shipped_fillers(None);
+async fn a_torrent_clients_account_is_held_against_the_client_it_was_minted_for() {
+    let env = config_scratch("held-torrent-minted");
+    let ctx = minting_torrent(seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())));
 
-    let recorded =
-        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
-    let minted = super::super::clients::held(
-        &ctx,
-        &fillers,
-        &std::collections::BTreeMap::from([(holder(None, "qbittorrent"), "minted-now".to_owned())]),
-    )
-    .await;
+    let held = super::super::clients::held(&ctx, &moved_torrent_fillers());
 
     // Compared rather than printed: the values are credentials, and a failing
     // assertion prints its message into the run's log.
-    assert!(password_of(&recorded, &holder(None, "qbittorrent"))
-        .is_some_and(|held| held == "minted-earlier"));
-    assert!(
-        password_of(&minted, &holder(None, "qbittorrent")).is_some_and(|held| held == "minted-now")
-    );
-    assert!(password_of(&minted, &holder(None, "sabnzbd")).is_none());
+    let minted = Credential::UserPass {
+        username: MINTED_TORRENT_USER.to_owned(),
+        password: MINTED_TORRENT_PASSWORD.to_owned(),
+    };
+    assert!(held
+        .of(&holder(Some(TORRENT), TORRENT))
+        .is_some_and(|held| *held == minted));
+    assert!(held.of(&holder(None, TORRENT)).is_none());
 }
 
-/// The password held for a service, where what is held for it is one.
-fn password_of(held: &Held, service: &super::super::clients::Holder) -> Option<String> {
-    match held.of(service) {
-        Some(Credential::UserPass { password, .. }) => Some(password.clone()),
-        Some(Credential::ApiKey(_)) | None => None,
-    }
-}
-
-/// The bundled torrent client's password is recorded under the setting its credential is
-/// listed and rotated by.
-#[test]
-fn the_bundled_torrent_clients_password_setting_is_the_one_its_credential_names() {
-    let fillers = shipped_fillers(None);
-    let setting = fillers
-        .service("qbittorrent")
-        .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX));
-    assert_eq!(
-        setting.as_deref(),
-        Some(crate::config::TORRENT_PASSWORD_KEY)
-    );
-}
-
-/// A torrent client a plugin brought, whose id would spell a setting lemonfiber keeps
-/// for something else, is never handed that setting's value: its own is named apart.
+/// No torrent client's account is in hand until one is minted for it: not for a moved
+/// client whose account the secret store does not hold yet, nor for the stack's own
+/// client, whatever password is recorded for it.
 #[tokio::test]
-async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
-    let path = config_scratch("held-namesake");
+async fn a_torrent_account_is_in_hand_only_once_minted() {
+    let (unminted_env, unmoved_env) = (
+        config_scratch("held-torrent-unminted"),
+        config_scratch("held-torrent-unmoved"),
+    );
     let _ = store::set(
-        &path,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-        "the-administrator",
+        &unmoved_env,
+        crate::config::TORRENT_PASSWORD_KEY,
+        "recorded-for-the-stacks",
     );
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
-    let namesake = crate::test_support::a_placed(
-        "jellyfin-admin",
-        &["download.torrent"],
-        Some(torrent_api()),
-        Some(8082),
+    let unminted = seed_ctx(true, Vec::new(), None, Some(unminted_env.to_path_buf()));
+    let unmoved = minting_torrent(seed_ctx(
+        true,
+        Vec::new(),
+        None,
+        Some(unmoved_env.to_path_buf()),
+    ));
+
+    let not_yet = super::super::clients::held(&unminted, &moved_torrent_fillers());
+    let never = super::super::clients::held(&unmoved, &shipped_fillers(Some(stack_root())));
+
+    assert!(
+        !not_yet.keys.keys().any(|holder| holder.id == TORRENT),
+        "held before it was minted"
     );
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|manifest| {
-            crate::wiring::Fillers::of(
-                &manifest,
-                &[crate::test_support::an_installed(
-                    "namesake",
-                    vec![namesake],
-                )],
-                &crate::wiring::Chosen::default(),
-                None,
-            )
-        })
-        .unwrap_or_default();
-
-    let held =
-        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
-
-    assert!(password_of(&held, &holder(Some("namesake"), "jellyfin-admin")).is_none());
-    assert_eq!(
-        fillers
-            .service("jellyfin-admin")
-            .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX))
-            .as_deref(),
-        Some("PLUGIN_NAMESAKE_JELLYFIN__ADMIN_PASSWORD")
+    assert!(
+        !never.keys.keys().any(|holder| holder.id == TORRENT),
+        "held for the stack's own client"
     );
-}
-
-/// Where even a plugin's own namespace lands on a setting one of the stack's services
-/// holds, the setting is refused: nothing is read for the plugin's client, and the pass
-/// says so rather than setting a password it would then keep on top of another.
-#[tokio::test]
-async fn a_plugin_setting_that_lands_on_one_the_stack_holds_is_refused() {
-    let path = config_scratch("held-landed");
-    let _ = store::set(&path, "PLUGIN_NZBGET_NZBGET_PASSWORD", "the-stacks-own");
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            // An operator's own stack may name a service anything, including what a
-            // plugin's namespace would spell.
-            manifest
-                .services
-                .push(manifest_service("plugin-nzbget-nzbget", None, None));
-            crate::wiring::Fillers::of(
-                &manifest,
-                &[crate::test_support::an_installed(
-                    "nzbget",
-                    vec![crate::test_support::a_placed(
-                        "nzbget",
-                        &["download.torrent"],
-                        Some(torrent_api()),
-                        Some(8082),
-                    )],
-                )],
-                &crate::wiring::Chosen::default(),
-                None,
-            )
-        })
-        .unwrap_or_default();
-
-    let held =
-        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
-    let (wirings, minted) = super::super::clients::seed_passwords(&ctx, &fillers).await;
-
-    assert!(password_of(&held, &holder(Some("nzbget"), "nzbget")).is_none());
-    assert!(minted.is_empty());
-    let refused: Vec<&crate::seed::Wiring> = wirings
-        .iter()
-        .filter(|wiring| matches!(wiring.state, crate::seed::State::Refused { .. }))
-        .collect();
-    // Counted rather than printed: what came back sits beside minted passwords, and a
-    // failing assertion prints its message into the run's log.
-    assert_eq!(refused.len(), 1);
-    assert!(refused
-        .iter()
-        .all(|wiring| wiring.connection == "nzbget the stand-in web UI password"));
-}
-
-/// A torrent client that publishes no port is one this machine cannot reach to set a
-/// password on, so it is passed over rather than reported as tried.
-#[tokio::test]
-async fn a_torrent_client_publishing_no_port_has_no_password_set() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            manifest
-                .services
-                .retain(|service| service.id != "qbittorrent");
-            crate::wiring::Fillers::of(
-                &manifest,
-                &[crate::test_support::an_installed(
-                    "unpublished",
-                    vec![crate::test_support::a_placed(
-                        "unpublished",
-                        &["download.torrent"],
-                        Some(torrent_api()),
-                        None,
-                    )],
-                )],
-                &crate::wiring::Chosen::default(),
-                None,
-            )
-        })
-        .unwrap_or_default();
-
-    let (wirings, minted) = super::super::clients::seed_passwords(&ctx, &fillers).await;
-
-    assert!(wirings.is_empty());
-    assert!(minted.is_empty());
-}
-
-/// The bundled torrent client's adapter, as a plugin's torrent client names it.
-fn torrent_api() -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Qbittorrent,
-        key_source: lemonfiber_manifest::KeySource::Generated,
-        path: None,
-        version: None,
-    }
 }
 
 #[test]
@@ -390,8 +239,8 @@ fn nothing_can_be_proven_without_a_project_directory() {
 async fn a_media_server_the_household_set_up_leaves_the_request_identity_to_them() {
     let env = config_scratch("targets-household-set-up");
     let _ = std::fs::create_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
-    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
-        .with_http(household(true, false));
+    let ctx =
+        seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_http(household(true, false));
     crate::test_support::media::moved_in(&ctx);
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let identity = report
@@ -432,44 +281,4 @@ fn a_target_carries_the_curator_api_version() {
         Some(8989),
     );
     assert!(super::super::target_for(&versionless, project).is_none());
-}
-
-/// A plugin's torrent client under the id one of the stack's own already has is held
-/// apart from it: the password minted for the plugin's is never the stack's, and the
-/// stack's is never handed to the plugin's.
-#[tokio::test]
-async fn a_plugin_client_sharing_a_stack_clients_id_never_shares_its_credential() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    let twin = crate::test_support::a_placed(
-        "qbittorrent",
-        &["download.torrent"],
-        Some(torrent_api()),
-        Some(8082),
-    );
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|manifest| {
-            crate::wiring::Fillers::of(
-                &manifest,
-                &[crate::test_support::an_installed("twin", vec![twin])],
-                &crate::wiring::Chosen::default(),
-                None,
-            )
-        })
-        .unwrap_or_default();
-
-    let held = super::super::clients::held(
-        &ctx,
-        &fillers,
-        &std::collections::BTreeMap::from([(
-            holder(Some("twin"), "qbittorrent"),
-            "the-twins".to_owned(),
-        )]),
-    )
-    .await;
-
-    // Compared rather than printed: the values are credentials.
-    assert!(password_of(&held, &holder(Some("twin"), "qbittorrent"))
-        .is_some_and(|password| password == "the-twins"));
-    assert!(password_of(&held, &holder(None, "qbittorrent")).is_none());
 }
