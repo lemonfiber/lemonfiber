@@ -252,8 +252,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // accounts it holds to anything that can reach it.
     wirings.extend(guarding::guarded(ctx, &fillers, &mut baseline).await);
 
-    // Every part that belongs to whoever claims it first, claimed over its contract with
-    // the credential its plugin minted before anybody else takes it.
     wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
 
     // The subtitle finder, told which curators to watch. Until it is, it has nothing

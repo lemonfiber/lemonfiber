@@ -209,6 +209,15 @@ impl Placed {
         }
     }
 
+    /// The settings of the secrets of `plugin` lemonfiber writes into its `upstream.json`.
+    #[must_use]
+    pub fn upstream_settings(&self, plugin: &str) -> Vec<String> {
+        self.upstream
+            .values()
+            .map(|secret| crate::settings::named(plugin, secret))
+            .collect()
+    }
+
     /// The icon its dashboard entry shows: the one its wiring named, or its id's.
     #[must_use]
     pub fn icon(&self) -> String {

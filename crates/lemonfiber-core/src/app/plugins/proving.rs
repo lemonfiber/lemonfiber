@@ -31,7 +31,6 @@ use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
-use crate::ports::service::Owner;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 
@@ -363,19 +362,11 @@ async fn claiming(
     }
     let part = claim::Adapter(adapter.clone());
     match crate::seed::run::owning::claimed(&part).await {
-        Ok(Owner::Ours) => None,
-        Ok(Owner::Theirs) => {
-            let secrets: Vec<String> = placed
-                .upstream
-                .values()
-                .map(|secret| crate::settings::named(&installed.plugin, secret))
-                .collect();
-            Some(crate::seed::run::owning::refusal(placed.called(), &secrets))
-        }
-        Ok(owner) => Some(format!(
-            "{spoken}: it was claimed and answers {owner:?}, and only a part lemonfiber holds \
-             is installed"
-        )),
+        Ok(owner) => crate::seed::run::owning::unclaimed(
+            placed.called(),
+            owner,
+            &placed.upstream_settings(&installed.plugin),
+        ),
         Err(failure) => Some(format!("{spoken}: claim: {failure}")),
     }
 }

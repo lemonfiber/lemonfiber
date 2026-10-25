@@ -501,11 +501,7 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .iter()
             .find(|secret| secret.minted && secret.of == placed.service)
             .map(|secret| crate::settings::named(plugin, &secret.id)),
-        upstream: placed
-            .upstream
-            .values()
-            .map(|secret| crate::settings::named(plugin, secret))
-            .collect(),
+        upstream: placed.upstream_settings(plugin),
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),

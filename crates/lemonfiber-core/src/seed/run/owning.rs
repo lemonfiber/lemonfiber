@@ -154,24 +154,28 @@ pub(super) async fn put_back(
 /// How a part stands where `owner` is who holds it after lemonfiber claimed it.
 fn answered(filler: &Filler, owner: Result<Owner, Failure>) -> State {
     match owner {
-        Ok(Owner::Ours) => State::Wired,
-        Ok(Owner::Open) => State::Failed {
-            detail: format!(
-                "{} was claimed and answers that anybody may still take it",
-                filler.name
-            ),
-        },
-        Ok(Owner::Settling) => State::Failed {
-            detail: format!(
-                "{} was still taking up its claim after {} seconds",
-                filler.name,
-                crate::patience::RESTART.longest().as_secs()
-            ),
-        },
         Ok(Owner::Theirs) => State::Refused {
             reason: refusal(&filler.name, &filler.upstream),
         },
+        Ok(owner) => unclaimed(&filler.name, owner, &filler.upstream)
+            .map_or(State::Wired, |detail| State::Failed { detail }),
         Err(failure) => crate::seed::unreached(&failure),
+    }
+}
+
+/// Why `name`, which `owner` holds once lemonfiber claimed it, is not lemonfiber's, naming
+/// the settings of the `secrets` it holds for it; nothing where it is.
+pub(crate) fn unclaimed(name: &str, owner: Owner, secrets: &[String]) -> Option<String> {
+    match owner {
+        Owner::Ours => None,
+        Owner::Open => Some(format!(
+            "{name} was claimed and answers that anybody may still take it"
+        )),
+        Owner::Settling => Some(format!(
+            "{name} was still taking up its claim after {} seconds",
+            crate::patience::RESTART.longest().as_secs()
+        )),
+        Owner::Theirs => Some(refusal(name, secrets)),
     }
 }
 

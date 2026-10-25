@@ -260,15 +260,27 @@ fn claimed_as(name: &str, claimed: lemonfiber_fixtures::http::Answer) -> Ctx {
 #[tokio::test]
 async fn an_adapter_speaking_owner_claim_is_installed_only_where_its_part_is_claimed_for_lemonfiber(
 ) {
-    for (name, owner, fault) in [
-        ("claimed-ours", "ours", None),
-        ("claimed-theirs", "theirs", Some("is held by somebody")),
-        ("claimed-open", "open", Some("answers Open")),
+    let holding =
+        |owner: &str| lemonfiber_fixtures::http::Answer::reply(200, format!("\"{owner}\""));
+    for (name, claimed, fault) in [
+        ("claimed-ours", holding("ours"), None),
+        (
+            "claimed-theirs",
+            holding("theirs"),
+            Some("is held by somebody"),
+        ),
+        (
+            "claimed-open",
+            holding("open"),
+            Some("anybody may still take it"),
+        ),
+        (
+            "claimed-unanswered",
+            lemonfiber_fixtures::http::Answer::reply(500, ""),
+            Some("owner.claim@1: claim:"),
+        ),
     ] {
-        let ctx = claimed_as(
-            name,
-            lemonfiber_fixtures::http::Answer::reply(200, format!("\"{owner}\"")),
-        );
+        let ctx = claimed_as(name, claimed);
         let said = verdicts(installing(&ctx, &source(name, &claiming())).await);
         let last = said.last().cloned().flatten();
         match fault {

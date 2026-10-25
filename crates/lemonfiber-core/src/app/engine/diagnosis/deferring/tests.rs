@@ -1,6 +1,6 @@
 //! Each deferred check declares the family and budget of the check it builds.
 
-use super::{providing, seasons, stored, tunnel, wired, Stack};
+use super::{owned, providing, seasons, stored, tunnel, wired, Stack};
 use crate::doctor::deferred::Deferred;
 use crate::doctor::Check;
 use crate::test_support::a_context;
@@ -40,6 +40,7 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
             providing(&ctx, manifest, None),
             wired(&ctx, stack, None),
             seasons(&ctx, manifest),
+            owned(&ctx, manifest),
         ] {
             assert!(
                 declared_what_it_built(&deferred).await,
@@ -49,4 +50,37 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
         }
     }
     assert_eq!(stacks.len(), 1, "the embedded stack parses");
+}
+
+/// Every installed service speaking `owner.claim` is a part the claimed check asks after.
+#[tokio::test]
+async fn the_claimed_check_asks_after_every_installed_part_claimed_first() {
+    let mut ctx = a_context().build();
+    ctx.settings.env_file = Some(crate::test_support::env_without_password("deferring-owned"));
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::contracted(
+            "claimer",
+            "claimed-part",
+            lemonfiber_contract::capabilities::owner::claim::CAPABILITY,
+        ))
+        .is_ok());
+    assert!(
+        crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register).is_ok()
+    );
+    let manifests: Vec<_> = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .into_iter()
+        .collect();
+    let mut findings = Vec::new();
+    for manifest in &manifests {
+        findings.extend(owned(&ctx, manifest).run().await);
+    }
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.check == "config.claimed.claimed-part"),
+        "{findings:?}"
+    );
 }

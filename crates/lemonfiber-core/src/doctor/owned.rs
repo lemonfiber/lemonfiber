@@ -17,6 +17,9 @@ use crate::ports::service::{Owner, Ownership};
 /// The name this check and anything answering it share.
 const CHECK: &str = "config.claimed";
 
+/// The family each part's finding is named under.
+const FAMILY: &str = "config.claimed.";
+
 /// The heading an operator reads this under.
 const TITLE: &str = "Who holds each service claimed first";
 
@@ -73,7 +76,7 @@ async fn ran(check: &OwnedCheck) -> Vec<Finding> {
         findings.push(
             Finding::in_category(
                 Category::Config,
-                &format!("{CHECK}.{}", part.id),
+                &format!("{FAMILY}{}", part.id),
                 &format!("Who holds {}", part.name),
                 asked(part, owner.as_deref()).await,
             )

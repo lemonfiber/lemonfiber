@@ -246,3 +246,126 @@ async fn a_reset_owes_a_part_lemonfiber_never_claimed_nothing() {
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
+
+#[tokio::test]
+async fn a_part_claimed_before_is_asked_who_holds_it_and_never_claimed_again() {
+    for (owner, held) in [("ours", true), ("theirs", false)] {
+        let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("owning-asked-{owner}"));
+        let http = Fake::by_path(vec![(OWNER, holding(owner)), (CLAIM, holding("ours"))]);
+        let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+
+        let wirings = super::super::owning::owned(
+            &ctx,
+            &beside(&project, &first_party(PLUGIN)),
+            &mut recorded(),
+        )
+        .await;
+
+        let state = wirings.first().map(|one| &one.state);
+        if held {
+            assert_eq!(
+                state,
+                Some(&crate::seed::State::AlreadyWired),
+                "{wirings:?}"
+            );
+        } else {
+            assert!(
+                matches!(state, Some(crate::seed::State::Refused { .. })),
+                "{owner}: {wirings:?}"
+            );
+        }
+        assert_eq!(asked_at(&http, CLAIM), 0, "{owner}");
+    }
+}
+
+#[tokio::test]
+async fn a_claim_that_leaves_the_part_open_or_goes_unanswered_records_nothing() {
+    for (name, answer) in [
+        ("open", holding("open")),
+        ("unanswered", Answer::reply(500, "")),
+    ] {
+        let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("owning-claim-{name}"));
+        let http = Fake::by_path(vec![(CLAIM, answer)]);
+        let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+        let mut baseline = Baseline::new();
+
+        let wirings = super::super::owning::owned(
+            &ctx,
+            &beside(&project, &first_party(PLUGIN)),
+            &mut baseline,
+        )
+        .await;
+
+        let state = wirings.first().map(|one| &one.state);
+        assert!(
+            matches!(
+                state,
+                Some(crate::seed::State::Failed { .. } | crate::seed::State::Skipped { .. })
+            ),
+            "{name}: {wirings:?}"
+        );
+        if name == "open" {
+            assert!(
+                matches!(state, Some(crate::seed::State::Failed { detail }) if detail.contains("anybody may still take it")),
+                "{wirings:?}"
+            );
+        }
+        assert_eq!(
+            baseline.expected(SERVICE, super::super::owning::FIELD),
+            None,
+            "{name}"
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_part_still_taking_up_the_claim_once_patience_runs_out_is_a_failure() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-settling-forever");
+    let http = Fake::by_path(vec![
+        (CLAIM, holding("settling")),
+        (OWNER, holding("settling")),
+    ]);
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+
+    let wirings = super::super::owning::owned(
+        &ctx,
+        &beside(&project, &first_party(PLUGIN)),
+        &mut Baseline::new(),
+    )
+    .await;
+
+    assert!(
+        wirings.first().is_some_and(|one| matches!(&one.state, crate::seed::State::Failed { detail } if detail.contains("still taking up its claim"))),
+        "{wirings:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_reset_leaves_a_part_lemonfiber_holds_and_refuses_one_somebody_else_holds() {
+    for (owner, owed) in [("ours", false), ("theirs", true)] {
+        let project =
+            lemonfiber_fixtures::scratch::Scratch::new(&format!("owning-reset-held-{owner}"));
+        let http = Fake::by_path(vec![(OWNER, holding(owner)), (CLAIM, holding("ours"))]);
+        let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+
+        let wirings = super::super::owning::put_back(
+            &ctx,
+            &beside(&project, &first_party(PLUGIN)),
+            &recorded(),
+            true,
+        )
+        .await;
+
+        if owed {
+            assert!(
+                wirings
+                    .first()
+                    .is_some_and(|one| matches!(one.state, crate::seed::State::Refused { .. })),
+                "{owner}: {wirings:?}"
+            );
+        } else {
+            assert!(wirings.is_empty(), "{owner}: {wirings:?}");
+        }
+        assert_eq!(asked_at(&http, CLAIM), 0, "{owner}");
+    }
+}
