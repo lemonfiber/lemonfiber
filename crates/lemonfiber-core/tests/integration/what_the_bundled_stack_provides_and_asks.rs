@@ -83,7 +83,6 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
         askers(&stack(), "dashboard.show"),
         once(&[
             "audiobookshelf",
-            "bazarr",
             "jellyfin",
             "lidarr",
             "navidrome",
@@ -95,11 +94,11 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
     );
 }
 
-/// Each download client the bundle installs rather than assembles asks the dashboard from
-/// its own plugin, as every service the stack carries whose panel reads it does from the
-/// stack.
+/// Each download client and the subtitle finder, which the bundle installs rather than
+/// assembles, asks the dashboard from its own plugin, as every service the stack carries
+/// whose panel reads it does from the stack.
 #[test]
-fn each_installed_download_client_asks_the_dashboard_from_its_plugin() {
+fn each_installed_part_asks_the_dashboard_from_its_plugin() {
     for (moved, plugin) in [
         (
             lemonfiber_testing::usenet::moved(),
@@ -108,6 +107,10 @@ fn each_installed_download_client_asks_the_dashboard_from_its_plugin() {
         (
             lemonfiber_testing::torrent::moved(),
             lemonfiber_testing::torrent::PLUGIN,
+        ),
+        (
+            lemonfiber_testing::subtitles::moved(),
+            lemonfiber_testing::subtitles::PLUGIN,
         ),
     ] {
         let asking: Vec<String> = moved

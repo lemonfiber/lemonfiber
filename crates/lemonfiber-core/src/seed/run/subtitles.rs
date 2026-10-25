@@ -28,7 +28,8 @@ struct Watching<'a> {
     curators: Vec<(&'a Filler, Kind, &'a Address)>,
 }
 
-/// Every subtitle finder and the curators lemonfiber tells it about.
+/// Every subtitle finder and the curators lemonfiber tells it about, each curator once
+/// however many of the finder's asks it fills.
 fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
     let mut found: Vec<Watching<'_>> = Vec::new();
     for pairing in pairings(fillers) {
@@ -36,6 +37,11 @@ fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
             continue;
         };
         match found.iter_mut().find(|one| one.asker.id == asker.id) {
+            Some(one)
+                if one
+                    .curators
+                    .iter()
+                    .any(|(told, _, _)| told.id == pairing.filler.id) => {}
             Some(one) => one.curators.push((pairing.filler, which, at)),
             None => found.push(Watching {
                 asker,

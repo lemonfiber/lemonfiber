@@ -382,6 +382,55 @@ fn a_first_party_part_moved_in_place_keeps_the_key_the_stack_published_for_it() 
     assert_ne!(stranger, RECORDED);
 }
 
+/// What minting the bundled subtitle finder's plugin leaves held for its upstream's key,
+/// first-party as this build embeds it, in a stack that published `recorded` for its own
+/// subtitle finder, or nothing.
+fn minted_subtitle_finder(name: &str, recorded: Option<&str>) -> Option<String> {
+    use crate::test_support::subtitles;
+    let ctx = seeding(name);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    if let Some(key) = recorded {
+        let _ = crate::config::store::set(
+            &env,
+            &crate::seed::run::published_as(subtitles::PLUGIN),
+            key,
+        );
+    }
+    let manifest = lemonfiber_bundled::PINNED
+        .iter()
+        .find(|one| one.first_party.plugin == subtitles::PLUGIN)
+        .and_then(|one| lemonfiber_plugin::Manifest::from_toml(one.copy).ok())?;
+    let would = subtitles::moved()?;
+
+    super::super::super::minting::minted(
+        &ctx,
+        &would,
+        &manifest,
+        "1",
+        crate::plugin::first_party::EMBEDDED,
+    )
+    .ok()?;
+    crate::settings::secrets_at(&ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .and_then(|held| {
+            held.value(&crate::settings::named(subtitles::PLUGIN, "upstream-key"))
+                .map(str::to_owned)
+        })
+}
+
+/// The subtitle finder moved into its plugin is handed the key the stack published for its
+/// own, which the Bazarr it moves in place of already answers to; a stack that published
+/// none has one minted.
+#[test]
+fn the_moved_subtitle_finder_keeps_the_key_the_stack_published_for_its_own() {
+    assert_eq!(
+        minted_subtitle_finder("seeded-moved-subtitles", Some(RECORDED)).as_deref(),
+        Some(RECORDED)
+    );
+    let fresh = minted_subtitle_finder("seeded-moved-subtitles-fresh", None).unwrap_or_default();
+    assert_eq!(fresh.len(), 32, "{:?}", fresh.len());
+}
+
 /// The seeded manifest, its adapter handing its upstream an account lemonfiber mints and
 /// its upstream answering in `native` in place of the stack's service of that name.
 fn moving_an_account(native: &str) -> Option<lemonfiber_plugin::Manifest> {

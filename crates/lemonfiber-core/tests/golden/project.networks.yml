@@ -9,11 +9,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.116.200/29
-  ask__bazarr__dashboard.show__homepage:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.34.184/29
   ask__bazarr__library.curate__bindery:
     internal: true
     ipam:

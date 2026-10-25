@@ -10,6 +10,7 @@ pub mod adapted;
 pub mod context;
 pub mod media;
 pub mod placeholder;
+pub mod subtitles;
 pub mod torrent;
 pub mod usenet;
 

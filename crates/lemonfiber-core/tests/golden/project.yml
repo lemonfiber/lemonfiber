@@ -29,39 +29,6 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  bazarr:
-    image: lscr.io/linuxserver/bazarr:v1.6.2-ls367@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
-    profiles:
-    - subs
-    restart: unless-stopped
-    environment:
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-    ports:
-    - 127.0.0.1:6767:6767
-    volumes:
-    - ./data:/data
-    - ./config/bazarr:/config
-    networks:
-    - ask__bazarr__dashboard.show__homepage
-    - ask__bazarr__library.curate__bindery
-    - ask__bazarr__library.curate__lidarr
-    - ask__bazarr__library.curate__radarr
-    - ask__bazarr__library.curate__sonarr
-    - own__bazarr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   bindery:
     image: ghcr.io/vavallee/bindery:v1.43.1@sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489
     profiles:
@@ -304,7 +271,6 @@ services:
     - ./config/homepage:/app/config
     networks:
     - ask__audiobookshelf__dashboard.show__homepage
-    - ask__bazarr__dashboard.show__homepage
     - ask__homepage__proxy.front__caddy
     - ask__jellyfin__dashboard.show__homepage
     - ask__lidarr__dashboard.show__homepage
@@ -652,6 +618,38 @@ services:
     - link__unpackerr__radarr
     - link__unpackerr__sonarr
     - own__unpackerr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:v1.6.2-ls367@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
+    profiles:
+    - subs
+    restart: unless-stopped
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+    ports:
+    - 127.0.0.1:6767:6767
+    volumes:
+    - ./data:/data
+    - ./config/bazarr:/config
+    networks:
+    - ask__bazarr__library.curate__bindery
+    - ask__bazarr__library.curate__lidarr
+    - ask__bazarr__library.curate__radarr
+    - ask__bazarr__library.curate__sonarr
+    - own__bazarr
     security_opt:
     - no-new-privileges:true
     cap_drop:

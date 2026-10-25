@@ -17,6 +17,8 @@ pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 mod adapted;
 #[path = "../../lemonfiber-testing/src/media.rs"]
 pub mod media;
+#[path = "../../lemonfiber-testing/src/subtitles.rs"]
+pub mod subtitles;
 #[path = "../../lemonfiber-testing/src/torrent.rs"]
 pub mod torrent;
 #[path = "../../lemonfiber-testing/src/usenet.rs"]

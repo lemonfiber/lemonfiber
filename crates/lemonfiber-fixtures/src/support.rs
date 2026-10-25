@@ -286,10 +286,6 @@ pub const SEERR_SETTINGS: &str = r#"{"main":{"apiKey":"seerr-own-key"}}"#;
 /// Only `read` is meaningful to seeding; the rest are unused.
 pub struct SeedFs {
     servarr: Option<&'static str>,
-    /// What the subtitle finder's configuration says, where a test has it written
-    /// one. Its own key lives in a YAML file rather than a Servarr XML, so a test
-    /// wiring subtitles has to be able to answer that path with something else.
-    bazarr: Option<&'static str>,
     /// What the request service's settings say. A JSON of its own, for the same
     /// reason — and under a different config mount again.
     seerr: Option<&'static str>,
@@ -317,7 +313,6 @@ impl SeedFs {
     pub fn keyed(servarr: Option<&'static str>) -> Self {
         Self {
             servarr,
-            bazarr: None,
             seerr: None,
             only_prowlarr: false,
             missing: Vec::new(),
@@ -332,13 +327,6 @@ impl SeedFs {
                 total: 0,
             },
         }
-    }
-
-    /// The same, answering the subtitle finder's configuration path with `config`.
-    #[must_use]
-    pub fn with_subtitle_finder(mut self, config: &'static str) -> Self {
-        self.bazarr = Some(config);
-        self
     }
 
     /// The same, answering the request service's settings path with `settings`.
@@ -501,12 +489,6 @@ fn next_answer(sequenced: &Sequenced, argv: &[String]) -> Result<Output, Failure
 /// Which service's configuration a path is asking for, and what this fixture holds.
 fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
     let path = path.to_string_lossy();
-    // Before the Servarr fall-through, because the finder's key is a YAML of its
-    // own: answering its path with a Servarr XML would read as a service that has
-    // started and written no key, which is a different thing entirely.
-    if path.contains("bazarr") {
-        return seed.bazarr.map(str::to_owned);
-    }
     if path.contains("seerr") {
         return seed.seerr.map(str::to_owned);
     }
