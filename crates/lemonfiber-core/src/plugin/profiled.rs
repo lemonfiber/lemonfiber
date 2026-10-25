@@ -31,11 +31,11 @@ pub struct Profiled {
 /// The bundle's pin of `installed` and the stack profile it names, where `installed` is a
 /// first-party plugin the bundle installs.
 fn pinned(installed: &Installed) -> Option<(&'static Pinned, &'static str)> {
-    let pin = PINNED
+    PINNED
         .iter()
         .filter(|pin| pin.stage == Some(Stage::Installed))
-        .find(|pin| super::first_party::holds(std::slice::from_ref(&pin.first_party), installed))?;
-    Some((pin, pin.profile?))
+        .filter(|pin| super::first_party::holds(std::slice::from_ref(&pin.first_party), installed))
+        .find_map(|pin| pin.profile.map(|profile| (pin, profile)))
 }
 
 /// The Compose profile `installed`'s services sit in: the stack profile its bundle entry
@@ -57,17 +57,15 @@ pub fn profiled(installed: &[Installed]) -> Vec<Profiled> {
         let Some((pin, profile)) = pinned(one) else {
             continue;
         };
-        let Ok(declared) = lemonfiber_plugin::Manifest::from_toml(pin.copy) else {
-            continue;
-        };
-        for service in &declared.services {
-            let Some(placed) = one
-                .services
+        let declared = lemonfiber_plugin::Manifest::from_toml(pin.copy)
+            .map(|manifest| manifest.services)
+            .unwrap_or_default();
+        for (service, placed) in declared.iter().filter_map(|service| {
+            one.services
                 .iter()
                 .find(|placed| placed.service == service.id)
-            else {
-                continue;
-            };
+                .map(|placed| (service, placed))
+        }) {
             found.push(Profiled {
                 id: placed.service.clone(),
                 name: placed.called().to_owned(),

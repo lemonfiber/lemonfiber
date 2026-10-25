@@ -45,6 +45,24 @@ fn every_service_of_a_plugin_the_bundle_installs_is_a_service_of_its_profile() {
 }
 
 #[test]
+fn a_service_the_record_no_longer_holds_is_no_service_of_the_profile() {
+    let found = profiled(
+        &media::moved()
+            .map(|mut installed| {
+                installed
+                    .services
+                    .retain(|placed| placed.service == media::ADAPTER);
+                installed
+            })
+            .into_iter()
+            .collect::<Vec<_>>(),
+    );
+
+    let ids: Vec<&str> = found.iter().map(|one| one.id.as_str()).collect();
+    assert_eq!(ids, vec![media::ADAPTER]);
+}
+
+#[test]
 fn a_plugins_criticality_is_the_stacks_weight_of_the_same_name() {
     for (declared, weighed) in [
         (
