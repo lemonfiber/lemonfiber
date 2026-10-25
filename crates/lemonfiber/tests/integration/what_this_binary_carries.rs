@@ -100,8 +100,9 @@ fn mounted_from_the_stack() -> Vec<String> {
 }
 
 /// Every path beneath the stack directory the generated project mounts is carried
-/// wherever the stack's repository or a part's copy holds it, and the repository itself
-/// is not.
+/// wherever the stack's repository or an assembled part's copy holds it, and the
+/// repository itself is not. An installed part's starting configuration is written by
+/// installing its plugin, from the tree the plugin brings.
 ///
 /// The carried set is chosen at build time from the manifest and the parts' trees.
 /// This reads the project those are run as instead, so a mount the choosing misses is
@@ -111,11 +112,21 @@ fn mounted_from_the_stack() -> Vec<String> {
 fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
     let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
     let copies = assets.join("plugins").join(lemonfiber_bundle::COPIES);
+    let assembled: Vec<String> = lemonfiber_bundle::read(&assets.join("plugins"))
+        .map(|(_, held)| {
+            held.into_iter()
+                .filter(|one| one.pin.stage == Some(lemonfiber_bundle::Stage::Assembled))
+                .map(|one| one.pin.id)
+                .collect()
+        })
+        .unwrap_or_default();
+    assert!(!assembled.is_empty(), "the bundle reads no assembled part");
     let held = |path: &str| {
         assets.join("media-stack").join(path).exists()
             || path
                 .split('/')
                 .nth(1)
+                .filter(|id| assembled.iter().any(|one| one == id))
                 .is_some_and(|id| copies.join(id).join(path).exists())
     };
     let mounted = mounted_from_the_stack();
