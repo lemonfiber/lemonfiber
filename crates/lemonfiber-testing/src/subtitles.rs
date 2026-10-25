@@ -48,13 +48,6 @@ pub fn running() -> Reporting {
     MOVED.running()
 }
 
-/// `ctx`'s stack with the subtitle finder moved in: [`moved`] recorded beside the env file
-/// its settings name, with every plugin recorded there before, and [`ADAPTER`] keyed where
-/// its configuration is written.
-pub fn moved_in(ctx: &Ctx) {
-    MOVED.moved_in(ctx);
-}
-
 /// `ctx` with its subtitle finder moved into its plugin without writing to its stack, for
 /// a stack directory tests share: [`moved`] recorded beside its env file, and [`ADAPTER`]'s
 /// key held wherever its configuration directory is. The engine stays `ctx`'s own.
@@ -63,8 +56,9 @@ pub fn keyed(ctx: Ctx) -> Ctx {
     MOVED.keyed(ctx)
 }
 
-/// `ctx` reaching its subtitle finder moved into its plugin: [`moved_in`], with the engine
-/// saying [`ADAPTER`] runs as [`running`] does.
+/// `ctx` reaching its subtitle finder moved into its plugin: [`moved`] recorded beside the
+/// env file its settings name, with every plugin recorded there before, [`ADAPTER`] keyed
+/// where its configuration is written, and the engine saying it runs as [`running`] does.
 #[must_use]
 pub fn reaching(ctx: Ctx) -> Ctx {
     MOVED.reaching(ctx)

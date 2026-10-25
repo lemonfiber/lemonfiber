@@ -97,9 +97,10 @@ pub(super) fn minted(
 /// A part moved in place keeps its configuration, so its upstream answers to the
 /// credential it had; one minted afresh would be one nothing set on it. A username or a
 /// password is the account lemonfiber set up on the stack's service answering in the API
-/// the moved service answers in, and anything else the key lemonfiber published for the
-/// stack's service. Asked only of a first-party plugin: the stack's own credential goes to
-/// nothing else.
+/// the moved service answers in. Anything else is the key the stack's service wrote into
+/// its own configuration, and where that cannot be read, the key lemonfiber published for
+/// it. Asked only of a first-party plugin: the stack's own credential goes to nothing
+/// else.
 fn moved(ctx: &Ctx, manifest: &Manifest, secret: &Secret) -> Option<String> {
     let of = manifest
         .services
@@ -116,8 +117,30 @@ fn moved(ctx: &Ctx, manifest: &Manifest, secret: &Secret) -> Option<String> {
         Some(UPSTREAM_USERNAME) => account().map(|account| account.username.to_owned()),
         Some(UPSTREAM_PASSWORD) => account()
             .and_then(|account| crate::app::targets::recorded_secret(ctx, account.password)),
-        _ => crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved)),
+        _ => written(ctx, reserved).or_else(|| {
+            crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
+        }),
     }
+}
+
+/// The key the stack's own service `reserved` wrote into the file its declaration names,
+/// read only where that is a plain file beneath the directory its container owns.
+///
+/// Nothing where the stack declares no such service, its declaration names no file the
+/// key is read from, or the file is not there, holds no key, or leads away.
+fn written(ctx: &Ctx, reserved: &str) -> Option<String> {
+    let manifest = ctx.stack.manifest().ok()?;
+    let service = manifest
+        .services
+        .iter()
+        .find(|service| service.id == reserved)?;
+    let api = service.api.as_ref()?;
+    let read = crate::credential::written::reader(api.key_source)?;
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
+    let path = crate::app::targets::config_path(&project, service, api.path.as_deref())?;
+    let within = crate::app::targets::service_config_dir(&project, &service.id);
+    read(&ctx.seams.confined.read(&path, &within).text()?)
 }
 
 /// The part of an adapter's upstream credential `secret` holds, where an adapter of

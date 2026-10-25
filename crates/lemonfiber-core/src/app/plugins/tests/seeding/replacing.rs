@@ -382,25 +382,85 @@ fn a_first_party_part_moved_in_place_keeps_the_key_the_stack_published_for_it() 
     assert_ne!(stranger, RECORDED);
 }
 
-/// What minting the bundled subtitle finder's plugin leaves held for its upstream's key,
-/// first-party as this build embeds it, in a stack that published `recorded` for its own
-/// subtitle finder, or nothing.
-fn minted_subtitle_finder(name: &str, recorded: Option<&str>) -> Option<String> {
-    use crate::test_support::subtitles;
+/// A part the bundle installs in place of the stack's own service of its id, and the file
+/// beneath that service's configuration directory its declaration names as holding its
+/// key.
+struct MovingIn {
+    /// The part's plugin, as the bundle pins it.
+    moved: Option<crate::plugin::Installed>,
+    /// The file the stack's own service writes its key to.
+    file: &'static str,
+    /// That file as the service writes it, holding [`WRITTEN`].
+    holding: &'static str,
+}
+
+/// The key the stack's own service wrote into its configuration.
+const WRITTEN: &str = "written-by-the-service";
+
+/// The subtitle finder, whose stack service writes its key into a YAML.
+fn subtitles() -> MovingIn {
+    MovingIn {
+        moved: crate::test_support::subtitles::moved(),
+        file: "config/config.yaml",
+        holding: "auth:\n  apikey: written-by-the-service\nsonarr:\n  apikey: someone-elses\n",
+    }
+}
+
+/// The Usenet client, whose stack service writes its key into an INI.
+fn usenet() -> MovingIn {
+    MovingIn {
+        moved: crate::test_support::usenet::moved(),
+        file: "sabnzbd.ini",
+        holding: "[misc]\nnzb_key = someone-elses\napi_key = written-by-the-service\n",
+    }
+}
+
+/// How the stack's own service left its key file before the move.
+enum Left {
+    /// Written as the service writes it.
+    Written,
+    /// Not there at all.
+    Absent,
+    /// A link leading out of the directory its container owns.
+    LeadingAway,
+}
+
+/// What minting `part`'s plugin, first-party as this build embeds it, leaves held for its
+/// upstream's key, in a stack whose own service of its id left its key file as `left`
+/// says, and which recorded `recorded` as the key it published for it, or none.
+fn minted_moving_in(
+    name: &str,
+    part: &MovingIn,
+    left: &Left,
+    recorded: Option<&str>,
+) -> Option<String> {
     let ctx = seeding(name);
+    let would = part.moved.clone()?;
+    let plugin = would.plugin.clone();
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     if let Some(key) = recorded {
-        let _ = crate::config::store::set(
-            &env,
-            &crate::seed::run::published_as(subtitles::PLUGIN),
-            key,
-        );
+        let _ = crate::config::store::set(&env, &crate::seed::run::published_as(&plugin), key);
+    }
+    let at = crate::app::targets::service_config_dir(&stack_of(&ctx), &plugin).join(part.file);
+    let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
+    match left {
+        Left::Written => {
+            let _ = std::fs::write(&at, part.holding);
+        }
+        Left::Absent => {}
+        Left::LeadingAway => {
+            let elsewhere =
+                lemonfiber_fixtures::scratch::Scratch::new(&format!("{name}-elsewhere")).kept();
+            let _ = std::fs::create_dir_all(&elsewhere);
+            let target = elsewhere.join("key");
+            let _ = std::fs::write(&target, part.holding);
+            link(&target, &at);
+        }
     }
     let manifest = lemonfiber_bundled::PINNED
         .iter()
-        .find(|one| one.first_party.plugin == subtitles::PLUGIN)
+        .find(|one| one.first_party.plugin == plugin)
         .and_then(|one| lemonfiber_plugin::Manifest::from_toml(one.copy).ok())?;
-    let would = subtitles::moved()?;
 
     super::super::super::minting::minted(
         &ctx,
@@ -413,22 +473,74 @@ fn minted_subtitle_finder(name: &str, recorded: Option<&str>) -> Option<String> 
     crate::settings::secrets_at(&ctx)
         .and_then(|at| crate::settings::Secrets::at(&at).ok())
         .and_then(|held| {
-            held.value(&crate::settings::named(subtitles::PLUGIN, "upstream-key"))
+            held.value(&crate::settings::named(&plugin, "upstream-key"))
                 .map(str::to_owned)
         })
 }
 
-/// The subtitle finder moved into its plugin is handed the key the stack published for its
-/// own, which the Bazarr it moves in place of already answers to; a stack that published
-/// none has one minted.
+/// `at` made a link to `target`.
+#[cfg(unix)]
+fn link(target: &std::path::Path, at: &std::path::Path) {
+    let _ = std::os::unix::fs::symlink(target, at);
+}
+
+/// `at` left as it is where links cannot be made.
+#[cfg(not(unix))]
+fn link(_target: &std::path::Path, _at: &std::path::Path) {}
+
+/// A part moved in place of the stack's own service is handed the key that service wrote
+/// into its own configuration, over a stale one the stack published for it: the YAML the
+/// subtitle finder writes and the INI the Usenet client writes alike.
 #[test]
-fn the_moved_subtitle_finder_keeps_the_key_the_stack_published_for_its_own() {
-    assert_eq!(
-        minted_subtitle_finder("seeded-moved-subtitles", Some(RECORDED)).as_deref(),
-        Some(RECORDED)
-    );
-    let fresh = minted_subtitle_finder("seeded-moved-subtitles-fresh", None).unwrap_or_default();
-    assert_eq!(fresh.len(), 32, "{:?}", fresh.len());
+fn a_part_moved_in_place_keeps_the_key_its_service_wrote_over_the_one_published() {
+    for (tag, part) in [("subtitles", subtitles()), ("usenet", usenet())] {
+        assert!(part.moved.is_some(), "{tag}");
+        assert_eq!(
+            minted_moving_in(
+                &format!("seeded-written-{tag}"),
+                &part,
+                &Left::Written,
+                Some(RECORDED)
+            )
+            .as_deref(),
+            Some(WRITTEN),
+            "{tag}"
+        );
+    }
+}
+
+/// A part whose service's key file is not there, or leads out of the directory its
+/// container owns, is handed the key the stack published for it instead, and nothing is
+/// read through the link.
+#[test]
+fn a_key_file_absent_or_leading_away_hands_on_the_key_the_stack_published() {
+    let mut left = vec![("absent", Left::Absent)];
+    if cfg!(unix) {
+        left.push(("leading-away", Left::LeadingAway));
+    }
+    for (tag, left) in left {
+        assert_eq!(
+            minted_moving_in(
+                &format!("seeded-published-{tag}"),
+                &subtitles(),
+                &left,
+                Some(RECORDED)
+            )
+            .as_deref(),
+            Some(RECORDED),
+            "{tag}"
+        );
+    }
+}
+
+/// A part whose service wrote no key and had none published for it is minted one.
+#[test]
+fn a_part_moved_in_place_of_a_service_with_no_key_anywhere_is_minted_one() {
+    let minted =
+        minted_moving_in("seeded-nothing", &usenet(), &Left::Absent, None).unwrap_or_default();
+
+    assert_eq!(minted.len(), 32, "{:?}", minted.len());
+    assert_ne!(minted, WRITTEN);
 }
 
 /// The seeded manifest, its adapter handing its upstream an account lemonfiber mints and
