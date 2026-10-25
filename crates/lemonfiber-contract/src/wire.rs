@@ -21,7 +21,8 @@ pub enum Kind {
     Unauthorised,
     /// The upstream answered in a way the adapter did not expect.
     Refused,
-    /// The upstream speaks a release the adapter does not support.
+    /// The upstream speaks a release the adapter does not support, or cannot perform the
+    /// operation at all, which is then not offered.
     Unsupported,
     /// The operation is not one this adapter serves.
     UnknownOperation,

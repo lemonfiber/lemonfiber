@@ -6,7 +6,7 @@
 //! and how a household's request reaches it. Every kind of media is named by what it is,
 //! never by the service that files it.
 
-use lemonfiber_ports::media::{Format, Kind, MUSIC};
+use lemonfiber_ports::media::{Format, Kind, BOOKS, MUSIC};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
     Credential, DownloadClient, FoundItem, Identity, Importing, ItemPart, Maintenance,
@@ -292,6 +292,7 @@ fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
                 (Kind::Tv.media_type(), Record::Series),
                 (Kind::Movies.media_type(), Record::Film),
                 (MUSIC, Record::Artist),
+                (BOOKS, Record::Author),
             ]
             .iter()
             .map(|(media_type, sort)| (*media_type, wire(sort)))
@@ -301,10 +302,15 @@ fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
     if operation == BY_FOLDER {
         return each(
             "/folder/media_type",
-            [Kind::Tv.media_type(), Kind::Movies.media_type(), MUSIC]
-                .into_iter()
-                .map(|media_type| (media_type, Value::String(media_type.to_owned())))
-                .collect(),
+            [
+                Kind::Tv.media_type(),
+                Kind::Movies.media_type(),
+                MUSIC,
+                BOOKS,
+            ]
+            .into_iter()
+            .map(|media_type| (media_type, Value::String(media_type.to_owned())))
+            .collect(),
         );
     }
     Vec::new()

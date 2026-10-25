@@ -175,8 +175,16 @@ fn a_curator_is_asked_the_cases_of_each_kind_it_files_and_no_other() {
     );
     assert!(!music.iter().any(|case| case.starts_with("lookup-answers")));
 
+    let books = named(&["books"]);
+    assert!(
+        books.contains(&"register_root_folder-answers-books".to_owned()),
+        "{books:?}"
+    );
+    assert!(books.contains(&"records-answers-books".to_owned()));
+    assert!(!books.iter().any(|case| case.starts_with("lookup-answers")));
+
     let every = cases(&curate).len();
-    assert_eq!(named(&["tv", "movies", "music"]).len(), every);
+    assert_eq!(named(&["tv", "movies", "music", "books"]).len(), every);
 }
 
 #[test]
@@ -204,6 +212,14 @@ fn a_kind_bound_case_posts_its_own_kind() {
     assert_eq!(
         asks("register_root_folder-answers-music").pointer("/folder/media_type"),
         Some(&Value::from("music"))
+    );
+    assert_eq!(
+        asks("carry-answers-books").pointer("/sort"),
+        Some(&Value::from("author"))
+    );
+    assert_eq!(
+        asks("register_root_folder-answers-books").pointer("/folder/media_type"),
+        Some(&Value::from("books"))
     );
     assert_eq!(
         asks("register_download_client-answers").pointer("/client/protocol"),

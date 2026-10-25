@@ -22,11 +22,8 @@ impl Filler {
         })
     }
 
-    fn filled(&self, upstream: Option<&str>, asks: &Value) -> (Result<Value, String>, usize) {
-        if let Some(text) = upstream {
-            let _ = self.held.hold(UPSTREAM_FILE, text);
-        }
-        let mut filling = Filling {
+    fn filling(&self) -> Filling<'_> {
+        Filling {
             random: &self.random,
             held: &self.held,
             answers: [
@@ -38,11 +35,22 @@ impl Filler {
                     "identity.source@1/household-answers".to_owned(),
                     json!([{"id": 3}]),
                 ),
+                (
+                    "identity.source@1/revoke-answers".to_owned(),
+                    json!({"type": "unsupported", "detail": "it revokes nothing"}),
+                ),
             ]
             .into_iter()
             .collect(),
             made: Vec::new(),
-        };
+        }
+    }
+
+    fn filled(&self, upstream: Option<&str>, asks: &Value) -> (Result<Value, String>, usize) {
+        if let Some(text) = upstream {
+            let _ = self.held.hold(UPSTREAM_FILE, text);
+        }
+        let mut filling = self.filling();
         let filled = filling.filled(asks).map(|filled| filled.value);
         (filled, filling.made.len())
     }
@@ -122,17 +130,44 @@ fn a_placeholder_with_nothing_to_fill_it_names_itself_and_why() {
 }
 
 #[test]
+fn a_case_reading_an_unspoken_contract_or_an_unsupported_answer_is_not_offered() {
+    let Some(filler) = Filler::new(None) else {
+        return;
+    };
+    let filling = filler.filling();
+    let speaks = ["identity.source@1".to_owned()];
+    assert_eq!(
+        filling.unoffered(
+            &json!({"by": ["plain", "{media.serve@1/mint-answers#/key}"]}),
+            &speaks
+        ),
+        Some(
+            "it speaks no media.serve@1, which media.serve@1/mint-answers is a case of".to_owned()
+        )
+    );
+    assert_eq!(
+        filling.unoffered(
+            &json!({"x": {"id": "{identity.source@1/revoke-answers#/id}"}}),
+            &speaks
+        ),
+        Some("identity.source@1/revoke-answers was answered unsupported".to_owned())
+    );
+    assert_eq!(
+        filling.unoffered(
+            &json!({"signed": ["{identity.source@1/whoever-answers#/token}", "{upstream:username}", 12]}),
+            &speaks
+        ),
+        None
+    );
+}
+
+#[test]
 fn a_minted_credential_is_written_into_what_the_adapter_holds_beside_its_fields() {
     let Some(filler) = Filler::new(Some(7)) else {
         return;
     };
     let _ = filler.held.hold(UPSTREAM_FILE, "{\"username\": \"admin\"}");
-    let filling = Filling {
-        random: &filler.random,
-        held: &filler.held,
-        answers: std::collections::BTreeMap::new(),
-        made: Vec::new(),
-    };
+    let filling = filler.filling();
     assert_eq!(filling.keep_minted(&[]), Ok(()));
     assert_eq!(
         filling.keep_minted(&[("password".to_owned(), "s3cret".to_owned())]),

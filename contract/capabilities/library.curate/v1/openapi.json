@@ -35,7 +35,7 @@
               },
               {
                 "const": "unsupported",
-                "description": "The upstream speaks a release the adapter does not support.",
+                "description": "The upstream speaks a release the adapter does not support, or cannot perform the\noperation at all, which is then not offered.",
                 "type": "string"
               },
               {

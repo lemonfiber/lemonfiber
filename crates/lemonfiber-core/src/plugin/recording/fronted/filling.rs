@@ -6,9 +6,12 @@ use std::path::Path;
 
 use lemonfiber_contract::adapter::UPSTREAM_FILE;
 use lemonfiber_contract::conformance::Placeholder;
+use lemonfiber_contract::wire::{Kind, Refusal};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::plugin::program::Throwaway;
+use crate::ports::http::{Response, PROBLEM};
 use crate::ports::random::Random;
 
 /// A case's ask with every placeholder in it filled.
@@ -100,6 +103,34 @@ impl Filling<'_> {
         }
     }
 
+    /// Why a case posting `asks` is not offered by an adapter speaking `speaks`: a
+    /// placeholder in it reads a case of a contract the adapter does not speak, or one it
+    /// answered `unsupported`. Nothing where every placeholder reads an answer it may.
+    pub(super) fn unoffered(&self, asks: &Value, speaks: &[String]) -> Option<String> {
+        match asks {
+            Value::String(text) => match Placeholder::read(text) {
+                Some(Placeholder::Answered { case, .. }) => {
+                    let contract = case.split_once('/').map_or(case.as_str(), |(of, _)| of);
+                    if !speaks.iter().any(|spoken| spoken == contract) {
+                        Some(format!(
+                            "it speaks no {contract}, which {case} is a case of"
+                        ))
+                    } else if self.answers.get(&case).is_some_and(refused_unsupported) {
+                        Some(format!("{case} was answered unsupported"))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
+            Value::Array(items) => items.iter().find_map(|item| self.unoffered(item, speaks)),
+            Value::Object(members) => members
+                .values()
+                .find_map(|member| self.unoffered(member, speaks)),
+            _ => None,
+        }
+    }
+
     /// A credential minted for one case, kept among what the run made.
     fn minted(&mut self) -> Result<String, String> {
         let fresh = crate::secret::generate(self.random)
@@ -119,6 +150,21 @@ impl Filling<'_> {
             return Ok(());
         }
         handed_over(self.held, minted)
+    }
+}
+
+/// Whether `answer` is the refusal an adapter answers an operation it cannot perform with.
+fn refused_unsupported(answer: &Value) -> bool {
+    Refusal::deserialize(answer).is_ok_and(|refusal| refusal.kind == Kind::Unsupported)
+}
+
+/// What a case that is not offered is recorded as answering: `unsupported`, saying why.
+pub(super) fn unsupported(why: String) -> Response {
+    let refusal = Refusal::new(Kind::Unsupported, why);
+    Response {
+        status: refusal.kind.status(),
+        headers: vec![("Content-Type".to_owned(), PROBLEM.to_owned())],
+        body: serde_json::to_string(&refusal).unwrap_or_default(),
     }
 }
 

@@ -1,5 +1,6 @@
 //! Whether a recording holds what was taken again, where a service makes some values
-//! afresh on every run: an identifier or a moment is held to its shape alone.
+//! afresh on every run: an identifier or a moment is held to its shape alone, also inside a
+//! string that holds JSON.
 
 use serde_json::Value;
 
@@ -19,7 +20,9 @@ enum Shape {
 pub(super) fn alike(held: &Value, taken: &Value) -> bool {
     match (held, taken) {
         (Value::String(held), Value::String(taken)) => {
-            held == taken || shaped(held).is_some_and(|shape| shaped(taken) == Some(shape))
+            held == taken
+                || shaped(held).is_some_and(|shape| shaped(taken) == Some(shape))
+                || encoded(held, taken)
         }
         (Value::Array(held), Value::Array(taken)) => {
             held.len() == taken.len()
@@ -32,6 +35,17 @@ pub(super) fn alike(held: &Value, taken: &Value) -> bool {
                     .all(|(key, one)| taken.get(key).is_some_and(|other| alike(one, other)))
         }
         _ => held == taken,
+    }
+}
+
+/// Whether `held` and `taken` each hold a JSON list or object as text, and are alike.
+fn encoded(held: &str, taken: &str) -> bool {
+    match (
+        serde_json::from_str::<Value>(held),
+        serde_json::from_str::<Value>(taken),
+    ) {
+        (Ok(held @ (Value::Array(_) | Value::Object(_))), Ok(taken)) => alike(&held, &taken),
+        _ => false,
     }
 }
 

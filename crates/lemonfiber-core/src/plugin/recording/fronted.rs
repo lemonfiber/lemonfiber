@@ -367,9 +367,11 @@ impl Asking<'_> {
         heard: &BTreeMap<String, Response>,
     ) -> Result<Case, String> {
         let url = format!("{}{}", reached.base, case.operation.path());
-        let response = match heard.get(&url).filter(|_| case.keyed) {
-            Some(first) => first.clone(),
-            None => self.posted(reached, filling, case, url).await?,
+        let unoffered = filling.unoffered(&case.asks, &self.adapter.service.speaks);
+        let response = match (unoffered, heard.get(&url).filter(|_| case.keyed)) {
+            (Some(why), _) => filling::unsupported(why),
+            (None, Some(first)) => first.clone(),
+            (None, None) => self.posted(reached, filling, case, url).await?,
         };
         let answer: Value = serde_json::from_str(&response.body).unwrap_or(Value::Null);
         filling.made.extend(issued(case.operation.secret, &answer));
