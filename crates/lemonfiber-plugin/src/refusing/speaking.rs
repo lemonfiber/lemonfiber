@@ -103,13 +103,15 @@ fn fronting(service: &Service, services: &[Service], at: &str, found: &mut Vec<V
     }
 }
 
-/// The capability `named` is the contract of, where the service does not provide it.
+/// The capability `named` is the contract of, where the service does not provide it and
+/// it is not a facet, which is spoken and never provided.
 fn unprovided<'a>(service: &Service, named: &'a str) -> Option<&'a str> {
     let capability = lemonfiber_contract::capability_of(named)?;
-    (!service
-        .provides
-        .iter()
-        .any(|provided| provided == capability))
+    (!lemonfiber_contract::capabilities::is_facet(capability)
+        && !service
+            .provides
+            .iter()
+            .any(|provided| provided == capability))
     .then_some(capability)
 }
 

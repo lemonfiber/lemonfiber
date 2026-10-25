@@ -29,7 +29,12 @@ fn every_party_answers_on_a_port_of_its_own_at_a_host_the_cases_name() {
 
     assert_eq!(
         all.iter().map(|party| party.named).collect::<Vec<_>>(),
-        vec!["download client", "identity source", "curator"]
+        vec![
+            "download client",
+            "identity source",
+            "curator",
+            "aggregator"
+        ]
     );
     assert_eq!(ports.len(), all.len());
     assert!(ports.iter().all(|port| *port > 1024), "{ports:?}");

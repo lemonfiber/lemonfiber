@@ -198,6 +198,7 @@ pub fn index(capabilities: &[Capability], files: &[(String, String)]) -> Value {
                 "capability": capability.name,
                 "majors": [capability.major],
                 "operations": capability.operations.len(),
+                "facet": crate::capabilities::is_facet(capability.name),
                 "openapi": located(capability, OPENAPI),
                 "conformance": located(capability, CONFORMANCE),
                 "files": documents

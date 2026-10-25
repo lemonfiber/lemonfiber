@@ -55,7 +55,15 @@ pub fn violations(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
 fn claimed_by(service: &Service, plugin: &str, found: &mut Vec<Violation>) {
     let at = format!("service {}", service.id);
     for name in &service.provides {
-        if vocabulary::is_core_name(name) {
+        if lemonfiber_contract::capabilities::is_facet(name) {
+            found.push(Violation {
+                location: format!("{at}.provides"),
+                message: format!(
+                    "names {name}, a facet: lemonfiber asks it of every service that speaks its \
+                     contract, so a service speaks it and does not provide it"
+                ),
+            });
+        } else if vocabulary::is_core_name(name) {
             core(
                 name,
                 &format!("{at}.provides"),

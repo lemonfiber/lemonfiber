@@ -1,15 +1,15 @@
-//! `indexer.search` across its contract: one script run against an indexer in process and
+//! `indexer.search` and `indexer.pull` across their contracts: one script run against an indexer in process and
 //! through the contract, which must answer alike and be told alike.
 
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use lemonfiber_ports::service::{
-    Aggregator, Aggregators, AppSync, Application, ApplicationKind, Failure, IndexerUse, Indexers,
-    KnownAggregator, Limits, RegisteredApplication,
+    Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, Failure,
+    IndexerUse, Indexers, KnownAggregator, Limits, Protocol, PullsIndexers, RegisteredApplication,
 };
 
-use super::{crosses_alike, search, Upstream, SERVICE};
+use super::{crosses_alike, pull, search, Upstream, SERVICE};
 
 #[async_trait]
 impl AppSync for Upstream {
@@ -114,4 +114,41 @@ async fn an_indexer_answers_and_is_told_through_its_contract_as_it_is_in_process
         search::Adapter,
         ["register", "test", "rekey", "aggregator"]
     );
+}
+
+#[async_trait]
+impl PullsIndexers for Upstream {
+    async fn aggregators(&self) -> Result<Vec<KnownAggregator>, Failure> {
+        Ok(vec![KnownAggregator {
+            id: "2".to_owned(),
+            url: "http://aggregator:9696".to_owned(),
+            keyed: true,
+        }])
+    }
+    async fn add_aggregator(&self, aggregator: &AggregatorAt) -> Result<(), Failure> {
+        self.tell(format!("pull from {aggregator:?}"));
+        Ok(())
+    }
+}
+
+/// Every operation of `indexer.pull`, once, each answer written down.
+async fn pulled<P: PullsIndexers>(curator: &P) -> Vec<String> {
+    let aggregator = AggregatorAt {
+        name: "aggregator".to_owned(),
+        url: "http://aggregator:9696".to_owned(),
+        protocol: Protocol("servarr".to_owned()),
+        key: "aggregator-key".to_owned(),
+    };
+    vec![
+        format!("{:?}", PullsIndexers::aggregators(curator).await),
+        format!(
+            "{:?}",
+            PullsIndexers::add_aggregator(curator, &aggregator).await
+        ),
+    ]
+}
+
+#[tokio::test]
+async fn a_curator_that_pulls_answers_and_is_told_through_its_contract_as_it_is_in_process() {
+    crosses_alike!(pulled, pull::Adapter, ["pull"]);
 }

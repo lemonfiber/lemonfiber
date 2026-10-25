@@ -1,0 +1,82 @@
+{
+  "post": {
+    "operationId": "claim",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "description": "Who holds a part.",
+              "oneOf": [
+                {
+                  "const": "open",
+                  "description": "Nobody: anybody may take it, or read what it holds.",
+                  "type": "string"
+                },
+                {
+                  "const": "settling",
+                  "description": "A claim was made and the part is still taking it up, such as by restarting.",
+                  "type": "string"
+                },
+                {
+                  "const": "ours",
+                  "description": "The credential lemonfiber handed its adapter.",
+                  "type": "string"
+                },
+                {
+                  "const": "theirs",
+                  "description": "Somebody else, whose credential is not the one lemonfiber handed its adapter.",
+                  "type": "string"
+                }
+              ],
+              "title": "Owner"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

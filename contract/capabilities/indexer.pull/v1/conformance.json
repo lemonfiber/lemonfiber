@@ -1,0 +1,45 @@
+{
+  "capability": "indexer.pull",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "aggregators"
+    },
+    {
+      "asked": {},
+      "case": "aggregators-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "aggregators"
+    },
+    {
+      "asked": {
+        "aggregator": {
+          "key": "{minted}",
+          "name": "conformance",
+          "protocol": "servarr",
+          "url": "http://conformance-aggregator:59696"
+        }
+      },
+      "case": "add_aggregator-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "add_aggregator"
+    }
+  ],
+  "major": 1
+}
