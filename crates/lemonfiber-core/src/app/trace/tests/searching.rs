@@ -20,10 +20,13 @@ const ONE_ACCEPTED: &str = r#"[{"rejections":[]}]"#;
 /// A release search that ran cleanly and came back with nothing at all.
 const NO_RELEASES: &str = "[]";
 
-/// A context whose download client's key is readable as well as the curators', so a
-/// trace that asks the accounts resolves both readers rather than only one.
+/// A context whose Usenet client is reachable through its plugin's adapter as well as the
+/// curators through their keys, so a trace that asks the accounts resolves both readers
+/// rather than only one.
 fn ctx_with_accounts(fake: &Fake) -> Ctx {
-    ctx_with(fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(USENET_INI))))
+    let mut ctx = ctx_with(fake);
+    ctx.settings.env_file = Some(crate::test_support::env_without_password("trace-accounts"));
+    crate::test_support::usenet::reaching(ctx)
 }
 
 /// The distinction this whole path exists to draw: releases are out there and the

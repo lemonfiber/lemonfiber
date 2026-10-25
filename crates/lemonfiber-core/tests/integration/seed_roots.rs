@@ -60,7 +60,7 @@ async fn backed(filesystem: &SeedFs, service: &FakeService, rehearsing: bool) ->
 async fn a_folder_within_the_data_root_is_made_and_then_registered() {
     let service = FakeService::with(Mode::Normal, Vec::new());
 
-    let states = backed(&SeedFs::keyed(None, None), &service, false).await;
+    let states = backed(&SeedFs::keyed(None), &service, false).await;
 
     assert_eq!(states, vec![State::Wired]);
     assert_eq!(service.registered().len(), 1);
@@ -71,7 +71,7 @@ async fn a_folder_within_the_data_root_is_made_and_then_registered() {
 #[tokio::test]
 async fn a_folder_whose_directory_cannot_be_made_is_failed_and_not_registered() {
     let service = FakeService::with(Mode::Normal, Vec::new());
-    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+    let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
 
     let states = backed(&filesystem, &service, false).await;
 
@@ -87,7 +87,7 @@ async fn a_folder_whose_directory_cannot_be_made_is_failed_and_not_registered() 
 #[tokio::test]
 async fn a_rehearsal_names_the_folder_without_making_its_directory() {
     let service = FakeService::with(Mode::Normal, Vec::new());
-    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+    let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
 
     let states = backed(&filesystem, &service, true).await;
 

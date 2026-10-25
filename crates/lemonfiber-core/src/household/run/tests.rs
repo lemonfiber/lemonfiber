@@ -231,8 +231,8 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("household-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let disk = SeedFs::keyed(Some(KEYED), None)
-        .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
+    let disk =
+        SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
     let mut context = a_context()
         .build()
         .with_filesystem(Arc::new(if no_room {

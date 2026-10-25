@@ -12,7 +12,7 @@ use super::{
 };
 use crate::config::Settings;
 use crate::dashboard::Protocol;
-use crate::ports::service::{Download, Seeded, UsenetAccount};
+use crate::ports::service::{Download, Filed, Seeded, UsenetAccount};
 use crate::test_support::{
     a_context, a_password, a_placed, an_installed, contracted, contracted_context, env_at,
     first_party, json, stack, CONTRACTED_KEY,
@@ -91,7 +91,7 @@ fn passwords(targets: &[super::DownloadTarget]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|target| match &target.kind {
             DownloadKind::Torrent { base, password } => Some((base.clone(), password.clone())),
-            DownloadKind::Usenet { .. } | DownloadKind::Over { .. } => None,
+            DownloadKind::Over { .. } => None,
         })
         .collect()
 }
@@ -207,9 +207,14 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
     let targets = [
         DownloadTarget {
             service: "usenet".to_owned(),
-            kind: DownloadKind::Usenet {
-                base: "http://127.0.0.1:8085".to_owned(),
-                key: "usenet-key".to_owned(),
+            kind: DownloadKind::Over {
+                protocol: Protocol::Usenet,
+                adapter: Contracted::new(
+                    Fake::silent(),
+                    "http://127.0.0.1:8085",
+                    "usenet",
+                    "usenet-key",
+                ),
             },
         },
         DownloadTarget {
@@ -455,6 +460,42 @@ async fn a_usenet_client_speaking_its_contract_is_read_over_it_with_its_own_key(
 }
 
 #[tokio::test]
+async fn a_usenet_client_speaking_its_contract_says_where_it_files_over_it() {
+    let filed = Filed {
+        category: "tv".to_owned(),
+        folder: "/data/downloads/complete/tv".to_owned(),
+    };
+    let http = Fake::by_path(vec![(
+        "download.usenet/v1/filed",
+        Answer::reply(200, json(&vec![filed.clone()])),
+    )]);
+    let (_project, ctx, fillers) = speaking(
+        "downloads-contracted-filing",
+        usenet::CAPABILITY,
+        true,
+        http.clone(),
+    );
+
+    let mut read = Vec::new();
+    for target in fetching(download_targets(&ctx, &fillers).await) {
+        read.extend(
+            target
+                .client(&ctx)
+                .filing()
+                .filed()
+                .await
+                .unwrap_or_default(),
+        );
+    }
+
+    assert_eq!(read, vec![filed]);
+    assert!(over_the_contract(
+        &to_the_fetcher(&http),
+        usenet::CAPABILITY
+    ));
+}
+
+#[tokio::test]
 async fn a_contracted_client_without_its_key_is_asked_nothing() {
     let http = Fake::always(Answer::reply(200, "[]"));
     let (_project, ctx, fillers) = speaking(
@@ -490,13 +531,6 @@ fn every_kind_of_client_is_asked_as_the_protocol_it_moves() {
                 password: a_password(),
             },
             Protocol::Torrent,
-        ),
-        (
-            DownloadKind::Usenet {
-                base: "http://127.0.0.1:8085".to_owned(),
-                key: "usenet-key".to_owned(),
-            },
-            Protocol::Usenet,
         ),
         (
             DownloadKind::Over {

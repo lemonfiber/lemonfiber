@@ -313,7 +313,6 @@ services:
     - ask__navidrome__dashboard.show__homepage
     - ask__prowlarr__dashboard.show__homepage
     - ask__radarr__dashboard.show__homepage
-    - ask__sabnzbd__dashboard.show__homepage
     - ask__seerr__dashboard.show__homepage
     - ask__sonarr__dashboard.show__homepage
     - own__homepage
@@ -584,39 +583,6 @@ services:
     pids_limit: 1024
     read_only: true
     mem_limit: 64m
-  sabnzbd:
-    image: lscr.io/linuxserver/sabnzbd:4.5.5-ls250@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
-    profiles:
-    - usenet
-    restart: unless-stopped
-    environment:
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-    ports:
-    - 127.0.0.1:8085:8080
-    volumes:
-    - ./data:/data
-    - ./config/sabnzbd:/config
-    networks:
-    - ask__bindery__download.usenet__sabnzbd
-    - ask__lidarr__download.usenet__sabnzbd
-    - ask__radarr__download.usenet__sabnzbd
-    - ask__sabnzbd__dashboard.show__homepage
-    - ask__sonarr__download.usenet__sabnzbd
-    - own__sabnzbd
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   seerr:
     image: ghcr.io/seerr-team/seerr:v3.5.0@sha256:27602401178d54f1964442287b9f23f67a3fa2252645ee8065839ea1c3f69e45
     profiles:
@@ -751,6 +717,38 @@ services:
     - ask__seerr__identity.source__jellyfin
     - link__decline__jellyfin
     - own__jellyfin
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:4.5.5-ls250@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
+    profiles:
+    - usenet
+    restart: unless-stopped
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+    ports:
+    - 127.0.0.1:8085:8080
+    volumes:
+    - ./data:/data
+    - ./config/sabnzbd:/config
+    networks:
+    - ask__bindery__download.usenet__sabnzbd
+    - ask__lidarr__download.usenet__sabnzbd
+    - ask__radarr__download.usenet__sabnzbd
+    - ask__sonarr__download.usenet__sabnzbd
+    - own__sabnzbd
     security_opt:
     - no-new-privileges:true
     cap_drop:

@@ -19,7 +19,7 @@ fn ctx_with_media_server(fake: &Fake, tag: &str) -> Ctx {
     let mut context = a_context()
         .engine(Arc::new(crate::test_support::media::running()))
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(fake.transport());
     context.settings.env_file = Some(dir.join(".env"));
     crate::test_support::media::moved_in(&context);
@@ -190,7 +190,7 @@ async fn stuck_over_curators_that_have_not_started_finds_nothing() {
     // and complete rather than incomplete.
     let context = a_context()
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(None)))
         .with_http(Fake::curator("", "", EMPTY_QUEUE).transport());
     let report = super::super::stuck(&context).await.unwrap_or_default();
     assert!(report.items.is_empty());

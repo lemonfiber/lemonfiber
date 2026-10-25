@@ -104,7 +104,7 @@ async fn a_layout_across_two_filesystems_is_reported_with_its_cost_and_a_remedy(
     let images = Pulled::holding(vec![Pulled::image("sonarr", 400, &["media"])]);
     let engine = mounting(somebody_elses(), &["/srv/media", "/mnt/downloads"]);
 
-    let split = SeedFs::keyed(None, None)
+    let split = SeedFs::keyed(None)
         .with_facts(facts("/srv"))
         .with_facts_under("/mnt", facts("/mnt"));
 
@@ -129,7 +129,7 @@ async fn a_layout_across_two_filesystems_is_reported_with_its_cost_and_a_remedy(
 async fn a_layout_on_one_filesystem_is_not_reported_at_all() {
     let images = Pulled::holding(vec![Pulled::image("sonarr", 400, &["media"])]);
     let engine = mounting(somebody_elses(), &["/srv/media", "/srv/downloads"]);
-    let one = SeedFs::keyed(None, None).with_facts(facts("/srv"));
+    let one = SeedFs::keyed(None).with_facts(facts("/srv"));
 
     let ctx = over_files(engine, images, Arc::new(one));
     let found = surveyed(&ctx).await.and_then(|report| report.linking);

@@ -50,7 +50,7 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let mut unpublished = aggregator_svc();
     unpublished.port = None;
     unpublished.listens = Some(9696);
@@ -79,7 +79,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = beside_a_stand_in(
         vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
         "movies",
@@ -118,7 +118,7 @@ async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = asked_by_a_plugin(&aggregator_svc(), vec![curator("sonarr", 8989, "tv")]);
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
@@ -136,7 +136,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -156,8 +156,8 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
 /// replaced key, so a replacement owes it nothing yet.
 #[tokio::test]
 async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let ctx =
+        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -173,7 +173,7 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = beside_a_stand_in(
         vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
         "movies",
@@ -190,8 +190,8 @@ async fn app_sync_skips_every_curator_until_the_aggregator_has_written_its_key()
     let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
     // The aggregator's key is not readable yet, so it is still starting: every
     // application is skipped for a re-run rather than failed.
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let ctx =
+        seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
@@ -214,7 +214,7 @@ async fn app_sync_skips_only_the_curator_that_has_not_written_its_key() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(CURATOR_CONFIG), None).only_for_aggregator(),
+            SeedFs::keyed(Some(CURATOR_CONFIG)).only_for_aggregator(),
         ));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
@@ -229,7 +229,7 @@ async fn app_sync_registers_a_curator_whose_keys_are_all_readable() {
     // application list — so the connection reads back as already wired.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
@@ -272,7 +272,7 @@ async fn app_sync_registers_an_absent_curator_and_reads_it_back() {
     let http = registering_aggregator();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
 
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
@@ -308,13 +308,9 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
     // The whole command against the real manifest: the indexer aggregator and the three
     // media-filing curators, each already registered by the seeding routes.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(
-            Some(CURATOR_CONFIG),
-            Some(USENET_CONFIG),
-        )));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let applications = application_wirings(&report);

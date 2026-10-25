@@ -23,7 +23,7 @@ use crate::app::{Ctx, Removing};
 use crate::config::Settings;
 use crate::ports::filesystem::{Eraser, FsKind, StorageFacts};
 use crate::ports::Runner;
-use crate::test_support::{a_context, nowhere};
+use crate::test_support::{a_context, nowhere, usenet};
 use crate::uninstall::{
     Item, Left, Manifest, Removal, Sort, Tier, ANOTHER_READING, NEEDS_AGREEING,
 };
@@ -78,7 +78,7 @@ fn a_filesystem() -> Arc<SeedFs> {
 
 /// A filesystem reporting the data location on a given sort of volume.
 fn over(kind: FsKind, removable: bool) -> Arc<SeedFs> {
-    Arc::new(SeedFs::keyed(None, None).with_facts(StorageFacts {
+    Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
         point: PathBuf::from(ROOT),
         kind,
         removable,

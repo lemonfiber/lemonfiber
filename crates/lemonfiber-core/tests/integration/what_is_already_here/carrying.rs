@@ -70,10 +70,9 @@ fn importing_over(
     )]);
     lemonfiber_testing::a_context()
         .engine(Arc::new(engine))
-        .filesystem(Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )))
+        .filesystem(Arc::new(SeedFs::keyed(Some(
+            "<Config><ApiKey>the-key</ApiKey></Config>",
+        ))))
         .over(stack)
         .settings(Settings {
             project: "lemonfiber".to_owned(),
@@ -217,7 +216,7 @@ fn importing_with(files: Arc<SeedFs>, http: Arc<lemonfiber_fixtures::http::Fake>
 /// A service that has written no key yet is one neither copy can be opened for.
 #[tokio::test]
 async fn a_service_whose_key_cannot_be_read_is_named_rather_than_carried_from() {
-    let keyless = Arc::new(SeedFs::keyed(None, None));
+    let keyless = Arc::new(SeedFs::keyed(None));
     let ctx = importing_with(keyless, two_stacks());
     let found = carrying(&ctx, false).await;
     let said = found.map_or_else(String::new, |read| {
@@ -243,10 +242,9 @@ async fn a_service_whose_records_will_not_read_is_named_for_that() {
         (Method::Get, "/api/v3/indexer", Answer::reply(500, "no")),
     ]);
     let ctx = importing_with(
-        Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )),
+        Arc::new(SeedFs::keyed(Some(
+            "<Config><ApiKey>the-key</ApiKey></Config>",
+        ))),
         partial,
     );
     let found = carrying(&ctx, false).await;

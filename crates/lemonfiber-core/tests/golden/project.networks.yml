@@ -196,11 +196,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.140.168/29
-  ask__sabnzbd__dashboard.show__homepage:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.134.56/29
   ask__seerr__dashboard.show__homepage:
     internal: true
     ipam:

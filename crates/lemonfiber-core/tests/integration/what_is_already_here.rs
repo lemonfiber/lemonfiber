@@ -69,15 +69,13 @@ fn driven(engine: Reporting, images: Arc<Pulled>, stack: Source, runner: Arc<dyn
     lemonfiber_testing::a_context()
         .runner(runner)
         .engine(Arc::new(engine))
-        .filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(
-            StorageFacts {
-                point: PathBuf::from("/srv/media"),
-                kind: FsKind::Linking("apfs".to_owned()),
-                removable: false,
-                available: 100,
-                total: 1_000,
-            },
-        )))
+        .filesystem(Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
+            point: PathBuf::from("/srv/media"),
+            kind: FsKind::Linking("apfs".to_owned()),
+            removable: false,
+            available: 100,
+            total: 1_000,
+        })))
         .over(stack)
         .settings(Settings {
             project: "lemonfiber".to_owned(),
@@ -235,10 +233,9 @@ fn importing(http: Arc<lemonfiber_fixtures::http::Fake>) -> Ctx {
     let (engine, images) = both_stacks();
     lemonfiber_testing::a_context()
         .engine(Arc::new(engine))
-        .filesystem(Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )))
+        .filesystem(Arc::new(SeedFs::keyed(Some(
+            "<Config><ApiKey>the-key</ApiKey></Config>",
+        ))))
         .settings(Settings {
             project: "lemonfiber".to_owned(),
             stack_dir: Some(PathBuf::from("/srv/lemonfiber")),

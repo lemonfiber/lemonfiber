@@ -259,10 +259,11 @@ fn unrecorded(failure: &config::store::Failure) -> String {
 /// Replace the media server's administrator password with a freshly minted one.
 async fn administrator(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fillers) -> Rotation {
     // The media server whose administrator's password this is: the one filling the
-    // identity source, where its password is kept under this credential's setting.
-    // Boxed, because it is carried across the replacement below.
+    // identity source, where its password is kept under this credential's setting and
+    // recorded there. Boxed, because it is carried across the replacement below.
     let Some(server) = MediaServer::of(fillers)
         .filter(|server| server.setting == held.setting)
+        .filter(|server| recorded_secret(ctx, &server.setting).is_some())
         .map(Box::new)
     else {
         return unproven(held, NO_ADMINISTRATOR_HELD);

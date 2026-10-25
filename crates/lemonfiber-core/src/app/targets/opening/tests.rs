@@ -83,9 +83,7 @@ fn reaching(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
         .engine(Arc::new(engine))
         .build()
         .with_http(fake.clone())
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_requests(SEERR_SETTINGS),
-        ));
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_requests(SEERR_SETTINGS)));
     ctx.settings.env_file = Some(project.join(".env"));
     (project, ctx, fake)
 }
@@ -193,7 +191,7 @@ async fn the_stacks_own_request_service_is_asked_with_its_own_key() {
         )]
     );
 
-    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None)));
     assert!(requests_from(&unwritten, &fillers).await.is_none());
 }
 
@@ -202,7 +200,7 @@ async fn the_stacks_own_request_service_is_asked_with_its_own_key() {
 #[tokio::test]
 async fn the_stacks_own_request_service_is_asked_as_its_owner_before_it_writes_its_key() {
     let (project, ctx, fake) = reaching("bundled-unkeyed", false);
-    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None)));
     let fillers = beside(&[], true, &project);
 
     let answered = match request_service(&fillers) {

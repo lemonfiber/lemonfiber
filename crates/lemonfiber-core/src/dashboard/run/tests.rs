@@ -11,10 +11,10 @@ use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::filesystem::{FsKind, StorageFacts};
 use crate::ports::http::Http;
 use crate::stack::Source;
-use crate::test_support::{a_context, a_password, env_at, nowhere, Reporting, SeedFs, Tunnel};
-use lemonfiber_fixtures::downloads::{
-    downloads, QBIT_TORRENTS, SAB_KEY_INI, SAB_NO_KEY_INI, SAB_QUEUE,
+use crate::test_support::{
+    a_context, a_password, env_at, env_without_password, nowhere, usenet, Reporting, SeedFs, Tunnel,
 };
+use lemonfiber_fixtures::downloads::QBIT_TORRENTS;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Renamed;
 

@@ -4,16 +4,14 @@
 //! category its transfers are filed under. Where each is reached is the filler's own
 //! declaration, read through [`crate::wiring::Fillers`].
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::ports::filesystem::Beneath;
 use crate::ports::service::Credential;
-use crate::seed::Wiring;
 use crate::wiring::Fillers;
 
-use super::connecting::{pairings, Connection, FILM, MUSIC, TELEVISION};
+use super::connecting::{FILM, MUSIC, TELEVISION};
 
 use super::{read_temporary_password, Ctx};
 use crate::origin::Origin;
@@ -84,8 +82,6 @@ impl Holder {
 pub(super) struct Held {
     /// Each credential in hand, by whose it is.
     pub(super) keys: BTreeMap<Holder, Credential>,
-    /// Every service whose credential file was refused rather than read.
-    pub(super) refused: BTreeSet<Holder>,
 }
 
 /// The credentials of the stack's own services, by id.
@@ -96,7 +92,6 @@ impl From<BTreeMap<String, Credential>> for Held {
                 .into_iter()
                 .map(|(id, credential)| (Holder::stack(&id), credential))
                 .collect(),
-            refused: BTreeSet::new(),
         }
     }
 }
@@ -116,25 +111,18 @@ impl Held {
     }
 }
 
-/// Every download client's credential that is in hand: a Usenet client's key, read from
-/// the file it wrote it to, and a torrent client's password, minted this run or recorded
+/// Every download client's credential that is in hand: a Usenet client's key, the one
+/// lemonfiber minted for it, and a torrent client's password, minted this run or recorded
 /// on an earlier one.
 ///
-/// A client missing from the answer has not written its key yet, or has never had a
-/// password set, and nothing is told about it until a later run finds one — unless the
-/// file its key would be in was refused, which is kept so it can be said.
+/// A client missing from the answer has no key minted yet, or has never had a password
+/// set, and nothing is told about it until a later run finds one.
 pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder, String>) -> Held {
     let mut held = Held::default();
-    for filler in fillers.speaking(ApiKind::Sabnzbd) {
-        match crate::app::targets::usenet_key(ctx, filler).await {
-            Beneath::Read(key) => {
-                held.keys
-                    .insert(Holder::of(filler), Credential::ApiKey(key));
-            }
-            Beneath::Escaped => {
-                held.refused.insert(Holder::of(filler));
-            }
-            Beneath::Absent => {}
+    for filler in fillers.talking(ApiKind::Sabnzbd) {
+        if let Some(key) = super::keys::minted_key(ctx, filler) {
+            held.keys
+                .insert(Holder::of(filler), Credential::ApiKey(key));
         }
     }
     for filler in fillers.speaking(ApiKind::Qbittorrent) {
@@ -153,22 +141,6 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder,
         }
     }
     held
-}
-
-/// Every download client whose credential file was refused, said on the connection it
-/// would have made into each curator that asks for it.
-pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
-    pairings(fillers)
-        .iter()
-        .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _, _))))
-        .filter(|pairing| held.refused.contains(&Holder::of(pairing.filler)))
-        .map(|pairing| {
-            super::keys::refused(
-                format!("{} into {}", pairing.filler.name, pairing.asker.name),
-                pairing.filler,
-            )
-        })
-        .collect()
 }
 
 /// Set every torrent client's web UI password, where it is still the one it started

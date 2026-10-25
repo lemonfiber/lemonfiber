@@ -228,7 +228,8 @@ fn connection(
 }
 
 /// Every asker paired with each service that fills what it asked for, for the asks
-/// answered here.
+/// answered here: the upstream it fronts, where that service is an adapter, since the
+/// asker is told about a service in that service's own API.
 ///
 /// An ask whose asker is not on this machine is passed over: the operator took it out of
 /// lemonfiber's hands, and a pass that wrote nothing to it has nothing to say about it.
@@ -242,6 +243,7 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
             continue;
         };
         for filler in &ask.fillers {
+            let filler = fillers.fronted_by(filler).unwrap_or(filler);
             found.push(Pairing {
                 asker,
                 ask,

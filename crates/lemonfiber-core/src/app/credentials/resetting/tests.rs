@@ -55,7 +55,6 @@ async fn a_reset_key_is_handed_to_a_quality_sync_holding_the_curator() {
         .with_http(http.clone())
         .with_filesystem(std::sync::Arc::new(crate::test_support::SeedFs::keyed(
             Some("<Config><ApiKey>the-new-key</ApiKey></Config>"),
-            None,
         )));
     let services: Vec<lemonfiber_manifest::Service> = crate::test_support::stack()
         .manifest()

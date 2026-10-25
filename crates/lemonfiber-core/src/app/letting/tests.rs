@@ -86,7 +86,7 @@ fn over(scratch: &str, routes: Arc<Fake>) -> crate::app::Ctx {
         .settings(measuring(scratch))
         .build()
         .with_http(routes)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts())))
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts())))
         .with_occupancy(Walking::holding(a_tree()))
 }
 
@@ -117,7 +117,7 @@ async fn a_stack_with_no_torrent_client_has_nothing_to_ask() {
             ..Settings::default()
         })
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts())))
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts())))
         .with_occupancy(Walking::holding(a_tree()));
     let refused = stop_seeding(&ctx, HELD.to_owned(), None).await;
     assert!(refused.is_err_and(|problem| problem.code == NOTHING_TO_ASK));
@@ -264,7 +264,7 @@ async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
         })
         .build()
         .with_http(asking.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts())))
+        .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts())))
         .with_occupancy(Walking::holding(a_tree()));
     let kept = crate::app::plugins::kept_at(&ctx).unwrap_or_default();
     assert!(std::fs::write(&kept, register.to_json().unwrap_or_default()).is_ok());

@@ -12,7 +12,7 @@ use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::process::Runner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::update::State;
-use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY};
+use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::pulled::Pulled;
@@ -99,7 +99,6 @@ fn still_coming_down() -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         ("/auth/login", vec![Answer::reply(200, "Ok.")]),
         ("/torrents/info", vec![Answer::reply(200, QBIT_TORRENTS)]),
-        ("", vec![Answer::reply(200, SAB_EMPTY)]),
     ])
 }
 
@@ -131,7 +130,6 @@ async fn a_run_asked_to_wait_lets_what_is_coming_down_finish_first() {
                 Answer::reply(200, QBIT_FINISHED),
             ],
         ),
-        ("", vec![Answer::reply(200, SAB_EMPTY)]),
     ]);
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);

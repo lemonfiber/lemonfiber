@@ -121,15 +121,13 @@ fn running(heard: &Arc<Heard>, runner: Arc<dyn Runner>) -> Ctx {
                 Lifecycle::Running,
                 Health::Healthy,
             )))
-            .filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(
-                StorageFacts {
-                    point: PathBuf::from("/srv/media"),
-                    kind: FsKind::Linking("apfs".to_owned()),
-                    removable: false,
-                    available: 100,
-                    total: 1_000,
-                },
-            )))
+            .filesystem(Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
+                point: PathBuf::from("/srv/media"),
+                kind: FsKind::Linking("apfs".to_owned()),
+                removable: false,
+                available: 100,
+                total: 1_000,
+            })))
             .settings(Settings {
                 project: "lemonfiber".to_owned(),
                 env_file: Some(PathBuf::from("/cfg/lemonfiber/.env")),

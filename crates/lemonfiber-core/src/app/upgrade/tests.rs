@@ -30,7 +30,7 @@ fn outcomes(report: &crate::model::UpgradeReport) -> Vec<Option<&Triggered>> {
 
 #[tokio::test]
 async fn unconfirmed_states_the_cost_per_media_and_triggers_nothing() {
-    let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None, None)), vec![]), false)
+    let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None)), vec![]), false)
         .await
         .unwrap_or_default();
     assert!(!report.confirmed);
@@ -53,7 +53,7 @@ async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_curator() {
     // Both media curators accept the command; music and index services are left out.
     let report = upgrade(
         &ctx(
-            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(SeedFs::keyed(Some(KEYED))),
             vec![(201, ""), (201, "")],
         ),
         true,
@@ -85,7 +85,7 @@ async fn a_per_type_choice_states_each_types_own_preset() {
         &env.with_file_name("quality.json"),
         &serde_json::to_string(&selection).unwrap_or_default(),
     );
-    let mut context = ctx(Arc::new(SeedFs::keyed(None, None)), vec![]);
+    let mut context = ctx(Arc::new(SeedFs::keyed(None)), vec![]);
     context.settings.env_file = Some(env);
 
     let report = upgrade(&context, false).await.unwrap_or_default();
@@ -101,7 +101,7 @@ async fn a_per_type_choice_states_each_types_own_preset() {
 #[tokio::test]
 async fn a_curator_not_yet_started_is_reported_not_started() {
     // No key on disk: the service has not finished starting, so it is not a fault.
-    let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None, None)), vec![]), true)
+    let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None)), vec![]), true)
         .await
         .unwrap_or_default();
     assert_eq!(report.media.len(), 2);
@@ -114,7 +114,7 @@ async fn a_curator_not_yet_started_is_reported_not_started() {
 async fn a_curator_that_refuses_the_command_is_reported_failed() {
     let report = upgrade(
         &ctx(
-            Arc::new(SeedFs::keyed(Some(KEYED), None)),
+            Arc::new(SeedFs::keyed(Some(KEYED))),
             vec![(500, "boom"), (500, "boom")],
         ),
         true,

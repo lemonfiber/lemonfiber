@@ -28,15 +28,13 @@ use lemonfiber_fixtures::support::{Reporting, SeedFs};
 fn over(engine: Reporting, images: Arc<Pulled>) -> Ctx {
     lemonfiber_testing::a_context()
         .engine(Arc::new(engine))
-        .filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(
-            StorageFacts {
-                point: PathBuf::from("/srv/media"),
-                kind: FsKind::Linking("apfs".to_owned()),
-                removable: false,
-                available: 100,
-                total: 1_000,
-            },
-        )))
+        .filesystem(Arc::new(SeedFs::keyed(None).with_facts(StorageFacts {
+            point: PathBuf::from("/srv/media"),
+            kind: FsKind::Linking("apfs".to_owned()),
+            removable: false,
+            available: 100,
+            total: 1_000,
+        })))
         .settings(Settings {
             project: "lemonfiber".to_owned(),
             ..Settings::default()

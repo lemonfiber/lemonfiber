@@ -520,7 +520,7 @@ async fn a_house_with_no_room_says_so_as_the_houses_and_files_nothing() {
         total: 4 * 1024 * 1024 * 1024 * 1024,
     };
     ctx = ctx.with_filesystem(Arc::new(
-        crate::test_support::SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"), None)
+        crate::test_support::SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"))
             .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
             .with_facts(full),
     ));

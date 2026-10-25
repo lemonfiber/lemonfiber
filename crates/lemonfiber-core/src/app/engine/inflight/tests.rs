@@ -6,10 +6,8 @@ use super::{in_flight, stopped_beside};
 use crate::app::Ctx;
 use crate::config::{Protocols, Settings};
 use crate::ports::http::Http;
-use crate::test_support::{a_context, a_password, env_at, nowhere, SeedFs};
-use lemonfiber_fixtures::downloads::{
-    downloads, QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY, SAB_KEY_INI, SAB_QUEUE,
-};
+use crate::test_support::{a_context, a_password, env_at, nowhere, usenet};
+use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
 use lemonfiber_fixtures::http::Fake;
 
 /// The forms an operator names, as the engine takes them.
@@ -17,21 +15,22 @@ fn named(forms: &[&str]) -> Vec<String> {
     forms.iter().map(|form| (*form).to_owned()).collect()
 }
 
-/// A context that can reach both download clients: the Usenet client's key on a fake
-/// filesystem, the torrent client's password in a scratch env file, and both protocols
-/// in play so a plan holds both.
+/// A context that can reach both download clients: the Usenet client moved into its
+/// plugin where `env_file` gives it somewhere to be recorded, the torrent client's
+/// password in that scratch env file, and both protocols in play so a plan holds both.
 fn reaching(http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
     let settings = Settings {
         protocols: Protocols::both(),
         env_file,
         ..Settings::default()
     };
-    a_context()
-        .settings(settings)
-        .build()
-        .with_patience(Duration::ZERO)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SAB_KEY_INI))))
-        .with_http(http)
+    usenet::reaching(
+        a_context()
+            .settings(settings)
+            .build()
+            .with_patience(Duration::ZERO)
+            .with_http(http),
+    )
 }
 
 /// The whole reason this is safe to put on the teardown path: a form with no
@@ -52,7 +51,7 @@ async fn a_form_holding_no_client_asks_nothing_at_all() {
 
 #[tokio::test]
 async fn both_clients_say_what_they_are_working_on() {
-    let fake = downloads(QBIT_TORRENTS, SAB_QUEUE);
+    let fake = usenet::beside_torrents(QBIT_TORRENTS, &[usenet::carrying()]);
     let ctx = reaching(
         Arc::clone(&fake) as Arc<dyn Http>,
         Some(env_at("in-flight", &a_password())),
@@ -65,13 +64,13 @@ async fn both_clients_say_what_they_are_working_on() {
         .map(|download| download.name.as_str())
         .collect();
     assert!(names.contains(&"Ubuntu.iso"), "{names:?}");
-    assert!(names.contains(&"Linux.nzb"), "{names:?}");
+    assert!(names.contains(&usenet::CARRIED), "{names:?}");
 }
 
 /// Naming a finished download would be warning about work stopping cannot undo.
 #[tokio::test]
 async fn a_download_that_has_finished_is_not_in_flight() {
-    let fake = downloads(QBIT_FINISHED, SAB_EMPTY);
+    let fake = usenet::beside_torrents(QBIT_FINISHED, &[]);
     let ctx = reaching(
         Arc::clone(&fake) as Arc<dyn Http>,
         Some(env_at("finished", &a_password())),

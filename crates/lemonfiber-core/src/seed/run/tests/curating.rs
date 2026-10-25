@@ -26,7 +26,7 @@ async fn seed_wires_each_curators_root_folders() {
         Some(vec![0x11; 24]),
         None,
     )
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
@@ -52,7 +52,7 @@ async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
         })
         .build()
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED), None).missing(vec!["/srv/data/media/"]),
+            SeedFs::keyed(Some(KEYED)).missing(vec!["/srv/data/media/"]),
         ))
         .with_http(seeding_with(vec![(
             "/rootfolder",
@@ -75,7 +75,7 @@ async fn seed_skips_curator_root_folders_when_the_key_is_not_readable() {
     // No configuration to read a key from, so the curators have not finished
     // starting: their folders are skipped for a re-run, not failed.
     let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
@@ -99,7 +99,7 @@ async fn the_read_only_filesystem_fake_is_inert_elsewhere() {
     // The fake answers only `read`; the rest are stubs, exercised here so the
     // fake carries no uncovered lines of its own.
     use crate::ports::filesystem::FileSystem;
-    let fs = SeedFs::keyed(None, None);
+    let fs = SeedFs::keyed(None);
     let path = std::path::Path::new("/x");
     assert!(fs.canonicalize(path).await.is_ok());
     assert!(fs.touch(path).await.is_err());
@@ -273,59 +273,6 @@ fn a_filler_nothing_connects_is_not_told_about() {
     );
 }
 
-/// A plugin's Usenet client whose key file leads away from the directory its container
-/// owns is not read, and each curator that asks for it is told why on that connection.
-#[tokio::test]
-async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection() {
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
-    let stand_in = crate::test_support::a_placed(
-        "nzbget",
-        &["download.usenet"],
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-            key_source: lemonfiber_manifest::KeySource::ConfigIni,
-            path: Some("/config/sabnzbd.ini".to_owned()),
-            version: None,
-        }),
-        Some(6789),
-    );
-    let installed = [crate::test_support::an_installed("nzbget", vec![stand_in])];
-    let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
-    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
-        SeedFs::keyed(None, Some(USENET_CONFIG)).leading_away(vec!["config/nzbget/"]),
-    ));
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|manifest| {
-            crate::wiring::Fillers::of(&manifest, &installed, &chosen, Some(stack_root()))
-        })
-        .unwrap_or_default();
-
-    let held =
-        super::super::clients::held(&ctx, &fillers, &std::collections::BTreeMap::new()).await;
-    let refused = super::super::clients::refused(&fillers, &held);
-
-    assert!(
-        held.of(&holder(Some("nzbget"), "nzbget")).is_none(),
-        "the file was read"
-    );
-    assert_eq!(
-        refused
-            .iter()
-            .map(|wiring| wiring.connection.as_str())
-            .collect::<Vec<&str>>(),
-        vec![
-            "nzbget the stand-in into Sonarr",
-            "nzbget the stand-in into Radarr",
-            "nzbget the stand-in into Lidarr",
-        ]
-    );
-    assert!(refused.iter().all(|wiring| matches!(
-        &wiring.state,
-        crate::seed::State::Refused { reason } if reason.starts_with("nzbget's credential file")
-    )));
-}
-
 /// A curator filing a media type with no category field is told about no client.
 #[test]
 fn a_curator_with_no_category_is_told_about_no_client() {
@@ -373,7 +320,6 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
     // The torrent client announces a temporary password, so it is set and its value
     // threaded to the download clients; each curator already holds both clients.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -383,10 +329,8 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(
-        Some(CURATOR_CONFIG),
-        Some(USENET_CONFIG),
-    )));
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -415,7 +359,6 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     // never registering it a second time. The point guarded here is that the adopt
     // command dispatches and reports every present client.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -425,10 +368,8 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(
-        Some(CURATOR_CONFIG),
-        Some(USENET_CONFIG),
-    )));
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -447,7 +388,6 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
 async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     // The clients' own credentials are in hand, but the curators have not written
     // their keys, so registration is skipped for a re-run rather than failed.
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -457,7 +397,8 @@ async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
+    .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -572,5 +513,25 @@ fn a_plugin_under_a_stack_curators_id_is_told_about_none_of_its_clients() {
         told.iter().map(Vec::len).collect::<Vec<_>>(),
         vec![2, 0],
         "{told:?}"
+    );
+}
+
+/// A record of what is installed that will not read refuses the seed rather than letting
+/// it wire past a contest nobody could see.
+#[tokio::test]
+async fn a_seed_over_a_record_of_plugins_that_will_not_read_is_refused() {
+    let env = config_scratch("seed-unread-register");
+    let kept = env.with_file_name(crate::config::paths::PLUGINS);
+    let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
+    let _ = std::fs::write(&kept, "not a register");
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf())).with_filesystem(
+        Arc::new(SeedFs::keyed(Some(crate::test_support::KEYED_CURATOR))),
+    );
+
+    let refused = dispatch(Command::Seed, &ctx).await;
+
+    assert!(
+        refused.is_err_and(|problem| problem.summary.contains("record of what is installed")),
+        "a seed wired past a record it could not read"
     );
 }

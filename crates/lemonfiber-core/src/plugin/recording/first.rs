@@ -31,8 +31,6 @@ const ANNOUNCED_WITHIN: usize = 200;
 pub(super) enum Presented {
     /// In this header, holding this.
     Header(&'static str, String),
-    /// In this query field, holding this.
-    Query(&'static str, String),
     /// In the session the transport the first run signed in through carries.
     Session,
 }
@@ -138,7 +136,6 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
 fn presenting(kind: ApiKind, key: String) -> Presented {
     match kind {
         ApiKind::Bazarr => Presented::Header(crate::bazarr::KEY, key),
-        ApiKind::Sabnzbd => Presented::Query(crate::sabnzbd::KEY_FIELD, key),
         _ => Presented::Header(crate::endpoint::API_KEY_HEADER, key),
     }
 }

@@ -78,17 +78,15 @@ async fn a_volume_that_read_last_refresh_and_not_this_one_reads_stale() {
     // the assembler: every `Reading` it built was known or unknown, so the
     // distinction the whole model rests on had a state nothing ever entered.
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let reading = ctx(engine).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_facts(facts(42, 100)),
-    ));
+    let reading =
+        ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(42, 100))));
     let first = gather(&reading, None).await;
     assert!(matches!(first.storage, Panel::Ready(ref s) if s.free == Reading::Known(42)));
 
     // The same volume, now unreadable — a zero total is a mount it could not be
     // attributed to, not a full disk.
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let quiet =
-        ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
+    let quiet = ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(0, 0))));
     let second = gather(&quiet, Some(&first)).await;
     assert!(
         matches!(second.storage, Panel::Ready(ref s) if s.free == Reading::Stale(42)),
@@ -98,8 +96,7 @@ async fn a_volume_that_read_last_refresh_and_not_this_one_reads_stale() {
     // And with nothing to carry forward it is still unknown, never a zero that
     // would read as a full disk.
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let cold =
-        ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts(0, 0))));
+    let cold = ctx(engine).with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts(0, 0))));
     let alone = gather(&cold, None).await;
     assert!(matches!(alone.storage, Panel::Ready(ref s) if s.free == Reading::Unknown));
 }

@@ -282,12 +282,10 @@ pub fn seeding_with(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
 /// it answers as its owner.
 pub const SEERR_SETTINGS: &str = r#"{"main":{"apiKey":"seerr-own-key"}}"#;
 
-/// A filesystem that hands back a Servarr configuration for a Servarr path and
-/// a `SABnzbd` one for `SABnzbd`'s, or nothing. Only `read` is meaningful to
-/// seeding; the rest are unused.
+/// A filesystem that hands back a Servarr configuration for a Servarr path, or nothing.
+/// Only `read` is meaningful to seeding; the rest are unused.
 pub struct SeedFs {
     servarr: Option<&'static str>,
-    sabnzbd: Option<&'static str>,
     /// What the subtitle finder's configuration says, where a test has it written
     /// one. Its own key lives in a YAML file rather than a Servarr XML, so a test
     /// wiring subtitles has to be able to answer that path with something else.
@@ -314,12 +312,11 @@ pub struct SeedFs {
 }
 
 impl SeedFs {
-    /// A transport answering by the shape of the URL, with these two keys in place.
+    /// A filesystem holding `servarr` as every Servarr service's configuration.
     #[must_use]
-    pub fn keyed(servarr: Option<&'static str>, sabnzbd: Option<&'static str>) -> Self {
+    pub fn keyed(servarr: Option<&'static str>) -> Self {
         Self {
             servarr,
-            sabnzbd,
             bazarr: None,
             seerr: None,
             only_prowlarr: false,
@@ -504,9 +501,6 @@ fn next_answer(sequenced: &Sequenced, argv: &[String]) -> Result<Output, Failure
 /// Which service's configuration a path is asking for, and what this fixture holds.
 fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
     let path = path.to_string_lossy();
-    if path.contains("sabnzbd") {
-        return seed.sabnzbd.map(str::to_owned);
-    }
     // Before the Servarr fall-through, because the finder's key is a YAML of its
     // own: answering its path with a Servarr XML would read as a service that has
     // started and written no key, which is a different thing entirely.

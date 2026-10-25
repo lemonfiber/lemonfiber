@@ -16,9 +16,6 @@ use crate::trace::{Coverage, Outcome, Presence, Stage};
 /// A curator config that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
-/// A download client configuration carrying the key it generated for itself.
-const USENET_INI: &str = "[misc]\napi_key = sabkey123\n";
-
 /// An empty queue, as the shape a service returns with nothing downloading.
 const EMPTY_QUEUE: &str = r#"{"records":[]}"#;
 
@@ -125,7 +122,7 @@ fn queued(stage: Stage, stuck: bool) -> Vec<QueueItem> {
 fn ctx_with(fake: &Fake) -> Ctx {
     a_context()
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(fake.transport())
 }
 

@@ -20,7 +20,6 @@ use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::reconfigure::{Review, Stance};
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::downloads::SAB_KEY_INI;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::{seeding_routes, Reporting, SeedFs};
 use lemonfiber_ports::docker::{Health, Lifecycle};
@@ -133,9 +132,7 @@ fn stood_up(settings: Settings, stack: Source, http: Arc<Fake>, missing: Vec<&'s
             Lifecycle::Running,
             Health::Healthy,
         )))
-        .filesystem(Arc::new(
-            SeedFs::keyed(Some(CONFIG), Some(SAB_KEY_INI)).missing(missing),
-        ))
+        .filesystem(Arc::new(SeedFs::keyed(Some(CONFIG)).missing(missing)))
         .over(stack)
         .settings(settings)
         .build()

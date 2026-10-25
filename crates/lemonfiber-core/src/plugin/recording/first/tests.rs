@@ -104,28 +104,6 @@ async fn a_service_writing_its_own_key_is_first_run_by_reading_it_and_presented_
 }
 
 #[tokio::test]
-async fn a_key_the_service_reads_from_a_query_is_presented_there() {
-    let Some((_source, copy)) = copy("first-sabnzbd") else {
-        return;
-    };
-    let written = "7".repeat(32);
-    let _ = std::fs::write(
-        copy.path().join("sabnzbd.ini"),
-        format!("[misc]\napi_key = {written}\n"),
-    );
-    let Some(placed) = placed(
-        "api         = { kind = \"sabnzbd\", key_source = \"config-ini\", path = \"/config/sabnzbd.ini\" }",
-    ) else {
-        return;
-    };
-    let held = first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await;
-    assert_eq!(
-        held.map(|held| held.map(|held| held.presented)),
-        Ok(Some(Presented::Query("apikey", written)))
-    );
-}
-
-#[tokio::test]
 async fn a_service_with_no_api_or_no_credential_has_no_first_run() {
     let Some((_source, copy)) = copy("first-none") else {
         return;

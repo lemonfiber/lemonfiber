@@ -8,7 +8,7 @@ async fn a_wired_root_folder_the_host_cannot_back_is_a_warning() {
     // is not there — the operator repointed the data root, or the media directory
     // was never made. The curator imports into a void, so the folder is raised to a
     // warning naming the missing path.
-    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+    let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
     let wanted = [root("tv")];
     let mut wirings = vec![Wiring::settled(
         "tv root folder in Sonarr".to_owned(),
@@ -31,7 +31,7 @@ async fn a_wired_root_folder_the_host_cannot_back_is_a_warning() {
 async fn a_wired_root_folder_backed_on_disk_stays_informational() {
     // The host directory is there, so the folder files where it should — nothing is
     // broken, and it stays the settled connection it is.
-    let filesystem = SeedFs::keyed(None, None);
+    let filesystem = SeedFs::keyed(None);
     let wanted = [root("tv")];
     let mut wirings = vec![Wiring::settled(
         "tv root folder in Sonarr".to_owned(),
@@ -51,7 +51,7 @@ async fn a_wired_root_folder_backed_on_disk_stays_informational() {
 async fn a_root_folder_check_without_a_data_root_escalates_nothing() {
     // Without a data root the host path cannot be resolved, so nothing can be
     // confirmed or denied — the check escalates nothing rather than guessing.
-    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+    let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
     let wanted = [root("tv")];
     let mut wirings = vec![Wiring::settled(
         "tv root folder in Sonarr".to_owned(),
@@ -65,7 +65,7 @@ async fn a_root_folder_check_without_a_data_root_escalates_nothing() {
 async fn a_root_folder_not_wired_is_not_warned_even_where_the_path_is_missing() {
     // A skipped folder is not one the curator files into, so a missing path there is
     // not yet a break — only the folders the curator actually holds are checked.
-    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+    let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
     let wanted = [root("tv")];
     let mut wirings = vec![Wiring::settled(
         "tv root folder in Sonarr".to_owned(),
@@ -85,7 +85,7 @@ async fn a_root_folder_not_wired_is_not_warned_even_where_the_path_is_missing() 
 
 #[tokio::test]
 async fn a_wired_root_folder_outside_the_data_root_has_no_host_directory_to_check() {
-    let filesystem = SeedFs::keyed(None, None).missing(vec!["elsewhere"]);
+    let filesystem = SeedFs::keyed(None).missing(vec!["elsewhere"]);
     let wanted = [RootFolder {
         path: "/elsewhere/tv".to_owned(),
         media_type: "tv".to_owned(),
@@ -126,7 +126,7 @@ async fn a_reset_previews_then_reverts_a_drifted_connection() {
             ..Settings::default()
         })
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(seeding());
 
     // Preview: the drifted connection is named, and nothing is written.
@@ -200,7 +200,7 @@ fn schema_ctx(dir: &std::path::Path, baseline: &str, http: Arc<Fake>) -> Ctx {
             ..Settings::default()
         })
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(http)
 }
 
@@ -308,7 +308,7 @@ async fn a_reset_over_an_unreadable_register_puts_back_nothing() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-unread");
     let _ = std::fs::remove_dir_all(&dir);
-    let context = reset_ctx(&dir, Arc::new(SeedFs::keyed(Some(KEYED), None)), seeding());
+    let context = reset_ctx(&dir, Arc::new(SeedFs::keyed(Some(KEYED))), seeding());
     let _ = crate::config::store::write(
         &dir.join("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
@@ -332,7 +332,7 @@ async fn a_reset_skips_a_curator_that_has_not_written_its_key() {
     // starting — so there is nothing to open and it is passed over rather than reset.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-noopen");
     let _ = std::fs::remove_dir_all(&dir);
-    let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(None, None)), seeding());
+    let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(None)), seeding());
     assert!(super::super::reset_connections(&ctx, false)
         .await
         .is_empty());
@@ -348,7 +348,7 @@ async fn a_reset_preview_passes_over_a_client_the_service_does_not_hold() {
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,
-        Arc::new(SeedFs::keyed(Some(KEYED), None)),
+        Arc::new(SeedFs::keyed(Some(KEYED))),
         clients_answering(Answer::reply(200, "[]")),
     );
     assert!(super::super::reset_connections(&ctx, false)
@@ -368,7 +368,7 @@ async fn a_reset_preview_names_a_client_whose_category_the_operator_changed() {
     let held = r#"[{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#;
     let ctx = reset_ctx(
         &dir,
-        Arc::new(SeedFs::keyed(Some(KEYED), None)),
+        Arc::new(SeedFs::keyed(Some(KEYED))),
         clients_answering(Answer::reply(200, held)),
     );
     let _ = crate::config::store::write(
@@ -394,7 +394,7 @@ async fn a_reset_preview_reads_nothing_where_the_client_list_cannot_be_read() {
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,
-        Arc::new(SeedFs::keyed(Some(KEYED), None)),
+        Arc::new(SeedFs::keyed(Some(KEYED))),
         clients_answering(Answer::Silent),
     );
     assert!(super::super::reset_connections(&ctx, false)

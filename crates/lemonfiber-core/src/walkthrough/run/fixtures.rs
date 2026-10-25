@@ -10,7 +10,8 @@ use std::sync::Arc;
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::ports::http::Method;
-use crate::test_support::{a_context, media, Reporting, SeedFs};
+use crate::ports::service::Download;
+use crate::test_support::{a_context, json, media, usenet, Reporting, SeedFs};
 use crate::walkthrough::{Line, Narrator};
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
@@ -41,8 +42,8 @@ pub(super) struct Fake {
     pub queue: &'static str,
     /// What the media server answers asked whether its library holds the item.
     pub holds: &'static str,
-    /// What the download client says it is moving.
-    pub transfers: &'static str,
+    /// What the Usenet client says it is moving.
+    pub transfers: Vec<Download>,
     /// A path fragment every request to which fails, for the refusal paths.
     pub refuses: &'static str,
     /// Whether writes fail — the add, which is a write to the same path a lookup reads.
@@ -72,14 +73,17 @@ pub(super) const A_RELEASE: &str = r#"[{"rejections":[]}]"#;
 pub(super) const IMPORTED: &str =
     r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-08-08T00:00:00Z"}]}"#;
 
-/// A download client with nothing in its queue.
-pub(super) const NOTHING_MOVING: &str = r#"{"queue":{"kbpersec":"0","slots":[]}}"#;
-
-/// A download client carrying the item, half done at fourteen megabytes a second.
-pub(super) const CARRYING_IT: &str = r#"{"queue":{"kbpersec":"13672","slots":[{"filename":"Sintel.2010.1080p","percentage":"50","status":"Downloading","timeleft":"0:02:00","mbleft":"1050"}]}}"#;
-
-/// The Usenet client's configuration that opens a download-client target, carrying a key.
-pub(super) const USENET_KEYED: &str = "[misc]\napi_key = the-key\n";
+/// A Usenet client carrying the item, half done at fourteen megabytes a second with
+/// 1050 mebibytes left.
+pub(super) fn carrying_it() -> Vec<Download> {
+    vec![Download {
+        name: "Sintel.2010.1080p".to_owned(),
+        progress: 50,
+        speed: Some(13_672 * 1024),
+        eta: Some(std::time::Duration::from_secs(120)),
+        remaining: Some(1050 * 1024 * 1024),
+    }]
+}
 
 /// A media server library holding the item, and one that does not.
 pub(super) const HAS_ITEM: &str = "true";
@@ -100,7 +104,7 @@ impl Default for Fake {
             history: IMPORTED,
             queue: r#"{"records":[],"totalRecords":0}"#,
             holds: HAS_ITEM,
-            transfers: NOTHING_MOVING,
+            transfers: Vec::new(),
             refuses: "\u{0}",
             refuses_writes: false,
         }
@@ -127,10 +131,14 @@ impl Fake {
             routes.push((Some(Method::Post), "", Answer::Silent));
         }
         routes.push((None, self.refuses, Answer::Silent));
+        routes.push((
+            None,
+            usenet::operation("transfers"),
+            Answer::reply(200, json(&self.transfers)),
+        ));
         routes.extend(
             [
                 ("echo.example", EGRESS),
-                ("mode=queue", self.transfers),
                 (media::serve("has_item"), self.holds),
                 (media::serve("rescan"), "null"),
                 ("lookup", self.lookup),
@@ -183,30 +191,39 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
     a_context()
         .settings(over_usenet())
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(USENET_KEYED))))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .with_http(fake.transport())
         // No waiting: every test would otherwise sit through the real poll, and what the wait
         // does at its bound is exactly what the tests are about.
         .with_patience(std::time::Duration::ZERO)
 }
 
-/// The same, reachable media server and all — moved into its plugin, recorded beside a
-/// scratch environment file this context alone holds.
+/// `ctx` holding an env file of its own, in a scratch directory no other context shares.
 ///
 /// Counted rather than named by the test that asked, because a name is an agreement the
 /// next test has to keep and cannot be made to. Two contexts under one name share one
-/// register, and recording the move rewrites it in place: the write truncates before it
+/// register, and recording a move rewrites it in place: the write truncates before it
 /// writes, so a walk reading the register in that gap finds no plugin, opens no media
 /// server, and stops at [`crate::walkthrough::Reason::NoMediaServer`] on a stack that has
 /// one. Counting leaves nothing to agree about.
-pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
+fn of_its_own(mut ctx: Ctx) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("walkthrough-{nth}")).kept();
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = ctx_with(fake);
     ctx.settings.env_file = Some(dir.join(".env"));
-    media::reaching(ctx)
+    ctx
+}
+
+/// The same, reachable media server and all, moved into its plugin.
+pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
+    media::reaching(of_its_own(ctx_with(fake)))
+}
+
+/// The same, its Usenet client moved into its plugin and reachable, saying it moves what
+/// `fake` says.
+pub(super) fn ctx_downloading(fake: &Fake) -> Ctx {
+    usenet::reaching(of_its_own(ctx_with(fake)))
 }
 
 /// Settings that acquire content over usenet — a configured stack with no tunnel to
