@@ -180,7 +180,7 @@ async fn told(
 }
 
 /// A curator that would not take the aggregator, in its own words: unpaired where it
-/// cannot pull from one of that native API, failed otherwise.
+/// cannot pull from one of that native API, and otherwise as any other failure.
 fn unreached(asker: &str, aggregator: &AggregatorAt, failure: &Failure) -> crate::seed::State {
     match failure {
         Failure::Unsupported { detail, .. } => crate::seed::State::Unmatched {
@@ -190,8 +190,6 @@ fn unreached(asker: &str, aggregator: &AggregatorAt, failure: &Failure) -> crate
                 aggregator.name, aggregator.protocol.0
             ),
         },
-        _ => crate::seed::State::Failed {
-            detail: failure.to_string(),
-        },
+        _ => crate::seed::unreached(failure),
     }
 }

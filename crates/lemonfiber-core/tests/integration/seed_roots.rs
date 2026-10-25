@@ -397,11 +397,7 @@ async fn a_service_that_refuses_the_listing_fails() {
 }
 
 #[tokio::test]
-async fn a_service_on_an_unsupported_api_version_refuses_its_folders() {
-    // The service answers, but not the API version this build speaks. Its folders
-    // are refused, not skipped or failed: writing to it would be malformed, and a
-    // re-run against the same service cannot lift it — the operator must align the
-    // versions. Nothing is written.
+async fn a_service_on_an_unsupported_api_version_does_not_offer_its_folders() {
     let (states, recorded) = seed(
         FakeService::with(Mode::Unsupported, Vec::new()),
         &[folder("/data/media/tv")],
@@ -409,9 +405,8 @@ async fn a_service_on_an_unsupported_api_version_refuses_its_folders() {
     .await;
     assert_eq!(
         states,
-        vec![State::Refused {
-            reason: "sonarr does not serve the API version this build speaks: there is no /api/v3"
-                .to_owned(),
+        vec![State::Unmatched {
+            reason: "sonarr does not offer this: there is no /api/v3".to_owned(),
         }]
     );
     assert_eq!(recorded, 0, "nothing is written to an unsupported version");

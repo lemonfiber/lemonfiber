@@ -44,9 +44,9 @@ pub enum Failure {
         /// The service's own words.
         detail: String,
     },
-    /// The service answered, but does not serve the API version lemonfiber speaks
-    /// — it has been upgraded past it (or is older than it). Writing to it would
-    /// mean writing something malformed, so it is reported instead.
+    /// The service answered that it does not offer what was asked: it speaks a release
+    /// lemonfiber does not, or cannot perform the operation at all. What was asked is
+    /// treated as not offered, and nothing is written to it.
     #[error("{service} does not serve the API version this build speaks: {detail}")]
     Unsupported {
         /// The service that answered.
