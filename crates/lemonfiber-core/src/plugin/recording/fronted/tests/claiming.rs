@@ -85,3 +85,38 @@ async fn a_part_somebody_else_holds_fails_the_service_at_its_claim() {
         vec![("claim".to_owned(), "it was Theirs once claimed".to_owned())]
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_part_still_settling_at_its_health_limit_fails_the_service_at_its_claim() {
+    let at = source("fronted-settling", &claimed_first());
+    let settling = || vec![Answer::served(200, "application/json", "\"settling\"")];
+    let http = owned(settling(), settling());
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "claim".to_owned(),
+            "it was not claimed within its health's limit".to_owned()
+        )]
+    );
+    assert_eq!(posted(&http, "/claim").len(), 1);
+}
+
+#[tokio::test]
+async fn a_claim_the_adapter_refuses_fails_the_service_at_it_saying_why() {
+    let at = source("fronted-refused", &claimed_first());
+    let http = owned(
+        vec![Answer::served(401, "text/plain", "Unauthorized")],
+        vec![Answer::served(401, "text/plain", "Unauthorized")],
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "claim".to_owned(),
+            "jellyfin-adapter rejected the credential".to_owned()
+        )]
+    );
+}
