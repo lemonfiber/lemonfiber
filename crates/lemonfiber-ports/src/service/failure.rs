@@ -47,7 +47,7 @@ pub enum Failure {
     /// The service answered that it does not offer what was asked: it speaks a release
     /// lemonfiber does not, or cannot perform the operation at all. What was asked is
     /// treated as not offered, and nothing is written to it.
-    #[error("{service} does not serve the API version this build speaks: {detail}")]
+    #[error("{service} does not offer this: {detail}")]
     Unsupported {
         /// The service that answered.
         service: String,
@@ -81,9 +81,9 @@ impl Diagnose for Failure {
             .with_detail(detail.clone()),
             Self::Unsupported { service, detail } => Problem::new(
                 SERVICE_UNSUPPORTED,
-                format!("{service} does not serve the API version this build speaks"),
-                "The service was upgraded past — or stands before — the API version lemonfiber knows how to speak, so writing to it would mean writing something malformed. Nothing was changed for it.",
-                Remedy::new("Match the service to the version lemonfiber supports, or update lemonfiber, then run seed again")
+                format!("{service} does not offer this"),
+                "The service answered that it does not offer what was asked: it speaks a release lemonfiber does not, or cannot do this at all. Nothing was changed for it.",
+                Remedy::new("Where the service's release is the cause, match it to the version lemonfiber supports or update lemonfiber, then run seed again")
                     .with_detail("lemonfiber seed"),
             )
             .with_detail(detail.clone()),

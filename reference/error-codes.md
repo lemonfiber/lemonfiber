@@ -482,7 +482,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SEED-1` | `SERVICE_UNAVAILABLE` | warning | 1 | 500 | 0.1.0 | Raised when a service is not answering yet. |
 | `SEED-2` | `SERVICE_UNAUTHORISED` | error | 1 | 500 | 0.1.0 | Raised when a service rejects the credential lemonfiber holds. |
 | `SEED-3` | `SERVICE_REFUSED` | error | 1 | 500 | 0.1.0 | Raised when a service answers with something unusable. |
-| `SEED-4` | `SERVICE_UNSUPPORTED` | error | 1 | 500 | 0.4.0 | Raised when a service does not serve the API version this build speaks. |
+| `SEED-4` | `SERVICE_UNSUPPORTED` | error | 1 | 500 | 0.4.0 | Raised when a service answers that it does not offer what was asked. |
 
 ## `SERVE` — the web surface
 

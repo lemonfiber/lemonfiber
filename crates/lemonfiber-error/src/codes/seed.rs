@@ -29,14 +29,14 @@ codes! {
             bundle](https://docs.lemonfiber.app/fixing/the-support-bundle/); the service's own \
             words are attached to the message.",
     }
-    /// Raised when a service does not serve the API version this build speaks.
+    /// Raised when a service answers that it does not offer what was asked.
     SERVICE_UNSUPPORTED = "SEED-4" {
         severity: Error,
         status: 500,
         since: "0.4.0",
-        meaning: "A service is past — or stands before — the API version this build speaks, so \
-            writing to it would mean writing something malformed. Nothing was changed for it.",
-        remedy: "Match the service to the version lemonfiber supports, or update lemonfiber, \
-            then run lemonfiber seed again.",
+        meaning: "A service answered that it does not offer what was asked: it speaks a release \
+            this build does not, or cannot do this at all. Nothing was changed for it.",
+        remedy: "Where the service's release is the cause, match it to the version lemonfiber \
+            supports or update lemonfiber, then run lemonfiber seed again.",
     }
 }
