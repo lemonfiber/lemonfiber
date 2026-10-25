@@ -6,6 +6,8 @@ use std::path::Path;
 
 use lemonfiber_contract::adapter::UPSTREAM_FILE;
 use lemonfiber_contract::conformance::Placeholder;
+use lemonfiber_contract::wire::{Kind, Refusal};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::plugin::program::Throwaway;
@@ -153,18 +155,16 @@ impl Filling<'_> {
 
 /// Whether `answer` is the refusal an adapter answers an operation it cannot perform with.
 fn refused_unsupported(answer: &Value) -> bool {
-    serde_json::from_value::<lemonfiber_contract::wire::Refusal>(answer.clone())
-        .is_ok_and(|refusal| refusal.kind == lemonfiber_contract::wire::Kind::Unsupported)
+    Refusal::deserialize(answer).is_ok_and(|refusal| refusal.kind == Kind::Unsupported)
 }
 
 /// What a case that is not offered is recorded as answering: `unsupported`, saying why.
 pub(super) fn unsupported(why: String) -> Response {
-    let kind = lemonfiber_contract::wire::Kind::Unsupported;
+    let refusal = Refusal::new(Kind::Unsupported, why);
     Response {
-        status: kind.status(),
+        status: refusal.kind.status(),
         headers: vec![("Content-Type".to_owned(), PROBLEM.to_owned())],
-        body: serde_json::to_string(&lemonfiber_contract::wire::Refusal { kind, detail: why })
-            .unwrap_or_default(),
+        body: serde_json::to_string(&refusal).unwrap_or_default(),
     }
 }
 
