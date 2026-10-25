@@ -308,13 +308,9 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
     // The whole command against the real manifest: the indexer aggregator and the three
     // media-filing curators, each already registered by the seeding routes.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(
-            Some(CURATOR_CONFIG),
-            Some(USENET_CONFIG),
-        )));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let applications = application_wirings(&report);

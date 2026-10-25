@@ -28,10 +28,6 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 /// A curator's config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
-/// The Usenet client's own configuration, carrying the key a curator is told to reach it
-/// with.
-const USENET_CONFIG: &str = "[misc]\napi_key = sabkey123\n";
-
 /// Where this test's records live, in a scratch directory of its own.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     lemonfiber_fixtures::scratch::Scratch::unmade(name)
@@ -44,13 +40,7 @@ fn paths(root: &Path) -> Paths {
 /// A context over the real stack, answering services from the given transport.
 fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
     lemonfiber_testing::a_live_context()
-        // The Usenet client's key too: the wirings a diagnosis reads are the clients
-        // lemonfiber would write, and without a credential to write there is no client to
-        // compare.
-        .filesystem(Files::ending(vec![
-            ("config/sonarr/config.xml", CONFIG),
-            ("config/sabnzbd/sabnzbd.ini", USENET_CONFIG),
-        ]))
+        .filesystem(Files::ending(vec![("config/sonarr/config.xml", CONFIG)]))
         .settings(Settings {
             env_file: Some(paths(root).env_file()),
             stack_dir: Some(project().to_path_buf()),

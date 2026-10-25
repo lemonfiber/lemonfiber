@@ -6,18 +6,19 @@
 
 pub(crate) use lemonfiber_fixtures::support::*;
 
-// The same file the testing crate is built from, compiled here as a module of this
-// crate: the core's own tests cannot depend on a crate that depends on the core
-// without the core being built twice, and a context from the other copy would not be
-// a context this copy's `dispatch` accepts.
+/// The context a command is driven through, the same file the testing crate is built from:
+/// the core's tests cannot depend on a crate depending on the core.
 #[path = "../../lemonfiber-testing/src/context.rs"]
 pub mod context;
 
 pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
-/// The media server moved into its plugin, the same file the testing crate is built from.
+#[path = "../../lemonfiber-testing/src/adapted.rs"]
+mod adapted;
 #[path = "../../lemonfiber-testing/src/media.rs"]
 pub mod media;
+#[path = "../../lemonfiber-testing/src/usenet.rs"]
+pub mod usenet;
 
 mod crossing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader};

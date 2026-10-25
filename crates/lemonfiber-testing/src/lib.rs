@@ -6,9 +6,11 @@
 //! file: a crate cannot depend on a crate that depends on it without being built twice,
 //! so the core includes [`context`] as a module of its own rather than as this crate.
 
+pub mod adapted;
 pub mod context;
 pub mod media;
 pub mod placeholder;
+pub mod usenet;
 
 pub use context::{a_context, a_live_context, nowhere, repository_stack, Context};
 pub use placeholder::a_word;

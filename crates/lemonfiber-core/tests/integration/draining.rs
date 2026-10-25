@@ -17,7 +17,7 @@ use lemonfiber_core::config::{store, Protocols, Settings, TORRENT_PASSWORD_KEY};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::Narrator;
-use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY};
+use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
 use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{a_password, Reporting};
@@ -79,7 +79,7 @@ fn rendered(outcome: Result<Outcome, Box<lemonfiber_core::error::Problem>>) -> O
 async fn a_teardown_asked_to_wait_holds_on_until_nothing_is_coming_down() {
     // The torrent client answers with the same torrent still coming down twice, and then
     // with one that has finished: something to wait for, a look that has no news,
-    // and an end. The Usenet client has no key on this filesystem and contributes nothing.
+    // and an end.
     let fake = Fake::by_path_in_turn(vec![
         ("/auth/login", vec![Answer::reply(200, "Ok.")]),
         (
@@ -90,7 +90,6 @@ async fn a_teardown_asked_to_wait_holds_on_until_nothing_is_coming_down() {
                 Answer::reply(200, QBIT_FINISHED),
             ],
         ),
-        ("", vec![Answer::reply(200, SAB_EMPTY)]),
     ]);
     let heard = Arc::new(Heard::default());
     let context = ctx(Arc::clone(&fake) as Arc<dyn Http>, "waiting", &heard);

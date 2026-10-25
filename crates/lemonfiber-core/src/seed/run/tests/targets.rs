@@ -90,57 +90,99 @@ fn shipped_fillers(project: Option<&std::path::Path>) -> crate::wiring::Fillers 
         .unwrap_or_default()
 }
 
-/// A Usenet client's key is read from the file its own declaration names, and held
-/// against that client rather than against its kind.
+/// The Usenet client's service, which its plugin is named after.
+const USENET: &str = crate::test_support::usenet::PLUGIN;
+
+/// The shipped stack with its Usenet client moved into its plugin, written at the stack's
+/// root.
+fn moved_usenet_fillers() -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::trusting(
+                &manifest,
+                &crate::test_support::usenet::moved()
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                &crate::wiring::Chosen::default(),
+                Some(stack_root()),
+                crate::plugin::first_party::EMBEDDED,
+            )
+        })
+        .unwrap_or_default()
+}
+
+/// A Usenet client's key is the one lemonfiber minted for it, held against the moved
+/// client it was minted for rather than against its kind or the stack's own client.
 #[tokio::test]
-async fn a_usenet_clients_key_is_held_against_the_client_it_was_read_from() {
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
+async fn a_usenet_clients_key_is_held_against_the_client_it_was_minted_for() {
+    let env = config_scratch("held-usenet-minted");
+    let ctx = minting_usenet(seed_ctx(
+        None,
+        true,
+        Vec::new(),
+        None,
+        Some(env.to_path_buf()),
+    ));
 
     let held = super::super::clients::held(
         &ctx,
-        &shipped_fillers(Some(stack_root())),
+        &moved_usenet_fillers(),
         &std::collections::BTreeMap::new(),
     )
     .await;
 
     assert_eq!(
-        held.of(&holder(None, "sabnzbd")),
-        Some(&Credential::ApiKey("the-sab-key".to_owned()))
+        held.of(&holder(Some(USENET), USENET)),
+        Some(&Credential::ApiKey(MINTED_USENET_KEY.to_owned()))
     );
+    assert!(held.of(&holder(None, USENET)).is_none());
 }
 
-/// Without a project there is no file beneath it to read a key from, so no Usenet
-/// client's key is in hand — and one that has written nothing yet holds none either.
+/// No Usenet client's key is in hand until one is minted for it: not for a moved client
+/// whose key the secret store does not hold yet, nor for the stack's own client, which
+/// nothing mints a key for.
 #[tokio::test]
-async fn a_usenet_key_needs_a_project_and_a_file_that_holds_one() {
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
-    let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
-    let unwritten = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+async fn a_usenet_key_is_in_hand_only_once_minted() {
+    let (unminted_env, unmoved_env) = (
+        config_scratch("held-usenet-unminted"),
+        config_scratch("held-usenet-unmoved"),
+    );
+    let unminted = seed_ctx(
+        None,
+        true,
+        Vec::new(),
+        None,
+        Some(unminted_env.to_path_buf()),
+    );
+    let unmoved = minting_usenet(seed_ctx(
+        None,
+        true,
+        Vec::new(),
+        None,
+        Some(unmoved_env.to_path_buf()),
+    ));
 
-    let nowhere = super::super::clients::held(
-        &ctx,
-        &shipped_fillers(None),
+    let not_yet = super::super::clients::held(
+        &unminted,
+        &moved_usenet_fillers(),
         &std::collections::BTreeMap::new(),
     )
     .await;
-    let nothing_yet = super::super::clients::held(
-        &unwritten,
+    let never = super::super::clients::held(
+        &unmoved,
         &shipped_fillers(Some(stack_root())),
         &std::collections::BTreeMap::new(),
     )
     .await;
 
     assert!(
-        nowhere.of(&holder(None, "sabnzbd")).is_none(),
-        "read from no project"
+        !not_yet.keys.keys().any(|holder| holder.id == USENET),
+        "held before it was minted"
     );
     assert!(
-        nothing_yet.of(&holder(None, "sabnzbd")).is_none(),
-        "read from a file never written"
+        !never.keys.keys().any(|holder| holder.id == USENET),
+        "held for the stack's own client"
     );
 }
 

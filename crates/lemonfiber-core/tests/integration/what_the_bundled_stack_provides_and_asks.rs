@@ -3,10 +3,10 @@
 //!
 //! Every part the bundle carries fills one, and the services that reach those parts ask
 //! for them: each service given a household hostname asks the proxy, each service whose
-//! dashboard panel reads it asks the dashboard, the request service asks the gate, and the
-//! gate, quality sync and decline ask what they act on. The core asks quality sync,
-//! archive extraction, the stream guard and decline over their contracts, so no service
-//! asks those.
+//! dashboard panel reads it asks the dashboard, from its plugin where the bundle installs
+//! it, the request service asks the gate, and the gate, quality sync and decline ask what
+//! they act on. The core asks quality sync, archive extraction, the stream guard and
+//! decline over their contracts, so no service asks those.
 
 use std::collections::BTreeSet;
 
@@ -90,11 +90,32 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
             "prowlarr",
             "qbittorrent",
             "radarr",
-            "sabnzbd",
             "seerr",
             "sonarr"
         ])
     );
+}
+
+/// The Usenet client the bundle installs rather than assembles asks the dashboard from its
+/// own plugin, as every service the stack carries whose panel reads it does from the stack.
+#[test]
+fn the_installed_usenet_client_asks_the_dashboard_from_its_plugin() {
+    let asking: Vec<String> = lemonfiber_testing::usenet::moved()
+        .map(|installed| {
+            installed
+                .services
+                .into_iter()
+                .filter(|placed| {
+                    placed
+                        .asks
+                        .iter()
+                        .any(|ask| ask.capability == "dashboard.show")
+                })
+                .map(|placed| placed.service)
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(asking, vec![lemonfiber_testing::usenet::PLUGIN.to_owned()]);
 }
 
 #[test]

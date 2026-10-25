@@ -10,7 +10,7 @@ use crate::bandwidth::{Answer, Held, Period, Pulling, Verdict};
 use crate::config::Settings;
 use crate::dashboard::Protocol;
 use crate::ports::service::{Failure, Hours, Moved, Pulling as Answered, Rates, Throttled, Wanted};
-use crate::test_support::{a_context, a_password, env_at, json};
+use crate::test_support::{a_context, a_password, env_at, json, usenet};
 
 /// The three parts of an answer, where the client answered at all.
 fn parts(answer: &Answer) -> Option<(Held, Held, Option<Period>)> {
@@ -326,38 +326,77 @@ async fn what_a_client_has_moved_is_nothing_where_it_would_not_say() {
     }
 }
 
-/// The Usenet client's queue, holding at a quarter of a megabyte and pulling under it.
-const QUEUED: &str = r#"{"queue":{"speedlimit_abs":"262144","kbpersec":"128.0"}}"#;
+/// The Usenet client over its contract: holding down at a quarter of a megabyte and
+/// pulling under it, with no upload and no hours of its own, and two thousand bytes
+/// moved in the month asked about.
+fn the_usenet_client_over_its_contract() -> DownloadTarget {
+    let held = json(&Throttled {
+        rates: Rates {
+            down: Some(SLOW),
+            up: None,
+        },
+        uploads: false,
+        hours: None,
+    });
+    let http = Fake::by_path(vec![
+        (
+            usenet::operation("restrain"),
+            Replies::reply(200, held.clone()),
+        ),
+        (usenet::operation("throttled"), Replies::reply(200, held)),
+        (
+            usenet::operation("moving"),
+            Replies::reply(
+                200,
+                json(&Rates {
+                    down: Some(SLOW / 2),
+                    up: None,
+                }),
+            ),
+        ),
+        (
+            usenet::operation("moved"),
+            Replies::reply(
+                200,
+                json(&Moved {
+                    down: 2_000,
+                    up: 0,
+                    since_start: false,
+                }),
+            ),
+        ),
+        (
+            usenet::operation("pulling"),
+            Replies::reply(200, json(&Answered::Fetching)),
+        ),
+    ]);
+    DownloadTarget {
+        service: USENET.to_owned(),
+        kind: DownloadKind::Over {
+            protocol: Protocol::Usenet,
+            adapter: Contracted::new(http, "http://127.0.0.1:8080", USENET, "usenet-key"),
+        },
+    }
+}
 
-/// Its account statistics, kept by the day rather than as a running total.
-const DAILY: &str = r#"{"servers":{"one":{"total":9000,"daily":{"2026-09-01":2000}}}}"#;
-
-/// Its schedule, with nothing in it that would switch the rate.
-const UNSCHEDULED: &str = r#"{"config":{"misc":{"schedlines":[]}}}"#;
-
+/// The Usenet client is judged as one that has no upload and keeps no hours, and is asked
+/// for a month it can answer for. A stack that judged it as a torrent client would hold
+/// the household to an upload limit nothing had ever put on it.
 #[tokio::test]
-async fn the_usenet_client_is_asked_on_its_own_shape_rather_than_the_torrent_one() {
-    // It answers about a limit and a month through entirely different calls,
-    // and it has no upload and keeps no hours. A stack that reached it the
-    // torrent client's way would report a working client as silent, and the
-    // household would be held to a limit nothing had ever put on it.
-    let ctx = a_context().build().with_http(Fake::by_path(vec![
-        ("mode=queue", Replies::reply(200, QUEUED)),
-        ("mode=get_config", Replies::reply(200, UNSCHEDULED)),
-        ("mode=server_stats", Replies::reply(200, DAILY)),
-    ]));
-    let clients = opened(&ctx, &[usenet()]);
+async fn the_usenet_client_is_judged_with_no_upload_and_no_hours_over_its_contract() {
+    let ctx = a_context().build();
+    let clients = opened(&ctx, &[the_usenet_client_over_its_contract()]);
     assert_eq!(clients.len(), 1, "the Usenet client opened");
 
     for client in &clients {
         let reported = holding(client, &wanted(), None, false).await;
-        assert_eq!(reported.client, "sabnzbd");
-        // Asked whether it is fetching at all, which is what a spent cap is
-        // judged by. It answers from its own queue flag rather than the
-        // torrent client's pair of readings, and a stack that never asked it
-        // would judge a Usenet-only household's cap on nothing.
+        assert_eq!(reported.client, USENET);
         let asked = holding(client, &wanted(), Some(Fetch::Ask), false).await;
-        assert_eq!(asked.pulling, Some(Pulling::Fetching));
+        assert_eq!(
+            asked.pulling,
+            Some(Pulling::Fetching),
+            "asked whether it is fetching at all, which is what a spent cap is judged by"
+        );
         let answered = parts(&reported.answer);
         assert!(
             answered.is_some_and(|(down, up, period)| down.accepted == Some(SLOW)

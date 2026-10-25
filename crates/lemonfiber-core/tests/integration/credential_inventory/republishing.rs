@@ -117,7 +117,7 @@ async fn a_key_that_cannot_be_proven_by_identity_points_at_the_seeding_instead()
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "SABNZBD_API_KEY".to_owned(),
+            credential: "BAZARR_API_KEY".to_owned(),
         },
     )
     .await;

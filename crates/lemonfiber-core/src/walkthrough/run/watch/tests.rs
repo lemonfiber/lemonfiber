@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::super::fixtures::{ctx_with, Fake, Ticking, CARRYING_IT};
+use super::super::fixtures::{carrying_it, ctx_downloading, ctx_with, Fake, Ticking};
 use super::{done, first_word, furthest, past_patience, settled, speed_of, what_was_said, Landed};
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::service::{QueueItem, TraceEvent};
@@ -223,16 +223,15 @@ async fn nothing_to_ask_and_nothing_that_answers_are_both_simply_no_quote() {
         .is_empty());
 }
 
+/// A size and a rate are what make a download look like progress rather than a hang,
+/// and they come from the client rather than being guessed.
 #[tokio::test]
 async fn a_download_the_client_is_carrying_is_narrated_with_its_own_figures() {
-    // A size and a rate are what make a download look like progress rather than a
-    // hang, and they come from the client rather than being guessed.
-    let ctx = ctx_with(&Fake {
-        transfers: CARRYING_IT,
+    let ctx = ctx_downloading(&Fake {
+        transfers: carrying_it(),
         ..Fake::default()
     });
     let speed = speed_of(&ctx, "Sintel").await;
-    // Mebibytes, as the client reports them.
     assert_eq!(speed.map(|speed| speed.left), Some(1050 * 1024 * 1024));
     assert!(
         speed.is_some_and(|speed| speed.total > speed.left),
@@ -243,7 +242,7 @@ async fn a_download_the_client_is_carrying_is_narrated_with_its_own_figures() {
 
 #[tokio::test]
 async fn a_client_carrying_nothing_of_ours_has_no_figures_to_offer() {
-    let ctx = ctx_with(&Fake::default());
+    let ctx = ctx_downloading(&Fake::default());
     assert_eq!(speed_of(&ctx, "Sintel").await, None);
 }
 

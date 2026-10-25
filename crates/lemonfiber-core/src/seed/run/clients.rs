@@ -119,7 +119,7 @@ impl Held {
 /// set, and nothing is told about it until a later run finds one.
 pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder, String>) -> Held {
     let mut held = Held::default();
-    for filler in fillers.speaking(ApiKind::Sabnzbd) {
+    for filler in fillers.talking(ApiKind::Sabnzbd) {
         if let Some(key) = super::keys::minted_key(ctx, filler) {
             held.keys
                 .insert(Holder::of(filler), Credential::ApiKey(key));

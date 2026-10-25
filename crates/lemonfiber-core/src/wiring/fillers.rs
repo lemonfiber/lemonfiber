@@ -355,6 +355,14 @@ impl Fillers {
         self.services.iter().filter(move |one| one.speaks(kind))
     }
 
+    /// Every service lemonfiber speaks to in this API, through its adapter or as the API
+    /// the upstream declares its own, the stack's first.
+    pub fn talking(&self, kind: ApiKind) -> impl Iterator<Item = &Filler> {
+        self.services
+            .iter()
+            .filter(move |one| one.talks_in() == Some(kind))
+    }
+
     /// The setting a credential this service holds is kept under, ending in `holds`.
     ///
     /// A stack service's is named after its id. A plugin's is named in a namespace of its

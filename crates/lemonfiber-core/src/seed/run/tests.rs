@@ -132,7 +132,38 @@ fn seed_ctx(
         .build()
         .with_http(Fake::scripted(replies))
         .with_random(Arc::new(FixedRandom(bytes)));
-    ctx.seams.confined = crate::test_support::media::Keyed::over(Arc::clone(&ctx.seams.confined));
+    ctx.seams.confined = crate::test_support::media::Keyed::holding(
+        Arc::clone(&ctx.seams.confined),
+        &[crate::test_support::media::ADAPTER],
+    );
+    ctx
+}
+
+/// The key lemonfiber minted for the Usenet client moved into its plugin.
+const MINTED_USENET_KEY: &str = "the-minted-usenet-key";
+
+/// `ctx` with its Usenet client moved into its plugin, and [`MINTED_USENET_KEY`] kept in
+/// its secret store as the key lemonfiber minted for it.
+fn minting_usenet(ctx: Ctx) -> Ctx {
+    crate::test_support::usenet::moved_in(&ctx);
+    let minted = crate::test_support::usenet::moved()
+        .and_then(|installed| {
+            installed
+                .declared
+                .secrets
+                .iter()
+                .find(|secret| secret.minted)
+                .map(|secret| crate::settings::named(&installed.plugin, &secret.id))
+        })
+        .unwrap_or_default();
+    let keeping = [crate::settings::Keeping {
+        name: &minted,
+        value: MINTED_USENET_KEY,
+        from: crate::settings::Source::Minted,
+        at: 1,
+    }];
+    let at = crate::settings::secrets_at(&ctx).unwrap_or_default();
+    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
     ctx
 }
 

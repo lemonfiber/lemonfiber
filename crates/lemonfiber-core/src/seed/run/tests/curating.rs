@@ -273,8 +273,7 @@ fn a_filler_nothing_connects_is_not_told_about() {
     );
 }
 
-/// A plugin's Usenet client whose key file leads away from the directory its container
-/// owns is not read, and each curator that asks for it is told why on that connection.
+/// A curator filing a media type with no category field is told about no client.
 #[test]
 fn a_curator_with_no_category_is_told_about_no_client() {
     assert_eq!(
@@ -321,7 +320,6 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
     // The torrent client announces a temporary password, so it is set and its value
     // threaded to the download clients; each curator already holds both clients.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -331,10 +329,8 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(
-        Some(CURATOR_CONFIG),
-        Some(USENET_CONFIG),
-    )));
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -363,7 +359,6 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     // never registering it a second time. The point guarded here is that the adopt
     // command dispatches and reports every present client.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -373,10 +368,8 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(
-        Some(CURATOR_CONFIG),
-        Some(USENET_CONFIG),
-    )));
+    .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -395,7 +388,6 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
 async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     // The clients' own credentials are in hand, but the curators have not written
     // their keys, so registration is skipped for a re-run rather than failed.
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -405,7 +397,8 @@ async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
+    .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);

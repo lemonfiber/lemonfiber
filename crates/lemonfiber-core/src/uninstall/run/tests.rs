@@ -23,7 +23,7 @@ use crate::app::{Ctx, Removing};
 use crate::config::Settings;
 use crate::ports::filesystem::{Eraser, FsKind, StorageFacts};
 use crate::ports::Runner;
-use crate::test_support::{a_context, nowhere};
+use crate::test_support::{a_context, nowhere, usenet};
 use crate::uninstall::{
     Item, Left, Manifest, Removal, Sort, Tier, ANOTHER_READING, NEEDS_AGREEING,
 };

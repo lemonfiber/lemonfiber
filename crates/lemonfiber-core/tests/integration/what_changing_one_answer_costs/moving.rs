@@ -7,7 +7,6 @@ use super::{
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::reconfigure::Stance;
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::downloads::SAB_KEY_INI;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{seeding_routes, SeedFs};
 use std::path::{Path, PathBuf};
@@ -102,7 +101,7 @@ async fn a_move_is_refused_where_the_services_have_not_written_their_keys_yet() 
         Fake::by_path(seeding_routes()),
         Vec::new(),
     )
-    .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SAB_KEY_INI))));
+    .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
 
     let review = changing(&ctx, DATA_ROOT, "/srv/new", AGREED).await;
 

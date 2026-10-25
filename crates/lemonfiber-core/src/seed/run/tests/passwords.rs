@@ -435,15 +435,12 @@ async fn a_later_seed_offers_the_torrent_client_from_its_recorded_password() {
     // The temporary password is gone, so nothing is minted this run; the
     // password recorded earlier stands in and the torrent client is offered anyway.
     const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let path = config_scratch("qbt-later-seed");
     let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()))
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(
-            Some(CURATOR_CONFIG),
-            Some(USENET_CONFIG),
-        )));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let ctx = minting_usenet(ctx);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);

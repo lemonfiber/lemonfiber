@@ -5,10 +5,11 @@ use super::{
 };
 use lemonfiber_core::app::Waiting;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::reconfigure::Stance;
-use lemonfiber_fixtures::downloads::{
-    downloads, QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY, SAB_QUEUE,
-};
+use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS};
+use lemonfiber_fixtures::support::Reporting;
+use lemonfiber_testing::usenet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -29,7 +30,7 @@ async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wai
         env.clone(),
         &from,
         Protocols::both(),
-        downloads(QBIT_TORRENTS, SAB_EMPTY),
+        usenet::beside_torrents(QBIT_TORRENTS, &[]),
         Vec::new(),
     );
 
@@ -60,18 +61,22 @@ async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wai
     assert_eq!(held(&env, TORRENT), None, "a refused change writes nothing");
 }
 
+/// Narrowed to the protocol being dropped: a torrent is in no danger from switching Usenet
+/// off, and naming it would be reporting work nothing is about to interrupt.
 #[tokio::test]
 async fn dropping_usenet_names_what_is_coming_down_over_usenet_and_not_the_torrents() {
-    // Narrowed to the protocol being dropped: a torrent is in no danger from switching
-    // Usenet off, and naming it would be reporting work nothing is about to interrupt.
     let from = PathBuf::from("/srv/media");
     let env = env_at("usenet-in-flight", &from);
-    let ctx = over(
+    let mut ctx = usenet::keyed(over(
         env.clone(),
         &from,
         Protocols::both(),
-        downloads(QBIT_TORRENTS, SAB_QUEUE),
+        usenet::beside_torrents(QBIT_TORRENTS, &[usenet::carrying()]),
         Vec::new(),
+    ));
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
+            .alongside(usenet::running()),
     );
 
     let review = changing(&ctx, USENET, "off", UNSAID).await;
@@ -89,7 +94,7 @@ async fn dropping_usenet_names_what_is_coming_down_over_usenet_and_not_the_torre
         .unwrap_or_default();
     assert_eq!(
         named,
-        vec![("usenet".to_owned(), "Linux.nzb".to_owned())],
+        vec![("usenet".to_owned(), usenet::CARRIED.to_owned())],
         "only what the dropped protocol is carrying"
     );
     assert_eq!(stance(review.as_ref()), Some(Stance::Blocked));
@@ -108,7 +113,7 @@ async fn the_offer_to_wait_taken_up_lets_the_downloads_finish_and_then_makes_the
         env.clone(),
         &from,
         Protocols::both(),
-        downloads(QBIT_FINISHED, SAB_EMPTY),
+        usenet::beside_torrents(QBIT_FINISHED, &[]),
         Vec::new(),
     );
 
@@ -134,7 +139,7 @@ async fn asking_a_change_that_takes_nothing_away_to_wait_waits_for_nothing() {
     // it must not sit down in front of every download on the machine.
     let from = PathBuf::from("/srv/media");
     let env = env_at("not-a-reduction", &from);
-    let fake = downloads(QBIT_TORRENTS, SAB_EMPTY);
+    let fake = usenet::beside_torrents(QBIT_TORRENTS, &[]);
     let ctx = over(env, &from, Protocols::none(), Arc::clone(&fake), Vec::new());
 
     let review = changing(&ctx, USENET, "on", WAITING).await;

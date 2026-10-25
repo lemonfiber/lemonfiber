@@ -377,39 +377,41 @@ async fn what_is_still_coming_down_is_reported_before_anything_stops() {
     let ctx = a_context()
         .settings(Settings {
             protocols: crate::config::Protocols::both(),
+            env_file: Some(crate::test_support::env_without_password(
+                "uninstall-coming-down",
+            )),
             ..settings()
         })
-        .engine(Arc::new(Reporting::holding(
-            &["sabnzbd"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .build()
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(None, Some(lemonfiber_fixtures::downloads::SAB_KEY_INI)).with_facts(
-                StorageFacts {
-                    point: PathBuf::from(ROOT),
-                    kind: FsKind::Linking("apfs".to_owned()),
-                    removable: false,
-                    available: 100,
-                    total: 1_000,
-                },
-            ),
+        .engine(Arc::new(
+            Reporting::holding(&["sabnzbd"], Lifecycle::Running, Health::Healthy)
+                .alongside(usenet::running()),
         ))
-        .with_http(lemonfiber_fixtures::downloads::downloads(
+        .build()
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(
+            StorageFacts {
+                point: PathBuf::from(ROOT),
+                kind: FsKind::Linking("apfs".to_owned()),
+                removable: false,
+                available: 100,
+                total: 1_000,
+            },
+        )))
+        .with_http(usenet::beside_torrents(
             lemonfiber_fixtures::downloads::QBIT_TORRENTS,
-            lemonfiber_fixtures::downloads::SAB_QUEUE,
+            &[usenet::carrying()],
         ))
         .with_images(Pulled::holding(Vec::new()))
         .with_occupancy(Walking::holding(only_ours()))
         .with_eraser(Erasing::willing());
+    usenet::moved_in(&ctx);
 
     let manifest = read(&ctx, Tier::Services).await;
 
     assert!(
-        manifest
-            .as_ref()
-            .is_some_and(|manifest| manifest.coming.iter().any(|one| one.name == "Linux.nzb")),
+        manifest.as_ref().is_some_and(|manifest| manifest
+            .coming
+            .iter()
+            .any(|one| one.name == usenet::CARRIED)),
         "{manifest:?}"
     );
 }
