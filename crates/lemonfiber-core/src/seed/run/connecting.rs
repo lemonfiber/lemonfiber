@@ -15,7 +15,7 @@
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
 use lemonfiber_contract::capabilities::archive::extract;
-use lemonfiber_contract::capabilities::indexer::search;
+use lemonfiber_contract::capabilities::indexer::{pull, search};
 use lemonfiber_contract::capabilities::quality::sync;
 use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_contract::capabilities::subtitles::fetch;
@@ -36,7 +36,8 @@ const TORRENT: &str = "download.torrent";
 /// quality sync each ask of every service that does it.
 const CURATES: &str = "library.curate";
 
-/// Searching across indexers, which the book curator asks of the service it pulls from.
+/// Searching across indexers, which a curator pulling its indexers asks of the service it
+/// pulls from.
 const SEARCHES: &str = "indexer.search";
 
 /// Television, as the stack manifest names the media a curator files.
@@ -53,8 +54,9 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// Every contract an asker is paired by, as capability and major.
-const CONTRACTED: [(&str, u32); 5] = [
+const CONTRACTED: [(&str, u32); 6] = [
     (extract::CAPABILITY, extract::MAJOR),
+    (pull::CAPABILITY, pull::MAJOR),
     (fetch::CAPABILITY, fetch::MAJOR),
     (search::CAPABILITY, search::MAJOR),
     (intake::CAPABILITY, intake::MAJOR),
@@ -130,6 +132,9 @@ pub(super) enum Unmade {
     NoPort,
     /// Nothing in this table connects what the asker speaks to what the filler speaks.
     Unpaired,
+    /// The filler's application sync serves the media the asker files, so the filler is
+    /// told about the asker rather than the asker about the filler.
+    Synced,
     /// The two are connected for some media, and the filler files none of them.
     Files,
     /// The connection would hand the asker's own credential to a filler the gate does
@@ -145,14 +150,30 @@ pub(super) enum Unmade {
 /// Built only in [`made`], where the gate is asked, so whatever takes one — the
 /// indexer's sync, the subtitle finder, anything that reads a credential to hand an
 /// asker — is never handed a service the gate refused to give one to.
+///
+/// It reads as the service that asked, which every report names; [`Cleared::answering`]
+/// is the service asked for it, the adapter in front of it where one of its plugin fronts
+/// it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Cleared<'a>(&'a Filler);
+pub(super) struct Cleared<'a> {
+    /// The service that asked.
+    named: &'a Filler,
+    /// The service asked for it.
+    answering: &'a Filler,
+}
+
+impl<'a> Cleared<'a> {
+    /// The service asked for the asker: the adapter that fronts it, or the asker itself.
+    pub(super) const fn answering(&self) -> &'a Filler {
+        self.answering
+    }
+}
 
 impl std::ops::Deref for Cleared<'_> {
     type Target = Filler;
 
     fn deref(&self) -> &Filler {
-        self.0
+        self.named
     }
 }
 
@@ -181,6 +202,7 @@ fn connection(
     capability: &str,
     filler: ApiKind,
     media: &[String],
+    files: &[String],
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
         (Asking::Bundled(ApiKind::Servarr), USENET, ApiKind::Sabnzbd)
@@ -214,6 +236,12 @@ fn connection(
         (Asking::Bundled(ApiKind::Bindery), SEARCHES, ApiKind::Servarr) => {
             Ok(Connection::Aggregator)
         }
+        (Asking::Over(pull::CAPABILITY), SEARCHES, _)
+            if super::applications::application_kind(files).is_some() =>
+        {
+            Err(Unmade::Synced)
+        }
+        (Asking::Over(pull::CAPABILITY), SEARCHES, _) => Ok(Connection::Aggregator),
         (Asking::Over(extract::CAPABILITY), CURATES, ApiKind::Servarr) => media
             .first()
             .and_then(|kind| {
@@ -229,7 +257,8 @@ fn connection(
 
 /// Every asker paired with each service that fills what it asked for, for the asks
 /// answered here: the upstream it fronts, where that service is an adapter, since the
-/// asker is told about a service in that service's own API.
+/// asker is told about a service in that service's own API. An asker an adapter of its
+/// plugin fronts is paired by what that adapter speaks, and the adapter is asked.
 ///
 /// An ask whose asker is not on this machine is passed over: the operator took it out of
 /// lemonfiber's hands, and a pass that wrote nothing to it has nothing to say about it.
@@ -242,38 +271,54 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
         let Some(asker) = fillers.service(&ask.by) else {
             continue;
         };
+        let answering = fillers.fronting(asker).unwrap_or(asker);
         for filler in &ask.fillers {
             let filler = fillers.fronted_by(filler).unwrap_or(filler);
             found.push(Pairing {
                 asker,
                 ask,
                 filler,
-                made: made(fillers, asker, ask, filler),
+                made: made(fillers, asker, answering, ask, filler),
             });
         }
     }
     found
 }
 
-/// What one asker and one filler come to.
+/// What one asker, asked through `answering`, and one filler come to.
 fn made<'a>(
     fillers: &Fillers,
     asker: &'a Filler,
+    answering: &'a Filler,
     ask: &Ask,
     filler: &'a Filler,
 ) -> Result<(Connection, &'a Address, Cleared<'a>), Unmade> {
-    if !fillers.hands(filler, asker) {
+    if !fillers.hands(filler, answering) {
         return Err(Unmade::Asked);
     }
     let speaks = filler.talks_in().ok_or(Unmade::NoAdapter)?;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
-    let asks = asking(asker).ok_or(Unmade::Unpaired)?;
-    let made = connection(asks, &ask.capability, speaks, &filler.media_types)?;
-    if made.hands_over_the_askers_key() && !crate::wiring::crosses(asker.holder(), filler.holder())
+    let asks = asking(answering).ok_or(Unmade::Unpaired)?;
+    let made = connection(
+        asks,
+        &ask.capability,
+        speaks,
+        &filler.media_types,
+        &asker.media_types,
+    )?;
+    if made.hands_over_the_askers_key()
+        && !crate::wiring::crosses(answering.holder(), filler.holder())
     {
         return Err(Unmade::Withheld);
     }
-    Ok((made, at, Cleared(asker)))
+    Ok((
+        made,
+        at,
+        Cleared {
+            named: asker,
+            answering,
+        },
+    ))
 }
 
 /// Every pairing that comes to nothing, each reported naming what fills and what asked.
@@ -321,6 +366,10 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
         Unmade::Unpaired => format!(
             "{fills} and nothing in lemonfiber tells {asker} about a service that speaks \
              {filler}'s adapter"
+        ),
+        Unmade::Synced => format!(
+            "{fills} and syncs the media {asker} files to it itself, so {filler} is told about \
+             {asker} rather than {asker} about {filler}"
         ),
         Unmade::Files if pairing.filler.media_types.is_empty() => format!(
             "{fills} and names no media it files, so lemonfiber cannot say what to hand {asker}"

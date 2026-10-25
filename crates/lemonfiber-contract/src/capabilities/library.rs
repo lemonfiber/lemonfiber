@@ -75,9 +75,12 @@ const NO_ITEM: i64 = 0;
 /// more.
 #[must_use]
 pub fn client_answering(media_types: &[String]) -> lemonfiber_ports::serving::StandIn {
-    let categories: Vec<Value> = ["*", NAMED]
+    let named: Vec<&str> = ["*", NAMED]
         .into_iter()
         .chain(media_types.iter().map(String::as_str))
+        .collect();
+    let categories: Vec<Value> = named
+        .iter()
         .map(|name| serde_json::json!({ "name": name, "dir": "" }))
         .collect();
     let answers = [
@@ -101,6 +104,7 @@ pub fn client_answering(media_types: &[String]) -> lemonfiber_ports::serving::St
             serde_json::json!({ "queue": { "slots": [], "paused": false } }),
         ),
         ("history", serde_json::json!({ "history": { "slots": [] } })),
+        ("get_cats", serde_json::json!({ "categories": named })),
     ];
     lemonfiber_ports::serving::StandIn {
         port: CLIENT_PORT,

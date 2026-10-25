@@ -69,7 +69,13 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
     let mut wirings = Vec::new();
     for holding in holding(fillers) {
         let connection = format!("{} watching every curator", holding.asker.name);
-        let extractor = match spoken(ctx, &holding.asker, extract::CAPABILITY, extract::MAJOR).await
+        let extractor = match spoken(
+            ctx,
+            holding.asker.answering(),
+            extract::CAPABILITY,
+            extract::MAJOR,
+        )
+        .await
         {
             Spoken::Over(adapter) => extract::Adapter(adapter),
             Spoken::Unanswered | Spoken::Not => continue,

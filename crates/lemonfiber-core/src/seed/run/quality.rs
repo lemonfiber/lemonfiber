@@ -47,7 +47,7 @@ fn holding(fillers: &Fillers) -> Vec<Holding<'_>> {
 /// The sync as the core asks it, over `quality.sync`. Nothing where it cannot be asked
 /// over it.
 async fn syncer(ctx: &Ctx, asker: Cleared<'_>) -> Option<Box<dyn Syncing>> {
-    match spoken(ctx, &asker, sync::CAPABILITY, sync::MAJOR).await {
+    match spoken(ctx, asker.answering(), sync::CAPABILITY, sync::MAJOR).await {
         Spoken::Over(adapter) => Some(Box::new(sync::Adapter(adapter))),
         Spoken::Unanswered | Spoken::Not => None,
     }
