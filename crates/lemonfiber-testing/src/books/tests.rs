@@ -11,8 +11,8 @@ use lemonfiber_fixtures::scratch::Scratch;
 use super::super::context::a_context;
 use super::{
     add_aggregator, added, aggregators, asking, clients_registered, curating, download_clients,
-    folders_registered, keyed, moved, pulling, reaching, reading_from, root_folders, taken,
-    ADAPTER, PLUGIN,
+    folders_registered, keyed, moved, pulling, reaching, reading_from, root_folders, running,
+    taken, ADAPTER, PLUGIN,
 };
 
 #[test]
@@ -189,4 +189,12 @@ fn a_held_client_is_answered_as_the_contract_carries_it() {
         matches!(&answer, Answer::Reply(200, body) if body.contains("\"category\"")),
         "{answer:?}"
     );
+}
+
+#[test]
+fn the_running_adapter_is_healthy_and_published_on_the_adapters_port() {
+    assert!(super::super::adapted::runs_on_the_adapters_port(
+        &running(),
+        ADAPTER
+    ));
 }

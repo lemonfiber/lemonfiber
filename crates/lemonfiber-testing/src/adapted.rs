@@ -283,6 +283,21 @@ impl Confined for Keyed {
     }
 }
 
+/// Whether the engine's account `reporting` lists `adapter` healthy and published on
+/// [`PORT`], where its answer is ready at once.
+#[cfg(test)]
+pub(crate) fn runs_on_the_adapters_port(reporting: &Reporting, adapter: &str) -> bool {
+    use lemonfiber_core::ports::docker::Engine as _;
+    use std::future::Future as _;
+    let mut asked = std::pin::pin!(reporting.list("lemonfiber"));
+    matches!(
+        asked.as_mut().poll(&mut std::task::Context::from_waker(std::task::Waker::noop())),
+        std::task::Poll::Ready(Ok(listed)) if listed.iter().any(|one| one.service == adapter
+            && one.health == Health::Healthy
+            && one.published.iter().any(|at| at.port == PORT))
+    )
+}
+
 #[cfg(test)]
 #[path = "adapted/tests.rs"]
 mod tests;

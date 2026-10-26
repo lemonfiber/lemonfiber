@@ -496,3 +496,21 @@ fn a_service_not_first_party_stands_in_for_nothing() {
 mod filling;
 mod fronting;
 mod via;
+
+impl super::Fillers {
+    /// The services `services` alone, asking nothing and linking nothing by name.
+    pub(crate) fn holding(services: Vec<super::Filler>) -> Self {
+        Self {
+            services,
+            asks: Vec::new(),
+            named: Vec::new(),
+        }
+    }
+
+    /// These fillers with every ask made a second time.
+    pub(crate) fn asked_again(mut self) -> Self {
+        let again = self.asks.clone();
+        self.asks.extend(again);
+        self
+    }
+}

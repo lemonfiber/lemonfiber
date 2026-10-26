@@ -88,6 +88,19 @@ async fn both_curators_are_told_to_the_moved_finder_over_its_contract() {
     );
 }
 
+/// A curator filling more than one of the finder's asks is told to it once.
+#[tokio::test]
+async fn a_curator_filling_two_of_the_finders_asks_is_told_once() {
+    let http = holding(&subtitles::unwatched());
+    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let fillers = moved_finder(curators()).asked_again();
+
+    let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
+
+    assert_eq!(wirings.len(), 2, "{wirings:?}");
+    assert_eq!(subtitles::told(&http.requests()).len(), 2);
+}
+
 /// A plugin's service asking where the stack's subtitle finder would is never handed a
 /// curator's key: nothing is asked of it or of any curator, and a replaced key owes it
 /// nothing.

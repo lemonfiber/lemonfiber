@@ -267,3 +267,30 @@ fn an_assembled_parts_key_of_a_service_nothing_here_runs_is_withheld() {
 
     assert_eq!(held, Some(crate::plugin::Holding::Withheld));
 }
+
+/// A stack service's own key, one its secrets hold for no other service, is read under
+/// the stack's name for the service itself.
+#[test]
+fn a_stack_services_own_key_is_read_under_its_own_name() {
+    let (ctx, _) = machine("secrets-own");
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
+
+    let held = manifest
+        .as_ref()
+        .and_then(|manifest| manifest.services.iter().find(|one| one.id == "unpackerr"))
+        .cloned()
+        .map(|mut unpackerr| {
+            for secret in &mut unpackerr.secret {
+                secret.of.clone_from(&unpackerr.id);
+            }
+            crate::settings::files::stack_holding(&unpackerr, "music-key", &resolved)
+        });
+
+    assert_eq!(
+        held,
+        Some(crate::plugin::Holding::Crossing(
+            crate::config::for_service("unpackerr", crate::config::API_KEY_SUFFIX)
+        ))
+    );
+}
