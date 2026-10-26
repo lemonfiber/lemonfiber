@@ -520,7 +520,7 @@ fn contained(service: &Service) -> Vec<String> {
             service
                 .secret
                 .iter()
-                .filter(|secret| secret.minted)
+                .filter(|secret| secret.minted.is())
                 .map(|secret| {
                     format!(
                 "secret {}: is minted, and lemonfiber mints a secret for a plugin it installs \

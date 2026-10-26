@@ -4,7 +4,11 @@ use std::path::Path;
 use base64::Engine as _;
 use lemonfiber_fixtures::ports::Chance;
 
-use super::{mint, starting, upstream, written, Shipped, MINTED_BYTES};
+use lemonfiber_manifest::container::Minted;
+
+use super::{
+    mint, minted_as, shape_of, shapes, starting, upstream, written, Shipped, MINTED_BYTES,
+};
 use crate::plugin::Lands;
 
 /// The value the store holds as `api-key`.
@@ -240,4 +244,62 @@ fn a_replaced_hash_is_derived_afresh_for_the_new_value() {
         .unwrap_or_default();
     assert!(replaced.starts_with("WebUI\\Port=8080\nWebUI\\Password_PBKDF2=\"@ByteArray("));
     assert!(!replaced.contains("old:old"), "{replaced}");
+}
+
+/// Whether `value` holds 32 characters, every one of them a letter, a digit or `-_.~`, and
+/// at least one of each class.
+fn a_password(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|one| one.is_ascii_alphanumeric() || b"-_.~".contains(&one))
+        && value.bytes().any(|one| one.is_ascii_uppercase())
+        && value.bytes().any(|one| one.is_ascii_lowercase())
+        && value.bytes().any(|one| one.is_ascii_digit())
+        && value.bytes().any(|one| b"-_.~".contains(&one))
+}
+
+#[test]
+fn a_minted_password_holds_every_class_however_alike_its_random_bytes() {
+    for random in [
+        Chance::cycling(),
+        Chance::exactly(Some(vec![0x00; 80])),
+        Chance::exactly(Some(vec![0xff; 80])),
+        Chance::exactly(Some(vec![0xcd; 80])),
+    ] {
+        let value = minted_as(&random, Minted::Password).unwrap_or_default();
+        assert!(a_password(&value), "{value}");
+    }
+}
+
+#[test]
+fn a_minted_password_is_nothing_without_enough_random_bytes() {
+    assert_eq!(minted_as(&Chance::exactly(None), Minted::Password), None);
+    assert_eq!(
+        minted_as(&Chance::exactly(Some(vec![0x10; 79])), Minted::Password),
+        None
+    );
+}
+
+#[test]
+fn a_key_is_minted_as_before_and_an_unminted_secret_is_minted_nothing() {
+    let random = Chance::exactly(Some(vec![0xab; MINTED_BYTES]));
+    assert_eq!(minted_as(&random, Minted::Key), mint(&random));
+    assert_eq!(minted_as(&random, Minted::Not), None);
+}
+
+#[test]
+fn the_shapes_a_manifest_declares_are_read_beside_it_and_a_key_is_the_default() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::new("minted-shapes");
+    let manifest = crate::plugin::program::tests::RUNNING.to_owned()
+        + "\n[[secret]]\nid     = \"admin-password\"\nof     = \"qualitysync\"\n\
+           minted = \"password\"\nwhy    = \"Its administrator's password\"\n";
+    let _ = std::fs::write(dir.join(lemonfiber_bundle::MANIFEST), manifest);
+
+    let read = shapes(&dir);
+
+    assert_eq!(read.get("admin-password"), Some(&Minted::Password));
+    assert_eq!(shape_of(&read, "admin-password"), Minted::Password);
+    assert_eq!(shape_of(&read, "never-declared"), Minted::Key);
+    assert!(shapes(Path::new("/lemonfiber/no/such/plugin")).is_empty());
 }

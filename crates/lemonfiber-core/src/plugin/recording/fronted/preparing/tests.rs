@@ -6,7 +6,7 @@ use lemonfiber_fixtures::ports::Chance;
 use super::super::filling::handed_over;
 use std::collections::BTreeMap;
 
-use super::{environment, handed, written};
+use super::{environment, handed, written, Minting};
 use crate::plugin::program::{Starting, Throwaway};
 
 /// An adapter handing `api_key` the plugin's `upstream-key`, and `other` its `other-key`.
@@ -58,7 +58,7 @@ fn the_adapter_is_handed_the_value_its_upstream_was_seeded_with_or_one_minted_an
 
     let mut made = Vec::new();
     let handed = handed(
-        &Chance::exactly(Some(vec![0x22; 16])),
+        &keyed(&Chance::exactly(Some(vec![0x22; 16]))),
         &mut secrets,
         &adapter(),
         &mut made,
@@ -97,7 +97,7 @@ fn the_adapter_is_handed_the_value_its_upstream_was_seeded_with_or_one_minted_an
 #[test]
 fn an_adapter_is_handed_nothing_where_the_machine_supplies_no_random_bytes() {
     let refused = handed(
-        &Chance::exactly(None),
+        &keyed(&Chance::exactly(None)),
         &mut BTreeMap::new(),
         &adapter(),
         &mut Vec::new(),
@@ -133,8 +133,13 @@ fn an_upstream_given_its_key_in_its_environment_and_its_adapter_hold_the_same_va
     let mut made = Vec::new();
     let random = Chance::exactly(Some(vec![0x33; 16]));
 
-    let env = environment(&random, &mut secrets, &keyed_by_environment(), &mut made);
-    let handed = handed(&random, &mut secrets, &adapter(), &mut made);
+    let env = environment(
+        &keyed(&random),
+        &mut secrets,
+        &keyed_by_environment(),
+        &mut made,
+    );
+    let handed = handed(&keyed(&random), &mut secrets, &adapter(), &mut made);
 
     let key = "33333333333333333333333333333333".to_owned();
     assert_eq!(env, Ok(vec![format!("API_KEY={key}")]));
@@ -148,7 +153,7 @@ fn an_upstream_given_its_key_in_its_environment_and_its_adapter_hold_the_same_va
 #[test]
 fn an_upstream_whose_environment_names_a_secret_is_given_nothing_without_random_bytes() {
     let refused = environment(
-        &Chance::exactly(None),
+        &keyed(&Chance::exactly(None)),
         &mut BTreeMap::new(),
         &keyed_by_environment(),
         &mut Vec::new(),
@@ -168,4 +173,39 @@ fn an_upstream_json_that_is_not_an_object_is_not_written_over() {
         handed_over(&held, &[("api_key".to_owned(), "k".to_owned())]),
         Err(format!("{UPSTREAM_FILE} is not an object"))
     );
+}
+
+/// Minting from `random`, every secret declared a key.
+fn keyed(random: &Chance) -> Minting<'_> {
+    Minting {
+        random,
+        shapes: BTreeMap::new(),
+    }
+}
+
+#[test]
+fn a_secret_declared_a_password_is_minted_as_one_and_handed_on_as_it_was_written() {
+    let random = Chance::exactly(Some((0..=255).collect()));
+    let minting = Minting {
+        random: &random,
+        shapes: BTreeMap::from([(
+            "upstream-key".to_owned(),
+            lemonfiber_manifest::container::Minted::Password,
+        )]),
+    };
+    let mut secrets = BTreeMap::new();
+    let mut made = Vec::new();
+
+    let handed = handed(&minting, &mut secrets, &adapter(), &mut made).unwrap_or_default();
+    let value = handed
+        .first()
+        .map(|(_, value)| value.clone())
+        .unwrap_or_default();
+
+    assert_eq!(value.len(), 32, "{value}");
+    assert!(value.bytes().any(|one| one.is_ascii_uppercase()), "{value}");
+    assert!(value.bytes().any(|one| one.is_ascii_lowercase()), "{value}");
+    assert!(value.bytes().any(|one| one.is_ascii_digit()), "{value}");
+    assert!(value.bytes().any(|one| b"-_.~".contains(&one)), "{value}");
+    assert!(made.contains(&value), "{made:?}");
 }

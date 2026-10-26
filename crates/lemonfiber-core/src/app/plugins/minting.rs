@@ -32,7 +32,7 @@ pub(super) fn minted(
     stamp: &str,
     trusted: &[FirstParty],
 ) -> Result<(), Box<Problem>> {
-    if !manifest.secrets.iter().any(|secret| secret.minted) {
+    if !manifest.secrets.iter().any(|secret| secret.minted.is()) {
         return Ok(());
     }
     let plugin = would.plugin.as_str();
@@ -44,12 +44,14 @@ pub(super) fn minted(
     let minting: Vec<(String, String)> = manifest
         .secrets
         .iter()
-        .filter(|secret| secret.minted)
+        .filter(|secret| secret.minted.is())
         .map(|secret| {
             first_party
                 .then(|| moved(ctx, manifest, secret))
                 .flatten()
-                .or_else(|| crate::plugin::seeding::mint(ctx.seams.random.as_ref()))
+                .or_else(|| {
+                    crate::plugin::seeding::minted_as(ctx.seams.random.as_ref(), secret.minted)
+                })
                 .map(|value| (crate::settings::named(plugin, &secret.id), value))
         })
         .collect::<Option<_>>()

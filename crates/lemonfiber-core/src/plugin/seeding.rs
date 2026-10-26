@@ -12,6 +12,7 @@ use std::num::NonZeroU32;
 use std::path::Path;
 
 use base64::Engine as _;
+use lemonfiber_manifest::container::Minted;
 use lemonfiber_plugin::seeding::{filled, placeholders, Form, MOST_PLACEHOLDERS};
 use lemonfiber_plugin::{Manifest, Violation};
 use lemonfiber_ports::random::Random;
@@ -171,6 +172,81 @@ pub(crate) fn mint(random: &dyn Random) -> Option<String> {
     random
         .bytes(MINTED_BYTES)
         .map(|bytes| crate::secret::render(&bytes))
+}
+
+/// A secret lemonfiber mints in `shape`: a key as [`mint`] makes one, or a password of
+/// [`PASSWORD_LENGTH`] characters holding one of each of [`CLASSES`]; nothing where it is
+/// not minted or `random` supplies no bytes.
+#[must_use]
+pub(crate) fn minted_as(random: &dyn Random, shape: Minted) -> Option<String> {
+    match shape {
+        Minted::Not => None,
+        Minted::Key => mint(random),
+        Minted::Password => password(random),
+    }
+}
+
+/// How many characters a minted password holds.
+const PASSWORD_LENGTH: usize = 32;
+
+/// The character classes a minted password holds one of each of, and draws the rest from:
+/// the symbols are those every environment file, URL and form takes as written.
+const CLASSES: [&[u8]; 4] = [
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    b"abcdefghijklmnopqrstuvwxyz",
+    b"0123456789",
+    b"-_.~",
+];
+
+/// A password of [`PASSWORD_LENGTH`] characters drawn from every one of [`CLASSES`], each
+/// class then set at a distinct place, two bytes of `random` to each choice.
+fn password(random: &dyn Random) -> Option<String> {
+    let alphabet: Vec<u8> = CLASSES.concat();
+    let drawn = random.bytes(2 * (PASSWORD_LENGTH + 2 * CLASSES.len()))?;
+    let mut choices = drawn.chunks_exact(2).map(|pair| {
+        Some(usize::from(u16::from_be_bytes([
+            *pair.first()?,
+            *pair.get(1)?,
+        ])))
+    });
+    let mut chars = Vec::with_capacity(PASSWORD_LENGTH);
+    for _ in 0..PASSWORD_LENGTH {
+        chars.push(*alphabet.get(choices.next()?? % alphabet.len())?);
+    }
+    let mut places: Vec<usize> = (0..PASSWORD_LENGTH).collect();
+    for (at, class) in CLASSES.iter().enumerate() {
+        let place = at + choices.next()?? % (PASSWORD_LENGTH - at);
+        places.swap(at, place);
+        *chars.get_mut(*places.get(at)?)? = *class.get(choices.next()?? % class.len())?;
+    }
+    String::from_utf8(chars).ok()
+}
+
+/// The shape each secret the manifest at `root` declares is minted in, by its id: nothing
+/// where no manifest is there or it does not read.
+#[must_use]
+pub(crate) fn shapes(root: &Path) -> BTreeMap<String, Minted> {
+    std::fs::read_to_string(root.join(lemonfiber_bundle::MANIFEST))
+        .ok()
+        .and_then(|text| Manifest::from_toml(&text).ok())
+        .map(|manifest| {
+            manifest
+                .secrets
+                .into_iter()
+                .map(|secret| (secret.id, secret.minted))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The shape `shapes` names for `secret`, a key where it names none.
+#[must_use]
+pub(crate) fn shape_of(shapes: &BTreeMap<String, Minted>, secret: &str) -> Minted {
+    shapes
+        .get(secret)
+        .copied()
+        .filter(|shape| shape.is())
+        .unwrap_or(Minted::Key)
 }
 
 /// `value` as a service keeping only a hash of its password reads it: PBKDF2-HMAC-SHA512
