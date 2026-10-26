@@ -271,23 +271,45 @@ fn read_from<'a>(recipe: &'a lemonfiber_plugin::Recipe, value: &str) -> Option<&
         .map(|step| step.call.to.as_str())
 }
 
-/// The same recipes, with the adapter of every call to one of the stack's services.
+/// The same recipes, with the adapter of every call to one of the stack's services: the
+/// API the service a first-party part of `installed` moved in place of it answers in,
+/// and the one the stack's declaration of it names otherwise.
 #[must_use]
-pub fn reaching(mut recipes: Vec<Recipe>, stack: &lemonfiber_manifest::Manifest) -> Vec<Recipe> {
+pub fn reaching(
+    mut recipes: Vec<Recipe>,
+    stack: &lemonfiber_manifest::Manifest,
+    installed: &[super::Installed],
+) -> Vec<Recipe> {
     for step in recipes
         .iter_mut()
         .flat_map(|recipe| recipe.steps.iter_mut())
     {
         if step.adapter.is_none() {
-            step.adapter = stack
-                .services
-                .iter()
-                .find(|service| service.id == step.to)
-                .and_then(|service| service.api.as_ref())
-                .map(|api| lemonfibers(api.kind));
+            step.adapter = moved_native(installed, &step.to)
+                .or_else(|| {
+                    stack
+                        .services
+                        .iter()
+                        .find(|service| service.id == step.to)
+                        .and_then(|service| service.api.as_ref())
+                        .map(|api| api.kind)
+                })
+                .map(lemonfibers);
         }
     }
     recipes
+}
+
+/// The API the service a first-party part of `installed` moved in place of the stack's
+/// service `service` answers in, where one did and it names one.
+fn moved_native(installed: &[super::Installed], service: &str) -> Option<ApiKind> {
+    crate::project::moving(installed, service, crate::plugin::first_party::EMBEDDED)?
+        .services
+        .iter()
+        .find(|placed| placed.service == service)?
+        .native
+        .as_deref()
+        .and_then(ApiKind::named)
 }
 
 /// Every approval these recipes ask for, once each, in the order they declare them.

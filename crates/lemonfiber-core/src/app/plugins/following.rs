@@ -288,8 +288,8 @@ pub(super) async fn following(
     Ok(ran)
 }
 
-/// Every key lemonfiber publishes for a service of the stack's, by the service's id,
-/// which a value holding one is held to however a recipe came by it.
+/// Every key lemonfiber holds for a service of the stack's, by the service's id, which a
+/// value holding one is held to however a recipe came by it.
 ///
 /// The same lookup a credential-store input resolves through, over every service the
 /// stack declares, so no credential a recipe can be handed is missing from what its
@@ -301,9 +301,13 @@ fn credentials(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Vec<(Str
         .collect()
 }
 
-/// The credential lemonfiber holds for one service of the stack's, where it holds one.
+/// The credential lemonfiber holds for one service of the stack's, where it holds one: the
+/// key it minted where a first-party part moved its own service in place of it, and the key
+/// it publishes for the service otherwise.
 fn credential(ctx: &Ctx, service: &str) -> Option<String> {
-    crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(service))
+    crate::app::targets::moved_credential(ctx, service).or_else(|| {
+        crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(service))
+    })
 }
 
 /// How each service a recipe may call is reached: the stack's at the port it
@@ -328,7 +332,7 @@ fn reaching(services: &[lemonfiber_manifest::Service], would: &Installed) -> Rea
 }
 
 /// Every value one recipe brings in: what the operator gave for its inputs, and the key
-/// lemonfiber publishes for each service a credential input names.
+/// lemonfiber holds for each service a credential input names.
 ///
 /// An input nothing holds a value for is left out, so a call substituting it carries the
 /// substitution as written and is answered for that.

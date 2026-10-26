@@ -439,11 +439,11 @@ impl Installed {
     }
 
     /// The same record, with the adapter of every recipe call to one of the stack's own
-    /// services.
+    /// services, `installed` beside it.
     #[must_use]
-    pub fn reaching(self, stack: &lemonfiber_manifest::Manifest) -> Self {
+    pub fn reaching(self, stack: &lemonfiber_manifest::Manifest, installed: &[Self]) -> Self {
         Self {
-            recipes: super::recipes::reaching(self.recipes, stack),
+            recipes: super::recipes::reaching(self.recipes, stack, installed),
             ..self
         }
     }

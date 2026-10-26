@@ -56,7 +56,8 @@ pub(crate) async fn update(
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
     let stack_manifest = super::writing::stack_manifest(ctx)?;
-    let (mut would, _) = super::installing::settled(&stack_manifest, &read, path, from, &stamp);
+    let (mut would, _) =
+        super::installing::settled(&stack_manifest, held.installed(), &read, path, from, &stamp);
     let was = installed_as(&held, &would.plugin)?;
     let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;

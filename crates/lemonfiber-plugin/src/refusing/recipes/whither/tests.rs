@@ -56,10 +56,23 @@ to    = "{to}"
     )
 }
 
+/// Sonarr is a part the bundle installs, moving its own service in place of the stack's
+/// and minting the key the adapter in front of it is handed, so lemonfiber holds that key.
 #[test]
 fn a_credential_goes_back_to_the_service_whose_credential_it_is() {
     let said = refused(&carrying("credential-store", r#"of = "sonarr""#, "sonarr"));
     assert!(said.is_empty(), "{said:?}");
+}
+
+/// The proxy names no adapter and no part moves in place of it, so lemonfiber holds no
+/// credential of it to hand a recipe.
+#[test]
+fn a_credential_of_a_shipped_service_lemonfiber_holds_none_for_is_refused() {
+    let said = refused(&carrying("credential-store", r#"of = "caddy""#, "caddy"));
+    assert!(
+        says(&said, &["caddy", "whose credential lemonfiber holds"]),
+        "{said:?}"
+    );
 }
 
 #[test]

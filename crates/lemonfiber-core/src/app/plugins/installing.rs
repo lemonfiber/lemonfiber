@@ -71,7 +71,7 @@ pub(super) async fn install(
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
     let stack_manifest = writing::stack_manifest(ctx)?;
-    let (mut would, named) = settled(&stack_manifest, &read, path, from, &stamp);
+    let (mut would, named) = settled(&stack_manifest, held.installed(), &read, path, from, &stamp);
     let trusted = crate::plugin::first_party::EMBEDDED;
     let granting = super::granting::asked(ctx, &stack_manifest, held.installed(), &would, trusted);
     would.granted = super::granting::approved(&granting, &stamp);
@@ -285,9 +285,10 @@ async fn followed(
 /// A plugin fetched from a git source is recorded as coming from that source, at the
 /// one commit that was fetched, rather than from the checkout it was read out of, and
 /// every recipe call to one of the stack's services is given the adapter it reaches
-/// through, which only the stack can say.
+/// through, which only the stack and the plugins `installed_beside` it can say.
 pub(super) fn settled(
     stack: &lemonfiber_manifest::Manifest,
+    installed_beside: &[Installed],
     read: &Accepted,
     path: &Path,
     from: Option<&Fetched<'_>>,
@@ -305,7 +306,7 @@ pub(super) fn settled(
         });
     installed.manifest.clone_from(&read.digest);
     installed.tree.clone_from(&read.tree);
-    let settled = installed.reaching(stack);
+    let settled = installed.reaching(stack, installed_beside);
     match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);

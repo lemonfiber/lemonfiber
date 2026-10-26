@@ -368,8 +368,9 @@ pub(super) fn freed(
 /// it is, asks the operator nothing, and is no secret the operator types.
 ///
 /// The stack's own, and never one of this plugin's: lemonfiber holds the key a bundled
-/// service is reached with, and holds none for a service a plugin brings, so a recipe
-/// naming one would be asking for a value nothing has.
+/// service is reached with, or the one it minted for a service a part the bundle installs
+/// moved in place of it, and holds none for a service a plugin brings, so a recipe naming
+/// one would be asking for a value nothing has.
 fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>) {
     match &input.of {
         Some(of) if own(manifest, of).is_some() => found.push(Violation {
@@ -379,7 +380,7 @@ fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>
                  for those; a credential comes from a service of the stack's"
             ),
         }),
-        Some(of) if bundled::named(of).is_some_and(|service| service.api.is_some()) => {}
+        Some(of) if bundled::credential_held(of) => {}
         Some(of) => found.push(Violation {
             location: format!("{at}.of"),
             message: format!(
