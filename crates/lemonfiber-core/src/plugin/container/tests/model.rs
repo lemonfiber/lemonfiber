@@ -113,6 +113,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             Value::Setting(Setting {
                 setting: "domain".to_owned(),
                 default: Constant::Text("home.local".to_owned()),
+                recorded_with: None,
             }),
         ),
         (
@@ -120,6 +121,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             Value::Setting(Setting {
                 setting: "komga:mode".to_owned(),
                 default: Constant::Flag(false),
+                recorded_with: None,
             }),
         ),
         ("INDEXER".to_owned(), url("indexer.search")),
@@ -336,6 +338,7 @@ fn naming_a_secret() -> Placed {
                 Value::Setting(Setting {
                     setting: "komga:mode".to_owned(),
                     default: Constant::Text("slow".to_owned()),
+                    recorded_with: None,
                 }),
             ),
             (

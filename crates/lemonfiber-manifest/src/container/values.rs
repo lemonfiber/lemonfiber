@@ -27,6 +27,57 @@ pub struct Setting {
     pub setting: String,
     /// What is written while the operator has recorded no value.
     pub default: Constant,
+    /// What a recording gives the service in the operator's place, where only the
+    /// operator holds the value and the service needs one to start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recorded_with: Option<RecordedWith>,
+}
+
+/// What a recording gives a service in the operator's place: a constant reaching no third
+/// party, or, written `"minted"`, a value made for that run alone.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(from = "Constant", into = "Constant")]
+#[schemars(with = "Constant")]
+pub enum RecordedWith {
+    /// [`RECORDED_MINTED`] random bytes made for that run alone, written in base64.
+    Minted,
+    /// A constant reaching no third party.
+    Constant(Constant),
+}
+
+/// How a manifest writes [`RecordedWith::Minted`].
+pub const MINTED_STAND_IN: &str = "minted";
+
+/// How many random bytes a [`RecordedWith::Minted`] stand-in is made of.
+pub const RECORDED_MINTED: usize = 32;
+
+impl RecordedWith {
+    /// What is wrong with the stand-in, where it holds a character no reader can see.
+    #[must_use]
+    pub fn unshown(&self) -> Option<String> {
+        match self {
+            Self::Constant(constant) => unshown(constant),
+            Self::Minted => None,
+        }
+    }
+}
+
+impl From<Constant> for RecordedWith {
+    fn from(constant: Constant) -> Self {
+        match constant {
+            Constant::Text(text) if text == MINTED_STAND_IN => Self::Minted,
+            other => Self::Constant(other),
+        }
+    }
+}
+
+impl From<RecordedWith> for Constant {
+    fn from(recorded: RecordedWith) -> Self {
+        match recorded {
+            RecordedWith::Minted => Self::Text(MINTED_STAND_IN.to_owned()),
+            RecordedWith::Constant(constant) => constant,
+        }
+    }
 }
 
 /// The address of a capability's filler.
@@ -65,6 +116,10 @@ pub struct Secret {
     /// Where the service a part moves in place of wrote this credential itself.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub carried_from: Option<CarriedFrom>,
+    /// What a recording gives the service in the operator's place, where only the
+    /// operator holds the value and the service needs one to start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recorded_with: Option<RecordedWith>,
 }
 
 /// Where a service wrote a credential itself: a file inside its container, the format it

@@ -98,3 +98,40 @@ fn an_upstream_field_is_written_as_a_field_and_names_one_of_the_plugins_own_secr
         assert!(names(&said, &[says]), "{upstream}: {said:?}");
     }
 }
+
+#[test]
+fn a_secret_lemonfiber_mints_is_never_stood_in_for_when_recorded() {
+    let said = said(
+        &(INSTALLABLE.to_owned()
+            + &minted("komga")
+                .replace("minted = true", "minted = true\nrecorded_with = \"minted\"")),
+    );
+    assert!(
+        names(
+            &said,
+            &["secret upstream-key.recorded_with", "operator alone holds"]
+        ),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn a_secret_stood_in_for_by_a_value_holding_a_control_character_is_refused() {
+    let entered =
+        "\n[[secret]]\nid            = \"tunnel\"\nof            = \"komga\"\nwhy           = \
+                   \"Reach the tunnel\"\nrecorded_with = \"a\\tb\"\n";
+    let refused = said(&(INSTALLABLE.to_owned() + entered));
+    assert!(
+        names(
+            &refused,
+            &["secret tunnel.recorded_with", "control character"]
+        ),
+        "{refused:?}"
+    );
+    let made = entered.replace("\"a\\tb\"", "\"minted\"");
+    let kept = said(&(INSTALLABLE.to_owned() + &made));
+    assert!(
+        !kept.iter().any(|one| one.contains("recorded_with")),
+        "{kept:?}"
+    );
+}

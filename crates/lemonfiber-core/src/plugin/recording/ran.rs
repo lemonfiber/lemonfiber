@@ -135,6 +135,7 @@ fn kept(
             result,
         },
         taking,
+        &[],
     )
 }
 

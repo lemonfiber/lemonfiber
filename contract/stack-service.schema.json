@@ -301,6 +301,14 @@
         {"description": "The host's render devices and the group that owns them.", "type": "string", "const": "render"}
       ]
     },
+    "RecordedWith": {
+      "description": "What a recording gives a service in the operator's place: a constant reaching no third\nparty, or, written `\"minted\"`, a value made for that run alone.",
+      "anyOf": [
+        {"description": "A string.", "type": "string"},
+        {"description": "An integer.", "type": "integer", "format": "int64"},
+        {"description": "A boolean.", "type": "boolean"}
+      ]
+    },
     "Secret": {
       "description": "A value a service holds, declared before anything captures or enters it.",
       "type": "object",
@@ -319,6 +327,13 @@
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
         "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it, and in what shape.", "$ref": "#/$defs/SecretMinted"},
         "of": {"description": "Whose credential it is.", "type": "string"},
+        "recorded_with": {
+          "description": "What a recording gives the service in the operator's place, where only the\noperator holds the value and the service needs one to start.",
+          "anyOf": [
+            {"$ref": "#/$defs/RecordedWith"},
+            {"type": "null"}
+          ]
+        },
         "why": {"description": "What holding it is for.", "type": "string"}
       },
       "additionalProperties": false,
@@ -606,6 +621,13 @@
       "type": "object",
       "properties": {
         "default": {"description": "What is written while the operator has recorded no value.", "$ref": "#/$defs/ServiceConstant"},
+        "recorded_with": {
+          "description": "What a recording gives the service in the operator's place, where only the\noperator holds the value and the service needs one to start.",
+          "anyOf": [
+            {"$ref": "#/$defs/RecordedWith"},
+            {"type": "null"}
+          ]
+        },
         "setting": {"description": "The setting's name.", "type": "string"}
       },
       "additionalProperties": false,

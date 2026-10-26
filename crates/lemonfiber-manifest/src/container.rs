@@ -19,7 +19,8 @@ pub use ports::{doubled, published};
 pub use record::Fields;
 use values::{narrowed, unshown};
 pub use values::{
-    CarriedFrom, Constant, Format, Minted, MintedAs, Secret, SecretOf, Setting, UrlOf, Value,
+    CarriedFrom, Constant, Format, Minted, MintedAs, RecordedWith, Secret, SecretOf, Setting,
+    UrlOf, Value, MINTED_STAND_IN, RECORDED_MINTED,
 };
 pub use words::is_api_name;
 use words::is_variable;
@@ -382,7 +383,15 @@ impl Container<'_> {
     fn valued(&self, value: &Value) -> impl Iterator<Item = String> {
         let (shown, named) = match value {
             Value::Constant(constant) => (unshown(constant), None),
-            Value::Setting(setting) => (unshown(&setting.default), self.settled(&setting.setting)),
+            Value::Setting(setting) => (
+                unshown(&setting.default).or_else(|| {
+                    setting
+                        .recorded_with
+                        .as_ref()
+                        .and_then(RecordedWith::unshown)
+                }),
+                self.settled(&setting.setting),
+            ),
             Value::Url(url) => (None, narrowed(url)),
             Value::Secret(secret) => (
                 None,

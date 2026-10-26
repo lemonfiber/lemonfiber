@@ -13,6 +13,7 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{ready_path, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
+use lemonfiber_manifest::container::Secret;
 use lemonfiber_plugin::{Health, HealthKind};
 use serde_json::Value;
 
@@ -20,6 +21,7 @@ use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
 use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
+use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
@@ -90,6 +92,7 @@ pub(super) async fn answers(
     health: Option<&Health>,
     adapter: Fronting<'_>,
     items: &[&Item<'_>],
+    secrets: &[Secret],
 ) -> Result<(Vec<Answer>, Vec<Case>), Failed> {
     let failing = |fault: Faulted| Failed {
         service: upstream.service.clone(),
@@ -97,7 +100,12 @@ pub(super) async fn answers(
         why: crate::text::plain(&fault.why),
         log: Vec::new(),
     };
-    let prepared = Prepared::of(recorder, root, upstream, adapter).map_err(failing)?;
+    let mut stand_ins = StandIns::of(secrets, recorder.random)
+        .map_err(|why| failing(Faulted::new(STAND_INS, why, Vec::new())))?;
+    let stood = stand_ins
+        .settings(upstream, recorder.random)
+        .map_err(|why| failing(Faulted::new(STAND_INS, why, Vec::new())))?;
+    let prepared = Prepared::of(recorder, root, upstream, adapter, &stand_ins).map_err(failing)?;
     let (reaching, answering) = parties(recorder, adapter, upstream)
         .await
         .map_err(failing)?;
@@ -105,7 +113,13 @@ pub(super) async fn answers(
     let serve = Serve {
         alias: Some(upstream.service.clone()),
         reaching,
-        env: settled.env.iter().chain(&prepared.env).cloned().collect(),
+        env: settled
+            .env
+            .iter()
+            .chain(&prepared.env)
+            .chain(&stood)
+            .cloned()
+            .collect(),
         ..settled
     };
     let served = recorder

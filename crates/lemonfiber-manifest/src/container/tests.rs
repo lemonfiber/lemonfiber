@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use super::{is_plain, UrlOf, UserMode, Value};
 use super::{
-    Constant, Container, Minted, Mount, Network, Posture, Publish, Secret, SecretOf, Setting, Shape,
+    Constant, Container, Minted, Mount, Network, Posture, Publish, RecordedWith, Secret, SecretOf,
+    Setting, Shape,
 };
 
 const NONE: BTreeMap<String, Value> = BTreeMap::new();
@@ -15,6 +16,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
         why: "Mint keys for the stack's services".to_owned(),
         minted: Minted::Not,
         carried_from: None,
+        recorded_with: None,
     }]
 });
 
@@ -177,6 +179,7 @@ fn a_setting_is_published_or_the_services_own() {
         Value::Setting(Setting {
             setting: name.to_owned(),
             default: Constant::Text(String::new()),
+            recorded_with: None,
         })
     };
     let named = env(vec![
@@ -197,6 +200,7 @@ fn a_setting_named_as_a_declared_secret_is_refused() {
         Value::Setting(Setting {
             setting: "jellyfin:admin-key".to_owned(),
             default: Constant::Text(String::new()),
+            recorded_with: None,
         }),
     )]);
     assert_eq!(
@@ -342,6 +346,7 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
             Value::Setting(Setting {
                 setting: "domain".to_owned(),
                 default: Constant::Text("x\ry".to_owned()),
+                recorded_with: None,
             }),
         ),
         (
@@ -349,6 +354,7 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
             Value::Setting(Setting {
                 setting: "gluetun:countries".to_owned(),
                 default: Constant::Text("a\tb".to_owned()),
+                recorded_with: None,
             }),
         ),
         ("PRICE", Value::Constant(Constant::Text("$5".to_owned()))),
@@ -508,6 +514,7 @@ fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
             why: "Its administrator's password".to_owned(),
             minted,
             carried_from: None,
+            recorded_with: None,
         };
         let text = toml::to_string(&declared).unwrap_or_default();
         assert_eq!(
@@ -528,4 +535,72 @@ fn a_minted_shape_reads_back_as_it_is_written_false_included() {
         assert_eq!(serde_json::to_value(minted).ok(), Some(written.clone()));
         assert_eq!(serde_json::from_value::<Minted>(written).ok(), Some(minted));
     }
+}
+
+#[test]
+fn a_stand_in_reads_minted_as_one_made_for_the_run_and_anything_else_as_a_constant() {
+    let read = |text: &str| toml::from_str::<BTreeMap<String, Value>>(text).ok();
+    let setting = |recorded_with: Option<RecordedWith>| {
+        Value::Setting(Setting {
+            setting: "gluetun:endpoint".to_owned(),
+            default: Constant::Text(String::new()),
+            recorded_with,
+        })
+    };
+    let declared = read(
+        "MADE = { setting = \"gluetun:endpoint\", default = \"\", recorded_with = \"minted\" }\n\
+         ADDRESS = { setting = \"gluetun:endpoint\", default = \"\", recorded_with = \"192.0.2.1\" }\n\
+         PORT = { setting = \"gluetun:endpoint\", default = \"\", recorded_with = 51820 }\n\
+         NONE = { setting = \"gluetun:endpoint\", default = \"\" }",
+    );
+    assert_eq!(
+        declared,
+        Some(env(vec![
+            ("MADE", setting(Some(RecordedWith::Minted))),
+            (
+                "ADDRESS",
+                setting(Some(RecordedWith::Constant(Constant::Text(
+                    "192.0.2.1".to_owned()
+                ))))
+            ),
+            (
+                "PORT",
+                setting(Some(RecordedWith::Constant(Constant::Number(51820))))
+            ),
+            ("NONE", setting(None)),
+        ]))
+    );
+    let written = declared
+        .as_ref()
+        .and_then(|declared| toml::to_string(declared).ok())
+        .unwrap_or_default();
+    assert_eq!(read(&written), declared, "{written}");
+    assert!(written.contains("recorded_with = \"minted\""), "{written}");
+    assert!(
+        !written.contains("NONE = { default = \"\", recorded_with"),
+        "{written}"
+    );
+}
+
+#[test]
+fn a_stand_in_holding_a_control_character_is_refused_and_one_made_for_the_run_is_not() {
+    let stood_in = |recorded_with: RecordedWith| {
+        Value::Setting(Setting {
+            setting: "domain".to_owned(),
+            default: Constant::Text(String::new()),
+            recorded_with: Some(recorded_with),
+        })
+    };
+    let named = env(vec![
+        (
+            "BROKEN",
+            stood_in(RecordedWith::Constant(Constant::Text("a\nb".to_owned()))),
+        ),
+        ("MADE", stood_in(RecordedWith::Minted)),
+    ]);
+    let said = wrong(&plain(&named));
+    assert_eq!(
+        said,
+        vec!["service jellyfin.env.BROKEN: \"a\\nb\" holds a control character".to_owned()]
+    );
 }

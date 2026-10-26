@@ -9,6 +9,7 @@ use lemonfiber_manifest::container::{Minted, Value};
 
 use lemonfiber_contract::adapter::KEY_FILE;
 
+use super::super::stood_in::StandIns;
 use super::{refused, Faulted, Fronting, Placed, Recorder, Starting, Throwaway};
 use crate::ports::random::Random;
 
@@ -106,6 +107,7 @@ impl Prepared {
         root: &Path,
         upstream: &Placed,
         adapter: Fronting<'_>,
+        stand_ins: &StandIns,
     ) -> Result<Self, Faulted> {
         let copy = Throwaway::of(
             Some(Starting {
@@ -132,8 +134,14 @@ impl Prepared {
         let mut made: Vec<String> = std::iter::once(key.clone())
             .chain(copy.made().map(str::to_owned))
             .chain(held.made().map(str::to_owned))
+            .chain(stand_ins.made.iter().cloned())
             .collect();
         let mut secrets = written(&copy, &held);
+        for (secret, value) in stand_ins.held() {
+            secrets
+                .entry(secret.to_owned())
+                .or_insert_with(|| value.to_owned());
+        }
         let minting = Minting {
             random: recorder.random,
             shapes: crate::plugin::seeding::shapes(root),
