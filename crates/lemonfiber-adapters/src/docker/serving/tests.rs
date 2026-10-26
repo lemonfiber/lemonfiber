@@ -9,7 +9,7 @@ use bollard::models::{
 use lemonfiber_ports::program::LEFT_BEHIND;
 use lemonfiber_ports::serving::{Bound, Serve, Standing};
 
-use super::{body, left_behind, machine, named, read_off, stood, PROOF_LABEL};
+use super::{body, device, left_behind, machine, named, read_off, stood, PROOF_LABEL};
 
 fn serve() -> Serve {
     Serve {
@@ -36,6 +36,7 @@ fn serve() -> Serve {
         tmpfs: vec!["/run".to_owned()],
         listens: Some(8989),
         alias: None,
+        devices: Vec::new(),
     }
 }
 
@@ -298,4 +299,53 @@ fn the_machine_is_known_by_each_of_its_name_kernel_and_system_the_engine_names()
         vec!["orbstack".to_owned(), "7.0.14-orbstack".to_owned()]
     );
     assert!(machine(&SystemInfo::default()).is_empty());
+}
+
+#[test]
+fn a_device_passed_in_is_mapped_as_written_and_one_written_otherwise_is_not() {
+    let mapped = device("/dev/net/tun:/dev/net/tun");
+    assert_eq!(
+        mapped.as_ref().and_then(|one| one.path_on_host.as_deref()),
+        Some("/dev/net/tun")
+    );
+    assert_eq!(
+        mapped
+            .as_ref()
+            .and_then(|one| one.path_in_container.as_deref()),
+        Some("/dev/net/tun")
+    );
+    assert_eq!(
+        mapped.and_then(|one| one.cgroup_permissions),
+        Some("rwm".to_owned())
+    );
+    assert!(device("/dev/net/tun").is_none());
+}
+
+#[test]
+fn a_container_is_given_each_device_written_as_the_engine_maps_it() {
+    let asked = body(
+        &Serve {
+            devices: vec![
+                "/dev/net/tun:/dev/net/tun".to_owned(),
+                "/dev/dri".to_owned(),
+            ],
+            ..serve()
+        },
+        "lemonfiber-record-1-2-3",
+    );
+
+    let devices = asked
+        .host_config
+        .and_then(|host| host.devices)
+        .unwrap_or_default();
+    assert_eq!(
+        devices
+            .iter()
+            .map(|one| (
+                one.path_on_host.as_deref(),
+                one.path_in_container.as_deref()
+            ))
+            .collect::<Vec<_>>(),
+        vec![(Some("/dev/net/tun"), Some("/dev/net/tun"))]
+    );
 }

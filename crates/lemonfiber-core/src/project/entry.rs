@@ -312,27 +312,33 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         cap_add: if confined {
             Vec::new()
         } else {
-            KEPT.into_iter()
-                .chain(
-                    unit.shape
-                        .iter()
-                        .flat_map(|shape| shape.grants().iter().copied()),
-                )
-                .collect()
+            KEPT.into_iter().chain(granted(unit.shape)).collect()
         },
-        devices: unit
-            .shape
-            .filter(|shape| *shape != Shape::Render)
-            .iter()
-            .flat_map(|shape| shape.devices().iter())
-            .map(|device| format!("{device}:{device}"))
-            .chain(render_devices)
-            .collect(),
+        devices: passed(unit.shape).chain(render_devices).collect(),
         group_add: render_groups,
         pids_limit: PROCESSES,
         read_only: confined,
         mem_limit: unit.mem_limit_mib.map(|mib| format!("{mib}m")),
     }
+}
+
+/// The kernel capabilities `shape` adds to the ones every service that is not confined
+/// keeps.
+pub(crate) fn granted(shape: Option<Shape>) -> impl Iterator<Item = &'static str> {
+    shape
+        .into_iter()
+        .flat_map(|shape| shape.grants().iter().copied())
+}
+
+/// Each device `shape` passes in that needs nothing of the host beside the device, as
+/// `host:container`: every one but the render devices, which wait on the host's render
+/// group.
+pub(crate) fn passed(shape: Option<Shape>) -> impl Iterator<Item = String> {
+    shape
+        .filter(|shape| *shape != Shape::Render)
+        .into_iter()
+        .flat_map(|shape| shape.devices().iter())
+        .map(|device| format!("{device}:{device}"))
 }
 
 /// The render devices and group, where the shape asks for them and the host has them.

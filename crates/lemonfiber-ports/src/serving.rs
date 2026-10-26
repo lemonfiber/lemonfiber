@@ -32,6 +32,8 @@ pub struct Serve {
     pub read_only: bool,
     /// Its memory ceiling in bytes, where it has one.
     pub memory: Option<i64>,
+    /// Each device on the engine's machine passed into it, as `host:container`.
+    pub devices: Vec<String>,
     /// Each directory on the engine's machine mounted into it.
     pub binds: Vec<Bound>,
     /// Each scratch path it holds in memory.

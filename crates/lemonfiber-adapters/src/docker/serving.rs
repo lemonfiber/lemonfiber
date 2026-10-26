@@ -7,8 +7,9 @@ use std::time::SystemTime;
 
 use bollard::container::LogOutput;
 use bollard::models::{
-    ContainerCreateBody, ContainerInspectResponse, EndpointSettings, HealthStatusEnum, HostConfig,
-    Mount, MountType, NetworkCreateRequest, NetworkingConfig, PortBinding, SystemInfo,
+    ContainerCreateBody, ContainerInspectResponse, DeviceMapping, EndpointSettings,
+    HealthStatusEnum, HostConfig, Mount, MountType, NetworkCreateRequest, NetworkingConfig,
+    PortBinding, SystemInfo,
 };
 use bollard::query_parameters::{
     ListNetworksOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
@@ -217,6 +218,8 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
             pids_limit: Some(serve.pids_limit),
             readonly_rootfs: Some(serve.read_only),
             memory: serve.memory,
+            devices: (!serve.devices.is_empty())
+                .then(|| serve.devices.iter().filter_map(|one| device(one)).collect()),
             privileged: Some(false),
             publish_all_ports: Some(false),
             tmpfs: Some(
@@ -371,6 +374,20 @@ pub(super) fn left_behind(names: &[String], now: SystemTime) -> Vec<String> {
         .cloned()
         .collect()
 }
+
+/// The device `passed`, written `host:container`, as the engine maps it: read, written and
+/// made by the container, and nothing where it is not written that way.
+fn device(passed: &str) -> Option<DeviceMapping> {
+    let (host, container) = passed.split_once(':')?;
+    Some(DeviceMapping {
+        path_on_host: Some(host.to_owned()),
+        path_in_container: Some(container.to_owned()),
+        cgroup_permissions: Some(DEVICE_ACCESS.to_owned()),
+    })
+}
+
+/// What a container may do with a device passed into it.
+const DEVICE_ACCESS: &str = "rwm";
 
 #[cfg(test)]
 mod tests;
