@@ -497,3 +497,45 @@ fn a_secret_named_in_two_starting_files_is_minted_once_for_the_copy() {
     assert_eq!(read("a.yml"), Some(format!("key: {minted}\n")));
     assert_eq!(read("b.yml"), Some(format!("key: {minted}\n")));
 }
+
+#[test]
+fn a_secret_declared_a_password_is_minted_as_one_for_the_copy() {
+    let source = Scratch::new("throwaway-minted-password");
+    put(
+        &source,
+        lemonfiber_bundle::MANIFEST,
+        crate::plugin::program::tests::declaring_a_password().as_bytes(),
+    );
+    put(
+        &source,
+        "config/recyclarr/a.yml",
+        b"key: {{secret:admin-password}}\n",
+    );
+    let copy = Throwaway::of(of(&source), &lemonfiber_fixtures::ports::Chance::cycling());
+    let made = copy
+        .as_ref()
+        .ok()
+        .and_then(|copy| std::fs::read_to_string(copy.path().join("a.yml")).ok())
+        .unwrap_or_default();
+    let made = made.trim_start_matches("key: ").trim_end();
+    assert_eq!(made.len(), 32);
+    assert!(made.bytes().any(|one| one.is_ascii_uppercase()));
+    assert!(made.bytes().any(|one| b"-_.~".contains(&one)));
+}
+
+#[test]
+fn a_copy_naming_a_secret_is_refused_where_the_machine_supplies_no_random_bytes() {
+    let source = Scratch::new("throwaway-unminted");
+    put(
+        &source,
+        "config/recyclarr/a.yml",
+        b"key: {{secret:api-key}}\n",
+    );
+    let refused = Throwaway::of(
+        of(&source),
+        &lemonfiber_fixtures::ports::Chance::exactly(None),
+    );
+    assert!(refused
+        .as_ref()
+        .is_err_and(|why| why.contains("which nothing holds")));
+}

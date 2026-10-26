@@ -51,6 +51,13 @@ fixture = "recordings/recyclarr/runs-version.json"
 why     = "It has no port."
 "#;
 
+/// [`RUNNING`], declaring as well an `admin-password` minted as a password.
+pub(crate) fn declaring_a_password() -> String {
+    RUNNING.to_owned()
+        + "\n[[secret]]\nid     = \"admin-password\"\nof     = \"qualitysync\"\n\
+           minted = \"password\"\nwhy    = \"Its administrator's password\"\n"
+}
+
 fn placed(text: &str) -> Option<Placed> {
     let manifest = Manifest::from_toml(text);
     assert!(manifest.is_ok(), "the fixture reads: {manifest:?}");

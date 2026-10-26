@@ -7,7 +7,7 @@ use crate::Violation;
 /// Whether every minted secret is one of the plugin's own services' and nothing captures
 /// it.
 pub(super) fn minted(manifest: &Manifest, found: &mut Vec<Violation>) {
-    for secret in manifest.secrets.iter().filter(|secret| secret.minted) {
+    for secret in manifest.secrets.iter().filter(|secret| secret.minted.is()) {
         let at = format!("secret {}", secret.id);
         if !manifest
             .services

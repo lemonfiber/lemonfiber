@@ -111,12 +111,19 @@ impl Throwaway {
         random: &dyn Random,
     ) -> Result<Self, String> {
         let minting = RefCell::new(BTreeMap::new());
+        let shapes = starting
+            .as_ref()
+            .map(|starting| crate::plugin::seeding::shapes(starting.root))
+            .unwrap_or_default();
         let value = |secret: &str| {
             let mut minted = minting.borrow_mut();
             if let Some(held) = minted.get(secret) {
                 return Some(String::clone(held));
             }
-            let fresh = crate::plugin::seeding::mint(random)?;
+            let fresh = crate::plugin::seeding::minted_as(
+                random,
+                crate::plugin::seeding::shape_of(&shapes, secret),
+            )?;
             minted.insert(secret.to_owned(), fresh.clone());
             Some(fresh)
         };

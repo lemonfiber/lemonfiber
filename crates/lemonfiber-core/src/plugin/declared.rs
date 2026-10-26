@@ -113,7 +113,7 @@ impl Declaration {
                     id: secret.id.clone(),
                     of: secret.of.clone(),
                     why: secret.why.clone(),
-                    minted: secret.minted,
+                    minted: secret.minted.is(),
                     serves: secret.serves.clone(),
                 })
                 .collect(),

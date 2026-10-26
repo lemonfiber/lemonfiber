@@ -55,9 +55,10 @@ pub struct Secret {
     /// What holding it is for.
     pub why: String,
     /// Whether lemonfiber makes the value at install, rather than anything capturing or
-    /// entering it.
-    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
-    pub minted: bool,
+    /// entering it, and in what shape.
+    #[serde(default, skip_serializing_if = "Minted::is_not")]
+    #[schemars(with = "MintedAs")]
+    pub minted: Minted,
     /// The capability of the plugin's own that a credential crossing to it is needed to fill.
     #[serde(default, rename = "for", skip_serializing_if = "Option::is_none")]
     pub serves: Option<String>,
@@ -94,6 +95,73 @@ pub enum Format {
     Yaml,
     /// INI.
     Ini,
+}
+
+/// Whether lemonfiber makes a secret's value, and in what shape.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(from = "MintedAs", into = "MintedAs")]
+pub enum Minted {
+    /// Something captures or enters it.
+    #[default]
+    Not,
+    /// 32 lowercase hexadecimal characters.
+    Key,
+    /// 32 characters holding every character class a password rule asks for.
+    Password,
+}
+
+impl Minted {
+    /// Whether lemonfiber makes the value.
+    #[must_use]
+    pub const fn is(self) -> bool {
+        !matches!(self, Self::Not)
+    }
+
+    /// Whether something captures or enters the value instead.
+    #[must_use]
+    pub const fn is_not(&self) -> bool {
+        matches!(self, Self::Not)
+    }
+}
+
+/// How a manifest writes [`Minted`]: `true` or `false`, or the shape it is made in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+#[schemars(rename = "SecretMinted")]
+pub enum MintedAs {
+    /// Made as a key, or not made.
+    Flag(bool),
+    /// Made in the shape named.
+    Shaped(MintedShape),
+}
+
+/// A shape a minted value is made in, beyond a key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "SecretMintedShape")]
+pub enum MintedShape {
+    /// A password: every character class a password rule asks for.
+    Password,
+}
+
+impl From<MintedAs> for Minted {
+    fn from(written: MintedAs) -> Self {
+        match written {
+            MintedAs::Flag(false) => Self::Not,
+            MintedAs::Flag(true) => Self::Key,
+            MintedAs::Shaped(MintedShape::Password) => Self::Password,
+        }
+    }
+}
+
+impl From<Minted> for MintedAs {
+    fn from(minted: Minted) -> Self {
+        match minted {
+            Minted::Not => Self::Flag(false),
+            Minted::Key => Self::Flag(true),
+            Minted::Password => Self::Shaped(MintedShape::Password),
+        }
+    }
 }
 
 /// A secret the manifest declares.

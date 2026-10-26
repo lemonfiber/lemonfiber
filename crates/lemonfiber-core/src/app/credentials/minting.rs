@@ -116,7 +116,8 @@ async fn replaced(
     else {
         return refused("there is no stack directory to find the service's settings in".to_owned());
     };
-    let Some(value) = crate::plugin::seeding::mint(ctx.seams.random.as_ref()) else {
+    let shape = crate::plugin::seeding::shape_of(&crate::plugin::seeding::shapes(&kept), secret);
+    let Some(value) = crate::plugin::seeding::minted_as(ctx.seams.random.as_ref(), shape) else {
         return refused(crate::plugin::seeding::UNMINTED.to_owned());
     };
     let files = match rewritten(ctx, installed, &stack, &kept, secret, &value) {

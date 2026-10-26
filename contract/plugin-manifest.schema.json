@@ -872,7 +872,7 @@
           "type": ["string", "null"]
         },
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
-        "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it.", "type": "boolean"},
+        "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it, and in what shape.", "$ref": "#/$defs/SecretMinted"},
         "of": {"description": "Whose credential it is.", "type": "string"},
         "why": {"description": "What holding it is for.", "type": "string"}
       },
@@ -897,6 +897,19 @@
         {"description": "JSON.", "type": "string", "const": "json"},
         {"description": "YAML.", "type": "string", "const": "yaml"},
         {"description": "INI.", "type": "string", "const": "ini"}
+      ]
+    },
+    "SecretMinted": {
+      "description": "How a manifest writes [`Minted`]: `true` or `false`, or the shape it is made in.",
+      "anyOf": [
+        {"description": "Made as a key, or not made.", "type": "boolean"},
+        {"description": "Made in the shape named.", "$ref": "#/$defs/SecretMintedShape"}
+      ]
+    },
+    "SecretMintedShape": {
+      "description": "A shape a minted value is made in, beyond a key.",
+      "oneOf": [
+        {"description": "A password: every character class a password rule asks for.", "type": "string", "const": "password"}
       ]
     },
     "ServiceConstant": {

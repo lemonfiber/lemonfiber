@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use super::{is_plain, UrlOf, UserMode, Value};
 use super::{
-    Constant, Container, Mount, Network, Posture, Publish, Secret, SecretOf, Setting, Shape,
+    Constant, Container, Minted, Mount, Network, Posture, Publish, Secret, SecretOf, Setting, Shape,
 };
 
 const NONE: BTreeMap<String, Value> = BTreeMap::new();
@@ -13,7 +13,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
         id: "admin-key".to_owned(),
         of: "jellyfin".to_owned(),
         why: "Mint keys for the stack's services".to_owned(),
-        minted: false,
+        minted: Minted::Not,
         carried_from: None,
     }]
 });
@@ -490,4 +490,40 @@ fn a_port_two_services_publish_names_both() {
         ),
         [(8920, "jellyfin", "emby"), (8096, "jellyfin", "plex")]
     );
+}
+
+#[test]
+fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
+    for (minted, written) in [
+        (Minted::Not, None),
+        (Minted::Key, Some("minted = true")),
+        (Minted::Password, Some("minted = \"password\"")),
+    ] {
+        let declared = Secret {
+            serves: None,
+            id: "admin-password".to_owned(),
+            of: "jellyfin".to_owned(),
+            why: "Its administrator's password".to_owned(),
+            minted,
+            carried_from: None,
+        };
+        let text = toml::to_string(&declared).unwrap_or_default();
+        assert_eq!(
+            text.lines().find(|line| line.starts_with("minted")),
+            written
+        );
+        assert_eq!(toml::from_str::<Secret>(&text).ok(), Some(declared));
+    }
+}
+
+#[test]
+fn a_minted_shape_reads_back_as_it_is_written_false_included() {
+    for (minted, written) in [
+        (Minted::Not, serde_json::json!(false)),
+        (Minted::Key, serde_json::json!(true)),
+        (Minted::Password, serde_json::json!("password")),
+    ] {
+        assert_eq!(serde_json::to_value(minted).ok(), Some(written.clone()));
+        assert_eq!(serde_json::from_value::<Minted>(written).ok(), Some(minted));
+    }
 }

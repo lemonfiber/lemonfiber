@@ -42,6 +42,43 @@ fn seeding(name: &str) -> Ctx {
     )
 }
 
+/// A secret declared a password is minted as one at install: 32 characters holding every
+/// class a password rule asks for, written into the starting file and handed to the adapter
+/// as it was made.
+#[tokio::test]
+async fn a_secret_declared_a_password_is_minted_as_one_at_install() {
+    let name = "seeded-password";
+    let ctx = seeding(name);
+    let source = shipped(name);
+    let declared = std::fs::read_to_string(source.join(lemonfiber_bundle::MANIFEST))
+        .unwrap_or_default()
+        .replace("minted = true", "minted = \"password\"");
+    let _ = std::fs::write(source.join(lemonfiber_bundle::MANIFEST), declared);
+
+    let outcome = installing(&ctx, &source).await;
+    assert!(
+        verdicts(outcome)
+            .iter()
+            .all(|verdict| came_to(verdict.as_ref()) == "passed"),
+        "the seeded plugin was not installed"
+    );
+
+    let made = minted(&ctx).unwrap_or_default();
+    assert_eq!(made.len(), 32);
+    for class in [
+        u8::is_ascii_uppercase,
+        u8::is_ascii_lowercase,
+        u8::is_ascii_digit,
+        |one: &u8| b"-_.~".contains(one),
+    ] {
+        assert!(made.bytes().any(|one| class(&one)));
+    }
+    assert_eq!(
+        read(&stack_of(&ctx).join("config/komga-adapter/upstream.json")),
+        format!(r#"{{"api_key":"{made}"}}"#)
+    );
+}
+
 #[tokio::test]
 async fn the_upstream_key_is_minted_written_into_its_starting_file_and_handed_to_the_adapter() {
     let ctx = seeding("seeded-installed");
