@@ -129,16 +129,27 @@ impl Reporting {
     /// is about is what the engine *says* — and a fake that worked the addresses out
     /// from the services would be answering the question the check exists to ask.
     #[must_use]
-    pub fn publishing(mut self, published: &[(&str, &str, u16)]) -> Self {
+    pub fn publishing(self, published: &[(&str, &str, u16)]) -> Self {
+        let forwarded: Vec<(&str, &str, u16, u16)> = published
+            .iter()
+            .map(|&(service, address, port)| (service, address, port, port))
+            .collect();
+        self.forwarding(&forwarded)
+    }
+
+    /// The same engine, with these services answering on these host addresses and ports,
+    /// each forwarded to the port its container listens on, last.
+    #[must_use]
+    pub fn forwarding(mut self, forwarded: &[(&str, &str, u16, u16)]) -> Self {
         for container in &mut self.containers {
-            container.published = published
+            container.published = forwarded
                 .iter()
-                .filter(|(service, _, _)| *service == container.service)
-                .filter_map(|(_, address, port)| {
+                .filter(|(service, _, _, _)| *service == container.service)
+                .filter_map(|(_, address, port, private)| {
                     Some(Published {
                         address: address.parse().ok()?,
                         port: *port,
-                        private: *port,
+                        private: *private,
                     })
                 })
                 .collect();

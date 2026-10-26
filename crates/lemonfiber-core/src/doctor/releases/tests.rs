@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use super::{ran, ReleasesCheck, NONE};
 use crate::doctor::credentials::Target;
 use crate::doctor::narrowing::Narrowing;
@@ -10,22 +8,14 @@ fn television() -> Target {
     Target {
         id: "sonarr".to_owned(),
         name: "Sonarr".to_owned(),
-        base: "http://127.0.0.1:8989".to_owned(),
-        config: std::path::PathBuf::from("/nowhere/config.xml"),
-        version: 3,
-        confined_to: None,
         kind: Some(crate::ports::media::Kind::Tv),
+        asked: None,
     }
 }
 
 #[tokio::test]
 async fn a_search_not_asked_for_says_what_it_spends_and_how_to_ask_for_it() {
-    let check = ReleasesCheck::new(
-        lemonfiber_fixtures::http::Fake::silent(),
-        Arc::new(lemonfiber_adapters::Disk),
-        vec![television()],
-        false,
-    );
+    let check = ReleasesCheck::new(vec![television()], false);
 
     let findings = ran(&check).await;
 

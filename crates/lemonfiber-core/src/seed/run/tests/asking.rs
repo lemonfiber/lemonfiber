@@ -44,18 +44,21 @@ fn asker(service: &str, kind: ApiKind, listens: u16, asks: &[(&str, bool)]) -> P
     placed
 }
 
-/// The plugin: a curator asking for both download clients, and a subtitle finder asking
-/// for every curator. Neither shares an id with anything the stack ships.
+/// The plugin: a curator speaking `library.curate` and asking for both download clients,
+/// and a subtitle finder asking for every curator. Neither shares an id with anything the
+/// stack ships.
 fn helpers() -> Installed {
+    let mut fetcher = asker(
+        FETCHER,
+        ApiKind::Servarr,
+        8990,
+        &[("download.usenet", false), ("download.torrent", false)],
+    );
+    fetcher.speaks = vec!["library.curate@1".to_owned()];
     let mut installed = an_installed(
         PLUGIN,
         vec![
-            asker(
-                FETCHER,
-                ApiKind::Servarr,
-                8990,
-                &[("download.usenet", false), ("download.torrent", false)],
-            ),
+            fetcher,
             asker(SUBBER, ApiKind::Bazarr, 6768, &[("library.curate", true)]),
         ],
     );

@@ -19,14 +19,20 @@
 //! and a listening server token in the environment file, are retired rather than
 //! published.
 //!
+//! **A moved part's key is not published.** A first-party plugin's service standing in
+//! for the stack's answers to the key lemonfiber minted for it, and every secrets file
+//! naming that key reads it from the secret store each time it is written, so no copy
+//! of it is left in the environment file to fall behind.
+//!
 //! A service that has not written its key yet is left out rather than published as
 //! empty: the quality sync refuses its whole configuration over one undefined variable,
 //! so an empty value is worse than an absent one.
 
 use lemonfiber_manifest::Service;
 
-use super::keys::read_curator_key;
 use super::Ctx;
+use crate::ports::filesystem::Beneath;
+use crate::wiring::{Fillers, Holder};
 
 /// What this connection is called where it is reported.
 const CONNECTION: &str = "Keys the stack's own services read";
@@ -47,10 +53,9 @@ pub(crate) fn published_as(id: &str) -> String {
 pub(super) async fn publish_keys(
     ctx: &Ctx,
     services: &[Service],
-    fillers: &crate::wiring::Fillers,
-    project: Option<&std::path::Path>,
+    fillers: &Fillers,
 ) -> crate::seed::Wiring {
-    let published = written_down(ctx, services, project).await;
+    let published = written_down(ctx, fillers).await;
 
     // Before anything is written: retiring revokes a key, so a rehearsal that got past
     // here would have changed the very thing it promised only to describe.
@@ -136,47 +141,30 @@ fn would_publish(written: Vec<(String, String)>) -> crate::seed::Wiring {
     crate::seed::Wiring::settled(CONNECTION.to_owned(), state)
 }
 
-/// A key published under the id of the service answering `kind`, where both the key
-/// and the service are there.
+/// The keys the stack's own services wrote to disk themselves, each under the service's
+/// id.
 ///
-/// The pairing every one of these needs: a key is worth nothing without the name to
-/// file it under, and the name comes from the service that answered.
-fn under_its_service(
-    services: &[Service],
-    kind: lemonfiber_manifest::ApiKind,
-    key: Option<String>,
-) -> Option<(String, String)> {
-    let service = with_api(services, kind)?;
-    Some((published_as(&service.id), key?))
-}
-
-/// The keys the services wrote to disk themselves.
-///
-/// Every curator-shaped service, not only the ones that file media: the indexer aggregator
-/// manages none and so declares no media types, which is what keeps it out of the curator
-/// list used for root folders and download clients — but it has a key like the rest, and a
-/// service added to the stack is given it by a secret its declaration names. The request
-/// service is not curator-shaped and keeps its key in a file of its own shape.
-async fn written_down(
-    ctx: &Ctx,
-    services: &[Service],
-    project: Option<&std::path::Path>,
-) -> Vec<(String, String)> {
+/// Each one whose declaration names the file it writes its key to and the shape of that
+/// file, read beneath its own directory. A service a first-party plugin stands in for is
+/// not among them: lemonfiber minted its key, and what reads it reads it from the secret
+/// store.
+async fn written_down(ctx: &Ctx, fillers: &Fillers) -> Vec<(String, String)> {
     let mut found = Vec::new();
-    for service in services {
-        let Some(target) = project.and_then(|project| super::target_for(service, project)) else {
+    for filler in fillers
+        .services()
+        .filter(|filler| filler.holder() == Holder::Stack)
+    {
+        let Some(read) = filler
+            .adapter
+            .as_ref()
+            .and_then(|api| crate::credential::written::reader(api.key_source))
+        else {
             continue;
         };
-        if let Some(key) = read_curator_key(ctx, &target.config).await {
-            found.push((published_as(&target.id), key));
+        if let Beneath::Read(text) = crate::app::targets::credential_file(ctx, filler).await {
+            found.extend(read(&text).map(|key| (published_as(&filler.id), key)));
         }
     }
-    let requests = crate::app::targets::stack_requests_key(ctx, services, project).await;
-    found.extend(under_its_service(
-        services,
-        lemonfiber_manifest::ApiKind::Seerr,
-        requests,
-    ));
     found
 }
 
@@ -187,7 +175,7 @@ async fn written_down(
 /// there — so a revocation that failed leaves the value where the next run can still
 /// find which key it was. The listening server's token cannot be revoked on its own;
 /// forgetting it is what leaves nothing on this machine holding it.
-async fn retired(ctx: &Ctx, services: &[Service], fillers: &crate::wiring::Fillers) {
+async fn retired(ctx: &Ctx, services: &[Service], fillers: &Fillers) {
     let Some(env) = ctx.settings.env_file.as_deref() else {
         return;
     };

@@ -127,9 +127,9 @@ async fn an_unreadable_episode_listing_leaves_the_rest_of_the_trace_standing() {
     // The episodes will not read, so there is no coverage to report — but everything
     // the other services did answer still stands, and the gap is named.
     let context = ctx_with(&Fake::with_episodes(
-        r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-        EMPTY_QUEUE,
-        "not json",
+        monitored(),
+        nothing_queued(),
+        refusing(),
     ));
     let report = trace(&context, "expanse", None, false)
         .await
@@ -145,13 +145,13 @@ async fn an_unreadable_episode_listing_leaves_the_rest_of_the_trace_standing() {
 #[tokio::test]
 async fn tracing_a_series_reads_its_episodes_into_coverage() {
     let context = ctx_with(&Fake::with_episodes(
-        r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-        EMPTY_QUEUE,
-        r#"[
-            {"id":11,"seasonNumber":1,"episodeNumber":1,"monitored":true,"hasFile":true},
-            {"id":12,"seasonNumber":1,"episodeNumber":2,"monitored":true,"hasFile":false},
-            {"id":13,"seasonNumber":0,"episodeNumber":1,"monitored":false,"hasFile":false}
-        ]"#,
+        monitored(),
+        nothing_queued(),
+        answered(&[
+            episode(11, 1, 1, true, true),
+            episode(12, 1, 2, true, false),
+            episode(13, 0, 1, false, false),
+        ]),
     ));
     let report = trace(&context, "expanse", None, false)
         .await

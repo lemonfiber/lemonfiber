@@ -26,6 +26,7 @@ use crate::program::Program;
 use crate::random::Random;
 use crate::registry::Registry;
 use crate::resolve::Resolver;
+use crate::serving::Serving;
 use crate::time::Clock;
 use crate::FileSystem;
 
@@ -76,4 +77,6 @@ pub struct Seams {
     pub resolver: Arc<dyn Resolver>,
     /// How an image's own program is run once, in a container of its own.
     pub program: Arc<dyn Program>,
+    /// How an image is served as its service runs, in a container of its own.
+    pub serving: Arc<dyn Serving>,
 }

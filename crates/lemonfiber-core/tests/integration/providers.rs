@@ -8,9 +8,9 @@
 //! clients this reads, at the addresses and config paths the manifest declares.
 //!
 //! The stack is the real one, read from the repository's own embedded copy, with its
-//! Usenet client moved into its plugin. The services under it are fakes: a filesystem
-//! holding the configuration file the aggregator writes its key to, and a transport
-//! answering as the Usenet client's adapter and the aggregator would.
+//! Usenet client and its indexer aggregator moved into their plugins. The services under
+//! it are fakes: a transport answering as the Usenet client's adapter and the
+//! aggregator's would.
 
 use std::sync::Arc;
 
@@ -18,14 +18,13 @@ use lemonfiber_core::app::{diagnose, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Narrowing, Verdict};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
-use lemonfiber_core::ports::service::{Recorded, Standing, UsenetAccount};
+use lemonfiber_core::ports::service::{IndexerUse, Recorded, Standing, UsenetAccount};
 use lemonfiber_fixtures::files::Files;
-use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_testing::{adapted::answered, usenet};
-
-/// The aggregator's configuration, carrying the key it generated for itself.
-const AGGREGATOR_XML: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
+use lemonfiber_testing::adapted::{answered, path_of};
+use lemonfiber_testing::indexer::INDEXER;
+use lemonfiber_testing::usenet;
 
 /// A gibibyte.
 const GIB: u64 = 1024 * 1024 * 1024;
@@ -72,20 +71,33 @@ fn refusing() -> Standing {
 }
 
 /// One indexer the aggregator is querying, with today's counts.
-const INDEXERS: &str = r#"[{"id":1,"name":"Fast Indexer","enable":true,"status":null}]"#;
-const STANDINGS: &str = "[]";
-const COUNTS: &str = r#"{"indexers":[{"indexerId":1,"numberOfQueries":12,"numberOfGrabs":2,
-    "numberOfFailedQueries":0,"numberOfFailedGrabs":0}]}"#;
+fn fast_indexer() -> IndexerUse {
+    IndexerUse {
+        name: "Fast Indexer".to_owned(),
+        enabled: true,
+        queries: 12,
+        failed_queries: 0,
+        grabs: 2,
+        failed_grabs: 0,
+        rested_until: None,
+        limits: None,
+        searched_from: None,
+        grabbed_from: None,
+    }
+}
 
-/// A context over the real stack, its Usenet client moved into its plugin and its adapter
-/// answering `download.usenet`'s accounts with `account`, beside the aggregator answering
-/// as configured, under an env file of its own named `name`.
+/// A context over the real stack, its Usenet client and its indexer aggregator moved into
+/// their plugins, the client's adapter answering `download.usenet`'s accounts with
+/// `account` and the aggregator's answering what it queries with [`fast_indexer`], under an
+/// env file of its own named `name`.
 fn reaching(name: &str, account: UsenetAccount) -> Ctx {
+    use lemonfiber_contract::capabilities::indexer::search;
     let http = Fake::by_path(vec![
         (usenet::operation("accounts"), answered(&vec![account])),
-        ("/api/v1/indexerstatus", Answer::reply(200, STANDINGS)),
-        ("/api/v1/indexerstats", Answer::reply(200, COUNTS)),
-        ("/api/v1/indexer", Answer::reply(200, INDEXERS)),
+        (
+            path_of(search::CAPABILITY, search::MAJOR, "indexers"),
+            answered(&vec![fast_indexer()]),
+        ),
     ]);
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("providers-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
@@ -95,13 +107,14 @@ fn reaching(name: &str, account: UsenetAccount) -> Ctx {
             env_file: Some(dir.join(".env")),
             ..Settings::default()
         })
-        .filesystem(Files::ending(vec![(
-            "config/prowlarr/config.xml",
-            AGGREGATOR_XML,
-        )]))
+        .filesystem(Files::empty())
         .build()
         .with_http(http);
-    usenet::reaching(ctx)
+    let ctx = lemonfiber_testing::adapted::asking(ctx, &[usenet::MOVED, INDEXER]);
+    for moved in [usenet::MOVED, INDEXER] {
+        moved.recorded(&ctx);
+    }
+    ctx
 }
 
 #[tokio::test]

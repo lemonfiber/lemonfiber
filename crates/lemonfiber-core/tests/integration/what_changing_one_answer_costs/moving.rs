@@ -1,14 +1,15 @@
 //! Moving the data location, and what the library survives.
 
 use super::{
-    changing, common, env_at, held, over, reaching, refusal, remembering, stance, stood_up, AGREED,
-    DATA_ROOT, TORRENT, UNSAID,
+    changing, common, env_at, held, library, over, reaching, refusal, remembering, stance,
+    stood_up, unkeyed, AGREED, DATA_ROOT, TORRENT, UNSAID,
 };
 use lemonfiber_core::config::{Protocols, Settings};
+use lemonfiber_core::ports::service::RegisteredFolder;
 use lemonfiber_core::reconfigure::Stance;
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::{seeding_routes, SeedFs};
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_testing::curators::{answered, curating, unavailable, FILM, TELEVISION};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -84,24 +85,23 @@ async fn a_move_that_would_leave_the_library_pointing_at_nothing_cannot_be_force
     );
 }
 
+/// An adapter still starting has written no key, so there is nothing to ask its
+/// curator with. That is not the same as a curator that says it holds no library, and
+/// only one of the two makes a move safe.
 #[tokio::test]
 async fn a_move_is_refused_where_the_services_have_not_written_their_keys_yet() {
-    // A service still starting has written no key, so there is nothing to open it
-    // with. That is not the same as a service that says it holds no library, and only
-    // one of the two makes a move safe.
     let from = PathBuf::from("/srv/old");
     let env = env_at("keyless", &from);
-    let ctx = stood_up(
+    let ctx = unkeyed(
         Settings {
             env_file: Some(env.clone()),
             data_root: Some(from),
             ..Settings::default()
         },
         Source::External(common::stack::project()),
-        Fake::by_path(seeding_routes()),
+        Fake::by_path(library()),
         Vec::new(),
-    )
-    .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    );
 
     let review = changing(&ctx, DATA_ROOT, "/srv/new", AGREED).await;
 
@@ -120,7 +120,7 @@ async fn a_move_no_service_will_answer_about_is_refused_where_there_is_a_library
         env.clone(),
         &from,
         Protocols::none(),
-        Fake::by_path(vec![("", Answer::reply(500, "no"))]),
+        Fake::by_path(vec![("", unavailable())]),
         Vec::new(),
     );
 
@@ -145,10 +145,13 @@ async fn a_folder_no_move_can_repoint_is_refused_by_name() {
     let from = PathBuf::from("/srv/old");
     let env = env_at("outside", &from);
     let mut routes = vec![(
-        "/rootfolder",
-        Answer::reply(200, r#"[{"id":1,"path":"/mnt/old/tv"}]"#),
+        curating(TELEVISION, "root_folders"),
+        answered(&[RegisteredFolder {
+            id: "1".to_owned(),
+            path: "/mnt/old/tv".to_owned(),
+        }]),
     )];
-    routes.extend(seeding_routes());
+    routes.extend(library());
     let ctx = over(
         env.clone(),
         &from,
@@ -175,8 +178,8 @@ async fn one_curator_that_will_not_list_is_passed_over_rather_than_read_as_a_bre
     // completes it. The curators that did answer are enough to weigh the move.
     let from = PathBuf::from("/srv/old");
     let env = env_at("half-answering", &from);
-    let mut routes = vec![("127.0.0.1:7878", Answer::reply(500, "no"))];
-    routes.extend(seeding_routes());
+    let mut routes = vec![(curating(FILM, "root_folders"), unavailable())];
+    routes.extend(library());
     let ctx = over(
         env.clone(),
         &from,
@@ -212,7 +215,7 @@ async fn a_move_with_no_library_behind_the_old_location_is_simply_made() {
         env.clone(),
         &from,
         Protocols::none(),
-        Fake::by_path(vec![("", Answer::reply(500, "no"))]),
+        Fake::by_path(vec![("", unavailable())]),
         vec!["/srv/old/media"],
     );
 
@@ -228,7 +231,7 @@ async fn setting_the_data_location_to_where_it_already_is_asks_no_service_anythi
     // out that nothing changes.
     let from = PathBuf::from("/srv/media");
     let env = env_at("unmoved", &from);
-    let fake = Fake::by_path(seeding_routes());
+    let fake = Fake::by_path(library());
     let ctx = over(env, &from, Protocols::none(), Arc::clone(&fake), Vec::new());
 
     let review = changing(&ctx, DATA_ROOT, "/srv/media", AGREED).await;
@@ -251,7 +254,7 @@ async fn choosing_a_data_location_where_none_was_chosen_is_setups_answer_not_a_m
             ..Settings::default()
         },
         Source::External(common::stack::project()),
-        Fake::by_path(seeding_routes()),
+        Fake::by_path(library()),
         Vec::new(),
     );
 
@@ -276,7 +279,7 @@ async fn a_stack_that_cannot_be_read_names_no_service_and_still_refuses_a_blind_
             ..Settings::default()
         },
         Source::External(Path::new("/lemonfiber-not-a-real-stack")),
-        Fake::by_path(seeding_routes()),
+        Fake::by_path(library()),
         Vec::new(),
     );
 

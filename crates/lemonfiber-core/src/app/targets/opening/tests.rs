@@ -170,50 +170,13 @@ async fn a_plugin_speaking_no_contract_is_never_asked_as_the_bundled_request_ser
     assert!(fake.requests().is_empty(), "{:?}", asked(&fake));
 }
 
-/// The stack's own request service is asked through this build's adapter, presenting
-/// the key it wrote for itself; one that has not written it yet is asked nothing.
+/// The stack's own request service, which no plugin's adapter fronts, is asked nothing:
+/// the core speaks a request service only over `request.intake`.
 #[tokio::test]
-async fn the_stacks_own_request_service_is_asked_with_its_own_key() {
+async fn the_stacks_own_request_service_is_asked_nothing() {
     let (project, ctx, fake) = reaching("bundled", false);
     let fillers = beside(&[], true, &project);
 
-    let answered = match requests_from(&ctx, &fillers).await {
-        Some(access) => access.requests.answers().await.is_ok(),
-        None => false,
-    };
-
-    assert!(answered, "{:?}", asked(&fake));
-    assert_eq!(
-        asked(&fake),
-        vec![(
-            "http://127.0.0.1:5055/api/v1/auth/me".to_owned(),
-            Some("seerr-own-key".to_owned())
-        )]
-    );
-
-    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None)));
-    assert!(requests_from(&unwritten, &fillers).await.is_none());
-}
-
-/// The stack's own request service is asked as its owner before it has written its
-/// key, holding none, so whatever uses it reports the refusal in its own words.
-#[tokio::test]
-async fn the_stacks_own_request_service_is_asked_as_its_owner_before_it_writes_its_key() {
-    let (project, ctx, fake) = reaching("bundled-unkeyed", false);
-    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None)));
-    let fillers = beside(&[], true, &project);
-
-    let answered = match request_service(&fillers) {
-        Some(filler) => match requests_as_owner(&unwritten, filler).await {
-            Some(requests) => requests.answers().await.is_ok(),
-            None => false,
-        },
-        None => false,
-    };
-
-    assert!(answered, "{:?}", asked(&fake));
-    assert_eq!(
-        asked(&fake),
-        vec![("http://127.0.0.1:5055/api/v1/auth/me".to_owned(), None)]
-    );
+    assert!(requests_from(&ctx, &fillers).await.is_none());
+    assert!(fake.requests().is_empty(), "{:?}", asked(&fake));
 }

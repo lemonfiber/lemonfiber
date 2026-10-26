@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 
 use super::{guidance, of_section, rewrite, section, Kind};
 use crate::quality::{Preset, Selection};
-use crate::servarr::Shape as _;
 
 /// The `recyclarr.yml` that ships in the stack — its defaults are the Balanced
 /// templates, which makes it the fixture the rewriter is checked against.
@@ -55,38 +54,10 @@ fn the_presets_that_differ_name_different_includes() {
 }
 
 #[test]
-fn each_service_names_its_own_cutoff_unmet_upgrade_command() {
-    // The upgrade action re-searches existing content; the command is named per
-    // service, and a compose id round-trips to the right one.
-    assert_eq!(
-        of_section("sonarr").map(Kind::upgrade_command),
-        Some("CutoffUnmetEpisodeSearch")
-    );
-    assert_eq!(
-        of_section("radarr").map(Kind::upgrade_command),
-        Some("CutoffUnmetMoviesSearch")
-    );
+fn each_section_names_the_kind_it_holds_and_no_other_key_does() {
+    assert_eq!(of_section("sonarr"), Some(Kind::Tv));
+    assert_eq!(of_section("radarr"), Some(Kind::Movies));
     assert_eq!(of_section("prowlarr"), None);
-}
-
-#[test]
-fn each_service_names_its_own_search_and_history_endpoints() {
-    // Television is searched and traced by episode; film by movie.
-    assert_eq!(Kind::Tv.release_id_param(), "episodeId");
-    assert_eq!(Kind::Movies.release_id_param(), "movieId");
-    assert_eq!(Kind::Tv.library_endpoint(), "series");
-    assert_eq!(Kind::Movies.library_endpoint(), "movie");
-    assert_eq!(Kind::Tv.history_filter(), "seriesIds");
-    assert_eq!(Kind::Movies.history_filter(), "movieIds");
-    // Only television files its items in parts; a film is the whole item.
-    assert_eq!(Kind::Tv.parts_endpoint(), Some("episode"));
-    assert_eq!(Kind::Movies.parts_endpoint(), None);
-    assert_eq!(Kind::Tv.reference_field(), "tvdbId");
-    assert_eq!(Kind::Movies.reference_field(), "tmdbId");
-    assert_eq!(Kind::Tv.search_option(), "searchForMissingEpisodes");
-    assert_eq!(Kind::Movies.search_option(), "searchForMovie");
-    assert_eq!(Kind::Tv.parts_filter(), "seriesId");
-    assert_eq!(Kind::Movies.parts_filter(), "movieId");
     // The words a household uses, not the services' own.
     assert_eq!(Kind::Tv.noun(), "series");
     assert_eq!(Kind::Movies.noun(), "film");

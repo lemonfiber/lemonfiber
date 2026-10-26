@@ -24,9 +24,7 @@ use lemonfiber_core::repair::run::retract;
 use lemonfiber_core::repair::OPERATION;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
-
-/// A curator's config carrying a readable key, so the target opens.
-const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
+use lemonfiber_testing::curators::{curating, refusing, taken, TELEVISION};
 
 /// Where this test's records live, in a scratch directory of its own.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -37,17 +35,22 @@ fn paths(root: &Path) -> Paths {
     Paths::rooted(&root.join("config"), &root.join("data"))
 }
 
-/// A context over the real stack, answering services from the given transport.
+/// A context over the real stack, its television curator moved into its plugin and asked
+/// through the adapter in front of it, answering services from the given transport.
 fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
-    lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![("config/sonarr/config.xml", CONFIG)]))
-        .settings(Settings {
-            env_file: Some(paths(root).env_file()),
-            stack_dir: Some(project().to_path_buf()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    let ctx = TELEVISION.asking(
+        lemonfiber_testing::a_live_context()
+            .filesystem(Files::empty())
+            .settings(Settings {
+                env_file: Some(paths(root).env_file()),
+                stack_dir: Some(project().to_path_buf()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
+    TELEVISION.recorded(&ctx);
+    ctx
 }
 
 /// A repair that changed one field inside the curator.
@@ -116,29 +119,15 @@ fn journalled(root: &Path, changes: &[Change]) {
     let _ = std::fs::write(path, lines.join("\n"));
 }
 
-/// The client as the service holds it, and its answer to being written back.
-fn answering() -> Arc<Fake> {
-    Fake::by_path(vec![(
-        "downloadclient/7",
-        Answer::reply(
-            200,
-            r#"{"id":7,"fields":[{"name":"host","value":"sabnzbd"},{"name":"tvCategory","value":"tv-sonarr"}]}"#,
-        ),
-    )])
+/// The curator answering a field of one of its download clients being written back with
+/// `answer`.
+fn writing_back(answer: Answer) -> Arc<Fake> {
+    Fake::by_path(vec![(curating(TELEVISION, "set_client_field"), answer)])
 }
 
-/// The same client, holding the field whose name reads as a credential.
-fn answering_with_a_key() -> Arc<Fake> {
-    Fake::by_path(vec![(
-        "downloadclient/7",
-        Answer::reply(
-            200,
-            format!(
-                r#"{{"id":7,"fields":[{{"name":"host","value":"sabnzbd"}},{{"name":"apiKey","value":"{}"}}]}}"#,
-                ["new", "-s3cret"].concat()
-            ),
-        ),
-    )])
+/// The curator taking a field of one of its download clients written back.
+fn answering() -> Arc<Fake> {
+    writing_back(taken())
 }
 
 /// The wirings a diagnosis reads are assembled from the baseline lemonfiber wrote, so a
@@ -240,7 +229,7 @@ async fn a_change_naming_a_service_the_stack_lacks_is_named_too() {
 async fn a_service_that_refuses_the_write_is_not_reported_as_undone() {
     let root = scratch("refused");
     journalled(&root, &[configured()]);
-    let http = Fake::by_path(vec![("downloadclient/7", Answer::reply(400, "no"))]);
+    let http = writing_back(refusing());
 
     let put_back = retract(&ctx(&root, http), &paths(&root)).await;
 
@@ -384,7 +373,7 @@ async fn a_service_field_named_like_a_credential_is_withheld_in_the_account_too(
     let root = scratch("credential-field");
     journalled(&root, &[a_secret_field_was_configured()]);
 
-    let put_back = retract(&ctx(&root, answering_with_a_key()), &paths(&root)).await;
+    let put_back = retract(&ctx(&root, answering()), &paths(&root)).await;
 
     let said = put_back
         .map(|undos| serde_json::to_string(&undos).unwrap_or_default())

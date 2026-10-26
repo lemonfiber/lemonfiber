@@ -10,11 +10,12 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::super::context::a_context;
 use super::super::usenet::{ADAPTER, PLUGIN};
-use super::{asked_at, Adapted, Keyed, KEY};
+use super::{asked_at, Adapted, Keyed, KEY, PORT};
 
 const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 static NO_STACK: include_dir::Dir<'static> = include_dir::Dir::new("", &[]);

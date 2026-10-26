@@ -116,10 +116,9 @@ fn a_service_whose_api_names_no_file_beneath_its_configuration_writes_no_key_of_
         .iter()
         .flat_map(|manifest| manifest.services.iter())
         .find(|service| {
-            service
-                .api
-                .as_ref()
-                .is_some_and(|api| super::reader(api.kind).is_some() && api.path.is_some())
+            service.api.as_ref().is_some_and(|api| {
+                crate::credential::written::reader(api.key_source).is_some() && api.path.is_some()
+            })
         });
     assert!(
         service.is_some(),
@@ -129,16 +128,24 @@ fn a_service_whose_api_names_no_file_beneath_its_configuration_writes_no_key_of_
         return;
     };
     let project = Path::new("/srv/stack");
+    let writes = |service: lemonfiber_manifest::Service| {
+        let fillers = crate::test_support::stack_fillers(vec![service], &[], Some(project), &[]);
+        let writes = fillers
+            .services()
+            .next()
+            .is_some_and(|filler| super::writes_its_own(filler).is_some());
+        writes
+    };
     let unnamed = |path: Option<&str>| {
         let mut moved = service.clone();
         moved.api = moved.api.map(|api| lemonfiber_manifest::Api {
             path: path.map(str::to_owned),
             ..api
         });
-        super::writes_its_own(&moved, project).is_none()
+        !writes(moved)
     };
 
-    assert!(super::writes_its_own(service, project).is_some());
+    assert!(writes(service.clone()));
     assert!(unnamed(None));
     assert!(unnamed(Some("/elsewhere/config.xml")));
 }

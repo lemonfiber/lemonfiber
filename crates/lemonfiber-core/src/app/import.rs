@@ -9,16 +9,27 @@
 //! already hold a record of that name: an import that overwrote what the operator has
 //! since changed on the new stack would be undoing their work in the name of copying it.
 //!
+//! **Both sides are asked over `library.curate`.** Ours through the adapter in front of
+//! it. Theirs has none, so the adapter of the first-party plugin lemonfiber runs ours
+//! from is lent to it: started as a throwaway container handed their key alone, asked
+//! for their records, and taken away whatever the reading came to. A plugin that is not
+//! first-party is never lent their key: their copy is not read through it.
+//!
 //! Unconfirmed it names what it would carry and carries nothing.
 
-use super::targets::{project_directory, target_named};
-use crate::doctor::credentials::Target;
+use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
+use lemonfiber_contract::capabilities::library::curate;
+
+use super::targets::{fillers_here, target_named};
 use crate::error::Problem;
 use crate::migration::importing::{carryable, missing, unmatched};
 use crate::model::{ImportReport, MigrationReport, RecordReport, UnsupportedReport};
+use crate::plugin::first_party::FirstParty;
+use crate::plugin::lending::{lent, Borrowing};
 use crate::ports::docker::Container;
-use crate::ports::service::{Carried, Carrying, Record};
+use crate::ports::service::{Carried, Record};
 use crate::reconfigure::Stance;
+use crate::wiring::Fillers;
 
 use super::Ctx;
 
@@ -41,7 +52,8 @@ fn kinds_for(service: &str) -> &'static [Record] {
         .map_or(&[Record::Indexer], |(_, kinds)| *kinds)
 }
 
-/// Carry what the setup already here holds into lemonfiber's own services.
+/// Carry what the setup already here holds into lemonfiber's own services, lending their
+/// copies only the adapters of plugins `trusted` holds as first-party.
 ///
 /// # Errors
 ///
@@ -52,6 +64,7 @@ pub async fn carry(
     survey: &MigrationReport,
     running: &[Container],
     confirmed: bool,
+    trusted: &[FirstParty],
 ) -> Result<ImportReport, Box<Problem>> {
     let Some(project) = crate::migration::one_setup(survey) else {
         return Ok(nothing(survey));
@@ -60,11 +73,10 @@ pub async fn carry(
     // Read again rather than carried through: the survey has already refused a stack
     // it could not read, so what comes back here is the same manifest it read. A
     // failure now leaves no services to look up, which carries nothing and says so.
-    let services = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map(|manifest| manifest.services)
-        .unwrap_or_default();
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        return Ok(nothing(survey));
+    };
+    let fillers = fillers_here(ctx, &manifest);
 
     let mut found = Found::default();
 
@@ -72,18 +84,37 @@ pub async fn carry(
         .iter()
         .filter(|container| container.project == project)
     {
-        let Some((kinds, ours)) = holds(&services, ctx, &container.service) else {
+        let Some(ours) = target_named(ctx, &fillers, &container.service).await else {
             continue;
         };
-        let Some(theirs) = theirs(container, &ours) else {
+        let (service, kinds) = (ours.id.as_str(), kinds_for(&ours.id));
+        let Some(to) = ours.asked.as_ref() else {
             found.refused.push(unreachable(
-                &container.service,
-                "no configuration to read a key from",
+                service,
+                "lemonfiber's own copy could not be asked over its contract",
             ));
             continue;
         };
-
-        gather(ctx, (&theirs, &ours), kinds, confirmed, &mut found).await;
+        let borrowing = match borrowed(ctx, &manifest, &fillers, container, trusted).await {
+            Ok(borrowing) => borrowing,
+            Err(why) => {
+                found.refused.push(unreachable(service, &why));
+                continue;
+            }
+        };
+        let theirs = match lent(ctx, &borrowing.as_asked()).await {
+            Ok(theirs) => theirs,
+            Err(why) => {
+                found.refused.push(unreachable(
+                    service,
+                    &format!("the adapter lent to their copy did not start: {why}"),
+                ));
+                continue;
+            }
+        };
+        let from = curate::Adapter(theirs.adapter.clone());
+        gather((&from, to.as_ref()), service, kinds, confirmed, &mut found).await;
+        theirs.returned(ctx).await;
     }
 
     // Read before the report takes the lists apart.
@@ -123,32 +154,19 @@ struct Going {
     item: Carried,
 }
 
-/// What each side holds, and what of it would travel.
+/// What each side holds, and what of it would travel: from their copy to ours, filed
+/// under `service`.
 async fn gather(
-    ctx: &Ctx,
-    pair: (&Target, &Target),
+    pair: (&dyn curate::Fills, &dyn curate::Fills),
+    service: &str,
     kinds: &[Record],
     confirmed: bool,
     found: &mut Found,
 ) {
-    let (theirs, ours) = pair;
-    let (Some(from), Some(to)) = (
-        theirs
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await,
-        ours.open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await,
-    ) else {
+    let (from, to) = pair;
+    let Ok(held) = to.quality_profiles().await else {
         found.refused.push(unreachable(
-            &ours.id,
-            "one of the two copies could not be reached",
-        ));
-        return;
-    };
-
-    let Ok(held) = crate::ports::service::Client::quality_profiles(&to).await else {
-        found.refused.push(unreachable(
-            &ours.id,
+            service,
             "its quality profiles could not be read",
         ));
         return;
@@ -158,7 +176,7 @@ async fn gather(
     for kind in kinds {
         let (Ok(held), Ok(already)) = (from.records(*kind).await, to.records(*kind).await) else {
             found.refused.push(unreachable(
-                &ours.id,
+                service,
                 &format!("its {} could not be read", kind.plural()),
             ));
             continue;
@@ -168,73 +186,158 @@ async fn gather(
         found.refused.extend(unmatched(&wanted, &profiles));
         for item in carryable(&wanted, &profiles) {
             let record = RecordReport {
-                service: ours.id.clone(),
+                service: service.to_owned(),
                 kind: kind.plural().to_owned(),
                 name: item.name.clone(),
             };
             found.going.push(Going {
-                service: ours.id.clone(),
+                service: service.to_owned(),
                 kind: *kind,
                 item: item.clone(),
             });
             if !confirmed {
                 continue;
             }
-            // Put where the client is already open, rather than opening a second one to
-            // write through: two openings are two chances for them to disagree about
-            // which service this is.
             match to.carry(*kind, &item).await {
                 Ok(()) => found.carried.push(record),
                 Err(failure) => found.refused.push(UnsupportedReport {
                     what: item.name.clone(),
-                    because: format!("{} would not take it: {failure}", ours.id),
+                    because: format!("{service} would not take it: {failure}"),
                 }),
             }
         }
     }
 }
 
-/// Where lemonfiber's own copy of a service is, and what it holds worth carrying.
-///
-/// Nothing for a service lemonfiber does not run, which is the ordinary answer for the
-/// rest of somebody's stack — a request manager, a subtitle finder, anything they added
-/// themselves.
-fn holds(
-    services: &[lemonfiber_manifest::Service],
-    ctx: &Ctx,
-    service: &str,
-) -> Option<(&'static [Record], Target)> {
-    let ours = target_named(
-        services,
-        project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref()).as_deref(),
-        service,
-    )?;
-    Some((kinds_for(&ours.id), ours))
+/// The name the adapter lent to their copy reaches this machine by.
+const THEIRS: &str = "theirs";
+
+/// What an adapter is lent to their copy of a service with, worked out before anything
+/// is started.
+struct Borrowed {
+    /// The plugin lemonfiber runs its own copy from.
+    installed: crate::plugin::Installed,
+    /// Its adapter in front of that copy.
+    adapter: crate::plugin::Placed,
+    /// Where the adapter reaches their copy.
+    upstream: String,
+    /// Each field of the adapter's credential, with their copy's key.
+    credentials: Vec<(String, String)>,
 }
 
-/// Where their copy of a service is, and what its key is read from.
-///
-/// The base comes from the port the engine says it publishes, and the key from the
-/// configuration file under one of the paths it mounts — which is the only way to reach
-/// a stack whose Compose file lemonfiber has never seen.
-fn theirs(container: &Container, ours: &Target) -> Option<Target> {
+impl Borrowed {
+    /// The borrowing it comes to.
+    fn as_asked(&self) -> Borrowing<'_> {
+        Borrowing {
+            installed: &self.installed,
+            adapter: &self.adapter,
+            upstream: self.upstream.clone(),
+            reaching: vec![THEIRS.to_owned()],
+            credentials: self.credentials.clone(),
+        }
+    }
+}
+/// Why their copy is not read through the adapter of a plugin that is not first-party.
+const NOT_FIRST_PARTY: &str =
+    "its plugin is not first-party, so their copy's key is not handed to it";
+
+/// Why no adapter is lent where lemonfiber's own copy is run from no plugin the record of
+/// what is installed holds.
+const UNRECORDED: &str = "lemonfiber's own copy is run from no plugin the record of what is \
+                          installed holds, so there is no adapter to lend their copy";
+
+/// Why no adapter is lent where it signs in with an account rather than a key.
+const ACCOUNTED: &str =
+    "its adapter signs in with an account, and lemonfiber holds none for their copy";
+
+/// Why no key is read where their copy names no configuration to read it from.
+const UNCONFIGURED: &str = "no configuration to read a key from";
+
+/// What the adapter in front of lemonfiber's own copy of `container`'s service is lent to
+/// their copy with: the plugin, where `trusted` holds it as first-party, and the adapter,
+/// their key read from the file the stack's declaration of the service names beneath the
+/// directory their container mounts, and where this machine reaches their copy; or why it
+/// cannot be lent.
+async fn borrowed(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    fillers: &Fillers,
+    container: &Container,
+    trusted: &[FirstParty],
+) -> Result<Borrowed, String> {
+    let service = container.service.as_str();
+    let plugin = fillers
+        .service(service)
+        .and_then(crate::wiring::Filler::brought_by);
+    let installed = crate::app::plugins::read(ctx)
+        .ok()
+        .and_then(|register| {
+            register
+                .installed()
+                .iter()
+                .find(|one| Some(one.plugin.as_str()) == plugin)
+                .cloned()
+        })
+        .ok_or_else(|| UNRECORDED.to_owned())?;
+    if !crate::plugin::first_party::holds(trusted, &installed) {
+        return Err(NOT_FIRST_PARTY.to_owned());
+    }
+    let adapter = installed
+        .services
+        .iter()
+        .find(|placed| placed.fronts.as_deref() == Some(service))
+        .cloned()
+        .ok_or_else(|| "its plugin brings no adapter in front of it".to_owned())?;
+    let key = their_key(ctx, manifest, container).await?;
     let port = container
         .published
-        .first()
-        .map(|published| published.port)?;
-    let config = container
-        .mounts
-        .first()
-        .map(|mount| mount.join("config.xml"))?;
-    Some(Target {
-        id: ours.id.clone(),
-        name: ours.name.clone(),
-        base: format!("http://127.0.0.1:{port}"),
-        config,
-        version: ours.version,
-        confined_to: None,
-        kind: ours.kind,
+        .iter()
+        .find(|published| !published.address.is_loopback())
+        .map(|published| published.port)
+        .ok_or_else(|| {
+            "it answers on no address but this machine's loopback, which a container cannot \
+             reach"
+                .to_owned()
+        })?;
+    let mut credentials = Vec::new();
+    for field in adapter.upstream.keys() {
+        if field == UPSTREAM_USERNAME || field == UPSTREAM_PASSWORD {
+            return Err(ACCOUNTED.to_owned());
+        }
+        credentials.push((field.clone(), key.clone()));
+    }
+    Ok(Borrowed {
+        upstream: format!("http://{THEIRS}:{port}"),
+        installed,
+        adapter,
+        credentials,
     })
+}
+
+/// The key their copy of `container`'s service wrote for itself, read from the file the
+/// stack's declaration of the service names, by the shape it gives it, beneath the first
+/// directory their container mounts.
+async fn their_key(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    container: &Container,
+) -> Result<String, String> {
+    let api = manifest
+        .services
+        .iter()
+        .find(|declared| declared.id == container.service)
+        .and_then(|declared| declared.api.as_ref());
+    let read = api.and_then(|api| crate::credential::written::reader(api.key_source));
+    let file = api
+        .and_then(|api| api.path.as_deref())
+        .and_then(|path| std::path::Path::new(path).file_name());
+    let (Some(read), Some(file), Some(mount)) = (read, file, container.mounts.first()) else {
+        return Err(UNCONFIGURED.to_owned());
+    };
+    crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), &mount.join(file), mount)
+        .await
+        .and_then(|text| read(&text))
+        .ok_or_else(|| "their copy has written no key lemonfiber could read".to_owned())
 }
 
 /// What is said about a service that could not be read on one side or the other.
@@ -286,3 +389,6 @@ fn nothing(survey: &MigrationReport) -> ImportReport {
         ..ImportReport::default()
     }
 }
+
+#[cfg(test)]
+mod tests;

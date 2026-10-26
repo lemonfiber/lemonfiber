@@ -130,7 +130,8 @@ pub(super) async fn seed_request_identity(
         None => pairing.at.url(),
     };
 
-    let Some(client) = crate::app::targets::requests_as_owner(ctx, &requests).await else {
+    let answering = fillers.fronting(&requests).unwrap_or(&requests);
+    let Some(client) = crate::app::targets::requests_as_owner(ctx, answering).await else {
         return (Vec::new(), records);
     };
     let wiring = match administered {
@@ -150,7 +151,7 @@ pub(super) async fn seed_request_identity(
     // What the household is told and where the request service reaches the media server
     // are read and written with the request service's own key, which the setup above
     // is what writes, so the client is opened only now.
-    let owner = crate::app::targets::requests_as_owner(ctx, &requests)
+    let owner = crate::app::targets::requests_as_owner(ctx, answering)
         .await
         .unwrap_or(client);
 

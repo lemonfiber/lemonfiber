@@ -1606,6 +1606,7 @@ dependencies = [
  "lemonfiber-contract",
  "lemonfiber-core",
  "lemonfiber-fixtures",
+ "lemonfiber-manifest",
  "lemonfiber-plugin",
  "serde",
  "serde_json",

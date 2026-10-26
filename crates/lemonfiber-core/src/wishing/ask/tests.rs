@@ -6,38 +6,16 @@ use lemonfiber_fixtures::ports::{stamp, DAY, HOUR};
 use super::{chosen, counted, said, Choice};
 use crate::app::{Ctx, Outcome};
 use crate::model::{AskedReport, Became, LeftAfter, TitleKind};
-use crate::ports::http::Method;
 use crate::ports::media::Kind;
-use crate::ports::service::{Detail, MediaStatus, Season, Wish};
-use crate::wishing::tests::{
-    asked, asked_for, code, ctx_over, ctx_running, house, route, Route, APPROVES_OWN,
+use crate::ports::service::{
+    Asking, Detail, Headroom, HouseholdRequest, Left, MediaStatus, Quota, RequestStatus, Season,
+    Wish,
 };
-
-/// A film out in Britain, rated twelve, that nobody has asked for.
-const FILM: &str = r#"{"status":"Released","releases":{"results":[
-    {"iso_3166_1":"GB","release_dates":[{"certification":"12A"}]}]}}"#;
-
-/// The same film, already here.
-const FILM_HERE: &str = r#"{"status":"Released","mediaInfo":{"status":5}}"#;
-
-/// The same film, on its way.
-const FILM_COMING: &str = r#"{"status":"Released","mediaInfo":{"status":3}}"#;
-
-/// A film rated fifteen in Britain.
-const FILM_FIFTEEN: &str = r#"{"status":"Released","releases":{"results":[
-    {"iso_3166_1":"GB","release_dates":[{"certification":"15"}]}]}}"#;
-
-/// A film not out yet.
-const FILM_COMING_OUT: &str = r#"{"status":"Post Production"}"#;
-
-/// A series of three seasons: the first here, the second on its way, the third nobody
-/// has asked for.
-const SERIES: &str = r#"{"status":"Ended","firstAirDate":"2011-04-17",
-    "seasons":[{"seasonNumber":0},{"seasonNumber":1},{"seasonNumber":2},{"seasonNumber":3}],
-    "mediaInfo":{"status":4,"seasons":[{"seasonNumber":1,"status":5},{"seasonNumber":2,"status":3}]}}"#;
-
-/// The ask filed and approved on the spot.
-const FILED_APPROVED: &str = r#"{"id":8,"status":2}"#;
+use crate::test_support::requests::{answered, intake, taken, told, unavailable};
+use crate::wishing::tests::{
+    account, asked, asked_for, call, calls, code, ctx_over, ctx_running, filing, house, rated,
+    titled_as, Route, ACCOUNT,
+};
 
 /// The report an ask answered with, or nothing where it was refused.
 fn report(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<AskedReport> {
@@ -47,25 +25,78 @@ fn report(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<AskedR
     }
 }
 
+/// A film out in Britain, rated twelve, standing in the house as `status`.
+fn film(status: MediaStatus) -> Answer {
+    answered(&Some(Detail {
+        status,
+        ..rated(Some("12A"))
+    }))
+}
+
+/// A series of three seasons: the first here, the second on its way, the third nobody
+/// has asked for.
+fn series() -> Answer {
+    let season = |number, status| Season { number, status };
+    answered(&Some(Detail {
+        status: MediaStatus::PartlyAvailable,
+        seasons: vec![
+            season(1, MediaStatus::Available),
+            season(2, MediaStatus::Processing),
+            season(3, MediaStatus::Unknown),
+        ],
+        ..rated(None)
+    }))
+}
+
 /// The house, with the film and the series looked up as given.
 fn titled(first: Vec<Route>) -> Arc<Transport> {
     let mut routes = first;
     routes.extend([
-        route(Method::Get, "/api/v1/movie/603", 200, FILM),
-        route(Method::Get, "/api/v1/tv/1399", 200, SERIES),
+        titled_as("603", film(MediaStatus::Unknown)),
+        titled_as("1399", series()),
     ]);
     house(routes)
 }
 
-/// The bodies the request service was asked to file.
-fn filed(transport: &Transport) -> Vec<serde_json::Value> {
-    transport
-        .requests()
-        .into_iter()
-        .filter(|request| request.method == Method::Post && request.url.ends_with("/request"))
-        .filter_map(|request| request.body)
-        .filter_map(|body| serde_json::from_str(&body).ok())
-        .collect()
+/// What the request service was asked to file.
+fn filed(transport: &Transport) -> Vec<Wish> {
+    told(&transport.requests(), "ask", "wish")
+}
+
+/// The film `id` as a wish names it whole.
+fn the_film(id: &str) -> Wish {
+    Wish {
+        id: id.to_owned(),
+        kind: Kind::Movies,
+        seasons: Vec::new(),
+    }
+}
+
+/// What the household may ask for where nobody chose otherwise for one person: asks
+/// that wait, `quota` of them.
+fn household(quota: Option<Quota>) -> Route {
+    call(
+        "asking",
+        answered(&Asking {
+            approves_own: false,
+            quota,
+        }),
+    )
+}
+
+/// What the member's period has counted where their one film is spent.
+fn spent() -> Route {
+    call(
+        "left",
+        answered(&Headroom {
+            films: Left {
+                limit: Some(1),
+                used: 1,
+                days: Some(30),
+            },
+            television: Left::default(),
+        }),
+    )
 }
 
 /// A rehearsal of `ctx`.
@@ -109,12 +140,7 @@ async fn a_rehearsal_says_what_the_ask_leaves_and_that_it_waits_and_files_nothin
 
 #[tokio::test]
 async fn a_rehearsal_for_a_member_who_approves_their_own_says_it_arrives_unasked() {
-    let transport = titled(vec![route(
-        Method::Get,
-        "/api/v1/user/jellyfin/",
-        200,
-        APPROVES_OWN,
-    )]);
+    let transport = titled(vec![call("requesting", account(true))]);
     let ctx = rehearsing(ctx_over(Arc::clone(&transport), "ask-rehearsed-arrives"));
 
     let rehearsed = report(asked(&ctx, "Ada", Kind::Movies, "603", &[]).await);
@@ -136,8 +162,8 @@ async fn a_rehearsal_for_a_member_who_approves_their_own_says_it_arrives_unasked
 #[tokio::test]
 async fn an_ask_is_filed_as_the_member_and_arrives_where_they_approve_their_own() {
     let transport = titled(vec![
-        route(Method::Get, "/api/v1/user/jellyfin/", 200, APPROVES_OWN),
-        route(Method::Post, "/api/v1/request", 201, FILED_APPROVED),
+        call("requesting", account(true)),
+        call("ask", filing(false)),
     ]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-arrives");
 
@@ -155,14 +181,11 @@ async fn an_ask_is_filed_as_the_member_and_arrives_where_they_approve_their_own(
              seasons of television."
         )
     );
+    assert_eq!(filed(&transport), vec![the_film("603")]);
     assert_eq!(
-        filed(&transport),
-        vec![serde_json::json!({"mediaType":"movie","mediaId":603})]
+        told::<String>(&transport.requests(), "ask", "member"),
+        vec![ACCOUNT.to_owned()]
     );
-    assert!(transport.requests().iter().any(|request| request
-        .headers
-        .iter()
-        .any(|(name, value)| name == "X-API-User" && value == "4")));
 }
 
 #[tokio::test]
@@ -183,12 +206,7 @@ async fn an_ask_from_a_member_whose_asks_wait_waits_for_whoever_runs_the_house()
 
 #[tokio::test]
 async fn a_request_service_that_lets_through_what_should_wait_is_never_reported_as_granted() {
-    let transport = titled(vec![route(
-        Method::Post,
-        "/api/v1/request",
-        201,
-        FILED_APPROVED,
-    )]);
+    let transport = titled(vec![call("ask", filing(false))]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-broken-promise");
 
     let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
@@ -200,21 +218,14 @@ async fn a_request_service_that_lets_through_what_should_wait_is_never_reported_
 #[tokio::test]
 async fn a_member_the_request_service_does_not_know_yet_is_given_an_account_and_asks() {
     let transport = titled(vec![
-        (
-            Method::Get,
-            "/api/v1/user/jellyfin/",
-            vec![
-                Answer::reply(404, "{}"),
-                Answer::reply(200, crate::wishing::tests::WAITS),
-            ],
+        calls(
+            "requesting",
+            vec![answered(&None::<String>), account(false)],
         ),
-        route(
-            Method::Get,
-            "/settings/main",
-            200,
-            r#"{"defaultPermissions":32,"defaultQuotas":{"movie":{"quotaLimit":3,"quotaDays":7}}}"#,
-        ),
-        route(Method::Post, "/user/import-from-jellyfin", 201, "[]"),
+        household(Some(Quota {
+            requests: 3,
+            days: 7,
+        })),
     ]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-unlinked");
 
@@ -236,41 +247,36 @@ async fn a_member_the_request_service_does_not_know_yet_is_given_an_account_and_
             .map(|report| (report.outcome, report.leaves.films)),
         Some((Became::Waiting, Some(2)))
     );
-    assert!(asked_for(&transport, "/user/import-from-jellyfin"));
+    assert_eq!(
+        told::<Vec<String>>(&transport.requests(), "link_members", "members"),
+        vec![vec!["a7f3".to_owned()]]
+    );
     assert_eq!(filed(&transport).len(), 1);
 }
 
 #[tokio::test]
 async fn a_member_the_request_service_cannot_be_given_an_account_for_is_not_working() {
-    for (accounts, imported, why) in [
-        (vec![404], 201, "still unknown once linked"),
-        (vec![404], 500, "linking refused"),
-        (vec![404, 500], 201, "unreadable once linked"),
+    let unknown = || answered(&None::<String>);
+    for (accounts, linked, why) in [
+        (vec![unknown()], taken(), "still unknown once linked"),
+        (vec![unknown()], unavailable(), "linking refused"),
+        (
+            vec![unknown(), unavailable()],
+            taken(),
+            "unreadable once linked",
+        ),
     ] {
-        let account: Route = (
-            Method::Get,
-            "/api/v1/user/jellyfin/",
-            accounts
-                .into_iter()
-                .map(|status| Answer::reply(status, "{}"))
-                .collect(),
-        );
         let transport = titled(vec![
-            account,
-            route(
-                Method::Get,
-                "/settings/main",
-                200,
-                r#"{"defaultPermissions":32,"defaultQuotas":{}}"#,
-            ),
-            route(Method::Post, "/user/import-from-jellyfin", imported, "[]"),
+            calls("requesting", accounts),
+            call("link_members", linked),
+            household(None),
         ]);
         let ctx = ctx_over(Arc::clone(&transport), "ask-unlinkable");
 
         let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
 
         assert_eq!(code(&refused).as_deref(), Some("WISH-8"), "{why}");
-        assert!(asked_for(&transport, "/user/import-from-jellyfin"), "{why}");
+        assert!(asked_for(&transport, intake("link_members")), "{why}");
         assert!(filed(&transport).is_empty(), "{why}");
     }
 }
@@ -290,10 +296,7 @@ fn an_ask_under_no_limit_says_nothing_about_room() {
 
 #[tokio::test]
 async fn a_title_outside_the_members_limits_is_no_such_title_and_nothing_is_filed() {
-    let transport = titled(vec![
-        route(Method::Get, "/api/v1/movie/604", 200, FILM_FIFTEEN),
-        route(Method::Get, "/api/v1/movie/605", 404, "{}"),
-    ]);
+    let transport = titled(vec![titled_as("604", answered(&Some(rated(Some("15")))))]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-restricted");
 
     let restricted = asked(&ctx, "Bea", Kind::Movies, "604", &[]).await;
@@ -329,9 +332,9 @@ async fn a_title_outside_the_members_limits_is_no_such_title_and_nothing_is_file
 
 #[tokio::test]
 async fn a_kind_the_house_cannot_fetch_is_refused_before_the_title_is_looked_up() {
-    for (running, kind, id, said, looked_up) in [
-        ("radarr", Kind::Tv, "1399", "series", "/api/v1/tv/"),
-        ("sonarr", Kind::Movies, "603", "films", "/api/v1/movie/"),
+    for (running, kind, id, said) in [
+        ("radarr", Kind::Tv, "1399", "series"),
+        ("sonarr", Kind::Movies, "603", "films"),
     ] {
         let transport = titled(Vec::new());
         let ctx = ctx_running(Arc::clone(&transport), "ask-no-kind", &[running]);
@@ -346,24 +349,14 @@ async fn a_kind_the_house_cannot_fetch_is_refused_before_the_title_is_looked_up(
                 .map(|problem| problem.summary.as_str()),
             Some(format!("This house can't fetch {said} right now.").as_str())
         );
-        assert!(!asked_for(&transport, looked_up), "{said}");
+        assert!(!asked_for(&transport, intake("detail")), "{said}");
     }
 }
 
 #[tokio::test]
 async fn a_film_already_here_is_refused_and_one_on_its_way_creates_nothing() {
-    let here = titled(vec![route(
-        Method::Get,
-        "/api/v1/movie/603",
-        200,
-        FILM_HERE,
-    )]);
-    let coming = titled(vec![route(
-        Method::Get,
-        "/api/v1/movie/603",
-        200,
-        FILM_COMING,
-    )]);
+    let here = titled(vec![titled_as("603", film(MediaStatus::Available))]);
+    let coming = titled(vec![titled_as("603", film(MediaStatus::Processing))]);
 
     let refused = asked(
         &ctx_over(Arc::clone(&here), "ask-here"),
@@ -422,7 +415,11 @@ async fn a_series_asks_only_for_the_seasons_not_already_here_or_on_their_way() {
     );
     assert_eq!(
         filed(&transport),
-        vec![serde_json::json!({"mediaType":"tv","mediaId":1399,"seasons":[3]})]
+        vec![Wish {
+            id: "1399".to_owned(),
+            kind: Kind::Tv,
+            seasons: vec![3],
+        }]
     );
 }
 
@@ -447,26 +444,36 @@ async fn seasons_named_wrongly_are_refused_and_seasons_all_here_or_coming_create
 
 #[tokio::test]
 async fn an_ask_past_the_members_allowance_is_refused_saying_when_it_frees_up() {
-    let requests = format!(
-        r#"{{"pageInfo":{{"results":4}},"results":[
-        {{"id":3,"status":2,"createdAt":"{}.000Z","type":"movie",
-            "media":{{"status":5}},"requestedBy":{{"displayName":"Ada","jellyfinUserId":"a7f3"}}}},
-        {{"id":4,"status":3,"createdAt":"{}.000Z","type":"movie",
-            "media":{{"status":1}},"requestedBy":{{"displayName":"Ada","jellyfinUserId":"a7f3"}}}},
-        {{"id":5,"status":2,"createdAt":"{}.000Z","type":"movie",
-            "media":{{"status":5}},"requestedBy":{{"displayName":"Bea","jellyfinUserId":"b8e4"}}}},
-        {{"id":6,"status":2,"createdAt":"{}.000Z","type":"movie",
-            "media":{{"status":5}},"requestedBy":{{"displayName":"ada"}}}}]}}"#,
-        stamp(-DAY + 10 * HOUR),
-        stamp(-16 * DAY + 10 * HOUR),
-        stamp(-15 * DAY + 10 * HOUR),
-        stamp(8 * HOUR),
-    );
-    let spent = r#"{"movie":{"days":30,"limit":1,"used":1},"tv":{}}"#;
-    let transport = titled(vec![
-        route(Method::Get, "/quota", 200, spent),
-        route(Method::Get, "/api/v1/request?", 200, &requests),
-    ]);
+    let made =
+        |id, member: &str, member_id: Option<&str>, at, statuses: (RequestStatus, MediaStatus)| {
+            HouseholdRequest {
+                arrived: None,
+                shelf_id: None,
+                id,
+                made: Some(format!("{}.000Z", stamp(at))),
+                member: member.to_owned(),
+                member_id: member_id.map(str::to_owned),
+                kind: Some(Kind::Movies),
+                title_id: None,
+                item: None,
+                request_status: Some(statuses.0),
+                media_status: Some(statuses.1),
+            }
+        };
+    let arrived = (RequestStatus::Approved, MediaStatus::Available);
+    let requests = vec![
+        made(3, "Ada", Some("a7f3"), -DAY + 10 * HOUR, arrived),
+        made(
+            4,
+            "Ada",
+            Some("a7f3"),
+            -16 * DAY + 10 * HOUR,
+            (RequestStatus::Declined, MediaStatus::Unknown),
+        ),
+        made(5, "Bea", Some("b8e4"), -15 * DAY + 10 * HOUR, arrived),
+        made(6, "ada", None, 8 * HOUR, arrived),
+    ];
+    let transport = titled(vec![spent(), call("requests", answered(&requests))]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-spent");
 
     let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
@@ -496,8 +503,7 @@ async fn an_ask_past_the_members_allowance_is_refused_saying_when_it_frees_up() 
 
 #[tokio::test]
 async fn an_ask_past_an_allowance_whose_dates_are_unknown_is_refused_with_the_plain_remedy() {
-    let spent = r#"{"movie":{"days":30,"limit":1,"used":1},"tv":{}}"#;
-    let transport = titled(vec![route(Method::Get, "/quota", 200, spent)]);
+    let transport = titled(vec![spent()]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-spent-undated");
 
     let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
@@ -520,9 +526,7 @@ async fn a_house_with_no_room_says_so_as_the_houses_and_files_nothing() {
         total: 4 * 1024 * 1024 * 1024 * 1024,
     };
     ctx = ctx.with_filesystem(Arc::new(
-        crate::test_support::SeedFs::keyed(Some("<Config><ApiKey>k</ApiKey></Config>"))
-            .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
-            .with_facts(full),
+        crate::test_support::SeedFs::keyed(None).with_facts(full),
     ));
     ctx.settings.data_root = ctx
         .settings
@@ -538,11 +542,12 @@ async fn a_house_with_no_room_says_so_as_the_houses_and_files_nothing() {
 
 #[tokio::test]
 async fn a_title_not_out_yet_is_asked_for_and_said_to_arrive_once_it_is() {
-    let transport = titled(vec![route(
-        Method::Get,
-        "/api/v1/movie/606",
-        200,
-        FILM_COMING_OUT,
+    let transport = titled(vec![titled_as(
+        "606",
+        answered(&Some(Detail {
+            released: false,
+            ..Detail::default()
+        })),
     )]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-unreleased");
 
@@ -556,9 +561,9 @@ async fn a_title_not_out_yet_is_asked_for_and_said_to_arrive_once_it_is() {
 
 #[tokio::test]
 async fn a_request_service_that_will_not_look_up_or_file_is_asking_not_working() {
-    let lookup = titled(vec![route(Method::Get, "/api/v1/movie/603", 500, "")]);
-    let filing = titled(vec![route(Method::Post, "/api/v1/request", 500, "")]);
-    let allowance = titled(vec![route(Method::Get, "/quota", 500, "")]);
+    let lookup = titled(vec![titled_as("603", unavailable())]);
+    let filing = titled(vec![call("ask", unavailable())]);
+    let allowance = titled(vec![call("left", unavailable())]);
 
     let unlooked = asked(
         &ctx_over(lookup, "ask-lookup-fails"),

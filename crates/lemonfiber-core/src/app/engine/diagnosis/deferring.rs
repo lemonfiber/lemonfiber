@@ -9,12 +9,14 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::app::targets::{committed_bytes, host_fillers};
+use crate::app::targets::{committed_bytes, curator_targets, host_fillers};
 use crate::app::Ctx;
+use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::declining::{Dating, Decline, DeclineKeyCheck, KeyDates};
 use crate::doctor::deferred::Deferred;
 use crate::doctor::owned::{OwnedCheck, Part};
 use crate::doctor::providers::ProvidersCheck;
+use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::seasons::SeasonsCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::{budget_for, VpnCheck};
@@ -39,6 +41,46 @@ pub(super) fn tunnel(
         async move {
             Box::new(tunnelled(&ctx, &manifest, project.as_deref(), disruptive).await)
                 as Box<dyn Check>
+        }
+    })
+}
+
+/// Whether each curator still answers to the key lemonfiber minted for it, built when it
+/// runs, so each is asked through the adapter in front of it.
+pub(super) fn credentials(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    project: Option<&Path>,
+) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    let project = project.map(Path::to_path_buf);
+    Deferred::new(Category::Credentials, CHECK_BUDGET, move || {
+        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
+        async move {
+            let fillers = host_fillers(&ctx, &manifest, project.as_deref());
+            Box::new(CredentialsCheck::new(curator_targets(&ctx, &fillers).await)) as Box<dyn Check>
+        }
+    })
+}
+
+/// Whether the chosen quality finds releases, built when it runs, so each curator is
+/// asked through the adapter in front of it.
+pub(super) fn releases(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    project: Option<&Path>,
+    disruptive: bool,
+) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    let project = project.map(Path::to_path_buf);
+    Deferred::new(Category::Services, CHECK_BUDGET, move || {
+        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
+        async move {
+            let fillers = host_fillers(&ctx, &manifest, project.as_deref());
+            Box::new(ReleasesCheck::new(
+                curator_targets(&ctx, &fillers).await,
+                disruptive,
+            )) as Box<dyn Check>
         }
     })
 }
@@ -178,12 +220,7 @@ pub(super) fn wired(ctx: &Ctx, stack: &Stack, project: Option<&Path>) -> Deferre
             let wirings =
                 crate::seed::run::managed_wirings(&ctx, &manifest, &installed, project.as_deref())
                     .await;
-            Box::new(WiringCheck::new(
-                ctx.seams.http.clone(),
-                ctx.seams.filesystem.clone(),
-                wirings,
-                ctx.stamp(),
-            )) as Box<dyn Check>
+            Box::new(WiringCheck::new(wirings, ctx.stamp())) as Box<dyn Check>
         }
     })
 }
@@ -268,10 +305,10 @@ async fn provider_accounts(
     manifest: &lemonfiber_manifest::Manifest,
     project: Option<&Path>,
 ) -> ProvidersCheck {
-    let services = &manifest.services;
+    let fillers = host_fillers(ctx, manifest, project);
     ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, &host_fillers(ctx, manifest, project)).await,
-        crate::app::targets::indexer_aggregator(ctx, services, project)
+        crate::app::targets::usenet_client(ctx, &fillers).await,
+        crate::app::targets::indexer_aggregator(ctx, &fillers)
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
         ctx.today(),

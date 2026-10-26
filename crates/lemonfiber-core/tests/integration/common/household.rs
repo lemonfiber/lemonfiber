@@ -7,40 +7,53 @@
 //! decision and the reading afterwards — and a second copy of that table would be a
 //! second idea of what the service says.
 //!
-//! **Answered by route rather than in turn.** Several of these calls read before they
-//! write, so a queue would prove only that the right number of requests went out; the
-//! defect worth catching is a narrow body, which a queue cannot see at all.
+//! The request service has moved into its plugin, so the table answers `request.intake`
+//! as its adapter would. **Answered by route rather than in turn.** Several of these
+//! calls read before they write, so a queue would prove only that the right number of
+//! requests went out.
 
 use std::sync::Arc;
 
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::{Reaching, Settings};
-use lemonfiber_core::ports::http::Method;
-use lemonfiber_core::ports::service::{Certificate, NamedLibrary};
+use lemonfiber_core::ports::service::{
+    Address, Asking, Certificate, Headroom, HouseholdRequest, Left, MediaStatus, NamedLibrary,
+    RequestStatus, Requesting,
+};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_ports::media::Kind;
 use lemonfiber_testing::media;
+use lemonfiber_testing::requests::{self, REQUESTS};
+
+/// The identifier the request service files the household's one member under.
+pub const MEMBER: &str = "4";
 
 /// Where the member who asked already hears from the request service.
 ///
-/// Both agents carrying the bit the service files a refusal under, because a member who
-/// gave two addresses and asked to hear on both is the case where every arm of the
-/// sending runs. The one who switched an agent off is a case of its own below.
-pub const REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
-    "pushoverApplicationToken":"the-application-token","pushoverSound":"bike",
-    "pushbulletAccessToken":"the-access-token",
-    "notificationTypes":{"pushover":64,"pushbullet":64}}"#;
+/// Both agents, because a member who gave two addresses and asked to hear on both is the
+/// case where every arm of the sending runs. The one who switched an agent off is a case
+/// of its own below.
+#[must_use]
+pub fn reached_at() -> Vec<Address> {
+    let mut both = half_reached_at();
+    both.push(Address::Pushbullet {
+        token: "the-access-token".to_owned(),
+    });
+    both
+}
 
 /// The same member, with one of the two agents left switched off.
-///
-/// Nought is what the service stores for anybody who has never chosen, and it is what it
-/// treats as telling them nothing on that agent.
-pub const HALF_REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
-    "pushoverApplicationToken":"the-application-token",
-    "pushbulletAccessToken":"the-access-token",
-    "notificationTypes":{"pushover":64,"pushbullet":0}}"#;
+#[must_use]
+pub fn half_reached_at() -> Vec<Address> {
+    vec![Address::Pushover {
+        user: "the-user-key".to_owned(),
+        application: "the-application-token".to_owned(),
+        sound: Some("bike".to_owned()),
+    }]
+}
 
 /// A scratch environment file holding the media server's recorded password.
 #[track_caller]
@@ -102,103 +115,96 @@ pub fn watched(name: &str) -> (Ctx, Arc<Fake>) {
     (context(name, &transport), transport)
 }
 
-/// The same, with one call answering a refusal instead.
+/// The same, with one operation answering a refusal instead.
 ///
 /// One rule rather than a whole transport per case: every write here reaches the
 /// service more than once, and what each of these holds is that the *later* calls
 /// leave the household as it was — which a fixture that refused everything could not
 /// tell apart from never having been asked.
-pub fn refusing(name: &str, method: Method, route: &'static str) -> Ctx {
-    with(name, vec![(Some(method), route, Answer::reply(500, "no"))])
+pub fn refusing(name: &str, route: &'static str) -> Ctx {
+    with(name, vec![(route, requests::refusing())])
 }
 
 /// The transport these run against, with any broken rule ahead of the working ones.
-pub fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
+pub fn with(name: &str, broken: Vec<(&'static str, Answer)>) -> Ctx {
     context(name, &table(broken))
 }
 
+/// The household's one request, as the request service records it.
+#[must_use]
+pub fn the_request() -> HouseholdRequest {
+    HouseholdRequest {
+        id: 7,
+        made: Some("2026-08-17T21:04:09.000Z".to_owned()),
+        member: "Alex".to_owned(),
+        member_id: None,
+        kind: Some(Kind::Movies),
+        title_id: None,
+        item: Some(3),
+        arrived: None,
+        shelf_id: None,
+        request_status: Some(RequestStatus::Pending),
+        media_status: Some(MediaStatus::Pending),
+    }
+}
+
 /// The routes, with any broken rule ahead of the working ones.
-pub fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
+pub fn table(broken: Vec<(&'static str, Answer)>) -> Arc<Fake> {
     let mut routes = broken;
     routes.extend(vec![
         (
-            None,
             media::identity("household"),
             media::answered(&[media::member("a1", "Alex", true)]),
         ),
         (
-            None,
             media::identity("libraries"),
             media::answered(&Vec::<NamedLibrary>::new()),
         ),
         (
-            None,
             media::identity("ratings"),
             media::answered(&Vec::<Certificate>::new()),
         ),
-        (None, "/auth/me", Answer::reply(200, "{}")),
-        (
-            None,
-            "/settings/main",
-            Answer::reply(
-                200,
-                r#"{"defaultPermissions":160,"defaultQuotas":{"movie":{},"tv":{}}}"#,
-            ),
+        requests::answering(
+            "asking",
+            &Asking {
+                approves_own: true,
+                quota: None,
+            },
         ),
-        (
-            None,
-            "/user/jellyfin/",
-            Answer::reply(200, r#"{"id":4,"permissions":160}"#),
+        requests::answering("member_for", &Some(MEMBER)),
+        requests::answering(
+            "requesting",
+            &Some(Requesting {
+                id: MEMBER.to_owned(),
+                approves_own: true,
+            }),
         ),
-        (
-            None,
-            "/user/4/quota",
-            // At their limit, so the line saying so — and the sentence that says what
-            // they have left and when there is room again — is built here too.
-            Answer::reply(
-                200,
-                r#"{"movie":{"days":7,"limit":5,"used":5},"tv":{"days":7,"limit":0,"used":0}}"#,
-            ),
+        requests::answering(
+            "left",
+            &Headroom {
+                films: Left {
+                    limit: Some(5),
+                    used: 5,
+                    days: Some(7),
+                },
+                television: Left {
+                    limit: None,
+                    used: 0,
+                    days: Some(7),
+                },
+            },
         ),
-        (
-            None,
-            "settings/permissions",
-            Answer::reply(200, r#"{"permissions":160}"#),
-        ),
-        // Where the member who asked is reached. Ahead of the settings write next
-        // door only in reading order; what matters is that it is behind nothing whose
-        // fragment this URL also contains.
-        (
-            None,
-            "/user/4/settings/notifications",
-            Answer::reply(200, REACHED_AT),
-        ),
-        // The one request's own record, read to find out whose it is. Named by method
-        // as well as by path, because the decision below posts to a URL this fragment
-        // is a prefix of.
-        (
-            Some(Method::Get),
-            "/request/7",
-            Answer::reply(
-                200,
-                r#"{"id":7,"requestedBy":{"id":4,"displayName":"Alex"}}"#,
-            ),
-        ),
-        (None, "/request/7/", Answer::reply(200, "{}")),
-        (
-            None,
-            "/api/v1/request",
-            Answer::reply(
-                200,
-                r#"{"pageInfo":{"results":1},"results":[{"id":7,
-                    "createdAt":"2026-08-17T21:04:09.000Z","status":1,"type":"movie",
-                    "media":{"status":2,"externalServiceId":3},
-                    "requestedBy":{"displayName":"Alex"}}]}"#,
-            ),
-        ),
-        (None, "", Answer::reply(200, "[]")),
+        requests::answering("reachable", &reached_at()),
+        requests::answering("requests", &vec![the_request()]),
+        (requests::intake("answers"), requests::taken()),
+        (requests::intake("decide"), requests::taken()),
+        (requests::intake("set_asking"), requests::taken()),
+        (requests::intake("set_quota"), requests::taken()),
+        (requests::intake("approves_own"), requests::taken()),
+        (requests::intake("set_notices"), requests::taken()),
+        ("", Answer::reply(200, "[]")),
     ]);
-    Fake::by_rules(routes)
+    Fake::by_path(routes)
 }
 
 /// An install reached over the given transport.
@@ -216,7 +222,8 @@ pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
         .over(set_up_request_service(name))
         .engine(Arc::new(
             Reporting::holding(&["jellyfin", "seerr"], Lifecycle::Running, Health::Healthy)
-                .alongside(media::running()),
+                .alongside(media::running())
+                .alongside(REQUESTS.running()),
         ))
         .settings(Settings {
             env_file: Some(recorded_admin(name)),
@@ -226,6 +233,7 @@ pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
         .build()
         .with_http(transport.clone());
     media::moved_in(&ctx);
+    REQUESTS.moved_in(&ctx);
     ctx
 }
 

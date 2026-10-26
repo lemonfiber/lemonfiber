@@ -1,6 +1,8 @@
 //! Seeing a credential once, and replacing one.
 
-use super::{asked, ctx, env_at, recorded, sealed, silent, the_recorded_password, Sealing};
+use super::{
+    asked, ctx, env_at, recorded, sealed, silent, the_recorded_password, Sealing, SERVICE_CONFIG,
+};
 use lemonfiber_contract::wire::Kind;
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::app::Ctx;
@@ -30,6 +32,26 @@ async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_say
     assert!(said.starts_with("Some(Elsewhere"), "{said}");
     assert!(said.contains("indexer's own account page"), "{said}");
     assert_eq!(recorded(&env, "INDEXER_APIKEY"), Some(key));
+}
+
+/// A key a stack service wrote for itself is not one lemonfiber replaces or hands out
+/// unproven — seeding already gives it to whatever reads it, and the answer says so.
+#[tokio::test]
+async fn a_key_a_service_wrote_for_itself_points_at_the_seeding_instead() {
+    let env = env_at("notservarr", &[]);
+    let ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "SEERR_API_KEY".to_owned(),
+        },
+    )
+    .await;
+
+    let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
+    assert!(said.starts_with("Some(Elsewhere"), "{said}");
+    assert!(said.contains("lemonfiber seed"), "{said}");
 }
 
 #[tokio::test]

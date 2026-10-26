@@ -1,4 +1,3 @@
-use super::{aggregator_target, project_directory};
 use crate::app::targets::downloads::committed_of;
 use crate::app::Ctx;
 use crate::ports::filesystem::Beneath;
@@ -10,26 +9,43 @@ fn ctx() -> Ctx {
     a_context().build()
 }
 
-/// Every service the embedded stack declares, with the project it is read from.
-fn resolving() -> (
-    Vec<lemonfiber_manifest::Service>,
-    Option<std::path::PathBuf>,
-) {
-    let context = ctx();
-    let services = context
-        .stack
-        .checked_manifest(context.today())
-        .map(|manifest| manifest.services)
-        .unwrap_or_default();
-    let project = project_directory(&context.stack, context.settings.stack_dir.as_deref());
-    (services, project)
+/// The embedded stack's fillers, with every part the bundle installs moved in where
+/// `moved` says.
+fn shipped(moved: bool) -> crate::wiring::Fillers {
+    let installed: Vec<crate::plugin::Installed> = if moved {
+        lemonfiber_bundled::PINNED
+            .iter()
+            .filter(|one| one.stage == Some(lemonfiber_bundled::Stage::Installed))
+            .filter_map(|one| {
+                crate::test_support::adapted::Adapted {
+                    plugin: one.first_party.plugin,
+                    adapter: "",
+                    port: 0,
+                }
+                .installed()
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &installed,
+                &crate::wiring::Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default()
 }
 
-/// Every service the shipped stack declares is one this build reaches.
+/// Every service the shipped stack declares is one this build reaches once every part
+/// the bundle installs has moved in.
 #[test]
 fn the_shipped_stack_declares_no_service_this_build_cannot_reach() {
-    let (services, project) = resolving();
-    let found = super::unsupported_here(&services, project.as_deref());
+    let found = super::unsupported_here(&shipped(true));
 
     assert!(
         found.is_empty(),
@@ -37,72 +53,41 @@ fn the_shipped_stack_declares_no_service_this_build_cannot_reach() {
     );
 }
 
-/// And a fork's incomplete declaration lands in the same list the deferred shapes
-/// do, sorted together rather than appended in whichever order they were found.
-#[test]
-fn a_declaration_this_build_cannot_reach_is_named_in_the_same_list() {
-    let (services, project) = resolving();
-    let mut theirs: Vec<lemonfiber_manifest::Service> = services
-        .into_iter()
-        .filter(|service| service.id == "sonarr")
-        .collect();
-    for service in &mut theirs {
-        service.port = None;
-    }
-    assert_eq!(theirs.len(), 1, "the stack declares an episode filer");
-
-    let found = super::unsupported_here(&theirs, project.as_deref());
-    assert!(
-        found.first().is_some_and(|one| one.what == "sonarr"),
-        "{found:?}"
-    );
-}
-
 /// Everything this build cannot cover reads in the order of the services it names, not
 /// the order the stack declares them in.
 ///
-/// Driven with two unreachable declarations rather than one, because a single entry
-/// proves nothing about an order and a pair already in order proves nothing either: the
-/// two chosen here are declared the other way round.
+/// Two declarations, declared the other way round from the order they are named in, so
+/// the order is observable.
 #[test]
 fn what_this_build_cannot_cover_reads_in_the_order_of_the_services_it_names() {
-    let (services, project) = resolving();
-    // Two curator declarations with the port taken away, and so unreachable.
-    let theirs: Vec<lemonfiber_manifest::Service> = services
+    let declared = crate::test_support::stack()
+        .manifest()
+        .ok()
+        .and_then(|manifest| manifest.services.into_iter().find(|one| one.id == "sonarr"));
+    let theirs: Vec<lemonfiber_manifest::Service> = ["zeta", "alpha"]
         .into_iter()
-        .map(|mut service| {
-            if service.id == "prowlarr" || service.id == "lidarr" {
-                service.port = None;
-            }
-            service
+        .filter_map(|id| {
+            declared.clone().map(|mut service| {
+                id.clone_into(&mut service.id);
+                service
+            })
         })
         .collect();
-    let declared: Vec<&str> = theirs
-        .iter()
-        .map(|service| service.id.as_str())
-        .filter(|id| *id == "prowlarr" || *id == "lidarr")
-        .collect();
-    assert_eq!(
-        declared,
-        vec!["prowlarr", "lidarr"],
-        "the stack declares these two in this order, which is what makes the sort \
-         below observable"
-    );
+    assert_eq!(theirs.len(), 2, "the stack declares an episode filer");
 
-    let found = super::unsupported_here(&theirs, project.as_deref());
+    let found =
+        super::unsupported_here(&crate::test_support::stack_fillers(theirs, &[], None, &[]));
 
     let named: Vec<&str> = found.iter().map(|report| report.what.as_str()).collect();
-    assert_eq!(named, vec!["lidarr", "prowlarr"], "{found:?}");
+    assert_eq!(named, vec!["alpha", "zeta"], "{found:?}");
 }
 
-#[test]
-fn a_service_that_files_no_media_and_is_no_target_does_not_end_the_walk() {
-    let (services, project) = resolving();
-    let without_the_aggregator: Vec<lemonfiber_manifest::Service> = services
-        .into_iter()
-        .filter(|service| service.id != "prowlarr")
-        .collect();
-    assert!(aggregator_target(&without_the_aggregator, project.as_deref()).is_none());
+/// The stack's own indexer speaks no contract, so it is no indexer anything here asks.
+#[tokio::test]
+async fn an_indexer_speaking_no_contract_is_not_asked() {
+    assert!(super::indexer_aggregator(&ctx(), &shipped(false))
+        .await
+        .is_none());
 }
 
 /// A download with only its bytes-still-to-write set — the one field the

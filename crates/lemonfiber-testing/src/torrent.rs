@@ -18,7 +18,7 @@ use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 
 pub use super::adapted::{answered, refusing, taken, unavailable};
-use super::adapted::{path_of, Adapted};
+use super::adapted::{path_of, Adapted, PORT};
 
 /// The plugin the torrent client moved into.
 pub const PLUGIN: &str = "qbittorrent";
@@ -30,6 +30,7 @@ pub const ADAPTER: &str = "qbittorrent-adapter";
 const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 /// What the torrent client is carrying in these fixtures.

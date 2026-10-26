@@ -2,52 +2,33 @@
 //!
 //! Three values decide every case here — what lemonfiber recorded, what the service holds,
 //! and what lemonfiber would write — so every test is a different arrangement of those
-//! three. Both sides are faked: a filesystem handing back the curator's key, and a transport
-//! answering as the service would.
+//! three. The curator is asked over `library.curate` through the adapter in front of it,
+//! faked as a transport answering its contract as it would.
 //!
 //! From here rather than a `#[cfg(test)]` module, as the credentials and releases checks
 //! are: the check is built on `#[async_trait]` clients built on another, and in-crate that
 //! code is compiled twice with its coverage counted from the copy that never ran.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use lemonfiber_contract::Contracted;
+use lemonfiber_contract::capabilities::library::curate;
+use lemonfiber_contract::wire::Kind as Refusal;
 use lemonfiber_core::baseline::{Origin, Record};
-use lemonfiber_core::doctor::credentials::{Reach, Target};
 use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck};
 use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
 use lemonfiber_core::error::codes::wiring::DRIFTED;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::journal::{Change, Kind};
-use lemonfiber_core::ports::http::Method;
-use lemonfiber_core::ports::service::{Credential, DownloadClient, Protocol};
+use lemonfiber_core::ports::service::{
+    ClientProbe, Credential, DownloadClient, Protocol, RegisteredClient,
+};
 use lemonfiber_core::repair::{Attempt, Repair, Writing, OPERATION};
-use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
-
-/// A curator's config carrying a generated key, as one reads from disk.
-const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
+use lemonfiber_testing::adapted::{refused, KEY};
+use lemonfiber_testing::curators::{answered, curating, taken, TELEVISION};
 
 /// The category lemonfiber files television downloads under.
 const OURS: &str = "tv-sonarr";
-
-/// Where the curator writes its key, in the stack's bind-mount convention.
-fn config() -> PathBuf {
-    PathBuf::from("/stack/config/sonarr/config.xml")
-}
-
-fn curator() -> Target {
-    Target {
-        id: "sonarr".to_owned(),
-        name: "Sonarr".to_owned(),
-        base: "http://127.0.0.1:8989".to_owned(),
-        config: config(),
-        version: 3,
-        confined_to: None,
-        kind: None,
-    }
-}
 
 /// The download client lemonfiber wires into the curator, filing under its own category.
 fn want() -> DownloadClient {
@@ -73,13 +54,13 @@ fn recorded(value: &str, origin: Origin) -> Record {
     }
 }
 
-/// The wiring lemonfiber manages, with whatever it recorded for it.
-fn managed(recorded: Option<Record>) -> Managed {
-    let target = curator();
+/// The wiring lemonfiber manages, with whatever it recorded for it, the curator asked
+/// over `http`.
+fn managed(recorded: Option<Record>, http: Arc<Fake>) -> Managed {
     Managed {
-        id: target.id.clone(),
-        name: target.name.clone(),
-        reach: Some(Reach::Bundled(target)),
+        id: "sonarr".to_owned(),
+        name: "Sonarr".to_owned(),
+        asked: Some(Arc::new(curate::Adapter(TELEVISION.contracted(http)))),
         clients: vec![Wired {
             want: want(),
             recorded,
@@ -87,24 +68,26 @@ fn managed(recorded: Option<Record>) -> Managed {
     }
 }
 
-/// The service's answer for a client list holding one client at the given category.
-fn holding(category: Option<&str>) -> String {
-    let field = category.map_or_else(String::new, |value| {
-        format!(r#",{{"name":"tvCategory","value":"{value}"}}"#)
-    });
-    format!(
-        r#"[{{"id":7,"fields":[{{"name":"host","value":"sabnzbd"}},{{"name":"port","value":8080}}{field}]}}]"#
-    )
+/// The curator's answer for a client list holding one client at the given category.
+fn holding(category: Option<&str>) -> Answer {
+    answered(&[RegisteredClient {
+        id: "7".to_owned(),
+        host: "sabnzbd".to_owned(),
+        port: 8080,
+        category: category.map(|value| lemonfiber_core::ports::service::Category {
+            field: "tvCategory".to_owned(),
+            value: value.to_owned(),
+        }),
+    }])
 }
 
-/// The service's verdict on the client it holds — reachable, or not with its own words.
-fn tested(reachable: bool) -> String {
-    let failures = if reachable {
-        String::new()
-    } else {
-        r#","validationFailures":[{"errorMessage":"connection refused"}]"#.to_owned()
-    };
-    format!(r#"[{{"id":7,"isValid":{reachable}{failures}}}]"#)
+/// The curator's verdict on the client it holds — reachable, or not with its own words.
+fn tested(reachable: bool) -> Answer {
+    answered(&[ClientProbe {
+        id: "7".to_owned(),
+        reachable,
+        detail: (!reachable).then(|| "connection refused".to_owned()),
+    }])
 }
 
 /// A transport answering the client list, and taking an update without complaint.
@@ -112,28 +95,31 @@ fn answering(category: Option<&str>) -> Arc<Fake> {
     reaching(category, true)
 }
 
-/// The same, carrying the service's own verdict on whether it can reach the client.
+/// The same, carrying the curator's own verdict on whether it can reach the client.
 ///
 /// The test route is listed first, because a fake routed by what the URL contains would
-/// otherwise answer `downloadclient/testall` with the client list.
+/// otherwise answer `test_download_clients` with the client list.
 fn reaching(category: Option<&str>, reachable: bool) -> Arc<Fake> {
     Fake::by_path(vec![
         (
-            "downloadclient/testall",
-            Answer::reply(200, tested(reachable)),
+            curating(TELEVISION, "test_download_clients"),
+            tested(reachable),
         ),
-        ("downloadclient", Answer::reply(200, holding(category))),
+        (curating(TELEVISION, "update_download_client"), taken()),
+        (curating(TELEVISION, "download_clients"), holding(category)),
     ])
 }
 
 /// The check over one managed wiring, against the given transport.
 fn checking(recorded: Option<Record>, http: Arc<Fake>) -> WiringCheck {
-    WiringCheck::new(
-        http,
-        Files::at(vec![(config(), CONFIG)]),
-        vec![managed(recorded)],
-        "2000".to_owned(),
-    )
+    WiringCheck::new(vec![managed(recorded, http)], "2000".to_owned())
+}
+
+/// The check over one managed wiring whose curator cannot be asked.
+fn unasked(recorded: Option<Record>) -> WiringCheck {
+    let mut held = managed(recorded, Fake::silent());
+    held.asked = None;
+    WiringCheck::new(vec![held], "2000".to_owned())
 }
 
 /// What the check made of one arrangement of the three values.
@@ -209,17 +195,11 @@ async fn an_edit_the_service_can_no_longer_reach_is_raised() {
     );
 }
 
-/// A service that has not written its key yet cannot be opened, let alone asked. That is
-/// a stack still starting, not a drift — and never a pass either.
+/// A curator whose adapter cannot be asked establishes nothing. That is a stack still
+/// starting, not a drift — and never a pass either.
 #[tokio::test]
-async fn a_service_that_has_not_written_its_key_is_unverified() {
-    let check = WiringCheck::new(
-        answering(Some(OURS)),
-        Files::empty(),
-        vec![managed(Some(recorded(OURS, Origin::Written)))],
-        "2000".to_owned(),
-    );
-    let mut findings = check.run().await;
+async fn a_curator_that_cannot_be_asked_is_unverified() {
+    let mut findings = unasked(Some(recorded(OURS, Origin::Written))).run().await;
 
     assert!(matches!(
         findings.pop().map(|found| found.verdict),
@@ -235,8 +215,14 @@ async fn an_edit_the_service_will_not_test_stays_information() {
     let check = checking(
         Some(recorded(OURS, Origin::Written)),
         Fake::by_path(vec![
-            ("downloadclient/testall", Answer::reply(500, "no")),
-            ("downloadclient", Answer::reply(200, holding(Some("mine")))),
+            (
+                curating(TELEVISION, "test_download_clients"),
+                refused(Refusal::Refused),
+            ),
+            (
+                curating(TELEVISION, "download_clients"),
+                holding(Some("mine")),
+            ),
         ]),
     );
     let findings = check.run().await;
@@ -262,7 +248,10 @@ async fn a_value_lemonfiber_adopted_stays_theirs() {
 async fn a_client_not_wired_yet_is_skipped_rather_than_faulted() {
     let check = checking(
         None,
-        Fake::by_path(vec![("downloadclient", Answer::reply(200, "[]"))]),
+        Fake::by_path(vec![(
+            curating(TELEVISION, "download_clients"),
+            answered(&Vec::<RegisteredClient>::new()),
+        )]),
     );
     let mut findings = check.run().await;
 
@@ -451,7 +440,10 @@ async fn a_client_the_service_no_longer_holds_is_not_written_afresh() {
 
     let gone = checking(
         Some(recorded("old-sonarr", Origin::Written)),
-        Fake::by_path(vec![("downloadclient", Answer::reply(200, "[]"))]),
+        Fake::by_path(vec![(
+            curating(TELEVISION, "download_clients"),
+            answered(&Vec::<RegisteredClient>::new()),
+        )]),
     );
     let attempt = match &repair {
         Some(repair) => carried(&gone, repair).await,
@@ -489,23 +481,16 @@ async fn a_repair_naming_a_wiring_no_longer_managed_writes_nothing() {
     );
 }
 
-/// A service whose key is not on disk yet is left exactly as it was.
+/// A curator whose adapter cannot be asked is left exactly as it was.
 ///
-/// The key is written by the service itself on first start, so a stack part-way through
-/// coming up has wirings that cannot be authenticated to. Writing to one unauthenticated
-/// would be refused by the service and reported to the operator as their wiring being
-/// broken, which it is not.
+/// Writing to one that cannot be asked would be refused and reported to the operator as
+/// their wiring being broken, which it is not.
 #[tokio::test]
-async fn a_service_whose_key_is_not_written_yet_is_left_as_it_was() {
+async fn a_curator_that_cannot_be_asked_is_left_as_it_was() {
     let check = stale();
     let repair = offer(&check).await;
 
-    let unreadable = WiringCheck::new(
-        answering(Some("old-sonarr")),
-        Files::at(Vec::new()),
-        vec![managed(Some(recorded("old-sonarr", Origin::Written)))],
-        "2000".to_owned(),
-    );
+    let unreadable = unasked(Some(recorded("old-sonarr", Origin::Written)));
     let attempt = match &repair {
         Some(repair) => carried(&unreadable, repair).await,
         None => None,
@@ -557,20 +542,16 @@ async fn a_service_that_refuses_the_write_keeps_the_category_it_had() {
     let check = stale();
     let repair = offer(&check).await;
 
-    // The write is listed first: routed by what the URL contains, a table that put the
-    // client list first would answer the update with the list and call it taken.
     let refusing = checking(
         Some(recorded("old-sonarr", Origin::Written)),
-        Fake::by_rules(vec![
+        Fake::by_path(vec![
             (
-                Some(Method::Put),
-                "downloadclient",
-                Answer::reply(403, "not allowed"),
+                curating(TELEVISION, "update_download_client"),
+                refused(Refusal::Refused),
             ),
             (
-                None,
-                "downloadclient",
-                Answer::reply(200, holding(Some("old-sonarr"))),
+                curating(TELEVISION, "download_clients"),
+                holding(Some("old-sonarr")),
             ),
         ]),
     );
@@ -642,57 +623,12 @@ fn a_repair_naming_a_wiring_nobody_manages_declares_no_write() {
     assert_eq!(writes(&check, &for_something_else()), Some(Vec::new()));
 }
 
-/// The wiring of a curator asked over `library.curate` under its own key.
-fn contracted(recorded: Option<Record>, http: Arc<Fake>) -> Managed {
-    Managed {
-        id: "shows".to_owned(),
-        name: "Shows".to_owned(),
-        reach: Some(Reach::Over(Contracted::new(
-            http,
-            "http://127.0.0.1:8080",
-            "shows",
-            "shows-key",
-        ))),
-        clients: vec![Wired {
-            want: want(),
-            recorded,
-        }],
-    }
-}
-
-/// A curator over `library.curate` holding the client at `category`, and taking a write.
-fn over_the_contract(category: &str) -> Arc<Fake> {
-    Fake::by_path(vec![
-        (
-            "library.curate/v1/update_download_client",
-            Answer::reply(204, ""),
-        ),
-        (
-            "library.curate/v1/download_clients",
-            Answer::reply(
-                200,
-                format!(
-                    r#"[{{"id":"7","host":"sabnzbd","port":8080,"category":{{"field":"tvCategory","value":"{category}"}}}}]"#
-                ),
-            ),
-        ),
-    ])
-}
-
 /// A curator asked over its contract is read and put right over it, every request under
-/// its own key.
+/// the key its adapter is asked with.
 #[tokio::test]
-async fn a_contracted_curator_is_read_and_mended_over_its_contract() {
-    let http = over_the_contract("old-sonarr");
-    let check = WiringCheck::new(
-        http.clone(),
-        Files::empty(),
-        vec![contracted(
-            Some(recorded("old-sonarr", Origin::Written)),
-            http.clone(),
-        )],
-        "2000".to_owned(),
-    );
+async fn a_curator_is_read_and_mended_over_its_contract_under_its_adapters_key() {
+    let http = answering(Some("old-sonarr"));
+    let check = checking(Some(recorded("old-sonarr", Origin::Written)), http.clone());
 
     let repair = offer(&check).await;
     let attempt = match &repair {
@@ -704,7 +640,7 @@ async fn a_contracted_curator_is_read_and_mended_over_its_contract() {
         changes(attempt.as_ref())
             .and_then(<[Change]>::first)
             .map(|change| change.target.as_str()),
-        Some("shows")
+        Some("sonarr")
     );
     let requests = http.requests();
     assert!(
@@ -713,45 +649,12 @@ async fn a_contracted_curator_is_read_and_mended_over_its_contract() {
             .any(|asked| asked.url.ends_with("/update_download_client")),
         "{requests:?}"
     );
-    let bearer = ("Authorization".to_owned(), "Bearer shows-key".to_owned());
+    let bearer = ("Authorization".to_owned(), format!("Bearer {KEY}"));
     assert!(
-        requests.iter().all(|asked| asked
-            .url
-            .starts_with("http://127.0.0.1:8080/lemonfiber/library.curate/v1/")
-            && asked.headers.contains(&bearer)),
+        requests.iter().all(|asked| asked.url.starts_with(&format!(
+            "http://127.0.0.1:{}/lemonfiber/library.curate/v1/",
+            TELEVISION.port
+        )) && asked.headers.contains(&bearer)),
         "{requests:?}"
     );
-}
-
-/// A curator that speaks its contract and cannot be asked over it is unverified, its
-/// repair is left undone, and nothing is asked of anything.
-#[tokio::test]
-async fn a_curator_that_cannot_be_asked_is_unverified_and_left_as_it_was() {
-    let repair = offer(&stale()).await;
-    let http = answering(Some("old-sonarr"));
-    let mut unasked = managed(Some(recorded("old-sonarr", Origin::Written)));
-    unasked.reach = None;
-    let check = WiringCheck::new(
-        http.clone(),
-        Files::at(vec![(config(), CONFIG)]),
-        vec![unasked],
-        "2000".to_owned(),
-    );
-
-    let mut findings = check.run().await;
-    let attempt = match &repair {
-        Some(repair) => carried(&check, repair).await,
-        None => None,
-    };
-
-    assert!(matches!(
-        findings.pop().map(|found| found.verdict),
-        Some(Verdict::Unverified { .. })
-    ));
-    assert!(
-        stopped(attempt.as_ref()).is_some_and(|why| why.contains("could not be asked")),
-        "{:?}",
-        stopped(attempt.as_ref())
-    );
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

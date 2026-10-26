@@ -112,8 +112,8 @@ fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
 }
 
 /// A rehearsal of an update names every move the bundle offers, the media server's, each
-/// download client's, the subtitle finder's, the listening server's, the book curator's
-/// and the Usenet indexer aggregator's, and takes none.
+/// download client's, the subtitle finder's, the listening server's, every curator's, both
+/// indexer aggregators' and the request service's, and takes none.
 #[tokio::test]
 async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
@@ -135,9 +135,14 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
             "bazarr".to_owned(),
             "bindery".to_owned(),
             BUNDLED.to_owned(),
+            "lidarr".to_owned(),
             "nzbhydra2".to_owned(),
+            "prowlarr".to_owned(),
             "qbittorrent".to_owned(),
-            "sabnzbd".to_owned()
+            "radarr".to_owned(),
+            "sabnzbd".to_owned(),
+            "seerr".to_owned(),
+            "sonarr".to_owned()
         ]
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
@@ -156,7 +161,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((7, 0))
+        Some((12, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -179,9 +184,14 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
             "audiobookshelf",
             "bazarr",
             "bindery",
+            "lidarr",
             "nzbhydra2",
+            "prowlarr",
             "qbittorrent",
-            "sabnzbd"
+            "radarr",
+            "sabnzbd",
+            "seerr",
+            "sonarr"
         ])
     );
     assert_eq!(counted(reading(&ctx).await), Some(1));
@@ -194,14 +204,14 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
     let ctx = unmoved("embedded-narrowed", &serving);
 
-    let confirmed = crate::update::run::update(&ctx, updating(Some("sonarr"), true)).await;
+    let confirmed = crate::update::run::update(&ctx, updating(Some("recyclarr"), true)).await;
 
     assert_eq!(
         confirmed
             .as_ref()
             .ok()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((7, 0)),
+        Some((12, 0)),
         "{confirmed:?}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));

@@ -2,10 +2,10 @@
 //!
 //! A wrong or stale credential is the quietest failure a stack has: everything
 //! reports healthy and searches simply come back empty, weeks apart from the
-//! cause. So this does not check the key's shape — it reads the key each service
-//! wrote to its own configuration, asks the running service who it is with that
-//! key, and reports what it observed. A proven credential names the service and
-//! its version; there is no green tick without a fact behind it.
+//! cause. So this does not check the key's shape — it asks each curator who it is
+//! through the adapter in front of it, which presents the key lemonfiber minted for
+//! it, and reports what it observed. A proven credential names the service and its
+//! version; there is no green tick without a fact behind it.
 //!
 //! The three ways it can go wrong are kept apart, because collapsing them sends
 //! the operator after the wrong problem. A service that answers and refuses the
@@ -13,136 +13,55 @@
 //! unproven rather than broken; one that answers unusably is carried through in
 //! the service's own words rather than guessed at.
 //!
-//! The credential itself never leaves this module — not into a finding, a log or
-//! a bundle. What is reported is the outcome, never the input.
+//! The credential itself never reaches the core's side of the contract: the adapter
+//! holds it. What is reported is the outcome, never the input.
 //!
 //! See `.docs/architecture/module-layout.md`.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use lemonfiber_contract::capabilities::library::curate;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::cred::CREDENTIAL_REJECTED;
 use crate::error::{Problem, Remedy};
-use crate::ports::filesystem::FileSystem;
-use crate::ports::http::Http;
-use crate::ports::service::{Client, Failure};
-use crate::servarr::{api_key, Servarr};
+use crate::ports::service::Failure;
 
-/// How a curator is asked.
-pub enum Reach {
-    /// Over `library.curate`.
-    Over(lemonfiber_contract::Contracted),
-    /// As the bundled curator.
-    Bundled(Target),
-}
-
-impl Reach {
-    /// The curator as a client, or nothing where its key cannot be read yet.
-    pub(crate) async fn open(
-        &self,
-        http: &Arc<dyn Http>,
-        fs: &dyn FileSystem,
-    ) -> Option<Box<dyn Client>> {
-        match self {
-            Self::Over(adapter) => Some(Box::new(
-                lemonfiber_contract::capabilities::library::curate::Adapter(adapter.clone()),
-            )),
-            Self::Bundled(target) => Some(Box::new(target.open(http, fs).await?)),
-        }
-    }
-}
-
-/// One service whose credential is to be proven.
-///
-/// The address the host reaches it on and the host path to the file it wrote its
-/// key to are resolved above, from the manifest and the running stack, so the
-/// check stays a matter of reading a file and asking a question.
+/// One curator whose credential is proven: the service that files media, and the adapter
+/// in front of it, presenting the key lemonfiber minted for it, where it can be asked.
+#[derive(Clone)]
 pub struct Target {
-    /// The compose service id, such as `sonarr`; names the finding.
+    /// The id of the service that files media, such as `sonarr`; names the finding.
     pub id: String,
-    /// The human-facing name, such as `Sonarr`; what the operator reads.
+    /// Its name, such as `Sonarr`; what the operator reads.
     pub name: String,
-    /// The base URL the host reaches it on, such as `http://127.0.0.1:8989`.
-    pub base: String,
-    /// The host path to the configuration file holding the generated key.
-    pub config: PathBuf,
-    /// The major version of its API — the `/api/vN` segment. The TV and movie curators are
-    /// v3, the music curator and the indexer aggregator v1, so it travels with the target
-    /// rather than being assumed.
-    pub version: u32,
-    /// The directory the key file has to stay beneath, where a plugin's container owns
-    /// the directory it is in; nothing for the stack's own services.
-    pub confined_to: Option<PathBuf>,
     /// The kind of video it files, read from the media types it declares; nothing for
-    /// one that files video by no resolution, such as music or an indexer.
+    /// one that files video by no resolution, such as music.
     pub kind: Option<crate::ports::media::Kind>,
+    /// The adapter it is asked through, or nothing where it cannot be asked.
+    pub asked: Option<Arc<dyn curate::Fills>>,
 }
 
-impl Target {
-    /// A client for this service, or nothing where its config or key cannot be read
-    /// yet — the "still starting, try again later" case every caller skips the same
-    /// way (a missing key is a service that has not written it, not a fault). The
-    /// read-back and the build are one step, so the callers that open a
-    /// curator-shape service — the credentials check, the dashboard's queues, and
-    /// seeding — cannot drift on how they do it.
-    pub(crate) async fn open(&self, http: &Arc<dyn Http>, fs: &dyn FileSystem) -> Option<Servarr> {
-        let key = self.key(fs).await?;
-        Some(Servarr::new(
-            http.clone(),
-            &self.base,
-            key,
-            &self.id,
-            self.version,
-        ))
-    }
-
-    /// The key this service generated for itself, read from the file it wrote it to.
-    ///
-    /// Apart from [`Self::open`] because the aggregator speaks a shape of its own: it
-    /// writes its key exactly the way the others do, and only what is built from it
-    /// differs.
-    ///
-    /// Read only where it is a plain file beneath the directory its container owns —
-    /// the one it names, or the one the file is in — which can hold a link put where
-    /// the file is expected.
-    pub(crate) async fn key(&self, fs: &dyn FileSystem) -> Option<String> {
-        let within = self
-            .confined_to
-            .as_deref()
-            .unwrap_or(crate::within::directory_of(&self.config));
-        let config = crate::app::targets::read_owned(fs, &self.config, within).await?;
-        api_key(&config)
-    }
-}
-
-/// Proves each curator-shape service still answers to the key it wrote.
+/// Proves each curator still answers to the key lemonfiber minted for it.
 pub struct CredentialsCheck {
-    http: Arc<dyn Http>,
-    filesystem: Arc<dyn FileSystem>,
     targets: Vec<Target>,
 }
 
 impl CredentialsCheck {
-    /// A check over the given transport, filesystem and services to prove.
+    /// A check over the curators given.
     #[must_use]
-    pub fn new(http: Arc<dyn Http>, filesystem: Arc<dyn FileSystem>, targets: Vec<Target>) -> Self {
-        Self {
-            http,
-            filesystem,
-            targets,
-        }
+    pub const fn new(targets: Vec<Target>) -> Self {
+        Self { targets }
     }
 
-    /// Read one service's key from disk, then ask it who it is with that key.
+    /// Ask one curator who it is, through its adapter.
     ///
-    /// An absent file or an empty key is a service still completing its first
-    /// start, skipped so a later run proves it — not a fault. Beyond that, the
-    /// three failures the service can present are kept as three distinct verdicts.
-    async fn prove(&self, target: &Target) -> Verdict {
-        let Some(service) = target.open(&self.http, self.filesystem.as_ref()).await else {
+    /// One that cannot be asked yet is skipped so a later run proves it, not a fault.
+    /// Beyond that, the three failures the service can present are kept as three
+    /// distinct verdicts.
+    async fn prove(target: &Target) -> Verdict {
+        let Some(service) = &target.asked else {
             return not_started(target);
         };
         match service.identity().await {
@@ -177,7 +96,7 @@ async fn ran(check: &CredentialsCheck) -> Vec<Finding> {
                 Category::Credentials,
                 &format!("credentials.{}", target.id),
                 &format!("{} credential", target.name),
-                check.prove(target).await,
+                CredentialsCheck::prove(target).await,
             )
             // Said so that a service which cannot answer because the thing underneath
             // it is down reads as one problem rather than as two.
@@ -187,25 +106,25 @@ async fn ran(check: &CredentialsCheck) -> Vec<Finding> {
     findings
 }
 
-/// There is no key to read yet: the ordinary case is a service still completing
-/// its first start, which a later run picks up once it has written one.
+/// The adapter in front of it cannot be asked yet: the ordinary case is a service still
+/// completing its first start, which a later run proves once it answers.
 fn not_started(target: &Target) -> Verdict {
     Verdict::Skipped {
         reason: format!(
-            "{}'s API key could not be read yet; a service still starting has not written one, and a later run proves it once it has",
+            "{} could not be asked yet; the adapter in front of it is still starting or has not answered as its contract says, and a later run proves it once it does",
             target.name
         ),
     }
 }
 
-/// The service answered and refused the key it wrote: the key on disk and the one
-/// the running service expects disagree, which a restart reconciles.
+/// The service answered and refused the key lemonfiber minted for it: the key the running
+/// service reads and the one its adapter presents disagree, which a restart reconciles.
 fn rejected(target: &Target) -> Problem {
     Problem::new(
         CREDENTIAL_REJECTED,
         format!("{} refused its own credential", target.name),
-        "The key in the service's configuration no longer matches the one the running service expects, usually because the configuration was regenerated after the service last started.",
-        Remedy::new("Restart the service so it reloads its configuration, then check again")
+        "The key lemonfiber minted for the service no longer matches the one the running service expects, usually because the key was replaced after the service last started.",
+        Remedy::new("Restart the service so it reads its key again, then check again")
             .with_detail("lemonfiber restart"),
     )
 }

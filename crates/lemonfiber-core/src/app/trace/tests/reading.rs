@@ -2,26 +2,19 @@
 
 use super::*;
 
-/// What the media server answers asked whether its library holds the traced item.
-const HOLDS: &str = "true";
-
 /// A context whose media server the trace cannot ask — it has not moved into its plugin,
 /// so the library stage is simply left unanswered, as on the curator-only slices.
-fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx {
-    ctx_with(&Fake::curator(library, history, queue))
+fn ctx(items: Answer, history: Answer, queue: Answer) -> Ctx {
+    ctx_with(&Fake::curator(items, history, queue))
 }
 
-/// A context that can reach its media server: moved into its plugin, its adapter keyed
-/// and published, with an env file of the test's own under `tag`.
-fn ctx_with_media_server(fake: &Fake, tag: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{tag}")).kept();
-    let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context()
-        .engine(Arc::new(crate::test_support::media::running()))
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-        .with_http(fake.transport());
-    context.settings.env_file = Some(dir.join(".env"));
+/// A context that can reach its media server as well as its curators, each moved into its
+/// plugin.
+fn ctx_with_media_server(fake: &Fake) -> Ctx {
+    let mut context = ctx_with(fake);
+    context.seams.engine = Arc::new(
+        curators::running(&curators::ALL).alongside(crate::test_support::media::running()),
+    );
     crate::test_support::media::moved_in(&context);
     context
 }
@@ -52,9 +45,9 @@ impl crate::ports::service::Library for Holding {
 async fn tracing_a_matched_item_reads_its_history_and_queue() {
     // Grabbed in history, and the queue shows it downloading — the trace reads both.
     let context = ctx(
-        r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-        r#"{"records":[{"eventType":"grabbed","date":"2026-01-01T00:00:00Z"}]}"#,
-        r#"{"records":[{"seriesId":1,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}]}"#,
+        monitored(),
+        happened(Outcome::Grabbed),
+        answered(&queued(Stage::Downloading, false)),
     );
     let report = trace(&context, "expanse", None, false)
         .await
@@ -67,11 +60,7 @@ async fn tracing_a_matched_item_reads_its_history_and_queue() {
 async fn a_matched_item_whose_reads_fail_reports_them_unavailable() {
     // The item is found, but its history and queue come back unreadable: the trace
     // reports both as unavailable rather than inferring the item stalled.
-    let context = ctx(
-        r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-        "not json",
-        "not json",
-    );
+    let context = ctx(monitored(), refusing(), refusing());
     let report = trace(&context, "expanse", None, false)
         .await
         .unwrap_or_default();
@@ -88,7 +77,11 @@ async fn a_matched_item_whose_reads_fail_reports_them_unavailable() {
 
 #[tokio::test]
 async fn tracing_a_term_no_item_matches_is_not_monitored() {
-    let context = ctx("[]", "{}", EMPTY_QUEUE);
+    let context = ctx(
+        answered(&Vec::<FoundItem>::new()),
+        nothing_happened(),
+        nothing_queued(),
+    );
     let report = trace(&context, "nothing here", None, false)
         .await
         .unwrap_or_default();
@@ -100,7 +93,8 @@ async fn tracing_a_term_no_item_matches_is_not_monitored() {
 async fn tracing_passes_over_a_service_whose_library_cannot_be_read() {
     // A service that answers nonsense to the library read is passed over rather than
     // failing the whole trace; with every service unreadable, nothing matched.
-    let report = trace(&ctx("not json", "{}", EMPTY_QUEUE), "expanse", None, false)
+    let unreadable = ctx(refusing(), nothing_happened(), nothing_queued());
+    let report = trace(&unreadable, "expanse", None, false)
         .await
         .unwrap_or_default();
     assert!(!report.matched);
@@ -111,18 +105,10 @@ async fn tracing_passes_over_a_service_whose_library_cannot_be_read() {
 async fn tracing_a_matched_item_present_in_the_library_reports_available() {
     // Imported in history, and the media server confirms it is in the library: the
     // trace runs all the way to available, on the media server stage, marked uncertain.
-    let context = ctx_with_media_server(
-        &Fake {
-            library: r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-            history: r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-01-01T00:00:00Z"}]}"#,
-            queue: EMPTY_QUEUE,
-            episodes: NO_EPISODES,
-            holds: HOLDS,
-            wanted: "",
-            releases: "",
-        },
-        "available",
-    );
+    let context = ctx_with_media_server(&Fake {
+        holds: answered(&true),
+        ..Fake::curator(monitored(), happened(Outcome::Imported), nothing_queued())
+    });
     let report = trace(&context, "expanse", None, false)
         .await
         .unwrap_or_default();
@@ -154,18 +140,24 @@ async fn tracing_over_an_unreadable_stack_is_an_error() {
     assert!(trace(&bad, "anything", None, false).await.is_err());
 }
 
-/// A queue holding one stuck download, the show embedded so it can be named.
-const STUCK_QUEUE: &str = r#"{"records":[{"trackedDownloadStatus":"warning","trackedDownloadState":"downloading","series":{"title":"The Expanse"}}]}"#;
+/// The curators' reads with the television curator answering what is stuck as `stuck`.
+fn stuck_as(stuck: Answer) -> Fake {
+    Fake {
+        stuck,
+        ..Fake::curator(monitored(), nothing_happened(), nothing_queued())
+    }
+}
 
+/// The television curator holds a stuck series and the others nothing, so the one stuck
+/// item is listed, tagged with the service holding it, and the list is complete.
 #[tokio::test]
 async fn stuck_lists_each_stuck_item_tagged_with_its_service() {
-    // The TV curator's queue holds a stuck series; the movie curator's holds nothing it can
-    // name (a series record, no movie title) and the music curator is not a traceable kind
-    // — so the one stuck item is listed, tagged with the service holding it, and the list
-    // is complete.
-    let report = super::super::stuck(&ctx("", "", STUCK_QUEUE))
-        .await
-        .unwrap_or_default();
+    let report = super::super::stuck(&ctx_with(&stuck_as(answered(&[StuckItem {
+        title: "The Expanse".to_owned(),
+        stage: Stage::Downloading,
+    }]))))
+    .await
+    .unwrap_or_default();
     assert!(report
         .items
         .iter()
@@ -173,25 +165,22 @@ async fn stuck_lists_each_stuck_item_tagged_with_its_service() {
     assert!(!report.incomplete);
 }
 
+/// A curator that will not say what is stuck is reported as leaving the list possibly
+/// short, rather than read as nothing stuck.
 #[tokio::test]
 async fn stuck_marks_the_list_incomplete_where_a_queue_cannot_be_read() {
-    // A curator whose queue will not decode is reported as leaving the list possibly
-    // short, rather than read as nothing stuck.
-    let report = super::super::stuck(&ctx("", "", "not json"))
+    let report = super::super::stuck(&ctx_with(&stuck_as(refusing())))
         .await
         .unwrap_or_default();
     assert!(report.items.is_empty());
     assert!(report.incomplete);
 }
 
+/// No curator's adapter runs, so none can be asked: nothing was asked, so the list is
+/// empty and complete rather than incomplete.
 #[tokio::test]
 async fn stuck_over_curators_that_have_not_started_finds_nothing() {
-    // No key is readable, so no curator opens: nothing was asked, so the list is empty
-    // and complete rather than incomplete.
-    let context = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(None)))
-        .with_http(Fake::curator("", "", EMPTY_QUEUE).transport());
+    let context = unmoved(&stuck_as(refusing()));
     let report = super::super::stuck(&context).await.unwrap_or_default();
     assert!(report.items.is_empty());
     assert!(!report.incomplete);

@@ -13,8 +13,7 @@ use super::{
     SCHEMA_VERSION_FIELD,
 };
 use crate::app::targets::{spoken, Spoken};
-use crate::doctor::credentials::Reach;
-use crate::ports::service::{Client, DownloadClient, RootFolder};
+use crate::ports::service::{Client as _, DownloadClient, RootFolder};
 use crate::wiring::{Filler, Fillers};
 
 /// A service that files media, as the core asks it: the service itself, and the service
@@ -43,36 +42,47 @@ impl<'a> Curator<'a> {
         self.named.media_types.as_slice()
     }
 
-    /// How the curator is asked: over `library.curate` where the service asked for it
-    /// speaks the contract, otherwise as the bundled curator. Nothing where it speaks the
-    /// contract and cannot be asked over it.
-    pub(crate) async fn reach(self, ctx: &Ctx) -> Option<Reach> {
-        match spoken(ctx, self.answering, curate::CAPABILITY, curate::MAJOR).await {
-            Spoken::Over(adapter) => Some(Reach::Over(adapter)),
-            Spoken::Unanswered => None,
-            Spoken::Not => self.named.target().map(Reach::Bundled),
-        }
+    /// The kind of video it files, where it files video by resolution.
+    pub(crate) fn kind(self) -> Option<crate::ports::media::Kind> {
+        crate::ports::media::Kind::of_declared(self.media_types())
     }
 
-    /// The curator as a client, or nothing where it cannot be asked or its key is not
-    /// written yet.
-    pub(crate) async fn client(self, ctx: &Ctx) -> Option<Box<dyn Client>> {
-        self.reach(ctx)
-            .await?
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await
+    /// The curator over `library.curate`, through the service asked for it: nothing where
+    /// it cannot be asked over it.
+    pub(crate) async fn client(self, ctx: &Ctx) -> Option<curate::Adapter> {
+        over(ctx, self.answering).await
+    }
+}
+
+/// The curator `named` over `library.curate`, through the adapter of its plugin in front
+/// of it where one fronts it: nothing where it cannot be asked over it.
+pub(super) async fn curated(
+    ctx: &Ctx,
+    fillers: &Fillers,
+    named: &Filler,
+) -> Option<curate::Adapter> {
+    over(ctx, fillers.fronting(named).unwrap_or(named)).await
+}
+
+/// `answering` over `library.curate`: nothing where it does not speak the contract or
+/// cannot be asked over it.
+async fn over(ctx: &Ctx, answering: &Filler) -> Option<curate::Adapter> {
+    match spoken(ctx, answering, curate::CAPABILITY, curate::MAJOR).await {
+        Spoken::Over(adapter) => Some(curate::Adapter(adapter)),
+        Spoken::Unanswered | Spoken::Not => None,
     }
 }
 
 /// Every service that files media and is asked over `library.curate`, itself or through
-/// the adapter in front of it, or as the bundled curator.
+/// the adapter in front of it.
 pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
     fillers
         .services()
         .filter(|filler| !filler.media_types.is_empty())
         .filter_map(|named| {
             let answering = fillers.fronting(named).unwrap_or(named);
-            (answering.contracted(curate::CAPABILITY, curate::MAJOR) || named.target().is_some())
+            answering
+                .contracted(curate::CAPABILITY, curate::MAJOR)
                 .then_some(Curator { named, answering })
         })
         .collect()
@@ -184,7 +194,7 @@ pub(super) async fn seed_curator(
     }
 
     let mut wirings = crate::seed::wire_root_folders(
-        client.as_ref(),
+        &client,
         curator.name(),
         &wanted,
         crate::seed::Placing {
@@ -214,7 +224,7 @@ pub(super) async fn seed_curator(
     if !clients.is_empty() {
         wirings.extend(
             crate::seed::wire_download_clients(
-                client.as_ref(),
+                &client,
                 curator.name(),
                 &clients,
                 &mut journal,

@@ -6,13 +6,15 @@ use std::sync::Arc;
 
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::ports::service::{Endpoint, MediaServerLink, RegisteredTarget};
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::{FixedRandom, Reporting};
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_fixtures::support::FixedRandom;
 use lemonfiber_sidecar::gate::{Accepted, Credential, Kind, Tokens, Upstream, Upstreams};
 use lemonfiber_sidecar::TokenHash;
+use lemonfiber_testing::curators::TELEVISION;
+use lemonfiber_testing::media;
+use lemonfiber_testing::requests::{self, REQUESTS};
 
 /// The gate accepting `tokens` on the curator's route.
 fn accepting(tokens: &[&str]) -> String {
@@ -41,52 +43,51 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
         .written(),
     );
     let _ = std::fs::write(gate.join("tokens.json"), accepting(&["held"]));
-    let curator = stack.join("config/sonarr");
-    let _ = std::fs::create_dir_all(&curator);
-    let _ = std::fs::write(
-        curator.join("config.xml"),
-        "<Config><ApiKey>sonarrs</ApiKey></Config>",
-    );
-    let held =
-        r#"[{"id":1,"hostname":"request-gate","port":5057,"baseUrl":"/sonarr","apiKey":"held"}]"#;
-    let http = Fake::by_route_in_turn(vec![
+    let through = |base: &str| Endpoint {
+        host: "request-gate".to_owned(),
+        port: lemonfiber_sidecar::gate::PORT,
+        base: base.to_owned(),
+    };
+    let http = Fake::by_path_in_turn(vec![
+        (media::serve("filed_as"), vec![media::answered(&["gates"])]),
         (
-            Method::Get,
-            "/settings/radarr",
-            vec![Answer::reply(200, "[]")],
+            requests::intake("fulfilment_targets"),
+            vec![requests::answered(&[RegisteredTarget {
+                id: "1".to_owned(),
+                at: through("/sonarr"),
+                key: "held".to_owned(),
+                kind: lemonfiber_ports::media::Kind::Tv,
+            }])],
         ),
         (
-            Method::Get,
-            "/settings/sonarr",
-            vec![Answer::reply(200, held)],
+            requests::intake("media_server_link"),
+            vec![requests::answered(&MediaServerLink {
+                at: through("/jellyfin"),
+                key: "linked".to_owned(),
+            })],
         ),
         (
-            Method::Get,
-            "/settings/jellyfin",
-            vec![Answer::reply(200, "{}")],
+            requests::intake("move_fulfilment_target"),
+            vec![requests::taken()],
         ),
         (
-            Method::Put,
-            "/settings/sonarr/1",
-            vec![Answer::reply(200, "")],
-        ),
-        (
-            Method::Post,
-            "/settings/sonarr/test",
-            vec![Answer::reply(200, "")],
+            requests::intake("test_fulfilment_target"),
+            vec![requests::taken()],
         ),
     ]);
-    let ctx = lemonfiber_testing::a_context()
-        .over(Source::External(stack))
-        .engine(Arc::new(Reporting::holding(
-            &["seerr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(Settings::default())
-        .build()
-        .with_http(http.clone())
-        .with_random(Arc::new(FixedRandom(Some(vec![0xab; 24]))));
+    let ctx = lemonfiber_testing::adapted::reaching(
+        lemonfiber_testing::a_context()
+            .over(Source::External(stack))
+            .settings(Settings {
+                env_file: Some(stack.join(".env")),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http.clone())
+            .with_random(Arc::new(FixedRandom(Some(vec![0xab; 24])))),
+        &[TELEVISION, REQUESTS, media::MOVED],
+    );
+    TELEVISION.minted(&ctx, "sonarrs");
     let asked = |asking| dispatch(Command::Credentials(asking), &ctx);
 
     let shown = match asked(lemonfiber_core::app::Asking::Reveal {

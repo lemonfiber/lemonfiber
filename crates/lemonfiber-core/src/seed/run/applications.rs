@@ -9,7 +9,7 @@ use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::ports::filesystem::Beneath;
-use crate::ports::service::{AppSync, Application};
+use crate::ports::service::Application;
 use crate::wiring::{Filler, Fillers};
 
 /// One indexer and the curators it is told about: each one's application, or the
@@ -41,46 +41,21 @@ fn syncing(fillers: &Fillers) -> Vec<Syncing<'_>> {
     found
 }
 
-/// How the indexer is asked.
-enum Asked {
-    /// By this client.
-    By(Box<dyn AppSync>),
-    /// Not at all: it cannot be reached, or speaks the contract and cannot be asked over it.
-    Nobody,
-    /// Not yet: it is the bundled indexer and its own key is not written yet.
-    Unkeyed,
-}
-
-/// The indexer as the core asks it: over `indexer.search` where it speaks the contract,
-/// otherwise as the bundled indexer holding its own key.
-async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Asked {
+/// The indexer over `indexer.search`, through the service asked for it: nothing where it
+/// does not speak the contract or cannot be asked over it.
+async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Option<search::Adapter> {
     match spoken(ctx, asker.answering(), search::CAPABILITY, search::MAJOR).await {
-        Spoken::Over(adapter) => return Asked::By(Box::new(search::Adapter(adapter))),
-        Spoken::Unanswered => return Asked::Nobody,
-        Spoken::Not => {}
+        Spoken::Over(adapter) => Some(search::Adapter(adapter)),
+        Spoken::Unanswered | Spoken::Not => None,
     }
-    let Some(published) = asker.published else {
-        return Asked::Nobody;
-    };
-    let Beneath::Read(key) = super::keys::curator_key(ctx, asker).await else {
-        return Asked::Unkeyed;
-    };
-    Asked::By(Box::new(crate::prowlarr::Prowlarr::new(
-        ctx.seams.http.clone(),
-        crate::app::targets::loopback(published),
-        key,
-        &asker.id,
-    )))
 }
 
 /// Register each curator the indexer asks for as an application in it, so the indexer
 /// pushes it indexers.
 ///
-/// Two keys gate a write, both read from configuration and never asked for: the
-/// indexer's own — without it the indexer is still starting, so every application is
-/// skipped for a re-run — and each curator's, which is what lets the indexer write into
-/// it; a curator that has not written its key yet is skipped on its own while the
-/// others proceed.
+/// The indexer is asked over `indexer.search` through the adapter in front of it, and
+/// each curator's key is what lets the indexer write into it; a curator whose key is not
+/// in hand yet is skipped on its own while the others proceed.
 pub(super) async fn seed_applications(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for syncing in syncing(fillers) {
@@ -104,15 +79,8 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     if curators.is_empty() {
         return Vec::new();
     }
-    let client = match indexer(ctx, &syncing.asker).await {
-        Asked::By(client) => client,
-        Asked::Nobody => return Vec::new(),
-        Asked::Unkeyed => {
-            return curators
-                .iter()
-                .map(|(curator, _, _)| skipped(synced(&curator.name, &asker.name), &asker.name))
-                .collect()
-        }
+    let Some(client) = indexer(ctx, &syncing.asker).await else {
+        return Vec::new();
     };
     let mut wanted = Vec::new();
     let mut passed = Vec::new();
@@ -137,7 +105,7 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     // undo the current reversal cannot do.
     let mut journal = crate::journal::Journal::new();
     let mut wirings = crate::seed::wire_applications(
-        client.as_ref(),
+        &client,
         &asker.name,
         &wanted,
         &mut journal,
@@ -153,8 +121,9 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
 /// now: what replacing that curator's key owes the indexer.
 ///
 /// Answers with the indexer's name and how the application came out, for each indexer
-/// that registers it — none where nothing does. One where either key is not written yet
-/// is passed over: until both are there is no application to hold to anything.
+/// that registers it — none where nothing does. One that cannot be asked, or whose
+/// curator's key is not in hand, is passed over: there is no application to hold to
+/// anything yet.
 pub(crate) async fn resync_application(
     ctx: &Ctx,
     fillers: &Fillers,

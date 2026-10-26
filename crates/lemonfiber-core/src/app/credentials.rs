@@ -19,7 +19,6 @@ mod gating;
 mod minting;
 pub(crate) mod pending;
 mod reading;
-mod resetting;
 mod revealing;
 mod rotating;
 mod tokening;
@@ -30,8 +29,7 @@ use crate::app::command::Asking;
 use crate::credential::{Held, Inventory, Rotation, Settled};
 use crate::error::Diagnose;
 
-pub(crate) use reading::reader;
-pub(crate) use resetting::reset_curator;
+pub(crate) use minting::{reminted, Amid};
 pub(crate) use rotating::{replace_admin_password, Replacing};
 
 /// What was asked about the credentials this stack holds.

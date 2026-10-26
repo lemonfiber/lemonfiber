@@ -16,7 +16,7 @@ use crate::doctor::vpn::{read_vpn, VpnReading};
 use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
 use crate::model::FrontDoorReport;
-use crate::ports::service::{QueueDepth, Queues};
+use crate::ports::service::QueueDepth;
 use crate::queue::run::Answered;
 use crate::storage::{test_link, Linked};
 
@@ -278,12 +278,11 @@ pub(super) async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Opti
 
 /// Each media-filing curator's queue depth and stuck count.
 ///
-/// Resolves the curator-shape services the same way the credentials check does —
-/// the stack's own bind-mount convention — then reads each one's key from disk and
-/// asks it for its queue. A service still starting (no key written yet) or one
-/// that will not answer is left out of the panel rather than failing it; only a
-/// stack that cannot be read at all leaves the whole panel unavailable, since then
-/// there are no services to ask.
+/// Each curator is asked for its queue through the adapter in front of it, the same way
+/// the credentials check asks it. One whose adapter cannot be asked yet or will not
+/// answer is left out of the panel rather than failing it; only a stack that cannot be
+/// read at all leaves the whole panel unavailable, since then there are no services to
+/// ask.
 pub(super) async fn queues(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
@@ -293,16 +292,10 @@ pub(super) async fn queues(
         Ok(manifest) => manifest,
         Err(reason) => return (Panel::unavailable(reason.clone()), Vec::new()),
     };
-    let targets = curator_targets(&manifest.services, project);
+    let targets = curator_targets(ctx, &host_fillers(ctx, manifest, project)).await;
 
-    // Opened and read at once rather than one service after another: each is two
-    // round trips, and five curators in series is ten waits where the slowest one would
-    // do. `join_all` keeps the order, so the panel and the answers below read the
-    // same as when they were gathered one at a time.
     let read = futures_util::future::join_all(targets.iter().map(|target| async move {
-        let service = target
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await?;
+        let service = target.asked.as_ref()?;
         Some((target.name.clone(), service.queue().await))
     }))
     .await;

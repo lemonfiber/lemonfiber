@@ -87,7 +87,7 @@ fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
         fingerprint: None,
         advisory: None,
     };
-    let said = super::would_rotate(&held, super::REPUBLISHING);
+    let said = super::would_rotate(&held, super::ADMINISTERING);
 
     assert!(said.kept_the_existing(), "nothing was replaced");
     assert!(said.rehearsed(), "and it is not a rotation that failed");
@@ -123,7 +123,7 @@ fn a_rehearsal_leaves_out_every_consumer_a_rotation_reaches_by_itself() {
         fingerprint: None,
         advisory: None,
     };
-    let said = super::would_rotate(&held, super::REPUBLISHING);
+    let said = super::would_rotate(&held, super::ADMINISTERING);
 
     assert_eq!(
         rehearsed(&said).map(|(_, afterwards)| afterwards),

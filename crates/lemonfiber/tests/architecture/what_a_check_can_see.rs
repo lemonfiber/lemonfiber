@@ -14,6 +14,23 @@
 
 use crate::source_tree::{production, sources};
 
+/// How a seam to look through is held: a trait object.
+const SEAM: &str = "Arc<dyn ";
+
+/// Whether a struct `fields` names, declared among the checks' sources `text`, holds a
+/// seam.
+fn holds_a_seam(text: &str, fields: &str) -> bool {
+    fields
+        .split(|one: char| !one.is_alphanumeric() && one != '_')
+        .filter(|word| word.starts_with(|first: char| first.is_ascii_uppercase()))
+        .filter_map(|named| {
+            text.split(&format!("pub struct {named} {{"))
+                .nth(1)
+                .and_then(|rest| rest.split("\n}").next())
+        })
+        .any(|held| held.contains(SEAM))
+}
+
 /// Every diagnostic check is given something to ask.
 ///
 /// A check must establish what it reports rather than infer it from the operator's
@@ -28,9 +45,10 @@ use crate::source_tree::{production, sources};
 /// runner, an HTTP client, a filesystem, or a narrower port like `Validator` or
 /// `UsenetAccounts`.
 ///
-/// Read from what the check is **handed**, not only from what it stores: several keep
-/// their ports inside a helper of their own rather than as a field, which is a detail
-/// of how they are built rather than of whether they can see.
+/// Read from what the check is **handed**, not only from what it stores, and from what
+/// each thing it stores holds where the checks declare it: several keep their ports
+/// inside a helper or inside each target they are given rather than as a field, which is
+/// a detail of how they are built rather than of whether they can see.
 ///
 /// This does not prove any particular finding was observed rather than assumed. It
 /// proves the check was built able to observe, and it fails the moment somebody adds
@@ -40,11 +58,13 @@ use crate::source_tree::{production, sources};
 fn every_check_is_given_something_to_ask() {
     let mut assuming: Vec<String> = Vec::new();
     let mut seen = 0_usize;
+    let checks: Vec<_> = sources()
+        .into_iter()
+        .filter(|(path, _)| path.to_string_lossy().contains("doctor"))
+        .collect();
+    let beside: String = checks.iter().map(|(_, text)| text.as_str()).collect();
 
-    for (path, text) in sources() {
-        if !path.to_string_lossy().contains("doctor") {
-            continue;
-        }
+    for (path, text) in &checks {
         for name in text.lines().filter_map(|line| {
             line.strip_prefix("pub struct ")
                 .and_then(|rest| rest.strip_suffix(" {"))
@@ -66,7 +86,7 @@ fn every_check_is_given_something_to_ask() {
                 .unwrap_or_default()
                 .to_owned();
 
-            if !fields.contains("Arc<dyn ") && !built.contains("Arc<dyn ") {
+            if !fields.contains(SEAM) && !built.contains(SEAM) && !holds_a_seam(&beside, &fields) {
                 assuming.push(format!("{} ({name})", path.display()));
             }
         }

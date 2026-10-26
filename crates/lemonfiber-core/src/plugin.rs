@@ -32,6 +32,7 @@ pub mod first_party;
 mod fronting;
 mod granted;
 mod installed;
+pub(crate) mod lending;
 // Whose a journalled change is. Apart from the fronting whose region markers carry the
 // same name: those say where a plugin's wiring sits, and this says what leaves the
 // machine with the plugin.

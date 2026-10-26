@@ -8,13 +8,14 @@ use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 use super::{capitalised, wished, REFUSALS};
 use crate::app::{Ctx, Outcome, Wishing};
 use crate::ports::docker::{Health, Lifecycle};
-use crate::ports::http::Method;
 use crate::ports::media::Kind;
-use crate::ports::service::{Certificate, Unrated, Wish};
+use crate::ports::service::{
+    Asked, Certificate, Detail, Headroom, HouseholdRequest, Left, Requesting, Unrated, Wish,
+};
+use crate::test_support::adapted::Adapted;
+use crate::test_support::curators::{FILM, TELEVISION};
+use crate::test_support::requests::{answered, intake, taken, unavailable, REQUESTS};
 use crate::test_support::{a_context, json, media, Reporting, SeedFs};
-
-/// A Servarr config carrying a readable key, so the curators resolve their targets.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// The household: Ada, whom nothing holds back; Bea, held to twelve with unrated titles
 /// held back; and Cy, held to twelve with unrated titles let through.
@@ -52,53 +53,108 @@ pub(super) fn country() -> String {
     json(&Some("GB"))
 }
 
-/// The member's account on the request service: asks that wait for approval.
-pub(super) const WAITS: &str = r#"{"id":4,"permissions":32}"#;
+/// The id the request service holds the member's account under.
+pub(super) const ACCOUNT: &str = "4";
 
-/// The member's account on the request service: asks that arrive by themselves.
-pub(super) const APPROVES_OWN: &str = r#"{"id":4,"permissions":160}"#;
+/// The member's account on the request service, their asks arriving by themselves where
+/// `approves_own`.
+pub(super) fn account(approves_own: bool) -> Answer {
+    answered(&Some(Requesting {
+        id: ACCOUNT.to_owned(),
+        approves_own,
+    }))
+}
 
 /// What the member's period has counted: one film of two, nothing of five seasons.
-pub(super) const COUNTED: &str =
-    r#"{"movie":{"days":30,"limit":2,"used":1},"tv":{"days":30,"limit":5,"used":0}}"#;
+pub(super) fn counted() -> Headroom {
+    let over_a_month = |limit, used| Left {
+        limit: Some(limit),
+        used,
+        days: Some(30),
+    };
+    Headroom {
+        films: over_a_month(2, 1),
+        television: over_a_month(5, 0),
+    }
+}
 
-/// The household's requests: none.
-pub(super) const NO_REQUESTS: &str = r#"{"pageInfo":{"results":0},"results":[]}"#;
+/// An ask the request service filed as request 7, waiting for approval where `waiting`.
+pub(super) fn filing(waiting: bool) -> Answer {
+    answered(&Asked {
+        request: 7,
+        waiting,
+    })
+}
 
-/// One route of the house: the method it answers, what its address contains, and its
-/// answers in turn, the last repeating.
-pub(super) type Route = (Method, &'static str, Vec<Answer>);
+/// One route of the house: what its address contains, what the body posted to it
+/// contains where that tells it apart, and its answers in turn, the last repeating.
+pub(super) type Route = (&'static str, Option<&'static str>, Vec<Answer>);
 
-/// A route answering one thing, always.
-pub(super) fn route(method: Method, fragment: &'static str, status: u16, body: &str) -> Route {
+/// What posting an ask contains and posting for `asking` does not, though the one's
+/// address begins the other's.
+const ASKING_FOR_A_TITLE: &str = r#""wish""#;
+
+/// The request service's `operation`, answering `answers` in turn.
+pub(super) fn calls(operation: &str, answers: Vec<Answer>) -> Route {
+    let body = (operation == "ask").then_some(ASKING_FOR_A_TITLE);
+    (intake(operation), body, answers)
+}
+
+/// The request service's `operation`, answering `answer` always.
+pub(super) fn call(operation: &str, answer: Answer) -> Route {
+    calls(operation, vec![answer])
+}
+
+/// The request service's `operation` where what is posted contains `posted`, answering
+/// `answer` always.
+pub(super) fn about(operation: &str, posted: &str, answer: Answer) -> Route {
     (
-        method,
-        fragment,
-        vec![Answer::reply(status, body.to_owned())],
+        intake(operation),
+        Some(Box::leak(posted.to_owned().into_boxed_str())),
+        vec![answer],
     )
+}
+
+/// The request service's record of the title `id`, answering `detail`.
+pub(super) fn titled_as(id: &str, detail: Answer) -> Route {
+    about("detail", &format!(r#""id":"{id}""#), detail)
+}
+
+/// The media server's `operation`, answering `answer` always.
+pub(super) fn serving(operation: &str, answer: Answer) -> Route {
+    (media::identity(operation), None, vec![answer])
+}
+
+/// A title as the request service records it, rated `certification` where anybody rated
+/// it, and out.
+pub(super) fn rated(certification: Option<&str>) -> Detail {
+    Detail {
+        certification: certification.map(str::to_owned),
+        released: true,
+        ..Detail::default()
+    }
 }
 
 /// The house, answering `first` ahead of everything it answers by default.
 pub(super) fn house(first: Vec<Route>) -> Arc<Transport> {
     let mut routes = first;
     routes.extend([
-        route(Method::Post, media::identity("country"), 200, &country()),
-        route(Method::Post, media::identity("ratings"), 200, &ratings()),
-        route(Method::Post, media::identity("household"), 200, &accounts()),
-        route(Method::Get, "/api/v1/user/jellyfin/", 200, WAITS),
-        route(Method::Get, "/quota", 200, COUNTED),
-        route(Method::Get, "/api/v1/request?", 200, NO_REQUESTS),
-        route(
-            Method::Post,
-            "/api/v1/request",
-            201,
-            r#"{"id":7,"status":1}"#,
-        ),
-        route(Method::Get, "", 404, "{}"),
-        route(Method::Post, "", 404, "{}"),
+        serving("country", Answer::reply(200, country())),
+        serving("ratings", Answer::reply(200, ratings())),
+        serving("household", Answer::reply(200, accounts())),
+        call("requesting", account(false)),
+        call("left", answered(&counted())),
+        call("requests", answered(&Vec::<HouseholdRequest>::new())),
+        call("ask", filing(true)),
+        call("link_members", taken()),
+        call("detail", answered(&None::<Detail>)),
     ]);
-    Transport::by_route_in_turn(routes)
+    Transport::by_call(routes)
 }
+
+/// Every part a member's wish reaches besides the media server: the curators that fetch
+/// television and film, and the request service.
+const PARTS: [Adapted; 3] = [TELEVISION, FILM, REQUESTS];
 
 /// A house whose curators for both kinds are running, over `transport`.
 pub(super) fn ctx_over(transport: Arc<Transport>, tag: &str) -> Ctx {
@@ -114,22 +170,31 @@ pub(super) fn ctx_running(transport: Arc<Transport>, tag: &str, running: &[&str]
     )
 }
 
-/// A house over `transport` whose engine is `engine`, its media server moved into its
-/// plugin.
+/// A house over `transport` whose engine is `engine`, its media server, its curators and
+/// its request service moved into their plugins and their adapters running.
 pub(super) fn ctx_engine(transport: Arc<Transport>, tag: &str, engine: Reporting) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("wishing-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let disk =
-        SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
+    let engine = engine
+        .alongside(crate::test_support::adapted::running(&PARTS))
+        .alongside(media::running());
     let mut context = a_context()
-        .engine(Arc::new(engine.alongside(media::running())))
+        .engine(Arc::new(engine))
         .build()
-        .with_filesystem(Arc::new(disk))
+        .with_filesystem(Arc::new(SeedFs::keyed(None)))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
-    media::moved_in(&context);
+    moved_in(&context);
     context
+}
+
+/// `ctx`'s stack with its media server, its curators and its request service moved in.
+fn moved_in(ctx: &Ctx) {
+    for part in PARTS {
+        part.moved_in(ctx);
+    }
+    media::moved_in(ctx);
 }
 
 /// What `member` finds for `term` from `after`.
@@ -185,6 +250,17 @@ pub(super) fn asked_for(transport: &Transport, fragment: &str) -> bool {
     transport.asked_for(fragment)
 }
 
+/// Whether the request service was asked `operation` with a body containing `posted`.
+pub(super) fn asked_about(transport: &Transport, operation: &str, posted: &str) -> bool {
+    transport.requests().iter().any(|request| {
+        request.url.ends_with(intake(operation))
+            && request
+                .body
+                .as_deref()
+                .is_some_and(|body| body.contains(posted))
+    })
+}
+
 #[tokio::test]
 async fn nobody_named_is_refused_before_anything_is_asked() {
     let transport = house(Vec::new());
@@ -204,7 +280,7 @@ async fn somebody_the_household_does_not_hold_is_refused_as_not_in_it() {
     let refused = found(&ctx, "Zed", "harbour", None).await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-12"));
-    assert!(!asked_for(&transport, "/search"));
+    assert!(!asked_for(&transport, intake("search")));
 }
 
 #[tokio::test]
@@ -247,27 +323,19 @@ async fn a_house_whose_stack_cannot_be_read_is_asking_not_working() {
 
 #[tokio::test]
 async fn a_media_server_that_will_not_say_who_is_in_the_house_is_asking_not_working() {
-    let transport = house(vec![route(
-        Method::Post,
-        media::identity("household"),
-        500,
-        "",
-    )]);
+    let transport = house(vec![serving("household", unavailable())]);
     let ctx = ctx_over(Arc::clone(&transport), "accounts-unread");
 
     let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-8"));
-    assert!(!asked_for(&transport, "/api/v1/movie/"));
+    assert!(!asked_for(&transport, intake("detail")));
 }
 
 #[tokio::test]
 async fn a_held_member_whose_rating_table_or_country_is_unread_is_offered_nothing() {
-    for (failing, tag) in [
-        (media::identity("country"), "country-unread"),
-        (media::identity("ratings"), "table-unread"),
-    ] {
-        let transport = house(vec![route(Method::Post, failing, 500, "")]);
+    for (failing, tag) in [("country", "country-unread"), ("ratings", "table-unread")] {
+        let transport = house(vec![serving(failing, unavailable())]);
         let ctx = ctx_over(Arc::clone(&transport), tag);
 
         let search = found(&ctx, "Bea", "harbour", None).await;
@@ -275,8 +343,8 @@ async fn a_held_member_whose_rating_table_or_country_is_unread_is_offered_nothin
 
         assert_eq!(code(&search).as_deref(), Some("WISH-8"), "{failing}");
         assert_eq!(code(&ask).as_deref(), Some("WISH-8"), "{failing}");
-        assert!(!asked_for(&transport, "/api/v1/search"), "{failing}");
-        assert!(!asked_for(&transport, "/api/v1/movie/"), "{failing}");
+        assert!(!asked_for(&transport, intake("search")), "{failing}");
+        assert!(!asked_for(&transport, intake("detail")), "{failing}");
     }
 }
 
@@ -293,12 +361,12 @@ async fn an_engine_that_cannot_say_what_runs_leaves_asking_not_working() {
         .build()
         .with_http(transport.clone());
     ctx.settings.env_file = Some(dir.join(".env"));
-    media::moved_in(&ctx);
+    moved_in(&ctx);
 
     let refused = found(&ctx, "Ada", "harbour", None).await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-8"));
-    assert!(!asked_for(&transport, "/api/v1/search"));
+    assert!(!asked_for(&transport, intake("search")));
 }
 
 /// An engine gone once the media server is reached cannot say which curators run, so no
@@ -310,13 +378,13 @@ async fn an_engine_gone_once_the_server_is_reached_offers_no_kind_to_search() {
         Arc::clone(&transport),
         "engine-gone",
         Reporting::holding(&["sonarr", "radarr"], Lifecycle::Running, Health::Healthy)
-            .leaving_after(1),
+            .leaving_after(2),
     );
 
     let refused = found(&ctx, "Ada", "harbour", None).await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-4"));
-    assert!(!asked_for(&transport, "/api/v1/search"));
+    assert!(!asked_for(&transport, intake("search")));
 }
 
 #[test]

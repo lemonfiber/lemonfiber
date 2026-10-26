@@ -14,7 +14,6 @@ use crate::ports::service::{
     Indexers, ItemPart, QualityReleases, QueueItem, ReleaseProbe, TraceEvent,
 };
 use crate::recyclarr::Kind;
-use crate::servarr::Servarr;
 use crate::trace::{Presence, Stage};
 
 /// What asking the indexers about a stalled item came to.
@@ -51,7 +50,7 @@ pub(crate) enum Searched {
 /// A search that will not run settles nothing rather than becoming an absence. An
 /// indexer that could not be reached is not an indexer carrying nothing, and reading it
 /// as one would send an operator to ease a preset that was never the problem.
-pub(crate) async fn asking(service: &Servarr, kind: Kind) -> Searched {
+pub(crate) async fn asking(service: &dyn QualityReleases, kind: Kind) -> Searched {
     match service.probe_releases(kind).await {
         Ok(ReleaseProbe::NoneMatch) => Searched::NoneAtTheQuality,
         Ok(ReleaseProbe::NoneFound) => Searched::Nothing,
@@ -82,13 +81,10 @@ pub(crate) fn account_explainable(report: &TraceReport) -> Option<String> {
 /// Reading it costs the providers nothing — every figure in it comes from the services
 /// that have been using the accounts.
 pub(crate) async fn providers(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Finding> {
-    let services = &manifest.services;
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let fillers = crate::app::targets::host_fillers(ctx, manifest, project.as_deref());
+    let fillers = crate::app::targets::fillers_here(ctx, manifest);
     ProvidersCheck::new(
         crate::app::targets::usenet_client(ctx, &fillers).await,
-        crate::app::targets::indexer_aggregator(ctx, services, project.as_deref())
+        crate::app::targets::indexer_aggregator(ctx, &fillers)
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),
         ctx.today(),

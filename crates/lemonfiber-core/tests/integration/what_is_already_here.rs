@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use crate::common;
 use common::stack::project;
+use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_core::app::{dispatch, Command, Ctx, MigrateAction, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::error::Problem;
@@ -21,11 +22,14 @@ use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::model::{AdoptReport, BesideReport, ReplaceReport};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
-use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::ports::service::{Carried, QualityProfile};
 use lemonfiber_core::ports::Runner;
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::pulled::Pulled;
+use lemonfiber_fixtures::serving::Serves;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted, SeedFs};
+use lemonfiber_testing::curators::{answered, curating, taken, TELEVISION};
 
 /// A machine whose engine answers with the given containers and images.
 fn ctx(engine: Reporting, images: Arc<Pulled>) -> Ctx {
@@ -171,11 +175,11 @@ async fn replacing(ctx: &Ctx, offer: Option<&str>) -> Result<Option<ReplaceRepor
     .await
 }
 
-/// Their curator, on a port of its own so the two stacks can be told apart.
+/// Their curator, published on every address of the machine on a port of its own.
 fn both_stacks() -> (Reporting, Arc<Pulled>) {
     let engine = Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
         .belonging_to("media")
-        .publishing(&[("sonarr", "127.0.0.1", 18989)])
+        .publishing(&[("sonarr", "0.0.0.0", 18989)])
         .mounting(&[PathBuf::from("/their/sonarr")]);
     let images = Pulled::holding(vec![Pulled::image(
         "lscr.io/linuxserver/sonarr:4.0.15",
@@ -185,65 +189,125 @@ fn both_stacks() -> (Reporting, Arc<Pulled>) {
     (engine, images)
 }
 
-/// A transport answering as two stacks at once, told apart by the port asked.
-fn two_stacks() -> Arc<lemonfiber_fixtures::http::Fake> {
-    use lemonfiber_fixtures::http::{Answer, Fake};
-    Fake::by_route(vec![
-        // Theirs: one series, following a profile it numbered 1.
+/// The port the engine says the adapter lent to their copy is published on.
+const LENT: u16 = 41_234;
+
+/// Where `operation` of `library.curate` is asked of the adapter lent to their copy.
+fn lent(operation: &str) -> &'static str {
+    Box::leak(
+        format!(
+            "127.0.0.1:{LENT}{}",
+            lemonfiber_contract::path(curate::CAPABILITY, curate::MAJOR, operation)
+        )
+        .into_boxed_str(),
+    )
+}
+
+/// What a request for `records` of `sort` posts.
+fn of_sort(sort: &str) -> &'static str {
+    Box::leak(format!(r#""sort":"{sort}""#).into_boxed_str())
+}
+
+/// The series their curator follows, under a profile named as both stacks name it.
+fn taskmaster() -> Carried {
+    Carried {
+        name: "Taskmaster".to_owned(),
+        profile: Some("HD".to_owned()),
+        folder: Some("/data/tv".to_owned()),
+        rest: "{}".to_owned(),
+    }
+}
+
+/// The routes of the two stacks, each curator asked through the adapter in front of it,
+/// theirs holding `theirs` and ours `ours`, and ours taking a record as `takes` answers.
+fn stacks(theirs: &[Carried], ours: &[Carried], takes: Answer) -> Vec<Route> {
+    let none = || answered(&Vec::<Carried>::new());
+    vec![
         (
-            Method::Get,
-            "18989/api/v3/qualityprofile",
-            Answer::reply(200, r#"[{"id":1,"name":"HD"}]"#),
+            ready_path_of_any_adapter(),
+            None,
+            vec![Answer::reply(200, "{}")],
         ),
         (
-            Method::Get,
-            "18989/api/v3/series",
-            Answer::reply(
-                200,
-                r#"[{"id":5,"title":"Taskmaster","qualityProfileId":1,"rootFolderPath":"/data/tv"}]"#,
-            ),
+            lent("records"),
+            Some(of_sort("series")),
+            vec![answered(&theirs)],
+        ),
+        (lent("records"), Some(of_sort("indexer")), vec![none()]),
+        (
+            curating(TELEVISION, "quality_profiles"),
+            None,
+            vec![answered(&[QualityProfile {
+                id: 7,
+                name: "HD".to_owned(),
+            }])],
         ),
         (
-            Method::Get,
-            "18989/api/v3/indexer",
-            Answer::reply(200, "[]"),
-        ),
-        // Ours: the same profile, numbered differently, and nothing followed yet.
-        (
-            Method::Get,
-            ":8989/api/v3/qualityprofile",
-            Answer::reply(200, r#"[{"id":7,"name":"HD"}]"#),
-        ),
-        (Method::Get, ":8989/api/v3/series", Answer::reply(200, "[]")),
-        (
-            Method::Get,
-            ":8989/api/v3/indexer",
-            Answer::reply(200, "[]"),
+            curating(TELEVISION, "records"),
+            Some(of_sort("series")),
+            vec![answered(&ours)],
         ),
         (
-            Method::Post,
-            ":8989/api/v3/series",
-            Answer::reply(201, "{}"),
+            curating(TELEVISION, "records"),
+            Some(of_sort("indexer")),
+            vec![none()],
         ),
-    ])
+        (curating(TELEVISION, "carry"), None, vec![takes]),
+    ]
+}
+
+/// Where any adapter says whether its upstream answers.
+fn ready_path_of_any_adapter() -> &'static str {
+    Box::leak(lemonfiber_contract::adapter::ready_path().into_boxed_str())
+}
+
+/// A route of the two stacks: what its address contains, what is posted to it where
+/// that tells it apart, and its answers in turn.
+type Route = (&'static str, Option<&'static str>, Vec<Answer>);
+
+/// A transport answering as two stacks at once: theirs holding one series and ours
+/// nothing yet, taking what is carried.
+fn two_stacks() -> Arc<Fake> {
+    Fake::by_call(stacks(&[taskmaster()], &[], taken()))
 }
 
 /// A machine holding both stacks, reached through the given transport.
-fn importing(http: Arc<lemonfiber_fixtures::http::Fake>) -> Ctx {
-    let (engine, images) = both_stacks();
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(engine))
-        .filesystem(Arc::new(SeedFs::keyed(Some(
-            "<Config><ApiKey>the-key</ApiKey></Config>",
-        ))))
+fn importing(http: Arc<Fake>) -> Ctx {
+    importing_over(
+        both_stacks().0,
+        Source::External(project()),
+        Arc::new(SeedFs::keyed(Some(THEIR_KEY))),
+        http,
+    )
+}
+
+/// Their curator's configuration, carrying a key their copy wrote.
+const THEIR_KEY: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+
+/// A machine whose engine holds what `engine` holds, its stack read from `stack` and its
+/// files from `files`, their curator's image pulled, lemonfiber's own television curator
+/// moved into its plugin and reached, and an engine serving the adapter lent to their copy
+/// on [`LENT`].
+fn importing_over(engine: Reporting, stack: Source, files: Arc<SeedFs>, http: Arc<Fake>) -> Ctx {
+    static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("importing-{nth}")).kept();
+    let _ = std::fs::create_dir_all(&dir);
+    let mut ctx = lemonfiber_testing::a_context()
+        .engine(Arc::new(engine.alongside(TELEVISION.running())))
+        .filesystem(files)
+        .over(stack)
         .settings(Settings {
             project: "lemonfiber".to_owned(),
             stack_dir: Some(PathBuf::from("/srv/lemonfiber")),
+            env_file: Some(dir.join(".env")),
             ..Settings::default()
         })
         .build()
-        .with_images(images)
-        .with_http(http)
+        .with_images(both_stacks().1)
+        .with_http(http);
+    ctx.seams.serving = Arc::new(Serves::on(LENT));
+    TELEVISION.keyed(ctx)
 }
 
 /// What carrying answered.

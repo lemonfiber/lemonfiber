@@ -24,17 +24,13 @@
 //! no search was spent on it. Calling that inapplicable would let a stack read as
 //! healthy on the strength of a search nobody made.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 
 use super::{Category, Check, Disruptive, Finding, Verdict};
 use crate::doctor::credentials::Target;
 use crate::error::codes::qual::{NONE_AVAILABLE, PRESET_UNMET};
 use crate::error::{Problem, Remedy, State};
-use crate::ports::filesystem::FileSystem;
-use crate::ports::http::Http;
-use crate::ports::service::{QualityReleases, ReleaseProbe};
+use crate::ports::service::ReleaseProbe;
 use crate::recyclarr::Kind;
 
 /// The id under which the check reports where there is nothing to run it against.
@@ -72,35 +68,25 @@ fn disruption() -> Disruptive {
 /// Searches the resolution services for the operator's wanted content, so a preset that
 /// asks for releases the indexers do not carry is told apart from an indexer failure.
 pub struct ReleasesCheck {
-    http: Arc<dyn Http>,
-    filesystem: Arc<dyn FileSystem>,
     targets: Vec<Target>,
     disruptive: bool,
 }
 
 impl ReleasesCheck {
-    /// A check over the resolution `targets` reachable through `http` and `filesystem`.
-    /// It searches live only when `disruptive`, so an ordinary run does not query the
-    /// indexer.
+    /// A check over the curators `targets`. It searches live only when `disruptive`, so an
+    /// ordinary run does not query the indexer.
     #[must_use]
-    pub fn new(
-        http: Arc<dyn Http>,
-        filesystem: Arc<dyn FileSystem>,
-        targets: Vec<Target>,
-        disruptive: bool,
-    ) -> Self {
+    pub const fn new(targets: Vec<Target>, disruptive: bool) -> Self {
         Self {
-            http,
-            filesystem,
             targets,
             disruptive,
         }
     }
 
     /// Search one service and read the result into a verdict.
-    async fn probe(&self, target: &Target, kind: Kind) -> Verdict {
+    async fn probe(target: &Target, kind: Kind) -> Verdict {
         let media = kind.media_type();
-        let Some(service) = target.open(&self.http, self.filesystem.as_ref()).await else {
+        let Some(service) = &target.asked else {
             return Verdict::Skipped {
                 reason: format!(
                     "{media} has not finished starting, so its releases could not be searched"
@@ -179,7 +165,7 @@ async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
 
     let mut findings = Vec::new();
     for (target, kind) in resolution {
-        let verdict = check.probe(target, kind).await;
+        let verdict = ReleasesCheck::probe(target, kind).await;
         findings.push(
             Finding::in_category(
                 Category::Services,

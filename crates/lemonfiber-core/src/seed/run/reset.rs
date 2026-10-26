@@ -41,7 +41,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
         };
         wirings.extend(
             reset_curator_connections(
-                client.as_ref(),
+                &client,
                 curator.name(),
                 &wanted,
                 confirm,

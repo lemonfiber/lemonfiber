@@ -8,23 +8,10 @@ use super::{beneath_the_catalogue, poster};
 use crate::app::Ctx;
 use crate::config::{Reaching, REACH_POSTERS_KEY};
 use crate::ports::http::{Method, Request};
-use crate::ports::service::PICTURE_MOST;
+use crate::ports::service::{Detail, PICTURE_MOST};
 use crate::screening::Pictured;
-use crate::wishing::tests::{asked_for, ctx_over, ctx_running, house, route, Route};
-
-/// A film out in Britain, rated twelve, with a poster.
-const FILM: &str = r#"{"status":"Released","posterPath":"/film.jpg","releases":{"results":[
-    {"iso_3166_1":"GB","release_dates":[{"certification":"12A"}]}]}}"#;
-
-/// A film rated fifteen in Britain, with a poster.
-const FILM_FIFTEEN: &str = r#"{"status":"Released","posterPath":"/fifteen.jpg","releases":{"results":[
-    {"iso_3166_1":"GB","release_dates":[{"certification":"15"}]}]}}"#;
-
-/// A film whose poster path climbs out from beneath the catalogue's address.
-const FILM_CLIMBING: &str = r#"{"status":"Released","posterPath":"/../../../elsewhere.jpg"}"#;
-
-/// A film with no poster.
-const FILM_BARE: &str = r#"{"status":"Released"}"#;
+use crate::test_support::requests::{answered, intake};
+use crate::wishing::tests::{asked_for, ctx_over, ctx_running, house, rated, titled_as, Route};
 
 /// Where the film's poster is published.
 const POSTER_AT: &str = "https://image.tmdb.org/t/p/w342/film.jpg";
@@ -32,15 +19,37 @@ const POSTER_AT: &str = "https://image.tmdb.org/t/p/w342/film.jpg";
 /// What the film's poster is.
 const JPEG: &str = "a picture's bytes";
 
-/// The house, with the films looked up and the poster answered as `served`.
+/// A film out in Britain, rated `certification`, its poster at `poster` where it has one.
+fn film(certification: Option<&str>, poster: Option<&str>) -> Answer {
+    answered(&Some(Detail {
+        poster: poster.map(str::to_owned),
+        ..rated(certification)
+    }))
+}
+
+/// The house, with the films looked up and the poster answered as `served`: a film rated
+/// twelve with a poster, one rated fifteen with a poster, one with none, and one whose
+/// poster's location climbs out from beneath the catalogue's address.
 fn pictured(served: Answer) -> Arc<Transport> {
-    let picture: Route = (Method::Get, "image.tmdb.org", vec![served]);
+    let picture: Route = ("image.tmdb.org", None, vec![served]);
     house(vec![
         picture,
-        route(Method::Get, "/api/v1/movie/603", 200, FILM),
-        route(Method::Get, "/api/v1/movie/604", 200, FILM_FIFTEEN),
-        route(Method::Get, "/api/v1/movie/605", 200, FILM_BARE),
-        route(Method::Get, "/api/v1/movie/606", 200, FILM_CLIMBING),
+        titled_as("603", film(Some("12A"), Some(POSTER_AT))),
+        titled_as(
+            "604",
+            film(
+                Some("15"),
+                Some("https://image.tmdb.org/t/p/w342/fifteen.jpg"),
+            ),
+        ),
+        titled_as("605", film(None, None)),
+        titled_as(
+            "606",
+            film(
+                None,
+                Some("https://image.tmdb.org/t/p/w342/../../../elsewhere.jpg"),
+            ),
+        ),
     ])
 }
 
@@ -156,7 +165,7 @@ async fn a_kind_that_names_no_kind_is_no_title() {
     let refused = poster(&ctx, "Ada", "music", "603").await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-3"));
-    assert!(!asked_for(&transport, "/api/v1/movie/"));
+    assert!(!asked_for(&transport, intake("detail")));
 }
 
 #[tokio::test]
@@ -168,7 +177,7 @@ async fn a_kind_no_running_curator_fetches_is_refused_before_the_title_is_looked
     let refused = poster(&ctx, "Ada", "movies", "603").await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-4"));
-    assert!(!asked_for(&transport, "/api/v1/movie/"));
+    assert!(!asked_for(&transport, intake("detail")));
 }
 
 #[tokio::test]

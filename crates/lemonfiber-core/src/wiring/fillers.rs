@@ -23,7 +23,7 @@ use crate::origin::Origin;
 use crate::plugin::{Installed, Placed};
 
 pub use super::handing::{crosses, Holder};
-use super::{settle, Chosen, Reaches};
+use super::{settle_trusting, Chosen, Reaches};
 
 /// Where a service answers inside the stack's network.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,26 +100,6 @@ pub struct Filler {
 }
 
 impl Filler {
-    /// The service as one of the curator shape this machine can open: where it reaches
-    /// it, the file its key is in and the version of the shape it speaks, or nothing
-    /// where it speaks another, publishes no port or names no file.
-    #[must_use]
-    pub fn target(&self) -> Option<crate::doctor::credentials::Target> {
-        let api = self
-            .adapter
-            .as_ref()
-            .filter(|api| api.kind == ApiKind::Servarr)?;
-        Some(crate::doctor::credentials::Target {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            base: crate::app::targets::loopback(self.published?),
-            config: self.key_file.clone()?,
-            version: api.version?,
-            confined_to: self.confined_to.clone(),
-            kind: crate::ports::media::Kind::of_declared(&self.media_types),
-        })
-    }
-
     /// Whether it is a first-party plugin's service taking the place of the stack's
     /// service of its own id, which keeps that service's names and links.
     #[must_use]
@@ -261,7 +241,7 @@ impl Fillers {
             .map(|one| one.id.clone())
             .collect();
         services.retain(|one| !(one.origin == Origin::Bundled && stood_in.contains(&one.id)));
-        let settled = settle(manifest, installed, chosen);
+        let settled = settle_trusting(manifest, installed, chosen, trusted);
         let named = settled
             .iter()
             .filter_map(|wired| match &wired.reaches {

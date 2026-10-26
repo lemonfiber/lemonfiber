@@ -3,62 +3,6 @@
 use super::*;
 use crate::test_support::media;
 
-/// The request service is handed the curators, read from the curators themselves.
-///
-/// Everything the request service needs to fetch through one — where it is, what
-/// to authenticate with, which profile and which folder — comes off the curator
-/// rather than being assumed here.
-#[tokio::test]
-async fn the_curators_in_the_stack_are_handed_to_the_request_service() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/qualityprofile",
-            vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
-        ),
-        (
-            "/rootfolder",
-            vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
-        ),
-        ("/settings/radarr", vec![Answer::reply(200, "[]")]),
-        (
-            "/settings/sonarr",
-            vec![
-                Answer::reply(200, "[]"),
-                Answer::reply(201, ""),
-                Answer::reply(200, r#"[{"id":1,"hostname":"sonarr","port":8989}]"#),
-            ],
-        ),
-    ]);
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
-
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[curator("sonarr", 8989, "tv"), requests_svc()],
-        &fillers_of(vec![curator("sonarr", 8989, "tv"), requests_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
-    )
-    .await;
-
-    assert_eq!(
-        wirings.first().map(|wiring| &wiring.state),
-        Some(&crate::seed::State::Wired),
-        "the *arr was not handed over: {wirings:?}"
-    );
-    let sent = http
-        .requests()
-        .into_iter()
-        .find(|asked| asked.method == Method::Post)
-        .and_then(|asked| asked.body)
-        .unwrap_or_default();
-    assert!(
-        sent.contains("\"hostname\":\"sonarr\"") && sent.contains("HD-1080p"),
-        "the request service was told where to reach it and what to fetch at: {sent}"
-    );
-}
-
 /// Each service's key is published where the stack's own services read it.
 ///
 /// Two of them are configured by the environment and by nothing else — there is no
@@ -75,7 +19,6 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
         &ctx,
         &[curator("sonarr", 8989, "tv")],
         &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -86,6 +29,28 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
         "the *arr's key was read and never written down: {written}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
+/// A key read where there is no environment file to record it in is named as one that
+/// could not be recorded, and the connection is not called wired over it.
+#[tokio::test]
+async fn a_key_with_nowhere_to_be_recorded_is_named() {
+    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let ctx = seed_ctx(true, Vec::new(), None, None)
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+
+    let wiring = super::super::published::publish_keys(
+        &ctx,
+        &[curator("sonarr", 8989, "tv")],
+        &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
+    )
+    .await;
+
+    assert!(
+        matches!(&wiring.state, crate::seed::State::Failed { detail }
+            if detail.starts_with("these keys could not be recorded: SONARR_API_KEY")),
+        "{wiring:?}"
+    );
 }
 
 /// The listening server, whose key is one lemonfiber makes an account for.
@@ -157,7 +122,6 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         &ctx,
         &services,
         &super::moved_fillers(services.clone()),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -213,7 +177,6 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
         &ctx,
         &[media_server_svc()],
         &super::moved_fillers(vec![media_server_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -251,7 +214,6 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
         &ctx,
         &[media_server_svc()],
         &super::moved_fillers(vec![media_server_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -286,7 +248,6 @@ async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
         &ctx,
         &[curator("sonarr", 8989, "tv")],
         &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -321,7 +282,6 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
         &ctx,
         &[curator("sonarr", 8989, "tv"), listening_server_svc()],
         &super::fillers_of(vec![curator("sonarr", 8989, "tv"), listening_server_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -370,7 +330,6 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
         &ctx,
         &[pathless.clone()],
         &super::fillers_of(vec![pathless]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -398,7 +357,6 @@ async fn nothing_is_published_where_no_service_has_written_a_key() {
         &ctx,
         &[curator("sonarr", 8989, "tv")],
         &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 

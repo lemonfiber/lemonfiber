@@ -1,52 +1,46 @@
 //! The releases check, driven through its public surface against fakes.
 //!
-//! The check opens a resolution service, asks for one wanted item, and searches for it,
-//! reading the result against the profile. Both sides are faked here: a filesystem that
-//! hands back the service's config, and a transport routed by URL so the wanted list and
-//! the search answer independently. The check is built on `#[async_trait]` clients built
-//! on another, so — as with the credentials check and the curator client — it is
+//! The check asks a resolution service, through the adapter in front of it, what it
+//! would grab for one wanted item, and reads the answer as a verdict on the preset. The
+//! adapter is faked here as a transport answering its contract. The check is built on
+//! `#[async_trait]` clients built on another, so — as with the credentials check — it is
 //! exercised from here rather than a `#[cfg(test)]` module, where async-trait code is
 //! compiled twice and its coverage counted from the wrong copy.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_core::doctor::credentials::Target;
 use lemonfiber_core::doctor::releases::ReleasesCheck;
 use lemonfiber_core::doctor::{Category, Check, Narrowing, Verdict};
 use lemonfiber_core::error::codes::qual::NONE_AVAILABLE;
 use lemonfiber_core::error::codes::qual::PRESET_UNMET;
-use lemonfiber_fixtures::files::Files;
+use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::ports::service::ReleaseProbe;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_testing::adapted::Adapted;
+use lemonfiber_testing::curators::{answered, curating, unavailable, FILM, TELEVISION};
 
-/// The curator config that opens a target, carrying a readable key.
-const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
-
-/// Where the curator's config is read from.
-fn config_path() -> PathBuf {
-    PathBuf::from("/stack/config/sonarr/config.xml")
-}
-
-fn curator() -> Target {
+/// `curator`, filing `kind`, asked through its adapter answering `probe_releases` as
+/// `answer`.
+fn probing(curator: Adapted, kind: Kind, answer: Answer) -> Target {
+    let http = Fake::by_path(vec![(curating(curator, "probe_releases"), answer)]);
     Target {
-        id: "sonarr".to_owned(),
-        name: "Sonarr".to_owned(),
-        base: "http://127.0.0.1:8989".to_owned(),
-        config: config_path(),
-        version: 3,
-        confined_to: None,
-        kind: Some(lemonfiber_core::ports::media::Kind::Tv),
+        id: curator.plugin.to_owned(),
+        name: curator.plugin.to_owned(),
+        kind: Some(kind),
+        asked: Some(Arc::new(curate::Adapter(curator.contracted(http)))),
     }
 }
 
-/// A filesystem that opens the curator target.
-fn opening_fs() -> Arc<Files> {
-    Files::at(vec![(config_path(), CONFIG_WITH_KEY)])
+/// The television curator, its search answered with `probe`.
+fn curator(probe: ReleaseProbe) -> Target {
+    probing(TELEVISION, Kind::Tv, answered(&probe))
 }
 
-/// Run a disruptive check over one curator target and return its single verdict.
-async fn curator_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
-    let check = ReleasesCheck::new(http, fs, vec![curator()], true);
+/// Run a disruptive check over one curator and return its single verdict.
+async fn curator_verdict(target: Target) -> Verdict {
+    let check = ReleasesCheck::new(vec![target], true);
     let mut findings = check.run().await;
     findings.pop().map_or(
         Verdict::Skipped {
@@ -61,7 +55,7 @@ async fn curator_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
 /// name, both of those features simply skip this check.
 #[tokio::test]
 async fn a_finding_about_a_service_names_it() {
-    let check = ReleasesCheck::new(Fake::silent(), opening_fs(), vec![curator()], true);
+    let check = ReleasesCheck::new(vec![curator(ReleaseProbe::Matching)], true);
 
     let named: Vec<Option<String>> = check
         .run()
@@ -80,9 +74,6 @@ async fn a_finding_about_a_service_names_it() {
     );
 }
 
-/// A wanted list naming one missing episode.
-const ONE_WANTED: &str = r#"{"records":[{"id":42}]}"#;
-
 /// The code a warning verdict carries, or `None` if it was not a warning — so a test
 /// asserts on the code without a panicking match arm.
 fn warned(verdict: &Verdict) -> Option<lemonfiber_core::error::Code> {
@@ -95,12 +86,8 @@ fn warned(verdict: &Verdict) -> Option<lemonfiber_core::error::Code> {
 #[tokio::test]
 async fn releases_meeting_the_preset_pass() {
     // Wanted content is found, and the profile would grab it — the preset is met.
-    let http = Fake::by_path(vec![
-        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
-        ("release", Answer::reply(200, r#"[{"rejections":[]}]"#)),
-    ]);
     assert!(matches!(
-        curator_verdict(opening_fs(), http).await,
+        curator_verdict(curator(ReleaseProbe::Matching)).await,
         Verdict::Pass { .. }
     ));
 }
@@ -109,60 +96,43 @@ async fn releases_meeting_the_preset_pass() {
 async fn releases_the_preset_rejects_warn_that_the_preset_is_unmet() {
     // Releases exist, but the profile wants none of them — the preset conflicts with
     // what is available, distinct from an indexer failure.
-    let http = Fake::by_path(vec![
-        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
-        (
-            "release",
-            Answer::reply(
-                200,
-                r#"[{"rejections":["Quality Bluray-2160p is not wanted in profile"]}]"#,
-            ),
-        ),
-    ]);
-    let verdict = curator_verdict(opening_fs(), http).await;
+    let verdict = curator_verdict(curator(ReleaseProbe::NoneMatch)).await;
     assert_eq!(warned(&verdict), Some(PRESET_UNMET));
 }
 
 #[tokio::test]
 async fn a_clean_search_that_finds_nothing_warns_that_none_are_available() {
-    let http = Fake::by_path(vec![
-        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
-        ("release", Answer::reply(200, "[]")),
-    ]);
-    let verdict = curator_verdict(opening_fs(), http).await;
+    let verdict = curator_verdict(curator(ReleaseProbe::NoneFound)).await;
     assert_eq!(warned(&verdict), Some(NONE_AVAILABLE));
 }
 
+/// The search itself did not run — the indexer-failure case: nothing was learned
+/// about releases, so it is unverified, never a warning.
 #[tokio::test]
 async fn a_search_that_cannot_run_is_unverified_not_a_verdict_on_the_preset() {
-    // The wanted list answered, but the search itself did not — the indexer-failure
-    // case: nothing was learned about releases, so it is unverified, never a warning.
-    let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
+    let target = probing(TELEVISION, Kind::Tv, unavailable());
     assert!(matches!(
-        curator_verdict(opening_fs(), http).await,
+        curator_verdict(target).await,
         Verdict::Unverified { .. }
     ));
 }
 
 #[tokio::test]
 async fn nothing_wanted_is_skipped_rather_than_searched() {
-    let http = Fake::by_path(vec![(
-        "wanted/missing",
-        Answer::reply(200, r#"{"records":[]}"#),
-    )]);
     assert!(matches!(
-        curator_verdict(opening_fs(), http).await,
+        curator_verdict(curator(ReleaseProbe::NothingWanted)).await,
         Verdict::Skipped { .. }
     ));
 }
 
 #[tokio::test]
-async fn a_service_that_has_not_started_is_skipped() {
-    // No config on disk, so the target does not open and there is nothing to search.
-    let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
-    let fs = Files::at(Vec::new());
+async fn a_service_whose_adapter_cannot_be_asked_is_skipped() {
+    let target = Target {
+        asked: None,
+        ..curator(ReleaseProbe::Matching)
+    };
     assert!(matches!(
-        curator_verdict(fs, http).await,
+        curator_verdict(target).await,
         Verdict::Skipped { .. }
     ));
 }
@@ -170,8 +140,7 @@ async fn a_service_that_has_not_started_is_skipped() {
 #[tokio::test]
 async fn no_resolution_service_is_skipped() {
     // A stack with no television or film service has no releases to check.
-    let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), Vec::new(), true);
+    let check = ReleasesCheck::new(Vec::new(), true);
     let verdict = check.run().await.pop().map(|found| found.verdict);
     assert!(matches!(verdict, Some(Verdict::Skipped { .. })));
 }
@@ -185,8 +154,7 @@ async fn no_resolution_service_is_skipped() {
 /// claiming an answer no search was made for.
 #[tokio::test]
 async fn an_ordinary_run_leaves_the_live_search_unverified_rather_than_skipped() {
-    let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), vec![curator()], false);
+    let check = ReleasesCheck::new(vec![curator(ReleaseProbe::Matching)], false);
     let findings = check.run().await;
     assert_eq!(findings.len(), 1);
     let said = findings.first().map(|found| &found.verdict);
@@ -211,8 +179,7 @@ async fn an_ordinary_run_leaves_the_live_search_unverified_rather_than_skipped()
 /// instruction that quietly stopped working.
 #[tokio::test]
 async fn the_remedy_names_a_check_a_run_can_be_narrowed_to() {
-    let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), vec![curator()], false);
+    let check = ReleasesCheck::new(vec![curator(ReleaseProbe::Matching)], false);
     let found = check.run().await.pop();
 
     let named = found
@@ -247,8 +214,7 @@ async fn the_remedy_names_a_check_a_run_can_be_narrowed_to() {
 /// weighing how many and for how long — the half a statement of the cost alone leaves out.
 #[tokio::test]
 async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
-    let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), vec![curator()], false);
+    let check = ReleasesCheck::new(vec![curator(ReleaseProbe::Matching)], false);
     let said = check
         .run()
         .await
@@ -273,27 +239,9 @@ async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
 }
 
 #[tokio::test]
-async fn a_film_service_is_searched_by_its_own_id() {
-    // The movie curator searches by movieId rather than episodeId — the same probe, the
-    // other resolution service, so both media types' search parameters are exercised.
-    let http = Fake::by_path(vec![
-        ("wanted/missing", Answer::reply(200, ONE_WANTED)),
-        ("release", Answer::reply(200, r#"[{"rejections":[]}]"#)),
-    ]);
-    let movie_curator = Target {
-        id: "radarr".to_owned(),
-        name: "Radarr".to_owned(),
-        base: "http://127.0.0.1:7878".to_owned(),
-        config: PathBuf::from("/stack/config/radarr/config.xml"),
-        version: 3,
-        confined_to: None,
-        kind: Some(lemonfiber_core::ports::media::Kind::Movies),
-    };
-    let fs = Files::at(vec![(
-        PathBuf::from("/stack/config/radarr/config.xml"),
-        CONFIG_WITH_KEY,
-    )]);
-    let verdict = ReleasesCheck::new(http, fs, vec![movie_curator], true)
+async fn a_film_service_is_searched_through_its_own_adapter() {
+    let movie_curator = probing(FILM, Kind::Movies, answered(&ReleaseProbe::Matching));
+    let verdict = ReleasesCheck::new(vec![movie_curator], true)
         .run()
         .await
         .pop()
@@ -303,6 +251,6 @@ async fn a_film_service_is_searched_by_its_own_id() {
 
 #[tokio::test]
 async fn the_check_is_a_services_check() {
-    let check = ReleasesCheck::new(Fake::by_path(Vec::new()), opening_fs(), Vec::new(), true);
+    let check = ReleasesCheck::new(Vec::new(), true);
     assert_eq!(check.category(), Category::Services);
 }

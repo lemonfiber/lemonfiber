@@ -658,15 +658,15 @@ fn only_a_first_party_service_taking_its_id_moves_in_place_of_a_stack_service() 
     };
     let pinned = crate::test_support::pinned_as;
 
-    assert!(crate::project::moved_in_place(
+    assert!(super::inputs::moved_in_place(
         &[pinned(replacing("jellyfin"))],
         "jellyfin"
     ));
-    assert!(!crate::project::moved_in_place(
+    assert!(!super::inputs::moved_in_place(
         &[replacing("jellyfin")],
         "jellyfin"
     ));
-    assert!(!crate::project::moved_in_place(
+    assert!(!super::inputs::moved_in_place(
         &[pinned(replacing("elsewhere"))],
         "jellyfin"
     ));

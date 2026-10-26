@@ -1,90 +1,21 @@
 //! Ruling on a request, and what the household is told.
 
-use super::common::household::{answering, recorded_admin, refusing, watched, with};
-use super::{request_service, MEMBER};
+use super::common::household::{answering, context, refusing, the_request, watched, with};
 use lemonfiber_core::app::{dispatch, Answer as Ruling, Chosen, Command, Ctx, Decision, Outcome};
 use lemonfiber_core::asking::Policy;
-use lemonfiber_core::config::Settings;
-use lemonfiber_core::ports::http::{Method, Request};
-use lemonfiber_core::ports::service::{Asking, Quota};
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
-use lemonfiber_ports::service::Approving;
-use std::sync::Arc;
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{HouseholdRequest, Quota, RequestStatus};
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_testing::requests::{self, intake};
 
-/// A decision is the last segment of the path, and the body is empty.
-///
-/// The service reads nothing but the path, which is the whole reason a reason cannot
-/// travel with it.
-#[tokio::test]
-async fn a_decision_is_the_path_and_the_body_is_empty() {
-    for (approve, said) in [(true, "approve"), (false, "decline")] {
-        let fake = Fake::by_route(vec![(
-            Method::Post,
-            "/request/7/",
-            Answer::reply(200, "{}"),
-        )]);
-
-        let ruled = request_service(&fake).decide(7, approve).await;
-
-        assert!(ruled.is_ok(), "{ruled:?}");
-        let asked = fake.requests();
-        let sent = asked.first().map(|request| request.url.clone());
-        assert!(
-            sent.as_deref().is_some_and(|url| url.ends_with(said)),
-            "{sent:?} does not end in {said}"
-        );
-        assert_eq!(asked.first().and_then(|request| request.body.clone()), None);
-    }
-}
-
-/// A service that refuses is a refusal rather than a change nobody made.
-#[tokio::test]
-async fn a_service_that_refuses_is_a_refusal() {
-    let fake = Fake::always(Answer::reply(500, "boom"));
-    let client = request_service(&fake);
-
-    assert!(client.asking().await.is_err());
-    assert!(client.left(MEMBER).await.is_err());
-    assert!(client.decide(7, true).await.is_err());
-    assert!(client.set_asking(&Asking::default()).await.is_err());
-    assert!(client.set_quota(MEMBER, None).await.is_err());
-    assert!(client.approves_own(MEMBER, true).await.is_err());
-}
-
-/// A service that answers something unreadable is a refusal too, rather than a
-/// household with no limit on it.
-#[tokio::test]
-async fn an_unreadable_answer_is_not_a_household_with_no_limit() {
-    let fake = Fake::always(Answer::reply(200, "not json"));
-    let client = request_service(&fake);
-
-    assert!(client.asking().await.is_err());
-    assert!(client.left(MEMBER).await.is_err());
-    assert!(client.set_asking(&Asking::default()).await.is_err());
-    assert!(client.set_quota(MEMBER, None).await.is_err());
-    assert!(client.approves_own(MEMBER, true).await.is_err());
-}
-
-/// A context over the shipped stack with the media server up and nothing answering.
+/// A context over the shipped stack with the media server and the request service moved
+/// in and nothing answering.
 ///
 /// Nothing answering is the point: what is held here is that the dispatcher reaches
 /// these two commands at all, and that a service which will not speak leaves the
 /// household exactly as it was rather than reporting a limit nobody set.
 fn silent(name: &str) -> Ctx {
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin", "seerr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(Settings {
-            env_file: Some(recorded_admin(name)),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(Fake::silent())
+    context(name, &Fake::silent())
 }
 
 /// A rehearsal leaves the household's own page exactly as it found it.
@@ -104,7 +35,7 @@ async fn a_rehearsal_leaves_the_households_own_page_alone() {
     let written: Vec<String> = transport
         .requests()
         .iter()
-        .filter(|request: &&Request| request.url.contains("/settings/discover"))
+        .filter(|request: &&Request| request.url.ends_with(intake("set_notices")))
         .map(|request| format!("{:?} {}", request.method, request.url))
         .collect();
     assert!(
@@ -124,7 +55,7 @@ async fn a_reading_hangs_what_the_house_is_owed_where_they_ask() {
     let filed: Vec<String> = transport
         .requests()
         .iter()
-        .filter(|request: &&Request| request.url.contains("/settings/discover/add"))
+        .filter(|request: &&Request| request.url.ends_with(intake("set_notices")))
         .filter_map(|request| request.body.clone())
         .collect();
     // What is hung rather than which: whether the disk of the machine running this has
@@ -147,7 +78,7 @@ async fn a_reading_hangs_what_the_house_is_owed_where_they_ask() {
 async fn a_page_that_will_not_hold_a_notice_costs_the_notice_and_not_the_reading() {
     let said = dispatch(
         Command::Household { member: None },
-        &refusing("unhung", Method::Get, "/settings/discover"),
+        &refusing("unhung", intake("set_notices")),
     )
     .await
     .ok()
@@ -241,16 +172,12 @@ async fn a_reason_survives_the_refusal_and_reaches_whoever_asked() {
         Command::Household { member: None },
         &with(
             "passed-on",
-            vec![(
-                None,
-                "/api/v1/request",
-                Answer::reply(
-                    200,
-                    r#"{"pageInfo":{"results":1},"results":[{"id":7,
-                        "createdAt":"2026-08-17T21:04:09.000Z","status":3,"type":"movie",
-                        "media":{"status":2,"externalServiceId":3},
-                        "requestedBy":{"displayName":"Alex"}}]}"#,
-                ),
+            vec![requests::answering(
+                "requests",
+                &vec![HouseholdRequest {
+                    request_status: Some(RequestStatus::Declined),
+                    ..the_request()
+                }],
             )],
         ),
     )
@@ -395,7 +322,7 @@ async fn a_write_the_service_will_not_take_changes_nothing() {
             policy: Some(Policy::Trusted),
             quota: None,
         }),
-        &refusing("nowrite", Method::Post, "/settings/main"),
+        &refusing("nowrite", intake("set_asking")),
     )
     .await;
 
@@ -413,7 +340,7 @@ async fn a_decision_the_service_will_not_rule_on_says_so() {
             request: 7,
             answer: Ruling::LetThrough,
         }),
-        &refusing("norule", Method::Post, "/request/7/"),
+        &refusing("norule", intake("decide")),
     )
     .await;
 

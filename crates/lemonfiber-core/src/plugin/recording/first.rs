@@ -60,7 +60,7 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
     if reaching.served.port.is_none() {
         return Err("it publishes no port, so its first run cannot reach it".to_owned());
     }
-    let reader = crate::app::credentials::reader(api.kind).ok_or_else(|| {
+    let reader = crate::credential::written::reader(api.key_source).ok_or_else(|| {
         "its first run is its adapter's, and no adapter fronts it here".to_owned()
     })?;
     read(reaching, api, reader).await.map(Some)
@@ -71,7 +71,7 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
 async fn read(
     reaching: &Reaching<'_>,
     api: &Api,
-    reader: fn(&str) -> Option<String>,
+    reader: crate::credential::written::Reader,
 ) -> Result<Held, String> {
     let placed = reaching.placed;
     let path = api

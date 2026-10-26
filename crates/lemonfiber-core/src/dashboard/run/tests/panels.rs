@@ -2,20 +2,21 @@
 
 use super::*;
 
-/// A transport answering every request with this body at 200 — the queue as JSON for
-/// the happy path, or something unreadable to stand in for a service that will not
-/// answer.
-fn answering(body: &'static str) -> Arc<Fake> {
-    Fake::always(Answer::reply(200, body))
+/// A queue as a curator reports it: four items, one of them stuck.
+fn four_queued() -> Answer {
+    let queued = |status: &str| crate::ports::service::Queued {
+        title: "something".to_owned(),
+        status: status.to_owned(),
+        state: "downloading".to_owned(),
+        message: None,
+        download_id: None,
+        grabs: 1,
+    };
+    crate::test_support::curators::answered(&crate::ports::service::Queue {
+        total: 4,
+        items: vec![queued("warning"), queued("ok")],
+    })
 }
-
-/// A curator config carrying a usable key, and one carrying none.
-const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
-
-const CONFIG_NO_KEY: &str = "<Config><Port>8989</Port></Config>";
-
-/// A queue as a service reports it: four items, one of them stuck.
-const QUEUE_JSON: &str = r#"{"totalRecords":4,"records":[{"trackedDownloadStatus":"warning"},{"trackedDownloadStatus":"ok"}]}"#;
 
 #[tokio::test]
 async fn a_running_stack_fills_the_services_and_health_and_reads_as_up() {
@@ -184,54 +185,71 @@ async fn an_engine_that_will_not_answer_leaves_the_door_panel_saying_why() {
     assert!(!snapshot.services.is_available());
 }
 
-/// A context configured with a fake filesystem and transport, over the stack
-/// this repo carries so its curator services resolve as queue targets.
-fn ctx_with(fs: SeedFs, http: Arc<Fake>) -> Ctx {
-    ctx(Reporting::holding(
-        &LIBRARY,
-        Lifecycle::Running,
-        Health::Healthy,
-    ))
-    .with_filesystem(Arc::new(fs))
-    .with_http(http)
+/// A context over the stack this repo carries, every curator moved into its plugin and
+/// answering its queue with `queue`, its adapter running where `running` and keyed where
+/// `keyed`.
+fn curating(queue: Answer, running: bool, keyed: bool) -> Ctx {
+    use crate::test_support::adapted;
+    use crate::test_support::curators::ALL;
+    static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir =
+        lemonfiber_fixtures::scratch::Scratch::named(&format!("dashboard-queue-{nth}")).kept();
+    let _ = std::fs::create_dir_all(&dir);
+    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
+    let mut ctx = ctx(if running {
+        engine.alongside(adapted::running(&ALL))
+    } else {
+        engine
+    })
+    .with_http(Fake::by_path(vec![(
+        crate::test_support::curators::curated("queue"),
+        queue,
+    )]));
+    ctx.settings.env_file = Some(dir.join(".env"));
+    for curator in ALL {
+        curator.recorded(&ctx);
+    }
+    if keyed {
+        let adapters: Vec<&str> = ALL.iter().map(|curator| curator.adapter).collect();
+        ctx.seams.confined = adapted::Keyed::holding(Arc::clone(&ctx.seams.confined), &adapters);
+    }
+    ctx
 }
 
 #[tokio::test]
 async fn the_queue_panel_fills_with_each_curators_depth_and_stuck_count() {
-    let ctx = ctx_with(SeedFs::keyed(Some(CONFIG_WITH_KEY)), answering(QUEUE_JSON));
-    let snapshot = gather(&ctx, None).await;
+    let snapshot = gather(&curating(four_queued(), true, true), None).await;
     assert!(
         matches!(snapshot.queue, Panel::Ready(ref queues)
             if !queues.is_empty() && queues.iter().all(|q| q.depth == 4 && q.stuck == 1)),
-        "each *arr that answered contributes its depth and stuck count"
+        "each curator that answered contributes its depth and stuck count"
     );
 }
 
+/// No adapter holds a key yet: the ordinary first-start case, skipped so the panel is
+/// ready-but-empty rather than failed.
 #[tokio::test]
-async fn a_service_still_starting_with_no_key_is_left_out_of_the_queue() {
-    // No config to read: the ordinary first-start case, skipped so the panel is
-    // ready-but-empty rather than failed.
-    let ctx = ctx_with(SeedFs::keyed(None), answering(QUEUE_JSON));
-    let snapshot = gather(&ctx, None).await;
+async fn a_curator_still_starting_with_no_key_is_left_out_of_the_queue() {
+    let snapshot = gather(&curating(four_queued(), true, false), None).await;
     assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
 }
 
 #[tokio::test]
-async fn a_service_whose_config_holds_no_key_is_left_out_of_the_queue() {
-    let ctx = ctx_with(SeedFs::keyed(Some(CONFIG_NO_KEY)), answering(QUEUE_JSON));
-    let snapshot = gather(&ctx, None).await;
+async fn a_curator_whose_adapter_is_not_running_is_left_out_of_the_queue() {
+    let snapshot = gather(&curating(four_queued(), false, true), None).await;
     assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
 }
 
+/// The adapter is asked, but the queue is refused, so that curator is dropped from the
+/// panel rather than failing it.
 #[tokio::test]
-async fn a_service_that_will_not_answer_its_queue_is_left_out() {
-    // The key reads, but the queue answer is unreadable, so that service is
-    // dropped from the panel rather than failing it.
-    let ctx = ctx_with(
-        SeedFs::keyed(Some(CONFIG_WITH_KEY)),
-        answering("not a queue"),
-    );
-    let snapshot = gather(&ctx, None).await;
+async fn a_curator_that_will_not_answer_its_queue_is_left_out() {
+    let snapshot = gather(
+        &curating(crate::test_support::curators::refusing(), true, true),
+        None,
+    )
+    .await;
     assert!(matches!(snapshot.queue, Panel::Ready(ref queues) if queues.is_empty()));
 }
 

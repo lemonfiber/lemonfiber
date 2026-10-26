@@ -12,14 +12,19 @@ const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugi
 const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
 
 /// Services the media stack runs that the bundle installs rather than assembles.
-const NOT_ASSEMBLED: [&str; 7] = [
+const NOT_ASSEMBLED: [&str; 12] = [
     "audiobookshelf",
     "bazarr",
     "bindery",
     "jellyfin",
+    "lidarr",
     "nzbhydra2",
+    "prowlarr",
     "qbittorrent",
+    "radarr",
     "sabnzbd",
+    "seerr",
+    "sonarr",
 ];
 
 /// Fields of a service that differ between the two, by service and field: the guarded
@@ -58,25 +63,18 @@ const DIFFERING: [(&str, &str); 24] = [
 
 /// The asks the embedded stack makes that the media stack does not, by asker and
 /// capability: each service given a household hostname asks the proxy, each whose
-/// dashboard panel reads it asks the dashboard, the request service asks the gate, and
-/// the gate, quality sync, decline and the guarded door ask what they act on.
-const ASKED_HERE: [(&str, &str); 16] = [
+/// dashboard panel reads it asks the dashboard, and the gate, quality sync, decline and
+/// the guarded door ask what they act on.
+const ASKED_HERE: [(&str, &str); 9] = [
     ("calibre-web-automated", "proxy.front"),
     ("decline", "identity.source"),
     ("door", "media.serve"),
     ("door", "proxy.front"),
     ("homepage", "proxy.front"),
-    ("lidarr", "dashboard.show"),
     ("navidrome", "dashboard.show"),
-    ("prowlarr", "dashboard.show"),
-    ("radarr", "dashboard.show"),
     ("recyclarr", "library.curate"),
     ("request-gate", "identity.source"),
     ("request-gate", "library.curate"),
-    ("seerr", "dashboard.show"),
-    ("seerr", "proxy.front"),
-    ("seerr", "request.gate"),
-    ("sonarr", "dashboard.show"),
 ];
 
 /// The links by name the media stack makes that the embedded stack does not, by asker

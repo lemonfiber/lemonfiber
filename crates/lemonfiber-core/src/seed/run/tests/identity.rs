@@ -12,7 +12,8 @@ async fn identity(
 }
 
 /// The same, with `installed` beside the stack, written to a directory of its own, and the
-/// stack's own media server moved into its plugin where it is among `services`.
+/// stack's own media server and request service moved into their plugins where each is
+/// among `services`.
 async fn identity_beside(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -43,7 +44,8 @@ async fn identity_in(
     (wirings, records, project)
 }
 
-/// The same, with the stack written to `project`.
+/// The same, with the stack written to `project`, and the plugin a contracted media server
+/// comes in held first-party, as the moved request service is.
 async fn identity_at(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -51,16 +53,23 @@ async fn identity_at(
     expected: &crate::baseline::Baseline,
     project: &std::path::Path,
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
-    let own = media_server_svc().id;
-    let installed: Vec<crate::plugin::Installed> = services
-        .iter()
-        .any(|service| service.id == own)
+    let among = |own: String| services.iter().any(|service| service.id == own);
+    let installed: Vec<crate::plugin::Installed> = among(media_server_svc().id)
         .then(crate::test_support::media::moved)
         .flatten()
         .into_iter()
+        .chain(
+            among(requests_svc().id)
+                .then(|| REQUESTS.installed())
+                .flatten(),
+        )
         .chain(installed.iter().cloned())
         .collect();
-    let fillers = fillers_beside(services.to_vec(), &installed, project);
+    let trusted: Vec<_> = first_party("contracted")
+        .into_iter()
+        .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
+        .collect();
+    let fillers = fillers_trusting(services.to_vec(), &installed, project, &trusted);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
     super::super::seed_request_identity(
@@ -396,10 +405,9 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answe
     assert!(written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
 }
 
-/// A third party's media server that will not take its changed password is said the same
-/// way, and what closes it is the server itself: lemonfiber does not rotate another
-/// plugin's credentials, so the operator is pointed at the server and at the setting its
-/// own administrator's password is kept under.
+/// A plugin's media server that will not take its changed password is said the same way,
+/// and what closes it is the server itself: the operator is pointed at the server and at
+/// the setting its own administrator's password is kept under.
 #[tokio::test]
 async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
     use crate::test_support::{a_contracted_media_server, media, CONTRACTED_PORT, MEDIA_ADAPTER};
@@ -415,11 +423,11 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
         Some(env.to_path_buf()),
     )
     .with_http(super::household_changing(false, false, media::refusing()));
-    ctx.seams.engine =
-        Arc::new(
-            Reporting::holding(&[MEDIA_ADAPTER], Lifecycle::Running, Health::Healthy)
-                .publishing(&[(MEDIA_ADAPTER, "127.0.0.1", CONTRACTED_PORT)]),
-        );
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&[MEDIA_ADAPTER], Lifecycle::Running, Health::Healthy)
+            .publishing(&[(MEDIA_ADAPTER, "127.0.0.1", CONTRACTED_PORT)])
+            .alongside(REQUESTS.running()),
+    );
     ctx.seams.confined = media::Keyed::holding(Arc::clone(&ctx.seams.confined), &[MEDIA_ADAPTER]);
 
     let (wirings, _) = identity_beside(
@@ -446,6 +454,16 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
     assert!(!written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
 }
 
+/// What the request service answers holding a telling, on where `enabled` says, for
+/// `occasions`.
+fn telling(enabled: bool, occasions: &[crate::ports::service::Occasion]) -> Answer {
+    crate::test_support::requests::answered(&crate::ports::service::Telling {
+        enabled,
+        occasions: occasions.iter().copied().collect(),
+        others: false,
+    })
+}
+
 /// A telling the operator set before lemonfiber ever ran is taken on, not flagged.
 ///
 /// The baseline is empty and the service holds something, so there is no
@@ -459,10 +477,13 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
             vec![crate::test_support::media::answered(&true)],
         ),
         (
-            "/settings/notifications/webpush",
-            vec![Answer::reply(200, r#"{"enabled":true,"types":8}"#)],
+            crate::test_support::requests::intake("initialized"),
+            vec![crate::test_support::requests::answered(&true)],
         ),
-        ("", vec![Answer::reply(200, r#"{"initialized":true}"#)]),
+        (
+            crate::test_support::requests::intake("telling"),
+            vec![telling(true, &[crate::ports::service::Occasion::Arrived])],
+        ),
     ]);
     let env = config_scratch("telling-theirs");
     if let Some(parent) = env.parent() {
@@ -512,10 +533,13 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
             vec![crate::test_support::media::answered(&true)],
         ),
         (
-            "/settings/notifications/webpush",
-            vec![Answer::reply(200, r#"{"enabled":false,"types":0}"#)],
+            crate::test_support::requests::intake("initialized"),
+            vec![crate::test_support::requests::answered(&true)],
         ),
-        ("", vec![Answer::reply(200, r#"{"initialized":true}"#)]),
+        (
+            crate::test_support::requests::intake("telling"),
+            vec![telling(false, &[])],
+        ),
     ]);
     let env = config_scratch("telling-off");
     if let Some(parent) = env.parent() {
@@ -544,10 +568,11 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         Some(&crate::seed::State::Drifted),
         "their setting was not read as theirs"
     );
-    let wrote_to_them = http
-        .requests()
-        .iter()
-        .any(|asked| asked.url.contains("notifications/webpush") && asked.method == Method::Post);
+    let wrote_to_them = http.requests().iter().any(|asked| {
+        asked
+            .url
+            .ends_with(crate::test_support::requests::intake("tell"))
+    });
     assert!(
         !wrote_to_them,
         "the service was written to, so their setting was overruled"

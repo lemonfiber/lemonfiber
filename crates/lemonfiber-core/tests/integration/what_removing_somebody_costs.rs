@@ -11,14 +11,17 @@
 use std::sync::Arc;
 
 use crate::common::household::{recorded_admin, stack_without};
+use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{HouseholdRemoval, Revoked};
-use lemonfiber_core::ports::http::{Method, Request};
-use lemonfiber_core::ports::service::Member;
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{HouseholdRequest, MediaStatus, Member, RequestStatus};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_ports::media::Kind;
 use lemonfiber_testing::media;
+use lemonfiber_testing::requests::{self, REQUESTS};
 
 /// The household: the owner, who administers the server, and one ordinary member.
 fn household() -> Vec<Member> {
@@ -46,7 +49,7 @@ fn taken_from(sent: &[Request]) -> Vec<&'static str> {
         .filter_map(|request| {
             if request.url.ends_with(media::identity("withdraw")) {
                 Some("media server")
-            } else if request.method == Method::Delete && request.url.contains("/api/v1/user/") {
+            } else if request.url.ends_with(requests::intake("remove_member")) {
                 Some("request service")
             } else {
                 None
@@ -55,42 +58,86 @@ fn taken_from(sent: &[Request]) -> Vec<&'static str> {
         .collect()
 }
 
+/// One request, made by somebody shown as `member` and filed under `member_id` where it is.
+fn made_by(member: &str, member_id: Option<&str>) -> HouseholdRequest {
+    HouseholdRequest {
+        id: 0,
+        made: None,
+        member: member.to_owned(),
+        member_id: member_id.map(str::to_owned),
+        kind: Some(Kind::Movies),
+        title_id: None,
+        item: None,
+        arrived: None,
+        shelf_id: None,
+        request_status: Some(RequestStatus::Approved),
+        media_status: Some(MediaStatus::Processing),
+    }
+}
+
 /// Two requests from Ana and one from somebody else, so the count is hers and not the
 /// household's: one filed under her name alone, one under her id whatever name it
 /// shows, and one showing her name under somebody else's id.
-const REQUESTS: &str = r#"{"pageInfo":{"results":3},"results":[
-    {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},"requestedBy":{"displayName":"ana"}},
-    {"status":2,"type":"movie","media":{"status":3,"externalServiceId":2},"requestedBy":{"displayName":"Annie","jellyfinUserId":"9"}},
-    {"status":2,"type":"movie","media":{"status":3,"externalServiceId":3},"requestedBy":{"displayName":"Ana","jellyfinUserId":"5"}}
-]}"#;
+fn household_requests() -> Vec<HouseholdRequest> {
+    vec![
+        made_by("ana", None),
+        made_by("Annie", Some("9")),
+        made_by("Ana", Some("5")),
+    ]
+}
+
+/// The account the request service files Ana under.
+const HER_ACCOUNT: &str = "7";
+
+/// The request service's half: taking lemonfiber's key as `signed`, holding `held`,
+/// answering who Ana is with `lookup`, and giving her account up with `gone`.
+fn the_request_service(
+    signed: Answer,
+    held: &[HouseholdRequest],
+    lookup: Answer,
+    gone: Answer,
+) -> Vec<(&'static str, Vec<Answer>)> {
+    vec![
+        (requests::intake("answers"), vec![signed]),
+        (
+            requests::intake("requests"),
+            vec![requests::answered(&held)],
+        ),
+        (requests::intake("member_for"), vec![lookup]),
+        (requests::intake("remove_member"), vec![gone]),
+    ]
+}
 
 /// Everything answering: the media server holds the household, and the request service
-/// knows Ana and gives her account up.
+/// holds Ana's requests and answers who she is with `lookup` and gives her account up
+/// with `gone`.
 fn answering_with(lookup: Answer, gone: Answer) -> Arc<Fake> {
     let mut routes = the_media_server(media::taken());
-    routes.extend(vec![
-        ("/auth/me", vec![Answer::reply(200, "{}")]),
-        ("/api/v1/request", vec![Answer::reply(200, REQUESTS)]),
-        ("/user/jellyfin/", vec![lookup]),
-        ("/api/v1/user/", vec![gone]),
-        ("", vec![Answer::reply(200, "[]")]),
-    ]);
+    routes.extend(the_request_service(
+        requests::taken(),
+        &household_requests(),
+        lookup,
+        gone,
+    ));
     Fake::by_path_in_turn(routes)
+}
+
+/// Ana's account, as the request service answers who she is.
+fn hers() -> Answer {
+    requests::answered(&Some(HER_ACCOUNT))
 }
 
 /// The ordinary case: the request service knows them and gives the account up.
 fn answering() -> Arc<Fake> {
-    answering_with(Answer::reply(200, r#"{"id":7}"#), Answer::reply(200, "{}"))
+    answering_with(hers(), requests::taken())
 }
 
-/// A context over the shipped stack, with the media server moved into its plugin and up,
-/// and a password recorded.
+/// A context over the shipped stack, with the media server and the request service moved
+/// into their plugins and up, and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    media::keyed_in(context_on(
-        env,
-        http,
-        crate::common::household::set_up_beside(env),
-    ))
+    let mut ctx = context_on(env, http, crate::common::household::set_up_beside(env));
+    ctx.seams.engine = Arc::new(media::running().alongside(REQUESTS.running()));
+    REQUESTS.keyed_in(media::keyed_in(ctx))
 }
 
 /// Remove somebody the way a surface does: read what it costs, then answer the offer that
@@ -245,15 +292,16 @@ async fn confirmed_it_revokes_in_both_places_and_the_media_server_first() {
         "both accounts were not taken, or the request service was asked first"
     );
     assert_eq!(media::asked_about(&sent, "withdraw"), ["9"]);
-    assert!(sent
-        .iter()
-        .any(|request| request.method == Method::Delete && request.url.contains("/api/v1/user/7")));
+    assert_eq!(
+        requests::told::<String>(&sent, "remove_member", "id"),
+        [HER_ACCOUNT]
+    );
 }
 
 /// Somebody the request service never heard of costs nothing there, and is not a failure.
 #[tokio::test]
 async fn somebody_who_never_asked_for_anything_has_nothing_to_revoke_there() {
-    let http = answering_with(Answer::reply(404, ""), Answer::reply(200, "{}"));
+    let http = answering_with(requests::answered(&None::<String>), requests::taken());
     let said = removing("never-asked", "ana", true, http.clone()).await;
 
     let report = said.unwrap_or_else(|| unreachable!("a confirmed removal answers"));
@@ -276,7 +324,7 @@ async fn somebody_who_never_asked_for_anything_has_nothing_to_revoke_there() {
 /// no further as far as anybody can tell — which is the middle state, not the whole one.
 #[tokio::test]
 async fn a_request_service_that_would_not_say_is_not_reported_as_revoked() {
-    let http = answering_with(Answer::reply(500, ""), Answer::reply(200, "{}"));
+    let http = answering_with(requests::unavailable(), requests::taken());
     let said = removing("unread", "ana", true, http).await;
 
     let report = said.unwrap_or_else(|| unreachable!("a confirmed removal answers"));
@@ -290,7 +338,7 @@ async fn a_request_service_that_would_not_say_is_not_reported_as_revoked() {
 /// A request service that will not give the account up leaves it, and says so.
 #[tokio::test]
 async fn an_account_the_request_service_keeps_is_reported_rather_than_claimed_gone() {
-    let http = answering_with(Answer::reply(200, r#"{"id":7}"#), Answer::reply(500, ""));
+    let http = answering_with(hers(), requests::unavailable());
     let said = removing("kept", "ana", true, http).await;
 
     let report = said.unwrap_or_else(|| unreachable!("a confirmed removal answers"));
@@ -458,7 +506,7 @@ async fn a_stack_with_no_request_service_counts_nothing_and_asks_nothing() {
         !http
             .requests()
             .iter()
-            .any(|request| request.url.contains("/api/v1/")),
+            .any(|request| request.url.contains(intake::CAPABILITY)),
         "a stack with no request service was asked something"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -488,18 +536,12 @@ async fn a_media_server_that_will_not_say_who_is_here_removes_nobody() {
 async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone() {
     let env = recorded_admin("refused");
     let mut routes = the_media_server(media::refusing());
-    routes.extend(vec![
-        ("/auth/me", vec![Answer::reply(200, "{}")]),
-        (
-            "/api/v1/request",
-            vec![Answer::reply(
-                200,
-                r#"{"pageInfo":{"results":0},"results":[]}"#,
-            )],
-        ),
-        ("/user/jellyfin/", vec![Answer::reply(200, r#"{"id":7}"#)]),
-        ("", vec![Answer::reply(200, "[]")]),
-    ]);
+    routes.extend(the_request_service(
+        requests::taken(),
+        &[],
+        hers(),
+        requests::taken(),
+    ));
     let http = Fake::by_path_in_turn(routes);
     let ctx = context(&env, http.clone());
 
@@ -516,36 +558,17 @@ async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone(
 
 /// A request service that will not say what it holds is said, not guessed at.
 ///
-/// Both ways it can fail to say — refusing the sign-in, and refusing the lookup — reach
-/// the same place, and neither may read as "they have no account there".
+/// Both ways it can fail to say — refusing lemonfiber's key, and refusing the lookup —
+/// reach the same place, and neither may read as "they have no account there".
 #[tokio::test]
 async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
-    for (tag, sign_in, lookup) in [
-        (
-            "no-session",
-            Answer::reply(500, ""),
-            Answer::reply(200, r#"{"id":7}"#),
-        ),
-        (
-            "no-lookup",
-            Answer::reply(200, "{}"),
-            Answer::reply(403, ""),
-        ),
+    for (tag, signed, lookup) in [
+        ("no-session", requests::unavailable(), hers()),
+        ("no-lookup", requests::taken(), requests::refusing()),
     ] {
         let env = recorded_admin(tag);
         let mut routes = the_media_server(media::taken());
-        routes.extend(vec![
-            ("/auth/me", vec![sign_in]),
-            (
-                "/api/v1/request",
-                vec![Answer::reply(
-                    200,
-                    r#"{"pageInfo":{"results":0},"results":[]}"#,
-                )],
-            ),
-            ("/user/jellyfin/", vec![lookup]),
-            ("", vec![Answer::reply(200, "[]")]),
-        ]);
+        routes.extend(the_request_service(signed, &[], lookup, requests::taken()));
         let http = Fake::by_path_in_turn(routes);
         let ctx = context(&env, http);
 

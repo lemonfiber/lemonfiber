@@ -8,24 +8,22 @@
 //! leaves the operator with the credential they started with rather than with neither,
 //! and never with a password set on a service that nothing recorded.
 //!
-//! Two kinds of credential can genuinely be replaced from here and the rest cannot, and
-//! the difference is not arbitrary. lemonfiber can replace what it minted and set itself —
-//! the media server's administrator password — and it can hand out afresh what a service
-//! minted for itself, which is the repair for a service that regenerated its key
-//! underneath a stack still handing out the old one. It cannot invent a Usenet password: a
-//! value this product made up would be one the provider has never heard of, so what is
-//! owed there is a sentence saying where a replacement comes from.
+//! What can genuinely be replaced from here is what lemonfiber minted and set itself — the
+//! media server's administrator password and every secret a plugin declares minted — and
+//! the rest cannot, and the difference is not arbitrary. It cannot invent a Usenet
+//! password: a value this product made up would be one the provider has never heard of,
+//! so what is owed there is a sentence saying where a replacement comes from. Nor can it
+//! replace a key a stack service wrote for itself, which nothing here asks.
 
 use std::path::Path;
 
 use lemonfiber_manifest::Service;
 
-use crate::app::targets::{record_secret, recorded_secret, target_for, MediaServer};
+use crate::app::targets::{recorded_secret, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
-use crate::ports::service::{Client, Failure};
-use crate::seed::run::published_as;
+use crate::ports::service::Failure;
 
 mod replacing;
 pub(crate) use replacing::replace_admin_password;
@@ -36,11 +34,13 @@ const ADMINISTERING: &str = "a real run would generate a new administrator passw
      took it, and only then put it in place of the old one. Nothing was generated here, and \
      nothing was set.";
 
-/// What a rehearsal says about handing a service's own key back out.
-const REPUBLISHING: &str = "a real run would read the key the service wrote for itself, \
-     ask the service to identify itself with it, and — only if it answered — publish \
-     that key where the rest of the stack reads it. Nothing was read out and nothing \
-     was published.";
+/// Why a key a stack service wrote for itself is not replaced or handed out from here.
+const UNPROVABLE: &str = "this service writes its own key, and lemonfiber asks a service only \
+     over a contract, through the adapter of the plugin that brings it, so there is nothing \
+     here to replace the key through or prove it against, and it is not one this will hand \
+     out unproven. Run lemonfiber seed, which reads it and gives it to everything that reads \
+     it from the environment. Until then the existing credential is untouched and still in \
+     force.";
 
 /// Replace the credential one inventory line names — or, on a run that only says what
 /// it would do, say what replacing it would take.
@@ -62,7 +62,18 @@ pub(crate) async fn rotate(
         if let Some((installed, secret)) =
             super::minting::minted(held, plugin, register.installed())
         {
-            return super::minting::rotate(ctx, held, installed, &secret).await;
+            return super::minting::rotate(
+                ctx,
+                held,
+                installed,
+                secret,
+                &super::minting::Amid {
+                    services,
+                    fillers,
+                    project,
+                },
+            )
+            .await;
         }
         return Rotation::stopped(
             &held.name,
@@ -81,12 +92,12 @@ pub(crate) async fn rotate(
         Origin::Lemonfiber if super::tokening::is_token(held) => {
             super::tokening::rotate(ctx, held, services, fillers, project).await
         }
-        Origin::Service => match super::resetting::resettable(held, services, project) {
-            Some(target) => {
-                super::resetting::rotate(ctx, held, services, fillers, project, target).await
-            }
-            None => republished(ctx, held, services, project).await,
-        },
+        Origin::Service => Rotation::stopped(
+            &held.name,
+            Settled::Elsewhere {
+                detail: UNPROVABLE.to_owned(),
+            },
+        ),
         Origin::Lemonfiber if held.setting == config::MEDIA_SERVER_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await
         }
@@ -223,104 +234,6 @@ pub(crate) enum Replacing {
 /// What is said where lemonfiber holds no administrator password for the media server.
 const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
                                      server, so there is nothing to change; run lemonfiber seed";
-
-/// Hand a service's own current key back to everything that reads it.
-///
-/// The repair for a service that regenerated its API key: what it holds now is read
-/// from the file it wrote, proven by asking the service to identify itself with it,
-/// and only then published where the stack's own services read it. A key that the
-/// service will not answer to is not written down, which is the same ordering the
-/// minted rotation keeps.
-async fn republished(
-    ctx: &Ctx,
-    held: &Held,
-    services: &[Service],
-    project: Option<&Path>,
-) -> Rotation {
-    let Some(target) = services
-        .iter()
-        .filter_map(|service| project.and_then(|project| target_for(service, project)))
-        .find(|target| published_as(&target.id) == held.setting)
-    else {
-        // Every service that writes its own key is on the inventory, and only the
-        // curator-shaped ones can be asked to identify themselves with it. For the
-        // rest there is nothing here to prove a key against, and handing one out
-        // unproven is what seeding already does.
-        return Rotation::stopped(
-            &held.name,
-            Settled::Elsewhere {
-                detail: "this service's key is not one lemonfiber can prove by asking the \
-                         service who it is, so it is not one this will hand out unproven. Run \
-                         lemonfiber seed, which reads it and gives it to everything that \
-                         reads it from the environment. Until then the existing credential is \
-                         untouched and still in force."
-                    .to_owned(),
-            },
-        );
-    };
-    // Below the one condition that can be told without asking anything — whether this
-    // is a service whose key can be proved at all — and above the read of the key
-    // itself. Reading it would put a credential in this run's memory to describe a
-    // rotation, and asking the service to identify itself with it is an
-    // authentication attempt in somebody's log that nobody asked for.
-    if ctx.dry_run {
-        return would_rotate(held, REPUBLISHING);
-    }
-    let Some(key) = target.key(ctx.seams.filesystem.as_ref()).await else {
-        return unproven(
-            held,
-            "the service has not written an API key yet, so there is none to hand out",
-        );
-    };
-    let service = crate::servarr::Servarr::new(
-        ctx.seams.http.clone(),
-        &target.base,
-        key.clone(),
-        &target.id,
-        target.version,
-    );
-    match service.identity().await {
-        Ok(identity) => {
-            if let Err(failure) = record_secret(ctx, &held.setting, &key) {
-                return unproven(held, &unpublished(&failure));
-            }
-            Rotation::landed(
-                &held.name,
-                &format!(
-                    "{} {} answered to the key it holds",
-                    identity.name, identity.version
-                ),
-                super::reading::service_consumers(&target.name, &held.setting)
-                    .into_iter()
-                    .map(|(consumer, reached)| Propagation {
-                        consumer,
-                        reach: reached.reach(),
-                    })
-                    .collect(),
-            )
-        }
-        Err(Failure::Unauthorised { .. }) => Rotation::stopped(
-            &held.name,
-            Settled::Refused {
-                detail: "the service refused the key in its own configuration, so publishing it \
-                         would hand every consumer a key that does not work. Nothing was \
-                         written. Restart the service so it reloads its configuration, then \
-                         try again."
-                    .to_owned(),
-            },
-        ),
-        Err(failure) => unproven(held, &said(&failure)),
-    }
-}
-
-/// Why a key the service answered to was not handed out.
-fn unpublished(failure: &config::store::Failure) -> String {
-    crate::config::store::withheld_text(&format!(
-        "the service answered to the key it holds, but the key could not be published where \
-         the rest of the stack reads it: {failure}. The existing credential is the one still \
-         in force."
-    ))
-}
 
 /// A rotation that could not be proven, and so changed nothing.
 pub(super) fn unproven(held: &Held, detail: &str) -> Rotation {

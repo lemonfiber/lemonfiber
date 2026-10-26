@@ -18,7 +18,7 @@ use lemonfiber_core::ports::service::Download;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 
-use super::adapted::{answered, path_of, Adapted};
+use super::adapted::{answered, path_of, Adapted, PORT};
 
 /// The plugin the Usenet client moved into.
 pub const PLUGIN: &str = "sabnzbd";
@@ -27,9 +27,10 @@ pub const PLUGIN: &str = "sabnzbd";
 pub const ADAPTER: &str = "sabnzbd-adapter";
 
 /// The Usenet client's plugin and the adapter in front of it.
-const MOVED: Adapted = Adapted {
+pub const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 /// What the Usenet client is carrying in these fixtures.
@@ -72,13 +73,6 @@ pub fn unkeyed(ctx: &Ctx) {
 #[must_use]
 pub fn keyed(ctx: Ctx) -> Ctx {
     MOVED.keyed(ctx)
-}
-
-/// `ctx` reaching its Usenet client moved into its plugin: [`moved_in`], with the engine
-/// saying [`ADAPTER`] runs as [`running`] does.
-#[must_use]
-pub fn reaching(ctx: Ctx) -> Ctx {
-    MOVED.reaching(ctx)
 }
 
 /// One download the Usenet client is carrying: [`CARRIED`], a fifth done, five minutes

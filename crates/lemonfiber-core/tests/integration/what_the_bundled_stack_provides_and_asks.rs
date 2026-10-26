@@ -67,7 +67,7 @@ fn each_part_fills_the_capability_it_is_the_bundled_claimant_of() {
 fn every_service_given_a_household_hostname_asks_the_proxy() {
     assert_eq!(
         askers(&stack(), "proxy.front"),
-        once(&["calibre-web-automated", "door", "homepage", "seerr"])
+        once(&["calibre-web-automated", "door", "homepage"])
     );
 }
 
@@ -75,15 +75,7 @@ fn every_service_given_a_household_hostname_asks_the_proxy() {
 fn every_service_whose_panel_reads_it_asks_the_dashboard() {
     assert_eq!(
         askers(&stack(), "dashboard.show"),
-        once(&[
-            "jellyfin",
-            "lidarr",
-            "navidrome",
-            "prowlarr",
-            "radarr",
-            "seerr",
-            "sonarr"
-        ])
+        once(&["jellyfin", "navidrome"])
     );
 }
 
@@ -101,12 +93,33 @@ fn asking_from(moved: Option<lemonfiber_core::plugin::Installed>, capability: &s
         .unwrap_or_default()
 }
 
-/// Each download client, the subtitle finder and the listening server, which the bundle
-/// installs rather than assembles, asks the dashboard from its own plugin, as every
-/// service the stack carries whose panel reads it does from the stack.
+/// Each download client, the subtitle finder, the listening server, the curators, the
+/// indexer aggregator and the request service, which the bundle installs rather than
+/// assembles, asks the dashboard from its own plugin, as every service the stack carries
+/// whose panel reads it does from the stack.
 #[test]
 fn each_installed_part_asks_the_dashboard_from_its_plugin() {
     for (moved, plugin) in [
+        (
+            lemonfiber_testing::curators::TELEVISION.installed(),
+            lemonfiber_testing::curators::TELEVISION.plugin,
+        ),
+        (
+            lemonfiber_testing::curators::FILM.installed(),
+            lemonfiber_testing::curators::FILM.plugin,
+        ),
+        (
+            lemonfiber_testing::curators::MUSIC.installed(),
+            lemonfiber_testing::curators::MUSIC.plugin,
+        ),
+        (
+            lemonfiber_testing::indexer::INDEXER.installed(),
+            lemonfiber_testing::indexer::INDEXER.plugin,
+        ),
+        (
+            lemonfiber_testing::requests::REQUESTS.installed(),
+            lemonfiber_testing::requests::REQUESTS.plugin,
+        ),
         (
             lemonfiber_testing::usenet::moved(),
             lemonfiber_testing::usenet::PLUGIN,
@@ -131,23 +144,31 @@ fn each_installed_part_asks_the_dashboard_from_its_plugin() {
     }
 }
 
-/// The listening server, which the bundle installs, is given its household hostname by
-/// its plugin, and so asks the proxy from there.
+/// The listening server and the request service, which the bundle installs, are given
+/// their household hostnames by their plugins, and so ask the proxy from there.
 #[test]
-fn the_installed_listening_server_asks_the_proxy_from_its_plugin() {
-    assert_eq!(
-        asking_from(
-            lemonfiber_testing::listening::MOVED.installed(),
-            "proxy.front"
-        ),
-        vec![lemonfiber_testing::listening::PLUGIN.to_owned()]
-    );
+fn the_installed_parts_given_a_household_hostname_ask_the_proxy_from_their_plugins() {
+    for adapted in [
+        lemonfiber_testing::listening::MOVED,
+        lemonfiber_testing::requests::REQUESTS,
+    ] {
+        assert_eq!(
+            asking_from(adapted.installed(), "proxy.front"),
+            vec![adapted.plugin.to_owned()]
+        );
+    }
 }
 
 #[test]
 fn the_request_service_asks_the_gate_and_the_gate_asks_what_it_admits_to() {
     let manifest = stack();
-    assert_eq!(askers(&manifest, "request.gate"), once(&["seerr"]));
+    assert_eq!(
+        asking_from(
+            lemonfiber_testing::requests::REQUESTS.installed(),
+            "request.gate"
+        ),
+        vec![lemonfiber_testing::requests::REQUESTS.plugin.to_owned()]
+    );
     assert!(askers(&manifest, "library.curate").contains(&("request-gate".to_owned(), true)));
     assert!(askers(&manifest, "identity.source").contains(&("request-gate".to_owned(), false)));
 }

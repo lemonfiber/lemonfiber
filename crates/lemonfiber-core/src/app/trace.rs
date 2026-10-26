@@ -34,7 +34,6 @@ use super::targets::{open_curators, serving};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceReport};
-use crate::ports::service::{Maintenance, Pipeline};
 
 /// Trace one item by a human term, across the resolution services.
 ///
@@ -60,7 +59,7 @@ pub(crate) async fn trace(
     // the same read whichever curator the item turns up in.
     let served = serving(ctx, &manifest).await;
 
-    for curator in open_curators(ctx, &manifest.services).await {
+    for curator in open_curators(ctx, &manifest).await {
         let (kind, service) = (curator.kind, curator.service);
         let Ok(items) = service.find_items(kind, term).await else {
             continue;
@@ -113,7 +112,11 @@ pub(crate) async fn trace(
         );
         if unexplained(&report) {
             if searching {
-                searched(&mut report, &curator.name, asking(&service, kind).await);
+                searched(
+                    &mut report,
+                    &curator.name,
+                    asking(service.as_ref(), kind).await,
+                );
             } else if service.wanting().await.unwrap_or(false) {
                 report.searchable = Some(searchable(&curator.name));
             }
@@ -142,7 +145,7 @@ pub(crate) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
         .map_err(|err| Box::new(err.problem()))?;
     let mut items = Vec::new();
     let mut incomplete = false;
-    for curator in open_curators(ctx, &manifest.services).await {
+    for curator in open_curators(ctx, &manifest).await {
         match curator.service.stuck_items(curator.kind).await {
             Ok(stuck) => items.extend(stuck.into_iter().map(|item| StuckEntry {
                 title: item.title,
@@ -156,8 +159,8 @@ pub(crate) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
     // answer. A service declaring an API this build cannot speak or reach holds a queue
     // nothing here can read, and leaving it out makes this list exactly as short as an
     // unreadable queue does — without the sentence that says so.
-    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let unsupported = super::targets::unsupported_here(&manifest.services, project.as_deref());
+    let unsupported =
+        super::targets::unsupported_here(&super::targets::fillers_here(ctx, &manifest));
 
     Ok(StuckReport {
         items,

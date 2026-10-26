@@ -62,24 +62,54 @@ pub(crate) async fn reached(
     installed: &[Installed],
     resolved: &Resolved,
 ) -> Vec<Propagation> {
-    let crossing = Holding::Crossing(setting.to_owned());
+    let (services, unwritten) = reread_by(
+        ctx,
+        &Holding::Crossing(setting.to_owned()),
+        installed,
+        resolved,
+    );
+    restarted_with(ctx, &services, unwritten).await
+}
+
+/// Every service whose secrets file reads `holding`, each such file written again with
+/// what is held now, and why they could not be written where they could not.
+pub(crate) fn reread_by(
+    ctx: &Ctx,
+    holding: &Holding,
+    installed: &[Installed],
+    resolved: &Resolved,
+) -> (Vec<String>, Option<String>) {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
     let services: Vec<String> = super::files::every_file(manifest.as_ref(), installed, resolved)
         .into_iter()
         .filter(|(_, _, variables)| {
             variables
                 .iter()
-                .any(|variable| variable.holding == crossing)
+                .any(|variable| variable.holding == *holding)
         })
         .map(|(service, _, _)| service)
         .collect();
     if services.is_empty() {
-        return Vec::new();
+        return (services, None);
     }
-    let unwritten = super::files::reread(ctx, manifest.as_ref(), installed, resolved, &crossing)
+    let unwritten = super::files::reread(ctx, manifest.as_ref(), installed, resolved, holding)
         .err()
         .map(|why| why.to_string());
-    let running = restarting::running(ctx, &services).await;
+    (services, unwritten)
+}
+
+/// How far a value written into the secrets files of `services` reached each of them:
+/// each running one restarted to read it, unless the files could not be written for
+/// `unwritten`.
+pub(crate) async fn restarted_with(
+    ctx: &Ctx,
+    services: &[String],
+    unwritten: Option<String>,
+) -> Vec<Propagation> {
+    if services.is_empty() {
+        return Vec::new();
+    }
+    let running = restarting::running(ctx, services).await;
     let unrestarted = match unwritten {
         Some(_) => None,
         None => restarting::restarted(ctx, &running).await,

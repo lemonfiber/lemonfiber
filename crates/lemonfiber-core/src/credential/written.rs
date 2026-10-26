@@ -5,16 +5,44 @@
 
 use lemonfiber_manifest::KeySource;
 
+/// Takes a key out of the contents of a file of one shape, where it is written there.
+pub(crate) type Reader = fn(&str) -> Option<String>;
+
 /// The reader that takes a service's own key out of a file of `source`'s shape, where
 /// keys are read from a file of that shape.
-pub(crate) fn reader(source: KeySource) -> Option<fn(&str) -> Option<String>> {
+pub(crate) fn reader(source: KeySource) -> Option<Reader> {
     match source {
-        KeySource::ConfigXml => Some(crate::servarr::api_key),
-        KeySource::ConfigJson => Some(crate::seerr::api_key),
+        KeySource::ConfigXml => Some(xml_key),
+        KeySource::ConfigJson => Some(json_key),
         KeySource::ConfigYaml => Some(yaml_key),
         KeySource::ConfigIni => Some(ini_key),
         KeySource::ApiSettings | KeySource::Generated | KeySource::None => None,
     }
+}
+
+/// The element of an XML configuration holding the service's own key, opened and closed.
+const XML_ELEMENT: (&str, &str) = ("<ApiKey>", "</ApiKey>");
+
+/// The object of a JSON configuration the service keeps its own key in.
+const JSON_OBJECT: &str = "main";
+
+/// The entry of that object holding it.
+const JSON_ENTRY: &str = "apiKey";
+
+/// The key in the single `<ApiKey>` element of an XML configuration.
+///
+/// Scanned rather than parsed: the file is machine-written with exactly one such
+/// element, and nothing else in it is wanted.
+fn xml_key(config_xml: &str) -> Option<String> {
+    let (open, close) = XML_ELEMENT;
+    let rest = config_xml.get(config_xml.find(open)? + open.len()..)?;
+    crate::generated::key(rest.get(..rest.find(close)?)?.trim())
+}
+
+/// The key under `apiKey` in the `main` object of a JSON configuration.
+fn json_key(config_json: &str) -> Option<String> {
+    let settings: serde_json::Value = serde_json::from_str(config_json).ok()?;
+    crate::generated::key(settings.get(JSON_OBJECT)?.get(JSON_ENTRY)?.as_str()?)
 }
 
 /// The section of a YAML configuration the service keeps its own key in.

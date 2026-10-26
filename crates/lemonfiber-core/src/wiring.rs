@@ -38,7 +38,7 @@ mod settling;
 pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
 use settling::claimants;
-pub use settling::{address, asked_by, contested_by, filled, settle, unfilled};
+pub use settling::{address, asked_by, contested_by, filled, settle, settle_trusting, unfilled};
 
 /// Every code the wiring, or the record of what is installed, is refused with where
 /// something it is read from cannot be read.
@@ -288,9 +288,14 @@ pub fn substitute(
     if !brought && !manifest.services.iter().any(|one| one.id == service) {
         return Err(Refused::NoSuchService(service.to_owned()));
     }
-    if !claimants(manifest, installed, capability)
-        .iter()
-        .any(|one| one.service == service)
+    if !claimants(
+        manifest,
+        installed,
+        capability,
+        crate::plugin::first_party::EMBEDDED,
+    )
+    .iter()
+    .any(|one| one.service == service)
     {
         return Err(Refused::DoesNotProvide {
             service: service.to_owned(),

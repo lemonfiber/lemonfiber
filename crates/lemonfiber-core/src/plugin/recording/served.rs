@@ -132,7 +132,7 @@ pub(super) fn settled(placed: &Placed, copy: &Throwaway, data: Option<&Path>) ->
 
 /// The same container, run as `operator` rather than as the entry writes it where nothing
 /// is set.
-pub(super) fn settled_as(
+pub(in crate::plugin) fn settled_as(
     placed: &Placed,
     copy: &Throwaway,
     data: Option<&Path>,
@@ -160,6 +160,7 @@ pub(super) fn settled_as(
         reaching: Vec::new(),
         image: format!("{}@{}", placed.image, placed.digest),
         env,
+        command: Vec::new(),
         user,
         security_opt,
         cap_drop,
@@ -195,7 +196,7 @@ async fn asked(
 ) -> Result<Vec<Answer>, (String, String)> {
     let served = reaching.served;
     let plain = Addressed::to((recorder.transport)(), LOOPBACK, inside(reaching.placed));
-    healthy(recorder, plain.as_ref(), health, served)
+    healthy(recorder.serving, plain.as_ref(), health, served)
         .await
         .map_err(|why| ("health".to_owned(), why))?;
     let held: Option<Held> = first::performed(reaching)
@@ -258,8 +259,8 @@ pub(super) fn allowed(health: Option<&Health>) -> Duration {
 }
 
 /// Wait until the service's health passes, or say why it did not within its limit.
-pub(super) async fn healthy(
-    recorder: Recorder<'_>,
+pub(in crate::plugin) async fn healthy(
+    serving: &dyn crate::ports::serving::Serving,
     http: &dyn Http,
     health: Option<&Health>,
     served: &Served,
@@ -267,8 +268,7 @@ pub(super) async fn healthy(
     let within = allowed(health);
     let until = Instant::now() + within;
     loop {
-        let standing = recorder
-            .serving
+        let standing = serving
             .standing(served)
             .await
             .map_err(|unran| unran.to_string())?;

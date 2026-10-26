@@ -1,32 +1,18 @@
 //! Asking the indexers, and what the accounts say about a stall.
 
 use super::*;
-
-/// One monitored item, with nothing yet done about it.
-const MONITORED: &str = r#"[{"id":1,"title":"The Expanse","monitored":true}]"#;
-
-/// A wanted-missing page naming one item, which is what a release search is run for.
-const ONE_WANTED: &str = r#"{"records":[{"id":7}]}"#;
-
-/// A wanted-missing page with nothing on it, so there is nothing to search for.
-const NOTHING_WANTED: &str = r#"{"records":[]}"#;
-
-/// A release search that came back with releases the profile rejected every one of.
-const ALL_REJECTED: &str = r#"[{"rejections":["quality 1080p is not wanted"]}]"#;
-
-/// A release search that came back with a release the profile would grab.
-const ONE_ACCEPTED: &str = r#"[{"rejections":[]}]"#;
-
-/// A release search that ran cleanly and came back with nothing at all.
-const NO_RELEASES: &str = "[]";
+use crate::ports::service::ReleaseProbe;
 
 /// A context whose Usenet client is reachable through its plugin's adapter as well as the
 /// curators through their keys, so a trace that asks the accounts resolves both readers
 /// rather than only one.
 fn ctx_with_accounts(fake: &Fake) -> Ctx {
     let mut ctx = ctx_with(fake);
-    ctx.settings.env_file = Some(crate::test_support::env_without_password("trace-accounts"));
-    crate::test_support::usenet::reaching(ctx)
+    ctx.seams.engine = Arc::new(
+        curators::running(&curators::ALL).alongside(crate::test_support::usenet::running()),
+    );
+    crate::test_support::usenet::moved_in(&ctx);
+    ctx
 }
 
 /// The distinction this whole path exists to draw: releases are out there and the
@@ -38,7 +24,12 @@ fn ctx_with_accounts(fake: &Fake) -> Ctx {
 /// the quality rather than the indexers.
 #[tokio::test]
 async fn releases_the_quality_rejects_read_as_found_rather_than_as_nothing_found() {
-    let report = searched_for(&Fake::searching(MONITORED, ONE_WANTED, ALL_REJECTED)).await;
+    let report = searched_for(&Fake::searching(
+        monitored(),
+        true,
+        answered(&ReleaseProbe::NoneMatch),
+    ))
+    .await;
 
     assert_eq!(report.furthest, Stage::Found);
     assert_eq!(
@@ -58,7 +49,12 @@ async fn releases_the_quality_rejects_read_as_found_rather_than_as_nothing_found
 /// doing — so an operator does not go and ease a quality that rejected nothing.
 #[tokio::test]
 async fn a_search_that_found_nothing_says_the_indexers_carry_nothing() {
-    let report = searched_for(&Fake::searching(MONITORED, ONE_WANTED, NO_RELEASES)).await;
+    let report = searched_for(&Fake::searching(
+        monitored(),
+        true,
+        answered(&ReleaseProbe::NoneFound),
+    ))
+    .await;
 
     assert_eq!(report.furthest, Stage::Monitored);
     let reason = report.stall.unwrap_or_default();
@@ -73,7 +69,12 @@ async fn a_search_that_found_nothing_says_the_indexers_carry_nothing() {
 /// been shown to exist.
 #[tokio::test]
 async fn a_search_that_settled_nothing_leaves_the_question_open_and_says_it_asked() {
-    let report = searched_for(&Fake::searching(MONITORED, NOTHING_WANTED, NO_RELEASES)).await;
+    let report = searched_for(&Fake::searching(
+        monitored(),
+        false,
+        answered(&ReleaseProbe::NothingWanted),
+    ))
+    .await;
 
     assert_eq!(report.furthest, Stage::Monitored);
     let reason = report.stall.unwrap_or_default();
@@ -84,7 +85,12 @@ async fn a_search_that_settled_nothing_leaves_the_question_open_and_says_it_aske
 /// nothing about that item either, however healthy it reads.
 #[tokio::test]
 async fn a_search_that_answers_about_other_content_settles_nothing_here() {
-    let report = searched_for(&Fake::searching(MONITORED, ONE_WANTED, ONE_ACCEPTED)).await;
+    let report = searched_for(&Fake::searching(
+        monitored(),
+        true,
+        answered(&ReleaseProbe::Matching),
+    ))
+    .await;
 
     assert_eq!(report.furthest, Stage::Monitored);
     assert!(report
@@ -100,7 +106,7 @@ async fn a_search_that_answers_about_other_content_settles_nothing_here() {
 /// never the problem.
 #[tokio::test]
 async fn a_search_that_will_not_run_is_not_an_indexer_carrying_nothing() {
-    let report = searched_for(&Fake::searching(MONITORED, "not json", NO_RELEASES)).await;
+    let report = searched_for(&Fake::searching(monitored(), true, refusing())).await;
 
     assert_eq!(report.furthest, Stage::Monitored);
     assert!(report
@@ -116,7 +122,7 @@ async fn a_search_that_will_not_run_is_not_an_indexer_carrying_nothing() {
 /// the indexers hold the operator to is spent whatever the trace then says.
 #[tokio::test]
 async fn a_trace_nobody_asked_to_search_asks_the_indexers_nothing() {
-    let fake = Fake::searching(MONITORED, ONE_WANTED, ALL_REJECTED);
+    let fake = Fake::searching(monitored(), true, answered(&ReleaseProbe::NoneMatch));
     let transport = fake.transport();
     let context = ctx_with(&fake).with_http(Arc::<Transport>::clone(&transport));
 
@@ -125,7 +131,7 @@ async fn a_trace_nobody_asked_to_search_asks_the_indexers_nothing() {
         .unwrap_or_default();
 
     assert!(
-        !transport.asked_for("/release"),
+        !transport.asked_for(curated("probe_releases")),
         "the indexers were searched"
     );
     assert_eq!(report.furthest, Stage::Monitored);
@@ -138,8 +144,8 @@ async fn a_trace_nobody_asked_to_search_asks_the_indexers_nothing() {
 #[tokio::test]
 async fn a_trace_that_already_has_its_answer_asks_the_indexers_nothing() {
     let fake = Fake {
-        history: r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-01-01T00:00:00Z"}]}"#,
-        ..Fake::searching(MONITORED, ONE_WANTED, ALL_REJECTED)
+        history: happened(Outcome::Imported),
+        ..Fake::searching(monitored(), true, answered(&ReleaseProbe::NoneMatch))
     };
     let transport = fake.transport();
     let context = ctx_with(&fake).with_http(Arc::<Transport>::clone(&transport));
@@ -149,7 +155,7 @@ async fn a_trace_that_already_has_its_answer_asks_the_indexers_nothing() {
         .unwrap_or_default();
 
     assert!(
-        !transport.asked_for("/release"),
+        !transport.asked_for(curated("probe_releases")),
         "the indexers were searched"
     );
     assert_eq!(report.furthest, Stage::Imported);
@@ -162,9 +168,9 @@ async fn a_trace_that_already_has_its_answer_asks_the_indexers_nothing() {
 #[tokio::test]
 async fn a_stall_reads_unchanged_where_the_accounts_cannot_be_read() {
     let context = ctx_with_accounts(&Fake::curator(
-        r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-        r#"{"records":[]}"#,
-        EMPTY_QUEUE,
+        monitored(),
+        nothing_happened(),
+        nothing_queued(),
     ));
     let report = trace(&context, "expanse", None, false)
         .await
@@ -272,7 +278,12 @@ async fn unsearched(fake: &Fake) -> TraceReport {
 
 #[tokio::test]
 async fn a_trace_resting_at_monitored_says_what_a_search_would_spend_and_cover() {
-    let report = unsearched(&Fake::searching(MONITORED, ONE_WANTED, NO_RELEASES)).await;
+    let report = unsearched(&Fake::searching(
+        monitored(),
+        true,
+        answered(&ReleaseProbe::NoneFound),
+    ))
+    .await;
 
     assert_eq!(report.furthest, Stage::Monitored);
     let reason = report.stall.clone().unwrap_or_default();
@@ -299,8 +310,18 @@ async fn a_trace_resting_at_monitored_says_what_a_search_would_spend_and_cover()
 
 #[tokio::test]
 async fn a_trace_a_search_would_spend_nothing_on_offers_none() {
-    let nothing_wanted = unsearched(&Fake::searching(MONITORED, NOTHING_WANTED, NO_RELEASES)).await;
-    let searched = searched_for(&Fake::searching(MONITORED, ONE_WANTED, NO_RELEASES)).await;
+    let nothing_wanted = unsearched(&Fake::searching(
+        monitored(),
+        false,
+        answered(&ReleaseProbe::NothingWanted),
+    ))
+    .await;
+    let searched = searched_for(&Fake::searching(
+        monitored(),
+        true,
+        answered(&ReleaseProbe::NoneFound),
+    ))
+    .await;
 
     assert_eq!(nothing_wanted.searchable, None);
     assert_eq!(searched.searchable, None);

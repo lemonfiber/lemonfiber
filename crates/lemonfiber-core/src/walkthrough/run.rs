@@ -54,7 +54,7 @@ pub async fn walkthrough(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let curators = open_curators(ctx, &manifest.services).await;
+    let curators = open_curators(ctx, &manifest).await;
     let mut walk = Walk::new(ctx, narrator);
 
     match offer::offered(ctx, &curators).await {
@@ -94,7 +94,12 @@ async fn pipeline(
         // the download keeps going, which is the promise the narration just made them.
         watch::Landed::StillGoing => Ok(walk.handed_off(&chosen.named)),
         watch::Landed::Stopped(reason) => {
-            let logs = watch::what_was_said(walk.ctx, &manifest.services, &chosen.named).await;
+            let fillers = crate::app::targets::fillers_here(walk.ctx, manifest);
+            let curators: Vec<String> = crate::seed::run::curators(&fillers)
+                .iter()
+                .map(|curator| curator.id().to_owned())
+                .collect();
+            let logs = watch::what_was_said(walk.ctx, &curators, &chosen.named).await;
             Ok(walk.stopped_quoting(Shape::Pipeline, Some(chosen.named.clone()), reason, logs))
         }
     }
@@ -114,7 +119,7 @@ pub async fn worth_offering(ctx: &Ctx) -> Result<Why, Box<Problem>> {
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let curators = open_curators(ctx, &manifest.services).await;
+    let curators = open_curators(ctx, &manifest).await;
     Ok(offer::offered(ctx, &curators).await)
 }
 

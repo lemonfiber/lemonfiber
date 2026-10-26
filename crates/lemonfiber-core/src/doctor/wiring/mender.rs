@@ -19,7 +19,7 @@ use crate::repair::{may_write, Attempt, Repair, Writing, OPERATION};
 
 use crate::seed::CLIENT;
 
-use super::{holding, Managed, Reading, Wired};
+use super::{holding, Managed, Wired};
 
 /// Bringing one curator's download client back to the category lemonfiber files under.
 ///
@@ -28,7 +28,6 @@ use super::{holding, Managed, Reading, Wired};
 /// acting and writing over what somebody changed in between is the one thing this must
 /// not do.
 pub(crate) struct WiringMender {
-    reading: Reading,
     managed: Arc<Vec<Managed>>,
     /// When a change made here is recorded as happening — the run's own stamp, so every
     /// change one repair makes carries the same one and a reversal can tell them apart
@@ -37,13 +36,9 @@ pub(crate) struct WiringMender {
 }
 
 impl WiringMender {
-    /// A mender over the wirings given, writing through `http`.
-    pub(crate) fn new(reading: Reading, managed: Arc<Vec<Managed>>, stamp: String) -> Self {
-        Self {
-            reading,
-            managed,
-            stamp,
-        }
+    /// A mender over the wirings given.
+    pub(crate) const fn new(managed: Arc<Vec<Managed>>, stamp: String) -> Self {
+        Self { managed, stamp }
     }
 
     /// The wiring a repair names, or nothing where it names none of these.
@@ -122,7 +117,7 @@ async fn may_proceed(mender: &WiringMender, repair: &Repair) -> Writing {
     let Some((managed, wired)) = mender.named(repair) else {
         return Writing::TheirsAlone;
     };
-    let Some(held) = mender.reading.held(managed).await else {
+    let Some(held) = managed.held().await else {
         // The service will not say what it holds, so nothing can establish the value
         // is still lemonfiber's. Silence is not permission.
         return Writing::TheirsAlone;
@@ -140,7 +135,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
             leaving: "the wiring this repair names is no longer one lemonfiber manages".to_owned(),
         };
     };
-    let Some(client) = mender.reading.open(managed).await else {
+    let Some(client) = managed.asked.as_ref() else {
         return Attempt::Stopped {
             leaving: format!(
                 "{} could not be asked, so it was left as it was",

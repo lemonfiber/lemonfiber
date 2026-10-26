@@ -13,6 +13,7 @@ fn serve() -> Serve {
         reaching: Vec::new(),
         image: "lscr.io/linuxserver/sonarr@sha256:dffc".to_owned(),
         env: vec!["TZ=UTC".to_owned()],
+        command: Vec::new(),
         user: None,
         security_opt: vec!["no-new-privileges:true".to_owned()],
         cap_drop: vec!["ALL".to_owned()],

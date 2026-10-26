@@ -18,6 +18,9 @@ pub struct Serve {
     pub image: String,
     /// Its whole environment, as `NAME=value`.
     pub env: Vec<String>,
+    /// The arguments its image's own program is started with, or none for the image's
+    /// own.
+    pub command: Vec<String>,
     /// Who it runs as, as `uid:gid`, or nothing for the image's own choice.
     pub user: Option<String>,
     /// What it may not gain once started.

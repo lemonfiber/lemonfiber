@@ -5,18 +5,18 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use super::{allowing, deciding, found, now_reads, one_named, settled, theirs, Ctx};
 use crate::app::command::{Answer as Ruling, Chosen, Decision};
 use crate::asking::Policy;
-use crate::ports::http::Method;
-use crate::ports::service::{Asking, Member, Quota};
-use crate::test_support::{a_context, a_password, media, SeedFs};
+use crate::ports::service::{
+    Address, Asking, Headroom, HouseholdRequest, Left, MediaStatus, Member, Quota, RequestStatus,
+    Requesting,
+};
+use crate::test_support::requests as request_service;
+use crate::test_support::{a_context, a_password, media};
 
 /// A household trusted within five a week.
 const FIVE_A_WEEK: Quota = Quota {
     requests: 5,
     days: 7,
 };
-
-/// A curator config that opens a target, carrying a readable key.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// The one account the media server holds, so the forgiving match has a name to be
 /// forgiving about.
@@ -26,118 +26,134 @@ fn accounts() -> Vec<Member> {
     vec![alex]
 }
 
-/// Where the member who asked already hears from the request service.
-///
-/// Both agents carrying the bit a refusal is filed under, because a member who gave
-/// two addresses and asked to hear on both is the case where every arm of the
-/// sending runs. The one who switched an agent off is a case of its own below.
-const REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
-    "pushoverApplicationToken":"the-application-token","pushoverSound":"bike",
-    "pushbulletAccessToken":"the-access-token",
-    "notificationTypes":{"pushover":64,"pushbullet":64}}"#;
+/// Where the member who asked already hears from the request service: both agents,
+/// because a member who gave two addresses and asked to hear on both is the case where
+/// every arm of the sending runs. The one who switched an agent off is a case of its own.
+fn reached_at() -> Vec<Address> {
+    let mut both = half_reached_at();
+    both.push(Address::Pushbullet {
+        token: "the-access-token".to_owned(),
+    });
+    both
+}
+
+/// The same member, with one of the two agents left switched off.
+fn half_reached_at() -> Vec<Address> {
+    vec![Address::Pushover {
+        user: "the-user-key".to_owned(),
+        application: "the-application-token".to_owned(),
+        sound: Some("bike".to_owned()),
+    }]
+}
+
+/// The identifier the request service files the household's one member under.
+const MEMBER: &str = "4";
 
 /// One request nobody has ruled on, as the request service records it.
-const WAITING: &str = r#"{"pageInfo":{"results":1},"results":[{"id":7,
-    "createdAt":"2026-08-17T21:04:09.000Z","status":1,"type":"movie",
-    "media":{"status":2,"externalServiceId":3},
-    "requestedBy":{"displayName":"Alex"}}]}"#;
+fn waiting() -> HouseholdRequest {
+    HouseholdRequest {
+        id: 7,
+        made: Some("2026-08-17T21:04:09.000Z".to_owned()),
+        member: "Alex".to_owned(),
+        member_id: None,
+        kind: Some(crate::ports::media::Kind::Movies),
+        title_id: None,
+        item: Some(3),
+        arrived: None,
+        shelf_id: None,
+        request_status: Some(RequestStatus::Pending),
+        media_status: Some(MediaStatus::Pending),
+    }
+}
 
 /// A context over a transport that answers every read and write these take.
 ///
 /// Routed by what each call asks for rather than scripted in turn, because the
-/// answer here is the household read *again* — so the same paths are asked twice
+/// answer here is the household read *again* — so the same operations are asked twice
 /// and a queue would run out halfway through the second reading.
 fn a_household(tag: &str) -> Ctx {
     answering(tag, Vec::new())
 }
 
-/// The same household, with the named calls answering a refusal instead.
+/// The same household, with each of the named routes answering a refusal instead.
 ///
 /// One rule per call rather than one transport per case: what each of these holds
 /// is that a service which will not answer *that* leaves the household as it was,
 /// and a fixture that broke everything at once could not say which call it was.
-fn refusing(tag: &str, broken: Vec<(Method, &'static str)>) -> Ctx {
+fn refusing(tag: &str, broken: Vec<&'static str>) -> Ctx {
     answering(
         tag,
         broken
             .into_iter()
-            .map(|(method, route)| (Some(method), route, Answer::reply(500, "no")))
+            .map(|route| (route, request_service::refusing()))
             .collect(),
     )
 }
 
 /// The transport these run against, with the broken rules ahead of the working
 /// ones — the first rule whose fragment the address holds is the one that answers.
-fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
+fn answering(tag: &str, broken: Vec<(&'static str, Answer)>) -> Ctx {
+    use request_service::{answered, intake, taken};
     let mut routes = broken;
     routes.extend(vec![
+        (media::identity("household"), media::answered(&accounts())),
+        (media::identity("libraries"), Answer::reply(200, "[]")),
+        (media::identity("ratings"), Answer::reply(200, "[]")),
+        (intake("answers"), taken()),
         (
-            None,
-            media::identity("household"),
-            media::answered(&accounts()),
+            intake("asking"),
+            answered(&Asking {
+                approves_own: true,
+                quota: None,
+            }),
         ),
-        (None, media::identity("libraries"), Answer::reply(200, "[]")),
-        (None, media::identity("ratings"), Answer::reply(200, "[]")),
-        (None, "/auth/me", Answer::reply(200, "{}")),
+        (intake("member_for"), answered(&Some(MEMBER))),
         (
-            None,
-            "/settings/main",
-            Answer::reply(
-                200,
-                r#"{"defaultPermissions":160,
-                    "defaultQuotas":{"movie":{},"tv":{}}}"#,
-            ),
-        ),
-        (
-            None,
-            "/user/jellyfin/",
-            Answer::reply(200, r#"{"id":4,"permissions":160}"#),
+            intake("requesting"),
+            answered(&Some(Requesting {
+                id: MEMBER.to_owned(),
+                approves_own: true,
+            })),
         ),
         (
-            None,
-            "/user/4/quota",
-            Answer::reply(
-                200,
-                r#"{"movie":{"days":7,"limit":5,"used":1},"tv":{"days":7,"limit":0,"used":0}}"#,
-            ),
+            intake("left"),
+            answered(&Headroom {
+                films: Left {
+                    limit: Some(5),
+                    used: 1,
+                    days: Some(7),
+                },
+                television: Left {
+                    limit: None,
+                    used: 0,
+                    days: Some(7),
+                },
+            }),
         ),
-        (
-            None,
-            "settings/permissions",
-            Answer::reply(200, r#"{"permissions":160}"#),
-        ),
-        (
-            None,
-            "/user/4/settings/notifications",
-            Answer::reply(200, REACHED_AT),
-        ),
-        // Named by method as well as by path: the decision below posts to an
-        // address this fragment is a prefix of.
-        (
-            Some(Method::Get),
-            "/request/7",
-            Answer::reply(200, r#"{"id":7,"requestedBy":{"id":4}}"#),
-        ),
-        (None, "/request/7/", Answer::reply(200, "{}")),
-        (None, "/api/v1/request", Answer::reply(200, WAITING)),
-        (None, "", Answer::reply(200, "[]")),
+        (intake("reachable"), answered(&reached_at())),
+        (intake("requests"), answered(&[waiting()])),
+        (intake("decide"), taken()),
+        (intake("set_asking"), taken()),
+        (intake("set_quota"), taken()),
+        (intake("approves_own"), taken()),
+        (intake("set_notices"), taken()),
+        ("", Answer::reply(200, "[]")),
     ]);
-    let transport = Fake::by_rules(routes);
+    let transport = Fake::by_path(routes);
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("asking-{tag}")).kept();
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context()
-        .build()
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
-        ))
-        .with_http(transport);
+    let mut context = a_context().build().with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &context,
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
-    media::reaching(context)
+    let mut context = media::reaching(context);
+    context.seams.engine =
+        Arc::new(media::running().alongside(request_service::REQUESTS.running()));
+    request_service::REQUESTS.moved_in(&context);
+    context
 }
 
 mod allowances;

@@ -7,6 +7,7 @@ use crate::test_support::{a_contracted_gate, unaskable_gates, GATE_TRUSTED};
 
 use super::gate::routes;
 use super::*;
+use crate::test_support::curators::{self, FILM, TELEVISION};
 
 /// What the gate is asked for the routes it admits.
 const ADMITTED: &str = "/lemonfiber/request.gate/v1/admitted";
@@ -66,11 +67,30 @@ fn states(wirings: &[Wiring]) -> Vec<&State> {
     wirings.iter().map(|one| &one.state).collect()
 }
 
-/// Whether anything but a read was asked of anyone.
+/// Whether anybody was asked to change anything: the gate to admit a route, or the
+/// request service to hold a curator or a link.
 fn wrote(http: &Fake) -> bool {
+    use crate::test_support::requests::intake;
+    let writes = [
+        ADMIT,
+        intake("add_fulfilment_target"),
+        intake("move_fulfilment_target"),
+        intake("link_media_server"),
+    ];
     http.requests()
         .iter()
-        .any(|asked| asked.method != Method::Get)
+        .any(|asked| writes.iter().any(|write| asked.url.ends_with(write)))
+}
+
+/// `trusted` as first-party, beside every plugin this build embeds.
+fn trusting(
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> Vec<crate::plugin::first_party::FirstParty> {
+    trusted
+        .iter()
+        .chain(crate::plugin::first_party::EMBEDDED)
+        .copied()
+        .collect()
 }
 
 #[tokio::test]
@@ -204,23 +224,62 @@ async fn without_a_gate_to_ask_no_curator_is_handed_to_the_request_service() {
     for (tag, trusted, keyed) in unaskable_gates() {
         let project =
             lemonfiber_fixtures::scratch::Scratch::new(&format!("gate-unasked-fulfilment-{tag}"));
+        let folder = |path: &str| crate::ports::service::RegisteredFolder {
+            id: "1".to_owned(),
+            path: path.to_owned(),
+        };
+        let profiles = curators::answered(&[crate::ports::service::QualityProfile {
+            id: 4,
+            name: "HD-1080p".to_owned(),
+        }]);
         let http = Fake::by_path(vec![
             (
-                "/qualityprofile",
-                Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#),
+                curators::curating(TELEVISION, "quality_profiles"),
+                profiles.clone(),
+            ),
+            (curators::curating(FILM, "quality_profiles"), profiles),
+            (
+                curators::curating(TELEVISION, "root_folders"),
+                curators::answered(&[folder("/data/media/tv")]),
             ),
             (
-                "/rootfolder",
-                Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#),
+                curators::curating(FILM, "root_folders"),
+                curators::answered(&[folder("/data/media/movies")]),
             ),
-            ("/settings/", Answer::reply(200, "[]")),
+            (
+                crate::test_support::requests::intake("fulfilment_targets"),
+                curators::answered(&Vec::<crate::ports::service::RegisteredTarget>::new()),
+            ),
         ]);
-        let ctx = contracted_ctx(&project, SERVICE, keyed, http.clone());
-        let fillers = contracted_gate(&project, trusted);
+        let mut ctx = contracted_ctx(&project, SERVICE, keyed, http.clone());
+        ctx.settings.env_file = Some(project.join(".env"));
+        let ctx = crate::test_support::adapted::asking(ctx, &[TELEVISION, FILM, REQUESTS]);
+        for curator in [TELEVISION, FILM] {
+            curator.minted(&ctx, MINTED_CURATOR_KEY);
+        }
+        let installed: Vec<_> = [
+            Some(a_contracted_gate()),
+            TELEVISION.installed(),
+            FILM.installed(),
+            REQUESTS.installed(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        let fillers = fillers_trusting(
+            vec![request_gate()],
+            &installed,
+            &project,
+            &trusting(trusted),
+        );
 
-        let wirings =
-            super::super::seed_fulfilment_targets(&ctx, &standing_in(), &fillers, Some(&project))
-                .await;
+        let wirings = super::super::seed_fulfilment_targets(
+            &ctx,
+            &[request_gate()],
+            &fillers,
+            Some(&project),
+        )
+        .await;
 
         assert_eq!(states(&wirings), vec![&unasked, &unasked], "{tag}");
         assert!(!wrote(&http), "{tag}: {:?}", http.requests());
@@ -235,29 +294,33 @@ async fn without_a_gate_to_ask_the_media_server_link_is_handed_no_token() {
         let project =
             lemonfiber_fixtures::scratch::Scratch::new(&format!("gate-unasked-link-{tag}"));
         let http = Fake::by_path(vec![(
-            "/settings/jellyfin",
-            Answer::reply(
-                200,
-                r#"{"ip":"jellyfin","port":8096,"useSsl":false,"urlBase":"","apiKey":"own"}"#,
-            ),
+            crate::test_support::requests::intake("media_server_link"),
+            crate::test_support::requests::answered(&crate::ports::service::MediaServerLink {
+                at: crate::ports::service::Endpoint {
+                    host: "jellyfin".to_owned(),
+                    port: 8096,
+                    base: String::new(),
+                },
+                key: "own".to_owned(),
+            }),
         )]);
-        let ctx = contracted_ctx(&project, SERVICE, keyed, http.clone());
-        let trusting: Vec<_> = trusted
-            .iter()
-            .chain(
-                crate::plugin::first_party::EMBEDDED
-                    .iter()
-                    .filter(|one| one.plugin == crate::test_support::media::PLUGIN),
-            )
-            .copied()
-            .collect();
+        let ctx = crate::test_support::adapted::asking(
+            contracted_ctx(&project, SERVICE, keyed, http.clone()),
+            &[REQUESTS],
+        );
+        let installed: Vec<_> = [
+            Some(a_contracted_gate()),
+            crate::test_support::media::moved(),
+            REQUESTS.installed(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         let fillers = fillers_trusting(
-            vec![media_server_svc(), requests_svc()],
-            &std::iter::once(a_contracted_gate())
-                .chain(crate::test_support::media::moved())
-                .collect::<Vec<_>>(),
+            vec![media_server_svc()],
+            &installed,
             &project,
-            &trusting,
+            &trusting(trusted),
         );
 
         assert_eq!(

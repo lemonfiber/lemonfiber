@@ -14,15 +14,21 @@ pub mod context;
 pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
 #[path = "../../lemonfiber-testing/src/adapted.rs"]
-mod adapted;
+pub mod adapted;
 #[path = "../../lemonfiber-testing/src/aggregator.rs"]
 pub mod aggregator;
 #[path = "../../lemonfiber-testing/src/books.rs"]
 pub mod books;
+#[path = "../../lemonfiber-testing/src/curators.rs"]
+pub mod curators;
+#[path = "../../lemonfiber-testing/src/indexer.rs"]
+pub mod indexer;
 #[path = "../../lemonfiber-testing/src/listening.rs"]
 pub mod listening;
 #[path = "../../lemonfiber-testing/src/media.rs"]
 pub mod media;
+#[path = "../../lemonfiber-testing/src/requests.rs"]
+pub mod requests;
 #[path = "../../lemonfiber-testing/src/subtitles.rs"]
 pub mod subtitles;
 #[path = "../../lemonfiber-testing/src/torrent.rs"]

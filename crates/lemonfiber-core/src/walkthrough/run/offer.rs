@@ -7,7 +7,6 @@
 
 use crate::app::targets::OpenCurator;
 use crate::app::Ctx;
-use crate::ports::service::Catalogue;
 use crate::walkthrough::Why;
 
 /// What this stack should be offered.

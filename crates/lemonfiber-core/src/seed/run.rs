@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use crate::app::targets::{project_directory, target_for};
+use crate::app::targets::project_directory;
 use crate::app::Ctx;
 use crate::error::Diagnose;
 use crate::error::Problem;
@@ -224,8 +224,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // configured that way and by no other means — the quality sync and the archive
     // extractor — so without this they run with nothing, and the quality sync refuses
     // its whole configuration over a single undefined name.
-    wirings
-        .push(published::publish_keys(ctx, &manifest.services, &fillers, project.as_deref()).await);
+    wirings.push(published::publish_keys(ctx, &manifest.services, &fillers).await);
 
     wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
 
@@ -271,15 +270,12 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         wirings,
         assessment,
         rehearsed: ctx.dry_run,
-        // Read from the manifest rather than from what this pass reached, because a
-        // service it cannot speak to is one it never tried — and a list assembled from
-        // what was attempted could only ever hold the attempts.
-        unsupported: crate::app::targets::unsupported_here(&manifest.services, project.as_deref()),
+        unsupported: crate::app::targets::unsupported_here(&fillers),
     })
 }
 
 /// The request service to ask about the household's telling, and what lemonfiber
-/// last recorded setting it to, under that service's id.
+/// last recorded setting it to, under the id of the service its adapter fronts.
 ///
 /// Both or neither: a stack with no request service has nothing to ask, and a
 /// baseline that was never formed leaves the recorded value absent — which the check
@@ -298,7 +294,12 @@ pub(crate) async fn managed_telling(
         .await
         .map(|requests| requests as std::sync::Arc<dyn crate::ports::service::Requests>);
     let recorded = match load_baseline(ctx) {
-        Loaded::Formed(baseline) => baseline.entry(&filler.id, crate::seed::TELLING).cloned(),
+        Loaded::Formed(baseline) => baseline
+            .entry(
+                &fillers.fronted_by(filler).unwrap_or(filler).id,
+                crate::seed::TELLING,
+            )
+            .cloned(),
         Loaded::Fresh | Loaded::Lost => None,
     };
     (requests, recorded)
@@ -340,7 +341,9 @@ pub(crate) async fn managed_wirings(
         managed.push(crate::doctor::wiring::Managed {
             id: curator.id().to_owned(),
             name: curator.name().to_owned(),
-            reach: curator.reach(ctx).await,
+            asked: curator.client(ctx).await.map(|adapter| {
+                std::sync::Arc::new(adapter) as std::sync::Arc<dyn crate::ports::service::Client>
+            }),
             clients,
         });
     }

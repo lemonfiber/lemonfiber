@@ -17,11 +17,11 @@
 //! an upgrade — leaves the copy the stack's own services read pointing at a key that
 //! no longer exists, and every symptom of it looks like something else.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use lemonfiber_manifest::{ApiKind, Service};
+use lemonfiber_manifest::Service;
 
-use crate::app::targets::{config_path, recorded_secret};
+use crate::app::targets::recorded_secret;
 use crate::app::Ctx;
 use crate::credential::{catalogue, fingerprint, Entry, Held, Origin, Reached, State};
 use crate::plugin::Installed;
@@ -46,25 +46,23 @@ pub(crate) async fn taken(
         .into_iter()
         .map(|entry| recorded(ctx, entry))
         .collect();
-    for service in services {
-        let Some((project, (config, read))) =
-            project.and_then(|project| Some((project, writes_its_own(service, project)?)))
-        else {
+    for filler in fillers
+        .services()
+        .filter(|filler| filler.holder() == crate::wiring::Holder::Stack)
+    {
+        let Some((config, read)) = writes_its_own(filler) else {
             continue;
         };
-        let setting = published_as(&service.id);
-        let held = crate::app::targets::read_owned(
-            ctx.seams.filesystem.as_ref(),
-            &config,
-            &crate::app::targets::service_config_dir(project, &service.id),
-        )
-        .await
-        .and_then(|text| read(&text));
+        let setting = published_as(&filler.id);
+        let held = crate::app::targets::credential_file(ctx, filler)
+            .await
+            .text()
+            .and_then(|text| read(&text));
         let published = recorded_secret(ctx, &setting);
         taken.push(service_key(
-            &service.name,
+            &filler.name,
             &setting,
-            &config,
+            config,
             held.as_deref(),
             published.as_deref(),
         ));
@@ -151,40 +149,18 @@ fn declared(
         .collect()
 }
 
-/// The reader that takes one service's own key out of the file it wrote it into.
+/// Where one of the stack's services keeps the key it wrote for itself, and the reader
+/// that takes it out of that file by the shape its declaration gives it — where it is a
+/// service that writes one at all and the stack is written to disk.
 ///
-/// Two shapes and one question. A curator-shape service keeps its key in XML and the
-/// request service in JSON, each a file under the service's own configuration directory,
-/// named by the manifest, so the shape decides only which reader opens it.
-///
-/// The rest are not read here: each is reached through its plugin's adapter with what
-/// lemonfiber minted for it, and so is on the declared list instead, which is where a
+/// The parts a plugin brings are not read here: each is reached through its adapter with
+/// what lemonfiber minted for it, and so is on the declared list instead, which is where a
 /// credential lemonfiber minted belongs.
-pub(crate) fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
-    match kind {
-        ApiKind::Servarr => Some(crate::servarr::api_key),
-        ApiKind::Seerr => Some(crate::seerr::api_key),
-        ApiKind::Bazarr
-        | ApiKind::Sabnzbd
-        | ApiKind::Qbittorrent
-        | ApiKind::Bindery
-        | ApiKind::Jellyfin
-        | ApiKind::Audiobookshelf
-        | ApiKind::Nzbhydra2 => None,
-    }
-}
-
-/// Where a service keeps the key it wrote for itself, and the reader that pulls it out
-/// of that file — the two are useless apart, so they travel together.
-type SelfWritten = (PathBuf, fn(&str) -> Option<String>);
-
-/// Where one service keeps the key it wrote for itself, and how to read it — where it
-/// is a service that writes one at all.
-fn writes_its_own(service: &Service, project: &Path) -> Option<SelfWritten> {
-    let api = service.api.as_ref()?;
-    let read = reader(api.kind)?;
-    let path = config_path(project, service, api.path.as_deref())?;
-    Some((path, read))
+fn writes_its_own(
+    filler: &crate::wiring::Filler,
+) -> Option<(&Path, crate::credential::written::Reader)> {
+    let read = crate::credential::written::reader(filler.adapter.as_ref()?.key_source)?;
+    Some((filler.key_file.as_deref()?, read))
 }
 
 /// The settings file this machine resolved, as something to print.

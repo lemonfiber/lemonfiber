@@ -7,16 +7,17 @@ use super::naming::Titled;
 use super::{allowance, assemble, household, reaching, titled, Ctx, Naming};
 use crate::household::State;
 use crate::model::{HouseholdReport, Restriction};
-use crate::ports::service::Certificate;
-use crate::ports::service::{Access, HouseholdRequest, Member, NamedLibrary, Unrated};
+use crate::ports::service::{
+    Access, Certificate, FoundItem, Headroom, Holding, HouseholdRequest, Left, Member,
+    NamedLibrary, Requesting, Unrated,
+};
 use crate::quality::Selection;
 use crate::recyclarr::Kind;
+use crate::test_support::curators::curated;
+use crate::test_support::requests as request_service;
 use crate::test_support::{a_context, a_password, json, media, SeedFs};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
-
-/// A curator config that opens a target, carrying a readable key.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// A request service that answered nothing, which is what these cases are about.
 fn nothing_asked() -> allowance::Asked {
@@ -71,6 +72,26 @@ fn request(
     }
 }
 
+/// The series every curator's library holds in these cases.
+fn the_expanse() -> FoundItem {
+    FoundItem {
+        id: 1,
+        title: "The Expanse".to_owned(),
+        year: None,
+        monitored: true,
+    }
+}
+
+/// Alex's request for [`the_expanse`], approved and arrived.
+fn arrived() -> HouseholdRequest {
+    request(
+        "Alex",
+        Some(Kind::Tv),
+        Some(1),
+        (RequestStatus::Approved, MediaStatus::Available),
+    )
+}
+
 /// A title map holding one series and one film.
 fn titles() -> BTreeMap<(Kind, i64), Titled> {
     let named = |title: &str, year: Option<u16>| Titled {
@@ -84,27 +105,28 @@ fn titles() -> BTreeMap<(Kind, i64), Titled> {
 }
 
 /// A transport answering the media server's accounts, the request service's check of
-/// its own key and its reads, and the curator libraries, by the shape of the URL.
+/// its own key and its reads, and the curators' libraries, each over its contract.
 struct Fake {
     accounts: String,
     folders: String,
     ratings: String,
-    answered: &'static str,
-    requests: &'static str,
-    library: &'static str,
-    refuse: bool,
+    /// What the request service answers when asked whether it takes lemonfiber's key.
+    answers: Answer,
+    /// What the household has asked for.
+    requests: Answer,
+    /// What every curator's library holds.
+    library: Answer,
+    /// What the household may ask for where nobody chose otherwise for one person.
+    asking: Answer,
     /// The account the request service holds for a member, where it holds one.
     ///
     /// Absent by default, which is a household nobody has signed into the request
     /// service — the state the cases about joining and naming are written against.
     account: Option<&'static str>,
-    /// What the narrow permissions endpoint answers, to the read and to the write.
-    ///
-    /// One answer for both because the write only has to succeed: what it was sent
-    /// is read back off the transport rather than out of its reply.
-    permissions: (u16, &'static str),
-    /// What the request service's own record of a film answers, where a case names one.
-    film: Option<&'static str>,
+    /// What taking a member's asking away answers, and what giving it back answers.
+    holding: (Answer, Answer),
+    /// What the request service's own record of a title answers, where a case names one.
+    film: Option<Answer>,
 }
 
 impl Default for Fake {
@@ -129,19 +151,31 @@ impl Default for Fake {
                     age: 15,
                 },
             ]),
-            answered: "",
-            requests: "",
-            library: "[]",
-            refuse: false,
+            answers: request_service::taken(),
+            requests: request_service::answered(&Vec::<HouseholdRequest>::new()),
+            library: request_service::answered(&Vec::<FoundItem>::new()),
+            asking: request_service::refusing(),
             account: None,
-            permissions: (200, r#"{"permissions":32}"#),
+            holding: (
+                request_service::answered(&Holding { taken: 32 }),
+                request_service::taken(),
+            ),
             film: None,
         }
     }
 }
 
 /// What one member's period has counted, as the request service works it out.
-const COUNTS: &str = r#"{"movie":{"days":7,"limit":2,"used":0},"tv":{}}"#;
+fn counts() -> Headroom {
+    Headroom {
+        films: Left {
+            limit: Some(2),
+            used: 0,
+            days: Some(7),
+        },
+        television: Left::default(),
+    }
+}
 
 impl Fake {
     /// The scripted answers as a transport, routed by what each call asks for.
@@ -160,25 +194,45 @@ impl Fake {
                 media::identity("household"),
                 Answer::reply(200, self.accounts.clone()),
             ),
-            (
-                "/auth/me",
-                Answer::reply(if self.refuse { 403 } else { 200 }, self.answered),
-            ),
+            (request_service::intake("answers"), self.answers.clone()),
+            (request_service::intake("requests"), self.requests.clone()),
+            (request_service::intake("asking"), self.asking.clone()),
+            (curated("library"), self.library.clone()),
         ];
-        if let Some(account) = self.account {
-            // Ahead of the catch-all, which would answer an account with a library.
-            routes.push(("/user/jellyfin/", Answer::reply(200, account)));
-            routes.push(("/quota", Answer::reply(200, COUNTS)));
-            routes.push((
-                "/settings/permissions",
-                Answer::reply(self.permissions.0, self.permissions.1),
-            ));
+        match self.account {
+            Some(id) => routes.extend([
+                (
+                    request_service::intake("member_for"),
+                    request_service::answered(&Some(id)),
+                ),
+                (
+                    request_service::intake("requesting"),
+                    request_service::answered(&Some(Requesting {
+                        id: id.to_owned(),
+                        approves_own: false,
+                    })),
+                ),
+                (
+                    request_service::intake("left"),
+                    request_service::answered(&counts()),
+                ),
+                (
+                    request_service::intake("hold_requests"),
+                    self.holding.0.clone(),
+                ),
+            ]),
+            None => routes.push((
+                request_service::intake("member_for"),
+                request_service::answered(&None::<String>),
+            )),
         }
-        if let Some(film) = self.film {
-            routes.push(("/api/v1/movie/", Answer::reply(200, film)));
+        routes.push((
+            request_service::intake("release_requests"),
+            self.holding.1.clone(),
+        ));
+        if let Some(film) = &self.film {
+            routes.push((request_service::intake("detail"), film.clone()));
         }
-        routes.push(("/api/v1/request", Answer::reply(200, self.requests)));
-        routes.push(("", Answer::reply(200, self.library)));
         Transport::by_path(routes)
     }
 }
@@ -205,9 +259,10 @@ fn unnamed() -> BTreeMap<String, String> {
     BTreeMap::new()
 }
 
-/// A context whose media server has moved into its plugin and whose request service can
-/// be reached: the media-server password is recorded, so `household_requests` resolves a
-/// client. Tagged so each test keeps its own env file rather than racing on a shared one.
+/// A context whose media server, curators and request service have moved into their
+/// plugins and can be reached: the media-server password is recorded, so
+/// `household_requests` resolves a client. Tagged so each test keeps its own env file
+/// rather than racing on a shared one.
 fn ctx_with(fake: &Fake, tag: &str) -> Ctx {
     ctx_over(fake.transport(), tag, false)
 }
@@ -231,8 +286,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("household-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let disk =
-        SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
+    let disk = SeedFs::keyed(None);
     let mut context = a_context()
         .build()
         .with_filesystem(Arc::new(if no_room {
@@ -252,8 +306,21 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
-    media::reaching(context)
+    let mut context = crate::test_support::adapted::reaching(context, &PARTS);
+    context.seams.engine =
+        Arc::new(crate::test_support::adapted::running(&PARTS).alongside(media::running()));
+    media::moved_in(&context);
+    context
 }
+
+/// Every part besides the media server a household reading reaches: the curators whose
+/// libraries name what was asked for, and the request service.
+const PARTS: [crate::test_support::adapted::Adapted; 4] = [
+    crate::test_support::curators::TELEVISION,
+    crate::test_support::curators::FILM,
+    crate::test_support::curators::MUSIC,
+    crate::test_support::requests::REQUESTS,
+];
 
 /// Alex, the one account the media server holds, held to `age_limit` where one is set and
 /// doing `unrated` with content it has no rating for.

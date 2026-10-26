@@ -1,5 +1,5 @@
-use super::{curator_targets, unreachable_targets};
-use std::path::Path;
+use super::{curator_targets, target_named, unasked};
+use crate::test_support::curators::{asking, TELEVISION};
 
 /// One service, read back through the manifest parser rather than built as a
 /// struct, so what this test calls a declaration is what the stack's own file
@@ -35,82 +35,92 @@ fn service(id: &str, port: Option<u16>, api: &str) -> Vec<lemonfiber_manifest::S
     read
 }
 
-/// A complete curator declaration.
+/// A curator declaration.
 const WHOLE: &str =
     "\n[service.api]\nkind = \"servarr\"\nkey_source = \"config-xml\"\npath = \"/config/config.xml\"\nversion = 3\n";
 
-/// Where the stack was written, which the config half of the question is asked
-/// against.
-fn project() -> &'static Path {
-    Path::new("/somewhere/stack")
+/// The fillers `services` come to, with nothing installed beside them.
+fn alone(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
+    crate::test_support::stack_fillers(services, &[], None, &[])
 }
 
-/// Why one service is unreachable, or nothing where it is not named at all.
-fn because(services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    unreachable_targets(services, Some(project()))
-        .into_iter()
-        .next()
-        .map(|report| report.because)
+/// The shipped stack, written to disk, with its television curator moved into its plugin.
+fn television_moved() -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &TELEVISION.installed().into_iter().collect::<Vec<_>>(),
+                &crate::wiring::Chosen::default(),
+                Some(std::path::Path::new("/opt/lemonfiber/stack")),
+            )
+        })
+        .unwrap_or_default()
 }
 
+/// The service is named by the id the stack declares it under, with why nothing here
+/// asks it, so an operator can go and find the declaration.
 #[test]
-fn a_complete_declaration_is_a_target_and_is_not_reported_as_anything_else() {
-    let whole = service("theirs", Some(8989), WHOLE);
-    assert_eq!(curator_targets(&whole, Some(project())).len(), 1);
-    assert_eq!(because(&whole), None);
+fn a_stack_service_declaring_a_native_api_is_named_with_why_nothing_asks_it() {
+    let reports = unasked(&alone(service("theirs", Some(8989), WHOLE)));
+
+    let [report] = reports.as_slice() else {
+        unreachable!("one report was not made: {reports:?}");
+    };
+    assert_eq!(report.what, "theirs");
+    assert!(report.because.contains("servarr API"), "{}", report.because);
+    assert!(report.because.contains("adapter"), "{}", report.because);
 }
 
 /// The manifest saying nothing is the stack's own statement that there is nothing
 /// to integrate with, which is not lemonfiber failing to do something.
 #[test]
 fn a_service_declaring_no_api_at_all_is_not_reported_as_unsupported() {
-    assert_eq!(because(&service("caddy", Some(80), "")), None);
+    assert!(unasked(&alone(service("caddy", Some(80), ""))).is_empty());
 }
 
-/// Nor is a shape this file is not about. Another kind's own resolution answers
-/// for it, and two answers about one service is how they come to disagree.
+/// A first-party plugin's service moved in place of the stack's is asked through the
+/// adapter in front of it, so it is not reported.
 #[test]
-fn a_service_declaring_another_shape_is_left_to_whatever_answers_for_that_shape() {
-    let other = "\n[service.api]\nkind = \"qbittorrent\"\nkey_source = \"generated\"\n";
-    assert_eq!(because(&service("qbittorrent", Some(8080), other)), None);
-}
+fn a_service_moved_into_its_plugin_is_not_reported() {
+    let reports = unasked(&television_moved());
 
-#[test]
-fn a_declaration_with_no_port_is_named_with_nowhere_to_speak_to_it() {
-    let said = because(&service("theirs", None, WHOLE)).unwrap_or_default();
-    assert!(said.contains("no port"), "{said}");
-}
-
-#[test]
-fn a_declaration_naming_no_api_version_is_named_rather_than_guessed_at() {
-    let versionless =
-        "\n[service.api]\nkind = \"servarr\"\nkey_source = \"config-xml\"\npath = \"/config/config.xml\"\n";
-    let said = because(&service("theirs", Some(8989), versionless)).unwrap_or_default();
-    assert!(said.contains("two API versions"), "{said}");
-}
-
-#[test]
-fn a_declaration_whose_config_file_is_under_no_mount_lemonfiber_reads_is_named() {
-    let elsewhere =
-        "\n[service.api]\nkind = \"servarr\"\nkey_source = \"config-xml\"\npath = \"/etc/theirs.xml\"\nversion = 3\n";
-    let said = because(&service("theirs", Some(8989), elsewhere)).unwrap_or_default();
-    assert!(said.contains("configuration file"), "{said}");
-}
-
-/// The service is named, so an operator can go and find the declaration.
-#[test]
-fn what_is_unsupported_is_named_by_the_id_the_stack_declares_it_under() {
-    let reports = unreachable_targets(&service("theirs", None, WHOLE), Some(project()));
-    assert_eq!(
-        reports.first().map(|report| report.what.clone()),
-        Some("theirs".to_owned())
+    assert!(
+        reports
+            .iter()
+            .all(|report| report.what != TELEVISION.plugin),
+        "{reports:?}"
     );
 }
 
-/// With no stack on disk the config half cannot be asked, and answering
-/// "unreachable" for every service at once would say something about the machine
-/// rather than about any declaration.
-#[test]
-fn a_stack_that_has_not_been_written_yet_reports_nothing_unsupported() {
-    assert!(unreachable_targets(&service("theirs", None, WHOLE), None).is_empty());
+/// A moved curator is listed under its own name with the adapter it is asked through,
+/// and listed still where that adapter cannot be asked.
+#[tokio::test]
+async fn a_moved_curator_is_listed_whether_or_not_its_adapter_can_be_asked() {
+    let fillers = television_moved();
+    let unasked_ctx = crate::test_support::context::a_context().build();
+    let asked_ctx = asking(
+        crate::test_support::context::a_context().build(),
+        &[TELEVISION],
+    );
+
+    let silent = target_named(&unasked_ctx, &fillers, TELEVISION.plugin).await;
+    let reached = target_named(&asked_ctx, &fillers, TELEVISION.plugin).await;
+
+    assert_eq!(
+        silent
+            .as_ref()
+            .map(|target| (target.name.as_str(), target.asked.is_some())),
+        Some(("Sonarr", false))
+    );
+    assert_eq!(
+        reached.map(|target| (target.kind, target.asked.is_some())),
+        Some((Some(crate::ports::media::Kind::Tv), true))
+    );
+    assert!(
+        curator_targets(&asked_ctx, &alone(service("theirs", Some(8989), WHOLE)))
+            .await
+            .is_empty()
+    );
 }
