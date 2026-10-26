@@ -22,6 +22,14 @@ pub const UPSTREAM_USERNAME: &str = "username";
 /// The part of an upstream's credential holding that account's password.
 pub const UPSTREAM_PASSWORD: &str = "password";
 
+/// The longest key taken. Every service makes one well under a hundred characters long;
+/// this is room to spare and still a bound.
+pub const KEY_LIMIT: usize = 256;
+
+/// The marks a generated key may hold beside letters and digits: hex has none, base64 has
+/// `+`, `/` and `=`, and a UUID or a hand-made key has `-`, `_` and `.`.
+pub const KEY_MARKS: &[u8] = b"-_.+/=";
+
 /// The marks a password lemonfiber mints holds beside letters and digits, at least one of
 /// them in every password.
 pub const PASSWORD_MARKS: &[u8] = b"-_.~";

@@ -1,4 +1,6 @@
-use super::{key, KEY_LIMIT};
+use lemonfiber_contract::adapter::KEY_LIMIT;
+
+use super::key;
 
 /// A key spelled the way services spell theirs is taken; anything a container could
 /// have written instead of one is not.

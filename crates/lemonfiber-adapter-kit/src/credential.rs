@@ -4,14 +4,8 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_contract::adapter::{PASSWORD_MARKS, UPSTREAM_FILE};
-
-/// The longest key taken.
-pub const KEY_LIMIT: usize = 256;
-
-/// The marks a generated key may hold beside letters and digits: those hex, base64 and a
-/// UUID are written in.
-const KEY_MARKS: &[u8] = b"-_.+/=";
+pub use lemonfiber_contract::adapter::KEY_LIMIT;
+use lemonfiber_contract::adapter::{KEY_MARKS, PASSWORD_MARKS, UPSTREAM_FILE};
 
 /// Where the key every call presents comes from.
 pub trait Holding: Send + Sync {
