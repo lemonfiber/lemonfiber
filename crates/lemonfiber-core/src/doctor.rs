@@ -28,7 +28,6 @@ mod examining;
 #[cfg(test)]
 mod fixtures;
 pub mod gating;
-pub mod guarded;
 pub mod guides;
 pub mod headroom;
 pub mod indexer;

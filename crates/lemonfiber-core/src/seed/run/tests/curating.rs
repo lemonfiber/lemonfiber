@@ -120,6 +120,10 @@ fn a_category_is_named_by_the_media_the_application_files() {
         category_for("music").map(|category| category.field),
         Some("musicCategory".to_owned())
     );
+    assert_eq!(
+        category_for("books").map(|category| category.field),
+        Some("category".to_owned())
+    );
     assert!(category_for("comics").is_none());
 }
 
@@ -524,5 +528,169 @@ async fn a_seed_over_a_record_of_plugins_that_will_not_read_is_refused() {
     assert!(
         refused.is_err_and(|problem| problem.summary.contains("record of what is installed")),
         "a seed wired past a record it could not read"
+    );
+}
+
+/// The shipped stack with its book curator moved into its plugin.
+fn books_moved() -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &crate::test_support::books::moved()
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                &crate::wiring::Chosen::default(),
+                Some(stack_root()),
+            )
+        })
+        .unwrap_or_default()
+}
+
+/// The moved book curator is a curator under its own name, asked over `library.curate`
+/// through the adapter in front of it; the stack's own, which no adapter fronts, is none.
+#[tokio::test]
+async fn the_moved_book_curator_is_asked_through_the_adapter_in_front_of_it() {
+    use crate::test_support::books;
+    let fillers = books_moved();
+    let http = Fake::by_path(vec![books::root_folders(&[])]);
+    let ctx = books::asking(seed_ctx(true, Vec::new(), None, None)).with_http(http.clone());
+
+    let curating = curators(&fillers);
+    let bindery = curating.iter().find(|one| one.id() == books::PLUGIN);
+    let folders = match bindery {
+        Some(bindery) => match bindery.client(&ctx).await {
+            Some(client) => client.root_folders().await.ok(),
+            None => None,
+        },
+        None => None,
+    };
+
+    assert_eq!(
+        bindery.map(|one| (one.name(), one.media_types())),
+        Some(("Bindery", ["books".to_owned()].as_slice()))
+    );
+    assert_eq!(folders.map(|held| held.len()), Some(0));
+    assert_eq!(
+        http.request().map(|asked| asked.url),
+        Some(format!(
+            "http://127.0.0.1:8080{}",
+            books::curating("root_folders")
+        ))
+    );
+    assert!(curators(&fillers_of(vec![book_curator_svc()])).is_empty());
+}
+
+/// The moved book curator is told about both download clients over its contract, each
+/// filing under the books category in the field the book curator names it.
+#[test]
+fn the_moved_book_curator_is_told_both_clients_under_the_books_category() {
+    let fillers = books_moved();
+    let told: Vec<Vec<crate::ports::service::DownloadClient>> = curators(&fillers)
+        .iter()
+        .filter(|curator| curator.id() == crate::test_support::books::PLUGIN)
+        .map(|curator| super::super::curating::wanted_clients(*curator, &fillers, &both_held()))
+        .collect();
+
+    assert_eq!(
+        told.iter()
+            .map(|clients| clients
+                .iter()
+                .map(|client| (
+                    client.name.as_str(),
+                    client.category.field.as_str(),
+                    client.category.value.as_str()
+                ))
+                .collect::<Vec<_>>())
+            .collect::<Vec<_>>(),
+        vec![vec![
+            ("SABnzbd", "category", "books"),
+            ("qBittorrent", "category", "books"),
+        ]]
+    );
+}
+
+/// A seed of the moved book curator registers its books folder and both download clients
+/// through the adapter in front of it.
+#[tokio::test]
+async fn the_moved_book_curator_is_seeded_its_folder_and_clients_over_its_contract() {
+    use crate::test_support::books;
+    let fillers = books_moved();
+    let registered = |host: &str, port: u16| crate::ports::service::RegisteredClient {
+        id: host.to_owned(),
+        host: host.to_owned(),
+        port,
+        category: category_for("books"),
+    };
+    let http = Fake::by_path_in_turn(vec![
+        (
+            books::curating("root_folders"),
+            vec![
+                books::answered(&Vec::<crate::ports::service::RegisteredFolder>::new()),
+                books::answered(&[crate::ports::service::RegisteredFolder {
+                    id: "1".to_owned(),
+                    path: "/data/media/books".to_owned(),
+                }]),
+            ],
+        ),
+        (
+            books::curating("download_clients"),
+            vec![
+                books::answered(&Vec::<crate::ports::service::RegisteredClient>::new()),
+                books::answered(&[registered("sabnzbd", 8080)]),
+                books::answered(&[registered("sabnzbd", 8080), registered("gluetun", 8081)]),
+            ],
+        ),
+        (
+            books::curating("register_root_folder"),
+            vec![books::taken()],
+        ),
+        (
+            books::curating("register_download_client"),
+            vec![books::taken(), books::taken()],
+        ),
+        (books::curating("identity"), vec![books::unavailable()]),
+    ]);
+    let ctx = books::asking(seed_ctx(true, Vec::new(), None, None)).with_http(http.clone());
+    let curating = curators(&fillers);
+    let contested = super::super::curating::contested(&curating);
+    let held = both_held();
+    let expected = crate::baseline::Baseline::new();
+    let seeding = super::super::curating::CuratorSeeding {
+        contested: &contested,
+        fillers: &fillers,
+        held: &held,
+        data_root: None,
+        expected: &expected,
+        adopt: false,
+    };
+    let Some(bindery) = curating.iter().find(|one| one.id() == books::PLUGIN) else {
+        unreachable!("the moved book curator is a curator");
+    };
+
+    let (wirings, _) = super::super::curating::seed_curator(&ctx, *bindery, &seeding).await;
+
+    assert!(
+        !wirings.is_empty()
+            && wirings
+                .iter()
+                .all(|wiring| wiring.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    let sent = http.requests();
+    assert_eq!(
+        books::folders_registered(&sent)
+            .iter()
+            .map(|folder| folder.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["/data/media/books"]
+    );
+    assert_eq!(
+        books::clients_registered(&sent)
+            .iter()
+            .map(|client| (client.host.as_str(), client.category.value.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("sabnzbd", "books"), ("gluetun", "books")]
     );
 }

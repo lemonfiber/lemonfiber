@@ -12,7 +12,15 @@ const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugi
 const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
 
 /// Services the media stack runs that the bundle installs rather than assembles.
-const NOT_ASSEMBLED: [&str; 4] = ["bazarr", "jellyfin", "qbittorrent", "sabnzbd"];
+const NOT_ASSEMBLED: [&str; 7] = [
+    "audiobookshelf",
+    "bazarr",
+    "bindery",
+    "jellyfin",
+    "nzbhydra2",
+    "qbittorrent",
+    "sabnzbd",
+];
 
 /// Fields of a service that differ between the two, by service and field: the guarded
 /// door and the proxy run the images lemonfiber builds for them, a part released here
@@ -52,9 +60,7 @@ const DIFFERING: [(&str, &str); 24] = [
 /// capability: each service given a household hostname asks the proxy, each whose
 /// dashboard panel reads it asks the dashboard, the request service asks the gate, and
 /// the gate, quality sync, decline and the guarded door ask what they act on.
-const ASKED_HERE: [(&str, &str); 18] = [
-    ("audiobookshelf", "dashboard.show"),
-    ("audiobookshelf", "proxy.front"),
+const ASKED_HERE: [(&str, &str); 16] = [
     ("calibre-web-automated", "proxy.front"),
     ("decline", "identity.source"),
     ("door", "media.serve"),
@@ -79,8 +85,7 @@ const NAMED_THERE: [(&str, &str); 1] = [("door", "jellyfin")];
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's own services declare none of them.
-const FROM_SECRETS: [(&str, &str, &str); 7] = [
-    ("bindery", "BINDERY_API_KEY", "api-key"),
+const FROM_SECRETS: [(&str, &str, &str); 6] = [
     ("gluetun", "WIREGUARD_PRIVATE_KEY", "wireguard-key"),
     ("recyclarr", "RADARR_API_KEY", "movies-key"),
     ("recyclarr", "SONARR_API_KEY", "tv-key"),

@@ -66,9 +66,7 @@ pub(super) async fn answers(
     .map_err(failing("starting files"))?;
     certified(placed, &copy).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;
-    let before = first::before(placed, recorder.random).map_err(failing("first run"))?;
-    let mut serve = settled(placed, &copy, data.as_deref());
-    serve.env.extend(before.env.iter().cloned());
+    let serve = settled(placed, &copy, data.as_deref());
     let served = recorder
         .serving
         .serve(&serve)
@@ -81,8 +79,6 @@ pub(super) async fn answers(
         copy: &copy,
         served: &served,
         keyed: Addressed::to((recorder.transport)(), LOOPBACK, serve.listens),
-        random: recorder.random,
-        before: &before,
     };
     let outcome = asked(recorder, health, &reaching, items, &mut scrub).await;
     let finished = match outcome {
@@ -216,7 +212,6 @@ async fn asked(
         ));
     }
     let mut made: Vec<String> = held.iter().flat_map(|held| held.made.clone()).collect();
-    made.extend(reaching.before.key.iter().cloned());
     made.extend(reaching.copy.made().map(str::to_owned));
     *scrub = Scrub::of(&made, Some(served));
     let port = served.port;

@@ -544,8 +544,8 @@ fn a_part_moved_in_place_of_a_service_with_no_key_anywhere_is_minted_one() {
 }
 
 /// The seeded manifest, its adapter handing its upstream an account lemonfiber mints and
-/// its upstream answering in `native` in place of the stack's service of that name.
-fn moving_an_account(native: &str) -> Option<lemonfiber_plugin::Manifest> {
+/// its upstream moving in place of the stack's own service `reserved`.
+fn moving_an_account(reserved: &str) -> Option<lemonfiber_plugin::Manifest> {
     let account = "upstream    = { username = { secret = \"upstream-username\" }, password = \
                    { secret = \"upstream-password\" } }";
     let text = seeded()
@@ -565,24 +565,24 @@ fn moving_an_account(native: &str) -> Option<lemonfiber_plugin::Manifest> {
             "id          = \"komga\"\nname        = \"Komga\"\nimage",
             &format!(
                 "id          = \"komga\"\nname        = \"Komga\"\nreplaces    = \
-                 \"{native}\"\nnative      = \"{native}\"\nimage"
+                 \"{reserved}\"\nimage"
             ),
             1,
         );
     lemonfiber_plugin::Manifest::from_toml(&text).ok()
 }
 
-/// The account minting the moving-an-account manifest leaves held for its upstream
-/// answering in `native`, `trusted` as first-party, in a stack that recorded `recorded` as
-/// its torrent client's password, or none.
+/// The account minting the moving-an-account manifest leaves held for its upstream moving
+/// in place of the stack's own service `reserved`, `trusted` as first-party, in a stack
+/// that recorded `recorded` as its torrent client's password, or none.
 fn minted_account(
     name: &str,
-    native: &str,
+    reserved: &str,
     recorded: Option<&str>,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> Option<(String, String)> {
     let ctx = seeding(name);
-    let manifest = moving_an_account(native)?;
+    let manifest = moving_an_account(reserved)?;
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let _ = match recorded {
         Some(password) => {
@@ -602,8 +602,8 @@ fn minted_account(
 }
 
 /// A first-party upstream moved in place of the stack's torrent client keeps the account
-/// lemonfiber set up on it: the name the stack signs in under, and the password recorded
-/// for it.
+/// lemonfiber set up on it, by the API the stack declares that client answering in: the
+/// name the stack signs in under, and the password recorded for it.
 #[test]
 fn a_first_party_part_moved_in_place_keeps_the_account_the_stack_set_up_on_it() {
     assert!(moving_an_account("qbittorrent").is_some());
@@ -628,20 +628,23 @@ fn a_first_party_part_moved_in_place_keeps_the_account_the_stack_set_up_on_it() 
     assert_ne!(stranger.1, RECORDED);
 }
 
-/// An upstream answering in an API the stack sets up no account on has a fresh account
-/// minted, whatever the stack recorded.
+/// An upstream moved in place of a stack service lemonfiber sets up no account on, or of
+/// one the stack does not declare, has a fresh account minted, whatever the stack
+/// recorded.
 #[test]
 fn a_part_moved_in_place_of_a_service_with_no_account_is_minted_one() {
-    let minted = minted_account(
-        "seeded-account-none",
-        "servarr",
-        Some(RECORDED),
-        &crate::test_support::first_party("komga"),
-    )
-    .unwrap_or_default();
+    for reserved in ["sonarr", "undeclared"] {
+        let minted = minted_account(
+            &format!("seeded-account-none-{reserved}"),
+            reserved,
+            Some(RECORDED),
+            &crate::test_support::first_party("komga"),
+        )
+        .unwrap_or_default();
 
-    assert_eq!((minted.0.len(), minted.1.len()), (32, 32));
-    assert_ne!(minted.1, RECORDED);
+        assert_eq!((minted.0.len(), minted.1.len()), (32, 32), "{reserved}");
+        assert_ne!(minted.1, RECORDED, "{reserved}");
+    }
 }
 
 /// A password the stack never recorded for the service a part moves in place of is minted
@@ -658,4 +661,124 @@ fn a_part_moved_in_place_of_a_service_with_no_password_recorded_is_minted_one() 
 
     assert_eq!(minted.0, "admin");
     assert_eq!(minted.1.len(), 32, "{:?}", minted.1.len());
+}
+
+/// Every secret minting `moved`, a part the bundle installs in place of the stack's own
+/// service of its id, leaves held, by secret id, in a stack that recorded each setting of
+/// `recorded` with its value.
+fn carried(
+    name: &str,
+    moved: Option<crate::plugin::Installed>,
+    recorded: &[(&str, &str)],
+) -> std::collections::BTreeMap<String, String> {
+    let ctx = seeding(name);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    for (setting, value) in recorded {
+        let _ = crate::config::store::set(&env, setting, value);
+    }
+    let Some(would) = moved else {
+        return std::collections::BTreeMap::new();
+    };
+    let manifest = lemonfiber_bundled::PINNED
+        .iter()
+        .find(|one| one.first_party.plugin == would.plugin)
+        .and_then(|one| lemonfiber_plugin::Manifest::from_toml(one.copy).ok());
+    let minted = manifest.as_ref().and_then(|manifest| {
+        super::super::super::minting::minted(
+            &ctx,
+            &would,
+            manifest,
+            "1",
+            crate::plugin::first_party::EMBEDDED,
+        )
+        .ok()
+    });
+    let held = crate::settings::secrets_at(&ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .filter(|_| minted.is_some())
+        .unwrap_or_default();
+    manifest
+        .iter()
+        .flat_map(|manifest| manifest.secrets.iter())
+        .filter_map(|secret| {
+            held.value(&crate::settings::named(&would.plugin, &secret.id))
+                .map(|value| (secret.id.clone(), value.to_owned()))
+        })
+        .collect()
+}
+
+/// The Usenet indexer aggregator moved in place keeps the administrator lemonfiber turned
+/// its authentication on for, and the listening server the root account lemonfiber made:
+/// each the name the stack signed in under, with the password it recorded.
+#[test]
+fn the_aggregator_and_the_listening_server_moved_in_place_keep_their_accounts() {
+    let aggregator = carried(
+        "seeded-carried-aggregator",
+        crate::test_support::aggregator::MOVED.installed(),
+        &[(
+            crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
+            RECORDED,
+        )],
+    );
+    let listening = carried(
+        "seeded-carried-listening",
+        crate::test_support::listening::MOVED.installed(),
+        &[(crate::config::LISTENING_SERVER_PASSWORD_KEY, RECORDED)],
+    );
+
+    let held =
+        |minted: &std::collections::BTreeMap<String, String>, id: &str| minted.get(id).cloned();
+    assert_eq!(
+        (
+            held(&aggregator, "admin-username"),
+            held(&aggregator, "admin-password")
+        ),
+        (Some("admin".to_owned()), Some(RECORDED.to_owned()))
+    );
+    assert_eq!(
+        (
+            held(&listening, "root-username"),
+            held(&listening, "root-password")
+        ),
+        (Some("admin".to_owned()), Some(RECORDED.to_owned()))
+    );
+}
+
+/// The book curator moved in place keeps the key lemonfiber recorded and handed it through
+/// its environment, and is minted the first account it never had.
+#[test]
+fn the_book_curator_moved_in_place_keeps_its_key_and_is_minted_an_account() {
+    let minted = carried(
+        "seeded-carried-books",
+        crate::test_support::books::moved(),
+        &[(crate::config::BOOK_CURATOR_API_KEY, RECORDED)],
+    );
+
+    assert_eq!(minted.get("api-key").map(String::as_str), Some(RECORDED));
+    for id in ["admin-username", "admin-password"] {
+        let fresh = minted.get(id).cloned().unwrap_or_default();
+        assert_eq!(fresh.len(), 32, "{id}: {fresh:?}");
+        assert_ne!(fresh, RECORDED, "{id}");
+    }
+}
+
+/// A part moved in place of a stack service whose password was never recorded is minted
+/// one, keeping the name the stack signs in under.
+#[test]
+fn a_moved_aggregator_whose_password_was_never_recorded_is_minted_one() {
+    let minted = carried(
+        "seeded-carried-unrecorded",
+        crate::test_support::aggregator::MOVED.installed(),
+        &[],
+    );
+
+    assert_eq!(
+        minted.get("admin-username").map(String::as_str),
+        Some("admin")
+    );
+    assert_eq!(
+        minted.get("admin-password").map(String::len),
+        Some(32),
+        "{minted:?}"
+    );
 }

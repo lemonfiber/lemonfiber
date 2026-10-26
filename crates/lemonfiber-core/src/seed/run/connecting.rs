@@ -15,7 +15,9 @@
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
 use lemonfiber_contract::capabilities::archive::extract;
+use lemonfiber_contract::capabilities::download::{torrent, usenet};
 use lemonfiber_contract::capabilities::indexer::{pull, search};
+use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_contract::capabilities::quality::sync;
 use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_contract::capabilities::subtitles::fetch;
@@ -27,18 +29,18 @@ use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
 
 /// Usenet downloading, which a media-filing curator asks for.
-const USENET: &str = "download.usenet";
+const USENET: &str = usenet::CAPABILITY;
 
 /// Torrent downloading, which a media-filing curator asks for.
-const TORRENT: &str = "download.torrent";
+const TORRENT: &str = torrent::CAPABILITY;
 
 /// Curating a library, which the indexer, the request service, the subtitle finder and the
 /// quality sync each ask of every service that does it.
-const CURATES: &str = "library.curate";
+const CURATES: &str = curate::CAPABILITY;
 
 /// Searching across indexers, which a curator pulling its indexers asks of the service it
 /// pulls from.
-const SEARCHES: &str = "indexer.search";
+const SEARCHES: &str = search::CAPABILITY;
 
 /// Television, as the stack manifest names the media a curator files.
 pub(super) const TELEVISION: &str = Kind::Tv.media_type();
@@ -46,6 +48,8 @@ pub(super) const TELEVISION: &str = Kind::Tv.media_type();
 pub(super) const FILM: &str = Kind::Movies.media_type();
 /// Music, likewise.
 pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
+/// Books, likewise.
+pub(super) const BOOKS: &str = crate::ports::media::BOOKS;
 
 /// Every capability an ask is answered for here.
 ///
@@ -53,14 +57,19 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 /// it, and is not reported here as reached by nothing.
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
-/// Every contract an asker is paired by, as capability and major.
-const CONTRACTED: [(&str, u32); 6] = [
-    (extract::CAPABILITY, extract::MAJOR),
-    (pull::CAPABILITY, pull::MAJOR),
-    (fetch::CAPABILITY, fetch::MAJOR),
-    (search::CAPABILITY, search::MAJOR),
-    (intake::CAPABILITY, intake::MAJOR),
-    (sync::CAPABILITY, sync::MAJOR),
+/// Every contract an asker is paired by, each with the capability of the asks it is paired
+/// by it for: a curator is told its download clients over `library.curate`, a curator
+/// pulling its indexers its aggregator over `indexer.pull`, and each of the rest the
+/// curators over its own.
+const CONTRACTED: [(&str, &str, u32); 8] = [
+    (USENET, curate::CAPABILITY, curate::MAJOR),
+    (TORRENT, curate::CAPABILITY, curate::MAJOR),
+    (SEARCHES, pull::CAPABILITY, pull::MAJOR),
+    (CURATES, extract::CAPABILITY, extract::MAJOR),
+    (CURATES, fetch::CAPABILITY, fetch::MAJOR),
+    (CURATES, search::CAPABILITY, search::MAJOR),
+    (CURATES, intake::CAPABILITY, intake::MAJOR),
+    (CURATES, sync::CAPABILITY, sync::MAJOR),
 ];
 
 /// An asker, as the table pairs it.
@@ -72,12 +81,13 @@ enum Asking {
     Over(&'static str),
 }
 
-/// The asker as the table pairs it: by a contract it speaks before the adapter it names.
-fn asking(asker: &Filler) -> Option<Asking> {
+/// The asker as the table pairs it for an ask of `capability`: by a contract it speaks
+/// for asks of that capability before the adapter it names.
+fn asking(asker: &Filler, capability: &str) -> Option<Asking> {
     CONTRACTED
         .iter()
-        .find(|(capability, major)| asker.contracted(capability, *major))
-        .map(|(capability, _)| Asking::Over(capability))
+        .find(|(asked, contract, major)| *asked == capability && asker.contracted(contract, *major))
+        .map(|(_, contract, _)| Asking::Over(contract))
         .or_else(|| asker.adapter.as_ref().map(|api| Asking::Bundled(api.kind)))
 }
 
@@ -205,10 +215,18 @@ fn connection(
     files: &[String],
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
-        (Asking::Bundled(ApiKind::Servarr), USENET, ApiKind::Sabnzbd)
-        | (Asking::Bundled(ApiKind::Servarr), TORRENT, ApiKind::Qbittorrent) => Ok(
-            Connection::DownloadClient(Protocol(filler.name().to_owned())),
-        ),
+        (
+            Asking::Bundled(ApiKind::Servarr) | Asking::Over(curate::CAPABILITY),
+            USENET,
+            ApiKind::Sabnzbd,
+        )
+        | (
+            Asking::Bundled(ApiKind::Servarr) | Asking::Over(curate::CAPABILITY),
+            TORRENT,
+            ApiKind::Qbittorrent,
+        ) => Ok(Connection::DownloadClient(Protocol(
+            filler.name().to_owned(),
+        ))),
         (
             Asking::Bundled(ApiKind::Servarr) | Asking::Over(search::CAPABILITY),
             CURATES,
@@ -233,9 +251,6 @@ fn connection(
         (Asking::Over(sync::CAPABILITY), CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Quality)
             .ok_or(Unmade::Files),
-        (Asking::Bundled(ApiKind::Bindery), SEARCHES, ApiKind::Servarr) => {
-            Ok(Connection::Aggregator)
-        }
         (Asking::Over(pull::CAPABILITY), SEARCHES, _)
             if super::applications::application_kind(files).is_some() =>
         {
@@ -298,7 +313,7 @@ fn made<'a>(
     }
     let speaks = filler.talks_in().ok_or(Unmade::NoAdapter)?;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
-    let asks = asking(answering).ok_or(Unmade::Unpaired)?;
+    let asks = asking(answering, &ask.capability).ok_or(Unmade::Unpaired)?;
     let made = connection(
         asks,
         &ask.capability,

@@ -17,34 +17,40 @@ use crate::doctor::credentials::Reach;
 use crate::ports::service::{Client, DownloadClient, RootFolder};
 use crate::wiring::{Filler, Fillers};
 
-/// A service that files media, as the core asks it.
+/// A service that files media, as the core asks it: the service itself, and the service
+/// asked for it, which is the adapter of its plugin in front of it where one fronts it.
 #[derive(Clone, Copy)]
-pub(crate) struct Curator<'a>(&'a Filler);
+pub(crate) struct Curator<'a> {
+    /// The service that files media.
+    named: &'a Filler,
+    /// The service asked for it.
+    answering: &'a Filler,
+}
 
 impl<'a> Curator<'a> {
     /// Its id.
     pub(crate) const fn id(self) -> &'a str {
-        self.0.id.as_str()
+        self.named.id.as_str()
     }
 
     /// Its name.
     pub(crate) const fn name(self) -> &'a str {
-        self.0.name.as_str()
+        self.named.name.as_str()
     }
 
     /// The media it files.
     pub(crate) const fn media_types(self) -> &'a [String] {
-        self.0.media_types.as_slice()
+        self.named.media_types.as_slice()
     }
 
-    /// How the curator is asked: over `library.curate` where it speaks the contract,
-    /// otherwise as the bundled curator. Nothing where it speaks the contract and cannot
-    /// be asked over it.
+    /// How the curator is asked: over `library.curate` where the service asked for it
+    /// speaks the contract, otherwise as the bundled curator. Nothing where it speaks the
+    /// contract and cannot be asked over it.
     pub(crate) async fn reach(self, ctx: &Ctx) -> Option<Reach> {
-        match spoken(ctx, self.0, curate::CAPABILITY, curate::MAJOR).await {
+        match spoken(ctx, self.answering, curate::CAPABILITY, curate::MAJOR).await {
             Spoken::Over(adapter) => Some(Reach::Over(adapter)),
             Spoken::Unanswered => None,
-            Spoken::Not => self.0.target().map(Reach::Bundled),
+            Spoken::Not => self.named.target().map(Reach::Bundled),
         }
     }
 
@@ -58,17 +64,17 @@ impl<'a> Curator<'a> {
     }
 }
 
-/// Every service that files media and is asked over `library.curate` or as the bundled
-/// curator.
+/// Every service that files media and is asked over `library.curate`, itself or through
+/// the adapter in front of it, or as the bundled curator.
 pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
     fillers
         .services()
-        .filter(|filler| {
-            !filler.media_types.is_empty()
-                && (filler.contracted(curate::CAPABILITY, curate::MAJOR)
-                    || filler.target().is_some())
+        .filter(|filler| !filler.media_types.is_empty())
+        .filter_map(|named| {
+            let answering = fillers.fronting(named).unwrap_or(named);
+            (answering.contracted(curate::CAPABILITY, curate::MAJOR) || named.target().is_some())
+                .then_some(Curator { named, answering })
         })
-        .map(Curator)
         .collect()
 }
 
@@ -248,7 +254,7 @@ pub(super) fn wanted_clients(
     };
     let mut wanted = Vec::new();
     for pairing in pairings(fillers) {
-        if pairing.asker != curator.0 {
+        if pairing.asker != curator.named {
             continue;
         }
         let Ok((Connection::DownloadClient(protocol), at, _)) = &pairing.made else {

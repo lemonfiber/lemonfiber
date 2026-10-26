@@ -484,7 +484,7 @@ async fn a_client_no_curator_hands_a_category_is_told_nothing() {
     let mut services = shipped_services();
     for service in &mut services {
         if !service.media_types.is_empty() {
-            service.media_types = vec!["books".to_owned()];
+            service.media_types = vec!["comics".to_owned()];
         }
     }
     let http = Fake::always(Answer::reply(200, "{}"));

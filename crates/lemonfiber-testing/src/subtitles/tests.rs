@@ -1,6 +1,3 @@
-use std::future::Future;
-
-use lemonfiber_core::ports::docker::{Container, Engine, Health};
 use lemonfiber_core::ports::filesystem::Beneath;
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_core::ports::media::Kind;
@@ -121,31 +118,12 @@ fn a_finder_asked_through_its_fillers_holds_its_key_wherever_its_stack_is_and_wr
     );
 }
 
-/// What `engine` lists, where its answer is ready at once.
-fn listed(engine: &impl Engine) -> Vec<Container> {
-    let mut asked = std::pin::pin!(engine.list("lemonfiber"));
-    match asked
-        .as_mut()
-        .poll(&mut std::task::Context::from_waker(std::task::Waker::noop()))
-    {
-        std::task::Poll::Ready(Ok(listed)) => listed,
-        _ => Vec::new(),
-    }
-}
-
 #[test]
 fn the_running_adapter_is_healthy_and_published_on_the_adapters_port() {
-    let listed = listed(&running());
-
-    assert!(
-        listed.iter().any(|one| one.service == ADAPTER
-            && one.health == Health::Healthy
-            && one
-                .published
-                .iter()
-                .any(|at| at.port == super::super::adapted::PORT)),
-        "{listed:?}"
-    );
+    assert!(super::super::adapted::runs_on_the_adapters_port(
+        &running(),
+        ADAPTER
+    ));
 }
 
 #[test]

@@ -199,14 +199,14 @@ pub(super) fn owned(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Defe
             let parts = crate::seed::run::owning::parts(&ctx, &fillers)
                 .await
                 .into_iter()
-                .map(|(filler, part)| {
+                .map(|(claimable, asked)| {
                     (
                         Part {
-                            id: filler.id.clone(),
-                            name: filler.name.clone(),
-                            secrets: filler.upstream_settings(),
+                            id: claimable.part.id.clone(),
+                            name: claimable.part.name.clone(),
+                            secrets: claimable.speaker.upstream_settings(),
                         },
-                        part.map(|part| Arc::new(part) as Arc<dyn Ownership>),
+                        asked.map(|asked| Arc::new(asked) as Arc<dyn Ownership>),
                     )
                 })
                 .collect();

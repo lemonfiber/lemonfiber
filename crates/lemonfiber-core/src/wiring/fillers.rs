@@ -531,16 +531,4 @@ fn host(service: &Service, services: &[Service]) -> String {
 }
 
 #[cfg(test)]
-impl Fillers {
-    /// The services `services` alone, asking nothing and linking nothing by name.
-    pub(crate) fn holding(services: Vec<Filler>) -> Self {
-        Self {
-            services,
-            asks: Vec::new(),
-            named: Vec::new(),
-        }
-    }
-}
-
-#[cfg(test)]
 mod tests;

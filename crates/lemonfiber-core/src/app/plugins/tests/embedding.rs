@@ -112,7 +112,8 @@ fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
 }
 
 /// A rehearsal of an update names every move the bundle offers, the media server's, each
-/// download client's and the subtitle finder's, and takes none.
+/// download client's, the subtitle finder's, the listening server's, the book curator's
+/// and the Usenet indexer aggregator's, and takes none.
 #[tokio::test]
 async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
@@ -130,8 +131,11 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     assert_eq!(
         offered,
         vec![
+            "audiobookshelf".to_owned(),
             "bazarr".to_owned(),
+            "bindery".to_owned(),
             BUNDLED.to_owned(),
+            "nzbhydra2".to_owned(),
             "qbittorrent".to_owned(),
             "sabnzbd".to_owned()
         ]
@@ -152,7 +156,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((4, 0))
+        Some((7, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -171,7 +175,14 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     );
     assert_eq!(
         report.map(|report| report.moves.iter().map(|one| one.plugin.as_str()).collect()),
-        Some(vec!["bazarr", "qbittorrent", "sabnzbd"])
+        Some(vec![
+            "audiobookshelf",
+            "bazarr",
+            "bindery",
+            "nzbhydra2",
+            "qbittorrent",
+            "sabnzbd"
+        ])
     );
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
@@ -190,7 +201,7 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
             .as_ref()
             .ok()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((4, 0)),
+        Some((7, 0)),
         "{confirmed:?}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));

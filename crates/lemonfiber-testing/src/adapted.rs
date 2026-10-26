@@ -9,11 +9,13 @@
 
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::plugin::{Installed, Register};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying, Readable};
 use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::Owner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
@@ -154,6 +156,18 @@ pub fn path_of(capability: &str, major: u32, operation: &str) -> &'static str {
     Box::leak(lemonfiber_contract::path(capability, major, operation).into_boxed_str())
 }
 
+/// Where `operation` of `owner.claim` is asked, of whichever adapter speaks it.
+#[must_use]
+pub fn claiming(operation: &str) -> &'static str {
+    path_of(claim::CAPABILITY, claim::MAJOR, operation)
+}
+
+/// The route answering `owner.claim`'s `operation` with `owner`.
+#[must_use]
+pub fn held_by(operation: &str, owner: Owner) -> (&'static str, Answer) {
+    (claiming(operation), answered(&owner))
+}
+
 /// What was asked at `at` in `sent`, in order.
 #[must_use]
 pub fn asked_at(sent: &[Request], at: &str) -> Vec<serde_json::Value> {
@@ -267,6 +281,21 @@ impl Confined for Keyed {
     ) -> Result<(), Fault> {
         self.inner.moved(from, to, within)
     }
+}
+
+/// Whether the engine's account `reporting` lists `adapter` healthy and published on
+/// [`PORT`], where its answer is ready at once.
+#[cfg(test)]
+pub(crate) fn runs_on_the_adapters_port(reporting: &Reporting, adapter: &str) -> bool {
+    use lemonfiber_core::ports::docker::Engine as _;
+    use std::future::Future as _;
+    let mut asked = std::pin::pin!(reporting.list("lemonfiber"));
+    matches!(
+        asked.as_mut().poll(&mut std::task::Context::from_waker(std::task::Waker::noop())),
+        std::task::Poll::Ready(Ok(listed)) if listed.iter().any(|one| one.service == adapter
+            && one.health == Health::Healthy
+            && one.published.iter().any(|at| at.port == PORT))
+    )
 }
 
 #[cfg(test)]

@@ -439,6 +439,74 @@ fn a_service(
     }
 }
 
+/// One kind of connection the gate is held to: what asks, the contracts it speaks and the
+/// media it files, what it asks for, what fills it, and whether the connection also hands
+/// the filler the asker's own key.
+type Crossing = (
+    lemonfiber_manifest::ApiKind,
+    &'static [&'static str],
+    &'static str,
+    &'static str,
+    lemonfiber_manifest::ApiKind,
+    bool,
+);
+
+/// Every kind of connection the table makes, once each.
+fn crossing_kinds() -> [Crossing; 6] {
+    use lemonfiber_manifest::ApiKind;
+    let neither: &[&str] = &[];
+    [
+        (
+            ApiKind::Servarr,
+            neither,
+            "tv",
+            "download.usenet",
+            ApiKind::Sabnzbd,
+            false,
+        ),
+        (
+            ApiKind::Servarr,
+            neither,
+            "tv",
+            "download.torrent",
+            ApiKind::Qbittorrent,
+            false,
+        ),
+        (
+            ApiKind::Servarr,
+            neither,
+            "tv",
+            "library.curate",
+            ApiKind::Servarr,
+            true,
+        ),
+        (
+            ApiKind::Seerr,
+            neither,
+            "tv",
+            "library.curate",
+            ApiKind::Servarr,
+            false,
+        ),
+        (
+            ApiKind::Bazarr,
+            neither,
+            "tv",
+            "library.curate",
+            ApiKind::Servarr,
+            false,
+        ),
+        (
+            ApiKind::Servarr,
+            &["indexer.pull@1"],
+            "books",
+            "indexer.search",
+            ApiKind::Servarr,
+            false,
+        ),
+    ]
+}
+
 /// **Every credential crosses one gate, whichever connection carries it.** Each kind of
 /// connection the table makes, between an asker and a filler of each pair of origins:
 /// the stack's own to the stack's own, the stack's to a plugin's, a plugin's to its own
@@ -448,7 +516,6 @@ fn a_service(
 #[test]
 fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
     use crate::origin::Origin;
-    use lemonfiber_manifest::ApiKind;
 
     let stack = Origin::Bundled;
     let one = Origin::Plugin {
@@ -457,21 +524,7 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
     let other = Origin::Plugin {
         named: "other".to_owned(),
     };
-    // What asks, what it asks for, what fills it, and whether the connection also hands
-    // the filler the asker's own key.
-    let kinds = [
-        (ApiKind::Servarr, "download.usenet", ApiKind::Sabnzbd, false),
-        (
-            ApiKind::Servarr,
-            "download.torrent",
-            ApiKind::Qbittorrent,
-            false,
-        ),
-        (ApiKind::Servarr, "library.curate", ApiKind::Servarr, true),
-        (ApiKind::Seerr, "library.curate", ApiKind::Servarr, false),
-        (ApiKind::Bazarr, "library.curate", ApiKind::Servarr, false),
-        (ApiKind::Bindery, "indexer.search", ApiKind::Servarr, false),
-    ];
+    let kinds = crossing_kinds();
     // Whose the filler is, whose the asker is, and what the pairing comes to: made, or
     // refused because the filler's credential may not reach the asker, or because the
     // asker's may not reach the filler.
@@ -484,9 +537,11 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
     ];
 
     let mut seen = std::collections::BTreeSet::new();
-    for (asks, capability, fills, both_ways) in kinds {
+    for (asks, speaks, files, capability, fills, both_ways) in kinds {
         for (filler_is, asker_is, refused, refused_both_ways) in &rows {
-            let asker = a_service("asker", asker_is, asks);
+            let mut asker = a_service("asker", asker_is, asks);
+            asker.contracts = speaks.iter().map(|one| (*one).to_owned()).collect();
+            asker.media_types = vec![files.to_owned()];
             let filler = a_service("filler", filler_is, fills);
             let ask = crate::wiring::Ask {
                 by: asker.id.clone(),

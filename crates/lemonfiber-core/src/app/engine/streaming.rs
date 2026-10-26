@@ -166,11 +166,7 @@ pub async fn start_progress(
     super::grounded::grounded(ctx, &action).await?;
     sweep.taken_away(ctx).await;
     copies.made(ctx).await?;
-    // Before the spawn, because one credential has to exist before the service that
-    // uses it has ever run. The waited-on path does the same thing at the same point;
-    // a start that went one way and not the other would leave that service holding a
-    // key nothing else can present.
-    super::mint_adopted_secrets(ctx, &manifest);
+    crate::screening::door::made_before_start(ctx, &manifest);
     // Let go of what this start addresses, as the waited-on path does: a service that
     // falls over on the way up fell over, whoever stopped it last.
     super::halted::before(ctx, &action, &super::addressed(&action, &report.plan));

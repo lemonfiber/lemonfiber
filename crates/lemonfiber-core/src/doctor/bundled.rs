@@ -24,7 +24,6 @@
 /// direction that matters, leaving a renamed check's old name free for a contribution
 /// to take.
 pub const BUNDLED_CHECKS: &[&str] = &[
-    "config.aggregator-guarded",
     "config.claimed",
     "config.claimed.",
     "config.compose-retired",

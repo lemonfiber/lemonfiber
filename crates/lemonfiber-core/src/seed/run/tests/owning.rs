@@ -383,3 +383,100 @@ fn a_refusal_names_every_setting_lemonfiber_holds_for_the_part() {
         );
     }
 }
+
+/// The shipped stack with its Usenet indexer aggregator, book curator and listening server
+/// moved into their plugins, and a context asking each adapter in front of them over
+/// `http`.
+fn three_moved(http: Arc<Fake>) -> (Ctx, crate::wiring::Fillers) {
+    use crate::test_support::{aggregator, books, listening, media};
+    let installed: Vec<crate::plugin::Installed> = [
+        aggregator::MOVED.installed(),
+        books::moved(),
+        listening::MOVED.installed(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &installed,
+                &crate::wiring::Chosen::default(),
+                Some(stack_root()),
+            )
+        })
+        .unwrap_or_default();
+    let mut ctx = seed_ctx(true, Vec::new(), None, None).with_http(http);
+    ctx.seams.engine = Arc::new(
+        aggregator::MOVED
+            .running()
+            .alongside(books::running())
+            .alongside(listening::MOVED.running()),
+    );
+    ctx.seams.confined = media::Keyed::holding(
+        Arc::clone(&ctx.seams.confined),
+        &[aggregator::ADAPTER, books::ADAPTER, listening::ADAPTER],
+    );
+    (ctx, fillers)
+}
+
+/// Each part moved into its plugin whose adapter speaks `owner.claim` is claimed through
+/// that adapter, and named and recorded as the part itself rather than as its adapter.
+#[tokio::test]
+async fn every_moved_part_is_claimed_through_its_adapter_and_recorded_as_itself() {
+    let http = Fake::by_path(vec![crate::test_support::aggregator::held_by(
+        "claim",
+        crate::ports::service::Owner::Ours,
+    )]);
+    let (ctx, fillers) = three_moved(http.clone());
+    let mut baseline = Baseline::new();
+
+    let wirings = super::super::owning::owned(&ctx, &fillers, &mut baseline).await;
+
+    assert_eq!(
+        wirings
+            .iter()
+            .map(|one| (one.connection.as_str(), &one.state))
+            .collect::<Vec<_>>(),
+        vec![
+            ("NZBHydra2 claimed", &crate::seed::State::Wired),
+            ("Bindery claimed", &crate::seed::State::Wired),
+            ("Audiobookshelf claimed", &crate::seed::State::Wired),
+        ]
+    );
+    assert_eq!(asked_at(&http, CLAIM), 3);
+    for part in ["nzbhydra2", "bindery", "audiobookshelf"] {
+        assert_eq!(
+            baseline.expected(part, super::super::owning::FIELD),
+            Some("ours"),
+            "{part}"
+        );
+    }
+}
+
+/// A moved part somebody else holds is refused naming every secret its plugin minted for
+/// the adapter to claim it with.
+#[tokio::test]
+async fn a_moved_part_somebody_else_holds_is_refused_naming_its_minted_account() {
+    let http = Fake::by_path(vec![crate::test_support::aggregator::held_by(
+        "claim",
+        crate::ports::service::Owner::Theirs,
+    )]);
+    let (ctx, fillers) = three_moved(http);
+
+    let wirings = super::super::owning::owned(&ctx, &fillers, &mut Baseline::new()).await;
+
+    let aggregator = wirings
+        .iter()
+        .find(|one| one.connection == "NZBHydra2 claimed");
+    assert!(
+        aggregator.is_some_and(
+            |one| matches!(&one.state, crate::seed::State::Refused { reason }
+            if reason.contains("nzbhydra2:admin-username")
+                && reason.contains("nzbhydra2:admin-password"))
+        ),
+        "{wirings:?}"
+    );
+}

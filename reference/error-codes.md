@@ -94,7 +94,6 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `CONFIG-4` | `CREDENTIALS_EXPOSED` | warning | 1 | 500 | 0.13.0 | Raised when a file holding a credential can be read by more than its owner. |
 | `CONFIG-5` | `CONFIG_TOO_NEW` | error | 1 | 500 | 0.14.0 | Raised when configuration was written by a newer lemonfiber. |
 | `CONFIG-6` | `CONFIG_SPANS_LINES` | error | 1 | 500 | 0.16.0 | Raised when a setting's key or value spans more than one line. |
-| `CONFIG-7` | `AGGREGATOR_EXPOSED` | warning | 1 | 500 | 0.17.0 | Raised when the Usenet indexer aggregator answers a read of its whole configuration to a caller presenting nothing, or will not say whether it does. |
 | `CONFIG-8` | `OVERLAY_UNVETTED` | warning | 1 | 500 | 0.18.0 | Raised where the operator's overlay changes services, merged over the project lemonfiber writes and held to nothing it vets. |
 | `CONFIG-9` | `OVERLAY_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where a path is still recorded under the retired overlay setting, which is no longer read. |
 | `CONFIG-10` | `COMPOSE_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where the project directory still holds a Compose file of the stack's own that lemonfiber no longer reads. |
@@ -667,4 +666,4 @@ what to do about it, is in `contract/codes.json` and written for operators at
 
 ## Retired
 
-Published once, raised by nothing, and never given to another problem: `QUOTA-3`.
+Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`.

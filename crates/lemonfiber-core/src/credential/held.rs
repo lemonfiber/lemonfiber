@@ -245,43 +245,6 @@ const MEDIA_SERVER: Entry = Entry {
     proven_by: None,
 };
 
-/// The listening server's first-account password.
-const LISTENING_SERVER: Entry = Entry {
-    name: "Audiobookshelf account password",
-    setting: config::LISTENING_SERVER_PASSWORD_KEY,
-    consumers: &[Consumer::at_the_service(
-        "the listening server's own first account",
-    )],
-    origin: Origin::Lemonfiber,
-    needed: Needed::Always,
-    proven_by: None,
-};
-
-/// The Usenet indexer aggregator's administrator password.
-const USENET_AGGREGATOR: Entry = Entry {
-    name: "NZBHydra2 administrator password",
-    setting: config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
-    consumers: &[Consumer::at_the_service(
-        "the Usenet indexer aggregator's own administrator account",
-    )],
-    origin: Origin::Lemonfiber,
-    needed: Needed::OverUsenet,
-    proven_by: None,
-};
-
-/// The book service's API key — minted here and adopted by the service.
-const BOOK_CURATOR: Entry = Entry {
-    name: "Book library API key",
-    setting: config::BOOK_CURATOR_API_KEY,
-    consumers: &[Consumer::from_its_environment(
-        "the book library service, which takes this key rather than minting its own",
-        "lemonfiber restart books",
-    )],
-    origin: Origin::Lemonfiber,
-    needed: Needed::Always,
-    proven_by: None,
-};
-
 /// An account lemonfiber set up on one of the stack's own services: the name it signs in
 /// under, and the setting the password lemonfiber minted for it is recorded under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -319,15 +282,7 @@ pub(crate) const fn account(kind: ApiKind) -> Option<Account> {
 ///
 /// The keys the services mint for themselves are not here: which of them exist is a
 /// question about what this stack runs, and the answer comes from the manifest.
-pub const CATALOGUE: &[Entry] = &[
-    VPN,
-    USENET,
-    INDEXER,
-    MEDIA_SERVER,
-    LISTENING_SERVER,
-    USENET_AGGREGATOR,
-    BOOK_CURATOR,
-];
+pub const CATALOGUE: &[Entry] = &[VPN, USENET, INDEXER, MEDIA_SERVER];
 
 /// The credentials this stack needs, given what it runs.
 #[must_use]

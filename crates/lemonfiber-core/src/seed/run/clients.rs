@@ -11,7 +11,7 @@ use lemonfiber_manifest::ApiKind;
 use crate::ports::service::Credential;
 use crate::wiring::Fillers;
 
-use super::connecting::{FILM, MUSIC, TELEVISION};
+use super::connecting::{BOOKS, FILM, MUSIC, TELEVISION};
 
 use super::Ctx;
 use crate::origin::Origin;
@@ -21,14 +21,16 @@ use crate::wiring::Filler;
 /// category field, for the media type it manages.
 ///
 /// The field is fixed per application — the TV curator names it `tvCategory`, the movie
-/// curator `movieCategory`, the music curator `musicCategory` — so the mapping is by the
-/// media type that identifies the application. A media type lemonfiber does not recognise
-/// has no known field, so it names none rather than guessing.
+/// curator `movieCategory`, the music curator `musicCategory`, the book curator
+/// `category` — so the mapping is by the media type that identifies the application. A
+/// media type lemonfiber does not recognise has no known field, so it names none rather
+/// than guessing.
 pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Category> {
     let field = match media {
         TELEVISION => "tvCategory",
         FILM => "movieCategory",
         MUSIC => "musicCategory",
+        BOOKS => "category",
         _ => return None,
     };
     Some(crate::ports::service::Category {

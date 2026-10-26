@@ -142,18 +142,6 @@ fn elsewhere(setting: &str) -> String {
             "your Usenet provider's own account page",
             "lemonfiber setup",
         ),
-        config::LISTENING_SERVER_PASSWORD_KEY => (
-            "the listening server's own account settings",
-            "lemonfiber config set AUDIOBOOKSHELF_PASSWORD",
-        ),
-        config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY => (
-            "the Usenet indexer aggregator's own authentication settings",
-            "lemonfiber config set NZBHYDRA2_ADMIN_PASSWORD",
-        ),
-        config::BOOK_CURATOR_API_KEY => (
-            "this setting itself — the book service adopts whatever it is given",
-            "lemonfiber config set BINDERY_API_KEY",
-        ),
         _ => ("wherever this credential was issued", "lemonfiber setup"),
     };
     format!(

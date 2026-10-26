@@ -191,14 +191,6 @@ async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
     crate::seerr::api_key(&credential_file(ctx, filler).await.text()?)
 }
 
-/// Where the host reaches a service, and the id it runs under.
-pub(crate) struct ServiceAddr {
-    /// The service's compose id, which names its container.
-    pub id: String,
-    /// Where the host reaches it: `http://127.0.0.1:{port}`.
-    pub loopback: String,
-}
-
 /// What the file a service's credential is read from holds.
 ///
 /// Read only where it is a plain file beneath the directory its container owns: whatever
@@ -231,27 +223,6 @@ pub(crate) fn escaped(filler: &Filler) -> String {
 /// Where this machine reaches a service that publishes this port.
 pub(crate) fn loopback(port: u16) -> String {
     format!("http://127.0.0.1:{port}")
-}
-
-/// The address of the one service of a given api kind, or nothing where the stack has
-/// none or it publishes no port to reach it on. The single place the "find the service
-/// by its kind, format where it is reached" step lives, so every caller that speaks to a
-/// named service resolves it the same way rather than re-deriving the URLs.
-pub(crate) fn service_addr(
-    services: &[lemonfiber_manifest::Service],
-    kind: ApiKind,
-) -> Option<ServiceAddr> {
-    services.iter().find_map(|service| {
-        let api = service.api.as_ref()?;
-        if api.kind != kind {
-            return None;
-        }
-        let port = service.port?;
-        Some(ServiceAddr {
-            id: service.id.clone(),
-            loopback: loopback(port),
-        })
-    })
 }
 
 /// The first Usenet download client among `fillers`, as a reader of the accounts behind
@@ -321,8 +292,12 @@ pub(crate) async fn stack_requests_key(
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,
 ) -> Option<String> {
-    let addr = service_addr(services, ApiKind::Seerr)?;
-    let service = services.iter().find(|service| service.id == addr.id)?;
+    let service = services.iter().find(|service| {
+        service
+            .api
+            .as_ref()
+            .is_some_and(|api| api.kind == ApiKind::Seerr)
+    })?;
     let path = crate::app::targets::config_path(
         project?,
         service,

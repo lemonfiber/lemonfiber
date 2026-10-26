@@ -67,13 +67,7 @@ fn each_part_fills_the_capability_it_is_the_bundled_claimant_of() {
 fn every_service_given_a_household_hostname_asks_the_proxy() {
     assert_eq!(
         askers(&stack(), "proxy.front"),
-        once(&[
-            "audiobookshelf",
-            "calibre-web-automated",
-            "door",
-            "homepage",
-            "seerr"
-        ])
+        once(&["calibre-web-automated", "door", "homepage", "seerr"])
     );
 }
 
@@ -82,7 +76,6 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
     assert_eq!(
         askers(&stack(), "dashboard.show"),
         once(&[
-            "audiobookshelf",
             "jellyfin",
             "lidarr",
             "navidrome",
@@ -94,9 +87,23 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
     );
 }
 
-/// Each download client and the subtitle finder, which the bundle installs rather than
-/// assembles, asks the dashboard from its own plugin, as every service the stack carries
-/// whose panel reads it does from the stack.
+/// The services of `moved` asking `capability`.
+fn asking_from(moved: Option<lemonfiber_core::plugin::Installed>, capability: &str) -> Vec<String> {
+    moved
+        .map(|installed| {
+            installed
+                .services
+                .into_iter()
+                .filter(|placed| placed.asks.iter().any(|ask| ask.capability == capability))
+                .map(|placed| placed.service)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Each download client, the subtitle finder and the listening server, which the bundle
+/// installs rather than assembles, asks the dashboard from its own plugin, as every
+/// service the stack carries whose panel reads it does from the stack.
 #[test]
 fn each_installed_part_asks_the_dashboard_from_its_plugin() {
     for (moved, plugin) in [
@@ -112,24 +119,29 @@ fn each_installed_part_asks_the_dashboard_from_its_plugin() {
             lemonfiber_testing::subtitles::moved(),
             lemonfiber_testing::subtitles::PLUGIN,
         ),
+        (
+            lemonfiber_testing::listening::MOVED.installed(),
+            lemonfiber_testing::listening::PLUGIN,
+        ),
     ] {
-        let asking: Vec<String> = moved
-            .map(|installed| {
-                installed
-                    .services
-                    .into_iter()
-                    .filter(|placed| {
-                        placed
-                            .asks
-                            .iter()
-                            .any(|ask| ask.capability == "dashboard.show")
-                    })
-                    .map(|placed| placed.service)
-                    .collect()
-            })
-            .unwrap_or_default();
-        assert_eq!(asking, vec![plugin.to_owned()]);
+        assert_eq!(
+            asking_from(moved, "dashboard.show"),
+            vec![plugin.to_owned()]
+        );
     }
+}
+
+/// The listening server, which the bundle installs, is given its household hostname by
+/// its plugin, and so asks the proxy from there.
+#[test]
+fn the_installed_listening_server_asks_the_proxy_from_its_plugin() {
+    assert_eq!(
+        asking_from(
+            lemonfiber_testing::listening::MOVED.installed(),
+            "proxy.front"
+        ),
+        vec![lemonfiber_testing::listening::PLUGIN.to_owned()]
+    );
 }
 
 #[test]
