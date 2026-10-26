@@ -38,7 +38,7 @@ pub fn repository_stack() -> Source {
     ))
     .kept()
     .join("stack");
-    lemonfiber_fixtures::stack::fixture_into(&copy);
+    lemonfiber_fixtures::stack::directory_into(&copy);
     Source::External(Box::leak(copy.into_boxed_path()))
 }
 

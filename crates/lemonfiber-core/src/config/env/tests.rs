@@ -2,7 +2,7 @@ use super::{is_one_line, EnvFile};
 
 /// The settings template a stack on disk ships as an operator's starting point.
 fn example() -> &'static str {
-    include_str!("../../../../lemonfiber-fixtures/stack/.env.example")
+    include_str!("../../../tests/fixtures/settings.env")
 }
 
 #[test]

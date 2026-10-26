@@ -520,10 +520,15 @@ pub(crate) fn carried_stack() -> crate::stack::Source {
     ))))
 }
 
+/// The version of the stack this build ships.
+pub(crate) fn shipped_stack_version() -> String {
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .map(|manifest| manifest.stack_version)
+        .unwrap_or_default()
+}
+
 /// The stack the tests are written against carried inside the build, as a machine that
 /// has chosen no stack directory yet holds it.
 pub(crate) fn embedded() -> crate::stack::Source {
-    static STACK: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
-    crate::stack::Source::Embedded(&STACK)
+    crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED)
 }

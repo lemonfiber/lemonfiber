@@ -54,32 +54,9 @@ pub fn manifest_into(into: &Path) {
 /// declares and the starting files of every service's configuration.
 const BESIDE: [&str; 2] = [".env.example", "config"];
 
-/// A whole stack kept beside the tests, as the media stack declared it before its parts
-/// moved into plugins: its manifest, the settings it declares and every service's
-/// starting files. A test about what lemonfiber does with a stack runs against it, so a
-/// change to the stack this build ships moves none of them.
-pub const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/stack");
-
-/// [`FIXTURE`] copied whole into `into`, so a run that writes beside it writes into the
-/// copy and never into the repository.
-pub fn fixture_into(into: &Path) {
-    copied(Path::new(FIXTURE), into);
-}
-
-/// [`FIXTURE`] copied once into a directory kept for the whole run.
-#[must_use]
-pub fn fixture_on_disk() -> &'static Path {
-    static WRITTEN: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
-        let into = crate::scratch::Scratch::new("fixture-stack").kept();
-        fixture_into(&into);
-        into
-    });
-    &WRITTEN
-}
-
 /// The carried stack written into `into` as a stack directory holds it: its manifest
 /// without the secrets an assembled part declares, and what a run reads beside it.
-fn directory_into(into: &Path) {
+pub fn directory_into(into: &Path) {
     manifest_into(into);
     for name in BESIDE {
         copied(

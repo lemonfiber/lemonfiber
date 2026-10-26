@@ -11,7 +11,7 @@ use lemonfiber_core::stack::Source;
 /// The stack the tests are written against, as a stack directory holds it, copied once
 /// and kept.
 pub fn project() -> &'static Path {
-    lemonfiber_fixtures::stack::fixture_on_disk()
+    lemonfiber_fixtures::stack::on_disk()
 }
 
 /// The same stack, as the source a context reads.

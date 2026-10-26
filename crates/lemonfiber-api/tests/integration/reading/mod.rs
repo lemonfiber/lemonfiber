@@ -47,7 +47,7 @@ pub(crate) fn bound() -> Binding {
 
 /// The stack the tests are written against, read from disk.
 pub(crate) fn stack() -> Source {
-    Source::External(lemonfiber_fixtures::stack::fixture_on_disk())
+    Source::External(lemonfiber_fixtures::stack::on_disk())
 }
 
 /// A stack source pointing nowhere, for the reads that are about a refusal.

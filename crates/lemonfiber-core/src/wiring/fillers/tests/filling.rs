@@ -18,7 +18,7 @@ fn a_capability_asked_for_is_filled_as_the_ask_settled() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
     assert_eq!(
         filled_by(&fillers, "identity.source"),
-        Some(("jellyfin".to_owned(), Some("seerr".to_owned())))
+        Some(("jellyfin".to_owned(), Some("decline".to_owned())))
     );
 
     let rival = an_installed(

@@ -34,7 +34,7 @@ fn given() -> Chance {
 
 /// The stack the tests are written against, read from disk.
 fn stack() -> Source {
-    Source::External(lemonfiber_fixtures::stack::fixture_on_disk())
+    Source::External(lemonfiber_fixtures::stack::on_disk())
 }
 
 /// The world a follow runs against: what the engine says, and nothing else.

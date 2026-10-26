@@ -13,42 +13,42 @@ use crate::stack::RUNNING;
 const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 
 /// A machine running the stack this build carries, asking `registry` what it publishes,
-/// with a guard installed where `guarded`; answers where the project is.
+/// its guard taken out where not `guarded`; answers where the project is.
 fn machine(name: &str, registry: &Arc<Registered>, guarded: bool) -> (Ctx, PathBuf) {
     machine_with(name, registry, guarded, &[])
 }
 
-/// The same, with a plugin's service under each of `also` installed beside the guard.
+/// The same, with a plugin's service under each of `also` installed beside the stack.
 fn machine_with(
     name: &str,
     registry: &Arc<Registered>,
     guarded: bool,
     also: &[&str],
 ) -> (Ctx, PathBuf) {
+    let env = crate::test_support::env_without_password(name);
+    let stack = if guarded {
+        crate::test_support::embedded()
+    } else {
+        let unguarded = env.with_file_name("unguarded");
+        lemonfiber_fixtures::stack::manifest_without(&unguarded, "door");
+        crate::stack::Source::External(Box::leak(unguarded.into_boxed_path()))
+    };
     let mut ctx = crate::test_support::a_context()
-        .over(crate::test_support::embedded())
+        .over(stack)
         .build()
         .with_registry(Arc::clone(registry) as Arc<dyn lemonfiber_ports::registry::Registry>);
-    let env = crate::test_support::env_without_password(name);
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
     ctx.settings.env_file = Some(env);
-    if guarded {
-        let door = crate::test_support::a_placed("door", &["stream.guard"], None, Some(8080));
-        let mut register = crate::plugin::Register::empty();
+    let mut register = crate::plugin::Register::empty();
+    for id in also {
+        let service = crate::test_support::a_placed(id, &[], None, None);
         assert!(register
-            .record(crate::test_support::an_installed("door", vec![door]))
+            .record(crate::test_support::an_installed("other", vec![service]))
             .is_ok());
-        for id in also {
-            let service = crate::test_support::a_placed(id, &[], None, None);
-            assert!(register
-                .record(crate::test_support::an_installed("other", vec![service]))
-                .is_ok());
-        }
-        assert!(
-            crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register)
-                .is_ok()
-        );
     }
+    assert!(
+        crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register).is_ok()
+    );
     let project = super::super::directory(&ctx).unwrap_or_default();
     (ctx, project)
 }
