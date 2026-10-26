@@ -95,7 +95,7 @@ pub async fn carry(
             ));
             continue;
         };
-        let borrowing = match borrowed(ctx, &manifest, &fillers, container, trusted).await {
+        let borrowing = match borrowed(ctx, &fillers, container, trusted).await {
             Ok(borrowing) => borrowing,
             Err(why) => {
                 found.refused.push(unreachable(service, &why));
@@ -256,12 +256,11 @@ const UNCONFIGURED: &str = "no configuration to read a key from";
 
 /// What the adapter in front of lemonfiber's own copy of `container`'s service is lent to
 /// their copy with: the plugin, where `trusted` holds it as first-party, and the adapter,
-/// their key read from the file the stack's declaration of the service names beneath the
-/// directory their container mounts, and where this machine reaches their copy; or why it
-/// cannot be lent.
+/// their key read from where the plugin says the service keeps it beneath the directory
+/// their container mounts, and where this machine reaches their copy; or why it cannot
+/// be lent.
 async fn borrowed(
     ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
     fillers: &Fillers,
     container: &Container,
     trusted: &[FirstParty],
@@ -289,7 +288,6 @@ async fn borrowed(
     if !crate::plugin::first_party::holds(trusted, &installed) {
         return Err(NOT_FIRST_PARTY.to_owned());
     }
-    let key = their_key(ctx, manifest, container).await?;
     let port = container
         .published
         .iter()
@@ -301,11 +299,12 @@ async fn borrowed(
                 .to_owned()
         })?;
     let mut credentials = Vec::new();
-    for field in adapter.upstream.keys() {
+    for (field, secret) in &adapter.upstream {
         if field == UPSTREAM_USERNAME || field == UPSTREAM_PASSWORD {
             return Err(ACCOUNTED.to_owned());
         }
-        credentials.push((field.clone(), key.clone()));
+        let key = their_key(ctx, &installed, secret, container).await?;
+        credentials.push((field.clone(), key));
     }
     Ok(Borrowed {
         upstream: format!("http://{THEIRS}:{port}"),
@@ -315,29 +314,35 @@ async fn borrowed(
     })
 }
 
-/// The key their copy of `container`'s service wrote for itself, read from the file the
-/// stack's declaration of the service names, by the shape it gives it, beneath the first
+/// The key their copy of `container`'s service wrote for itself, read from where the
+/// plugin `installed`'s secret `secret` says the service keeps it, beneath the first
 /// directory their container mounts.
 async fn their_key(
     ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
+    installed: &crate::plugin::Installed,
+    secret: &str,
     container: &Container,
 ) -> Result<String, String> {
-    let api = manifest
+    let manifest = crate::app::plugins::kept::manifest(ctx, installed)?;
+    let from = manifest
+        .secrets
+        .iter()
+        .find(|declared| declared.id == secret)
+        .and_then(|declared| declared.carried_from.as_ref());
+    let mount = manifest
         .services
         .iter()
-        .find(|declared| declared.id == container.service)
-        .and_then(|declared| declared.api.as_ref());
-    let read = api.and_then(|api| crate::credential::written::reader(api.key_source));
-    let file = api
-        .and_then(|api| api.path.as_deref())
-        .and_then(|path| std::path::Path::new(path).file_name());
-    let (Some(read), Some(file), Some(mount)) = (read, file, container.mounts.first()) else {
+        .find(|service| service.id == container.service)
+        .map(lemonfiber_plugin::Service::configuration);
+    let (Some(from), Some(mount), Some(theirs)) = (from, mount, container.mounts.first()) else {
         return Err(UNCONFIGURED.to_owned());
     };
-    crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), &mount.join(file), mount)
+    let Some(path) = crate::app::targets::config_file(theirs, mount, &from.file) else {
+        return Err(UNCONFIGURED.to_owned());
+    };
+    crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), &path, theirs)
         .await
-        .and_then(|text| read(&text))
+        .and_then(|text| crate::credential::written::at(from.format, &from.key, &text))
         .ok_or_else(|| "their copy has written no key lemonfiber could read".to_owned())
 }
 

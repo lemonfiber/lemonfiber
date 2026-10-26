@@ -132,10 +132,10 @@ happens to do.
 
 ### Checked against real Compose
 
-The generated invocations were run through `docker compose … config --quiet`
-against the real lemonfiber-media-stack checkout for `library`, `search`, `tv` and `full`;
-all four resolve. The golden files pin the argv, and that check is what says the
-argv is the *right* one — worth repeating by hand when the shape changes.
+Run the generated invocations through `docker compose … config --quiet` against
+the embedded stack written out, for `library`, `search`, `tv` and `full`, whenever the
+shape changes. The golden files pin the argv, and that check is what says the argv is
+the *right* one.
 
 ## `environment` is threaded but unused
 

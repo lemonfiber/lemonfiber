@@ -5,10 +5,10 @@
 //! when a copy is not the manifest its pin names.
 //!
 //! The stack is the one that bundle declares: its own tables, a service for each part
-//! it assembles, and each part it installs as `assets/media-stack` declares it until
-//! the part moves. Everything compiled against the bundled stack reads it through here,
-//! and the build fails before any of it compiles when the stack is not one lemonfiber
-//! reads.
+//! it assembles, and for each part it installs the service its copy says it takes the
+//! place of, until the part moves. Everything compiled against the bundled stack reads
+//! it through here, and the build fails before any of it compiles when the stack is not
+//! one lemonfiber reads.
 
 /// The embedded stack's manifest: the bundle's tables, then a service for each part, the
 /// assembled ones in the bundle's order and the installed ones after them.

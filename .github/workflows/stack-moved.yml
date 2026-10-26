@@ -1,20 +1,21 @@
-# Whether the vendored stack has moved on something this repository reads.
+# Whether the vendored catalogue has moved on something this repository reads.
 #
-# `assets/media-stack` is a submodule pinned by revision, and three files inside
-# it are compiled in: `stack.toml`, `scripts/spdx_osi.txt` and `.env.example`.
-# The binary carries whatever those said at the pinned revision, and every test
-# that validates against them validates against that same copy — so this
-# repository and the stack can disagree while both are green.
+# `assets/plugins` is a submodule pinned by revision, and files inside it are
+# compiled in: the licence list the manifest validator is tested against and the
+# Caddyfiles the proxy refusals read. The binary carries whatever those said at the
+# pinned revision, and every test that validates against them validates against
+# that same copy — so this repository and the catalogue can disagree while both
+# are green.
 #
 # A pin is meant to lag. Bumping one changes what ships, which is a release
 # decision rather than something that drifts under a build, so this runs on a
 # schedule and reports rather than on pull requests and gating. Failing every
-# open pull request because the stack merged a CI change is the check people
+# open pull request because the catalogue merged a CI change is the check people
 # route around.
 #
 # What it asks is narrower than "is the pin behind": eight commits behind and
 # none of them touching a file read here is a healthy pin, and one commit behind
-# on `spdx_osi.txt` is a manifest validator refusing a licence the stack now
+# on `spdx_osi.txt` is a manifest validator refusing a licence the catalogue now
 # permits. `website-docs` draws the same line for the trees it renders, and the
 # shared `pins` job in `spec` for the workflows it calls.
 name: stack-moved
@@ -52,7 +53,7 @@ jobs:
       - name: The reading is proved before the forge is asked
         run: python3 scripts/what_the_stack_moved_on.py --self-test
 
-      - name: What the stack has moved on since this pin
+      - name: What the catalogue has moved on since this pin
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/what_the_stack_moved_on.py

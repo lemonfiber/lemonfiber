@@ -7,26 +7,21 @@
 //!
 //! - **The manifest:** the stack the bundle declares, written apart as a root and a
 //!   file per service, as a stack directory holds it.
-//! - **Each part's starting configuration:** an assembled part's from its copy in the
-//!   bundle, which holds its tree and nothing beside it; an installed part's from the
-//!   media stack, which declares it until it moves.
-//! - **What the media stack publishes beside it:** the settings file the configuration
-//!   surface reads and the licence it is published under.
+//! - **Each part's starting configuration:** from its copy in the bundle, which holds its
+//!   tree and nothing beside it.
+//! - **The licence the stack is published under:** the catalogue's.
 //! - **What a claim names:** every recording the manifest's claims are proven against,
-//!   from the part's copy where it holds it. A recording a claim names and nothing
-//!   holds refuses the build, because a claim nothing can prove is a stack that
+//!   from the copy of the part whose recording it is. A recording a claim names and no
+//!   copy holds refuses the build, because a claim nothing can prove is a stack that
 //!   cannot be judged.
 
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
-use lemonfiber_bundle::{Held, Stage};
+use lemonfiber_bundle::Held;
 
-/// The licence the media stack is published under, relative to its root.
+/// The licence the stack is published under, relative to the catalogue's root.
 pub const LICENCE: &str = "LICENSE";
-
-/// The media stack's files carried whole, relative to its root.
-const WHOLE_FILES: [&str; 2] = [".env.example", LICENCE];
 
 /// Where a part's starting configuration is, relative to a stack's root or its copy's.
 const CONFIG: &str = "config";
@@ -40,11 +35,11 @@ enum Carried {
 }
 
 /// Write what runs of the stack `text` the bundle declares into `out/stack`: the copies
-/// of the parts `held` from `copies`, and the rest from the media stack at `media`.
-pub fn stack(media: &Path, copies: &Path, text: &str, held: &[Held], out: &Path) {
+/// of the parts `held` from `copies`, and the licence from the catalogue at `catalogue`.
+pub fn stack(catalogue: &Path, copies: &Path, text: &str, held: &[Held], out: &Path) {
     let into = out.join(super::CARRIED);
     let _ = std::fs::remove_dir_all(&into);
-    for (relative, from) in runtime(media, copies, text, held) {
+    for (relative, from) in runtime(catalogue, copies, text, held) {
         let target = into.join(&relative);
         let made = target
             .parent()
@@ -65,22 +60,24 @@ pub fn stack(media: &Path, copies: &Path, text: &str, held: &[Held], out: &Path)
 
 /// Every file of the stack that runs, by its path in a stack directory, with where its
 /// bytes come from.
-fn runtime(media: &Path, copies: &Path, text: &str, held: &[Held]) -> BTreeMap<PathBuf, Carried> {
+fn runtime(
+    catalogue: &Path,
+    copies: &Path,
+    text: &str,
+    held: &[Held],
+) -> BTreeMap<PathBuf, Carried> {
     let mut carried = manifest(text, copies);
-    for relative in WHOLE_FILES.iter().map(PathBuf::from) {
-        if media.join(&relative).is_file() {
-            carried.insert(relative.clone(), Carried::File(media.join(relative)));
-        }
+    if catalogue.join(LICENCE).is_file() {
+        carried.insert(
+            PathBuf::from(LICENCE),
+            Carried::File(catalogue.join(LICENCE)),
+        );
     }
     for one in held {
         let id = &one.pin.id;
-        let starting = Path::new(CONFIG).join(id);
-        match one.pin.stage {
-            Some(Stage::Assembled) => from(&copies.join(id), &starting, &mut carried),
-            _ => from(media, &starting, &mut carried),
-        }
+        from(&copies.join(id), &Path::new(CONFIG).join(id), &mut carried);
     }
-    carried.extend(proven(media, copies, text));
+    carried.extend(proven(copies, text));
     carried
 }
 
@@ -133,9 +130,8 @@ fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, Carried>) {
 }
 
 /// Every recording the manifest's claims are proven against, by its path in a stack
-/// directory: from the copy of the part whose recordings it is where the copy holds it,
-/// and from the media stack at `media` otherwise.
-fn proven(media: &Path, copies: &Path, text: &str) -> BTreeMap<PathBuf, Carried> {
+/// directory, from the copy of the part whose recordings it is.
+fn proven(copies: &Path, text: &str) -> BTreeMap<PathBuf, Carried> {
     let mut named = Vec::new();
     if let Ok(document) = text.parse::<toml::Table>() {
         fixtures(&toml::Value::Table(document), &mut named);
@@ -144,15 +140,12 @@ fn proven(media: &Path, copies: &Path, text: &str) -> BTreeMap<PathBuf, Carried>
     let mut missing = Vec::new();
     for fixture in named {
         let relative = PathBuf::from(&fixture);
-        let in_copy = relative
+        let held = relative
             .components()
             .nth(1)
             .and_then(|part| part.as_os_str().to_str())
-            .map(|id| copies.join(id).join(&relative));
-        let held = in_copy
-            .into_iter()
-            .chain([media.join(&relative)])
-            .find(|path| beneath(&relative) && path.is_file());
+            .map(|id| copies.join(id).join(&relative))
+            .filter(|path| beneath(&relative) && path.is_file());
         match held {
             Some(path) => {
                 proven.insert(relative, Carried::File(path));

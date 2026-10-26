@@ -8,8 +8,8 @@
 # the citation for a pull request GitHub says `dependabot[bot]` opened.
 #
 # Not configured here, deliberately:
-#   - the `assets/media-stack` submodule. That revision is embedded in the
-#     binary at build time and moved on purpose, not on release.
+#   - the `assets/plugins` submodule. That revision is embedded in the binary at
+#     build time and moved on purpose, not on release.
 #   - `python-version:` written inline in a workflow. Dependabot has no regex
 #     manager and nothing else watches it — see the spec's 40-quality/tooling.md,
 #     "What Dependabot does not watch".
