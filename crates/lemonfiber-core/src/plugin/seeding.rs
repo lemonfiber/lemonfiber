@@ -195,7 +195,7 @@ const CLASSES: [&[u8]; 4] = [
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     b"abcdefghijklmnopqrstuvwxyz",
     b"0123456789",
-    b"-_.~",
+    lemonfiber_contract::adapter::PASSWORD_MARKS,
 ];
 
 /// A password of [`PASSWORD_LENGTH`] characters drawn from every one of [`CLASSES`], each

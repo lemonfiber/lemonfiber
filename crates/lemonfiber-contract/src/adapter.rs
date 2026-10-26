@@ -22,6 +22,10 @@ pub const UPSTREAM_USERNAME: &str = "username";
 /// The part of an upstream's credential holding that account's password.
 pub const UPSTREAM_PASSWORD: &str = "password";
 
+/// The marks a password lemonfiber mints holds beside letters and digits, at least one of
+/// them in every password.
+pub const PASSWORD_MARKS: &[u8] = b"-_.~";
+
 /// What every adapter answers under, beside the capabilities it serves.
 pub const ADAPTER: &str = "adapter";
 
