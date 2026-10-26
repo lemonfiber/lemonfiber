@@ -34,7 +34,7 @@ use super::targets::{open_curators, serving};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceReport};
-use crate::ports::service::Pipeline;
+use crate::ports::service::{Maintenance, Pipeline};
 
 /// Trace one item by a human term, across the resolution services.
 ///
@@ -114,7 +114,7 @@ pub(crate) async fn trace(
         if unexplained(&report) {
             if searching {
                 searched(&mut report, &curator.name, asking(&service, kind).await);
-            } else if service.wants_any().await.unwrap_or(false) {
+            } else if service.wanting().await.unwrap_or(false) {
                 report.searchable = Some(searchable(&curator.name));
             }
         }

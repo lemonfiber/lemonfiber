@@ -259,7 +259,9 @@ impl crate::ports::service::Maintenance for Servarr {
     }
 
     async fn wanting(&self) -> Result<bool, Failure> {
-        self.wants_any().await
+        quality::first_wanted(self)
+            .await
+            .map(|first| first.is_some())
     }
 }
 
