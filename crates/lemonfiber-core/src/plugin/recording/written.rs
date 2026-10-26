@@ -33,7 +33,7 @@ pub(super) fn before(root: &Path, fixture: &str) -> Option<Recording> {
 }
 
 /// How the sentence a recording's note ends with where it was taken with stand-ins begins.
-pub(super) const STOOD_IN: &str = "Taken with the stand-ins the manifest declares for ";
+const STOOD_IN: &str = "Taken with the stand-ins the manifest declares for ";
 
 /// How that sentence ends.
 const STOOD_IN_END: &str = ", never with an operator's value.";
