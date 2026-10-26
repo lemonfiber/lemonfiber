@@ -4,14 +4,8 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_contract::adapter::UPSTREAM_FILE;
-
-/// The longest key taken.
-pub const KEY_LIMIT: usize = 256;
-
-/// The marks a generated key may hold beside letters and digits: those hex, base64 and a
-/// UUID are written in.
-const KEY_MARKS: &[u8] = b"-_.+/=";
+pub use lemonfiber_contract::adapter::KEY_LIMIT;
+use lemonfiber_contract::adapter::{KEY_MARKS, PASSWORD_MARKS, UPSTREAM_FILE};
 
 /// Where the key every call presents comes from.
 pub trait Holding: Send + Sync {
@@ -74,15 +68,18 @@ impl Holding for Upstream {
     }
 }
 
-/// Whether `key` is spelled the way a generated key is: letters, digits and the marks
-/// hex, base64 and a UUID are written in, and no longer than [`KEY_LIMIT`].
+/// Whether `key` is spelled the way a generated key or a minted password is: letters,
+/// digits, the marks hex, base64 and a UUID are written in and those of a password, and no
+/// longer than [`KEY_LIMIT`].
 #[must_use]
 pub fn spelled_as_a_key(key: &str) -> bool {
     !key.is_empty()
         && key.len() <= KEY_LIMIT
-        && key
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || KEY_MARKS.contains(&byte))
+        && key.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || KEY_MARKS.contains(&byte)
+                || PASSWORD_MARKS.contains(&byte)
+        })
 }
 
 #[cfg(test)]

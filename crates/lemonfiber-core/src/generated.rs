@@ -9,13 +9,7 @@
 //! read as a reference to another setting, a quote, a header broken across lines — is
 //! not a key, and reads as one not written yet.
 
-/// The longest key taken. Every service here makes one well under a hundred characters
-/// long; this is room to spare and still a bound.
-pub const KEY_LIMIT: usize = 256;
-
-/// The marks a key may hold besides letters and digits: hex has none, base64 has `+`,
-/// `/` and `=`, and a UUID or a hand-made key has `-`, `_` and `.`.
-const KEY_MARKS: &[u8] = b"-_.+/=";
+use lemonfiber_contract::adapter::{KEY_LIMIT, KEY_MARKS};
 
 /// `key`, where it is spelled the way a generated key is and no longer than
 /// [`KEY_LIMIT`].

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use lemonfiber_contract::adapter::UPSTREAM_FILE;
+use lemonfiber_contract::adapter::{PASSWORD_MARKS, UPSTREAM_FILE};
 
 use super::{spelled_as_a_key, Holding, Upstream, KEY_LIMIT};
 
@@ -114,6 +114,18 @@ fn a_key_is_letters_digits_and_the_marks_keys_are_written_in() {
     ] {
         assert!(!spelled_as_a_key(&not_a_key), "{not_a_key:?}");
     }
+}
+
+#[test]
+fn a_password_lemonfiber_mints_is_spelled_as_a_key_whichever_mark_it_holds() {
+    for mark in PASSWORD_MARKS {
+        let password = format!("Ab3{}Ab3Ab3Ab3Ab3Ab3Ab3Ab3Ab3Ab3A", char::from(*mark));
+        assert!(spelled_as_a_key(&password), "{}", char::from(*mark));
+    }
+    assert!(
+        !spelled_as_a_key("Ab3!Ab3"),
+        "a mark no password holds is refused"
+    );
 }
 
 #[test]
