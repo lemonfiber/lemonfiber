@@ -45,7 +45,7 @@ fn asker(service: &str, kind: ApiKind, listens: u16, asks: &[(&str, bool)]) -> P
 }
 
 /// The plugin: a curator speaking `library.curate` and asking for both download clients,
-/// and a subtitle finder asking for every curator. Neither shares an id with anything the
+/// and a subtitle finder speaking `subtitles.fetch` and asking for every curator. Neither shares an id with anything the
 /// stack ships.
 fn helpers() -> Installed {
     let mut fetcher = asker(
@@ -55,13 +55,9 @@ fn helpers() -> Installed {
         &[("download.usenet", false), ("download.torrent", false)],
     );
     fetcher.speaks = vec!["library.curate@1".to_owned()];
-    let mut installed = an_installed(
-        PLUGIN,
-        vec![
-            fetcher,
-            asker(SUBBER, ApiKind::Bazarr, 6768, &[("library.curate", true)]),
-        ],
-    );
+    let mut subber = asker(SUBBER, ApiKind::Bazarr, 6768, &[("library.curate", true)]);
+    subber.speaks = vec!["subtitles.fetch@1".to_owned()];
+    let mut installed = an_installed(PLUGIN, vec![fetcher, subber]);
     installed.manifest = MANIFEST.to_owned();
     installed.tree = crate::test_support::A_TREE.to_owned();
     installed

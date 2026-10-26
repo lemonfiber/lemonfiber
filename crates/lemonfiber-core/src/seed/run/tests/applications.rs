@@ -420,24 +420,93 @@ async fn an_indexer_on_no_address_is_told_about_nobody() {
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// A plugin's curator is never registered into the stack's own indexer either, since the
-/// indexer would hand it its own key: the pair is said as reached by nothing, naming that.
-#[tokio::test]
-async fn the_stacks_indexer_is_never_registered_a_plugin_curator() {
-    let fillers = beside_a_stand_in(
-        vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
-        "movies",
-    );
-
-    let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
-        .into_iter()
-        .filter(|wiring| wiring.connection.starts_with("kept"))
+/// What the indexer `asking` and the curators it syncs come to once the operator granted
+/// it the credential of the service `granted` names, each pair that comes to nothing said
+/// with why.
+fn said_with_a_grant(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+    asking: &str,
+    granted: &str,
+) -> Vec<crate::seed::Wiring> {
+    let ungranted = fillers_beside(services.clone(), installed, stack_root());
+    let credential = ungranted
+        .service(granted)
+        .and_then(|one| ungranted.credential(one))
+        .unwrap_or_default();
+    let installed: Vec<crate::plugin::Installed> = installed
+        .iter()
+        .cloned()
+        .map(|mut one| {
+            if one.services.iter().any(|placed| placed.service == asking) {
+                one.granted.push(crate::plugin::Grant {
+                    credential: credential.clone(),
+                    of: granted.to_owned(),
+                    serves: "indexer.search".to_owned(),
+                    at: String::new(),
+                });
+            }
+            one
+        })
         .collect();
+    super::super::connecting::unmatched(&fillers_beside(services, &installed, stack_root()))
+}
+
+/// A plugin's curator is never registered into the moved indexer, even where the indexer was
+/// granted the curator's key, since the indexer would hand it its own: the pair is said as
+/// reached by nothing, naming that.
+#[test]
+fn an_indexer_granted_a_plugin_curators_key_is_never_registered_it() {
+    let said = said_with_a_grant(
+        vec![curator("sonarr", 8989, "tv")],
+        &INDEXER
+            .installed()
+            .into_iter()
+            .chain([a_stand_in("movies")])
+            .collect::<Vec<_>>(),
+        "prowlarr",
+        "kept",
+    );
 
     assert!(
         matches!(said.as_slice(), [wiring]
-            if matches!(&wiring.state, crate::seed::State::Unmatched { reason }
-                if reason.contains("hands every service it registers its own API key"))),
+            if wiring.connection == "kept the stand-in into Prowlarr"
+                && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
+                    if reason.contains("is a third-party plugin's service; Prowlarr hands every \
+                        service it registers its own API key"))),
+        "{said:?}"
+    );
+}
+
+/// A plugin's indexer granted a moved curator's key is never registered the curator either,
+/// since the indexer would hand the curator its own key: the pair is said, naming the
+/// indexer as the plugin's.
+#[test]
+fn a_plugin_indexer_granted_a_moved_curators_key_is_never_registered_it() {
+    let mut indexing = contracted("indexing", "finder", "indexer.search");
+    for placed in &mut indexing.services {
+        placed.asks = vec![crate::plugin::Asking {
+            capability: "library.curate".to_owned(),
+            each: true,
+            native: None,
+        }];
+    }
+    let said = said_with_a_grant(
+        Vec::new(),
+        &TELEVISION
+            .installed()
+            .into_iter()
+            .chain([indexing])
+            .collect::<Vec<_>>(),
+        "finder",
+        "sonarr",
+    );
+
+    assert!(
+        matches!(said.as_slice(), [wiring]
+            if wiring.connection == "Sonarr into finder the stand-in"
+                && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
+                    if reason.contains("finder the stand-in is a third-party plugin's service"))),
         "{said:?}"
     );
 }

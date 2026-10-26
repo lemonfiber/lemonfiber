@@ -24,7 +24,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// A manifest service with the few fields the credential resolver reads, and
 /// filler for the rest, so a test can vary the shape, port and key file.
-fn manifest_service(
+pub(super) fn manifest_service(
     id: &str,
     api: Option<lemonfiber_manifest::Api>,
     port: Option<u16>,

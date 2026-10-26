@@ -15,8 +15,8 @@ const ADMITTED: &str = "/lemonfiber/request.gate/v1/admitted";
 /// What the gate is told every route it should admit through.
 const ADMIT: &str = "/lemonfiber/request.gate/v1/admit";
 
-/// [`a_contracted_gate`] beside the request service and both curators, trusting `trusted`
-/// as first-party.
+/// [`a_contracted_gate`] beside the request service moved into its plugin and both
+/// curators, trusting `trusted` as first-party beside every plugin this build embeds.
 fn contracted_gate(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
@@ -27,10 +27,20 @@ fn contracted_gate(
             curator("sonarr", 8989, "tv"),
             curator("radarr", 7878, "movies"),
         ],
-        &[a_contracted_gate()],
+        &with_the_request_service(vec![a_contracted_gate()]),
         project,
-        trusted,
+        &trusting(trusted),
     )
+}
+
+/// `installed`, with the request service moved into its plugin.
+fn with_the_request_service(
+    installed: Vec<crate::plugin::Installed>,
+) -> Vec<crate::plugin::Installed> {
+    installed
+        .into_iter()
+        .chain(crate::test_support::requests::REQUESTS.installed())
+        .collect()
 }
 
 /// The path and credential of every route each `admit` the gate was told carried.
@@ -118,13 +128,12 @@ async fn a_first_party_gate_speaking_the_contract_is_handed_its_routes_over_it()
     assert_eq!(routes(&project), None);
 }
 
-/// A curator a third-party plugin brought is not routed through a first-party gate: its
-/// key may not be handed to another plugin's service.
-#[tokio::test]
-async fn a_third_party_curators_key_is_never_handed_to_the_gate() {
-    let project = lemonfiber_fixtures::scratch::Scratch::new("gate-stranger-curator");
-    let http = admitting_nothing();
-    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+/// A third-party plugin's curator filing film, beside the request service moved into its
+/// plugin holding `granted`, the first-party gate and the television curator.
+fn beside_a_stranger(
+    project: &std::path::Path,
+    granted: &[crate::plugin::Grant],
+) -> crate::wiring::Fillers {
     let mut stranger = crate::test_support::a_placed(
         "kept",
         &["library.curate"],
@@ -132,23 +141,75 @@ async fn a_third_party_curators_key_is_never_handed_to_the_gate() {
         Some(8990),
     );
     stranger.media_types = vec!["movies".to_owned()];
-    let fillers = fillers_trusting(
+    let requests = REQUESTS.installed().map(|mut one| {
+        granted.clone_into(&mut one.granted);
+        one
+    });
+    fillers_trusting(
         vec![requests_svc(), curator("sonarr", 8989, "tv")],
         &[
-            a_contracted_gate(),
-            crate::test_support::an_installed("kept", vec![stranger]),
-        ],
+            Some(a_contracted_gate()),
+            Some(crate::test_support::an_installed("kept", vec![stranger])),
+            requests,
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>(),
+        project,
+        &trusting(&GATE_TRUSTED),
+    )
+}
+
+/// A curator a third-party plugin brought is not routed through a first-party gate: its
+/// key may not be handed to another plugin's service. Where the operator granted it to the
+/// request service, so the request service fulfils through it, the gate's pass says it
+/// holds no route to it and why.
+#[tokio::test]
+async fn a_third_party_curators_key_is_never_handed_to_the_gate() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("gate-stranger-curator");
+    let http = admitting_nothing();
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+    let ungranted = beside_a_stranger(&project, &[]);
+    let credential = ungranted
+        .service("kept")
+        .and_then(|kept| ungranted.credential(kept))
+        .unwrap_or_default();
+    let granted = beside_a_stranger(
         &project,
-        &GATE_TRUSTED,
+        &[crate::plugin::Grant {
+            credential,
+            of: "kept".to_owned(),
+            serves: "request.intake".to_owned(),
+            at: String::new(),
+        }],
     );
 
-    let _ =
-        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None, Some(&project))
+    let alone = super::super::gate::seed_gate_routes(
+        &ctx,
+        &standing_in(),
+        &ungranted,
+        None,
+        Some(&project),
+    )
+    .await;
+    let said =
+        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &granted, None, Some(&project))
             .await;
 
     assert_eq!(
         admitted_routes(&http),
-        vec![("sonarr".to_owned(), "the-key".to_owned())]
+        vec![
+            ("sonarr".to_owned(), "the-key".to_owned()),
+            ("sonarr".to_owned(), "the-key".to_owned())
+        ]
+    );
+    assert_eq!(states(&alone), vec![&State::Wired]);
+    assert!(
+        matches!(said.as_slice(), [_, unrouted]
+            if unrouted.connection == "kept the stand-in routed through the request gate"
+                && matches!(&unrouted.state, State::Unmatched { reason }
+                    if reason.starts_with("kept the stand-in is a third-party plugin's service"))),
+        "{said:?}"
     );
 }
 

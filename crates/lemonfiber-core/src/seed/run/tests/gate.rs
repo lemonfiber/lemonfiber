@@ -25,6 +25,23 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     services
 }
 
+/// The parts every route here is reached through, moved into their plugins: the media
+/// server and the request service.
+fn moved_parts() -> Vec<crate::plugin::Installed> {
+    media::moved()
+        .into_iter()
+        .chain(crate::test_support::requests::REQUESTS.installed())
+        .collect()
+}
+
+/// `services` written at `project`, with [`moved_parts`] moved.
+fn routed_at(
+    services: Vec<lemonfiber_manifest::Service>,
+    project: &std::path::Path,
+) -> crate::wiring::Fillers {
+    fillers_beside(services, &moved_parts(), project)
+}
+
 /// A media server filing `filed` under the gate's name and minting `minted`, taking a mint
 /// where `mints` and a revocation where `revokes`.
 fn serving(filed: &[&str], minted: &str, mints: bool, revokes: bool) -> Arc<Fake> {
@@ -56,7 +73,7 @@ fn minted_on(http: &Fake) -> bool {
 
 /// The majors of the API the moved media server answers in, which the gate forwards to.
 fn moved_majors() -> Vec<u32> {
-    crate::app::targets::MediaServer::of(&moved_fillers(stack(true)))
+    crate::app::targets::MediaServer::of(&routed_at(stack(true), stack_root()))
         .and_then(|server| server.pairing)
         .map(|pairing| pairing.majors)
         .unwrap_or_default()
@@ -158,7 +175,7 @@ async fn seeded(
     gating: bool,
     project: &std::path::Path,
 ) -> (Option<State>, Vec<String>) {
-    let fillers = moved_at(stack(gating), project);
+    let fillers = routed_at(stack(gating), project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let wiring = super::super::gate::seed_gate_routes(
         ctx,
@@ -261,16 +278,57 @@ async fn a_moved_curator_key_is_written_and_strays_revoked() {
     assert_eq!(revoked, vec!["stray".to_owned()]);
 }
 
-/// A curator that has written no key yet has no route until it has.
+/// Every line the gate's pass reports beside its own, by connection and state.
+async fn unrouted(ctx: &Ctx, project: &std::path::Path) -> Vec<(String, State)> {
+    let fillers = routed_at(stack(true), project);
+    let server = crate::app::targets::MediaServer::of(&fillers);
+    super::super::gate::seed_gate_routes(
+        ctx,
+        &stack(true),
+        &fillers,
+        server.as_ref(),
+        Some(project),
+    )
+    .await
+    .into_iter()
+    .skip(1)
+    .map(|one| (one.connection, one.state))
+    .collect()
+}
+
+/// A curator that has written no key yet has no route until it has, and the pass says it
+/// is skipped; one whose key file is a link is refused, and the pass says that.
 #[tokio::test]
 async fn a_curator_without_a_key_has_no_route() {
     let http = serving(&[], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-routes-keyless", true, MOVIES_ONLY, None, http.clone());
+    let connection = "sonarr the app routed through the request gate".to_owned();
 
-    let (state, _) = seeded(&ctx, &http, true, &at).await;
+    let said = unrouted(&ctx, &at).await;
 
-    assert_eq!(state, Some(State::Wired));
     assert_eq!(routes(&at), Some(holding(MOVIES_ONLY, "fresh")));
+    assert_eq!(
+        said,
+        vec![(
+            connection.clone(),
+            State::Skipped {
+                reason: "sonarr the app has not written its API key yet; a later run completes it"
+                    .to_owned()
+            }
+        )]
+    );
+
+    let _ = std::fs::create_dir_all(at.join("config/sonarr"));
+    let _ = std::os::unix::fs::symlink(
+        at.join("config/radarr/config.xml"),
+        at.join("config/sonarr/config.xml"),
+    );
+    let refused = unrouted(&ctx, &at).await;
+
+    assert!(
+        matches!(refused.as_slice(), [(named, State::Refused { .. })] if *named == connection),
+        "{refused:?}"
+    );
 }
 
 /// A key the routes hold that the media server no longer lists is replaced, and what was
@@ -420,7 +478,7 @@ async fn without_a_media_server_the_curators_are_still_routed() {
     let wiring = super::super::gate::seed_gate_routes(
         &ctx,
         &services,
-        &fillers_at(services.clone(), &project),
+        &routed_at(services.clone(), &project),
         served(&services).as_ref(),
         Some(&project),
     )
@@ -470,7 +528,7 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
         curator("sonarr", 8989, "tv"),
         request_gate(),
     ];
-    let fillers = fillers_at(services.clone(), &project);
+    let fillers = routed_at(services.clone(), &project);
     let mut expected = holding(&curators, "").upstreams;
     expected.retain(|route| route.kind != Kind::Jellyfin);
 
@@ -527,8 +585,8 @@ async fn without_a_stack_directory_nothing_is_minted() {
     let wiring = super::super::gate::seed_gate_routes(
         &ctx,
         &stack(true),
-        &moved_fillers(stack(true)),
-        crate::app::targets::MediaServer::of(&moved_fillers(stack(true))).as_ref(),
+        &routed_at(stack(true), stack_root()),
+        crate::app::targets::MediaServer::of(&routed_at(stack(true), stack_root())).as_ref(),
         None,
     )
     .await;
@@ -712,7 +770,7 @@ async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
     let (ctx, at) = gate_ctx("gate-withheld", true, CURATORS, None, http.clone());
     let mut services = stack(false);
     services.retain(|service| service.id != crate::app::gating::SERVICE);
-    let installed: Vec<_> = media::moved()
+    let installed: Vec<_> = moved_parts()
         .into_iter()
         .chain([crate::test_support::contracted(
             "stranger",
@@ -748,7 +806,7 @@ async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
 async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
     let http = serving(&["stale"], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-unnamed", true, CURATORS, None, http.clone());
-    let installed: Vec<_> = media::moved()
+    let installed: Vec<_> = moved_parts()
         .into_iter()
         .chain([crate::test_support::a_contracted_gate()])
         .collect();

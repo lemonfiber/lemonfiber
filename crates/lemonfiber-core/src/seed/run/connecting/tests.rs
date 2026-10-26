@@ -5,32 +5,60 @@ use crate::seed::State;
 use crate::test_support::{a_placed, an_installed};
 use crate::wiring::{Chosen, Fillers};
 
-/// The shipped stack's asks answered against `installed` with `chosen`, after
+/// The shipped stack's asks, every part the bundle installs moved into its plugin as
+/// `moving` leaves those parts, answered against them and `installed` with `chosen`, after
 /// `changing` the stack.
+fn moved(
+    installed: &[crate::plugin::Installed],
+    chosen: &Chosen,
+    changing: impl FnOnce(&mut lemonfiber_manifest::Manifest),
+    moving: impl FnOnce(&mut Vec<crate::plugin::Installed>),
+) -> Fillers {
+    let mut parts = crate::test_support::adapted::installed_parts();
+    moving(&mut parts);
+    parts.extend_from_slice(installed);
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .map(|mut manifest| {
+            changing(&mut manifest);
+            Fillers::of(&manifest, &parts, chosen, None)
+        })
+        .unwrap_or_default()
+}
+
+/// [`moved`], with every part as the bundle pins it.
 fn shipped(
     installed: &[crate::plugin::Installed],
     chosen: &Chosen,
     changing: impl FnOnce(&mut lemonfiber_manifest::Manifest),
 ) -> Fillers {
-    crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            changing(&mut manifest);
-            Fillers::of(&manifest, installed, chosen, None)
-        })
-        .unwrap_or_default()
+    moved(installed, chosen, changing, |_| ())
 }
 
-/// A Usenet client a plugin brought, chosen to answer for the stack's own.
+/// The services of every part moved into its plugin that serve `id`: the service itself
+/// and the adapter in front of it.
+fn serving<'a>(
+    parts: &'a mut [crate::plugin::Installed],
+    id: &'a str,
+) -> impl Iterator<Item = &'a mut crate::plugin::Placed> {
+    parts
+        .iter_mut()
+        .flat_map(|part| part.services.iter_mut())
+        .filter(move |placed| placed.service == id || placed.fronts.as_deref() == Some(id))
+}
+
+/// The stack with a Usenet client of its own speaking `api` and listening on `listens`,
+/// chosen to answer for the shipped one.
 fn chosen_stand_in(
     api: Option<lemonfiber_manifest::Api>,
     listens: Option<u16>,
-) -> (Vec<crate::plugin::Installed>, Chosen) {
+) -> (impl FnOnce(&mut lemonfiber_manifest::Manifest), Chosen) {
+    let stand_in = lemonfiber_manifest::Service {
+        provides: vec!["download.usenet".to_owned()],
+        listens,
+        ..crate::seed::run::tests::manifest_service("stand-in", api, None)
+    };
     (
-        vec![an_installed(
-            "stand-in",
-            vec![a_placed("stand-in", &["download.usenet"], api, listens)],
-        )],
+        move |manifest: &mut lemonfiber_manifest::Manifest| manifest.services.push(stand_in),
         Chosen::read(Some("download.usenet=stand-in")),
     )
 }
@@ -58,9 +86,8 @@ fn reasons(fillers: &Fillers) -> Vec<String> {
         .collect()
 }
 
-/// Every download ask a \*arr curator in the shipped stack makes comes to a download
-/// client of the kind its filler speaks, and the book curator's come to nothing, since
-/// lemonfiber tells it about no download client.
+/// Every download ask a curator moved into its plugin makes comes to a download client of
+/// the kind its filler speaks, told it over the curator's contract.
 #[test]
 fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
@@ -90,14 +117,14 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
     assert_eq!(
         made,
         vec![
-            client("sonarr", "sabnzbd"),
-            client("sonarr", "qbittorrent"),
-            client("radarr", "sabnzbd"),
-            client("radarr", "qbittorrent"),
+            client("bindery", "sabnzbd"),
+            client("bindery", "qbittorrent"),
             client("lidarr", "sabnzbd"),
             client("lidarr", "qbittorrent"),
-            ("bindery".to_owned(), "sabnzbd".to_owned(), None),
-            ("bindery".to_owned(), "qbittorrent".to_owned(), None),
+            client("radarr", "sabnzbd"),
+            client("radarr", "qbittorrent"),
+            client("sonarr", "sabnzbd"),
+            client("sonarr", "qbittorrent"),
         ]
     );
 }
@@ -137,9 +164,19 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
         made,
         vec![
             (
-                "prowlarr".to_owned(),
+                "bazarr".to_owned(),
+                "radarr".to_owned(),
+                Some(Connection::Subtitles(Kind::Movies))
+            ),
+            (
+                "bazarr".to_owned(),
                 "sonarr".to_owned(),
-                Some(Connection::Application(ApplicationKind::Tv))
+                Some(Connection::Subtitles(Kind::Tv))
+            ),
+            (
+                "prowlarr".to_owned(),
+                "lidarr".to_owned(),
+                Some(Connection::Application(ApplicationKind::Music))
             ),
             (
                 "prowlarr".to_owned(),
@@ -148,13 +185,8 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
             ),
             (
                 "prowlarr".to_owned(),
-                "lidarr".to_owned(),
-                Some(Connection::Application(ApplicationKind::Music))
-            ),
-            (
-                "seerr".to_owned(),
                 "sonarr".to_owned(),
-                Some(Connection::Fulfilment { kind: Kind::Tv })
+                Some(Connection::Application(ApplicationKind::Tv))
             ),
             (
                 "seerr".to_owned(),
@@ -162,26 +194,19 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
                 Some(Connection::Fulfilment { kind: Kind::Movies })
             ),
             (
-                "bazarr".to_owned(),
+                "seerr".to_owned(),
                 "sonarr".to_owned(),
-                Some(Connection::Subtitles(Kind::Tv))
-            ),
-            (
-                "bazarr".to_owned(),
-                "radarr".to_owned(),
-                Some(Connection::Subtitles(Kind::Movies))
+                Some(Connection::Fulfilment { kind: Kind::Tv })
             ),
         ]
     );
     assert_eq!(
         said,
         vec![
-            "SABnzbd into Bindery",
-            "qBittorrent into Bindery",
-            "Lidarr into Seerr",
-            "Bindery into Seerr",
-            "Lidarr into Bazarr",
             "Bindery into Bazarr",
+            "Lidarr into Bazarr",
+            "Bindery into Seerr",
+            "Lidarr into Seerr",
         ]
     );
 }
@@ -190,13 +215,16 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
 /// naming no media at all is said as that.
 #[test]
 fn a_curator_filing_media_nothing_hands_the_asker_is_said_naming_it() {
-    let fillers = shipped(&[], &Chosen::default(), |manifest| {
-        for service in &mut manifest.services {
-            if service.id == "radarr" {
-                service.media_types = Vec::new();
+    let fillers = moved(
+        &[],
+        &Chosen::default(),
+        |_| (),
+        |parts| {
+            for placed in serving(parts, "radarr") {
+                placed.media_types = Vec::new();
             }
-        }
-    });
+        },
+    );
 
     let request_services: Vec<String> = unmatched(&fillers)
         .into_iter()
@@ -222,8 +250,8 @@ fn a_curator_filing_media_nothing_hands_the_asker_is_said_naming_it() {
 /// A filler naming no adapter is reported, naming what fills, what asked and why.
 #[test]
 fn a_filler_naming_no_adapter_is_reported_as_reached_by_nothing() {
-    let (installed, chosen) = chosen_stand_in(None, Some(6789));
-    let fillers = shipped(&installed, &chosen, |_| ());
+    let (standing_in, chosen) = chosen_stand_in(None, Some(6789));
+    let fillers = shipped(&[], &chosen, standing_in);
 
     assert_eq!(
         unmatched(&fillers)
@@ -232,16 +260,16 @@ fn a_filler_naming_no_adapter_is_reported_as_reached_by_nothing() {
             .filter(|connection| connection.starts_with("stand-in"))
             .collect::<Vec<&str>>(),
         vec![
-            "stand-in the stand-in into Sonarr",
-            "stand-in the stand-in into Radarr",
-            "stand-in the stand-in into Lidarr",
-            "stand-in the stand-in into Bindery",
+            "stand-in the app into Bindery",
+            "stand-in the app into Lidarr",
+            "stand-in the app into Radarr",
+            "stand-in the app into Sonarr",
         ]
     );
     assert_eq!(
         reasons(&fillers),
         vec![
-            "stand-in the stand-in fills download.usenet, which Sonarr asks for, and names no \
+            "stand-in the app fills download.usenet, which Sonarr asks for, and names no \
              adapter lemonfiber could tell Sonarr about it through"
                 .to_owned()
         ]
@@ -251,14 +279,14 @@ fn a_filler_naming_no_adapter_is_reported_as_reached_by_nothing() {
 /// A filler naming an adapter and no port it answers on is reported.
 #[test]
 fn a_filler_saying_no_port_is_reported_as_reached_by_nothing() {
-    let (installed, chosen) =
+    let (standing_in, chosen) =
         chosen_stand_in(Some(speaking(lemonfiber_manifest::ApiKind::Sabnzbd)), None);
-    let fillers = shipped(&installed, &chosen, |_| ());
+    let fillers = shipped(&[], &chosen, standing_in);
 
     assert_eq!(
         reasons(&fillers),
         vec![
-            "stand-in the stand-in fills download.usenet, which Sonarr asks for, and does not \
+            "stand-in the app fills download.usenet, which Sonarr asks for, and does not \
              say which port it answers on inside the stack's network"
                 .to_owned()
         ]
@@ -268,49 +296,56 @@ fn a_filler_saying_no_port_is_reported_as_reached_by_nothing() {
 /// A filler speaking an adapter nothing pairs with what asked is reported.
 #[test]
 fn a_filler_speaking_an_adapter_nothing_pairs_is_reported_as_reached_by_nothing() {
-    let (installed, chosen) = chosen_stand_in(
+    let (standing_in, chosen) = chosen_stand_in(
         Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
         Some(6789),
     );
-    let fillers = shipped(&installed, &chosen, |_| ());
+    let fillers = shipped(&[], &chosen, standing_in);
 
     assert_eq!(
         reasons(&fillers),
         vec![
-            "stand-in the stand-in fills download.usenet, which Sonarr asks for, and nothing \
-             in lemonfiber tells Sonarr about a service that speaks stand-in the stand-in's \
+            "stand-in the app fills download.usenet, which Sonarr asks for, and nothing \
+             in lemonfiber tells Sonarr about a service that speaks stand-in the app's \
              adapter"
                 .to_owned()
         ]
     );
 }
 
-/// An asker naming no adapter is connected to nothing, since what it speaks decides.
+/// An asker speaking no contract it is paired by is not paired here: whatever wires its
+/// asks is another pass's, and nothing here reports it as reached by nothing.
 #[test]
-fn an_asker_naming_no_adapter_is_connected_to_nothing() {
-    let fillers = shipped(&[], &Chosen::default(), |manifest| {
-        for service in &mut manifest.services {
-            if service.id == "sonarr" {
-                service.api = None;
+fn an_asker_speaking_no_contract_is_not_paired_here() {
+    let fillers = moved(
+        &[],
+        &Chosen::default(),
+        |_| (),
+        |parts| {
+            for placed in serving(parts, "sonarr") {
+                placed.speaks = Vec::new();
             }
-        }
-    });
+        },
+    );
 
-    let curators: Vec<Result<Connection, Unmade>> = pairings(&fillers)
+    assert!(pairings(&fillers)
         .iter()
-        .filter(|pairing| pairing.ask.by == "sonarr")
-        .map(|pairing| pairing.made.clone().map(|(connection, _, _)| connection))
-        .collect();
-    assert_eq!(curators, vec![Err(Unmade::Unpaired); 2]);
+        .all(|pairing| pairing.ask.by != "sonarr"));
+    assert!(unmatched(&fillers)
+        .iter()
+        .all(|wiring| !wiring.connection.ends_with("into Sonarr")));
 }
 
 /// An asker that is not on this machine is passed over, and an ask answered elsewhere
 /// is not paired here at all.
 #[test]
 fn an_asker_withheld_or_an_ask_answered_elsewhere_is_not_paired() {
-    let fillers = shipped(&[], &Chosen::default(), |manifest| {
-        manifest.services.retain(|service| service.id != "sonarr");
-    });
+    let fillers = moved(
+        &[],
+        &Chosen::default(),
+        |manifest| manifest.services.retain(|service| service.id != "sonarr"),
+        |parts| parts.retain(|part| part.plugin != "sonarr"),
+    );
 
     let paired: Vec<(&str, &str)> = pairings(&fillers)
         .iter()
@@ -358,19 +393,31 @@ fn a_plugin_asker_is_connected_to_nothing() {
         Some(8990),
     );
     curator.media_types = vec!["movies".to_owned()];
-    let asker = a_placed(
+    let mut asker = a_placed(
         "prowlarr",
         &[],
         Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
         Some(9696),
     );
+    asker.speaks = vec![lemonfiber_contract::spoken(
+        lemonfiber_contract::capabilities::indexer::search::CAPABILITY,
+        lemonfiber_contract::capabilities::indexer::search::MAJOR,
+    )];
+    asker.asks = vec![crate::plugin::Asking {
+        capability: "library.curate".to_owned(),
+        each: true,
+        native: None,
+    }];
     let installed = vec![
         an_installed("asking", vec![asker]),
         an_installed("kept", vec![curator]),
     ];
-    let fillers = shipped(&installed, &Chosen::default(), |manifest| {
-        manifest.services.retain(|service| service.id != "prowlarr");
-    });
+    let fillers = moved(
+        &installed,
+        &Chosen::default(),
+        |manifest| manifest.services.retain(|service| service.id != "prowlarr"),
+        |parts| parts.retain(|part| part.plugin != "prowlarr"),
+    );
 
     let made: Vec<(&str, Result<Connection, Unmade>)> = pairings(&fillers)
         .iter()
@@ -439,12 +486,11 @@ fn a_service(
     }
 }
 
-/// One kind of connection the gate is held to: what asks, the contracts it speaks and the
+/// One kind of connection the gate is held to: the contract the asker speaks and the
 /// media it files, what it asks for, what fills it, and whether the connection also hands
 /// the filler the asker's own key.
 type Crossing = (
-    lemonfiber_manifest::ApiKind,
-    &'static [&'static str],
+    (&'static str, u32),
     &'static str,
     &'static str,
     lemonfiber_manifest::ApiKind,
@@ -453,58 +499,63 @@ type Crossing = (
 
 /// Every kind of connection the table makes, once each.
 fn crossing_kinds() -> [Crossing; 6] {
+    use lemonfiber_contract::capabilities::indexer::{pull, search};
+    use lemonfiber_contract::capabilities::library::curate;
+    use lemonfiber_contract::capabilities::request::intake;
+    use lemonfiber_contract::capabilities::subtitles::fetch;
     use lemonfiber_manifest::ApiKind;
-    let neither: &[&str] = &[];
+    let curating = (curate::CAPABILITY, curate::MAJOR);
     [
+        (curating, "tv", "download.usenet", ApiKind::Sabnzbd, false),
         (
-            ApiKind::Servarr,
-            neither,
-            "tv",
-            "download.usenet",
-            ApiKind::Sabnzbd,
-            false,
-        ),
-        (
-            ApiKind::Servarr,
-            neither,
+            curating,
             "tv",
             "download.torrent",
             ApiKind::Qbittorrent,
             false,
         ),
         (
-            ApiKind::Servarr,
-            neither,
+            (search::CAPABILITY, search::MAJOR),
             "tv",
             "library.curate",
             ApiKind::Servarr,
             true,
         ),
         (
-            ApiKind::Seerr,
-            neither,
+            (intake::CAPABILITY, intake::MAJOR),
             "tv",
             "library.curate",
             ApiKind::Servarr,
             false,
         ),
         (
-            ApiKind::Bazarr,
-            neither,
+            (fetch::CAPABILITY, fetch::MAJOR),
             "tv",
             "library.curate",
             ApiKind::Servarr,
             false,
         ),
         (
-            ApiKind::Servarr,
-            &["indexer.pull@1"],
+            (pull::CAPABILITY, pull::MAJOR),
             "books",
             "indexer.search",
             ApiKind::Servarr,
             false,
         ),
     ]
+}
+
+/// A service of `origin` asking over `contract`, filing television, reached at its id.
+fn an_asker(
+    id: &str,
+    origin: &crate::origin::Origin,
+    contract: (&str, u32),
+) -> crate::wiring::Filler {
+    crate::wiring::Filler {
+        adapter: None,
+        contracts: vec![lemonfiber_contract::spoken(contract.0, contract.1)],
+        ..a_service(id, origin, lemonfiber_manifest::ApiKind::Servarr)
+    }
 }
 
 /// **Every credential crosses one gate, whichever connection carries it.** Each kind of
@@ -537,10 +588,9 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
     ];
 
     let mut seen = std::collections::BTreeSet::new();
-    for (asks, speaks, files, capability, fills, both_ways) in kinds {
+    for (speaks, files, capability, fills, both_ways) in kinds {
         for (filler_is, asker_is, refused, refused_both_ways) in &rows {
-            let mut asker = a_service("asker", asker_is, asks);
-            asker.contracts = speaks.iter().map(|one| (*one).to_owned()).collect();
+            let mut asker = an_asker("asker", asker_is, speaks);
             asker.media_types = vec![files.to_owned()];
             let filler = a_service("filler", filler_is, fills);
             let ask = crate::wiring::Ask {
@@ -549,7 +599,7 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
                 fillers: vec![filler.clone()],
             };
             let fillers = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
-            let came = made(&fillers, &asker, &asker, &ask, &filler);
+            let came = made(&fillers, (&asker, &asker, speaks.0), &ask, &filler);
             let expected = if both_ways {
                 refused_both_ways
             } else {
@@ -591,14 +641,22 @@ fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection()
         named: "comics".to_owned(),
     };
     let filler = a_service("sonarr", &Origin::Bundled, ApiKind::Servarr);
-    let asker = a_service("finder", &stranger, ApiKind::Bazarr);
+    let asker = an_asker(
+        "finder",
+        &stranger,
+        (
+            lemonfiber_contract::capabilities::subtitles::fetch::CAPABILITY,
+            lemonfiber_contract::capabilities::subtitles::fetch::MAJOR,
+        ),
+    );
     let ask = crate::wiring::Ask {
         by: asker.id.clone(),
         capability: "library.curate".to_owned(),
         fillers: vec![filler.clone()],
     };
     let ungranted = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
-    let came = made(&ungranted, &asker, &asker, &ask, &filler).map(|(made, ..)| made);
+    let subtitles = lemonfiber_contract::capabilities::subtitles::fetch::CAPABILITY;
+    let came = made(&ungranted, (&asker, &asker, subtitles), &ask, &filler).map(|(made, ..)| made);
     assert_eq!(came, Err(Unmade::Asked));
 
     let credential = ungranted
@@ -609,6 +667,7 @@ fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection()
         ..asker
     };
     let fillers = crate::wiring::Fillers::holding(vec![granted.clone(), filler.clone()]);
-    let came = made(&fillers, &granted, &granted, &ask, &filler).map(|(made, ..)| made);
+    let came =
+        made(&fillers, (&granted, &granted, subtitles), &ask, &filler).map(|(made, ..)| made);
     assert!(came.is_ok(), "{came:?}");
 }
