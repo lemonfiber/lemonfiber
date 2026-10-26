@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use lemonfiber_core::config::paths::STARTING_KEPT;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::plugin::Register;
 use lemonfiber_core::ports::filesystem::{Beneath, Confined, Lying, Readable};
@@ -9,8 +10,9 @@ use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::super::context::a_context;
+use super::super::curators::TELEVISION;
 use super::super::usenet::{ADAPTER, PLUGIN};
-use super::{asked_at, Adapted, Keyed, KEY, PORT};
+use super::{asked_at, installed_parts, Adapted, Keyed, KEY, PORT};
 
 const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
@@ -294,4 +296,62 @@ fn a_claim_is_asked_on_the_owner_contracts_path_and_answered_with_who_holds_the_
         matches!(&answer, lemonfiber_fixtures::http::Answer::Reply(200, body) if body == "\"ours\""),
         "{answer:?}"
     );
+}
+
+/// The digests of every plugin, by its id.
+type Digests = Vec<(String, String, String)>;
+
+/// Every part the bundle pins as installed is recorded first-party, by the digests it is
+/// pinned at, and nothing else is.
+#[test]
+fn every_part_the_bundle_installs_is_recorded_as_it_is_pinned() {
+    let recorded: Digests = installed_parts()
+        .into_iter()
+        .map(|one| (one.plugin, one.manifest, one.tree))
+        .collect();
+    let pinned: Digests = lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|one| one.stage == Some(lemonfiber_bundled::Stage::Installed))
+        .map(|one| {
+            (
+                one.first_party.plugin.to_owned(),
+                one.first_party.manifest.to_owned(),
+                one.first_party.tree.to_owned(),
+            )
+        })
+        .collect();
+
+    assert!(!recorded.is_empty());
+    assert_eq!(recorded, pinned);
+}
+
+/// A plugin's pinned copy is kept beside the env file a context names, and nowhere where
+/// it names none.
+#[test]
+fn a_kept_manifest_is_the_pinned_copy_beside_the_env_file() {
+    let env = Scratch::new("adapted-kept").join(".env");
+    let ctx = a_context()
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            ..Settings::default()
+        })
+        .build();
+    let unnamed = a_context().build();
+
+    TELEVISION.kept(&ctx);
+    TELEVISION.kept(&unnamed);
+
+    let kept = std::fs::read_to_string(
+        env.with_file_name(STARTING_KEPT)
+            .join(TELEVISION.plugin)
+            .join(lemonfiber_bundle::MANIFEST),
+    )
+    .ok();
+    let pinned = lemonfiber_bundled::PINNED
+        .iter()
+        .find(|one| one.first_party.plugin == TELEVISION.plugin)
+        .map(|one| one.copy.to_owned());
+    assert!(pinned.is_some());
+    assert_eq!(kept, pinned);
+    assert_eq!(unnamed.settings.env_file, None);
 }

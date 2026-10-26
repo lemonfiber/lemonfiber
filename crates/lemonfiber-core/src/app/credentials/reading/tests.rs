@@ -111,7 +111,7 @@ fn a_service_key_nobody_has_written_carries_no_likeness_of_a_value() {
 
 #[test]
 fn a_service_whose_api_names_no_file_beneath_its_configuration_writes_no_key_of_its_own() {
-    let manifest = crate::test_support::carried_stack().manifest().ok();
+    let manifest = crate::test_support::stack().manifest().ok();
     let service = manifest
         .iter()
         .flat_map(|manifest| manifest.services.iter())
@@ -122,7 +122,7 @@ fn a_service_whose_api_names_no_file_beneath_its_configuration_writes_no_key_of_
         });
     assert!(
         service.is_some(),
-        "the stack ships a service writing its own key"
+        "the stack the tests are written against has a service writing its own key"
     );
     let Some(service) = service else {
         return;

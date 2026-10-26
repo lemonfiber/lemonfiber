@@ -122,27 +122,6 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
     );
 }
 
-/// An ask for all of them is not a contest. Four services curate a library here,
-/// and a reader that could only answer "one or refused" would refuse every link
-/// in the stack that reaches all of them.
-#[test]
-fn an_ask_for_every_filler_reaches_every_filler() {
-    let curators = ["sonarr", "radarr", "lidarr", "bindery"];
-    let reaches = came(stack(), &Chosen::default(), "bazarr");
-    let ordered = crate::test_support::in_the_stacks_order(&curators);
-    assert!(ordered.is_some(), "the stack runs every curator");
-    assert_eq!(
-        reaches,
-        ordered.map(|services| Reaches::Asked {
-            native: None,
-            capability: "library.curate".to_owned(),
-            services,
-            settled: Settled::Each,
-            origins: bundled(&curators),
-        })
-    );
-}
-
 /// Several claimants and a link asking for one, with nobody having chosen:
 /// refused, with every candidate named so the choice is made from a list.
 #[test]
@@ -471,27 +450,6 @@ fn a_substitution_is_journalled_as_a_change_that_can_be_put_back() {
     );
 }
 
-/// One capability resolves the same way for everything that asks for it, so what
-/// is settled is one map rather than one answer per asker.
-#[test]
-fn what_fills_each_capability_is_one_answer_for_every_asker() {
-    let held = stack()
-        .map(|manifest| filled(&settle(&manifest, &[], &Chosen::default())))
-        .unwrap_or_default();
-    assert_eq!(
-        held.get("download.torrent").map(Vec::as_slice),
-        Some(["qbittorrent".to_owned()].as_slice())
-    );
-    assert_eq!(
-        held.get("identity.source").map(Vec::as_slice),
-        Some(["jellyfin".to_owned()].as_slice())
-    );
-    assert_eq!(
-        held.get("indexer.search").map(Vec::as_slice),
-        Some(["prowlarr".to_owned()].as_slice())
-    );
-}
-
 /// A setting is read back as what it said, and a pair nobody can read is dropped
 /// rather than stopping a stack from being described.
 #[test]
@@ -775,5 +733,6 @@ fn a_link_that_says_neither_what_it_asks_for_nor_what_it_names_is_left_out() {
 }
 
 mod asking;
+mod installed;
 mod moved;
 mod native;

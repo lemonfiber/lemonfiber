@@ -168,8 +168,8 @@ bundled-claims:
 
 # Rewrite the capability vocabulary from the types and the stack this build pins.
 #
-# Who declares each capability is read out of `assets/media-stack/stack.toml` rather
-# than restated, so moving the stack pin can move this file — which is the intended
+# Who declares each capability is read out of the stack the bundle assembles rather
+# than restated, so moving the bundle pin can move this file — which is the intended
 # behaviour. It refuses to write one that is untrue: a capability no bundled service
 # declares, or a name a bundled service declares that the vocabulary does not carry,
 # fails here rather than reaching a plugin author who would trust it.

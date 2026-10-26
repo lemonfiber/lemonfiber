@@ -95,17 +95,40 @@ pub fn assembled(text: &str, held: &[Held], version: &str) -> Result<String, Vec
 /// One part's service as a stack service, with the asks it makes as wiring rows.
 fn service(one: &Held) -> Result<(Table, Vec<Value>), String> {
     let manifest: Table = toml::from_str(&one.copy).map_err(|refused| refused.to_string())?;
-    let mut declared = manifest
-        .get("service")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
+    let mut declared = services(&manifest);
     if declared.len() != 1 {
         return Err(format!("declares {} services, not one", declared.len()));
     }
-    let Some(Value::Table(mut written)) = declared.pop() else {
+    let Some(Value::Table(written)) = declared.pop() else {
         return Err("its service is not a table".into());
     };
+    let (mut written, asks) = stacked(one, &manifest, written)?;
+    for table in FROM_MANIFEST {
+        if let Some(rows) = manifest.get(table) {
+            written.insert(table.into(), rows.clone());
+        }
+    }
+    Ok((written, asks))
+}
+
+/// Every service the part's manifest declares.
+pub(crate) fn services(manifest: &Table) -> Vec<Value> {
+    manifest
+        .get("service")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The service `written` of the part `one`, whose manifest is `manifest`, as a stack
+/// service: without the id it takes the place of, with its profile and last release from
+/// its pin, what the manifest's `[plugin]` table says of it and its dashboard; with each
+/// ask the manifest makes for it as a wiring row.
+pub(crate) fn stacked(
+    one: &Held,
+    manifest: &Table,
+    mut written: Table,
+) -> Result<(Table, Vec<Value>), String> {
     written.remove(REPLACES);
     let id = written
         .get("id")
@@ -125,18 +148,22 @@ fn service(one: &Held) -> Result<(Table, Vec<Value>), String> {
             written.insert(to.into(), value.clone());
         }
     }
-    if let Some(dashboard) = dashboard(&manifest, &id) {
+    if let Some(dashboard) = dashboard(manifest, &id) {
         written.insert("dashboard".into(), Value::Table(dashboard));
-    }
-    for table in FROM_MANIFEST {
-        if let Some(rows) = manifest.get(table) {
-            written.insert(table.into(), rows.clone());
-        }
     }
     let asks = manifest
         .get("ask")
         .and_then(Value::as_array)
-        .map(|asks| asks.iter().filter_map(|ask| asked(&id, ask)).collect())
+        .map(|asks| {
+            asks.iter()
+                .filter(|ask| {
+                    ask.get("service")
+                        .and_then(Value::as_str)
+                        .is_none_or(|named| named == id)
+                })
+                .filter_map(|ask| asked(&id, ask))
+                .collect()
+        })
         .unwrap_or_default();
     Ok((written, asks))
 }

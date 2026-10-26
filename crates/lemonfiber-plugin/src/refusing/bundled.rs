@@ -71,6 +71,40 @@ pub(super) fn named(id: &str) -> Option<&'static Service> {
     services().iter().find(|service| service.id == id)
 }
 
+/// Whether lemonfiber holds a credential for the shipped service `id`: its declaration
+/// names the adapter it is reached through, or a part the bundle installs moves its own
+/// service in place of it and hands the adapter in front of that service a key lemonfiber
+/// minted for it.
+pub(super) fn credential_held(id: &str) -> bool {
+    named(id).is_some_and(|service| service.api.is_some()) || minted_for(id)
+}
+
+/// Whether a part the bundle installs moves its own service in place of the shipped
+/// service `id` and mints the key the adapter in front of that service is handed.
+fn minted_for(id: &str) -> bool {
+    lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|pinned| pinned.stage == Some(lemonfiber_bundled::Stage::Installed))
+        .filter_map(|pinned| crate::Manifest::from_toml(pinned.copy).ok())
+        .any(|part| {
+            let moves = part
+                .services
+                .iter()
+                .any(|service| service.id == id && service.replaces.as_deref() == Some(id));
+            let handed = part
+                .services
+                .iter()
+                .filter(|service| service.fronts.as_deref() == Some(id))
+                .flat_map(|service| service.upstream.values())
+                .any(|named| {
+                    part.secrets
+                        .iter()
+                        .any(|secret| secret.minted && secret.of == id && secret.id == named.secret)
+                });
+            moves && handed
+        })
+}
+
 /// The shipped service whose id is written as this one is once each is spelled as an
 /// environment name, where the stack ships one.
 pub(super) fn spelled_like(id: &str) -> Option<&'static Service> {

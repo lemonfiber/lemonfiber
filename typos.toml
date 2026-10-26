@@ -35,7 +35,7 @@ ignore-hidden = false
 # The generated project's golden file carries the stack's own settings verbatim, so it
 # is excluded for the same reason the stack is, and so is the stack the tests are
 # written against, which carries those settings too.
-extend-exclude = ["assets/web", "assets/media-stack", "assets/plugins", "crates/lemonfiber-core/tests/golden/project.yml", "crates/lemonfiber-fixtures/stack", ".git/"]
+extend-exclude = ["assets/web", "assets/plugins", "crates/lemonfiber-core/tests/golden/project.yml", "crates/lemonfiber-fixtures/stack", ".git/"]
 
 [default.extend-identifiers]
 # A crate name, not a misspelling of "flat". Found the moment the checker could

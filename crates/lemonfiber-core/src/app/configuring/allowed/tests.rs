@@ -48,15 +48,32 @@ async fn a_name_nothing_reads_is_refused() {
     }
 }
 
-/// The settings a stack declares are read from its own file, embedded or on disk; a
-/// stack with no such file declares nothing.
+/// The embedded stack declares the names something it runs reads, and none of the keys
+/// its plugins now mint; a stack on disk declares what its own file does, and one with no
+/// such file declares nothing.
 #[tokio::test]
-async fn the_settings_a_stack_declares_are_read_from_its_own_file() {
-    let embedded = declared(crate::test_support::stack()).await;
-    assert!(
-        embedded.iter().any(|key| key == "DATA_ROOT"),
-        "{embedded:?}"
-    );
+async fn the_embedded_stack_declares_what_it_reads_and_one_on_disk_its_own_file() {
+    for embedded in [
+        declared(crate::stack::Source::Embedded(&SHIPPED)).await,
+        declared(crate::stack::Source::Embedded(&STACKLET)).await,
+    ] {
+        for key in [
+            "DATA_ROOT",
+            "TZ",
+            "LAN_BIND",
+            "VPN_COUNTRIES",
+            "RECYCLARR_CRON",
+        ] {
+            assert!(embedded.iter().any(|one| one == key), "{key} {embedded:?}");
+        }
+        assert!(
+            !embedded.iter().any(|one| one == "SONARR_API_KEY"),
+            "{embedded:?}"
+        );
+    }
+
+    let on_disk = declared(crate::test_support::stack()).await;
+    assert!(on_disk.iter().any(|key| key == "DATA_ROOT"), "{on_disk:?}");
 
     let dir = lemonfiber_fixtures::scratch::Scratch::new("declared-external");
     let _ = std::fs::write(dir.join(".env.example"), "# ours\nOURS=1\n");
@@ -66,12 +83,6 @@ async fn the_settings_a_stack_declares_are_read_from_its_own_file() {
         vec!["OURS"]
     );
     assert!(declared(crate::test_support::nowhere()).await.is_empty());
-
-    let shipped = declared(crate::stack::Source::Embedded(&SHIPPED)).await;
-    assert!(shipped.iter().any(|key| key == "DATA_ROOT"), "{shipped:?}");
-    assert!(declared(crate::stack::Source::Embedded(&STACKLET))
-        .await
-        .is_empty());
 }
 
 /// The user and group the services run as are numbers, and never root's.

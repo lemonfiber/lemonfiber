@@ -286,8 +286,8 @@ const THEIR_KEY: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// A machine whose engine holds what `engine` holds, its stack read from `stack` and its
 /// files from `files`, their curator's image pulled, lemonfiber's own television curator
-/// moved into its plugin and reached, and an engine serving the adapter lent to their copy
-/// on [`LENT`].
+/// moved into its plugin, reached and its manifest kept, and an engine serving the adapter
+/// lent to their copy on [`LENT`].
 fn importing_over(engine: Reporting, stack: Source, files: Arc<SeedFs>, http: Arc<Fake>) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -307,7 +307,9 @@ fn importing_over(engine: Reporting, stack: Source, files: Arc<SeedFs>, http: Ar
         .with_images(both_stacks().1)
         .with_http(http);
     ctx.seams.serving = Arc::new(Serves::on(LENT));
-    TELEVISION.keyed(ctx)
+    let ctx = TELEVISION.keyed(ctx);
+    TELEVISION.kept(&ctx);
+    ctx
 }
 
 /// What carrying answered.

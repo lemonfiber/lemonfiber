@@ -2,8 +2,8 @@
 //! into Rust, or refuse to build.
 //!
 //! The bundle is read by `lemonfiber-bundle`, which holds every copy to its pin. Each
-//! part it assembles becomes a stack service; each part it installs is kept as the
-//! media stack it replaces declares it, until the part moves. What reads the stack at
+//! part it assembles becomes a stack service; each part it installs is kept as its own
+//! copy declares the service it takes the place of, until the part moves. What reads the stack at
 //! compile time — the vocabulary the bundled services publish, the names a plugin may
 //! not take — reads that text, and a stack the manifest reader refuses is refused
 //! here, while it is still a compile error. The pins and the first-party set the core
@@ -17,9 +17,6 @@ use std::process::exit;
 #[path = "build/carried.rs"]
 mod carried;
 
-/// Where the media stack the bundle replaces lives, from this crate.
-const STACK: &str = "../../assets/media-stack";
-
 /// Where the catalogue holding the default bundle lives, from this crate.
 const CATALOGUE: &str = "../../assets/plugins";
 
@@ -29,12 +26,10 @@ const CARRIED: &str = "stack";
 fn main() {
     let out = PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
     let catalogue = Path::new(env!("CARGO_MANIFEST_DIR")).join(CATALOGUE);
-    let media = Path::new(env!("CARGO_MANIFEST_DIR")).join(STACK);
-    println!("cargo::rerun-if-changed={}", media.display());
     let held = bundle(&catalogue, &out);
-    let text = stack(&media, &catalogue, &held, &out);
+    let text = stack(&catalogue, &held, &out);
     carried::stack(
-        &media,
+        &catalogue,
         &catalogue.join(lemonfiber_bundle::COPIES),
         &text,
         &held,
@@ -42,22 +37,15 @@ fn main() {
     );
 }
 
-/// The stack the bundle at `catalogue` declares, with each part it installs kept as the
-/// media stack at `media` declares it, assembled into `stack.toml` in `out`.
-fn stack(media: &Path, catalogue: &Path, held: &[lemonfiber_bundle::Held], out: &Path) -> String {
-    let frozen = lemonfiber_manifest::read(media).unwrap_or_else(|refused| {
-        refuse(
-            "the media stack cannot be assembled",
-            &refused.to_string(),
-            media,
-        )
-    });
+/// The stack the bundle at `catalogue` declares, with each part it installs kept as its
+/// copy declares it, assembled into `stack.toml` in `out`.
+fn stack(catalogue: &Path, held: &[lemonfiber_bundle::Held], out: &Path) -> String {
     let declared =
         std::fs::read_to_string(catalogue.join(lemonfiber_bundle::FILE)).unwrap_or_else(|unread| {
             refuse("the bundle cannot be read", &unread.to_string(), catalogue)
         });
     let text = lemonfiber_bundle::assembled(&declared, held, env!("CARGO_PKG_VERSION"))
-        .and_then(|assembled| lemonfiber_bundle::kept(&assembled, &frozen, held))
+        .and_then(|assembled| lemonfiber_bundle::kept(&assembled, held))
         .unwrap_or_else(|refused| {
             refuse(
                 "the bundle's stack cannot be assembled",

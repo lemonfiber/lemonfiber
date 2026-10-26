@@ -34,7 +34,7 @@ pub(super) async fn curator_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Be
 /// The credential lemonfiber minted for `filler`, from the secret store, where its plugin
 /// declares one and the store holds it.
 pub(super) fn minted_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Option<String> {
-    stored(ctx, filler.minted.as_ref()?)
+    crate::app::targets::stored_secret(ctx, filler.minted.as_ref()?)
 }
 
 /// The account the adapter fronting `filler` signs in to it as, from the secret store,
@@ -45,18 +45,15 @@ pub(super) fn minted_account(
     filler: &crate::wiring::Filler,
 ) -> Option<Credential> {
     let upstream = &fillers.fronting(filler)?.upstream;
-    let part = |name: &str| upstream.get(name).and_then(|held| stored(ctx, held));
+    let part = |name: &str| {
+        upstream
+            .get(name)
+            .and_then(|held| crate::app::targets::stored_secret(ctx, held))
+    };
     Some(Credential::UserPass {
         username: part(UPSTREAM_USERNAME)?,
         password: part(UPSTREAM_PASSWORD)?,
     })
-}
-
-/// The value the secret store holds under `name`, where it holds one.
-fn stored(ctx: &Ctx, name: &str) -> Option<String> {
-    crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .and_then(|secrets| secrets.value(name).map(str::to_owned))
 }
 
 /// A connection refused because the filler's credential file was, saying why.

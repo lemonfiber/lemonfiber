@@ -141,13 +141,12 @@ fn no_closed_field_in_the_shipped_stack_is_left_off_the_table() {
 fn a_field_left_off_the_table_is_what_the_sweep_refuses() {
     let short: Vec<Closed> = ON_SERVICE
         .iter()
-        .filter(|closed| closed.at != "api.key_source")
+        .filter(|closed| closed.at != "user_mode")
         .copied()
         .collect();
     let (_, escaped) = sweeping(&[("profile", ON_PROFILE), ("service", &short)]);
     assert!(
-        escaped.iter().any(|said| said.contains("key_source")),
-        "a table missing api.key_source lets it through as a parse failure: \
-             {escaped:?}"
+        escaped.iter().any(|said| said.contains("user_mode")),
+        "a table missing user_mode lets it through as a parse failure: {escaped:?}"
     );
 }

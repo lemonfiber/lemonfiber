@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""What the vendored stack has moved on since this repository took it.
+"""What the vendored catalogue has moved on since this repository took it.
 
-`assets/media-stack` is a submodule pinned by revision, and some of the files
+`assets/plugins` is a submodule pinned by revision, and some of the files
 inside it are read at compile time through `include_str!`. The binary therefore
 carries whatever those files said at the pinned revision, and every test that
 validates against them validates against that.
 
 A pin is meant to lag. Bumping one changes what ships, so it is a release
 decision rather than something that drifts under a build, and nothing here fails
-because the stack has moved. What is missing is narrower: whether any of the
+because the catalogue has moved. What is missing is narrower: whether any of the
 commits this pin has not taken touched a file this repository actually reads.
 
 That distinction is not academic. `spdx_osi.txt` is the list of OSI licence
-identifiers the manifest validator accepts. The stack maintains it. A licence
-added there and not taken here is a licence the stack permits and this binary
+identifiers the manifest validator accepts. The catalogue maintains it. A licence
+added there and not taken here is a licence the catalogue permits and this binary
 refuses, and every test in this repository agrees with the refusal, because they
 are all reading the same stale copy.
 
@@ -47,8 +47,11 @@ import re
 import subprocess
 import sys
 
-SUBMODULE = "assets/media-stack"
-UPSTREAM = "lemonfiber/lemonfiber-media-stack"
+SUBMODULE = "assets/plugins"
+UPSTREAM = "lemonfiber/lemonfiber-plugins"
+
+#: The licence list the manifest validator is tested against, read out of the catalogue.
+SPDX = "registry/spdx_osi.txt"
 
 # How many files the forge will return from one comparison. Past this the `files`
 # array is cut short, and nothing in the response says so — so a comparison that
@@ -57,7 +60,7 @@ UPSTREAM = "lemonfiber/lemonfiber-media-stack"
 # forge never mentioned, and the further behind the pin the likelier it gets.
 CAP = 300
 
-#: `include_str!("../../../assets/media-stack/<path>")`, however deep the crate.
+#: `include_str!("../../../assets/plugins/<path>")`, however deep the crate.
 EMBEDS = re.compile(
     r'include_str!\(\s*"(?:\.\./)*' + re.escape(SUBMODULE) + r'/([^"]+)"',
 )
@@ -192,8 +195,8 @@ def self_test() -> int:
             "this would compare are empty and every answer below would be 'nothing "
             "moved'"
         )
-    elif "stack.toml" not in here:
-        problems.append(f"stack.toml is not among the paths read: {sorted(here)}")
+    elif SPDX not in here:
+        problems.append(f"{SPDX} is not among the paths read: {sorted(here)}")
 
     if problems:
         print("\n".join(f"::error::self-test: {p}" for p in problems))
@@ -239,7 +242,7 @@ def main() -> int:
         print(f"  {path}")
     print(
         f"\nThe binary embeds these at {pin[:8]}, and every test here validates "
-        f"against that copy — so this repository and the stack can disagree while "
+        f"against that copy — so this repository and the catalogue can disagree while "
         f"both are green. Bump the submodule when the difference is one that "
         f"should ship."
     )

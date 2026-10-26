@@ -73,7 +73,9 @@ fn importing(name: &str, serves: &Arc<Serves>) -> crate::app::Ctx {
             Answer::reply(200, "{}"),
         )]));
     ctx.seams.serving = Arc::clone(serves) as Arc<dyn lemonfiber_ports::serving::Serving>;
-    TELEVISION.reaching(ctx)
+    let ctx = TELEVISION.reaching(ctx);
+    TELEVISION.kept(&ctx);
+    ctx
 }
 
 /// What an unconfirmed import comes to in `ctx`, `trusted` holding the plugins that are

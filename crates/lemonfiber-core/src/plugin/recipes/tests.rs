@@ -115,29 +115,65 @@ fn every_call_is_kept_in_order_with_its_own_services_adapter() {
     );
 }
 
-#[test]
-fn a_call_to_the_stacks_own_service_names_its_adapter_once_the_stack_is_read() {
-    let reached = manifest()
-        .zip(stack())
-        .map(|(manifest, stack)| reaching(declared(&manifest), &stack));
-    let adapters: Option<Vec<Option<Adapter>>> = reached
+/// The adapter each step of the first recipe names once the stack is read beside
+/// `installed`.
+fn adapters_against(
+    stack: Option<lemonfiber_manifest::Manifest>,
+    installed: &[crate::plugin::Installed],
+) -> Option<Vec<Option<Adapter>>> {
+    manifest()
+        .zip(stack)
+        .map(|(manifest, stack)| reaching(declared(&manifest), &stack, installed))
         .as_ref()
         .and_then(|recipes| recipes.first())
-        .map(|recipe| recipe.steps.iter().map(|step| step.adapter).collect());
+        .map(|recipe| recipe.steps.iter().map(|step| step.adapter).collect())
+}
+
+/// What the steps name where sonarr is reached in its servarr API.
+fn through_servarr() -> Vec<Option<Adapter>> {
+    vec![
+        Some(Adapter {
+            kind: ApiKind::Seerr,
+            owner: Owner::Lemonfiber,
+        }),
+        Some(Adapter {
+            kind: ApiKind::Servarr,
+            owner: Owner::Lemonfiber,
+        }),
+        None,
+    ]
+}
+
+#[test]
+fn a_call_to_a_moved_part_names_the_api_the_service_moved_in_its_place_answers_in() {
+    let installed: Vec<_> = crate::test_support::curators::TELEVISION
+        .installed()
+        .into_iter()
+        .collect();
     assert_eq!(
-        adapters,
+        adapters_against(stack(), &installed),
+        Some(through_servarr()),
+        "sonarr is reached in the servarr API, and a host outside in none"
+    );
+    assert_eq!(
+        adapters_against(stack(), &[]),
         Some(vec![
             Some(Adapter {
                 kind: ApiKind::Seerr,
-                owner: Owner::Lemonfiber
-            }),
-            Some(Adapter {
-                kind: ApiKind::Servarr,
-                owner: Owner::Lemonfiber
+                owner: Owner::Lemonfiber,
             }),
             None,
+            None,
         ]),
-        "sonarr is reached through lemonfiber's servarr adapter, and a host outside through none"
+        "with nothing moved in its place, the shipped sonarr names no API"
+    );
+}
+
+#[test]
+fn a_call_to_a_stack_service_declaring_an_api_names_that_adapter() {
+    assert_eq!(
+        adapters_against(crate::test_support::stack().manifest().ok(), &[]),
+        Some(through_servarr())
     );
 }
 

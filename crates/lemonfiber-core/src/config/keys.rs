@@ -296,7 +296,7 @@ pub(crate) const TORRENT_USER: &str = "admin";
 pub(crate) const PASSWORD_SUFFIX: &str = "_PASSWORD";
 
 /// What a setting holding the account a service is reached under ends in, after the
-/// service it is for; the bundled torrent client's is `QBITTORRENT_USERNAME`.
+/// service it is for.
 ///
 /// One of the [`CREDENTIAL_SUFFIXES`], so no plugin's setting is spelled onto one.
 pub(crate) const USERNAME_SUFFIX: &str = "_USERNAME";

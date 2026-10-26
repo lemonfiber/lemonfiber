@@ -268,10 +268,15 @@ fn a_stack_no_one_service_guards_fixes_no_address() {
     assert!(!fixes_addresses(&project(&two, &[])));
 }
 
-fn with_url(manifest: &mut Manifest, service: &str, key: &str, url: UrlOf) {
-    if let Some(found) = manifest.services.iter_mut().find(|one| one.id == service) {
-        found.env.insert(key.to_owned(), Value::Url(url));
-    }
+/// A plugin's service asking for `capability` and given its address as `key`.
+fn asking_for(service: &str, key: &str, capability: &str) -> Placed {
+    let mut placed = asking(service, key, url(capability, None, None));
+    placed.asks = vec![crate::plugin::Asking {
+        capability: capability.to_owned(),
+        each: false,
+        native: None,
+    }];
+    placed
 }
 
 fn url(url_of: &str, files: Option<&str>, native: Option<&str>) -> UrlOf {
@@ -284,31 +289,26 @@ fn url(url_of: &str, files: Option<&str>, native: Option<&str>) -> UrlOf {
 
 #[test]
 fn an_address_for_what_the_service_asks_is_the_one_service_the_ask_reaches() {
-    let mut manifest = carried();
-    with_url(
-        &mut manifest,
-        "prowlarr",
-        "SOLVER_URL",
-        url("indexer.proxy", None, None),
-    );
-    let project = project(&manifest, &[]);
+    let reader = asking_for("reader", "SOLVER_URL", "indexer.proxy");
+    let project = project(&carried(), &[an_installed("reader", vec![reader])]);
     assert_eq!(
-        environment(&entry(&project, "prowlarr"), "SOLVER_URL"),
+        environment(&entry(&project, "reader"), "SOLVER_URL"),
         "http://flaresolverr:8191"
     );
 }
 
 #[test]
 fn an_address_an_ask_reaches_several_services_for_is_written_for_none() {
-    let mut manifest = carried();
-    with_url(
-        &mut manifest,
-        "prowlarr",
-        "CURATOR_URL",
-        url("library.curate", None, None),
+    let mut reader = asking_for("reader", "CURATOR_URL", "library.curate");
+    for ask in &mut reader.asks {
+        ask.each = true;
+    }
+    let project = project(&carried(), &[an_installed("reader", vec![reader])]);
+    assert_eq!(environment(&entry(&project, "reader"), "CURATOR_URL"), "");
+    assert!(
+        project.topology.placed.contains_key("reader"),
+        "the reader is written"
     );
-    let project = project(&manifest, &[]);
-    assert_eq!(environment(&entry(&project, "prowlarr"), "CURATOR_URL"), "");
 }
 
 #[test]
@@ -451,22 +451,23 @@ fn solver_installed(reached: Option<u16>) -> Project {
     manifest
         .services
         .retain(|service| service.id != "flaresolverr");
-    with_url(
-        &mut manifest,
-        "prowlarr",
-        "SOLVER_URL",
-        url("indexer.proxy", None, None),
-    );
+    let reader = asking_for("reader", "SOLVER_URL", "indexer.proxy");
     let mut solver = a_placed("solver", &["indexer.proxy"], None, reached);
     solver.listens = None;
-    project(&manifest, &[an_installed("solver", vec![solver])])
+    project(
+        &manifest,
+        &[
+            an_installed("solver", vec![solver]),
+            an_installed("reader", vec![reader]),
+        ],
+    )
 }
 
 #[test]
 fn an_address_of_a_service_with_no_port_of_its_own_inside_is_the_one_it_is_reached_on() {
     assert_eq!(
         environment(
-            &entry(&solver_installed(Some(18994)), "prowlarr"),
+            &entry(&solver_installed(Some(18994)), "reader"),
             "SOLVER_URL"
         ),
         "http://solver:18994"
@@ -476,7 +477,7 @@ fn an_address_of_a_service_with_no_port_of_its_own_inside_is_the_one_it_is_reach
 #[test]
 fn an_address_of_a_service_that_answers_on_no_port_is_written_for_none() {
     assert_eq!(
-        environment(&entry(&solver_installed(None), "prowlarr"), "SOLVER_URL"),
+        environment(&entry(&solver_installed(None), "reader"), "SOLVER_URL"),
         ""
     );
 }

@@ -18,13 +18,10 @@
 //! renders, a screenshot captures and a screen-share broadcasts, and losing a lookup
 //! there is cheaper than publishing a key from it.
 //!
-//! An account name is the case worth stating, because the list answers it twice and
-//! differently. `QBITTORRENT_USERNAME` is shown: it names an account on a local service
-//! lemonfiber itself sets up, and the password beside it is what signs in. `USENET_USER`
-//! is not: a Usenet provider issues it, several of them issue an account number as the
-//! username, and it is half of a paid login. Nothing diagnosable needs it — the host, the
-//! port and whether the login was proven are all shown beside it. A keyword rule cannot
-//! tell those two apart, because it is not a fact about the name.
+//! An account name is the case worth stating. `USENET_USER` is not shown: a Usenet
+//! provider issues it, several of them issue an account number as the username, and it
+//! is half of a paid login. Nothing diagnosable needs it — the host, the port and
+//! whether the login was proven are all shown beside it.
 //!
 //! The counterpart rule is in [`crate::error::withheld`], which handles text that has
 //! no field names for a list to work from. Two surfaces, two rules, balanced opposite
@@ -201,7 +198,7 @@ pub const SHOWN: &[(&str, &str)] = &[
         super::PROVIDER_VALIDATED_KEY,
         "whether the provider login was proven before it was kept, never the login",
     ),
-    // The stack's own settings, as its `.env.example` declares them.
+    // The settings something the stack runs reads.
     (
         super::DATA_ROOT_KEY,
         "the one path an operator has to get right, and the one they check first",
@@ -233,11 +230,6 @@ pub const SHOWN: &[(&str, &str)] = &[
     (
         super::VPN_PORT_FORWARDING_KEY,
         "whether a forwarded port is asked for at all",
-    ),
-    (
-        "QBITTORRENT_USERNAME",
-        "the name of an account on a local service lemonfiber itself sets up; the password \
-         beside it is what signs in, and that is withheld",
     ),
     (
         "UMASK",

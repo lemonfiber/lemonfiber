@@ -23,7 +23,7 @@ manifest:
       - any-glob-to-any-file: ['crates/lemonfiber-manifest/**', 'crates/lemonfiber-plugin/**']
 stack:
   - changed-files:
-      - any-glob-to-any-file: ['assets/media-stack/**']
+      - any-glob-to-any-file: ['assets/plugins', 'crates/lemonfiber-bundle/**', 'crates/lemonfiber-bundled/**']
 documentation:
   - changed-files:
       - any-glob-to-any-file: ['**/*.md', '.docs/**']

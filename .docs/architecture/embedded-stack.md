@@ -11,7 +11,7 @@ This is the mechanism.
 
 | When | Where | Catches |
 |------|-------|---------|
-| Build | `crates/lemonfiber/build.rs` | A missing submodule, or a stack this build cannot read |
+| Build | `crates/lemonfiber-bundled/build.rs` | A catalogue that is not populated, a copy that is not the manifest its pin names, or an assembled stack this build cannot read |
 | Load | `core::stack::Source::manifest` | An external `--stack-dir` that is missing or from another generation |
 | Parse | `lemonfiber_manifest::Manifest::from_toml` | The schema-version gate itself |
 
@@ -20,39 +20,31 @@ means. `build.rs` takes `lemonfiber-manifest` as a **build-dependency** for
 exactly that reason — a second, simpler check written in the build script is how
 the two drift.
 
+## What the build assembles
+
+The stack is the one the default bundle in `assets/plugins` declares: the bundle's
+own tables, a service for each part it assembles, and for each part it installs the
+service its copy says it takes the place of, until the part moves. Each part's
+starting configuration and every recording a claim names come from its copy; the
+licence comes from the catalogue.
+
 ## What the build refuses
 
-Verified by hand; both messages are the ones an operator or contributor sees.
-
-Submodule not initialised:
+`refuse` prints what failed, why, and the directory it was reading, then exits:
 
 ```
-error: the embedded stack is missing at …/assets/media-stack
-error:
-error: It is a git submodule, and a fresh clone does not populate it.
-error:
-error:   git submodule update --init --recursive
+error: the embedded bundle cannot be read
+
+<why>
+
+At: …/assets/plugins
+If the directory is empty, the submodule is not populated:
+  git submodule update --init --recursive
 ```
 
-A stack from a generation this build cannot read:
-
-```
-error: the embedded stack cannot be read by this build
-error:
-error: the manifest declares schema version 99, and this build reads [1]
-error:
-error: Manifest: …/assets/media-stack/stack.toml
-error: The submodule and this binary are out of step; move the pin, or
-error: teach the parser the generation the stack now declares.
-```
-
-Written as `cargo::error=` lines rather than a panic, so the message survives
-Cargo's framing instead of arriving inside a backtrace. `refuse` returns `!` and
-calls `exit(1)`, which keeps it usable in a `let … else`.
-
-Paths are resolved from the workspace root rather than by walking up out of the
-crate, so a reader sees `assets/media-stack` and not
-`crates/lemonfiber/../../assets/media-stack`.
+The same shape says when the bundle's stack cannot be assembled, or assembles into
+a stack this build does not read. `refuse` returns `!` and calls `exit(1)`, which
+keeps it usable in a `let … else`.
 
 ## `Source` — embedded or external, one type
 
@@ -77,8 +69,8 @@ assert_eq!(
 );
 ```
 
-The binary's `include_dir!` and the test's point at the same submodule, so that
-assertion would fail if embedding ever diverged from the checkout.
+The binary's `include_dir!` and the test's point at the same carried tree, so that
+assertion fails if embedding ever diverges from it.
 
 ### Why the path is leaked
 

@@ -40,7 +40,7 @@ pub(crate) const NONCONFORMING: &str = "nonconforming.json";
 
 /// The directory kept for each installed plugin: its manifest and the starting files of
 /// its run proofs.
-pub(crate) const STARTING_KEPT: &str = "plugin-starting";
+pub const STARTING_KEPT: &str = "plugin-starting";
 
 /// The file name of the verdicts the doctor keeps for installed plugins' run proofs.
 pub(crate) const RUN_VERDICTS: &str = "run-proofs.json";

@@ -157,18 +157,18 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          manifest="assets/media-stack/stack.toml"
+          assembly="crates/lemonfiber-bundle/src/assembly.rs"
 
-          # Read off the stack that actually ships rather than restated here. A number
-          # copied into this file is one that goes stale the first time the stack
-          # moves, and it would go stale silently.
-          if [ ! -s "$manifest" ]; then
-            echo "::error::$manifest is missing at $TAG — the submodule was not checked out"
+          # Read off the generation the shipped stack is assembled at rather than
+          # restated here. A number copied into this file is one that goes stale the
+          # first time the generation moves, and it would go stale silently.
+          if [ ! -s "$assembly" ]; then
+            echo "::error::$assembly is missing at $TAG"
             exit 1
           fi
-          schema=$(sed -n 's/^[[:space:]]*schema_version[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$manifest" | head -n 1)
+          schema=$(sed -n 's/^const STACK_SCHEMA: i64 = \([0-9][0-9]*\);.*/\1/p' "$assembly" | head -n 1)
           if [ -z "$schema" ]; then
-            echo "::error::$manifest declares no schema_version"
+            echo "::error::$assembly declares no STACK_SCHEMA"
             exit 1
           fi
 

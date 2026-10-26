@@ -42,17 +42,10 @@ impl Adapted {
     /// The plugin as the bundle pins it, recorded as installed from its embedded tree.
     #[must_use]
     pub fn installed(self) -> Option<Installed> {
-        let pinned = lemonfiber_bundled::PINNED
+        lemonfiber_bundled::PINNED
             .iter()
-            .find(|one| one.first_party.plugin == self.plugin)?;
-        let manifest = lemonfiber_plugin::Manifest::from_toml(pinned.copy).ok()?;
-        let mut installed = Installed::of(&manifest);
-        pinned
-            .first_party
-            .manifest
-            .clone_into(&mut installed.manifest);
-        pinned.first_party.tree.clone_into(&mut installed.tree);
-        Some(installed)
+            .find(|one| one.first_party.plugin == self.plugin)
+            .and_then(recorded)
     }
 
     /// The engine's account of the adapter running healthy, published on its port.
@@ -136,6 +129,24 @@ impl Adapted {
         let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
     }
 
+    /// The plugin's manifest kept beside the env file `ctx`'s settings name, as installing
+    /// it keeps one, from the copy the bundle pins. Nothing where `ctx` names no env file.
+    pub fn kept(self, ctx: &Ctx) {
+        let (Some(into), Some(pinned)) = (
+            ctx.settings.env_file.as_deref().map(|env| {
+                env.with_file_name(lemonfiber_core::config::paths::STARTING_KEPT)
+                    .join(self.plugin)
+            }),
+            lemonfiber_bundled::PINNED
+                .iter()
+                .find(|one| one.first_party.plugin == self.plugin),
+        ) else {
+            return;
+        };
+        let _ = std::fs::create_dir_all(&into);
+        let _ = std::fs::write(into.join(lemonfiber_bundle::MANIFEST), pinned.copy);
+    }
+
     /// Each secret the plugin mints held as `value` in the secret store beside the env file
     /// `ctx`'s settings name, beside everything held there before, the store stamped as an
     /// earlier lemonfiber wrote it. Nothing where `ctx` names no env file.
@@ -213,6 +224,29 @@ impl Adapted {
         self.moved_in(&ctx);
         ctx
     }
+}
+
+/// `pinned` recorded as installed from its embedded tree.
+fn recorded(pinned: &lemonfiber_bundled::Pinned) -> Option<Installed> {
+    let manifest = lemonfiber_plugin::Manifest::from_toml(pinned.copy).ok()?;
+    let mut installed = Installed::of(&manifest);
+    pinned
+        .first_party
+        .manifest
+        .clone_into(&mut installed.manifest);
+    pinned.first_party.tree.clone_into(&mut installed.tree);
+    Some(installed)
+}
+
+/// Every part the bundle pins as installed, each recorded as installed from its embedded
+/// tree: the stack with every part moved into its plugin.
+#[must_use]
+pub fn installed_parts() -> Vec<Installed> {
+    lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|pinned| pinned.stage == Some(lemonfiber_bundled::Stage::Installed))
+        .filter_map(recorded)
+        .collect()
 }
 
 /// The engine's account of every one of `adapted` running healthy, each published on its

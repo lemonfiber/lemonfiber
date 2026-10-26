@@ -1,5 +1,5 @@
-//! Parsing of a stack manifest, the contract between `lemonfiber` and
-//! `lemonfiber-media-stack`: `stack.toml` and the service files it includes.
+//! Parsing of a stack manifest: `stack.toml` and the service files it includes, as the
+//! bundle assembles them or a `--stack-dir` stack holds them.
 //! See spec `20-architecture/contracts/stack-manifest.md`.
 //!
 //! This crate is deliberately inert: it reads a manifest into types and refuses

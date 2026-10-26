@@ -1,15 +1,12 @@
 use super::{is_one_line, EnvFile};
 
-/// The file this stack ships as its documented starting point.
+/// The settings template a stack on disk ships as an operator's starting point.
 fn example() -> &'static str {
-    lemonfiber_bundled::CARRIED
-        .get_file(".env.example")
-        .and_then(include_dir::File::contents_utf8)
-        .unwrap_or_default()
+    include_str!("../../../../lemonfiber-fixtures/stack/.env.example")
 }
 
 #[test]
-fn the_stack_s_own_example_round_trips_byte_for_byte() {
+fn a_stacks_settings_template_round_trips_byte_for_byte() {
     assert_eq!(EnvFile::parse(example()).render(), example());
 }
 

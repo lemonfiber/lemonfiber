@@ -51,3 +51,38 @@ pub(crate) fn record_secret(ctx: &Ctx, key: &str, value: &str) -> Result<(), sto
         .ok_or(store::Failure::Nowhere)?;
     store::set(path, key, value)
 }
+
+/// What the secret store holds under `name`, where it holds a value.
+pub(crate) fn stored_secret(ctx: &Ctx, name: &str) -> Option<String> {
+    crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .and_then(|secrets| secrets.value(name).map(str::to_owned))
+}
+
+/// The key lemonfiber minted for the stack's service `service` where a first-party part
+/// moved its own service in place of it: the secret the adapter in front of that service
+/// is handed in its `upstream.json`, as the secret store holds it.
+pub(crate) fn moved_credential(ctx: &Ctx, service: &str) -> Option<String> {
+    let register = crate::app::plugins::read(ctx).ok()?;
+    let installed = crate::project::moving(
+        register.installed(),
+        service,
+        crate::plugin::first_party::EMBEDDED,
+    )?;
+    let secret = installed
+        .services
+        .iter()
+        .filter(|placed| placed.fronts.as_deref() == Some(service))
+        .flat_map(|placed| placed.upstream.values())
+        .find(|named| {
+            installed
+                .declared
+                .secrets
+                .iter()
+                .any(|one| one.minted && one.of == service && one.id == **named)
+        })?;
+    stored_secret(ctx, &crate::settings::named(&installed.plugin, secret))
+}
+
+#[cfg(test)]
+mod tests;

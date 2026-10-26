@@ -100,9 +100,8 @@ fn mounted_from_the_stack() -> Vec<String> {
 }
 
 /// Every path beneath the stack directory the generated project mounts is carried
-/// wherever the stack's repository or an assembled part's copy holds it, and the
-/// repository itself is not. An installed part's starting configuration is written by
-/// installing its plugin, from the tree the plugin brings.
+/// wherever the copy of the part it belongs to holds it, and nothing that builds or
+/// tests a repository is.
 ///
 /// The carried set is chosen at build time from the manifest and the parts' trees.
 /// This reads the project those are run as instead, so a mount the choosing misses is
@@ -112,22 +111,15 @@ fn mounted_from_the_stack() -> Vec<String> {
 fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
     let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
     let copies = assets.join("plugins").join(lemonfiber_bundle::COPIES);
-    let assembled: Vec<String> = lemonfiber_bundle::read(&assets.join("plugins"))
-        .map(|(_, held)| {
-            held.into_iter()
-                .filter(|one| one.pin.stage == Some(lemonfiber_bundle::Stage::Assembled))
-                .map(|one| one.pin.id)
-                .collect()
-        })
+    let parts: Vec<String> = lemonfiber_bundle::read(&assets.join("plugins"))
+        .map(|(_, held)| held.into_iter().map(|one| one.pin.id).collect())
         .unwrap_or_default();
-    assert!(!assembled.is_empty(), "the bundle reads no assembled part");
+    assert!(!parts.is_empty(), "the bundle reads no part");
     let held = |path: &str| {
-        assets.join("media-stack").join(path).exists()
-            || path
-                .split('/')
-                .nth(1)
-                .filter(|id| assembled.iter().any(|one| one == id))
-                .is_some_and(|id| copies.join(id).join(path).exists())
+        path.split('/')
+            .nth(1)
+            .filter(|id| parts.iter().any(|one| one == id))
+            .is_some_and(|id| copies.join(id).join(path).exists())
     };
     let mounted = mounted_from_the_stack();
     assert!(
@@ -188,18 +180,15 @@ fn carried_under(under: &str) -> std::collections::BTreeSet<String> {
         .collect()
 }
 
-/// An assembled part's starting configuration is its copy's in the bundle, file for
-/// file and byte for byte, and nothing beside it: a file a run left in the media
-/// stack's checkout, a key or an invitation among them, never travels.
+/// Every part's starting configuration is its copy's in the bundle, file for file and
+/// byte for byte, and nothing beside it: a file a run left in a checkout, a key or an
+/// invitation among them, never travels.
 #[test]
-fn an_assembled_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
+fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
     let copies = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../assets/plugins")
         .join(lemonfiber_bundle::COPIES);
-    for pinned in lemonfiber_bundled::PINNED
-        .iter()
-        .filter(|pinned| pinned.stage == Some(lemonfiber_bundled::Stage::Assembled))
-    {
+    for pinned in lemonfiber_bundled::PINNED {
         let id = pinned.first_party.plugin;
         let copy = copies.join(id);
         let mut held = Vec::new();

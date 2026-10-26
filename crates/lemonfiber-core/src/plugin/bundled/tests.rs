@@ -7,7 +7,13 @@ use crate::plugin::Verdict;
 
 const STACK: &str = lemonfiber_bundled::STACK;
 
-/// Both probes `media.serve` declares, bound under the bundled media server's own
+/// A service of a part the bundle assembles, which the stack runs as its own.
+const ASSEMBLED: &str = "navidrome";
+
+/// A service of a part the bundle installs, kept in the stack until it moves.
+const KEPT: &str = "jellyfin";
+
+/// Both probes `media.serve` declares, bound under the assembled service's own
 /// recordings.
 const CLAIM: &str = r#"
 capability = "media.serve"
@@ -16,21 +22,21 @@ capability = "media.serve"
 id = "guarded"
 request = { method = "GET", path = "/Items" }
 expect = { status = 401 }
-fixture = "recordings/jellyfin/guarded.json"
+fixture = "recordings/navidrome/guarded.json"
 
 [[probe]]
 id = "catalogue"
 request = { method = "GET", path = "/Items" }
 expect = { status = 200, json_has_keys = ["Items"] }
-fixture = "recordings/jellyfin/catalogue.json"
+fixture = "recordings/navidrome/catalogue.json"
 "#;
 
-/// The shipped stack, with the bundled media server alone providing and claiming
-/// `media.serve` as `claim` writes it.
+/// The shipped stack, with [`ASSEMBLED`] alone providing and claiming `media.serve` as
+/// `claim` writes it.
 fn claiming(claim: &str) -> Manifest {
     let mut manifest = Manifest::from_toml(STACK).unwrap_or_else(|why| unreachable!("{why}"));
     for service in &mut manifest.services {
-        if service.id == "jellyfin" {
+        if service.id == ASSEMBLED {
             service.provides = vec!["media.serve".to_owned()];
             service.claim = vec![Claimed(
                 toml::from_str(claim).unwrap_or_else(|why| unreachable!("{why}")),
@@ -43,12 +49,12 @@ fn claiming(claim: &str) -> Manifest {
     manifest
 }
 
-/// Where the media server's image is pinned in the shipped stack.
+/// Where [`ASSEMBLED`]'s image is pinned in the shipped stack.
 fn pinned(manifest: &Manifest) -> String {
     manifest
         .services
         .iter()
-        .find(|service| service.id == "jellyfin")
+        .find(|service| service.id == ASSEMBLED)
         .map(lemonfiber_manifest::Service::reference)
         .unwrap_or_default()
 }
@@ -56,7 +62,7 @@ fn pinned(manifest: &Manifest) -> String {
 /// A stack directory holding the recordings named, each answering `status` with `body`.
 fn recorded(tag: &str, from: &str, answers: &[(&str, u16, &str)]) -> PathBuf {
     let root = lemonfiber_fixtures::scratch::Scratch::named(tag).kept();
-    let under = root.join("recordings/jellyfin");
+    let under = root.join("recordings/navidrome");
     let _ = std::fs::create_dir_all(&under);
     for (name, status, body) in answers {
         let recording = format!(
@@ -138,7 +144,7 @@ fn a_recording_of_another_image_is_refused() {
     let manifest = claiming(CLAIM);
     let root = recorded(
         "bundled-elsewhere",
-        "jellyfin/jellyfin@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "deluan/navidrome@sha256:0000000000000000000000000000000000000000000000000000000000000000",
         &[
             ("guarded.json", 401, "null"),
             ("catalogue.json", 200, r#"{"Items":[]}"#),
@@ -172,10 +178,11 @@ fn a_claim_the_contract_will_not_bind_is_refused() {
         .any(|refused| refused.message.contains("binds no probe catalogue")));
 }
 
-/// A capability provided with no claim is named as unclaimed and refuses the stack, even
-/// with nothing else wrong: a declaration nothing demonstrates is one nothing holds.
+/// A capability an assembled service provides with no claim is named as unclaimed and
+/// refuses the stack, even with nothing else wrong: a declaration nothing demonstrates is
+/// one nothing holds.
 #[test]
-fn a_capability_with_no_claim_refuses_the_stack() {
+fn an_assembled_service_providing_with_no_claim_refuses_the_stack() {
     let mut manifest = claiming(CLAIM);
     for service in &mut manifest.services {
         service.claim = Vec::new();
@@ -190,14 +197,14 @@ fn a_capability_with_no_claim_refuses_the_stack() {
     assert_eq!(
         report.unclaimed,
         vec![super::Unclaimed {
-            service: "jellyfin".to_owned(),
+            service: ASSEMBLED.to_owned(),
             capability: "media.serve".to_owned(),
         }]
     );
     assert_eq!(
         said(&report),
         vec![
-            "refused: jellyfin provides media.serve, and no claim demonstrates it".to_owned(),
+            "refused: navidrome provides media.serve, and no claim demonstrates it".to_owned(),
             "1 refused, 0 refuted, 0 unproven, 0 demonstrated".to_owned(),
         ]
     );
@@ -233,7 +240,7 @@ fn the_report_says_each_answer_worst_first_with_a_count() {
     assert!(
         lines
             .get(2)
-            .is_some_and(|line| line.starts_with("refuted: jellyfin media.serve probe guarded")),
+            .is_some_and(|line| line.starts_with("refuted: navidrome media.serve probe guarded")),
         "{lines:?}"
     );
     assert!(
@@ -245,7 +252,7 @@ fn the_report_says_each_answer_worst_first_with_a_count() {
     );
     assert!(lines
         .iter()
-        .any(|line| line.starts_with("unproven: jellyfin media.serve probe catalogue")));
+        .any(|line| line.starts_with("unproven: navidrome media.serve probe catalogue")));
     assert_eq!(
         lines.last().map(String::as_str),
         Some("2 refused, 1 refuted, 1 unproven, 0 demonstrated")
@@ -269,7 +276,7 @@ fn a_probe_the_recording_answers_is_said_as_demonstrated() {
 
     assert!(lines
         .iter()
-        .any(|line| line == "demonstrated: jellyfin media.serve probe guarded"));
+        .any(|line| line == "demonstrated: navidrome media.serve probe guarded"));
     assert_eq!(
         lines.last().map(String::as_str),
         Some("0 refused, 0 refuted, 0 unproven, 2 demonstrated")
@@ -298,7 +305,7 @@ expect = { status = 200"#,
     );
     let root = recorded("bundled-runs", &pinned(&manifest), &[]);
     let _ = std::fs::write(
-        root.join("recordings/jellyfin/guarded.json"),
+        root.join("recordings/navidrome/guarded.json"),
         format!(
             r#"{{"recorded_from":"{}","note":"its release","run":{{"args":["--version"]}},"result":{{"exit":0,"stdout_starts_with":"10.11.11\n"}}}}"#,
             pinned(&manifest)
@@ -324,4 +331,23 @@ expect = { status = 200"#,
             ),
         ]
     );
+}
+
+/// A capability a kept service provides is not judged here: the part's adapter carries
+/// its claims and is judged against its own repository's recordings and live check.
+#[test]
+fn a_kept_service_providing_with_no_claim_is_not_judged_here() {
+    let mut manifest = claiming(CLAIM);
+    for service in &mut manifest.services {
+        service.claim = Vec::new();
+        service.provides = if service.id == KEPT {
+            vec!["media.serve".to_owned()]
+        } else {
+            Vec::new()
+        };
+    }
+    let report = judged(&manifest, Path::new("/lemonfiber/no/such/stack"));
+
+    assert!(report.holds(), "{report:?}");
+    assert!(report.unclaimed.is_empty(), "{report:?}");
 }

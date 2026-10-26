@@ -73,10 +73,7 @@ fn every_service_given_a_household_hostname_asks_the_proxy() {
 
 #[test]
 fn every_service_whose_panel_reads_it_asks_the_dashboard() {
-    assert_eq!(
-        askers(&stack(), "dashboard.show"),
-        once(&["jellyfin", "navidrome"])
-    );
+    assert_eq!(askers(&stack(), "dashboard.show"), once(&["navidrome"]));
 }
 
 /// The services of `moved` asking `capability`.
@@ -93,10 +90,10 @@ fn asking_from(moved: Option<lemonfiber_core::plugin::Installed>, capability: &s
         .unwrap_or_default()
 }
 
-/// Each download client, the subtitle finder, the listening server, the curators, the
-/// indexer aggregator and the request service, which the bundle installs rather than
-/// assembles, asks the dashboard from its own plugin, as every service the stack carries
-/// whose panel reads it does from the stack.
+/// Each download client, the subtitle finder, the listening server, the media server, the
+/// curators, the indexer aggregator and the request service, which the bundle installs
+/// rather than assembles, asks the dashboard from its own plugin, as every service the
+/// stack carries whose panel reads it does from the stack.
 #[test]
 fn each_installed_part_asks_the_dashboard_from_its_plugin() {
     for (moved, plugin) in [
@@ -135,6 +132,10 @@ fn each_installed_part_asks_the_dashboard_from_its_plugin() {
         (
             lemonfiber_testing::listening::MOVED.installed(),
             lemonfiber_testing::listening::PLUGIN,
+        ),
+        (
+            lemonfiber_testing::media::moved(),
+            lemonfiber_testing::media::PLUGIN,
         ),
     ] {
         assert_eq!(
