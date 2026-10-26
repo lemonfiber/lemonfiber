@@ -61,6 +61,39 @@ pub struct Secret {
     /// The capability of the plugin's own that a credential crossing to it is needed to fill.
     #[serde(default, rename = "for", skip_serializing_if = "Option::is_none")]
     pub serves: Option<String>,
+    /// Where the service a part moves in place of wrote this credential itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carried_from: Option<CarriedFrom>,
+}
+
+/// Where a service wrote a credential itself: a file inside its container, the format it
+/// is written in and the dotted path to the value.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "SecretCarriedFrom")]
+pub struct CarriedFrom {
+    /// The file, as a path inside the service's container beneath its configuration
+    /// directory.
+    pub file: String,
+    /// The format the file is written in.
+    pub format: Format,
+    /// The dotted path to the value in the file; for `ini`, its section and entry.
+    pub key: String,
+}
+
+/// A format a service writes its configuration in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "SecretFormat")]
+pub enum Format {
+    /// XML.
+    Xml,
+    /// JSON.
+    Json,
+    /// YAML.
+    Yaml,
+    /// INI.
+    Ini,
 }
 
 /// A secret the manifest declares.

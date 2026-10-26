@@ -1,6 +1,8 @@
 use lemonfiber_manifest::KeySource;
 
-use super::reader;
+use lemonfiber_manifest::container::Format;
+
+use super::{at, reader};
 
 /// What the reader for `source` takes out of `text`, where there is one.
 fn read(source: KeySource, text: &str) -> Option<String> {
@@ -24,6 +26,14 @@ fn a_yaml_key_is_the_one_under_auth_and_not_one_under_another_section() {
         None
     );
     assert_eq!(read(KeySource::ConfigYaml, "auth:\n  apikey: ''\n"), None);
+    assert_eq!(
+        read(
+            KeySource::ConfigYaml,
+            "auth:\n  no entry here\n  apikey: own-key\n"
+        )
+        .as_deref(),
+        Some("own-key")
+    );
 }
 
 #[test]
@@ -59,7 +69,7 @@ fn an_xml_key_is_trimmed_and_one_not_generated_yet_is_none() {
     assert_eq!(
         read(
             KeySource::ConfigXml,
-            "<ApiKey>\n    a1b2c3d4e5\n  </ApiKey>"
+            "<Config><ApiKey>\n    a1b2c3d4e5\n  </ApiKey></Config>"
         )
         .as_deref(),
         Some("a1b2c3d4e5")
@@ -97,5 +107,84 @@ fn a_key_read_over_the_api_minted_or_absent_has_no_file_reader() {
         KeySource::None,
     ] {
         assert!(reader(source).is_none(), "{source:?}");
+    }
+}
+
+#[test]
+fn a_dotted_path_is_followed_through_each_format() {
+    assert_eq!(
+        at(
+            Format::Xml,
+            "Settings.Auth.Key",
+            "<Settings><Port>1</Port><Auth><Key> k1 </Key></Auth></Settings>"
+        )
+        .as_deref(),
+        Some("k1")
+    );
+    assert_eq!(
+        at(Format::Json, "a.b.c", r#"{"a":{"b":{"c":"k2"},"c":"no"}}"#).as_deref(),
+        Some("k2")
+    );
+    assert_eq!(
+        at(
+            Format::Yaml,
+            "server.auth.token",
+            "server:\n  port: 1\n  auth:\n    token: \"k3\"\nauth:\n  token: no\n"
+        )
+        .as_deref(),
+        Some("k3")
+    );
+    assert_eq!(
+        at(
+            Format::Ini,
+            "server.key",
+            "key = no\n[other]\nkey = no\n[server]\nkey = k4\n"
+        )
+        .as_deref(),
+        Some("k4")
+    );
+}
+
+#[test]
+fn a_path_the_file_does_not_hold_is_none() {
+    assert_eq!(
+        at(
+            Format::Xml,
+            "Config.Missing",
+            "<Config><ApiKey>k</ApiKey></Config>"
+        ),
+        None
+    );
+    assert_eq!(
+        at(
+            Format::Json,
+            "main.apiKey.deeper",
+            r#"{"main":{"apiKey":"k"}}"#
+        ),
+        None
+    );
+    assert_eq!(
+        at(
+            Format::Yaml,
+            "auth.apikey",
+            "other:\n  auth:\n    apikey: k\n"
+        ),
+        None
+    );
+    assert_eq!(
+        at(Format::Ini, "misc.api_key", "[servers]\napi_key = k\n"),
+        None
+    );
+    assert_eq!(at(Format::Ini, "api_key", "api_key = k\n"), None);
+}
+
+#[test]
+fn a_path_with_an_empty_segment_reads_nothing() {
+    for key in ["", ".", "main.", ".apiKey", "main..apiKey"] {
+        assert_eq!(
+            at(Format::Json, key, r#"{"main":{"apiKey":"k"}}"#),
+            None,
+            "{key}"
+        );
     }
 }

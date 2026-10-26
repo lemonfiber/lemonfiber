@@ -14,6 +14,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
         of: "jellyfin".to_owned(),
         why: "Mint keys for the stack's services".to_owned(),
         minted: false,
+        carried_from: None,
     }]
 });
 

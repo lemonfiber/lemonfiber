@@ -35,8 +35,18 @@ pub(crate) fn config_path(
     service: &lemonfiber_manifest::Service,
     api_path: Option<&str>,
 ) -> Option<PathBuf> {
-    let inside = beneath(service.container().configuration(), api_path?)?;
-    Some(service_config_dir(project, &service.id).join(inside))
+    config_file(
+        &service_config_dir(project, &service.id),
+        service.container().configuration(),
+        api_path?,
+    )
+}
+
+/// Where `path`, a file inside a container whose configuration directory is mounted at
+/// `mount`, lies on this machine beneath `directory`, the directory mounted there; nothing
+/// where it lies outside the mount.
+pub(crate) fn config_file(directory: &Path, mount: &str, path: &str) -> Option<PathBuf> {
+    Some(directory.join(beneath(mount, path)?))
 }
 
 /// Where `path` lies beneath the configuration directory mounted at `mount`, where it

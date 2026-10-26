@@ -18,7 +18,7 @@ pub use paths::{is_plain, is_source, is_target, lies_inside};
 pub use ports::{doubled, published};
 pub use record::Fields;
 use values::{narrowed, unshown};
-pub use values::{Constant, Secret, SecretOf, Setting, UrlOf, Value};
+pub use values::{CarriedFrom, Constant, Format, Secret, SecretOf, Setting, UrlOf, Value};
 pub use words::is_api_name;
 use words::is_variable;
 
