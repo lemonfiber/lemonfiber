@@ -351,7 +351,7 @@ fn moving_an_account(reserved: &str) -> Option<lemonfiber_plugin::Manifest> {
 fn moving_an_account_text(reserved: &str) -> String {
     let account = "upstream    = { username = { secret = \"upstream-username\" }, password = \
                    { secret = \"upstream-password\" } }";
-    let text = seeded()
+    seeded()
         .replace(
             "upstream    = { api_key = { secret = \"upstream-key\" } }",
             account,
@@ -371,8 +371,7 @@ fn moving_an_account_text(reserved: &str) -> String {
                  \"{reserved}\"\nimage"
             ),
             1,
-        );
-    text
+        )
 }
 
 /// The account minting the moving-an-account manifest leaves held for its upstream moving
