@@ -3,6 +3,7 @@
 //! One reader per shape a stack service's declaration may name as its `key_source`, each
 //! taking the key from where the service writing that shape keeps its own.
 
+use lemonfiber_manifest::container::Format;
 use lemonfiber_manifest::KeySource;
 
 /// Takes a key out of the contents of a file of one shape, where it is written there.
@@ -20,85 +21,137 @@ pub(crate) fn reader(source: KeySource) -> Option<Reader> {
     }
 }
 
-/// The element of an XML configuration holding the service's own key, opened and closed.
-const XML_ELEMENT: (&str, &str) = ("<ApiKey>", "</ApiKey>");
+/// Where a servarr-shaped XML configuration keeps the service's own key.
+const XML_KEY: &str = "Config.ApiKey";
 
-/// The object of a JSON configuration the service keeps its own key in.
-const JSON_OBJECT: &str = "main";
+/// Where a JSON configuration of the request service's shape keeps it.
+const JSON_KEY: &str = "main.apiKey";
 
-/// The entry of that object holding it.
-const JSON_ENTRY: &str = "apiKey";
+/// Where a YAML configuration of the subtitle finder's shape keeps it.
+const YAML_KEY: &str = "auth.apikey";
 
-/// The key in the single `<ApiKey>` element of an XML configuration.
-///
-/// Scanned rather than parsed: the file is machine-written with exactly one such
-/// element, and nothing else in it is wanted.
-fn xml_key(config_xml: &str) -> Option<String> {
-    let (open, close) = XML_ELEMENT;
-    let rest = config_xml.get(config_xml.find(open)? + open.len()..)?;
-    crate::generated::key(rest.get(..rest.find(close)?)?.trim())
+/// Where an INI configuration of the Usenet client's shape keeps it.
+const INI_KEY: &str = "misc.api_key";
+
+/// The key in the `<ApiKey>` element of an XML configuration.
+fn xml_key(text: &str) -> Option<String> {
+    at(Format::Xml, XML_KEY, text)
 }
 
 /// The key under `apiKey` in the `main` object of a JSON configuration.
-fn json_key(config_json: &str) -> Option<String> {
-    let settings: serde_json::Value = serde_json::from_str(config_json).ok()?;
-    crate::generated::key(settings.get(JSON_OBJECT)?.get(JSON_ENTRY)?.as_str()?)
+fn json_key(text: &str) -> Option<String> {
+    at(Format::Json, JSON_KEY, text)
 }
 
-/// The section of a YAML configuration the service keeps its own key in.
-const YAML_SECTION: &str = "auth";
-
-/// The entry of that section holding it.
-const YAML_ENTRY: &str = "apikey";
-
-/// The entry of an INI configuration holding the service's own key.
-const INI_ENTRY: &str = "api_key";
-
 /// The key under `apikey` in the `auth` section of a YAML configuration.
+fn yaml_key(text: &str) -> Option<String> {
+    at(Format::Yaml, YAML_KEY, text)
+}
+
+/// The key the `api_key` entry of an INI configuration's `misc` section sets.
+fn ini_key(text: &str) -> Option<String> {
+    at(Format::Ini, INI_KEY, text)
+}
+
+/// The key at the dotted path `key` of `text`, a file written in `format`, where it holds
+/// one spelled as a key.
+pub(crate) fn at(format: Format, key: &str, text: &str) -> Option<String> {
+    let path: Vec<&str> = key.split('.').collect();
+    if path.iter().any(|segment| segment.is_empty()) {
+        return None;
+    }
+    let found = match format {
+        Format::Xml => in_xml(&path, text),
+        Format::Json => in_json(&path, text),
+        Format::Yaml => in_yaml(&path, text),
+        Format::Ini => in_ini(&path, text),
+    }?;
+    crate::generated::key(&found)
+}
+
+/// The text of the element `path` names, each segment an element inside the one before.
 ///
-/// Only that section's: the file holds an `apikey` under each service it has been
-/// pointed at too. A key in the first column opens a section. Scanned rather than parsed,
-/// since nothing else in the file is wanted.
-fn yaml_key(config_yaml: &str) -> Option<String> {
-    let mut section = None;
-    for line in config_yaml.lines() {
-        if let Some(opened) = section_of(line) {
-            section = Some(opened);
+/// Scanned rather than parsed: the file is machine-written and nothing else in it is
+/// wanted.
+fn in_xml(path: &[&str], text: &str) -> Option<String> {
+    let mut within = text;
+    for name in path {
+        let opened = within.find(&format!("<{name}>"))? + name.len() + 2;
+        let rest = within.get(opened..)?;
+        within = rest.get(..rest.find(&format!("</{name}>"))?)?;
+    }
+    Some(within.trim().to_owned())
+}
+
+/// The string `path` names, each segment an object's entry inside the one before.
+fn in_json(path: &[&str], text: &str) -> Option<String> {
+    let root: serde_json::Value = serde_json::from_str(text).ok()?;
+    let mut value = &root;
+    for name in path {
+        value = value.get(name)?;
+    }
+    value.as_str().map(str::to_owned)
+}
+
+/// The scalar `path` names, each segment a mapping's key indented beneath the one before.
+///
+/// Scanned rather than parsed: a line that is a list item, a comment or no mapping entry
+/// is passed over, and an entry is matched only where every mapping holding it is the
+/// path's.
+fn in_yaml(path: &[&str], text: &str) -> Option<String> {
+    let mut open: Vec<(usize, &str)> = Vec::new();
+    for line in text.lines() {
+        let body = line.trim_start();
+        if body.is_empty() || body.starts_with('#') || body.starts_with('-') {
             continue;
         }
-        if section != Some(YAML_SECTION) {
-            continue;
-        }
-        let Some((name, value)) = line.split_once(':') else {
+        let Some((name, value)) = body.split_once(':') else {
             continue;
         };
-        if name.trim() == YAML_ENTRY {
-            return crate::generated::key(value.trim().trim_matches('\'').trim_matches('"'));
+        let indent = line.len() - body.len();
+        while open.last().is_some_and(|(held, _)| *held >= indent) {
+            open.pop();
+        }
+        let depth = open.len();
+        let along = depth < path.len()
+            && open.iter().zip(path).all(|((_, held), want)| held == want)
+            && path.get(depth) == Some(&name.trim());
+        let value = value.trim();
+        if along && depth + 1 == path.len() {
+            return Some(value.trim_matches('\'').trim_matches('"').to_owned());
+        }
+        if value.is_empty() {
+            open.push((indent, name.trim()));
         }
     }
     None
 }
 
-/// The section `line` opens, where it is a key in the first column.
-fn section_of(line: &str) -> Option<&str> {
-    let first = line.chars().next()?;
-    if first.is_whitespace() || first == '#' {
-        return None;
-    }
-    Some(line.split_once(':')?.0.trim())
-}
-
-/// The key the `api_key` entry of an INI configuration sets.
+/// The value of the entry `path` names: its section, then the entry within it.
 ///
-/// Matched by its exact name, so a neighbouring `nzb_key` or a commented line is not
-/// read as it.
-fn ini_key(config_ini: &str) -> Option<String> {
-    config_ini.lines().find_map(|line| {
-        let (name, value) = line.split_once('=')?;
-        (name.trim() == INI_ENTRY)
-            .then(|| crate::generated::key(value.trim()))
-            .flatten()
-    })
+/// Matched by exact names, so a neighbouring entry, another section's or a commented line
+/// is not read as it.
+fn in_ini(path: &[&str], text: &str) -> Option<String> {
+    let [section, entry] = path else {
+        return None;
+    };
+    let mut current = None;
+    for line in text.lines().map(str::trim) {
+        if let Some(opened) = line
+            .strip_prefix('[')
+            .and_then(|rest| rest.strip_suffix(']'))
+        {
+            current = Some(opened.trim());
+            continue;
+        }
+        let Some((name, value)) = line.split_once('=') else {
+            continue;
+        };
+        if current == Some(*section) && name.trim() == *entry {
+            return Some(value.trim().to_owned());
+        }
+    }
+    None
 }
 
 #[cfg(test)]
