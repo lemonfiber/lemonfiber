@@ -515,3 +515,15 @@ fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
         assert_eq!(toml::from_str::<Secret>(&text).ok(), Some(declared));
     }
 }
+
+#[test]
+fn a_minted_shape_reads_back_as_it_is_written_false_included() {
+    for (minted, written) in [
+        (Minted::Not, serde_json::json!(false)),
+        (Minted::Key, serde_json::json!(true)),
+        (Minted::Password, serde_json::json!("password")),
+    ] {
+        assert_eq!(serde_json::to_value(minted).ok(), Some(written.clone()));
+        assert_eq!(serde_json::from_value::<Minted>(written).ok(), Some(minted));
+    }
+}
