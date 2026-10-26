@@ -209,6 +209,77 @@ fn a_plugins_service_can_be_the_door_by_the_same_rule() {
     );
 }
 
+/// A plugin bringing `id` behind an adapter speaking `media.serve` and declaring `media`,
+/// published to the household at the label `id`.
+fn serving(id: &str, media: &[&str]) -> Installed {
+    let mut plugin = fronted(id, Some("media.serve@1"), Some(id));
+    for adapter in plugin
+        .services
+        .iter_mut()
+        .filter(|one| one.fronts.is_some())
+    {
+        adapter.media_types = media.iter().map(|one| (*one).to_owned()).collect();
+    }
+    plugin
+}
+
+/// A media server declaring shelf media alone is a shelf, one declaring anything else
+/// beside it is the library, and so is one declaring none.
+#[test]
+fn a_media_server_is_a_shelf_where_it_serves_shelf_media_alone() {
+    for (media, expected) in [
+        (&["audiobooks"][..], Facing::Shelf),
+        (&["audiobooks", "podcasts"][..], Facing::Shelf),
+        (&["music"][..], Facing::Shelf),
+        (&["books", "comics"][..], Facing::Shelf),
+        (&["movies", "audiobooks"][..], Facing::Watching),
+        (&["tv"][..], Facing::Watching),
+        (&["films"][..], Facing::Watching),
+        (&[][..], Facing::Watching),
+    ] {
+        assert_eq!(
+            judged(&serving("server", media)),
+            Some(expected),
+            "{media:?}"
+        );
+    }
+}
+
+/// A shelf is never somewhere to begin: where one stands beside the library and the
+/// request service, the household begins at the request service, and where it stands
+/// alone there is no door at all.
+#[test]
+fn a_shelf_stands_beside_the_door_rather_than_being_it() {
+    let shelf = serving("listening", &["audiobooks", "podcasts"]);
+    let library = serving("library", &["movies", "tv", "music"]);
+    let requests = fronted("requests", Some("request.intake@1"), Some("ask"));
+
+    assert_eq!(
+        begins(&[], &[shelf.clone(), library.clone(), requests]),
+        Some((Facing::Asking, "requests".to_owned()))
+    );
+    assert_eq!(
+        begins(&[], &[shelf.clone(), library]),
+        Some((Facing::Watching, "library".to_owned()))
+    );
+    assert_eq!(begins(&[], &[shelf]), None);
+}
+
+/// The shelf media are the vocabulary's, and every other medium in it is one a library
+/// is watched for.
+#[test]
+fn the_shelf_media_are_the_vocabulary_but_what_is_watched() {
+    let vocabulary = lemonfiber_manifest::container::MEDIA;
+    assert!(super::SHELF_MEDIA
+        .iter()
+        .all(|one| vocabulary.contains(one)));
+    let watched: Vec<&str> = vocabulary
+        .into_iter()
+        .filter(|one| !super::SHELF_MEDIA.contains(one))
+        .collect();
+    assert_eq!(watched, ["tv", "movies"]);
+}
+
 /// A plugin's service is reached through the proxy at its label, and one reachable from
 /// this machine alone is reached at no port the household could use.
 #[test]
@@ -236,8 +307,8 @@ fn a_plugins_service_is_reached_through_the_proxy() {
 
 /// The stack this build carries with every part it installs: the request service moved
 /// into its plugin is the door, judged by the contract its adapter speaks and reached on
-/// the port it is published on as the stack's own was, and the guard in front of the
-/// library is met under the library's name.
+/// the port it is published on as the stack's own was, the guard in front of the library
+/// is met under the library's name, and the listening server is a shelf beside them.
 #[test]
 fn the_carried_stack_begins_at_its_moved_request_service() {
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
@@ -270,5 +341,14 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
         .filter(|one| one.facing.is_some_and(Facing::begins))
         .map(|one| one.id)
         .collect();
-    assert_eq!(begin, ["door", "audiobookshelf", "seerr"]);
+    assert_eq!(begin, ["door", "seerr"]);
+    let listening = candidates
+        .iter()
+        .find(|one| one.id == "audiobookshelf")
+        .and_then(|one| one.facing);
+    assert_eq!(
+        listening,
+        Some(Facing::Shelf),
+        "the listening server is a shelf"
+    );
 }

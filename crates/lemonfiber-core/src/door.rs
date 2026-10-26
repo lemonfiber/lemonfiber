@@ -9,8 +9,9 @@
 //! The two that can be a door are told apart by the contract the adapter in front of
 //! them speaks, never by their name or by an API this build holds an adapter for: a
 //! service fronted by one speaking `request.intake` is where asking begins, and one
-//! fronted by one speaking `media.serve` is a library, so any service speaking the same
-//! contract resolves the same way. The stack's guard in front of the media server is
+//! fronted by one speaking `media.serve` is a library, or a shelf where the adapter
+//! declares [`SHELF_MEDIA`] alone, so any service speaking the same contract resolves the
+//! same way. The stack's guard in front of the media server is
 //! met as the library it guards, under that library's name. The rest speak no such
 //! contract, so each of the stack's is written down below with what it is to the
 //! household — and one nobody has written down, another plugin's among them, is not
@@ -113,6 +114,11 @@ impl Facing {
     }
 }
 
+/// The media in [`lemonfiber_manifest::container::MEDIA`] that make a media server a
+/// [`Facing::Shelf`] where it declares nothing else: one kind of media, reached from the
+/// library rather than instead of it.
+pub const SHELF_MEDIA: [&str; 5] = ["music", "books", "comics", "audiobooks", "podcasts"];
+
 /// The services published to the household that a contract does not settle.
 ///
 /// A register rather than a rule read off a name, for the reason
@@ -171,20 +177,26 @@ pub fn brought(installed: &[Installed], plugin: &Installed, placed: &Placed) -> 
 /// What the contract the adapter of `plugin` in front of `placed` speaks makes it to the
 /// household, where it settles it.
 fn by_contract(plugin: &Installed, placed: &Placed) -> Option<Facing> {
-    let speaks = |capability: &str, major: u32| {
+    let speaking = |capability: &str, major: u32| {
         let spoken = lemonfiber_contract::spoken(capability, major);
-        plugin
-            .services
-            .iter()
-            .filter(|one| one.fronts.as_deref() == Some(placed.service.as_str()))
-            .any(|adapter| adapter.speaks.contains(&spoken))
+        plugin.services.iter().find(|adapter| {
+            adapter.fronts.as_deref() == Some(placed.service.as_str())
+                && adapter.speaks.contains(&spoken)
+        })
     };
-    if speaks(intake::CAPABILITY, intake::MAJOR) {
-        Some(Facing::Asking)
-    } else if speaks(serve::CAPABILITY, serve::MAJOR) {
-        Some(Facing::Watching)
+    if speaking(intake::CAPABILITY, intake::MAJOR).is_some() {
+        return Some(Facing::Asking);
+    }
+    speaking(serve::CAPABILITY, serve::MAJOR).map(|adapter| served(&adapter.media_types))
+}
+
+/// What a media server declaring `media` is to the household: a shelf where it declares
+/// shelf media alone, and the library otherwise.
+fn served(media: &[String]) -> Facing {
+    if !media.is_empty() && media.iter().all(|one| SHELF_MEDIA.contains(&one.as_str())) {
+        Facing::Shelf
     } else {
-        None
+        Facing::Watching
     }
 }
 
