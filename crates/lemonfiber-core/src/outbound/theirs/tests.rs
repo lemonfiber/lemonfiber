@@ -172,7 +172,10 @@ fn a_service_this_binary_once_described_is_still_the_stacks_to_describe() {
 
 #[test]
 fn the_list_follows_the_stack_it_is_given() {
-    let one = declared().into_iter().take(1).collect::<Vec<_>>();
+    let one = declared()
+        .into_iter()
+        .filter(|service| service.id == "prowlarr")
+        .collect::<Vec<_>>();
     let found = elsewhere(&one);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(

@@ -169,10 +169,17 @@ fn a_call_to_a_moved_part_names_the_api_the_service_moved_in_its_place_answers_i
     );
 }
 
+/// A call to a service a stack running its own copy of it declares an API for names that
+/// API's adapter.
 #[test]
 fn a_call_to_a_stack_service_declaring_an_api_names_that_adapter() {
+    let declaring = crate::test_support::declaring(
+        "recipes-servarr",
+        "sonarr",
+        r#"{ kind = "servarr", key_source = "config-xml", path = "/config/config.xml", version = 3 }"#,
+    );
     assert_eq!(
-        adapters_against(crate::test_support::stack().manifest().ok(), &[]),
+        adapters_against(declaring.manifest().ok(), &[]),
         Some(through_servarr())
     );
 }

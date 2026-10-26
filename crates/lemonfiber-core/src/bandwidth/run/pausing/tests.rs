@@ -95,18 +95,22 @@ async fn a_rehearsal_asks_each_client_what_it_is_doing_and_tells_it_nothing() {
         .is_some_and(|client| client.was == Some(Pulling::Fetching) && client.now.is_none())));
 }
 
+/// A Usenet client moved in whose key this machine never wrote down is named as not
+/// reached: an answer that left it out would read as every client paused.
 #[tokio::test]
 async fn a_client_nothing_here_can_open_is_named_as_not_reached() {
-    // The fixture stack declares a Usenet client whose key this machine never wrote
-    // down. An answer that left it out would read as every client paused.
     let ctx = a_stack("unopened", a_client(Answered::Stopped));
+    crate::test_support::usenet::unkeyed(&ctx);
     let paused = pausing(&ctx, Pausing::Pause, None).await;
-    assert!(paused.is_ok_and(|paused| paused
-        .clients
-        .iter()
-        .any(|client| client.client == "sabnzbd"
-            && client.unreached.is_some()
-            && client.now.is_none())));
+    let clients = paused.map(|paused| paused.clients).unwrap_or_default();
+    assert!(
+        clients.iter().any(
+            |client| client.client == crate::test_support::usenet::ADAPTER
+                && client.unreached.is_some()
+                && client.now.is_none()
+        ),
+        "{clients:?}"
+    );
 }
 
 #[tokio::test]

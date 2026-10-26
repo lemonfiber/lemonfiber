@@ -51,8 +51,9 @@ fn beside_an_unadapted_client() -> Fillers {
         .unwrap_or_default()
 }
 
-/// The stack's own download clients, and a plugin's naming their API and speaking no
-/// contract, are declared with nothing to reach them by, and nothing is asked of any.
+/// A plugin's client naming the torrent client's API and speaking no contract is declared
+/// with nothing to reach it by, the stack's kept clients naming no API are not declared at
+/// all, and nothing is asked of any.
 #[tokio::test]
 async fn a_client_no_adapter_fronts_is_declared_and_never_reached() {
     let fillers = beside_an_unadapted_client();
@@ -66,7 +67,7 @@ async fn a_client_no_adapter_fronts_is_declared_and_never_reached() {
         .map(|client| client.id.as_str())
         .collect();
 
-    assert_eq!(unreached, ["sabnzbd", "qbittorrent", "seedbox"]);
+    assert_eq!(unreached, ["seedbox"]);
     assert!(download_targets(&ctx, &fillers).await.is_empty());
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

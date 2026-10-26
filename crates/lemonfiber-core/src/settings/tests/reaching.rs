@@ -243,12 +243,14 @@ async fn an_assembled_parts_crossing_key_is_listed_as_granted() {
     assert_eq!(granted.map(|one| one.from), Some(Some(SecretFrom::Granted)));
 }
 
-/// A crossing key the operator sets by hand is written into every file that reads it at
-/// once, as a rotation's is, so no reader keeps the value it replaced.
+/// A crossing key the operator sets by hand over the one recorded is written into every
+/// file that reads it at once, as a rotation's is, so no reader keeps the value it
+/// replaced.
 #[tokio::test]
 async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
     let machine = machine("set-by-hand", Reporting::absent());
     registered(&machine, crate::test_support::a_trusted_crossing_reader());
+    assert!(store::set(&machine.env, CROSSING, "the-replaced-key").is_ok());
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=the-replaced-key\n").is_ok());
 
@@ -407,6 +409,7 @@ pub(super) fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) 
 async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
     let machine = machine("set-unwritten", Reporting::absent());
     registered(&machine, crate::test_support::a_trusted_crossing_reader());
+    assert!(store::set(&machine.env, CROSSING, "recorded").is_ok());
     unwritable_files(&machine);
 
     let set = crate::app::configuring::set(
