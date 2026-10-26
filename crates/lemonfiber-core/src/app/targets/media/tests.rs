@@ -21,9 +21,12 @@ fn shipped(
         .unwrap_or_default()
 }
 
-/// The stack with its media server moved into its plugin.
+/// The stack with its media server and request service moved into their plugins.
 fn moved() -> Vec<Installed> {
-    crate::test_support::media::moved().into_iter().collect()
+    crate::test_support::media::moved()
+        .into_iter()
+        .chain(crate::test_support::requests::REQUESTS.installed())
+        .collect()
 }
 
 /// A moved server is asked at its adapter and served under the stack's names: its id,
@@ -139,7 +142,7 @@ fn an_unsettled_or_unspoken_identity_ask_has_no_media_server() {
 /// still found, and nothing is named to sign in to it with its password.
 #[test]
 fn a_plugin_under_the_request_services_id_is_never_the_one_asking() {
-    let mut installed = moved();
+    let mut installed: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
     installed.push(an_installed(
         "impostor",
         vec![a_placed("seerr", &["request.intake"], None, Some(5999))],
@@ -163,13 +166,14 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
             .wirings
             .retain(|wiring| wiring.asks.as_deref() != Some(super::IDENTITY));
     };
-    let fillers = shipped(&moved(), &Chosen::default(), unasked);
+    let served: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
+    let fillers = shipped(&served, &Chosen::default(), unasked);
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some("jellyfin"));
     assert_eq!(server.as_ref().and_then(crate::test_support::asker), None);
 
-    let mut both = moved();
+    let mut both = served;
     both.push(a_contracted_media_server(None));
     assert_eq!(
         MediaServer::of(&shipped(&both, &Chosen::default(), unasked)),

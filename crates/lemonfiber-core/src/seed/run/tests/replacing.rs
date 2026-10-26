@@ -27,8 +27,8 @@ const ITS_PORT: u16 = 4321;
 type Plan = Vec<(String, Result<(Connection, String), Unmade>)>;
 
 /// The shipped stack, with every part the bundle installs moved into its plugin as
-/// `moving` leaves those parts and `installed` beside them, answered with `chosen` and the
-/// stand-in's plugin held first-party.
+/// `moving` leaves those parts and `installed` beside them, answered with `chosen`, the
+/// stand-in's plugin and the contracted media server's held first-party.
 fn shipped(
     installed: &[Installed],
     chosen: &Chosen,
@@ -39,6 +39,7 @@ fn shipped(
     parts.extend_from_slice(installed);
     let trusted: Vec<FirstParty> = crate::test_support::first_party(PLUGIN)
         .iter()
+        .chain(&crate::test_support::first_party("contracted"))
         .chain(crate::plugin::first_party::EMBEDDED)
         .copied()
         .collect();
