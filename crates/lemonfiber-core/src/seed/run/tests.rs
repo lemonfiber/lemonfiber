@@ -454,6 +454,18 @@ fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: A
 }
 
 /// A third-party plugin's curator, `kept`, filing `media` over `library.curate` and keeping
+/// `installed`, each of its services asking for every curator.
+fn asking_every_curator(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
+    for placed in &mut installed.services {
+        placed.asks = vec![crate::plugin::Asking {
+            capability: "library.curate".to_owned(),
+            each: true,
+            native: None,
+        }];
+    }
+    installed
+}
+
 /// its key in a file beneath the directory its container owns.
 fn a_stand_in(media: &str) -> crate::plugin::Installed {
     let mut stand_in = crate::test_support::a_placed(

@@ -119,14 +119,18 @@ async fn a_plugin_finder_is_never_handed_a_curators_key() {
 }
 
 /// A plugin `subber` whose service stands in for the stack's finder over
-/// `subtitles.fetch`, beside both curators.
+/// `subtitles.fetch`, asking for every curator, beside both curators.
 fn contracted_finder(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
     fillers_trusting(
         curators(),
-        &[contracted("subber", "bazarr", "subtitles.fetch")],
+        &[asking_every_curator(contracted(
+            "subber",
+            "bazarr",
+            "subtitles.fetch",
+        ))],
         project,
         trusted,
     )

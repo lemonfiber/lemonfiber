@@ -63,17 +63,27 @@ fn helpers() -> Installed {
     installed
 }
 
-/// The shipped stack with the plugin installed, first-party where `trusted` says.
+/// The shipped stack with every part it installs moved into its plugin and the plugin
+/// installed beside them, first-party where `trusted` says.
 fn fillers(trusted: &[FirstParty]) -> Fillers {
+    let installed: Vec<Installed> = crate::test_support::adapted::installed_parts()
+        .into_iter()
+        .chain([helpers()])
+        .collect();
+    let trusting: Vec<FirstParty> = trusted
+        .iter()
+        .chain(crate::plugin::first_party::EMBEDDED)
+        .copied()
+        .collect();
     crate::test_support::stack()
         .manifest()
         .map(|manifest| {
             Fillers::trusting(
                 &manifest,
-                &[helpers()],
+                &installed,
                 &Chosen::default(),
                 Some(stack_root()),
-                trusted,
+                &trusting,
             )
         })
         .unwrap_or_default()
@@ -101,18 +111,23 @@ fn made(fillers: &Fillers, by: &str) -> Vec<(String, String, Result<Connection, 
         .collect()
 }
 
-/// Both download clients' credentials, as the stack holds them.
+/// Both download clients' credentials, each client moved into its plugin.
 fn held() -> Held {
-    Held::from(std::collections::BTreeMap::from([
-        ("sabnzbd".to_owned(), Credential::ApiKey("k".to_owned())),
-        (
-            "qbittorrent".to_owned(),
-            Credential::UserPass {
-                username: "admin".to_owned(),
-                password: "p".to_owned(),
-            },
-        ),
-    ]))
+    Held {
+        keys: std::collections::BTreeMap::from([
+            (
+                super::holder(Some(crate::test_support::usenet::PLUGIN), "sabnzbd"),
+                Credential::ApiKey("k".to_owned()),
+            ),
+            (
+                super::holder(Some(crate::test_support::torrent::PLUGIN), "qbittorrent"),
+                Credential::UserPass {
+                    username: "admin".to_owned(),
+                    password: "p".to_owned(),
+                },
+            ),
+        ]),
+    }
 }
 
 /// The download clients the plugin's curator is told about, where the seed takes it as
