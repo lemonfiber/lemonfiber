@@ -21,7 +21,6 @@ use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
 use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
-use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
@@ -100,12 +99,7 @@ pub(super) async fn answers(
         why: crate::text::plain(&fault.why),
         log: Vec::new(),
     };
-    let mut stand_ins = StandIns::of(secrets, recorder.random)
-        .map_err(|why| failing(Faulted::new(STAND_INS, why, Vec::new())))?;
-    let stood = stand_ins
-        .settings(upstream, recorder.random)
-        .map_err(|why| failing(Faulted::new(STAND_INS, why, Vec::new())))?;
-    let prepared = Prepared::of(recorder, root, upstream, adapter, &stand_ins).map_err(failing)?;
+    let prepared = Prepared::of(recorder, root, upstream, adapter, secrets).map_err(failing)?;
     let (reaching, answering) = parties(recorder, adapter, upstream)
         .await
         .map_err(failing)?;
@@ -113,13 +107,7 @@ pub(super) async fn answers(
     let serve = Serve {
         alias: Some(upstream.service.clone()),
         reaching,
-        env: settled
-            .env
-            .iter()
-            .chain(&prepared.env)
-            .chain(&stood)
-            .cloned()
-            .collect(),
+        env: settled.env.iter().chain(&prepared.env).cloned().collect(),
         ..settled
     };
     let served = recorder

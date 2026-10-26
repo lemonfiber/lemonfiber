@@ -6,6 +6,12 @@
       ],
       "required": true
     },
+    "recorded_with": {
+      "type": [
+        "anyOf(null,ref:RecordedWith)"
+      ],
+      "required": false
+    },
     "setting": {
       "type": [
         "string"

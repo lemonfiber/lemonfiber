@@ -5,11 +5,11 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use lemonfiber_manifest::container::{Minted, Value};
+use lemonfiber_manifest::container::{Minted, Secret, Value};
 
 use lemonfiber_contract::adapter::KEY_FILE;
 
-use super::super::stood_in::StandIns;
+use super::super::stood_in::{StandIns, STAND_INS};
 use super::{refused, Faulted, Fronting, Placed, Recorder, Starting, Throwaway};
 use crate::ports::random::Random;
 
@@ -25,7 +25,8 @@ pub(super) struct Prepared {
     pub(super) key: String,
     /// Every credential minted for the run so far, which every answer is scrubbed of.
     pub(super) made: Vec<String>,
-    /// Each variable of the upstream's environment that names a secret, as `NAME=value`.
+    /// Each variable of the upstream's environment that names a secret or a setting
+    /// declaring a stand-in, as `NAME=value`.
     pub(super) env: Vec<String>,
 }
 
@@ -107,8 +108,12 @@ impl Prepared {
         root: &Path,
         upstream: &Placed,
         adapter: Fronting<'_>,
-        stand_ins: &StandIns,
+        declared: &[Secret],
     ) -> Result<Self, Faulted> {
+        let mut stand_ins = StandIns::of(declared, recorder.random).map_err(refused(STAND_INS))?;
+        let stood = stand_ins
+            .settings(upstream, recorder.random)
+            .map_err(refused(STAND_INS))?;
         let copy = Throwaway::of(
             Some(Starting {
                 root,
@@ -146,8 +151,9 @@ impl Prepared {
             random: recorder.random,
             shapes: crate::plugin::seeding::shapes(root),
         };
-        let env = environment(&minting, &mut secrets, upstream, &mut made)
+        let mut env = environment(&minting, &mut secrets, upstream, &mut made)
             .map_err(refused("upstream's environment"))?;
+        env.extend(stood);
         let handed = handed(&minting, &mut secrets, adapter.placed, &mut made)
             .map_err(refused("adapter's upstream credentials"))?;
         if !handed.is_empty() {
