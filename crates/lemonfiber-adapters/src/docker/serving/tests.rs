@@ -320,3 +320,32 @@ fn a_device_passed_in_is_mapped_as_written_and_one_written_otherwise_is_not() {
     );
     assert!(device("/dev/net/tun").is_none());
 }
+
+#[test]
+fn a_container_is_given_each_device_written_as_the_engine_maps_it() {
+    let asked = body(
+        &Serve {
+            devices: vec![
+                "/dev/net/tun:/dev/net/tun".to_owned(),
+                "/dev/dri".to_owned(),
+            ],
+            ..serve()
+        },
+        "lemonfiber-record-1-2-3",
+    );
+
+    let devices = asked
+        .host_config
+        .and_then(|host| host.devices)
+        .unwrap_or_default();
+    assert_eq!(
+        devices
+            .iter()
+            .map(|one| (
+                one.path_on_host.as_deref(),
+                one.path_in_container.as_deref()
+            ))
+            .collect::<Vec<_>>(),
+        vec![(Some("/dev/net/tun"), Some("/dev/net/tun"))]
+    );
+}
