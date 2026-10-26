@@ -401,21 +401,29 @@ async fn a_contracted_indexer_untrusted_or_unreachable_registers_nothing_and_is_
     }
 }
 
-/// An indexer the stack publishes on no address has nothing a curator could reach it back
-/// on, so nothing is registered into it and nothing is asked.
+/// An indexer saying nowhere it answers has nothing a curator could reach it back on, so
+/// nothing is registered into it and nothing is asked.
 #[tokio::test]
 async fn an_indexer_on_no_address_is_told_about_nobody() {
-    let http = seeding();
-    let ctx = seed_ctx(true, None, None).with_http(http.clone());
-    let unreached = manifest_service(
-        "prowlarr",
-        Some(curator_api(Some("/config/config.xml"))),
-        None,
+    let project = lemonfiber_fixtures::scratch::Scratch::new("applications-unaddressed");
+    let http = Fake::always(Answer::reply(200, "[]"));
+    let ctx = contracted_ctx(&project, "prowlarr", true, http.clone());
+    let mut indexing = contracted("indexing", "prowlarr", "indexer.search");
+    for placed in &mut indexing.services {
+        placed.listens = None;
+        placed.reached = None;
+    }
+    let fillers = fillers_trusting(
+        vec![curator("sonarr", 8989, "tv")],
+        &[indexing],
+        &project,
+        &first_party("indexing"),
     );
-    let fillers = fillers_of(vec![unreached, curator("sonarr", 8989, "tv")]);
 
+    let paired = super::super::connecting::pairings(&fillers).len();
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
 
+    assert_eq!(paired, 1);
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

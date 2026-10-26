@@ -801,7 +801,7 @@ async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
 
 /// A stack that names no gate of its own asked for no route to the media server, even
 /// beside a plugin's gate that may hold its key: every key filed under the gate's name is
-/// revoked.
+/// revoked, and a key list the server will not give is left for a later run.
 #[tokio::test]
 async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
     let http = serving(&["stale"], "fresh", true, true);
@@ -826,10 +826,22 @@ async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
     )
     .await;
 
+    let unlisted = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
+    let unread = super::super::gate::seed_gate_routes(
+        &ctx.with_http(unlisted.clone()),
+        &stack(false),
+        &fillers,
+        server.as_ref(),
+        Some(&at),
+    )
+    .await;
+
     assert_eq!(
         wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
         vec![State::Wired]
     );
     assert_eq!(revoked(&http), vec!["stale".to_owned()]);
     assert_eq!(routes(&at), None);
+    assert!(unread.is_empty(), "{unread:?}");
+    assert!(unlisted.asked_for(media::serve("filed_as")));
 }
