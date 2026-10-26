@@ -2,7 +2,7 @@
 
 use super::*;
 
-/// A context whose settings live in a scratch file.
+/// A context over the stack this build carries, whose settings live in a scratch file.
 fn with_config(path: &std::path::Path) -> Ctx {
     let settings = Settings {
         env_file: Some(path.to_path_buf()),
@@ -10,6 +10,7 @@ fn with_config(path: &std::path::Path) -> Ctx {
         ..Settings::default()
     };
     a_context()
+        .over(crate::test_support::embedded())
         .engine(Arc::new(Reporting::default()))
         .settings(settings)
         .build()

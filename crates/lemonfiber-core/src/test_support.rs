@@ -520,6 +520,17 @@ pub(crate) fn carried_stack() -> crate::stack::Source {
     ))))
 }
 
+/// The stack this build carries, written beside the tests under `name`, its service `id`
+/// declaring the adapter `api` as a stack running its own copy of that service does.
+pub(crate) fn declaring(name: &str, id: &str, api: &str) -> crate::stack::Source {
+    let at = lemonfiber_fixtures::scratch::Scratch::new(&format!("declaring-{name}"))
+        .kept()
+        .join("stack");
+    lemonfiber_fixtures::stack::directory_into(&at);
+    lemonfiber_fixtures::stack::manifest_declaring(&at, id, api);
+    crate::stack::Source::External(Box::leak(at.into_boxed_path()))
+}
+
 /// The version of the stack this build ships.
 pub(crate) fn shipped_stack_version() -> String {
     lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)

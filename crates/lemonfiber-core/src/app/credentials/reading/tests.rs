@@ -111,18 +111,27 @@ fn a_service_key_nobody_has_written_carries_no_likeness_of_a_value() {
 
 #[test]
 fn a_service_whose_api_names_no_file_beneath_its_configuration_writes_no_key_of_its_own() {
-    let manifest = crate::test_support::stack().manifest().ok();
-    let service = manifest
-        .iter()
-        .flat_map(|manifest| manifest.services.iter())
-        .find(|service| {
-            service.api.as_ref().is_some_and(|api| {
-                crate::credential::written::reader(api.key_source).is_some() && api.path.is_some()
-            })
+    let service = crate::test_support::stack()
+        .manifest()
+        .ok()
+        .and_then(|manifest| {
+            manifest
+                .services
+                .into_iter()
+                .find(|service| service.id == "bazarr")
+        })
+        .map(|service| lemonfiber_manifest::Service {
+            api: Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Servarr,
+                key_source: lemonfiber_manifest::KeySource::ConfigXml,
+                path: Some("/config/config.xml".to_owned()),
+                version: Some(3),
+            }),
+            ..service
         });
     assert!(
         service.is_some(),
-        "the stack the tests are written against has a service writing its own key"
+        "the stack the tests are written against runs bazarr"
     );
     let Some(service) = service else {
         return;

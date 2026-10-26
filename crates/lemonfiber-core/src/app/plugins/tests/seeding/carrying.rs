@@ -386,15 +386,20 @@ fn minted_account(
     minted_account_of(name, &moving_an_account(reserved)?, recorded, trusted)
 }
 
-/// The account minting `manifest` leaves held, `trusted` as first-party, in a stack that
-/// recorded `recorded` as its torrent client's password, or none.
+/// The account minting `manifest` leaves held, `trusted` as first-party, in a stack running
+/// its own torrent client that recorded `recorded` as its password, or none.
 fn minted_account_of(
     name: &str,
     manifest: &lemonfiber_plugin::Manifest,
     recorded: Option<&str>,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> Option<(String, String)> {
-    let ctx = seeding(name);
+    let mut ctx = seeding(name);
+    ctx.stack = crate::test_support::declaring(
+        name,
+        "qbittorrent",
+        r#"{ kind = "qbittorrent", key_source = "generated" }"#,
+    );
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let _ = match recorded {
         Some(password) => {

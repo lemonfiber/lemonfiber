@@ -371,7 +371,6 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
     // An embedded stack that has not been materialised has no project directory,
     // so there is no directory the services keep their own files in to measure —
     // which is a volume absent from the report rather than one reported as empty.
-
     let ctx = a_context()
         .over(crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED))
         .settings(measuring())
