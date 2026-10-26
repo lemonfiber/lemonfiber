@@ -83,3 +83,6 @@ pub(crate) fn moved_credential(ctx: &Ctx, service: &str) -> Option<String> {
         })?;
     stored_secret(ctx, &crate::settings::named(&installed.plugin, secret))
 }
+
+#[cfg(test)]
+mod tests;

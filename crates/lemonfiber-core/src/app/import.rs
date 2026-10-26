@@ -338,10 +338,17 @@ async fn their_key(
         .iter()
         .find(|service| service.id == container.service)
         .map(lemonfiber_plugin::Service::configuration);
-    let (Some(from), Some(mount), Some(theirs)) = (from, mount, container.mounts.first()) else {
-        return Err(UNCONFIGURED.to_owned());
-    };
-    let Some(path) = crate::app::targets::config_file(theirs, mount, &from.file) else {
+    let read = from
+        .zip(mount)
+        .zip(container.mounts.first())
+        .and_then(|((from, mount), theirs)| {
+            Some((
+                from,
+                theirs,
+                crate::app::targets::config_file(theirs, mount, &from.file)?,
+            ))
+        });
+    let Some((from, theirs, path)) = read else {
         return Err(UNCONFIGURED.to_owned());
     };
     crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), &path, theirs)

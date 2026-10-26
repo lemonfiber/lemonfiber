@@ -166,6 +166,20 @@ fn an_installed_part_whose_environment_is_only_secrets_keeps_none() {
 }
 
 #[test]
+fn an_installed_part_declaring_no_environment_or_capability_keeps_neither() {
+    let copy = PLAYER
+        .replace(
+            "[service.env]\nPLAYER_LOG = { setting = \"player:log\", default = \"info\" }\nPLAYER_KEY = { secret = \"upstream-key\" }\n",
+            "",
+        )
+        .replace("provides = [\"media.serve\", \"identity.source\"]\n", "");
+    let player = player(&stack(&[held("player", Stage::Installed, &copy)]));
+    assert_eq!(field(&player, "image"), Some("example.invalid/player"));
+    assert!(player.get("env").is_none(), "{player:?}");
+    assert!(player.get("provides").is_none(), "{player:?}");
+}
+
+#[test]
 fn an_assembled_part_stays_as_the_bundle_assembled_it() {
     let stack = stack(&[held("curator", Stage::Assembled, "")]);
     let services = rows(&stack, "service");
