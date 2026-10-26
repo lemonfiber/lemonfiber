@@ -157,7 +157,7 @@ fn a_stack_service_reading_a_key_is_said_and_one_of_nothing_here_is_not() {
         id: id.to_owned(),
         of: of.to_owned(),
         why: String::new(),
-        minted: false,
+        minted: lemonfiber_manifest::container::Minted::Not,
         serves: None,
         carried_from: None,
     };
