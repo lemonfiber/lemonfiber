@@ -18,6 +18,9 @@ mod served;
 mod unasked;
 mod written;
 
+pub(super) use fronted::handed_over;
+pub(super) use served::{healthy, settled_as};
+
 use std::path::Path;
 use std::sync::Arc;
 

@@ -85,6 +85,14 @@ impl Serves {
         })
     }
 
+    /// No service can be served, because there is no engine in a test.
+    #[must_use]
+    pub fn unreachable() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self::refusing(Unran::Unreachable {
+            reason: "no engine in a test".to_owned(),
+        }))
+    }
+
     /// No service can be served, for `unran`.
     #[must_use]
     pub fn refusing(unran: Unran) -> Self {

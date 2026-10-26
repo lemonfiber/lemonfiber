@@ -16,7 +16,7 @@ use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 
 pub use super::adapted::{answered, refusing, taken, unavailable};
-use super::adapted::{asked_at, path_of, Adapted};
+use super::adapted::{asked_at, path_of, Adapted, PORT};
 
 /// The plugin the subtitle finder moved into.
 pub const PLUGIN: &str = "bazarr";
@@ -25,9 +25,10 @@ pub const PLUGIN: &str = "bazarr";
 pub const ADAPTER: &str = "bazarr-adapter";
 
 /// The subtitle finder's plugin and the adapter in front of it.
-const MOVED: Adapted = Adapted {
+pub const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 /// Where `operation` of `subtitles.fetch` is asked.

@@ -20,7 +20,7 @@ use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 
 pub use super::adapted::{answered, refusing, taken, unavailable};
-use super::adapted::{asked_at, path_of, Adapted};
+use super::adapted::{asked_at, path_of, Adapted, PORT};
 
 /// The plugin the book curator moved into.
 pub const PLUGIN: &str = "bindery";
@@ -32,6 +32,7 @@ pub const ADAPTER: &str = "bindery-adapter";
 const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 /// Where `operation` of `indexer.pull` is asked.

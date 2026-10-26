@@ -39,6 +39,7 @@ mod preparing;
 mod speaking;
 mod tapped;
 
+pub(in crate::plugin) use filling::handed_over;
 pub(super) use speaking::fixtures;
 
 /// The contract whose first run the adapter performs, as the seed performs it.
@@ -322,7 +323,8 @@ impl Asking<'_> {
             LOOPBACK,
             super::served::inside(self.upstream),
         );
-        healthy(self.recorder, upstream.as_ref(), self.health, self.served)
+        let serving = self.recorder.serving;
+        healthy(serving, upstream.as_ref(), self.health, self.served)
             .await
             .map_err(|why| ("health", why))?;
         let ready = Health {
@@ -336,7 +338,7 @@ impl Asking<'_> {
                 .and_then(|health| health.timeout_s),
         };
         let adapter = (self.recorder.transport)();
-        healthy(self.recorder, adapter.as_ref(), Some(&ready), self.fronting)
+        healthy(serving, adapter.as_ref(), Some(&ready), self.fronting)
             .await
             .map_err(|why| ("adapter's health", why))?;
         let base = self

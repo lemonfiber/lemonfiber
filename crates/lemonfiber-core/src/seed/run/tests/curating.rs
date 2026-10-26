@@ -1,6 +1,7 @@
 //! Root folders and download clients on each curator.
 
 use super::*;
+use crate::ports::service::Client as _;
 
 /// The wirings whose connection names a root folder.
 fn root_folder_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
@@ -11,16 +12,18 @@ fn root_folder_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring
         .collect()
 }
 
+/// Each curator already holds the folders, so each is left as wired.
 #[tokio::test]
 async fn seed_wires_each_curators_root_folders() {
-    // Each application already holds the folders, so each is left as wired. Each
-    // curator also reads its version for the schema check first; that read decodes a
-    // folder list as no status, so a spare reply per curator covers it and the
-    // version is simply not learned — the folders are what this test reads.
-    const FOLDERS: &str = r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#;
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(true, vec![(200, FOLDERS); 6], Some(vec![0x11; 24]), None)
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+    let ctx = curating(
+        seed_ctx(
+            true,
+            Some(vec![0x11; 24]),
+            Some(crate::test_support::env_without_password("roots-held")),
+        ),
+        true,
+    )
+    .with_http(seeding_curated(Vec::new()));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
@@ -36,22 +39,26 @@ async fn seed_wires_each_curators_root_folders() {
 /// naming the host path rather than handed to the curator.
 #[tokio::test]
 async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = config_scratch("roots-made");
     let _ = store::write(&env, "DATA_ROOT=/srv/data\n");
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            ..Settings::default()
-        })
-        .build()
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED)).missing(vec!["/srv/data/media/"]),
-        ))
-        .with_http(seeding_with(vec![(
-            "/rootfolder",
-            Answer::reply(200, "[]"),
-        )]));
+    let ctx = curating(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                ..Settings::default()
+            })
+            .build(),
+        true,
+    )
+    .with_filesystem(Arc::new(
+        SeedFs::keyed(None).missing(vec!["/srv/data/media/"]),
+    ))
+    .with_http(seeding_curated(vec![(
+        curated("root_folders"),
+        crate::test_support::curators::answered(
+            &Vec::<crate::ports::service::RegisteredFolder>::new(),
+        ),
+    )]));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
@@ -64,12 +71,18 @@ async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
     }
 }
 
+/// No adapter holds a key yet, so the curators cannot be asked: their folders are
+/// skipped for a re-run, not failed.
 #[tokio::test]
 async fn seed_skips_curator_root_folders_when_the_key_is_not_readable() {
-    // No configuration to read a key from, so the curators have not finished
-    // starting: their folders are skipped for a re-run, not failed.
-    let ctx = seed_ctx(true, Vec::new(), Some(vec![0x11; 24]), None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = curating(
+        seed_ctx(
+            true,
+            Some(vec![0x11; 24]),
+            Some(crate::test_support::env_without_password("roots-unkeyed")),
+        ),
+        false,
+    );
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
@@ -151,16 +164,18 @@ fn told(
 ) -> Vec<Vec<crate::ports::service::DownloadClient>> {
     crate::test_support::stack()
         .manifest()
-        .map(|mut manifest| {
-            for service in manifest
-                .services
+        .map(|manifest| {
+            let mut moved = crate::test_support::curators::TELEVISION.installed();
+            for placed in moved
                 .iter_mut()
-                .filter(|one| one.id == "sonarr")
+                .flat_map(|plugin| plugin.services.iter_mut())
+                .filter(|placed| !placed.media_types.is_empty())
             {
-                service.media_types = vec![media.to_owned()];
+                placed.media_types = vec![media.to_owned()];
             }
+            let installed: Vec<_> = moved.into_iter().chain(installed.iter().cloned()).collect();
             let fillers =
-                crate::wiring::Fillers::of(&manifest, installed, chosen, Some(stack_root()));
+                crate::wiring::Fillers::of(&manifest, &installed, chosen, Some(stack_root()));
             curators(&fillers)
                 .iter()
                 .filter(|curator| curator.id() == "sonarr")
@@ -210,10 +225,11 @@ fn a_download_client_is_built_for_each_filler_whose_credential_is_in_hand() {
     );
 }
 
-/// A plugin chosen to stand in for the Usenet client is told about at its own id and
-/// the port it answers on, with its own credential, and nothing else changes.
+/// A third-party plugin chosen to stand in for the Usenet client is not told to a curator
+/// moved into its first-party plugin: its credential does not cross to another plugin's
+/// service, and the client beside it is told about as ever.
 #[test]
-fn a_plugin_standing_in_for_the_usenet_client_is_reached_where_it_answers() {
+fn a_third_party_usenet_stand_in_is_not_told_to_a_moved_curator() {
     let stand_in = crate::test_support::a_placed(
         "nzbget",
         &["download.usenet"],
@@ -233,21 +249,10 @@ fn a_plugin_standing_in_for_the_usenet_client_is_reached_where_it_answers() {
         Credential::ApiKey("its-own".to_owned()),
     );
 
-    let told = told(&installed, &chosen, &held, "tv");
-
     assert_eq!(
-        reached(&told),
-        vec![vec![
-            ("nzbget the stand-in".to_owned(), "nzbget".to_owned(), 6789),
-            ("qBittorrent".to_owned(), "gluetun".to_owned(), 8081),
-        ]]
+        reached(&told(&installed, &chosen, &held, "tv")),
+        vec![vec![("qBittorrent".to_owned(), "gluetun".to_owned(), 8081)]]
     );
-    let credentials: Vec<&Credential> = told
-        .iter()
-        .filter_map(|clients| clients.first())
-        .map(|client| &client.credential)
-        .collect();
-    assert_eq!(credentials, vec![&Credential::ApiKey("its-own".to_owned())]);
 }
 
 /// A filler the curator is connected to nothing by is told about as nothing, while the
@@ -288,11 +293,11 @@ fn a_curator_with_no_category_is_told_about_no_client() {
 #[test]
 fn a_recorded_password_is_read_back_or_read_as_absent() {
     // Nowhere to read from.
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
     assert!(recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).is_none());
 
     let path = config_scratch("qbt-readback");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(path.to_path_buf()));
+    let ctx = seed_ctx(true, None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
     let _ = store::set(&path, "SOMETHING_ELSE", "x");
     assert!(
@@ -317,17 +322,10 @@ fn a_recorded_password_is_read_back_or_read_as_absent() {
 async fn seed_leaves_each_curators_already_present_download_clients() {
     // Both download clients are moved into their plugins with what lemonfiber minted for
     // each in hand; each curator already holds both clients.
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let ctx = minting_torrent(minting_usenet(ctx));
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(seeding_curated(Vec::new()));
+    let ctx = curating(minting_torrent(minting_usenet(ctx)), true);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -355,17 +353,10 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     // no value to take on, an adopt pass reports it unmanaged just as a seed does,
     // never registering it a second time. The point guarded here is that the adopt
     // command dispatches and reports every present client.
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x22; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let ctx = minting_torrent(minting_usenet(ctx));
+    let ctx = seed_ctx(true, Some(vec![0x22; 24]), Some(env.to_path_buf()))
+        .with_http(seeding_curated(Vec::new()));
+    let ctx = curating(minting_torrent(minting_usenet(ctx)), true);
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -380,20 +371,14 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     assert!(all_reported, "an adopt pass reports each present client");
 }
 
+/// The clients' own credentials are in hand, but no curator's adapter can be asked
+/// yet, so registration is skipped for a re-run rather than failed.
 #[tokio::test]
 async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
-    // The clients' own credentials are in hand, but the curators have not written
-    // their keys, so registration is skipped for a re-run rather than failed.
     let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(None)));
-    let ctx = minting_torrent(minting_usenet(ctx));
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(seeding_curated(Vec::new()));
+    let ctx = curating(minting_torrent(minting_usenet(ctx)), false);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -429,10 +414,7 @@ async fn a_curator_speaking_the_contract_is_asked_over_it_and_never_as_the_bundl
     let ctx = contracted_ctx(&project, "shows", true, http.clone());
 
     let listed: Vec<&str> = curators(&fillers).iter().map(|one| one.id()).collect();
-    assert!(
-        listed.contains(&"shows") && listed.contains(&"sonarr"),
-        "{listed:?}"
-    );
+    assert_eq!(listed, vec!["shows"], "{listed:?}");
     let Some(shows) = curators(&fillers)
         .into_iter()
         .find(|one| one.id() == "shows")
@@ -481,8 +463,8 @@ fn a_contracted_service_filing_no_media_is_no_curator() {
     assert!(curators(&fillers).iter().all(|one| one.id() != "shows"));
 }
 
-/// A plugin's curator under the id of one of the stack's is told about none of the
-/// clients the stack's own asks for: their credentials were cleared for that one alone.
+/// A plugin's service under the id of one of the stack's curators, speaking no contract, is
+/// no curator and is told about none of the clients: only the moved curator is told.
 #[test]
 fn a_plugin_under_a_stack_curators_id_is_told_about_none_of_its_clients() {
     let mut impostor = crate::test_support::a_placed(
@@ -506,7 +488,7 @@ fn a_plugin_under_a_stack_curators_id_is_told_about_none_of_its_clients() {
 
     assert_eq!(
         told.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 0],
+        vec![2],
         "{told:?}"
     );
 }
@@ -519,7 +501,7 @@ async fn a_seed_over_a_record_of_plugins_that_will_not_read_is_refused() {
     let kept = env.with_file_name(crate::config::paths::PLUGINS);
     let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
     let _ = std::fs::write(&kept, "not a register");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_filesystem(Arc::new(
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_filesystem(Arc::new(
         SeedFs::keyed(Some(crate::test_support::KEYED_CURATOR)),
     ));
 
@@ -555,7 +537,7 @@ async fn the_moved_book_curator_is_asked_through_the_adapter_in_front_of_it() {
     use crate::test_support::books;
     let fillers = books_moved();
     let http = Fake::by_path(vec![books::root_folders(&[])]);
-    let ctx = books::asking(seed_ctx(true, Vec::new(), None, None)).with_http(http.clone());
+    let ctx = books::asking(seed_ctx(true, None, None)).with_http(http.clone());
 
     let curating = curators(&fillers);
     let bindery = curating.iter().find(|one| one.id() == books::PLUGIN);
@@ -652,7 +634,7 @@ async fn the_moved_book_curator_is_seeded_its_folder_and_clients_over_its_contra
         ),
         (books::curating("identity"), vec![books::unavailable()]),
     ]);
-    let ctx = books::asking(seed_ctx(true, Vec::new(), None, None)).with_http(http.clone());
+    let ctx = books::asking(seed_ctx(true, None, None)).with_http(http.clone());
     let curating = curators(&fillers);
     let contested = super::super::curating::contested(&curating);
     let held = both_held();

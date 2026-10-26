@@ -415,17 +415,40 @@ fn narrowing_to_one_member_is_forgiving_about_how_the_name_is_typed() {
     assert_eq!(names, vec!["Alex"]);
 }
 
+/// Alex's request `id` for a film awaiting approval, which no curator holds yet.
+fn awaiting(id: i64) -> HouseholdRequest {
+    HouseholdRequest {
+        id,
+        title_id: Some("603".to_owned()),
+        ..request(
+            "Alex",
+            Some(Kind::Movies),
+            None,
+            (RequestStatus::Pending, MediaStatus::Pending),
+        )
+    }
+}
+
+/// The request service's own record of the film awaiting approval, named where `named`.
+fn the_matrix(named: bool) -> crate::ports::service::Detail {
+    crate::ports::service::Detail {
+        title: named.then(|| "The Matrix".to_owned()),
+        year: named.then_some(1999),
+        status: MediaStatus::Pending,
+        overview: None,
+        certification: None,
+        released: true,
+        seasons: Vec::new(),
+        poster: None,
+    }
+}
+
 #[tokio::test]
 async fn the_household_view_reads_the_requests_and_names_them_from_the_library() {
     let context = ctx_with(
         &Fake {
-            answered: "",
-            requests: r#"{"pageInfo":{"results":1},"results":[
-                {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
-                 "requestedBy":{"displayName":"Alex"}}
-            ]}"#,
-            library: r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-            refuse: false,
+            requests: request_service::answered(&[arrived()]),
+            library: request_service::answered(&[the_expanse()]),
             ..Fake::default()
         },
         "reads",
@@ -444,13 +467,11 @@ async fn the_household_view_reads_the_requests_and_names_them_from_the_library()
 async fn a_request_awaiting_approval_is_named_from_the_request_services_own_record() {
     let context = ctx_with(
         &Fake {
-            answered: "",
-            requests: r#"{"pageInfo":{"results":1},"results":[
-                {"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
-                 "requestedBy":{"displayName":"Alex"},"createdAt":"2026-08-30T09:00:00Z"}
-            ]}"#,
-            library: "[]",
-            film: Some(r#"{"title":"The Matrix","releaseDate":"1999-03-31","status":"Released"}"#),
+            requests: request_service::answered(&[HouseholdRequest {
+                made: Some("2026-08-30T09:00:00Z".to_owned()),
+                ..awaiting(1)
+            }]),
+            film: Some(request_service::answered(&Some(the_matrix(true)))),
             ..Fake::default()
         },
         "unheld",
@@ -468,15 +489,8 @@ async fn a_request_awaiting_approval_is_named_from_the_request_services_own_reco
 async fn two_requests_for_one_title_awaiting_approval_are_both_named() {
     let context = ctx_with(
         &Fake {
-            answered: "",
-            requests: r#"{"pageInfo":{"results":2},"results":[
-                {"id":1,"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
-                 "requestedBy":{"displayName":"Alex"}},
-                {"id":2,"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
-                 "requestedBy":{"displayName":"Alex"}}
-            ]}"#,
-            library: "[]",
-            film: Some(r#"{"title":"The Matrix","releaseDate":"1999-03-31","status":"Released"}"#),
+            requests: request_service::answered(&[awaiting(1), awaiting(2)]),
+            film: Some(request_service::answered(&Some(the_matrix(true)))),
             ..Fake::default()
         },
         "shared",
@@ -494,13 +508,8 @@ async fn two_requests_for_one_title_awaiting_approval_are_both_named() {
 async fn a_request_nothing_names_is_still_shown() {
     let context = ctx_with(
         &Fake {
-            answered: "",
-            requests: r#"{"pageInfo":{"results":1},"results":[
-                {"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
-                 "requestedBy":{"displayName":"Alex"}}
-            ]}"#,
-            library: "[]",
-            film: Some(r#"{"status":"Released"}"#),
+            requests: request_service::answered(&[awaiting(1)]),
+            film: Some(request_service::answered(&Some(the_matrix(false)))),
             ..Fake::default()
         },
         "nameless",

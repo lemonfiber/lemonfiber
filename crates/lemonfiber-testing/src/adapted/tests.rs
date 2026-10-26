@@ -10,11 +10,12 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::super::context::a_context;
 use super::super::usenet::{ADAPTER, PLUGIN};
-use super::{asked_at, Adapted, Keyed, KEY};
+use super::{asked_at, Adapted, Keyed, KEY, PORT};
 
 const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 static NO_STACK: include_dir::Dir<'static> = include_dir::Dir::new("", &[]);
@@ -89,6 +90,52 @@ fn a_context_naming_an_env_file_records_the_moved_plugin_once_beside_it() {
             .collect::<Vec<_>>(),
         vec![PLUGIN]
     );
+}
+
+#[test]
+fn minting_for_a_second_curator_keeps_what_the_store_held_before() {
+    use super::super::curators::{MUSIC, TELEVISION};
+    let directory = Scratch::new("adapted-minted");
+    let mut ctx = embedded(Some(&directory));
+    ctx.settings.env_file = Some(directory.join(".env"));
+
+    TELEVISION.minted(&ctx, "television-key");
+    MUSIC.minted(&ctx, "music-key");
+
+    let store: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(directory.join(lemonfiber_core::config::paths::SECRETS))
+            .unwrap_or_default(),
+    )
+    .unwrap_or_default();
+    let held: Vec<(String, String)> = store
+        .get("held")
+        .and_then(serde_json::Value::as_object)
+        .map(|held| {
+            held.iter()
+                .map(|(name, one)| {
+                    (
+                        name.split(lemonfiber_manifest::container::NAMESPACED)
+                            .next()
+                            .unwrap_or_default()
+                            .to_owned(),
+                        one.get("value")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or_default()
+                            .to_owned(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    for (plugin, value) in [
+        (TELEVISION.plugin, "television-key"),
+        (MUSIC.plugin, "music-key"),
+    ] {
+        assert!(
+            held.contains(&(plugin.to_owned(), value.to_owned())),
+            "{plugin}: {held:?}"
+        );
+    }
 }
 
 #[test]

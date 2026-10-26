@@ -6,8 +6,8 @@
 //! where its configuration is written and published on the host's loopback, answering
 //! `owner.claim` and `indexer.search` over whatever transport the test scripts.
 
-use super::adapted::Adapted;
 pub use super::adapted::{claiming, held_by};
+use super::adapted::{Adapted, PORT};
 
 /// The plugin the Usenet indexer aggregator moved into.
 pub const PLUGIN: &str = "nzbhydra2";
@@ -19,6 +19,7 @@ pub const ADAPTER: &str = "nzbhydra2-adapter";
 pub const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 #[cfg(test)]

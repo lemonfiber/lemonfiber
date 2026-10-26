@@ -5,7 +5,7 @@ use super::*;
 
 #[tokio::test]
 async fn a_third_party_request_service_is_never_handed_a_token() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-third-party",
         true,
@@ -221,7 +221,7 @@ async fn a_request_service_that_cannot_be_asked_over_the_contract_is_handed_noth
 
 #[tokio::test]
 async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-rotate-arr",
         true,
@@ -252,19 +252,15 @@ async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
         rotation.consumers.first().map(|one| one.reach.clone()),
         Some(Reach::Updated)
     );
-    assert!(http
-        .requests()
-        .iter()
-        .any(|asked| asked.url.ends_with("/settings/sonarr/test")
-            && asked
-                .body
-                .as_deref()
-                .is_some_and(|body| body.contains(&minted()))));
+    assert_eq!(
+        told::<String>(&http.requests(), "test_fulfilment_target", "key"),
+        vec![minted()]
+    );
 }
 
 #[tokio::test]
 async fn a_curator_token_the_request_service_cannot_prove_is_taken_back() {
-    let http = serving("held", "linked", 200, &[500], 200);
+    let http = serving("held", "linked", taken(), vec![refusing()], taken());
     let (ctx, at) = scene(
         "tokens-rotate-unproven",
         true,
@@ -294,21 +290,15 @@ async fn a_curator_token_the_request_service_cannot_prove_is_taken_back() {
         )
     );
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
-    let moves: Vec<String> = http
-        .requests()
-        .into_iter()
-        .filter(|asked| asked.method == Method::Put)
-        .filter_map(|asked| asked.body)
-        .collect();
-    assert_eq!(moves.len(), 2, "{moves:?}");
-    assert!(moves
-        .last()
-        .is_some_and(|body| body.contains("\"apiKey\":\"held\"")));
+    assert_eq!(
+        told::<String>(&http.requests(), "move_fulfilment_target", "key"),
+        vec![minted(), "held".to_owned()]
+    );
 }
 
 #[tokio::test]
 async fn the_media_server_token_is_replaced_once_the_request_service_keeps_it() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-rotate-jellyfin",
         true,
@@ -336,7 +326,7 @@ async fn the_media_server_token_is_replaced_once_the_request_service_keeps_it() 
     );
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[&minted()])));
 
-    let refused = serving("held", "linked", 200, &[200], 400);
+    let refused = serving("held", "linked", taken(), vec![taken()], refusing());
     let (ctx, at) = scene(
         "tokens-rotate-unlinked",
         true,
@@ -358,7 +348,7 @@ async fn the_media_server_token_is_replaced_once_the_request_service_keeps_it() 
 
 #[tokio::test]
 async fn a_rotation_that_cannot_start_changes_nothing() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-rotate-unstarted",
         true,
@@ -417,10 +407,7 @@ async fn a_rotation_that_cannot_start_changes_nothing() {
         matches!(rehearsed.settled, Settled::Rehearsed { .. }),
         "{rehearsed:?}"
     );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method != Method::Get));
+    assert!(!written(&http));
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
 }
 
@@ -439,25 +426,17 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
         )
     };
     for (name, moved, unheld, blocked) in [
-        ("tokens-rotate-unmoved", 500, false, false),
-        ("tokens-rotate-untargeted", 200, true, false),
-        ("tokens-rotate-unwritable", 200, false, true),
+        ("tokens-rotate-unmoved", refusing(), false, false),
+        ("tokens-rotate-untargeted", taken(), true, false),
+        ("tokens-rotate-unwritable", taken(), false, true),
     ] {
         let http = if unheld {
-            beside_the_gates_key(vec![
-                (
-                    Method::Get,
-                    "/settings/radarr",
-                    vec![Answer::reply(200, "[]")],
-                ),
-                (
-                    Method::Get,
-                    "/settings/sonarr",
-                    vec![Answer::reply(200, "[]")],
-                ),
-            ])
+            beside_the_gates_key(vec![(
+                intake("fulfilment_targets"),
+                vec![answered(&Vec::<RegisteredTarget>::new())],
+            )])
         } else {
-            serving("held", "linked", moved, &[200], 200)
+            serving("held", "linked", moved, vec![taken()], taken())
         };
         let (ctx, at) = scene(name, true, &accepting(&["held"], &[]), http, true);
         let ctx = if blocked {
@@ -481,7 +460,7 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
         } else if unheld {
             not_handed_yet()
         } else {
-            not_proven("seerr answered unexpectedly: HTTP 500")
+            not_proven("seerr-adapter answered unexpectedly: refused in a test")
         };
 
         let rotation = rotate(
@@ -503,7 +482,7 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
 
 #[tokio::test]
 async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-rotate-unretired",
         true,
@@ -549,11 +528,7 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
 /// old leaves the gate accepting the old one alone again.
 #[tokio::test]
 async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
-    let http = beside_the_gates_key(vec![(
-        Method::Get,
-        "/settings/sonarr",
-        vec![Answer::Silent],
-    )]);
+    let http = beside_the_gates_key(vec![(intake("fulfilment_targets"), vec![Answer::Silent])]);
     let (ctx, at) = scene(
         "tokens-rotate-unanswered",
         true,
@@ -573,7 +548,7 @@ async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
 
     assert_eq!(
         unproven(&rotation.settled),
-        Some(not_proven("seerr is not answering").as_str())
+        Some(not_proven("seerr-adapter is not answering").as_str())
     );
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
 }

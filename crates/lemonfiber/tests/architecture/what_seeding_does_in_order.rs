@@ -1,7 +1,7 @@
 //! What seeding must act on, and what it must do before what.
 //!
-//! Two rules about one run. A service's declared API is the thing that decides
-//! whether its credential is ever read, so a kind the manifest allows and nothing
+//! Two rules about one run. Where a service says its credential comes from is the thing
+//! that decides whether it is ever read, so a source the manifest allows and nothing
 //! here answers is a service whose key is never published — which reads downstream
 //! as a service with nothing to say. And the request service refuses every call
 //! until it has an owner, so registering the curators into it before that step
@@ -15,27 +15,30 @@ use std::fs;
 
 use crate::source_tree::{production, sources, workspace_root};
 
-/// Every API a service can declare is one seeding acts on.
+/// Every place a service can say its credential comes from is one lemonfiber reads.
 ///
-/// A service's `api.kind` is what decides whether its credential is ever read: adding
-/// a kind to the manifest without a client to answer it leaves that service declaring
-/// an API nothing speaks, and the only symptom is a key that never gets published —
-/// which reads downstream as a service with nothing to say.
+/// A service's `api.key_source` is what decides whether its credential is ever read:
+/// adding a source to the manifest without a reader to answer it leaves that service
+/// declaring a key nothing reads, and the only symptom is a key that never gets
+/// published — which reads downstream as a service with nothing to say. Which service it
+/// is decides nothing: a part a plugin brings is asked over its contract, and its key is
+/// read by the shape of the file it is written in.
 ///
-/// The stack keeps its own list of kinds it will accept, so this is the second half of
-/// that pair: the stack refuses a kind nothing here implements, and this refuses a kind
-/// nothing here acts on. Two lists agreeing is what makes either of them mean anything.
+/// The stack keeps its own list of sources it will accept, so this is the second half of
+/// that pair: the stack refuses a source nothing here implements, and this refuses a
+/// source nothing here acts on. Two lists agreeing is what makes either of them mean
+/// anything.
 #[test]
-fn every_api_a_service_can_declare_is_acted_on() {
+fn every_key_source_a_service_can_declare_is_acted_on() {
     let schema =
         fs::read_to_string(workspace_root().join("crates/lemonfiber-manifest/src/schema/api.rs"))
             .unwrap_or_default();
     let Some(block) = schema
-        .split_once("pub enum ApiKind {")
+        .split_once("pub enum KeySource {")
         .and_then(|(_, rest)| rest.split_once('}'))
         .map(|(block, _)| block)
     else {
-        unreachable!("the manifest declares the API kinds a service may name");
+        unreachable!("the manifest declares where a service's credential may come from");
     };
     let declared: Vec<&str> = block
         .lines()
@@ -46,7 +49,7 @@ fn every_api_a_service_can_declare_is_acted_on() {
         .collect();
     assert!(
         declared.len() > 3,
-        "the API kinds were not read: {declared:?}"
+        "the key sources were not read: {declared:?}"
     );
 
     let acted_on: String = sources()
@@ -54,20 +57,19 @@ fn every_api_a_service_can_declare_is_acted_on() {
         .filter(|(path, _)| {
             path.to_string_lossy()
                 .replace('\\', "/")
-                .contains("/src/app")
+                .contains("lemonfiber-core/src/credential")
         })
         .map(|(_, text)| text)
         .collect();
 
     let ignored: Vec<&str> = declared
         .iter()
-        .filter(|kind| !acted_on.contains(&format!("ApiKind::{kind}")))
+        .filter(|source| !acted_on.contains(&format!("KeySource::{source}")))
         .copied()
         .collect();
     assert!(
         ignored.is_empty(),
-        "a service declaring one of these names an API nothing acts on, so its \
-         credential is never read: {ignored:?}"
+        "a service declaring one of these names a credential nothing reads: {ignored:?}"
     );
 }
 

@@ -1,29 +1,25 @@
-//! Opening an authenticated client for a service.
+//! Asking a service over its contract.
 //!
-//! A target says where a service is and where its key is written; this reads the key and
-//! hands back something that can talk. Absent where the key is not written yet, which is a
-//! service still starting rather than a fault.
+//! Each reader here finds the service a read is made of among the fillers and hands back
+//! the adapter that answers for it. Absent where that adapter cannot be asked yet, which
+//! is a service still starting rather than a fault.
 
-use std::path::Path;
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::indexer::search;
+use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_contract::capabilities::request::intake;
-use lemonfiber_manifest::ApiKind;
 
 use crate::app::Ctx;
-use crate::doctor::credentials::Target;
 use crate::ports::service::UsenetAccounts;
-use crate::prowlarr::Prowlarr;
-use crate::seerr::Seerr;
-use crate::servarr::Servarr;
-use crate::wiring::{Filler, Fillers, Holder};
+use crate::wiring::{Filler, Fillers};
 
 use crate::recyclarr::Kind;
 
-use super::curators::{curator_targets, target_for};
+use super::curators::curator_targets;
 use super::downloads::{download_targets, DownloadTarget};
 use super::filled::{spoken, Spoken};
-use super::layout::{project_directory, read_owned, service_config_dir};
+use super::media::fillers_here;
 
 /// The server the decline service acts on: the stack's own service its link by name
 /// reaches, or the first-party service standing in for it, rather than whatever serves
@@ -34,44 +30,37 @@ pub(crate) fn declined_server(fillers: &Fillers) -> Option<super::MediaServer> {
     super::MediaServer::at(fillers, fillers.fronting(named).unwrap_or(named))
 }
 
-/// One curator a read can be made against: the service it files, a client already carrying
-/// its key, and the name a report calls it by.
+/// One curator a read can be made against: the kind of video it files, the curator over
+/// its contract, and the name a report calls it by.
 pub(crate) struct OpenCurator {
     /// The service's display name, as a report names where a fact came from.
     pub name: String,
     /// Which of the two media services it is.
     pub kind: Kind,
-    /// A client carrying the key it wrote.
-    pub service: Servarr,
+    /// The curator, asked through the adapter in front of it.
+    pub service: Arc<dyn curate::Fills>,
 }
 
-/// Every curator whose key could be read, ready to be asked something.
+/// Every curator of video that can be asked, ready to be asked something.
 ///
-/// One that has not finished starting has not written its key yet, so it cannot be opened
-/// and is left out. That is deliberately not a failed read: a service still coming up
-/// holds nothing to report, so its absence understates nothing — the convention every
-/// caller here follows, stated once rather than re-derived at each of them.
+/// One whose adapter cannot be asked yet is left out. That is deliberately not a failed
+/// read: a service still coming up holds nothing to report, so its absence understates
+/// nothing — the convention every caller here follows, stated once rather than
+/// re-derived at each of them.
 pub(crate) async fn open_curators(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
 ) -> Vec<OpenCurator> {
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = fillers_here(ctx, manifest);
     let mut open = Vec::new();
-    for target in curator_targets(services, project.as_deref()) {
-        let Some(kind) = target.kind else {
-            continue;
-        };
-        let Some(service) = target
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await
-        else {
-            continue;
-        };
-        open.push(OpenCurator {
-            name: target.name.clone(),
-            kind,
-            service,
-        });
+    for target in curator_targets(ctx, &fillers).await {
+        if let (Some(kind), Some(service)) = (target.kind, target.asked) {
+            open.push(OpenCurator {
+                name: target.name,
+                kind,
+                service,
+            });
+        }
     }
     open
 }
@@ -93,20 +82,15 @@ pub(crate) async fn household_requests(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
 ) -> Option<HouseholdAccess> {
-    let fillers = super::media::fillers_here(ctx, manifest);
+    let fillers = fillers_here(ctx, manifest);
     super::media::MediaServer::of(&fillers)?;
     requests_from(ctx, &fillers).await
 }
 
-/// Whatever among `fillers` fills `request.intake`, asked over the contract where it
-/// speaks it, and otherwise as the stack's own request service holding the key it wrote
-/// for itself.
-///
-/// Nothing where nothing here fills it, where it speaks the contract and cannot be
-/// asked over it — never then asked any other way — or where it speaks none and is not
-/// the stack's own request service holding its key.
+/// Whatever among `fillers` fills `request.intake`, asked over its contract: nothing
+/// where nothing here fills it or it cannot be asked over it.
 pub(crate) async fn requests_from(ctx: &Ctx, fillers: &Fillers) -> Option<HouseholdAccess> {
-    let requests = asked(ctx, request_service(fillers)?, Unkeyed::Skipped).await?;
+    let requests = requests_as_owner(ctx, request_service(fillers)?).await?;
     Some(HouseholdAccess { requests })
 }
 
@@ -118,77 +102,16 @@ pub(crate) fn request_service(fillers: &Fillers) -> Option<&Filler> {
         .map(|(filler, _)| filler)
 }
 
-/// The request service `filler` is, asked as its owner: over `request.intake` where it
-/// speaks it, otherwise the stack's own request service holding the key it wrote for
-/// itself, or holding none where it has not written one yet, so whatever uses it reports
-/// the refusal in its own words. Nothing where it speaks the contract and cannot be asked
-/// over it, or where [`bundled_requests`] refuses it.
+/// The request service `filler` is, asked as its owner over `request.intake`: nothing
+/// where it does not speak the contract or cannot be asked over it.
 pub(crate) async fn requests_as_owner(
     ctx: &Ctx,
     filler: &Filler,
 ) -> Option<Arc<dyn intake::Fills>> {
-    asked(ctx, filler, Unkeyed::Asked).await
-}
-
-/// Whether the stack's own request service is asked before it has written its key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Unkeyed {
-    /// Asked holding no key, so it answers with its own refusal.
-    Asked,
-    /// Not asked at all.
-    Skipped,
-}
-
-/// The request service `filler` is: over `request.intake` where it speaks it, nothing
-/// where it speaks it and cannot be asked over it, and otherwise the stack's own request
-/// service where [`bundled_requests`] lets it be, holding the key it wrote for itself or,
-/// where `unkeyed` asks it, none.
-async fn asked(ctx: &Ctx, filler: &Filler, unkeyed: Unkeyed) -> Option<Arc<dyn intake::Fills>> {
     match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(intake::Adapter(adapter))),
-        Spoken::Unanswered => None,
-        Spoken::Not => {
-            let base = bundled_requests(filler)?;
-            let key = requests_key(ctx, filler).await;
-            if key.is_none() && unkeyed == Unkeyed::Skipped {
-                return None;
-            }
-            Some(Arc::new(holding(ctx, filler, base, key)))
-        }
+        Spoken::Unanswered | Spoken::Not => None,
     }
-}
-
-/// The stack's own request service `filler`, reached at `base`, as its owner: holding
-/// the key it wrote for itself, or none before it has written one.
-pub(crate) async fn owned_requests(ctx: &Ctx, filler: &Filler, base: String) -> Seerr {
-    holding(ctx, filler, base, requests_key(ctx, filler).await)
-}
-
-/// The stack's own request service `filler`, reached at `base`, holding `key` where it
-/// has written one.
-fn holding(ctx: &Ctx, filler: &Filler, base: String, key: Option<String>) -> Seerr {
-    let http = ctx.seams.http.clone();
-    match key {
-        Some(key) => Seerr::keyed(http, base, &filler.id, key),
-        None => Seerr::new(http, base, &filler.id),
-    }
-}
-
-/// Where the host reaches `filler` as the stack's own request service: nothing where it
-/// is a plugin's, is spoken to through another adapter, or publishes no port. The one
-/// gate before the stack's own request service is asked through this build's adapter
-/// for it.
-pub(crate) fn bundled_requests(filler: &Filler) -> Option<String> {
-    (filler.holder() == Holder::Stack && filler.speaks(ApiKind::Seerr))
-        .then_some(filler.published)
-        .flatten()
-        .map(loopback)
-}
-
-/// The key the stack's own request service `filler` wrote for itself, read from the
-/// settings beneath its own directory; nothing before it has written one.
-async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
-    crate::seerr::api_key(&credential_file(ctx, filler).await.text()?)
 }
 
 /// What the file a service's credential is read from holds.
@@ -220,11 +143,6 @@ pub(crate) fn escaped(filler: &Filler) -> String {
     )
 }
 
-/// Where this machine reaches a service that publishes this port.
-pub(crate) fn loopback(port: u16) -> String {
-    format!("http://127.0.0.1:{port}")
-}
-
 /// The first Usenet download client among `fillers`, as a reader of the accounts behind
 /// it.
 ///
@@ -239,72 +157,17 @@ pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dy
     Some(Arc::from(client))
 }
 
-/// The curator-shape service that files no media of its own — the indexer aggregator,
-/// which is what makes it the one that knows how the indexers have been behaving.
+/// The indexer the stack searches through, asked over `indexer.search`: the service
+/// filling it as the stack settles it, and nothing where nothing here fills it or it
+/// cannot be asked over it.
 ///
-/// Identified by what it does rather than by name, like every other service here, so a
-/// fork that ships a different aggregator under the same shape resolves the same way.
-pub(crate) fn aggregator_target(
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
-) -> Option<Target> {
-    let project = project?;
-    // A plain walk rather than a closure: this resolves from two callers in two
-    // crates, and a closure instantiated in both is one the coverage gate counts
-    // twice and sees run once.
-    for service in services {
-        if !service.media_types.is_empty() {
-            continue;
-        }
-        if let Some(target) = target_for(service, project) {
-            return Some(target);
-        }
+/// It is the one that knows how the indexers have been behaving.
+pub(crate) async fn indexer_aggregator(ctx: &Ctx, fillers: &Fillers) -> Option<search::Adapter> {
+    let (filler, _) = fillers.filling(search::CAPABILITY)?;
+    match spoken(ctx, filler, search::CAPABILITY, search::MAJOR).await {
+        Spoken::Over(adapter) => Some(search::Adapter(adapter)),
+        Spoken::Unanswered | Spoken::Not => None,
     }
-    None
-}
-
-/// The indexer aggregator, ready to be asked how its indexers have been behaving.
-///
-/// Its API is a major behind the media curators', which is why it is its own client
-/// rather than the shared curator one — but it writes its key exactly the way they do.
-pub(crate) async fn indexer_aggregator(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
-) -> Option<Prowlarr> {
-    let target = aggregator_target(services, project)?;
-    let key = target.key(ctx.seams.filesystem.as_ref()).await?;
-    Some(Prowlarr::new(
-        ctx.seams.http.clone(),
-        &target.base,
-        key,
-        &target.id,
-    ))
-}
-
-/// The request service's own key, read from the settings file it writes.
-///
-/// Published with the rest of the stack's keys, and the key lemonfiber itself reads and
-/// writes the request service with. Nothing before the request service is initialised,
-/// since that is the run that writes one.
-pub(crate) async fn stack_requests_key(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&std::path::Path>,
-) -> Option<String> {
-    let service = services.iter().find(|service| {
-        service
-            .api
-            .as_ref()
-            .is_some_and(|api| api.kind == ApiKind::Seerr)
-    })?;
-    let path = crate::app::targets::config_path(
-        project?,
-        service,
-        service.api.as_ref().and_then(|api| api.path.as_deref()),
-    )?;
-    let within = service_config_dir(project?, &service.id);
-    crate::seerr::api_key(&read_owned(ctx.seams.filesystem.as_ref(), &path, &within).await?)
 }
 
 #[cfg(test)]

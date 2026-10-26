@@ -185,7 +185,10 @@ fn held_upstream(held: &Throwaway) -> Result<Option<serde_json::Map<String, Valu
 /// # Errors
 ///
 /// Where what it holds is not an object, or the file could not be written.
-pub(super) fn handed_over(held: &Throwaway, fields: &[(String, String)]) -> Result<(), String> {
+pub(in crate::plugin) fn handed_over(
+    held: &Throwaway,
+    fields: &[(String, String)],
+) -> Result<(), String> {
     let mut kept = held_upstream(held)?.unwrap_or_default();
     for (field, value) in fields {
         kept.insert(field.clone(), Value::String(value.clone()));

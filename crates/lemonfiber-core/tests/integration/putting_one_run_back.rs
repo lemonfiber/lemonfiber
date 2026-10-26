@@ -20,7 +20,8 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::repair::run::{Left, Reversal};
 use lemonfiber_fixtures::files::Files;
-use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_testing::curators::{curating, taken, TELEVISION};
 
 /// The operation a first-run wizard records its work under.
 const SEED: &str = "seed";
@@ -33,36 +34,32 @@ fn paths(root: &Path) -> Paths {
     Paths::rooted(&root.join("config"), &root.join("data"))
 }
 
-/// A curator's config carrying a readable key, so the target opens.
-const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
-
-/// The client as the service holds it, and its answer to being written back.
+/// The curator taking a field of one of its download clients written back.
 fn answering() -> Arc<Fake> {
-    Fake::by_path(vec![(
-        "downloadclient/7",
-        Answer::reply(
-            200,
-            r#"{"id":7,"fields":[{"name":"host","value":"sabnzbd"},{"name":"tvCategory","value":"tv-sonarr"}]}"#,
-        ),
-    )])
+    Fake::by_path(vec![(curating(TELEVISION, "set_client_field"), taken())])
 }
 
-/// A context whose curator opens and answers, so a change inside it can go back.
+/// A context whose curator, moved into its plugin, is asked through the adapter in front
+/// of it and answers, so a change inside it can go back.
 fn reaching(root: &Path) -> Ctx {
-    lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![("config/sonarr/config.xml", CONFIG)]))
-        .settings(Settings {
-            env_file: Some(paths(root).env_file()),
-            stack_dir: Some(project().to_path_buf()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(answering())
+    let ctx = TELEVISION.asking(
+        lemonfiber_testing::a_live_context()
+            .filesystem(Files::empty())
+            .settings(Settings {
+                env_file: Some(paths(root).env_file()),
+                stack_dir: Some(project().to_path_buf()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(answering()),
+    );
+    TELEVISION.recorded(&ctx);
+    ctx
 }
 
 fn ctx(root: &Path) -> Ctx {
     lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .settings(Settings {
             env_file: Some(paths(root).env_file()),
             stack_dir: Some(project().to_path_buf()),
@@ -383,7 +380,7 @@ async fn what_a_reversal_could_not_reach_is_reported_beside_what_it_did() {
 #[tokio::test]
 async fn a_machine_that_cannot_say_where_its_record_is_refuses() {
     let nowhere = lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .build()
         .with_http(Fake::silent());
 
@@ -519,7 +516,7 @@ async fn a_stack_that_cannot_be_read_stops_the_reversal() {
     journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
 
     let nowhere = lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .over(lemonfiber_testing::nowhere())
         .settings(Settings {
             env_file: Some(paths(&root).env_file()),

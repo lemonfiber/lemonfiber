@@ -15,7 +15,7 @@ use super::walk::Walk;
 use crate::app::targets::{download_targets, host_fillers, project_directory, read_transfers};
 use crate::app::Ctx;
 use crate::ports::docker::LogQuery;
-use crate::ports::service::{Added, Pipeline, QueueItem, TraceEvent};
+use crate::ports::service::{Added, QueueItem, TraceEvent};
 use crate::trace::{Outcome, Stage};
 use crate::walkthrough::{Line, Reason, Speed, Step};
 
@@ -187,7 +187,7 @@ const fn past_patience(furthest: Step) -> Landed {
     }
 }
 
-/// What the services were saying, for a stop to quote.
+/// What the curators named `curators` were saying, for a stop to quote.
 ///
 /// The explanation for a failed import is almost always in the curator's own output, and an
 /// operator who has to go and find it has been handed a fault report rather than a
@@ -203,28 +203,19 @@ const fn past_patience(furthest: Step) -> Landed {
 /// shape of a setting — so a stack running a service called `authelia` or `keycloak` would
 /// have had every line of its output replaced by a redaction, the marker word in its name
 /// eating the sentence it introduced.
-pub(super) async fn what_was_said(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    title: &str,
-) -> Vec<String> {
+pub(super) async fn what_was_said(ctx: &Ctx, curators: &[String], title: &str) -> Vec<String> {
     /// How many lines are worth putting under a failure before it stops being a
     /// diagnosis and starts being a log dump.
     const KEPT: usize = 5;
 
-    let named: Vec<String> = services
-        .iter()
-        .filter(|service| matches!(service.api.as_ref().map(|api| api.kind), Some(kind) if is_curator(kind)))
-        .map(|service| service.id.clone())
-        .collect();
-    if named.is_empty() {
+    if curators.is_empty() {
         return Vec::new();
     }
     let query = LogQuery::last_words();
     let Ok(mut lines) = ctx
         .seams
         .engine
-        .logs(&ctx.settings.project, &named, query)
+        .logs(&ctx.settings.project, curators, query)
         .await
     else {
         return Vec::new();
@@ -248,11 +239,6 @@ pub(super) async fn what_was_said(
         about_it = recent;
     }
     about_it.split_off(about_it.len().saturating_sub(KEPT))
-}
-
-/// Whether an API kind is one of the library managers whose output explains an import.
-const fn is_curator(kind: lemonfiber_manifest::ApiKind) -> bool {
-    matches!(kind, lemonfiber_manifest::ApiKind::Servarr)
 }
 
 #[cfg(test)]

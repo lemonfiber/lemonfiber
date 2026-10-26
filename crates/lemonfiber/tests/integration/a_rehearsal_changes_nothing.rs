@@ -301,6 +301,7 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
             occupancy: Walking::holding(Vec::new()),
             hosting: Arc::clone(&hosting) as Arc<dyn lemonfiber_core::ports::Host>,
             program: lemonfiber_fixtures::proving::Proving::unreachable(),
+            serving: lemonfiber_fixtures::serving::Serves::unreachable(),
             registry: lemonfiber_fixtures::registered::Registered::unpublished(),
             ..lemonfiber_adapters::live()
         },

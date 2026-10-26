@@ -1,15 +1,15 @@
 //! A setting edited by hand, shown before anything is written.
 
 use super::{
-    changing, common, env_at, held, over, reaching, refusal, remembering, stance, stood_up, AGREED,
-    DATA_ROOT, UNSAID, USENET,
+    changing, common, env_at, held, library, over, reaching, refusal, remembering, stance,
+    stood_up, AGREED, DATA_ROOT, UNSAID, USENET,
 };
 use lemonfiber_core::app::{dispatch, Command, Setting};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::reconfigure::Stance;
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::seeding_routes;
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_testing::curators::unavailable;
 use std::path::PathBuf;
 
 #[cfg(unix)]
@@ -32,7 +32,7 @@ async fn a_change_that_cannot_reach_the_file_reports_that_rather_than_a_proposal
             ..Settings::default()
         },
         Source::External(common::stack::project()),
-        Fake::by_path(seeding_routes()),
+        Fake::by_path(library()),
         Vec::new(),
     );
 
@@ -87,7 +87,7 @@ async fn a_setting_edited_by_hand_is_shown_from_both_sides_before_anything_is_wr
         env.clone(),
         &from,
         Protocols::none(),
-        Fake::by_path(vec![("", Answer::reply(500, "no"))]),
+        Fake::by_path(vec![("", unavailable())]),
         vec!["/mnt/theirs/media"],
     );
 

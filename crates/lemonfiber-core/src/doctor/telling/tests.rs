@@ -1,19 +1,33 @@
 use super::{TellingCheck, BEHIND};
 use crate::baseline::Baseline;
 use crate::doctor::{Category, Check, Verdict};
+use crate::ports::service::{Occasion, Telling};
 use crate::seed::{said, wanted_telling, TELLING};
-use crate::seerr::Seerr;
+use crate::test_support::requests::{answered, intake, REQUESTS};
+use lemonfiber_contract::capabilities::request::intake as contract;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 /// A telling that is on, but not for the occasions lemonfiber would choose.
-const SOME: &str = r#"{"enabled":true,"types":8}"#;
+fn some() -> Answer {
+    holding(true, &[Occasion::Arrived])
+}
 
-/// The real client over a scripted service, so the check reads the request this
-/// product actually sends.
+/// What the request service answers holding a telling, on where `enabled` says, for
+/// `occasions`.
+fn holding(enabled: bool, occasions: &[Occasion]) -> Answer {
+    answered(&Telling {
+        enabled,
+        occasions: occasions.iter().copied().collect(),
+        others: false,
+    })
+}
+
+/// The request service over its contract, answering its telling as `answer`, so the
+/// check reads the request this product actually sends.
 fn asking(answer: Answer) -> Arc<dyn crate::ports::service::Requests> {
-    let http = Fake::by_path_in_turn(vec![("/settings/notifications/webpush", vec![answer])]);
-    Arc::new(Seerr::new(http, "http://seerr:5055", "seerr"))
+    let http = Fake::by_path(vec![(intake("telling"), answer)]);
+    Arc::new(contract::Adapter(REQUESTS.contracted(http)))
 }
 
 fn recorded(value: &str) -> Baseline {
@@ -65,26 +79,15 @@ async fn a_service_that_will_not_answer_is_unverified_rather_than_a_fault() {
 
 #[tokio::test]
 async fn a_telling_nobody_has_set_up_is_seedings_errand_rather_than_a_fault() {
-    let verdict = verdict_for(
-        Answer::reply(200, r#"{"enabled":false,"types":0}"#),
-        &Baseline::new(),
-    )
-    .await;
+    let verdict = verdict_for(holding(false, &[]), &Baseline::new()).await;
 
     assert!(matches!(verdict, Verdict::Skipped { .. }), "{verdict:?}");
 }
 
 #[tokio::test]
 async fn a_household_told_everything_passes_and_says_so() {
-    let held = format!(
-        r#"{{"enabled":true,"types":{}}}"#,
-        crate::seerr::bits(&wanted_telling().occasions)
-    );
-    let verdict = verdict_for(
-        Answer::reply(200, held),
-        &recorded(&said(&wanted_telling())),
-    )
-    .await;
+    let held = answered(&wanted_telling());
+    let verdict = verdict_for(held, &recorded(&said(&wanted_telling()))).await;
 
     assert!(
         matches!(&verdict, Verdict::Pass { note } if note.as_deref().is_some_and(|said| said.contains("decided"))),
@@ -100,22 +103,14 @@ async fn a_household_told_everything_passes_and_says_so() {
 #[tokio::test]
 async fn a_setting_the_operator_chose_is_reported_as_theirs_whichever_way_they_set_it() {
     // Narrowed: still sending, but not what lemonfiber would choose.
-    let narrowed = verdict_for(
-        Answer::reply(200, SOME),
-        &recorded(&said(&wanted_telling())),
-    )
-    .await;
+    let narrowed = verdict_for(some(), &recorded(&said(&wanted_telling()))).await;
     assert!(
         matches!(&narrowed, Verdict::Pass { note } if note.as_deref().is_some_and(|said| said.contains("not what"))),
         "{narrowed:?}"
     );
 
     // Switched off entirely: the household hears nothing, and they chose that.
-    let silent = verdict_for(
-        Answer::reply(200, r#"{"enabled":false,"types":0}"#),
-        &recorded(&said(&wanted_telling())),
-    )
-    .await;
+    let silent = verdict_for(holding(false, &[]), &recorded(&said(&wanted_telling()))).await;
     assert!(
         matches!(&silent, Verdict::Pass { note } if note.as_deref().is_some_and(|said| said.contains("nothing"))),
         "{silent:?}"
@@ -129,7 +124,7 @@ async fn a_setting_the_operator_chose_is_reported_as_theirs_whichever_way_they_s
 /// less than it should with no sign anything is missing.
 #[tokio::test]
 async fn lemonfibers_own_value_fallen_behind_is_the_thing_that_warns() {
-    let verdict = verdict_for(Answer::reply(200, SOME), &recorded("on:8")).await;
+    let verdict = verdict_for(some(), &recorded("on:8")).await;
 
     assert!(
         matches!(&verdict, Verdict::Warn(problem) if problem.code == BEHIND),

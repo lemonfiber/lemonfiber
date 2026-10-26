@@ -9,12 +9,11 @@
 //! confirmed, and only then asks each curator to re-search what it already has for a
 //! better release meeting the raised bar.
 
-use super::targets::{curator_targets, project_directory};
+use super::targets::{curator_targets, fillers_here};
 use super::Ctx;
 use crate::doctor::credentials::Target;
 use crate::error::{Diagnose, Problem};
 use crate::model::{Triggered, UpgradeMedia, UpgradeReport};
-use crate::ports::service::Maintenance;
 use crate::recyclarr::Kind;
 
 /// State the cost of upgrading existing content to the chosen quality, per media
@@ -32,7 +31,6 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
 
     // A confirmed run is the largest acquisition this product can start — the whole
     // library re-fetched — so it is the one that must not start onto a disk with no
@@ -43,7 +41,7 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
     }
 
     let mut media = Vec::new();
-    for target in curator_targets(&manifest.services, project.as_deref()) {
+    for target in curator_targets(ctx, &fillers_here(ctx, &manifest)).await {
         let Some(kind) = target.kind else {
             continue;
         };
@@ -51,7 +49,7 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
         // Unconfirmed states the cost and touches nothing — the deliberate gate a
         // large, bandwidth-expensive operation sits behind.
         let outcome = if confirm {
-            Some(trigger(ctx, kind, &target).await)
+            Some(trigger(kind, &target).await)
         } else {
             None
         };
@@ -72,11 +70,8 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
 /// Ask one resolution curator to re-search its existing content for an upgrade, and read
 /// what it said. The curator searches against its own current cutoff — whatever the last
 /// applied preset set — so what actually upgrades is what sits below that bar.
-async fn trigger(ctx: &Ctx, kind: Kind, target: &Target) -> Triggered {
-    match target
-        .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-        .await
-    {
+async fn trigger(kind: Kind, target: &Target) -> Triggered {
+    match &target.asked {
         None => Triggered::NotStarted,
         Some(service) => match service.search_upgrades(kind).await {
             Ok(()) => Triggered::Started,

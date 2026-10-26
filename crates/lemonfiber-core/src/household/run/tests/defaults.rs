@@ -5,33 +5,37 @@ use crate::app::Whom;
 use crate::model::MemberStanding;
 
 /// What the request service holds for the household: nothing arrives unseen, and five
-/// films a week.
-const FIVE_A_WEEK: &str =
-    r#"{"defaultPermissions":32,"defaultQuotas":{"movie":{"quotaLimit":5,"quotaDays":7}}}"#;
+/// a week.
+fn five_a_week() -> crate::ports::service::Asking {
+    crate::ports::service::Asking {
+        approves_own: false,
+        quota: Some(crate::ports::service::Quota {
+            requests: 5,
+            days: 7,
+        }),
+    }
+}
 
-/// A household whose request service answers, and whose media server would name
-/// everybody in it if anybody asked.
-fn answering(main: &'static str, refuse: bool) -> Arc<Transport> {
-    Transport::by_path(vec![
-        (
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        ("/Users", Answer::reply(200, Fake::default().accounts)),
-        (
-            "/auth/me",
-            Answer::reply(if refuse { 403 } else { 200 }, ""),
-        ),
-        ("/settings/main", Answer::reply(200, main)),
-        ("", Answer::reply(200, "[]")),
-    ])
+/// A household whose request service answers what it allows as `asking`, refusing
+/// lemonfiber's key where `refuse`.
+fn answering(asking: crate::ports::service::Asking, refuse: bool) -> Arc<Transport> {
+    Fake {
+        answers: if refuse {
+            request_service::refusing()
+        } else {
+            request_service::taken()
+        },
+        asking: request_service::answered(&asking),
+        ..Fake::default()
+    }
+    .transport()
 }
 
 /// The defaults are told what the household's own setting allows, as a member who has
 /// asked for nothing yet: all of a period left, under no name.
 #[tokio::test]
 async fn the_defaults_are_told_what_the_household_allows() {
-    let context = ctx_over(answering(FIVE_A_WEEK, false), "defaults-told", false);
+    let context = ctx_over(answering(five_a_week(), false), "defaults-told", false);
 
     let report = household(&context, Some(&Whom::Defaults))
         .await
@@ -62,7 +66,7 @@ async fn the_defaults_are_told_what_the_household_allows() {
 /// Reading the defaults reads nobody: no account list, no requests and nobody's count.
 #[tokio::test]
 async fn the_defaults_read_no_account() {
-    let transport = answering(FIVE_A_WEEK, false);
+    let transport = answering(five_a_week(), false);
     let context = ctx_over(Arc::clone(&transport), "defaults-nobody", false);
 
     let _ = household(&context, Some(&Whom::Defaults)).await;
@@ -73,28 +77,29 @@ async fn the_defaults_read_no_account() {
         .map(|one| one.url)
         .collect();
     assert!(
-        asked.iter().any(|url| url.contains("/settings/main")),
+        asked
+            .iter()
+            .any(|url| url.ends_with(request_service::intake("asking"))),
         "the household's own setting was never asked: {asked:?}"
     );
-    for nobody in ["/api/v1/request", "/quota", "/user/"] {
+    for nobody in [
+        request_service::intake("requests"),
+        request_service::intake("left"),
+        request_service::intake("member_for"),
+        media::identity("household"),
+    ] {
         assert!(
-            !asked.iter().any(|url| url.contains(nobody)),
+            !asked.iter().any(|url| url.ends_with(nobody)),
             "{nobody} was read for the defaults: {asked:?}"
         );
     }
-    assert!(
-        !asked
-            .iter()
-            .any(|url| url.contains("/Users") && !url.contains("/Users/AuthenticateByName")),
-        "an account was read for the defaults: {asked:?}"
-    );
 }
 
 /// A request service that will not answer leaves the defaults with no policy, said as
 /// unread rather than as unlimited — and with nothing to hand over.
 #[tokio::test]
 async fn a_request_service_that_will_not_answer_leaves_the_defaults_unread() {
-    let context = ctx_over(answering(FIVE_A_WEEK, true), "defaults-refused", false);
+    let context = ctx_over(answering(five_a_week(), true), "defaults-refused", false);
 
     let report = household(&context, Some(&Whom::Defaults))
         .await
@@ -127,7 +132,7 @@ async fn a_request_service_that_will_not_answer_leaves_the_defaults_unread() {
 /// A stack that cannot be read is an error, for the defaults as for everybody.
 #[tokio::test]
 async fn the_defaults_over_an_unreadable_stack_are_an_error() {
-    let mut context = ctx_over(answering(FIVE_A_WEEK, false), "defaults-badstack", false);
+    let mut context = ctx_over(answering(five_a_week(), false), "defaults-badstack", false);
     context.stack = crate::stack::Source::External(std::path::Path::new("/nowhere/at/all"));
 
     assert!(household(&context, Some(&Whom::Defaults)).await.is_err());

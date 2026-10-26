@@ -16,7 +16,7 @@ use crate::ports::random::Random;
 ///
 /// Twenty-four bytes is 192 bits, far past any brute-force reach for a login
 /// password, and a round number of bytes so the rendering has no remainder.
-pub(crate) const SECRET_BYTES: usize = 24;
+pub const SECRET_BYTES: usize = 24;
 
 /// What is said where no randomness was available to generate a token.
 pub(crate) const NO_RANDOMNESS_FOR_TOKEN: &str = "no randomness was available to generate a token";

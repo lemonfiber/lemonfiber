@@ -26,7 +26,7 @@ use lemonfiber_manifest::ApiKind;
 use crate::ports::media::Kind;
 use crate::ports::service::{ApplicationKind, Protocol};
 use crate::seed::{State, Wiring};
-use crate::wiring::{Address, Ask, Filler, Fillers};
+use crate::wiring::{Address, Ask, Filler, Fillers, Holder};
 
 /// Usenet downloading, which a media-filing curator asks for.
 const USENET: &str = usenet::CAPABILITY;
@@ -398,9 +398,13 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
              registers its own API key, which opens every indexer it holds, so lemonfiber does \
              not register a third-party plugin's service in it"
         ),
-        Unmade::Asked => format!(
+        Unmade::Asked if matches!(pairing.asker.holder(), Holder::ThirdParty(_)) => format!(
             "{fills} and {asker} is a third-party plugin's service, which is handed another \
              service's credential only where the operator granted it in an install or update"
+        ),
+        Unmade::Asked => format!(
+            "{fills} and is a third-party plugin's service, whose credential is handed only to \
+             the stack's own services and to its own plugin's"
         ),
     }
 }

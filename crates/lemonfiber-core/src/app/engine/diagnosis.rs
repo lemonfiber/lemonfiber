@@ -15,18 +15,16 @@ mod deferring;
 
 use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
-use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
-use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::model::DoctorReport;
 
-use crate::app::targets::{curator_targets, project_directory};
+use crate::app::targets::project_directory;
 use crate::app::Ctx;
 
 use crate::error::codes::diag::NO_SUCH_CHECK;
@@ -301,11 +299,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let storage = deferring::stored(ctx, manifest, project.as_deref());
     let vpn = deferring::tunnel(ctx, manifest, project.as_deref(), disruptive);
-    let credentials = CredentialsCheck::new(
-        ctx.seams.http.clone(),
-        ctx.seams.filesystem.clone(),
-        curator_targets(&manifest.services, project.as_deref()),
-    );
+    let credentials = deferring::credentials(ctx, manifest, project.as_deref());
     let indexer = indexer_still_answers(ctx);
     // Whether the upstream quality guides can be reached, so a sync that would come
     // back empty — leaving the profiles in place stale rather than unconfigured — is
@@ -330,12 +324,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     // for what the indexers do not carry, which reads as an indexer fault unless the two
     // are told apart. It searches for wanted content live, so it only does so on a
     // disruptive run; otherwise it reports skipped.
-    let releases = ReleasesCheck::new(
-        ctx.seams.http.clone(),
-        ctx.seams.filesystem.clone(),
-        curator_targets(&manifest.services, project.as_deref()),
-        disruptive,
-    );
+    let releases = deferring::releases(ctx, manifest, project.as_deref(), disruptive);
     let providers = deferring::providing(ctx, manifest, project.as_deref());
     let wiring = deferring::wired(ctx, stack, project.as_deref());
     let seasons = deferring::seasons(ctx, manifest);

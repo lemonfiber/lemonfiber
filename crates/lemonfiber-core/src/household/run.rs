@@ -131,7 +131,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
 
     // One library read per service names every request that has been handed over, rather
     // than a lookup per request: the same read either way, made once.
-    let (titles, named) = library_titles(ctx, &manifest.services).await;
+    let (titles, named) = library_titles(ctx, &manifest).await;
     let unheld = unheld_titles(reached.as_ref(), server.as_ref(), &requests, &titles).await;
     if !named {
         findings.push(

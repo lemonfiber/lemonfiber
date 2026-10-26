@@ -5,31 +5,48 @@ use lemonfiber_sidecar::gate::{Accepted, File, Kind, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
 
 use super::*;
+use crate::ports::service::{
+    Endpoint, FulfilmentTarget, QualityProfile, RegisteredFolder, RegisteredTarget,
+};
+use crate::test_support::curators::{self, TELEVISION};
+use crate::test_support::requests;
 
 /// What the fixed randomness renders to, which is every token minted here.
 fn minted() -> String {
     crate::secret::render(&[0xab; crate::secret::SECRET_BYTES])
 }
 
-/// A stack with a curator and the request service and, where `gating`, the request gate.
+/// A stack with, where `gating`, the request gate: the curator and the request service
+/// come in their plugins.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![curator("sonarr", 8989, "tv"), requests_svc()];
     if gating {
-        services.push(request_gate());
+        vec![request_gate()]
+    } else {
+        Vec::new()
     }
-    services
 }
 
-/// A stack directory where the curator has written its key and, where `accepted` names
-/// some, the gate accepts those tokens on the curator's route.
+/// `services`, written at `project`, with the television curator and the request service
+/// moved into their plugins.
+fn moved(
+    services: Vec<lemonfiber_manifest::Service>,
+    project: &std::path::Path,
+) -> crate::wiring::Fillers {
+    let installed: Vec<_> = TELEVISION
+        .installed()
+        .into_iter()
+        .chain(REQUESTS.installed())
+        .collect();
+    fillers_beside(services, &installed, project)
+}
+
+/// A stack directory where, where `accepted` names some, the gate accepts those tokens on
+/// the curator's route, which it reaches the curator on with the key lemonfiber minted.
 fn project(name: &str, accepted: &[&str]) -> std::path::PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
-    let _ = store::write(
-        &at.join("config/sonarr/config.xml"),
-        "<Config><ApiKey>sonarr-own-key</ApiKey></Config>",
-    );
-    routed(&at, &[("sonarr", Kind::Sonarr, "sonarr-own-key")]);
+    let _ = std::fs::create_dir_all(&at);
+    routed(&at, &[("sonarr", Kind::Sonarr, MINTED_CURATOR_KEY)]);
     if !accepted.is_empty() {
         let _ = store::write(&tokens_file(&at), &accepting(accepted).written());
     }
@@ -56,67 +73,77 @@ fn accepted(project: &std::path::Path) -> Option<Tokens> {
         .and_then(|text| Tokens::read(&text).ok())
 }
 
+/// Where the request service reaches the curator: at `host` and `port` under `base`.
+fn reached(host: &str, port: u16, base: &str) -> Endpoint {
+    Endpoint {
+        host: host.to_owned(),
+        port,
+        base: base.to_owned(),
+    }
+}
+
 /// The curator as the request service lists it: at `host` and `port` under `base`, with
 /// `key`.
-fn listed(host: &str, port: u16, base: &str, key: &str) -> String {
-    serde_json::json!([{
-        "id": 1,
-        "name": "Sonarr (mine)",
-        "hostname": host,
-        "port": port,
-        "baseUrl": base,
-        "apiKey": key,
-        "activeProfileId": 9,
+fn listed(host: &str, port: u16, base: &str, key: &str) -> Answer {
+    requests::answered(&[RegisteredTarget {
+        id: "1".to_owned(),
+        at: reached(host, port, base),
+        key: key.to_owned(),
+        kind: crate::ports::media::Kind::Tv,
     }])
-    .to_string()
+}
+
+/// Where the gate answers for the curator.
+fn the_gate() -> Endpoint {
+    reached("request-gate", PORT, "/sonarr")
 }
 
 /// The curator held at the gate with `key`.
-fn at_the_gate(key: &str) -> String {
+fn at_the_gate(key: &str) -> Answer {
     listed("request-gate", PORT, "/sonarr", key)
+}
+
+/// The request service listing nothing.
+fn nothing() -> Answer {
+    requests::answered(&Vec::<RegisteredTarget>::new())
 }
 
 /// A stack whose curator answers with a profile and a folder, and whose request service
 /// lists each of `held` in turn for the curator, answering a registration with `added` and
 /// a move with `moved`.
-fn serving(held: &[&str], added: u16, moved: u16) -> Arc<Fake> {
-    Fake::by_route_in_turn(vec![
+fn serving(held: Vec<Answer>, added: Answer, moved: Answer) -> Arc<Fake> {
+    Fake::by_path_in_turn(vec![
         (
-            Method::Get,
-            "/qualityprofile",
-            vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
+            curators::curating(TELEVISION, "quality_profiles"),
+            vec![curators::answered(&[QualityProfile {
+                id: 4,
+                name: "HD-1080p".to_owned(),
+            }])],
         ),
         (
-            Method::Get,
-            "/rootfolder",
-            vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
+            curators::curating(TELEVISION, "root_folders"),
+            vec![curators::answered(&[RegisteredFolder {
+                id: "1".to_owned(),
+                path: "/data/media/tv".to_owned(),
+            }])],
         ),
+        (requests::intake("fulfilment_targets"), held),
         (
-            Method::Get,
-            "/settings/radarr",
-            vec![Answer::reply(200, "[]")],
+            requests::intake("test_fulfilment_target"),
+            vec![requests::taken()],
         ),
-        (
-            Method::Get,
-            "/settings/sonarr",
-            held.iter().map(|list| Answer::reply(200, *list)).collect(),
-        ),
-        (
-            Method::Post,
-            "/settings/sonarr/test",
-            vec![Answer::reply(200, "")],
-        ),
-        (
-            Method::Post,
-            "/settings/sonarr",
-            vec![Answer::reply(added, "")],
-        ),
-        (
-            Method::Put,
-            "/settings/sonarr/1",
-            vec![Answer::reply(moved, "")],
-        ),
+        (requests::intake("add_fulfilment_target"), vec![added]),
+        (requests::intake("move_fulfilment_target"), vec![moved]),
     ])
+}
+
+/// A context over `http` asking the curator and the request service, the curator's minted
+/// key kept, with randomness that renders to [`minted`] where `random` and none where not.
+fn asking(name: &str, http: &Arc<Fake>, random: bool) -> Ctx {
+    let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
+    let ctx = seed_ctx(true, bytes, Some(recorded_admin(name))).with_http(http.clone());
+    TELEVISION.minted(&ctx, MINTED_CURATOR_KEY);
+    crate::test_support::adapted::asking(ctx, &[TELEVISION, REQUESTS])
 }
 
 /// Seed the request targets of `services` under `project`, over `http`, with
@@ -128,25 +155,42 @@ async fn seeded(
     random: bool,
     rehearsing: bool,
 ) -> Vec<Wiring> {
-    let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let mut ctx = seed_ctx(true, Vec::new(), bytes, None).with_http(http.clone());
+    let name = project
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("tokens");
+    let mut ctx = asking(name, http, random);
     ctx.dry_run = rehearsing;
     super::super::seed_fulfilment_targets(
         &ctx,
         services,
-        &fillers_at(services.to_vec(), project),
+        &moved(services.to_vec(), project),
         Some(project),
     )
     .await
 }
 
-/// The body of the one call made with `method`.
-fn sent(http: &Fake, method: Method) -> String {
-    http.requests()
+/// Each target the request service was asked to add, in `http`.
+fn added(http: &Fake) -> Vec<FulfilmentTarget> {
+    requests::told(&http.requests(), "add_fulfilment_target", "target")
+}
+
+/// Where and with what key the request service was asked to move the curator, in `http`.
+fn moves(http: &Fake) -> Vec<(Endpoint, String)> {
+    let sent = http.requests();
+    requests::told::<Endpoint>(&sent, "move_fulfilment_target", "at")
         .into_iter()
-        .find(|asked| asked.method == method)
-        .and_then(|asked| asked.body)
-        .unwrap_or_default()
+        .zip(requests::told::<String>(
+            &sent,
+            "move_fulfilment_target",
+            "key",
+        ))
+        .collect()
+}
+
+/// Whether the request service was asked to change anything, in `http`.
+fn written(http: &Fake) -> bool {
+    !added(http).is_empty() || !moves(http).is_empty()
 }
 
 /// The states the step reports, in order.
@@ -159,20 +203,22 @@ fn states(wirings: &[Wiring]) -> Vec<State> {
 #[tokio::test]
 async fn a_curator_is_handed_over_at_the_gate_under_a_new_token() {
     let at = project("tokens-fresh", &[]);
-    let http = serving(&["[]", "[]", &at_the_gate(&minted())], 201, 200);
+    let http = serving(
+        vec![nothing(), nothing(), at_the_gate(&minted())],
+        requests::taken(),
+        requests::taken(),
+    );
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
     assert_eq!(states(&wirings), vec![State::Wired]);
-    let body = sent(&http, Method::Post);
-    assert!(
-        body.contains("\"hostname\":\"request-gate\"")
-            && body.contains(&format!("\"port\":{PORT}"))
-            && body.contains("\"baseUrl\":\"/sonarr\"")
-            && body.contains(&format!("\"apiKey\":\"{}\"", minted())),
-        "{body}"
+    assert_eq!(
+        added(&http)
+            .into_iter()
+            .map(|target| (target.at, target.key))
+            .collect::<Vec<_>>(),
+        vec![(the_gate(), minted())]
     );
-    assert!(!body.contains("sonarr-own-key"), "{body}");
     assert_eq!(accepted(&at), Some(accepting(&[&minted()])));
 }
 
@@ -180,15 +226,16 @@ async fn a_curator_is_handed_over_at_the_gate_under_a_new_token() {
 #[tokio::test]
 async fn a_token_both_sides_hold_is_left_alone() {
     let at = project("tokens-held", &["held"]);
-    let http = serving(&[&at_the_gate("held")], 201, 200);
+    let http = serving(
+        vec![at_the_gate("held")],
+        requests::taken(),
+        requests::taken(),
+    );
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
     assert_eq!(states(&wirings), vec![State::AlreadyWired]);
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method != Method::Get));
+    assert!(!written(&http));
     assert_eq!(accepted(&at), Some(accepting(&["held"])));
 }
 
@@ -197,55 +244,54 @@ async fn a_token_both_sides_hold_is_left_alone() {
 #[tokio::test]
 async fn a_token_the_gate_refuses_is_replaced() {
     let at = project("tokens-refused", &["other"]);
-    let http = serving(&[&at_the_gate("stale")], 201, 200);
+    let http = serving(
+        vec![at_the_gate("stale")],
+        requests::taken(),
+        requests::taken(),
+    );
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
     assert_eq!(states(&wirings), vec![State::Wired]);
-    assert!(sent(&http, Method::Put).contains(&minted()));
+    assert_eq!(moves(&http), vec![(the_gate(), minted())]);
     assert_eq!(accepted(&at), Some(accepting(&[&minted()])));
 }
 
-/// The curator held at its own address is moved to the gate in place, keeping everything
-/// the operator chose about it.
+/// The curator held at its own address is moved to the gate in place rather than added a
+/// second time.
 #[tokio::test]
 async fn a_curator_held_at_its_own_address_is_moved_to_the_gate() {
     let at = project("tokens-moved", &[]);
-    let http = serving(&[&listed("sonarr", 8989, "", "sonarr-own-key")], 201, 200);
+    let http = serving(
+        vec![listed("sonarr", 8989, "", MINTED_CURATOR_KEY)],
+        requests::taken(),
+        requests::taken(),
+    );
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
     assert_eq!(states(&wirings), vec![State::Wired]);
-    let body = sent(&http, Method::Put);
-    assert!(
-        body.contains("\"hostname\":\"request-gate\"")
-            && body.contains("\"baseUrl\":\"/sonarr\"")
-            && body.contains("\"name\":\"Sonarr (mine)\"")
-            && body.contains("\"activeProfileId\":9"),
-        "{body}"
-    );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Post && asked.url.ends_with("/settings/sonarr")));
+    assert_eq!(moves(&http), vec![(the_gate(), minted())]);
+    assert!(added(&http).is_empty());
 }
 
 /// A stack that no longer runs the gate moves the curator back to its own address, with
-/// its own key.
+/// the key lemonfiber minted for it.
 #[tokio::test]
 async fn removing_the_gate_moves_a_curator_back() {
     let at = project("tokens-ungated", &[]);
-    let http = serving(&[&at_the_gate("held")], 201, 200);
+    let http = serving(
+        vec![at_the_gate("held")],
+        requests::taken(),
+        requests::taken(),
+    );
 
     let wirings = seeded(&stack(false), &at, &http, true, false).await;
 
     assert_eq!(states(&wirings), vec![State::Wired]);
-    let body = sent(&http, Method::Put);
-    assert!(
-        body.contains("\"hostname\":\"sonarr\"")
-            && body.contains("\"baseUrl\":\"\"")
-            && body.contains("\"apiKey\":\"sonarr-own-key\""),
-        "{body}"
+    assert_eq!(
+        moves(&http),
+        vec![(reached("sonarr", 8989, ""), MINTED_CURATOR_KEY.to_owned())]
     );
 }
 
@@ -255,7 +301,7 @@ async fn a_rehearsal_says_where_and_writes_nothing() {
     for (name, held, expected) in [
         (
             "tokens-would-move",
-            listed("sonarr", 8989, "", "sonarr-own-key"),
+            listed("sonarr", 8989, "", MINTED_CURATOR_KEY),
             State::WouldWire {
                 yours: Some("at sonarr:8989".to_owned()),
                 ours: Some("at the request gate".to_owned()),
@@ -271,18 +317,12 @@ async fn a_rehearsal_says_where_and_writes_nothing() {
         ),
     ] {
         let at = project(name, &[]);
-        let http = serving(&[&held], 201, 200);
+        let http = serving(vec![held], requests::taken(), requests::taken());
 
         let wirings = seeded(&stack(true), &at, &http, true, true).await;
 
         assert_eq!(states(&wirings), vec![expected], "{name}");
-        assert!(
-            !http
-                .requests()
-                .iter()
-                .any(|asked| asked.method != Method::Get),
-            "{name}"
-        );
+        assert!(!written(&http), "{name}");
         assert_eq!(accepted(&at), None, "{name}");
     }
 }
@@ -292,7 +332,11 @@ async fn a_rehearsal_says_where_and_writes_nothing() {
 #[tokio::test]
 async fn a_token_the_request_service_refuses_leaves_both_accepted() {
     let at = project("tokens-unmoved", &["older"]);
-    let http = serving(&[&at_the_gate("stale")], 201, 500);
+    let http = serving(
+        vec![at_the_gate("stale")],
+        requests::taken(),
+        requests::refusing(),
+    );
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
@@ -312,7 +356,7 @@ async fn a_token_the_request_service_refuses_leaves_both_accepted() {
 async fn a_curator_the_gate_has_no_route_to_is_given_to_nobody() {
     let at = project("tokens-unrouted", &[]);
     let _ = std::fs::remove_file(crate::app::gating::path(&at, File::Upstreams));
-    let http = serving(&["[]"], 201, 200);
+    let http = serving(vec![nothing()], requests::taken(), requests::taken());
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
@@ -324,10 +368,7 @@ async fn a_curator_the_gate_has_no_route_to_is_given_to_nobody() {
                 .to_owned(),
         }]
     );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method != Method::Get));
+    assert!(!written(&http));
     assert_eq!(accepted(&at), None);
 }
 
@@ -336,7 +377,7 @@ async fn a_curator_the_gate_has_no_route_to_is_given_to_nobody() {
 async fn tokens_that_cannot_be_written_are_given_to_nobody() {
     let at = project("tokens-unwritable", &[]);
     let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
-    let http = serving(&["[]"], 201, 200);
+    let http = serving(vec![nothing()], requests::taken(), requests::taken());
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
@@ -352,10 +393,7 @@ async fn tokens_that_cannot_be_written_are_given_to_nobody() {
             && detail.contains(&tokens_file(&at).display().to_string()),
         "{detail}"
     );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method != Method::Get));
+    assert!(!written(&http));
 }
 
 /// Retiring an old token the gate cannot be told about is said, and the old token
@@ -364,26 +402,26 @@ async fn tokens_that_cannot_be_written_are_given_to_nobody() {
 async fn an_old_token_that_cannot_be_retired_is_said() {
     let at = project("tokens-unretired", &[]);
     let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
-    let http = serving(&[&at_the_gate("held")], 201, 200);
+    let http = serving(
+        vec![at_the_gate("held")],
+        requests::taken(),
+        requests::taken(),
+    );
     let both = accepting(&["held", "older"]).written();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(http.clone())
-        .with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
-            (
-                at.join("config/sonarr/config.xml"),
-                "<Config><ApiKey>sonarr-own-key</ApiKey></Config>",
-            ),
+    let ctx = asking("tokens-unretired", &http, false).with_filesystem(
+        lemonfiber_fixtures::files::Files::at(vec![
             (tokens_file(&at), &both),
             (
                 crate::app::gating::path(&at, File::Upstreams),
-                &admitting(&[("sonarr", Kind::Sonarr, "sonarr-own-key")]),
+                &admitting(&[("sonarr", Kind::Sonarr, MINTED_CURATOR_KEY)]),
             ),
-        ]));
+        ]),
+    );
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
         &stack(true),
-        &fillers_at(stack(true), &at),
+        &moved(stack(true), &at),
         Some(&at),
     )
     .await;
@@ -393,10 +431,7 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
             .iter()
             .map(|one| one.connection.as_str())
             .collect::<Vec<_>>(),
-        vec![
-            "sonarr the app as a request target",
-            "The request gate's tokens"
-        ]
+        vec!["Sonarr as a request target", "The request gate's tokens"]
     );
     assert!(
         matches!(
@@ -411,7 +446,7 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
 #[tokio::test]
 async fn without_randomness_no_token_is_minted() {
     let at = project("tokens-unrandom", &[]);
-    let http = serving(&["[]"], 201, 200);
+    let http = serving(vec![nothing()], requests::taken(), requests::taken());
 
     let wirings = seeded(&stack(true), &at, &http, false, false).await;
 
@@ -431,7 +466,7 @@ async fn without_randomness_no_token_is_minted() {
 async fn a_route_presenting_a_credential_lemonfiber_does_not_know_is_not_handed_back() {
     let at = project("tokens-unvouched", &[]);
     routed(&at, &[("sonarr", Kind::Sonarr, "a-key-nobody-wrote")]);
-    let http = serving(&["[]"], 201, 200);
+    let http = serving(vec![nothing()], requests::taken(), requests::taken());
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
@@ -444,8 +479,5 @@ async fn a_route_presenting_a_credential_lemonfiber_does_not_know_is_not_handed_
         })
     );
     assert_eq!(accepted(&at), None);
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method != Method::Get));
+    assert!(!written(&http));
 }

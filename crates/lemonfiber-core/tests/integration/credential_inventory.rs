@@ -176,6 +176,5 @@ fn beside(name: &str, register: &str) -> PathBuf {
 mod listing;
 mod pending;
 mod plugins;
-mod republishing;
-mod resetting;
+mod reminting;
 mod rotating;

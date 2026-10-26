@@ -26,9 +26,10 @@ pub const PLUGIN: &str = "jellyfin";
 pub const ADAPTER: &str = "jellyfin-adapter";
 
 /// The media server's plugin and the adapter in front of it.
-const MOVED: Adapted = Adapted {
+pub const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 /// Where `operation` of `identity.source` is asked.

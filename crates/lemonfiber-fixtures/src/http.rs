@@ -82,7 +82,33 @@ enum Script {
     InTurn(Mutex<VecDeque<Answer>>),
     /// By what was asked for: the first route whose fragment the URL contains,
     /// and whose method matches where one was given.
-    ByRoute(Vec<(Option<Method>, &'static str, Replies)>),
+    ByRoute(Vec<Route>),
+}
+
+/// One route of a fake answering by what was asked for.
+struct Route {
+    /// The method it answers, where it answers only one.
+    method: Option<Method>,
+    /// What the URL it answers contains.
+    fragment: &'static str,
+    /// What the body it answers contains, where it answers only some bodies.
+    body: Option<&'static str>,
+    /// What it answers.
+    replies: Replies,
+}
+
+impl Route {
+    /// Whether it answers `request`.
+    fn answers(&self, request: &Request) -> bool {
+        request.url.contains(self.fragment)
+            && self.method.is_none_or(|wanted| wanted == request.method)
+            && self.body.is_none_or(|wanted| {
+                request
+                    .body
+                    .as_deref()
+                    .is_some_and(|body| body.contains(wanted))
+            })
+    }
 }
 
 /// What one route answers, however many times it is asked.
@@ -140,20 +166,6 @@ impl Fake {
         Self::new(Script::InTurn(Mutex::new(answers.into())))
     }
 
-    /// Each reply in turn, written as the status and body most tests already have.
-    ///
-    /// The same thing as [`Fake::in_turn`], spelled the way a test that only ever
-    /// replies with a status and a body wants to spell it.
-    #[must_use]
-    pub fn scripted(replies: Vec<(u16, &'static str)>) -> Arc<Self> {
-        Self::in_turn(
-            replies
-                .into_iter()
-                .map(|(status, body)| Answer::reply(status, body))
-                .collect(),
-        )
-    }
-
     /// By what was asked for, where some routes care about the method and others do
     /// not — the general form [`Fake::by_path`] and [`Fake::by_route`] are shorthands
     /// for. The first route whose fragment the URL contains wins, so a table can put
@@ -163,7 +175,12 @@ impl Fake {
         Self::new(Script::ByRoute(
             routes
                 .into_iter()
-                .map(|(method, fragment, answer)| (method, fragment, Replies::Same(answer)))
+                .map(|(method, fragment, answer)| Route {
+                    method,
+                    fragment,
+                    body: None,
+                    replies: Replies::Same(answer),
+                })
                 .collect(),
         ))
     }
@@ -201,8 +218,30 @@ impl Fake {
         Self::new(Script::ByRoute(
             routes
                 .into_iter()
-                .map(|(fragment, answers)| {
-                    (None, fragment, Replies::InTurn(Mutex::new(answers.into())))
+                .map(|(fragment, answers)| Route {
+                    method: None,
+                    fragment,
+                    body: None,
+                    replies: Replies::InTurn(Mutex::new(answers.into())),
+                })
+                .collect(),
+        ))
+    }
+
+    /// By what the URL contains and, where a route names one, what the body contains,
+    /// each route's answers in turn, the last repeating — for a contract posting every
+    /// call of one operation to one address, where only what is posted tells one title
+    /// or one page from another.
+    #[must_use]
+    pub fn by_call(routes: Vec<(&'static str, Option<&'static str>, Vec<Answer>)>) -> Arc<Self> {
+        Self::new(Script::ByRoute(
+            routes
+                .into_iter()
+                .map(|(fragment, body, answers)| Route {
+                    method: None,
+                    fragment,
+                    body,
+                    replies: Replies::InTurn(Mutex::new(answers.into())),
                 })
                 .collect(),
         ))
@@ -216,12 +255,11 @@ impl Fake {
         Self::new(Script::ByRoute(
             routes
                 .into_iter()
-                .map(|(method, fragment, answers)| {
-                    (
-                        Some(method),
-                        fragment,
-                        Replies::InTurn(Mutex::new(answers.into())),
-                    )
+                .map(|(method, fragment, answers)| Route {
+                    method: Some(method),
+                    fragment,
+                    body: None,
+                    replies: Replies::InTurn(Mutex::new(answers.into())),
                 })
                 .collect(),
         ))
@@ -268,11 +306,8 @@ impl Fake {
                 .unwrap_or(Answer::Silent),
             Script::ByRoute(routes) => routes
                 .iter()
-                .find(|(method, fragment, _)| {
-                    request.url.contains(fragment)
-                        && method.is_none_or(|wanted| wanted == request.method)
-                })
-                .map_or(Answer::Silent, |(_, _, replies)| replies.answer()),
+                .find(|route| route.answers(request))
+                .map_or(Answer::Silent, |route| route.replies.answer()),
         }
     }
 }
@@ -319,3 +354,6 @@ fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> 
         }),
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -307,4 +307,5 @@ fn nothing_is_minted_where_the_secret_store_cannot_be_written() {
     .is_err());
 }
 
+mod carrying;
 mod replacing;

@@ -35,7 +35,7 @@ fn moved_finder(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::F
 /// A context asking the moved finder's adapter over `http`, its curators' configuration
 /// reading as `curators` does.
 fn finder_ctx(http: Arc<Fake>, curators: Option<&'static str>) -> Ctx {
-    subtitles::asking(seed_ctx(true, Vec::new(), None, None))
+    subtitles::asking(seed_ctx(true, None, None))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(curators)))
 }
@@ -229,7 +229,7 @@ async fn a_finder_that_cannot_be_asked_over_its_contract_is_asked_nothing() {
     stack.push(subtitle_finder_svc());
     let http = holding(&subtitles::unwatched());
     let asking = finder_ctx(http.clone(), Some(KEYED));
-    let mut unkeyed = seed_ctx(true, Vec::new(), None, None)
+    let mut unkeyed = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
     unkeyed.seams.engine = Arc::new(subtitles::running());
@@ -508,7 +508,7 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
     };
     let mut stopped = finder_ctx(http.clone(), Some(KEYED));
     stopped.seams.engine = Arc::new(Reporting::absent());
-    let mut unkeyed = seed_ctx(true, Vec::new(), None, None)
+    let mut unkeyed = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
     unkeyed.seams.engine = Arc::new(subtitles::running());

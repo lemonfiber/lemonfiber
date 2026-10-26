@@ -53,7 +53,7 @@ pub(crate) const CATALOGUE: &str = "catalogue.json";
 pub(crate) const SETTINGS: &str = "settings.json";
 
 /// The file name of the secrets lemonfiber holds by name.
-pub(crate) const SECRETS: &str = "secrets.json";
+pub const SECRETS: &str = "secrets.json";
 
 /// The directory each service's own secrets file is written in.
 pub(crate) const SECRETS_FILES: &str = "env";

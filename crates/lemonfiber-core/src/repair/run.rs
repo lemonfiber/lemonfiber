@@ -276,11 +276,7 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let reached =
-        crate::app::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref())
-            .await;
+    let reached = crate::app::recover::reconfigured(ctx, &undos, &manifest).await;
     let carried = crate::app::recover::carrying_out(
         ctx.seams.confined.as_ref(),
         &reached.left,

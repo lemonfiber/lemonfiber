@@ -16,7 +16,7 @@ use crate::app::Ctx;
 use crate::asking::Reasons;
 use crate::model::{MemberAccess, Restriction};
 use crate::ports::media::Kind;
-use crate::ports::service::{Access, Certificate, HouseholdRequest, Pipeline};
+use crate::ports::service::{Access, Certificate, HouseholdRequest};
 use crate::quality::Selection;
 
 use super::allowance;
@@ -115,11 +115,11 @@ pub(super) struct Naming<'a> {
 /// they stand, and the gap is surfaced rather than left to look like unnamed items.
 pub(super) async fn library_titles(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
 ) -> (BTreeMap<(Kind, i64), Titled>, bool) {
     let mut titles = BTreeMap::new();
     let mut named = true;
-    for curator in open_curators(ctx, services).await {
+    for curator in open_curators(ctx, manifest).await {
         match curator.service.library(curator.kind).await {
             Ok(items) => titles.extend(items.into_iter().map(|item| {
                 let item_named = Titled {

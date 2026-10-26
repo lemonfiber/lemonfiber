@@ -2,27 +2,24 @@
 
 use super::*;
 
+/// No curator's adapter runs yet, so no library opens. That is a service still
+/// coming up rather than one that refused, so it is skipped — the requests still report
+/// where they stand, and nothing claims a read failed that was never made.
 #[tokio::test]
 async fn a_service_still_starting_costs_names_without_being_called_a_failed_read() {
-    // No key is readable yet, so no library opens. That is a service still coming up
-    // rather than one that refused, so it is skipped — the requests still report
-    // where they stand, and nothing claims a read failed that was never made.
     let mut context = ctx_with(
         &Fake {
-            answered: "",
-            requests: r#"{"pageInfo":{"results":1},"results":[
-                {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
-                 "requestedBy":{"displayName":"Alex"}}
-            ]}"#,
-            library: r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
-            refuse: false,
+            requests: request_service::answered(&[arrived()]),
+            library: request_service::answered(&[the_expanse()]),
             ..Fake::default()
         },
         "starting",
     );
-    context = context.with_filesystem(Arc::new(
-        SeedFs::keyed(None).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
-    ));
+    context.seams.engine = Arc::new(
+        crate::test_support::requests::REQUESTS
+            .running()
+            .alongside(media::running()),
+    );
     let report = household(&context, None).await.unwrap_or_default();
     assert!(report.available);
     let first = report.members.first().and_then(|m| m.requests.first());
@@ -45,8 +42,7 @@ async fn a_refused_key_costs_the_requests_and_not_the_household() {
     // fix, one service along — so the members still list and the refusal is said.
     let context = ctx_with(
         &Fake {
-            answered: "no",
-            refuse: true,
+            answers: request_service::refusing(),
             ..Fake::default()
         },
         "refused",
@@ -75,10 +71,7 @@ async fn a_refused_key_costs_the_requests_and_not_the_household() {
 async fn an_unreadable_request_record_costs_the_requests_and_not_the_household() {
     let context = ctx_with(
         &Fake {
-            answered: "",
-            requests: "not json",
-            library: "[]",
-            refuse: false,
+            requests: request_service::refusing(),
             ..Fake::default()
         },
         "unreadable",
@@ -187,13 +180,8 @@ async fn libraries_that_will_not_read_cost_their_names_and_not_the_access() {
 async fn an_unreadable_library_costs_names_not_the_view() {
     let context = ctx_with(
         &Fake {
-            answered: "",
-            requests: r#"{"pageInfo":{"results":1},"results":[
-                {"status":2,"type":"tv","media":{"status":5,"externalServiceId":1},
-                 "requestedBy":{"displayName":"Alex"}}
-            ]}"#,
-            library: "not json",
-            refuse: false,
+            requests: request_service::answered(&[arrived()]),
+            library: request_service::refusing(),
             ..Fake::default()
         },
         "unnamed",
@@ -215,19 +203,7 @@ async fn an_unreadable_library_costs_names_not_the_view() {
 async fn a_media_server_that_has_not_moved_has_nothing_to_ask() {
     // Nothing moved in, so the media server speaks no contract and cannot be asked,
     // which is said rather than shown as a household that asked for nothing.
-    let context = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-        .with_http(
-            Fake {
-                answered: "",
-                requests: "",
-                library: "[]",
-                refuse: false,
-                ..Fake::default()
-            }
-            .transport(),
-        );
+    let context = a_context().build().with_http(Fake::default().transport());
     let report = household(&context, None).await.unwrap_or_default();
     assert!(!report.available);
     assert!(
@@ -296,16 +272,7 @@ async fn an_account_that_holds_unrated_content_back_reads_as_one_that_does() {
 
 #[tokio::test]
 async fn a_household_view_over_an_unreadable_stack_is_an_error() {
-    let mut context = ctx_with(
-        &Fake {
-            answered: "",
-            requests: "",
-            library: "[]",
-            refuse: false,
-            ..Fake::default()
-        },
-        "badstack",
-    );
+    let mut context = ctx_with(&Fake::default(), "badstack");
     context.stack = crate::stack::Source::External(std::path::Path::new("/nowhere/at/all"));
     assert!(household(&context, None).await.is_err());
 }

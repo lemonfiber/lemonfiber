@@ -7,8 +7,8 @@
 //! loopback, answering `owner.claim` and `media.serve` over whatever transport the test
 //! scripts.
 
-use super::adapted::Adapted;
 pub use super::adapted::{claiming, held_by};
+use super::adapted::{Adapted, PORT};
 
 /// The plugin the listening server moved into.
 pub const PLUGIN: &str = "audiobookshelf";
@@ -20,6 +20,7 @@ pub const ADAPTER: &str = "audiobookshelf-adapter";
 pub const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
+    port: PORT,
 };
 
 #[cfg(test)]

@@ -290,27 +290,33 @@ async fn a_download_the_operator_already_answered_for_is_left_alone() {
     );
 }
 
-/// A curator-shape service's own configuration, with the key it wrote.
-const KEYED: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
-
-/// A queue holding one item the service has stopped making progress on.
-const STALLED: &str = r#"{"totalRecords":1,"records":[
-    {"title":"Never.Taken","trackedDownloadStatus":"warning",
-     "trackedDownloadState":"importPending",
-     "errorMessage":"No space left on device"}
-]}"#;
+/// A queue holding one item the curator has stopped making progress on.
+fn stalled() -> Answer {
+    crate::test_support::curators::answered(&crate::ports::service::Queue {
+        total: 1,
+        items: vec![crate::ports::service::Queued {
+            title: "Never.Taken".to_owned(),
+            status: "warning".to_owned(),
+            state: "importPending".to_owned(),
+            message: Some("No space left on device".to_owned()),
+            download_id: None,
+            grabs: 1,
+        }],
+    })
+}
 
 #[tokio::test]
 async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
     // The service is answering, so what it says about its own queue is what the
     // report carries — verbatim, because a permission denial or a full disk in
     // its own words is worth more than any reading of one.
+    use crate::test_support::adapted;
+    use crate::test_support::curators::ALL;
     let http = Fake::by_path(vec![
         seeding("Never.Taken"),
-        ("/queue", Answer::reply(200, STALLED)),
-        ("/history", Answer::reply(200, r#"{"records":[]}"#)),
+        (crate::test_support::curators::curated("queue"), stalled()),
     ]);
-    let ctx = torrent::reaching(
+    let mut ctx = torrent::reaching(
         a_context()
             .settings(Settings {
                 env_file: Some(env_without_password("space-stalled")),
@@ -319,10 +325,14 @@ async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
             .build()
             .with_http(http)
             .with_filesystem(Arc::new(
-                SeedFs::keyed(Some(KEYED)).with_facts(facts(900_000_000_000)),
+                SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
             ))
             .with_occupancy(Walking::holding(a_tree())),
     );
+    for curator in ALL {
+        curator.moved_in(&ctx);
+    }
+    ctx.seams.engine = Arc::new(torrent::running().alongside(adapted::running(&ALL)));
 
     // A service still waiting for it is also what stops it being called waste,
     // whatever the filesystem says about how many names point at its file — so

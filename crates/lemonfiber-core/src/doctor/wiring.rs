@@ -19,13 +19,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::credentials::Reach;
 use super::{Category, Check, Finding, Mend, Verdict};
 use crate::baseline::Record;
 use crate::error::codes::wiring::DRIFTED;
 use crate::error::{Problem, Remedy};
-use crate::ports::filesystem::FileSystem;
-use crate::ports::http::Http;
 use crate::ports::service::{Client, DownloadClient, RegisteredClient};
 use crate::seed::{observe_client, same_endpoint, Observed};
 
@@ -48,8 +45,8 @@ pub struct Managed {
     pub id: String,
     /// The curator's name.
     pub name: String,
-    /// How it is asked, or nothing where it speaks its contract and cannot be asked over it.
-    pub reach: Option<Reach>,
+    /// The curator over its contract, or nothing where it cannot be asked over it.
+    pub asked: Option<Arc<dyn Client>>,
     /// The clients lemonfiber wired into it, with what it last recorded for each.
     pub clients: Vec<Wired>,
 }
@@ -74,77 +71,42 @@ impl Wired {
     }
 }
 
-/// How a wiring is read: the transport to reach a service on, and the files its key is
-/// written to.
-///
-/// Held as one thing because every read of a wiring needs both, and because the check and
-/// the repair read the same way — the repair deliberately re-reading rather than trusting
-/// what the diagnosis saw.
-#[derive(Clone)]
-pub(crate) struct Reading {
-    http: Arc<dyn Http>,
-    filesystem: Arc<dyn FileSystem>,
-}
-
-impl Reading {
-    /// The clients a service holds, or nothing where it could not be asked.
+impl Managed {
+    /// The clients the curator holds, or nothing where it could not be asked.
     ///
-    /// Nothing covers "it cannot be asked", "the key is not written yet" and "the service
-    /// would not answer". None is a drift, and none is a pass; the caller reports each as
-    /// unverified.
-    pub(crate) async fn held(&self, managed: &Managed) -> Option<Vec<RegisteredClient>> {
-        self.open(managed).await?.download_clients().await.ok()
-    }
-
-    /// The curator as a client, or nothing where it cannot be asked or its key is not
-    /// written yet.
-    pub(crate) async fn open(&self, managed: &Managed) -> Option<Box<dyn Client>> {
-        managed
-            .reach
-            .as_ref()?
-            .open(&self.http, self.filesystem.as_ref())
-            .await
+    /// Nothing covers "it cannot be asked" and "the service would not answer". Neither is a
+    /// drift, and neither is a pass; the caller reports each as unverified.
+    pub(crate) async fn held(&self) -> Option<Vec<RegisteredClient>> {
+        self.asked.as_ref()?.download_clients().await.ok()
     }
 }
 
 /// Reports where a download client has stopped filing where lemonfiber wired it, and which
 /// side of the field moved.
 pub struct WiringCheck {
-    reading: Reading,
     managed: Arc<Vec<Managed>>,
     mender: WiringMender,
 }
 
 impl WiringCheck {
-    /// A check over the wirings given, reading each through `http` and the key files on
-    /// `filesystem`.
+    /// A check over the wirings given.
     #[must_use]
-    pub fn new(
-        http: Arc<dyn Http>,
-        filesystem: Arc<dyn FileSystem>,
-        managed: Vec<Managed>,
-        stamp: String,
-    ) -> Self {
+    pub fn new(managed: Vec<Managed>, stamp: String) -> Self {
         let managed = Arc::new(managed);
-        let reading = Reading { http, filesystem };
         Self {
-            mender: WiringMender::new(reading.clone(), Arc::clone(&managed), stamp),
-            reading,
+            mender: WiringMender::new(Arc::clone(&managed), stamp),
             managed,
         }
     }
 
     /// What one curator's managed clients look like now.
     ///
-    /// The service is opened and asked once, however many clients lemonfiber manages
+    /// What the service holds is read once, however many clients lemonfiber manages
     /// there: they are all rows of the same answer, and asking per client would be the
     /// same question repeated.
     async fn examine(&self, managed: &Managed) -> Vec<Finding> {
-        // Opened once and asked twice: what it holds, and — only where that shows an edit
-        // — whether it can still reach the client. Opening reads a key off disk, so a
-        // second open would be a second read for an answer already in hand.
-        let service = self.reading.open(managed).await;
-        let held = match &service {
+        let service = managed.asked.as_ref();
+        let held = match service {
             Some(service) => service.download_clients().await.ok(),
             None => None,
         };
@@ -152,7 +114,7 @@ impl WiringCheck {
         // a fault is the service saying it can no longer reach the client. Asked only where
         // an edit was actually found — a check that ran the service's own test on every
         // healthy run would be spending it to learn nothing.
-        let broken = match (&service, held.as_deref()) {
+        let broken = match (service, held.as_deref()) {
             (Some(service), Some(held)) => broken_clients(managed, held, service.as_ref()).await,
             _ => Vec::new(),
         };

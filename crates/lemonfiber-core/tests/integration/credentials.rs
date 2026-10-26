@@ -1,47 +1,52 @@
 //! The credentials check, driven through its public surface against fakes.
 //!
-//! The check reads a key from a file and asks a running service who it is with
-//! it. Both sides are faked here: a filesystem that hands back whatever config a
-//! test wants, and a transport that answers as the service would. The check is
-//! built on `#[async_trait]` clients built on another, so — as with the curator
-//! client and the VPN check — it is exercised from here rather than from a
-//! `#[cfg(test)]` module, where async-trait code is compiled twice and its
+//! The check asks each curator who it is through the adapter in front of it, which
+//! presents the key lemonfiber minted for it. The adapter is faked here as a transport
+//! answering its contract as it would. The check is built on `#[async_trait]` clients
+//! built on another, so — as with the VPN check — it is exercised from here rather than
+//! from a `#[cfg(test)]` module, where async-trait code is compiled twice and its
 //! coverage counted from the wrong copy.
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::library::curate;
+use lemonfiber_contract::wire::Kind;
 use lemonfiber_core::doctor::credentials::{CredentialsCheck, Target};
 use lemonfiber_core::doctor::{Category, Check, Verdict};
 use lemonfiber_core::error::codes::cred::CREDENTIAL_REJECTED;
 use lemonfiber_core::error::Severity;
-use lemonfiber_fixtures::files::Files;
+use lemonfiber_core::ports::service::Identity;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_testing::adapted::{refused, Adapted, KEY};
+use lemonfiber_testing::curators::{answered, curating, unavailable, FILM, TELEVISION};
 
-/// A curator's config carrying a generated key, as one reads from disk.
-const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
-
-/// The key inside `CONFIG_WITH_KEY`, so a test can assert it never surfaces.
-const THE_KEY: &str = "a1b2c3d4e5";
-
-/// A status body a healthy curator answers `system/status` with.
-const CURATOR_STATUS: &str = r#"{"instanceName":"Sonarr","version":"4.0.15.2941"}"#;
-
-fn curator(config: &Path) -> Target {
-    Target {
-        id: "sonarr".to_owned(),
+/// What a healthy curator answers about itself.
+fn sonarr() -> Identity {
+    Identity {
         name: "Sonarr".to_owned(),
-        base: "http://127.0.0.1:8989".to_owned(),
-        config: config.to_path_buf(),
-        version: 3,
-        confined_to: None,
-        kind: None,
+        version: "4.0.15.2941".to_owned(),
     }
 }
 
-/// Run the check over one target with the given filesystem and transport.
-async fn only(target: Target, fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
-    let check = CredentialsCheck::new(http, fs, vec![target]);
+/// `curator`, asked through its adapter answering `identity` as `answer`.
+fn asked(curator: Adapted, name: &str, http: &Arc<Fake>) -> Target {
+    Target {
+        id: curator.plugin.to_owned(),
+        name: name.to_owned(),
+        kind: None,
+        asked: Some(Arc::new(curate::Adapter(curator.contracted(http.clone())))),
+    }
+}
+
+/// The television curator, its adapter answering `identity` as `answer`.
+fn television(answer: Answer) -> (Target, Arc<Fake>) {
+    let http = Fake::by_path(vec![(curating(TELEVISION, "identity"), answer)]);
+    (asked(TELEVISION, "Sonarr", &http), http)
+}
+
+/// Run the check over one target.
+async fn only(target: Target) -> Verdict {
+    let check = CredentialsCheck::new(vec![target]);
     let mut findings = check.run().await;
     findings.pop().map_or(
         Verdict::Skipped {
@@ -53,13 +58,10 @@ async fn only(target: Target, fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
 
 #[tokio::test]
 async fn a_proven_credential_names_the_service_and_its_version() {
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = Fake::by_path(vec![("8989", Answer::reply(200, CURATOR_STATUS))]);
+    let (target, _) = television(answered(&sonarr()));
 
-    let verdict = only(curator(&config), fs, http).await;
     assert_eq!(
-        verdict,
+        only(target).await,
         Verdict::Pass {
             note: Some("Sonarr 4.0.15.2941".to_owned())
         },
@@ -68,12 +70,10 @@ async fn a_proven_credential_names_the_service_and_its_version() {
 }
 
 #[tokio::test]
-async fn a_service_that_refuses_its_own_key_is_a_failure() {
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = Fake::by_path(vec![("8989", Answer::reply(401, ""))]);
+async fn a_service_that_refuses_its_key_is_a_failure() {
+    let (target, _) = television(refused(Kind::Unauthorised));
 
-    let problem = match only(curator(&config), fs, http).await {
+    let problem = match only(target).await {
         Verdict::Fail(problem) => Some(problem),
         _ => None,
     };
@@ -89,23 +89,21 @@ async fn a_service_that_refuses_its_own_key_is_a_failure() {
 async fn a_service_that_does_not_answer_is_unverified_rather_than_failed() {
     // Nothing answered, so the credential is unproven — never a pass, but not a
     // fault either: the honest verdict is that it could not be established.
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = Fake::by_path(vec![("8989", Answer::Silent)]);
+    let (target, _) = television(unavailable());
 
-    assert!(matches!(
-        only(curator(&config), fs, http).await,
-        Verdict::Unverified { .. }
-    ));
+    assert!(matches!(only(target).await, Verdict::Unverified { .. }));
 }
 
 #[tokio::test]
 async fn a_service_answering_unusably_carries_its_own_words() {
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = Fake::by_path(vec![("8989", Answer::reply(500, "database is locked"))]);
+    let refusal = lemonfiber_contract::wire::Refusal::new(Kind::Refused, "database is locked");
+    let (target, _) = television(Answer::served(
+        Kind::Refused.status(),
+        lemonfiber_contract::wire::PROBLEM,
+        serde_json::to_string(&refusal).unwrap_or_default(),
+    ));
 
-    let reason = match only(curator(&config), fs, http).await {
+    let reason = match only(target).await {
         Verdict::Unverified { reason, .. } => Some(reason),
         _ => None,
     };
@@ -116,79 +114,31 @@ async fn a_service_answering_unusably_carries_its_own_words() {
 }
 
 #[tokio::test]
-async fn a_service_on_an_unsupported_api_version_is_unverified_with_that_reason() {
-    // A 404 is the versioned API prefix not served: the service was upgraded past
-    // (or stands before) the version this build speaks, so the credential cannot
-    // be proven through it — unverified, pointed at aligning the versions.
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
-    let http = Fake::by_path(vec![("8989", Answer::reply(404, ""))]);
+async fn a_service_on_an_unsupported_release_is_unverified_with_that_reason() {
+    let (target, _) = television(refused(Kind::Unsupported));
 
-    let reason = match only(curator(&config), fs, http).await {
+    let reason = match only(target).await {
         Verdict::Unverified { reason, .. } => Some(reason),
         _ => None,
     };
     assert!(
         reason.is_some_and(|reason| reason.contains("API version this build speaks")),
-        "an unsupported API version is unverified, named as a version mismatch"
+        "an unsupported release is unverified, named as a version mismatch"
     );
 }
 
 #[tokio::test]
-async fn a_service_with_no_config_file_yet_is_skipped() {
-    // The file is not there because the service has not finished first start.
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(Vec::new());
-    let http = Fake::by_path(vec![("8989", Answer::reply(200, CURATOR_STATUS))]);
-
-    assert!(matches!(
-        only(curator(&config), fs, http).await,
-        Verdict::Skipped { .. }
-    ));
-}
-
-#[tokio::test]
-async fn a_service_whose_key_is_not_generated_yet_is_skipped() {
-    // The config exists but the key element is still empty mid-first-start.
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let fs = Files::at(vec![(config.clone(), "<Config><ApiKey></ApiKey></Config>")]);
-    let http = Fake::by_path(vec![("8989", Answer::reply(200, CURATOR_STATUS))]);
-
-    assert!(matches!(
-        only(curator(&config), fs, http).await,
-        Verdict::Skipped { .. }
-    ));
-}
-
-/// A key a plugin's container keeps is read only from beneath the directory it owns: one
-/// there is proven like any other, and one the target names outside it is not read, so
-/// there is nothing to prove.
-#[tokio::test]
-async fn a_confined_key_is_read_only_from_beneath_its_directory() {
-    let config = PathBuf::from("/stack/config/kept/config.xml");
-    let http = Fake::by_path(vec![("8989", Answer::reply(200, CURATOR_STATUS))]);
-    let confined = |within: &str| Target {
-        confined_to: Some(PathBuf::from(within)),
-        ..curator(&config)
+async fn a_curator_whose_adapter_cannot_be_asked_yet_is_skipped() {
+    let target = Target {
+        asked: None,
+        ..television(answered(&sonarr())).0
     };
 
-    let beneath = only(
-        confined("/stack/config/kept"),
-        Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]),
-        http.clone(),
-    )
-    .await;
-    let elsewhere = only(
-        confined("/stack/config/other"),
-        Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]),
-        http,
-    )
-    .await;
+    let verdict = only(target).await;
 
-    assert!(matches!(beneath, Verdict::Pass { .. }), "{beneath:?}");
     assert!(
-        matches!(elsewhere, Verdict::Skipped { .. }),
-        "{elsewhere:?}"
+        matches!(&verdict, Verdict::Skipped { reason } if reason.contains("Sonarr")),
+        "{verdict:?}"
     );
 }
 
@@ -196,27 +146,15 @@ async fn a_confined_key_is_read_only_from_beneath_its_directory() {
 async fn each_service_is_reported_independently() {
     // One up, one not answering: the run reports both, and the unreachable one
     // does not stop the reachable one being proven.
-    let curator_config = PathBuf::from("/stack/config/sonarr/config.xml");
-    let second_curator_config = PathBuf::from("/stack/config/radarr/config.xml");
-    let fs = Files::at(vec![
-        (curator_config.clone(), CONFIG_WITH_KEY),
-        (second_curator_config.clone(), CONFIG_WITH_KEY),
-    ]);
     let http = Fake::by_path(vec![
-        ("8989", Answer::reply(200, CURATOR_STATUS)),
-        ("7878", Answer::Silent),
+        (curating(TELEVISION, "identity"), answered(&sonarr())),
+        (curating(FILM, "identity"), unavailable()),
     ]);
-    let second_curator = Target {
-        id: "radarr".to_owned(),
-        name: "Radarr".to_owned(),
-        base: "http://127.0.0.1:7878".to_owned(),
-        config: second_curator_config,
-        version: 3,
-        confined_to: None,
-        kind: None,
-    };
 
-    let check = CredentialsCheck::new(http, fs, vec![curator(&curator_config), second_curator]);
+    let check = CredentialsCheck::new(vec![
+        asked(TELEVISION, "Sonarr", &http),
+        asked(FILM, "Radarr", &http),
+    ]);
     let findings = check.run().await;
 
     assert_eq!(findings.len(), 2);
@@ -239,38 +177,38 @@ async fn each_service_is_reported_independently() {
 
 #[tokio::test]
 async fn nothing_to_prove_produces_no_findings() {
-    let fs = Files::at(Vec::new());
-    let http = Fake::by_path(Vec::new());
-    let check = CredentialsCheck::new(http, fs, Vec::new());
+    let check = CredentialsCheck::new(Vec::new());
     assert!(check.run().await.is_empty());
 }
 
 #[tokio::test]
 async fn the_check_belongs_to_the_credentials_category() {
-    let fs = Files::at(Vec::new());
-    let http = Fake::by_path(Vec::new());
-    let check = CredentialsCheck::new(http, fs, Vec::new());
+    let check = CredentialsCheck::new(Vec::new());
     assert_eq!(check.category(), Category::Credentials);
 }
 
+/// Outcomes are reported, never inputs. Whatever the verdict, the key the adapter is
+/// asked with must not be anywhere in what is shown.
 #[tokio::test]
 async fn the_credential_never_appears_in_a_finding() {
-    // Outcomes are reported, never inputs. Whatever the verdict, the key that
-    // authenticated the request must not be anywhere in what is shown.
-    let config = PathBuf::from("/stack/config/sonarr/config.xml");
     for answer in [
-        Answer::reply(200, CURATOR_STATUS),
-        Answer::reply(401, ""),
-        Answer::reply(500, "database is locked"),
-        Answer::Silent,
+        answered(&sonarr()),
+        refused(Kind::Unauthorised),
+        refused(Kind::Refused),
+        unavailable(),
     ] {
-        let fs = Files::at(vec![(config.clone(), CONFIG_WITH_KEY)]);
-        let http = Fake::by_path(vec![("8989", answer)]);
-        let check = CredentialsCheck::new(http, fs, vec![curator(&config)]);
+        let (target, http) = television(answer);
+        let check = CredentialsCheck::new(vec![target]);
         let rendered = serde_json::to_string(&check.run().await).unwrap_or_default();
         assert!(
-            !rendered.contains(THE_KEY),
+            !rendered.contains(KEY),
             "the credential leaked into a finding"
+        );
+        assert!(
+            http.requests()
+                .iter()
+                .all(|asked| asked.url.contains(&TELEVISION.port.to_string())),
+            "the check asked somewhere other than the adapter"
         );
     }
 }

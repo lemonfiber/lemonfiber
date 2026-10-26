@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::http::Method;
 use lemonfiber_sidecar::gate::{
     Accepted, Credential, File, Kind, Tokens, Upstream, Upstreams, PORT,
 };
@@ -12,7 +11,11 @@ use super::{held, rotate, UNPRINTED};
 use crate::app::Ctx;
 use crate::config::{store, Settings};
 use crate::credential::{Held, Reach, Settled, State};
+use crate::ports::service::{Endpoint, MediaServerLink, RegisteredTarget};
 use crate::test_support::a_context;
+use crate::test_support::requests::{
+    answered, intake, refusing, taken, told, unavailable, REQUESTS,
+};
 
 /// What the fixed randomness renders to, which is every token minted here.
 fn minted() -> String {
@@ -80,12 +83,14 @@ fn fillers(gating: bool, project: Option<&std::path::Path>) -> crate::wiring::Fi
     fillers_from(stack(gating), project)
 }
 
-/// The stack's fillers with `services` as its services, written at `project`.
+/// The stack's fillers with `services` as its services, written at `project`, the request
+/// service moved into its plugin.
 fn fillers_from(
     services: Vec<lemonfiber_manifest::Service>,
     project: Option<&std::path::Path>,
 ) -> crate::wiring::Fillers {
-    fillers_beside(services, &[], project)
+    let moved: Vec<_> = REQUESTS.installed().into_iter().collect();
+    fillers_beside(services, &moved, project)
 }
 
 /// The same, with `installed` beside the stack and the media server moved into its plugin.
@@ -211,11 +216,15 @@ fn scene(
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let keyed = crate::plugin::key_file(&at, crate::test_support::media::ADAPTER);
-    let _ = std::fs::create_dir_all(keyed.parent().unwrap_or(&at));
-    let _ = std::fs::write(&keyed, crate::test_support::media::KEY);
+    for adapter in [crate::test_support::media::ADAPTER, REQUESTS.adapter] {
+        let keyed = crate::plugin::key_file(&at, adapter);
+        let _ = std::fs::create_dir_all(keyed.parent().unwrap_or(&at));
+        let _ = std::fs::write(&keyed, crate::test_support::media::KEY);
+    }
     let ctx = a_context()
-        .engine(Arc::new(crate::test_support::media::running()))
+        .engine(Arc::new(
+            crate::test_support::media::running().alongside(REQUESTS.running()),
+        ))
         .settings(Settings {
             env_file: Some(env),
             ..Settings::default()
@@ -241,65 +250,60 @@ fn accepted(project: &Path) -> Option<Tokens> {
 fn serving(
     curator: &str,
     media_server: &str,
-    moved: u16,
-    tested: &[u16],
-    linked: u16,
+    moved: Answer,
+    tested: Vec<Answer>,
+    linked: Answer,
 ) -> Arc<Fake> {
-    let target = serde_json::json!([{
-        "id": 1, "hostname": "request-gate", "port": PORT, "baseUrl": "/sonarr", "apiKey": curator,
-    }])
-    .to_string();
-    let link = serde_json::json!({
-        "ip": "request-gate", "port": PORT, "urlBase": "/jellyfin", "apiKey": media_server,
-    })
-    .to_string();
+    let through = |base: &str| Endpoint {
+        host: crate::app::gating::SERVICE.to_owned(),
+        port: PORT,
+        base: base.to_owned(),
+    };
     beside_the_gates_key(vec![
         (
-            Method::Get,
-            "/settings/radarr",
-            vec![Answer::reply(200, "[]")],
+            intake("fulfilment_targets"),
+            vec![answered(&[RegisteredTarget {
+                id: "1".to_owned(),
+                at: through("/sonarr"),
+                key: curator.to_owned(),
+                kind: crate::ports::media::Kind::Tv,
+            }])],
         ),
         (
-            Method::Get,
-            "/settings/sonarr",
-            vec![Answer::reply(200, target)],
+            intake("media_server_link"),
+            vec![answered(&MediaServerLink {
+                at: through("/jellyfin"),
+                key: media_server.to_owned(),
+            })],
         ),
-        (
-            Method::Get,
-            "/settings/jellyfin",
-            vec![Answer::reply(200, link)],
-        ),
-        (
-            Method::Put,
-            "/settings/sonarr/1",
-            vec![Answer::reply(moved, "")],
-        ),
-        (
-            Method::Post,
-            "/settings/sonarr/test",
-            tested
-                .iter()
-                .map(|status| Answer::reply(*status, ""))
-                .collect(),
-        ),
-        (
-            Method::Post,
-            "/settings/jellyfin",
-            vec![Answer::reply(linked, "")],
-        ),
+        (intake("move_fulfilment_target"), vec![moved.clone(), moved]),
+        (intake("test_fulfilment_target"), tested),
+        (intake("link_media_server"), vec![linked]),
     ])
+}
+
+/// [`serving`], taking every write and proving every target.
+fn taking(curator: &str, media_server: &str) -> Arc<Fake> {
+    serving(curator, media_server, taken(), vec![taken()], taken())
 }
 
 /// A household answering the media server's keys filed under the gate's name, through
 /// which a rotation finds the key the gate presents on its route there, and then `routes`.
-fn beside_the_gates_key(routes: Vec<(Method, &'static str, Vec<Answer>)>) -> Arc<Fake> {
+fn beside_the_gates_key(routes: Vec<(&'static str, Vec<Answer>)>) -> Arc<Fake> {
     let mut answering = vec![(
-        Method::Post,
         crate::test_support::media::serve("filed_as"),
         vec![Answer::reply(200, crate::test_support::json(&["gates"]))],
     )];
     answering.extend(routes);
-    Fake::by_route_in_turn(answering)
+    Fake::by_path_in_turn(answering)
+}
+
+/// Whether the request service was asked to change anything.
+fn written(http: &Fake) -> bool {
+    http.requests().iter().any(|asked| {
+        asked.url.ends_with(intake("move_fulfilment_target"))
+            || asked.url.ends_with(intake("link_media_server"))
+    })
 }
 
 /// The line named `name`, or an empty one the assertions after it then fail on.
@@ -333,7 +337,7 @@ const MEDIA_SERVER_LINE: &str = "Request gate token for Jellyfin";
 
 #[tokio::test]
 async fn each_route_has_a_line_read_from_the_request_service() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-listed",
         true,
@@ -364,24 +368,21 @@ async fn each_route_has_a_line_read_from_the_request_service() {
 
 #[tokio::test]
 async fn a_token_not_handed_over_or_unread_says_so() {
-    let http = Fake::by_route_in_turn(vec![
+    let http = Fake::by_path(vec![
         (
-            Method::Get,
-            "/settings/radarr",
-            vec![Answer::reply(200, "[]")],
+            intake("fulfilment_targets"),
+            answered(&Vec::<RegisteredTarget>::new()),
         ),
         (
-            Method::Get,
-            "/settings/sonarr",
-            vec![Answer::reply(200, "[]")],
-        ),
-        (
-            Method::Get,
-            "/settings/jellyfin",
-            vec![Answer::reply(
-                200,
-                r#"{"ip":"jellyfin","port":8096,"apiKey":"own"}"#,
-            )],
+            intake("media_server_link"),
+            answered(&MediaServerLink {
+                at: Endpoint {
+                    host: "jellyfin".to_owned(),
+                    port: 8096,
+                    base: String::new(),
+                },
+                key: "own".to_owned(),
+            }),
         ),
     ]);
     let (ctx, at) = scene("tokens-unheld", true, &accepting(&[], &[]), http, true);
@@ -394,7 +395,7 @@ async fn a_token_not_handed_over_or_unread_says_so() {
             .is_some_and(|said| said.ends_with("Run lemonfiber seed.")));
     }
 
-    let silent = Fake::by_route_in_turn(vec![(Method::Get, "", vec![Answer::Silent])]);
+    let silent = Fake::by_path(vec![(intake(""), unavailable())]);
     let (ctx, at) = scene("tokens-unread", true, &accepting(&[], &[]), silent, true);
     let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
     assert_eq!(named(&lines, CURATOR_LINE).state, State::Stale);
@@ -403,7 +404,7 @@ async fn a_token_not_handed_over_or_unread_says_so() {
 
 #[tokio::test]
 async fn without_the_gate_its_routes_or_a_stack_directory_there_are_no_lines() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-none",
         true,
@@ -430,7 +431,7 @@ async fn without_the_gate_its_routes_or_a_stack_directory_there_are_no_lines() {
 
 #[tokio::test]
 async fn a_token_is_never_printed() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-unprinted",
         true,
@@ -451,7 +452,7 @@ async fn a_token_is_never_printed() {
 
 #[tokio::test]
 async fn a_route_for_a_service_the_stack_no_longer_names_is_called_by_its_route() {
-    let http = serving("held", "linked", 200, &[200], 200);
+    let http = taking("held", "linked");
     let (ctx, at) = scene(
         "tokens-unnamed",
         true,

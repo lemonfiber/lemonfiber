@@ -7,8 +7,9 @@ use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 use super::{agreeing, closing, expiring, overdue, standing, why, Arranged, CameTo, Expiry};
 use crate::app::Ctx;
 use crate::config::Settings;
-use crate::ports::service::HouseholdRequest;
-use crate::test_support::{a_context, a_password, env_at, SeedFs};
+use crate::ports::service::{Address, HouseholdRequest};
+use crate::test_support::requests::{self, answered, intake, refusing, taken, REQUESTS};
+use crate::test_support::{a_context, a_password, env_at};
 
 /// A moment the calendar holds, for these requests to have been asked at.
 const ASKED: &str = "2026-08-17T21:04:09";
@@ -313,67 +314,57 @@ fn what_travels_is_why_and_never_the_decline_itself() {
     }
 }
 
-/// A curator config that opens a target, carrying a readable key.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-
-/// The one request the household is waiting on, asked for long enough ago that any
-/// period these cases name has run out on it.
+/// The one request waiting on somebody, asked so long ago that every period these cases
+/// name has run out on it.
 ///
 /// **Dated years back on purpose.** These cases run on the real clock rather than a
 /// stopped one, so a date near today would be inside a thirty-day period this month
 /// and outside it the next — a test that passes or fails by the calendar.
-const WAITING: &str = r#"{"pageInfo":{"results":1},"results":[{"id":7,
-    "createdAt":"2020-01-01T00:00:00.000Z","status":1,"type":"movie",
-    "media":{"status":2,"externalServiceId":3},
-    "requestedBy":{"displayName":"Alex"}}]}"#;
+fn waiting() -> HouseholdRequest {
+    HouseholdRequest {
+        member: "Alex".to_owned(),
+        item: Some(3),
+        ..asked(7, Some("2020-01-01T00:00:00.000Z"), RequestStatus::Pending)
+    }
+}
 
-/// Where the member who asked already hears from the request service.
-const REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
-    "pushoverApplicationToken":"the-application-token",
-    "notificationTypes":{"pushover":64}}"#;
-
-/// A request service that answers everything one sweep asks of it.
+/// A request service that answers everything one sweep asks of it, closing a request as
+/// `closes` and listing them as `lists` answers.
 ///
 /// Answered by route rather than in turn, because a sweep reads before it writes and
 /// a queue would prove only that the right number of calls went out.
-fn service(closes: u16, lists: u16) -> Arc<Transport> {
-    Transport::by_rules(vec![
-        (None, "/auth/me", Answer::reply(200, "{}")),
-        (
-            Some(crate::ports::http::Method::Get),
-            "/request/7",
-            Answer::reply(
-                200,
-                r#"{"id":7,"requestedBy":{"id":4,"displayName":"Alex"}}"#,
-            ),
+fn service(closes: Answer, lists: Answer) -> Arc<Transport> {
+    Transport::by_path(vec![
+        (intake("answers"), taken()),
+        (intake("decide"), closes),
+        requests::answering(
+            "reachable",
+            &vec![Address::Pushover {
+                user: "the-user-key".to_owned(),
+                application: "the-application-token".to_owned(),
+                sound: None,
+            }],
         ),
-        (None, "/request/7/", Answer::reply(closes, "{}")),
-        (
-            None,
-            "/user/4/settings/notifications",
-            Answer::reply(200, REACHED_AT),
-        ),
-        (None, "/api/v1/request", Answer::reply(lists, WAITING)),
-        (None, "", Answer::reply(200, "[]")),
+        (intake("requests"), lists),
+        ("", Answer::reply(200, "[]")),
     ])
 }
 
-/// An install that reaches that service, its media server moved into its plugin, keeping
-/// the transport so what it was sent can be read back.
-fn install(name: &str, closes: u16) -> (Ctx, Arc<Transport>) {
-    listing(name, closes, 200)
+/// An install that reaches that service, its media server and its request service moved
+/// into their plugins, keeping the transport so what it was sent can be read back.
+fn install(name: &str, closes: Answer) -> (Ctx, Arc<Transport>) {
+    listing(name, closes, answered(&vec![waiting()]))
 }
 
 /// The same, with the request service's own list answering as given.
-fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
+fn listing(name: &str, closes: Answer, lists: Answer) -> (Ctx, Arc<Transport>) {
     let transport = service(closes, lists);
     let held: Arc<Transport> = Arc::clone(&transport);
     let mut ctx = a_context()
-        .engine(Arc::new(crate::test_support::media::running()))
-        .build()
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
+        .engine(Arc::new(
+            crate::test_support::media::running().alongside(REQUESTS.running()),
         ))
+        .build()
         .with_http(held);
     ctx.settings.env_file = Some(env_at(name, &a_password()));
     let _ = crate::app::targets::record_secret(
@@ -382,15 +373,17 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
         &a_password(),
     );
     crate::test_support::media::moved_in(&ctx);
+    REQUESTS.moved_in(&ctx);
     (ctx, transport)
 }
 
 /// Whether the transport was asked to turn request seven down.
 fn declined(transport: &Arc<Transport>) -> bool {
-    transport
-        .requests()
-        .iter()
-        .any(|asked| asked.url.contains("/request/7/decline"))
+    let sent = transport.requests();
+    requests::told::<bool>(&sent, "decide", "approve")
+        .into_iter()
+        .zip(requests::told::<i64>(&sent, "decide", "request"))
+        .any(|(approve, request)| !approve && request == 7)
 }
 
 /// A sweep closes what has waited too long, and carries the reason to whoever asked.
@@ -399,7 +392,7 @@ fn declined(transport: &Arc<Transport>) -> bool {
 /// what it told them is on the record for the reading afterwards.
 #[tokio::test]
 async fn a_sweep_closes_what_waited_too_long_and_tells_whoever_asked() {
-    let (ctx, transport) = install("swept", 200);
+    let (ctx, transport) = install("swept", taken());
 
     let came_to = closing(&ctx, 30, Duration::ZERO).await;
 
@@ -433,10 +426,10 @@ async fn a_sweep_closes_what_waited_too_long_and_tells_whoever_asked() {
 /// exactly the silent policy the whole arrangement exists not to be.
 #[tokio::test]
 async fn a_run_ends_when_the_arrangement_it_began_under_does() {
-    let (withdrawn, _) = install("gone", 200);
+    let (withdrawn, _) = install("gone", taken());
     assert_eq!(closing(&withdrawn, 30, Duration::ZERO).await.closed, 1);
 
-    let (replaced, transport) = install("replaced", 200);
+    let (replaced, transport) = install("replaced", taken());
     assert!(agreeing(&replaced, Arranged::After(45)).is_ok());
 
     assert_eq!(closing(&replaced, 30, Duration::ZERO).await.closed, 1);
@@ -446,7 +439,7 @@ async fn a_run_ends_when_the_arrangement_it_began_under_does() {
 /// A request service that will not close one says so, and leaves it waiting.
 #[tokio::test]
 async fn a_request_the_service_will_not_close_is_left_waiting_and_said() {
-    let (ctx, transport) = install("refused-close", 500);
+    let (ctx, transport) = install("refused-close", refusing());
 
     let came_to = closing(&ctx, 30, Duration::ZERO).await;
 
@@ -495,7 +488,7 @@ async fn each_way_a_look_can_fail_is_said_in_its_own_words() {
     .await;
     assert_eq!(unreadable.missed, 1);
 
-    let (silent, transport) = listing("unlisted", 200, 500);
+    let (silent, transport) = listing("unlisted", taken(), refusing());
     let unlisted = closing(&silent, 30, Duration::ZERO).await;
 
     assert_eq!(unlisted.closed, 0);
@@ -514,7 +507,7 @@ async fn each_way_a_look_can_fail_is_said_in_its_own_words() {
 /// Asked for as a command, arranging a period answers with the household under it.
 #[tokio::test]
 async fn arranging_a_period_as_a_command_answers_with_the_household() {
-    let (ctx, _) = install("as-a-command", 200);
+    let (ctx, _) = install("as-a-command", taken());
 
     let report = crate::app::dispatch(crate::app::Command::Expiring(Arranged::After(30)), &ctx)
         .await
@@ -531,7 +524,7 @@ async fn arranging_a_period_as_a_command_answers_with_the_household() {
 /// Asked to begin against nothing, as a command, it refuses rather than choosing.
 #[tokio::test]
 async fn beginning_against_nothing_is_refused_as_a_command_too() {
-    let (ctx, _) = install("unarranged", 200);
+    let (ctx, _) = install("unarranged", taken());
 
     let refused = crate::app::dispatch(crate::app::Command::Expiring(Arranged::AsAgreed), &ctx)
         .await
@@ -546,7 +539,7 @@ async fn beginning_against_nothing_is_refused_as_a_command_too() {
 /// A rehearsal of a run names what it would close and closes nothing.
 #[tokio::test]
 async fn a_rehearsed_run_closes_nothing() {
-    let (arranged, transport) = install("rehearsed-run", 200);
+    let (arranged, transport) = install("rehearsed-run", taken());
     assert!(agreeing(&arranged, Arranged::After(30)).is_ok());
     let ctx = arranged.rehearsing();
 

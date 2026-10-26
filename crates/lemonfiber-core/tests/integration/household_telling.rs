@@ -10,21 +10,31 @@
 
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::request::intake as contract;
 use lemonfiber_core::doctor::narrowing::Narrowing;
 use lemonfiber_core::doctor::telling::TellingCheck;
 use lemonfiber_core::doctor::{examine, Category, Check, Verdict};
-use lemonfiber_core::ports::service::Requests;
-use lemonfiber_core::seerr::Seerr;
+use lemonfiber_core::ports::service::{Occasion, Requests, Telling};
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_testing::requests::{answered, intake, taken, told, unavailable, REQUESTS};
 
-/// Every occasion, as the request service keeps the set: the bit field it answers and is
-/// written.
+/// Every occasion, as the record keeps the set: the sum of their codes.
 const OCCASIONS: u32 = 222;
 
-/// The real client over a scripted request service.
+/// What the request service answers holding a telling, on where `enabled` says, for
+/// `occasions`.
+fn holding(enabled: bool, occasions: &[Occasion]) -> Answer {
+    answered(&Telling {
+        enabled,
+        occasions: occasions.iter().copied().collect(),
+        others: false,
+    })
+}
+
+/// The request service over its contract, answering its telling as `answer`.
 fn asking(answer: Answer) -> Arc<dyn Requests> {
-    let http = Fake::by_path_in_turn(vec![("/settings/notifications/webpush", vec![answer])]);
-    Arc::new(Seerr::new(http, "http://seerr:5055", "seerr"))
+    let http = Fake::by_path(vec![(intake("telling"), answer)]);
+    Arc::new(contract::Adapter(REQUESTS.contracted(http)))
 }
 
 /// The one verdict the check produces.
@@ -39,8 +49,7 @@ async fn verdict(check: TellingCheck) -> Verdict {
 
 #[tokio::test]
 async fn a_household_told_everything_reads_as_told() {
-    let held = format!(r#"{{"enabled":true,"types":{OCCASIONS}}}"#);
-    let check = TellingCheck::new(Some(asking(Answer::reply(200, held))), None);
+    let check = TellingCheck::new(Some(asking(holding(true, &Occasion::ALL))), None);
 
     assert_eq!(check.category(), Category::Services);
     assert!(
@@ -61,7 +70,7 @@ async fn a_stack_without_a_request_service_has_nothing_to_ask() {
 
 #[tokio::test]
 async fn a_request_service_that_will_not_answer_is_unverified() {
-    let check = TellingCheck::new(Some(asking(Answer::Silent)), None);
+    let check = TellingCheck::new(Some(asking(unavailable())), None);
 
     assert!(
         matches!(verdict(check).await, Verdict::Unverified { .. }),
@@ -84,7 +93,7 @@ async fn a_telling_left_behind_what_lemonfiber_now_sends_warns() {
         origin: lemonfiber_core::baseline::Origin::Written,
     };
     let check = TellingCheck::new(
-        Some(asking(Answer::reply(200, r#"{"enabled":true,"types":8}"#))),
+        Some(asking(holding(true, &[Occasion::Arrived]))),
         Some(recorded),
     );
 
@@ -102,10 +111,7 @@ async fn a_setting_the_operator_chose_is_reported_as_theirs() {
         at: "2026-08-28T00:00:00Z".to_owned(),
         origin: lemonfiber_core::baseline::Origin::Written,
     };
-    let check = TellingCheck::new(
-        Some(asking(Answer::reply(200, r#"{"enabled":false,"types":0}"#))),
-        Some(recorded),
-    );
+    let check = TellingCheck::new(Some(asking(holding(false, &[]))), Some(recorded));
 
     assert!(
         matches!(&verdict(check).await, Verdict::Pass { note }
@@ -122,14 +128,11 @@ async fn a_setting_the_operator_chose_is_reported_as_theirs() {
 /// send is read back off the request rather than taken on trust.
 #[tokio::test]
 async fn a_service_nobody_configured_is_set_up_to_tell_the_household() {
-    let http = Fake::by_path_in_turn(vec![(
-        "/settings/notifications/webpush",
-        vec![
-            Answer::reply(200, r#"{"enabled":false,"types":0}"#),
-            Answer::reply(200, ""),
-        ],
-    )]);
-    let request_service = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
+    let http = Fake::by_path(vec![
+        (intake("telling"), holding(false, &[])),
+        (intake("tell"), taken()),
+    ]);
+    let request_service = contract::Adapter(REQUESTS.contracted(http.clone()));
 
     let (wiring, _) =
         lemonfiber_core::seed::wire_household_telling(&request_service, None, false).await;
@@ -139,15 +142,11 @@ async fn a_service_nobody_configured_is_set_up_to_tell_the_household() {
         lemonfiber_core::seed::State::Wired,
         "{wiring:?}"
     );
-    let sent = http
-        .requests()
-        .into_iter()
-        .find(|asked| asked.method == lemonfiber_core::ports::http::Method::Post)
-        .and_then(|asked| asked.body)
-        .unwrap_or_default();
+    let sent: Vec<Telling> = told(&http.requests(), "tell", "telling");
     assert!(
-        sent.contains("\"enabled\":true") && sent.contains(&OCCASIONS.to_string()),
-        "the household was not asked to be told about anything: {sent}"
+        sent.iter()
+            .any(|telling| telling.enabled && telling.occasions.len() == Occasion::ALL.len()),
+        "the household was not asked to be told about anything: {sent:?}"
     );
 }
 
@@ -158,9 +157,8 @@ async fn a_service_nobody_configured_is_set_up_to_tell_the_household() {
 /// operator's `doctor` takes is driven here rather than assumed to be the same one.
 #[tokio::test]
 async fn a_diagnosis_asks_the_household_question_and_gets_an_answer() {
-    let held = format!(r#"{{"enabled":true,"types":{OCCASIONS}}}"#);
     let checks: Vec<Box<dyn Check>> = vec![Box::new(TellingCheck::new(
-        Some(asking(Answer::reply(200, held))),
+        Some(asking(holding(true, &Occasion::ALL))),
         None,
     ))];
 

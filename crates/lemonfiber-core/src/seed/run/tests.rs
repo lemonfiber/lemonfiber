@@ -6,7 +6,7 @@ use super::baseline::escalate_broken_roots;
 use super::clients::{category_for, Held};
 use super::curating::curators;
 use super::{withheld, withheld_brought};
-use crate::app::targets::{curator_targets, project_directory, recorded_secret};
+use crate::app::targets::{project_directory, recorded_secret};
 use crate::app::{dispatch, Command, Ctx, Outcome};
 use crate::config::{store, Settings};
 use crate::model::VersionReport;
@@ -14,11 +14,13 @@ use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::service::{Credential, RootFolder};
 use crate::seed::{Severity, State, Wiring};
 use crate::stack::Source;
+use crate::test_support::curators::curated;
+use crate::test_support::indexer::INDEXER;
+use crate::test_support::requests::REQUESTS;
 use crate::test_support::{
     a_context, contracted, first_party, seeding, seeding_with, FixedRandom, Reporting, SeedFs,
 };
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::http::Method;
 
 /// A manifest service with the few fields the credential resolver reads, and
 /// filler for the rest, so a test can vary the shape, port and key file.
@@ -103,16 +105,12 @@ fn is_skipped(wiring: &crate::seed::Wiring) -> bool {
     matches!(wiring.state, crate::seed::State::Skipped { .. })
 }
 
-/// A context whose engine runs the media server's adapter where it is `reachable`,
-/// answering seeding's HTTP from `replies` and its randomness from `bytes`.
-fn seed_ctx(
-    reachable: bool,
-    replies: Vec<(u16, &'static str)>,
-    bytes: Option<Vec<u8>>,
-    env: Option<std::path::PathBuf>,
-) -> Ctx {
+/// A context whose engine runs the media server's and the request service's adapters where
+/// they are `reachable`, each keyed wherever its configuration is, answering no HTTP and
+/// its randomness from `bytes`.
+fn seed_ctx(reachable: bool, bytes: Option<Vec<u8>>, env: Option<std::path::PathBuf>) -> Ctx {
     let engine = if reachable {
-        crate::test_support::media::running()
+        crate::test_support::media::running().alongside(REQUESTS.running())
     } else {
         Reporting::absent()
     };
@@ -124,11 +122,11 @@ fn seed_ctx(
         .engine(Arc::new(engine))
         .settings(settings)
         .build()
-        .with_http(Fake::scripted(replies))
+        .with_http(Fake::silent())
         .with_random(Arc::new(FixedRandom(bytes)));
     ctx.seams.confined = crate::test_support::media::Keyed::holding(
         Arc::clone(&ctx.seams.confined),
-        &[crate::test_support::media::ADAPTER],
+        &[crate::test_support::media::ADAPTER, REQUESTS.adapter],
     );
     ctx
 }
@@ -185,10 +183,94 @@ const MINTED_USENET_KEY: &str = "the-minted-usenet-key";
 /// its secret store as the key lemonfiber minted for it.
 fn minting_usenet(ctx: Ctx) -> Ctx {
     crate::test_support::usenet::moved_in(&ctx);
-    keeping_minted(&ctx, crate::test_support::usenet::moved(), |_| {
-        MINTED_USENET_KEY
-    });
+    crate::test_support::usenet::MOVED.minted(&ctx, MINTED_USENET_KEY);
     ctx
+}
+
+/// The key lemonfiber minted for each curator moved into its plugin.
+const MINTED_CURATOR_KEY: &str = "the-minted-curator-key";
+
+/// `ctx` with every curator moved into its plugin, each holding [`MINTED_CURATOR_KEY`] in
+/// its secret store as the key lemonfiber minted for it.
+fn minting_curators(ctx: Ctx) -> Ctx {
+    for curator in crate::test_support::curators::ALL {
+        curator.moved_in(&ctx);
+        curator.minted(&ctx, MINTED_CURATOR_KEY);
+    }
+    ctx
+}
+
+/// `ctx` with every curator moved into its plugin, the engine saying each one's adapter
+/// runs beside the media server's, each adapter keyed wherever its configuration is where
+/// `keyed` and nowhere where not.
+fn curating(ctx: Ctx, keyed: bool) -> Ctx {
+    use crate::test_support::curators::ALL;
+    for curator in ALL {
+        curator.recorded(&ctx);
+        curator.minted(&ctx, MINTED_CURATOR_KEY);
+    }
+    let mut ctx = ctx;
+    ctx.seams.engine = Arc::new(
+        crate::test_support::adapted::running(&ALL)
+            .alongside(crate::test_support::media::running()),
+    );
+    if keyed {
+        let adapters: Vec<&str> = ALL.iter().map(|curator| curator.adapter).collect();
+        ctx.seams.confined = crate::test_support::adapted::Keyed::holding(
+            Arc::clone(&ctx.seams.confined),
+            &adapters,
+        );
+    }
+    ctx
+}
+
+/// What every moved curator answers a whole seed run with: each media root folder and both
+/// download clients already held, the clients answering their test, and every write taken.
+fn curated_routes() -> Vec<(&'static str, Answer)> {
+    use crate::ports::service::{ClientProbe, RegisteredClient, RegisteredFolder};
+    use crate::test_support::curators::{answered, taken};
+    let folder = |id: &str, path: &str| RegisteredFolder {
+        id: id.to_owned(),
+        path: path.to_owned(),
+    };
+    let client = |id: &str, host: &str, port: u16| RegisteredClient {
+        id: id.to_owned(),
+        host: host.to_owned(),
+        port,
+        category: None,
+    };
+    let probe = |id: &str| ClientProbe {
+        id: id.to_owned(),
+        reachable: true,
+        detail: None,
+    };
+    vec![
+        (
+            curated("root_folders"),
+            answered(&[
+                folder("1", "/data/media/tv"),
+                folder("2", "/data/media/movies"),
+                folder("3", "/data/media/music"),
+            ]),
+        ),
+        (
+            curated("download_clients"),
+            answered(&[client("1", "sabnzbd", 8080), client("2", "gluetun", 8081)]),
+        ),
+        (
+            curated("test_download_clients"),
+            answered(&[probe("1"), probe("2")]),
+        ),
+        (curated(""), taken()),
+    ]
+}
+
+/// A transport answering a whole seed run, every curator's connection already held, with
+/// `extra` answered first.
+fn seeding_curated(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
+    let mut routes = extra;
+    routes.extend(curated_routes());
+    seeding_with(routes)
 }
 
 /// The name of the account lemonfiber minted for the torrent client moved into its plugin.
@@ -371,8 +453,8 @@ fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: A
         ))))
 }
 
-/// A plugin's curator, `kept`, filing `media` and keeping its key in a file beneath the
-/// directory its container owns.
+/// A third-party plugin's curator, `kept`, filing `media` over `library.curate` and keeping
+/// its key in a file beneath the directory its container owns.
 fn a_stand_in(media: &str) -> crate::plugin::Installed {
     let mut stand_in = crate::test_support::a_placed(
         "kept",
@@ -381,6 +463,7 @@ fn a_stand_in(media: &str) -> crate::plugin::Installed {
         Some(8990),
     );
     stand_in.media_types = vec![media.to_owned()];
+    stand_in.speaks = vec!["library.curate@1".to_owned()];
     crate::test_support::an_installed("kept", vec![stand_in])
 }
 
@@ -411,6 +494,30 @@ fn asked_by_a_plugin(
 fn leading_away_from_the_stand_in() -> SeedFs {
     SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
         .leading_away(vec!["config/kept/"])
+}
+
+/// The stack's `services` with its indexer moved into its plugin, beside `installed`.
+fn indexed(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+) -> crate::wiring::Fillers {
+    let installed: Vec<_> = INDEXER
+        .installed()
+        .into_iter()
+        .chain(installed.iter().cloned())
+        .collect();
+    fillers_beside(services, &installed, stack_root())
+}
+
+/// A context asking the moved indexer over `http`, holding every stack curator's key as
+/// `fs` does.
+fn indexing(http: Arc<Fake>, fs: SeedFs) -> Ctx {
+    crate::test_support::adapted::asking(
+        seed_ctx(true, None, None)
+            .with_http(http)
+            .with_filesystem(Arc::new(fs)),
+        &[INDEXER],
+    )
 }
 
 /// The indexer aggregator as a manifest service: a curator shape that files no media.
@@ -490,13 +597,11 @@ fn household(completed: bool, signed_in: bool) -> Arc<Fake> {
 /// password with `changed`.
 fn household_changing(completed: bool, signed_in: bool, changed: Answer) -> Arc<Fake> {
     use crate::test_support::media;
+    use crate::test_support::requests::{answered, intake, taken};
     let initialised = if signed_in {
-        vec![Answer::reply(200, r#"{"initialized":true}"#)]
+        vec![answered(&true)]
     } else {
-        vec![
-            Answer::reply(200, r#"{"initialized":false}"#),
-            Answer::reply(200, r#"{"initialized":true}"#),
-        ]
+        vec![answered(&false), answered(&true)]
     };
     Fake::by_path_in_turn(vec![
         (
@@ -505,18 +610,14 @@ fn household_changing(completed: bool, signed_in: bool, changed: Answer) -> Arc<
         ),
         (media::identity("create_admin"), vec![media::taken()]),
         (media::identity("replace_admin_password"), vec![changed]),
-        ("/auth/jellyfin", vec![Answer::reply(200, "")]),
-        ("/settings/initialize", vec![Answer::reply(200, "")]),
-        // Untouched by anybody: what a service that has never had the agent
-        // configured answers, which is the case the telling must write into.
+        (intake("establish"), vec![taken()]),
+        (intake("initialized"), initialised),
+        (intake("configure_identity"), vec![taken()]),
         (
-            "/settings/notifications/webpush",
-            vec![
-                Answer::reply(200, r#"{"enabled":false,"types":0}"#),
-                Answer::reply(200, ""),
-            ],
+            intake("telling"),
+            vec![answered(&crate::ports::service::Telling::default())],
         ),
-        ("", initialised),
+        (intake("tell"), vec![taken()]),
     ])
 }
 

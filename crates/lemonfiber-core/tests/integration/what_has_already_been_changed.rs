@@ -35,7 +35,7 @@ fn paths(root: &Path) -> Paths {
 /// from disk rather than answered by a fake.
 fn ctx(root: &Path) -> Ctx {
     lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .settings(Settings {
             env_file: Some(paths(root).env_file()),
             stack_dir: Some(project().to_path_buf()),

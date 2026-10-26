@@ -203,6 +203,7 @@ impl Context {
             resolver: lemonfiber_fixtures::ports::Resolving::anywhere(),
             registry: lemonfiber_fixtures::registered::Registered::unpublished(),
             program: lemonfiber_fixtures::proving::Proving::unreachable(),
+            serving: lemonfiber_fixtures::serving::Serves::unreachable(),
             ..live
         };
         Ctx::new(seams, self.stack, self.settings, self.environment)

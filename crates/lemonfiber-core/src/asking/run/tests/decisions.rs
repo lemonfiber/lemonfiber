@@ -2,11 +2,7 @@
 
 use super::*;
 
-/// The same member, with one of the two agents left switched off.
-const HALF_REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
-    "pushoverApplicationToken":"the-application-token",
-    "pushbulletAccessToken":"the-access-token",
-    "notificationTypes":{"pushover":64,"pushbullet":0}}"#;
+use request_service::{answered, intake};
 
 /// Approving a waiting request answers with the household and says what happened.
 #[tokio::test]
@@ -66,11 +62,7 @@ async fn turning_one_down_says_the_reason_back_and_where_it_went() {
 async fn an_agent_the_member_switched_off_is_left_alone() {
     let carried = turning_down(
         "half",
-        vec![(
-            None,
-            "/user/4/settings/notifications",
-            Answer::reply(200, HALF_REACHED_AT),
-        )],
+        vec![(intake("reachable"), answered(&half_reached_at()))],
     )
     .await;
 
@@ -83,11 +75,7 @@ async fn an_agent_the_member_switched_off_is_left_alone() {
 async fn a_member_with_nowhere_to_reach_them_is_not_a_fault() {
     let carried = turning_down(
         "nowhere",
-        vec![(
-            None,
-            "/user/4/settings/notifications",
-            Answer::reply(200, "{}"),
-        )],
+        vec![(intake("reachable"), answered(&Vec::<Address>::new()))],
     )
     .await;
 
@@ -100,11 +88,7 @@ async fn a_member_with_nowhere_to_reach_them_is_not_a_fault() {
 async fn where_they_are_reached_that_cannot_be_read_is_said_as_that() {
     let carried = turning_down(
         "unreadable",
-        vec![(
-            Some(Method::Get),
-            "/user/4/settings/notifications",
-            Answer::reply(500, "no"),
-        )],
+        vec![(intake("reachable"), request_service::refusing())],
     )
     .await;
 
@@ -118,8 +102,8 @@ async fn every_address_refusing_names_them_and_keeps_the_words_here() {
     let carried = turning_down(
         "refused",
         vec![
-            (None, "pushover.net", Answer::reply(500, "no")),
-            (None, "pushbullet.com", Answer::reply(500, "no")),
+            ("pushover.net", Answer::reply(500, "no")),
+            ("pushbullet.com", Answer::reply(500, "no")),
         ],
     )
     .await;
@@ -134,11 +118,7 @@ async fn every_address_refusing_names_them_and_keeps_the_words_here() {
 /// One taking it and one refusing is told once, and said as told once.
 #[tokio::test]
 async fn one_address_taking_it_and_one_refusing_is_told_once() {
-    let carried = turning_down(
-        "mixed",
-        vec![(None, "pushbullet.com", Answer::reply(500, "no"))],
-    )
-    .await;
+    let carried = turning_down("mixed", vec![("pushbullet.com", Answer::reply(500, "no"))]).await;
 
     assert!(carried.contains("told why, on Pushover"), "{carried}");
     assert!(
@@ -174,7 +154,7 @@ async fn a_household_this_machine_may_not_reach_is_said_rather_than_reached() {
 }
 
 /// One request turned down, answered with the line saying what became of the words.
-async fn turning_down(tag: &str, routes: Vec<(Option<Method>, &'static str, Answer)>) -> String {
+async fn turning_down(tag: &str, routes: Vec<(&'static str, Answer)>) -> String {
     deciding(
         &answering(tag, routes),
         &Decision {
@@ -223,8 +203,8 @@ async fn a_call_that_will_not_answer_leaves_the_household_as_it_was() {
         quota: None,
     };
     let broken = [
-        ("read", vec![(Method::Get, "/settings/main")]),
-        ("write", vec![(Method::Post, "/settings/main")]),
+        ("read", vec![intake("asking")]),
+        ("write", vec![intake("set_asking")]),
     ];
 
     for (tag, rules) in broken {
@@ -247,10 +227,10 @@ async fn a_choice_about_one_person_refuses_on_any_of_its_three_calls() {
         quota: Some(FIVE_A_WEEK),
     };
     let broken = [
-        ("held", vec![(Method::Get, "/user/jellyfin/")]),
-        ("left", vec![(Method::Get, "/user/4/quota")]),
-        ("quota", vec![(Method::Post, "/user/4/settings/main")]),
-        ("approval", vec![(Method::Post, "settings/permissions")]),
+        ("held", vec![intake("requesting")]),
+        ("left", vec![intake("left")]),
+        ("quota", vec![intake("set_quota")]),
+        ("approval", vec![intake("approves_own")]),
     ];
 
     for (tag, rules) in broken {
@@ -295,7 +275,10 @@ async fn a_name_with_no_media_server_behind_it_is_refused() {
 async fn somebody_the_request_service_never_heard_of_has_no_limit_to_set() {
     let ctx = answering(
         "unknown",
-        vec![(None, "/user/jellyfin/", Answer::reply(404, "no such user"))],
+        vec![
+            (intake("member_for"), answered(&None::<String>)),
+            (intake("requesting"), answered(&None::<Requesting>)),
+        ],
     );
 
     let refused = allowing(
@@ -322,10 +305,7 @@ async fn somebody_the_request_service_never_heard_of_has_no_limit_to_set() {
 async fn a_media_server_that_will_not_say_who_is_here_changes_nothing() {
     let ctx = refusing(
         "nohousehold",
-        vec![(
-            Method::Post,
-            crate::test_support::media::identity("household"),
-        )],
+        vec![crate::test_support::media::identity("household")],
     );
 
     let refused = allowing(
@@ -352,7 +332,7 @@ async fn a_media_server_that_will_not_say_who_is_here_changes_nothing() {
 #[tokio::test]
 async fn a_member_whose_counts_will_not_read_is_left_out() {
     let report = allowing(
-        &refusing("nocounts", vec![(Method::Get, "/user/4/quota")]),
+        &refusing("nocounts", vec![intake("left")]),
         &Chosen {
             member: None,
             policy: Some(Policy::Trusted),
@@ -373,7 +353,7 @@ async fn a_member_whose_counts_will_not_read_is_left_out() {
 #[tokio::test]
 async fn a_service_that_will_not_list_what_was_asked_for_decides_nothing() {
     let refused = deciding(
-        &refusing("nolist", vec![(Method::Get, "/api/v1/request")]),
+        &refusing("nolist", vec![intake("requests")]),
         &Decision {
             request: 7,
             answer: Ruling::LetThrough,
@@ -391,7 +371,7 @@ async fn a_service_that_will_not_list_what_was_asked_for_decides_nothing() {
 #[tokio::test]
 async fn a_service_that_will_not_rule_says_so() {
     let refused = deciding(
-        &refusing("norule2", vec![(Method::Post, "/request/7/")]),
+        &refusing("norule2", vec![intake("decide")]),
         &Decision {
             request: 7,
             answer: Ruling::LetThrough,

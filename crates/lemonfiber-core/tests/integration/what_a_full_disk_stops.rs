@@ -5,26 +5,22 @@
 //! twice, and a branch exercised from only one of the two copies is counted as never run
 //! in the other.
 //!
-//! **The seam is the block rather than the sentence.** What the house is *told* when the
-//! disk is full is held next door, in
-//! [`what_the_household_is_told_before_they_ask.rs`](what_the_household_is_told_before_they_ask.rs);
-//! this is about the asking being stopped and given back, which is the half a heading
-//! cannot do on its own.
+//! **The seam is the block rather than the sentence.** This is about the asking being
+//! stopped and given back, which is the half a heading cannot do on its own.
 
 use std::sync::Arc;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
-use lemonfiber_core::ports::http::{Method, Request};
-use lemonfiber_core::ports::service::Invited;
+use lemonfiber_core::ports::service::{Holding, Invited};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{Reporting, SeedFs};
 use lemonfiber_ports::docker::{Health, Lifecycle};
 use lemonfiber_testing::media;
+use lemonfiber_testing::requests::{self, REQUESTS};
 
-/// The account identifier the request service files this household's member under.
-const MEMBER: &str = "4";
+use crate::common::household::MEMBER;
 
 /// A scratch directory of this test's own, emptied first.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -62,55 +58,23 @@ fn roomy() -> StorageFacts {
     }
 }
 
-/// The routes, with any broken rule ahead of the working ones.
-fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
+/// What the request service took off the member, in its own numbering.
+const TAKEN: u64 = 32;
+
+/// The routes, with any broken rule ahead of the working ones: a request service taking
+/// [`TAKEN`] off the member when asked to hold them back, and giving back what it is
+/// handed.
+fn table(broken: Vec<(&'static str, Answer)>) -> Arc<Fake> {
     let mut routes = broken;
-    routes.extend(vec![
+    routes.extend([
         (
-            None,
-            media::identity("household"),
-            media::answered(&[media::member("a1", "Alex", true)]),
-        ),
-        (
-            None,
             media::identity("when_invited"),
             media::answered(&Vec::<Invited>::new()),
         ),
-        (None, "/auth/me", Answer::reply(200, "{}")),
-        (
-            None,
-            "/settings/main",
-            Answer::reply(
-                200,
-                r#"{"defaultPermissions":32,"defaultQuotas":{"movie":{},"tv":{}}}"#,
-            ),
-        ),
-        (
-            None,
-            "/user/jellyfin/",
-            Answer::reply(200, r#"{"id":4,"permissions":32}"#),
-        ),
-        (
-            None,
-            "/user/4/quota",
-            Answer::reply(
-                200,
-                r#"{"movie":{"days":7,"limit":5,"used":1},"tv":{"days":7,"limit":0,"used":0}}"#,
-            ),
-        ),
-        (
-            None,
-            "settings/permissions",
-            Answer::reply(200, r#"{"permissions":32}"#),
-        ),
-        (
-            None,
-            "/api/v1/request",
-            Answer::reply(200, r#"{"pageInfo":{"results":0},"results":[]}"#),
-        ),
-        (None, "", Answer::reply(200, "[]")),
+        requests::answering("hold_requests", &Holding { taken: TAKEN }),
+        (requests::intake("release_requests"), requests::taken()),
     ]);
-    Fake::by_rules(routes)
+    crate::common::household::table(routes)
 }
 
 /// An install over the given transport, on a volume described as `facts` says.
@@ -122,17 +86,14 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
         lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    media::keyed_in(
+    REQUESTS.keyed_in(media::keyed_in(
         lemonfiber_testing::a_context()
             .engine(Arc::new(
-                Reporting::holding(&["jellyfin", "seerr"], Lifecycle::Running, Health::Healthy)
-                    .alongside(media::running()),
+                Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy)
+                    .alongside(media::running())
+                    .alongside(REQUESTS.running()),
             ))
-            .filesystem(Arc::new(
-                SeedFs::keyed(None)
-                    .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
-                    .with_facts(facts),
-            ))
+            .filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts)))
             .settings(Settings {
                 env_file: Some(env),
                 data_root: Some(dir),
@@ -140,19 +101,25 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
             })
             .build()
             .with_http(transport.clone()),
-    )
+    ))
 }
 
-/// Every body written to the narrow permissions endpoint, in order.
-fn permissions_written(transport: &Arc<Fake>) -> Vec<String> {
-    transport
-        .requests()
+/// Each member the request service was asked to hold back, in order.
+fn held_back(transport: &Arc<Fake>) -> Vec<String> {
+    requests::told(&transport.requests(), "hold_requests", "id")
+}
+
+/// What the request service was handed back, in order.
+fn given_back(transport: &Arc<Fake>) -> Vec<u64> {
+    requests::told::<Holding>(&transport.requests(), "release_requests", "holding")
         .into_iter()
-        .filter(|request: &Request| {
-            request.url.contains("settings/permissions") && request.method == Method::Post
-        })
-        .filter_map(|request| request.body)
+        .map(|holding| holding.taken)
         .collect()
+}
+
+/// What the record says was taken off the member.
+fn written_down() -> String {
+    format!(r#"{{"{MEMBER}":{TAKEN}}}"#)
 }
 
 /// Everything the reading said beside the list itself.
@@ -182,15 +149,12 @@ async fn a_full_disk_stops_the_household_asking() {
         "the reading itself was lost: {said}"
     );
     assert_eq!(
-        permissions_written(&transport),
-        vec![r#"{"permissions":0}"#.to_owned()],
+        held_back(&transport),
+        vec![MEMBER.to_owned()],
         "the household was left able to ask for what cannot be fetched"
     );
     let kept = std::fs::read_to_string(record_of(&ctx)).unwrap_or_default();
-    assert!(
-        kept.contains(&format!(r#""{MEMBER}":32"#)),
-        "what was taken was not written down: {kept}"
-    );
+    assert_eq!(kept, written_down(), "what was taken was not written down");
 }
 
 /// A rehearsal takes nothing away from anybody, however full the disk is.
@@ -203,7 +167,7 @@ async fn a_rehearsal_takes_nothing_away() {
 
     assert!(said.is_ok(), "a rehearsed reading did not answer");
     assert!(
-        permissions_written(&transport).is_empty(),
+        held_back(&transport).is_empty(),
         "a rehearsal stopped a household asking"
     );
 }
@@ -214,13 +178,9 @@ async fn a_rehearsal_takes_nothing_away() {
 /// goes back is the number that came off, not an account restored from a default.
 #[tokio::test]
 async fn a_disk_with_room_gives_back_exactly_what_was_taken() {
-    let transport = table(vec![(
-        None,
-        "settings/permissions",
-        Answer::reply(200, r#"{"permissions":4194304}"#),
-    )]);
+    let transport = table(Vec::new());
     let ctx = context("given-back", &transport, roomy());
-    let _ = std::fs::write(record_of(&ctx), format!(r#"{{"{MEMBER}":32}}"#));
+    let _ = std::fs::write(record_of(&ctx), written_down());
 
     let said = findings(&ctx).await;
 
@@ -229,8 +189,8 @@ async fn a_disk_with_room_gives_back_exactly_what_was_taken() {
         "the reading itself was lost: {said}"
     );
     assert_eq!(
-        permissions_written(&transport),
-        vec![r#"{"permissions":4194336}"#.to_owned()],
+        given_back(&transport),
+        vec![TAKEN],
         "what was given back was not what was taken"
     );
     let kept = std::fs::read_to_string(record_of(&ctx)).unwrap_or_default();
@@ -244,9 +204,8 @@ async fn a_disk_with_room_gives_back_exactly_what_was_taken() {
 #[tokio::test]
 async fn a_service_that_will_not_stop_the_asking_says_so() {
     let transport = table(vec![(
-        None,
-        "settings/permissions",
-        Answer::reply(500, "no"),
+        requests::intake("hold_requests"),
+        requests::unavailable(),
     )]);
     let ctx = context("unstoppable", &transport, exhausted());
 
@@ -266,12 +225,11 @@ async fn a_service_that_will_not_stop_the_asking_says_so() {
 #[tokio::test]
 async fn a_service_that_will_not_give_it_back_keeps_the_record() {
     let transport = table(vec![(
-        None,
-        "settings/permissions",
-        Answer::reply(500, "no"),
+        requests::intake("release_requests"),
+        requests::unavailable(),
     )]);
     let ctx = context("still-held", &transport, roomy());
-    let _ = std::fs::write(record_of(&ctx), format!(r#"{{"{MEMBER}":32}}"#));
+    let _ = std::fs::write(record_of(&ctx), written_down());
 
     let said = findings(&ctx).await;
 
@@ -280,19 +238,20 @@ async fn a_service_that_will_not_give_it_back_keeps_the_record() {
         "a household left unable to ask was passed over in silence: {said}"
     );
     let kept = std::fs::read_to_string(record_of(&ctx)).unwrap_or_default();
-    assert!(
-        kept.contains(&format!(r#""{MEMBER}":32"#)),
-        "the record was forgotten, so nothing would ever give it back: {kept}"
+    assert_eq!(
+        kept,
+        written_down(),
+        "the record was forgotten, so nothing would ever give it back"
     );
 }
 
-/// An owner is not written down as held back, because nothing was taken from them.
+/// Somebody nothing was taken from is not written down as held back: an owner, whose
+/// asking the request service reads past, or somebody it no longer holds.
 #[tokio::test]
-async fn an_owner_is_not_written_down_as_held_back() {
-    let transport = table(vec![(
-        None,
-        "settings/permissions",
-        Answer::reply(200, r#"{"permissions":2}"#),
+async fn somebody_nothing_was_taken_from_is_not_written_down_as_held_back() {
+    let transport = table(vec![requests::answering(
+        "hold_requests",
+        &Holding { taken: 0 },
     )]);
     let ctx = context("the-owner", &transport, exhausted());
 
@@ -303,66 +262,8 @@ async fn an_owner_is_not_written_down_as_held_back() {
         "the reading itself was lost: {said}"
     );
     assert!(
-        permissions_written(&transport).is_empty(),
-        "the owner's own account was written to for no effect"
-    );
-    assert!(
         !record_of(&ctx).exists(),
-        "the owner was written down as held back"
-    );
-}
-
-/// A member the request service no longer holds is forgotten rather than carried.
-///
-/// An account that has gone is nothing to give anything back to, and a record that kept
-/// the line would carry somebody who left for as long as the household did.
-#[tokio::test]
-async fn a_member_the_service_no_longer_holds_is_forgotten() {
-    let transport = table(vec![(
-        None,
-        "settings/permissions",
-        Answer::reply(404, r#"{"message":"User not found."}"#),
-    )]);
-    let ctx = context("gone", &transport, roomy());
-    let _ = std::fs::write(record_of(&ctx), format!(r#"{{"{MEMBER}":32}}"#));
-
-    let said = findings(&ctx).await;
-
-    assert!(
-        said.contains("to_hand_over"),
-        "the reading itself was lost: {said}"
-    );
-    assert!(
-        permissions_written(&transport).is_empty(),
-        "an account that is gone was written to"
-    );
-    let kept = std::fs::read_to_string(record_of(&ctx)).unwrap_or_default();
-    assert_eq!(kept, "{}", "somebody who left stayed written down: {kept}");
-}
-
-/// Nothing is taken from a member the request service no longer holds either.
-#[tokio::test]
-async fn nothing_is_taken_from_a_member_who_is_gone() {
-    let transport = table(vec![(
-        None,
-        "settings/permissions",
-        Answer::reply(404, r#"{"message":"User not found."}"#),
-    )]);
-    let ctx = context("gone-full", &transport, exhausted());
-
-    let said = findings(&ctx).await;
-
-    assert!(
-        said.contains("to_hand_over"),
-        "the reading itself was lost: {said}"
-    );
-    assert!(
-        permissions_written(&transport).is_empty(),
-        "an account that is gone was written to"
-    );
-    assert!(
-        !record_of(&ctx).exists(),
-        "an account that is gone was written down as held back"
+        "somebody nothing was taken from was written down as held back"
     );
 }
 

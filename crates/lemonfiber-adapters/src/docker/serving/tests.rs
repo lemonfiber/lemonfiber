@@ -16,6 +16,7 @@ fn serve() -> Serve {
         reaching: Vec::new(),
         image: "lscr.io/linuxserver/sonarr@sha256:dffc".to_owned(),
         env: vec!["TZ=UTC".to_owned(), "PUID=1000".to_owned()],
+        command: Vec::new(),
         user: None,
         security_opt: vec!["no-new-privileges:true".to_owned()],
         cap_drop: vec!["ALL".to_owned()],
@@ -49,6 +50,14 @@ fn a_served_container_is_on_its_own_network_with_its_port_on_loopback_alone() {
     );
     assert_eq!(asked.cmd, None);
     assert_eq!(asked.entrypoint, None);
+    let commanded = Serve {
+        command: vec!["--upstream".to_owned(), "http://elsewhere:8989".to_owned()],
+        ..serve()
+    };
+    assert_eq!(
+        body(&commanded, "lemonfiber-record-1-2-3").cmd,
+        Some(commanded.command.clone())
+    );
     assert_eq!(
         asked.env,
         Some(vec!["TZ=UTC".to_owned(), "PUID=1000".to_owned()])

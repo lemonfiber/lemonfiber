@@ -17,7 +17,6 @@ use crate::error::Problem;
 use crate::journal::{is_sealed, Action, Undo};
 use crate::plugin::Grant;
 use crate::ports::filesystem::{Confined, Lying};
-use crate::ports::service::Client as _;
 use crate::repair;
 use crate::settings::undoing;
 
@@ -44,9 +43,9 @@ pub use journal::{journal_at, journalled, unrecorded};
 pub(crate) async fn reconfigured(
     ctx: &Ctx,
     undos: &[Undo],
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
+    manifest: &lemonfiber_manifest::Manifest,
 ) -> Reached {
+    let fillers = super::targets::fillers_here(ctx, manifest);
     let mut reached = Reached::default();
     for undo in undos {
         let Action::Reconfigure {
@@ -59,14 +58,9 @@ pub(crate) async fn reconfigured(
             reached.left.push(undo.clone());
             continue;
         };
-        let open = match super::targets::target_named(services, project, &undo.target) {
-            Some(target) => {
-                target
-                    .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-                    .await
-            }
-            None => None,
-        };
+        let open = super::targets::target_named(ctx, &fillers, &undo.target)
+            .await
+            .and_then(|target| target.asked);
         let put_back = match open {
             Some(client) => client
                 .set_client_field(id, field, value.as_deref())

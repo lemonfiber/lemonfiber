@@ -5,7 +5,8 @@ use lemonfiber_sidecar::gate::{Accepted, File, Kind, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
 
 use super::*;
-use crate::test_support::media;
+use crate::ports::service::{Endpoint, IdentitySource, MediaServerLink};
+use crate::test_support::{media, requests};
 
 /// What the fixed randomness renders to, which is every token minted here.
 fn minted() -> String {
@@ -57,81 +58,76 @@ fn accepted(project: &std::path::Path) -> Option<Tokens> {
         .and_then(|text| Tokens::read(&text).ok())
 }
 
-/// The request service's media-server settings: at `host`, `port` and `base`, with
+/// Where the request service reaches the media server: at `host`, `port` and `base`, with
 /// `key`.
-fn link(host: &str, port: u16, base: &str, key: &str) -> String {
-    serde_json::json!({
-        "name": "Jellyfin",
-        "ip": host,
-        "port": port,
-        "useSsl": false,
-        "urlBase": base,
-        "apiKey": key,
+fn link(host: &str, port: u16, base: &str, key: &str) -> Answer {
+    requests::answered(&MediaServerLink {
+        at: Endpoint {
+            host: host.to_owned(),
+            port,
+            base: base.to_owned(),
+        },
+        key: key.to_owned(),
     })
-    .to_string()
 }
 
 /// Linked at the gate with `key`.
-fn at_the_gate(key: &str) -> String {
+fn at_the_gate(key: &str) -> Answer {
     link("request-gate", PORT, "/jellyfin", key)
 }
 
 /// A household whose media server, moved into its plugin, has been set up, whose request
-/// service answers each of
-/// `initialised` in turn when asked whether it is set up, lists `linked` as its
-/// media-server settings, and answers a new link with `relinked`.
-fn serving(initialised: &[bool], linked: &str, relinked: u16) -> Arc<Fake> {
-    Fake::by_route_in_turn(vec![
+/// service answers each of `initialised` in turn when asked whether it is set up, says it
+/// reaches the media server as `linked`, and answers a new link with `relinked`.
+fn serving(initialised: &[bool], linked: Answer, relinked: Answer) -> Arc<Fake> {
+    Fake::by_path_in_turn(vec![
         (
-            Method::Post,
             media::identity("startup_completed"),
             vec![media::answered(&true)],
         ),
         (
-            Method::Post,
             media::identity("replace_admin_password"),
             vec![media::taken()],
         ),
         (
-            Method::Post,
             media::serve("filed_as"),
             vec![media::answered(&[GATES_KEY])],
         ),
-        (Method::Post, "/auth/jellyfin", vec![Answer::reply(200, "")]),
+        (requests::intake("establish"), vec![requests::taken()]),
         (
-            Method::Post,
-            "/settings/initialize",
-            vec![Answer::reply(200, "")],
+            requests::intake("configure_identity"),
+            vec![requests::taken()],
         ),
         (
-            Method::Get,
-            "/settings/public",
-            initialised
-                .iter()
-                .map(|done| Answer::reply(200, format!(r#"{{"initialized":{done}}}"#)))
-                .collect(),
+            requests::intake("initialized"),
+            initialised.iter().map(requests::answered).collect(),
         ),
+        (requests::intake("media_server_link"), vec![linked]),
+        (requests::intake("link_media_server"), vec![relinked]),
         (
-            Method::Get,
-            "/settings/jellyfin",
-            vec![Answer::reply(200, linked.to_owned())],
+            requests::intake("telling"),
+            vec![requests::answered(&crate::seed::wanted_telling())],
         ),
-        (
-            Method::Post,
-            "/settings/jellyfin",
-            vec![Answer::reply(relinked, "")],
-        ),
-        (
-            Method::Get,
-            "/settings/notifications/webpush",
-            vec![Answer::reply(200, r#"{"enabled":true,"types":222}"#)],
-        ),
-        (
-            Method::Post,
-            "/settings/notifications/webpush",
-            vec![Answer::reply(200, "")],
-        ),
+        (requests::intake("tell"), vec![requests::taken()]),
     ])
+}
+
+/// Where the request service was told to sign the household in through, in `http`.
+fn signed_in_at(http: &Fake) -> Vec<String> {
+    requests::told::<IdentitySource>(&http.requests(), "configure_identity", "source")
+        .into_iter()
+        .map(|source| source.at)
+        .collect()
+}
+
+/// The keys the request service was told to reach the media server with, in `http`.
+fn relinked_with(http: &Fake) -> Vec<String> {
+    requests::told(&http.requests(), "link_media_server", "key")
+}
+
+/// The media server's address as the gate answers for it.
+fn through_the_gate() -> String {
+    format!("http://request-gate:{PORT}/jellyfin")
 }
 
 /// Both halves of the identity step over `http`, on `services` under `project`.
@@ -144,20 +140,30 @@ async fn seeded(
     rehearsing: bool,
 ) -> Vec<Wiring> {
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let mut ctx = media::asking(
-        seed_ctx(true, Vec::new(), bytes, Some(recorded_admin(name))).with_http(http.clone()),
-    );
+    let mut ctx = asking(seed_ctx(true, bytes, Some(recorded_admin(name))).with_http(http.clone()));
     ctx.dry_run = rehearsing;
     seeded_with(&ctx, services, project).await
 }
 
-/// Both halves of the identity step in `ctx`.
+/// `ctx` asking the media server and the request service through their adapters.
+fn asking(ctx: Ctx) -> Ctx {
+    let mut ctx = media::asking(ctx);
+    ctx.seams.engine = Arc::new(media::running().alongside(REQUESTS.running()));
+    ctx
+}
+
+/// Both halves of the identity step in `ctx`, the request service moved into its plugin
+/// as well as the media server.
 async fn seeded_with(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     project: &std::path::Path,
 ) -> Vec<Wiring> {
-    let fillers = moved_at(services.to_vec(), project);
+    let installed: Vec<_> = media::moved()
+        .into_iter()
+        .chain(REQUESTS.installed())
+        .collect();
+    let fillers = fillers_beside(services.to_vec(), &installed, project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
     super::super::seed_request_identity(
@@ -189,7 +195,11 @@ const LINK: &str = "Seerr's Jellyfin connection";
 #[tokio::test]
 async fn a_fresh_request_service_is_set_up_through_the_gate() {
     let at = project("linking-fresh", &[]);
-    let http = serving(&[false, true], &at_the_gate("a-placeholder"), 200);
+    let http = serving(
+        &[false, true],
+        at_the_gate("a-placeholder"),
+        requests::taken(),
+    );
 
     let wirings = seeded("linking-fresh", &stack(true), &at, &http, true, false).await;
 
@@ -198,26 +208,16 @@ async fn a_fresh_request_service_is_set_up_through_the_gate() {
         Some(State::Wired)
     );
     assert_eq!(state_of(&wirings, LINK), Some(State::Wired));
-    let sent = |method: Method, path: &str| {
-        http.requests()
-            .into_iter()
-            .find(|asked| asked.method == method && asked.url.contains(path))
-            .and_then(|asked| asked.body)
-            .unwrap_or_default()
-    };
-    let signed_in = sent(Method::Post, "/auth/jellyfin");
-    assert!(
-        signed_in.contains("\"hostname\":\"request-gate\"")
-            && signed_in.contains(&format!("\"port\":{PORT}"))
-            && signed_in.contains("\"urlBase\":\"/jellyfin\""),
-        "{signed_in}"
+    assert_eq!(signed_in_at(&http), vec![through_the_gate()]);
+    assert_eq!(
+        requests::told::<Endpoint>(&http.requests(), "link_media_server", "at"),
+        vec![Endpoint {
+            host: "request-gate".to_owned(),
+            port: PORT,
+            base: "/jellyfin".to_owned(),
+        }]
     );
-    let linked = sent(Method::Post, "/settings/jellyfin");
-    assert!(
-        linked.contains(&format!("\"apiKey\":\"{}\"", minted()))
-            && linked.contains("\"ip\":\"request-gate\""),
-        "{linked}"
-    );
+    assert_eq!(relinked_with(&http), vec![minted()]);
     assert_eq!(accepted(&at), Some(accepting(&[&minted()])));
 }
 
@@ -225,7 +225,7 @@ async fn a_fresh_request_service_is_set_up_through_the_gate() {
 #[tokio::test]
 async fn a_link_both_sides_hold_is_left_alone() {
     let at = project("linking-held", &["held"]);
-    let http = serving(&[true], &at_the_gate("held"), 200);
+    let http = serving(&[true], at_the_gate("held"), requests::taken());
 
     let wirings = seeded("linking-held", &stack(true), &at, &http, true, false).await;
 
@@ -237,7 +237,11 @@ async fn a_link_both_sides_hold_is_left_alone() {
 #[tokio::test]
 async fn a_request_service_linked_directly_is_moved_to_the_gate() {
     let at = project("linking-direct", &[]);
-    let http = serving(&[true], &link("jellyfin", 8096, "", "seerrs-own"), 200);
+    let http = serving(
+        &[true],
+        link("jellyfin", 8096, "", "seerrs-own"),
+        requests::taken(),
+    );
 
     let wirings = seeded("linking-direct", &stack(true), &at, &http, true, false).await;
 
@@ -250,15 +254,12 @@ async fn a_request_service_linked_directly_is_moved_to_the_gate() {
 #[tokio::test]
 async fn without_the_gate_there_is_no_link() {
     let at = project("linking-ungated", &[]);
-    let http = serving(&[false, true], &at_the_gate("x"), 200);
+    let http = serving(&[false, true], at_the_gate("x"), requests::taken());
 
     let wirings = seeded("linking-ungated", &stack(false), &at, &http, true, false).await;
 
     assert_eq!(state_of(&wirings, LINK), None);
-    assert!(http.requests().iter().any(|asked| asked
-        .body
-        .as_deref()
-        .is_some_and(|body| body.contains("\"hostname\":\"jellyfin\""))));
+    assert_eq!(signed_in_at(&http), vec!["http://jellyfin:8096".to_owned()]);
 }
 
 /// A rehearsal says where the request service would be pointed, and writes nothing.
@@ -304,19 +305,12 @@ async fn a_rehearsal_says_where_and_writes_nothing() {
         ),
     ] {
         let at = project(name, &[]);
-        let http = serving(&[initialised], &linked, 200);
+        let http = serving(&[initialised], linked, requests::taken());
 
         let wirings = seeded(name, &stack(true), &at, &http, true, true).await;
 
         assert_eq!(state_of(&wirings, LINK), Some(expected), "{name}");
-        assert!(
-            !http
-                .requests()
-                .iter()
-                .any(|asked| asked.url.contains("/settings/jellyfin")
-                    && asked.method == Method::Post),
-            "{name}"
-        );
+        assert!(relinked_with(&http).is_empty(), "{name}");
         assert_eq!(accepted(&at), None, "{name}");
     }
 }
@@ -326,7 +320,7 @@ async fn a_rehearsal_says_where_and_writes_nothing() {
 #[tokio::test]
 async fn a_token_the_request_service_refuses_is_said() {
     let at = project("linking-refused", &["older"]);
-    let http = serving(&[true], &at_the_gate("stale"), 400);
+    let http = serving(&[true], at_the_gate("stale"), requests::refusing());
 
     let wirings = seeded("linking-refused", &stack(true), &at, &http, true, false).await;
 
@@ -346,7 +340,7 @@ async fn a_token_the_request_service_refuses_is_said() {
 #[tokio::test]
 async fn a_link_that_cannot_be_made_fails() {
     let at = project("linking-unread", &[]);
-    let http = serving(&[true], "not settings", 200);
+    let http = serving(&[true], requests::refusing(), requests::taken());
     let wirings = seeded("linking-unread", &stack(true), &at, &http, true, false).await;
     assert!(
         matches!(state_of(&wirings, LINK), Some(State::Failed { .. })),
@@ -354,7 +348,7 @@ async fn a_link_that_cannot_be_made_fails() {
     );
 
     let at = project("linking-unrandom", &[]);
-    let http = serving(&[true], &at_the_gate("stale"), 200);
+    let http = serving(&[true], at_the_gate("stale"), requests::taken());
     let wirings = seeded("linking-unrandom", &stack(true), &at, &http, false, false).await;
     assert_eq!(
         state_of(&wirings, LINK),
@@ -365,7 +359,7 @@ async fn a_link_that_cannot_be_made_fails() {
 
     let at = project("linking-unwritable", &[]);
     let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
-    let http = serving(&[true], &at_the_gate("stale"), 200);
+    let http = serving(&[true], at_the_gate("stale"), requests::taken());
     let wirings = seeded("linking-unwritable", &stack(true), &at, &http, true, false).await;
     let detail = match state_of(&wirings, LINK) {
         Some(State::Failed { detail }) => detail,
@@ -376,10 +370,7 @@ async fn a_link_that_cannot_be_made_fails() {
             && detail.contains(&tokens_file(&at).display().to_string()),
         "{detail}"
     );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Post && asked.url.contains("/settings/jellyfin")));
+    assert!(relinked_with(&http).is_empty());
 }
 
 /// An old token the gate cannot be told to stop accepting is said.
@@ -388,11 +379,10 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
     let at = project("linking-unretired", &[]);
     let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
     let both = accepting(&["older", &minted()]).written();
-    let http = serving(&[true], &at_the_gate("stale"), 200);
-    let ctx = media::asking(
+    let http = serving(&[true], at_the_gate("stale"), requests::taken());
+    let ctx = asking(
         seed_ctx(
             true,
-            Vec::new(),
             Some(vec![0xab; crate::secret::SECRET_BYTES]),
             Some(recorded_admin("linking-unretired")),
         )
@@ -422,7 +412,7 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
 #[tokio::test]
 async fn a_request_service_not_set_up_is_not_linked() {
     let at = project("linking-unset", &[]);
-    let http = serving(&[false], &at_the_gate("x"), 200);
+    let http = serving(&[false], at_the_gate("x"), requests::taken());
 
     let wirings = seeded("linking-unset", &stack(true), &at, &http, true, false).await;
 

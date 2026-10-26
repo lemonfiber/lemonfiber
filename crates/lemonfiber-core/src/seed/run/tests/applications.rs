@@ -1,6 +1,26 @@
 //! Registering each curator with the indexer manager.
 
 use super::*;
+use crate::ports::service::RegisteredApplication;
+use crate::test_support::curators::{FILM, MUSIC, TELEVISION};
+use crate::test_support::indexer::{answered, registered, searching, taken};
+
+/// A curator's configuration, holding the key it answers to.
+const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+
+/// The moved indexer, holding the television curator as an application that answers it.
+fn holding_sonarr() -> Arc<Fake> {
+    Fake::by_path(vec![
+        (
+            searching("applications"),
+            answered(&[RegisteredApplication {
+                id: "1".to_owned(),
+                base_url: "http://sonarr:8989".to_owned(),
+            }]),
+        ),
+        (searching("test_application"), taken()),
+    ])
+}
 
 /// The wirings whose connection registers a curator into the indexer aggregator's app sync.
 fn application_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
@@ -34,7 +54,7 @@ fn the_application_kind_follows_from_the_media() {
 
 #[tokio::test]
 async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
     // Only a media-filing curator, so nothing asks for it at all.
     let wirings =
         super::super::seed_applications(&ctx, &fillers_of(vec![curator("sonarr", 8989, "tv")]))
@@ -42,30 +62,20 @@ async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
     assert!(wirings.is_empty(), "no Prowlarr, no app sync");
 }
 
-/// An indexer this machine cannot reach, or that says nowhere the curators reach it
-/// back, has nothing registered into it and says nothing.
+/// An indexer whose adapter this machine cannot ask has nothing registered into it and
+/// says nothing.
 #[tokio::test]
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
+    let http = Fake::always(answered(&Vec::<RegisteredApplication>::new()));
+    let ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let mut unpublished = aggregator_svc();
-    unpublished.port = None;
-    unpublished.listens = Some(9696);
-    let mut unlistening = aggregator_svc();
-    unlistening.listens = None;
 
-    for indexer in [unpublished, unlistening] {
-        let wirings = super::super::seed_applications(
-            &ctx,
-            &fillers_of(vec![indexer, curator("sonarr", 8989, "tv")]),
-        )
-        .await;
+    let wirings =
+        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
+            .await;
 
-        assert!(wirings.is_empty(), "{wirings:?}");
-    }
+    assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
@@ -75,15 +85,9 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
 /// registered as ever.
 #[tokio::test]
 async fn app_sync_never_registers_a_plugin_curator() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let fillers = beside_a_stand_in(
-        vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
-        "movies",
-    );
+    let http = holding_sonarr();
+    let ctx = indexing(http.clone(), SeedFs::keyed(Some(CURATOR_CONFIG)));
+    let fillers = indexed(vec![curator("sonarr", 8989, "tv")], &[a_stand_in("movies")]);
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
     let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
@@ -103,9 +107,9 @@ async fn app_sync_never_registers_a_plugin_curator() {
     }));
     assert!(
         matches!(said.as_slice(), [wiring]
-            if wiring.connection == "kept the stand-in into prowlarr the app"
+            if wiring.connection == "kept the stand-in into Prowlarr"
                 && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
-                    if reason.contains("is a third-party plugin's service"))),
+                    if reason.contains("whose credential is handed only to the stack's own"))),
         "{said:?}"
     );
 }
@@ -114,9 +118,8 @@ async fn app_sync_never_registers_a_plugin_curator() {
 /// key: nothing is asked of it or of any curator, and a replaced key owes it nothing.
 #[tokio::test]
 async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = asked_by_a_plugin(&aggregator_svc(), vec![curator("sonarr", 8989, "tv")]);
@@ -133,21 +136,15 @@ async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
 /// one, and nothing for a curator no indexer registers.
 #[tokio::test]
 async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
+    let ctx = indexing(holding_sonarr(), SeedFs::keyed(Some(CURATOR_CONFIG)));
+    let fillers = indexed(vec![curator("sonarr", 8989, "tv")], &[]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
     let nobody = super::super::resync_application(&ctx, &fillers, "radarr").await;
 
     assert_eq!(
         resynced,
-        vec![(
-            "prowlarr the app".to_owned(),
-            crate::seed::State::AlreadyWired
-        )]
+        vec![("Prowlarr".to_owned(), crate::seed::State::AlreadyWired)]
     );
     assert!(nobody.is_empty());
 }
@@ -156,7 +153,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
 /// replaced key, so a replacement owes it nothing yet.
 #[tokio::test]
 async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = seed_ctx(true, None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -168,9 +165,8 @@ async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
 /// there, so there is no application to hold to the new key.
 #[tokio::test]
 async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = beside_a_stand_in(
@@ -184,51 +180,44 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
     assert!(http.requests().is_empty());
 }
 
+/// An indexer whose adapter holds no key yet cannot be asked, so nothing is registered
+/// into it and nothing is asked of it until a later run.
 #[tokio::test]
-async fn app_sync_skips_every_curator_until_the_aggregator_has_written_its_key() {
-    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
-    // The aggregator's key is not readable yet, so it is still starting: every
-    // application is skipped for a re-run rather than failed.
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
-    let wirings = super::super::seed_applications(&ctx, &services).await;
-    assert_eq!(wirings.len(), 1);
-    assert!(wirings.iter().all(is_skipped));
-    // The key that is missing is the aggregator's, so it is the aggregator the report
-    // names.
-    assert!(
-        wirings.iter().all(|wiring| matches!(&wiring.state,
-            crate::seed::State::Skipped { reason } if reason.starts_with("prowlarr the app has"))),
-        "{wirings:?}"
-    );
+async fn app_sync_registers_nothing_until_the_indexer_can_be_asked() {
+    let http = holding_sonarr();
+    let mut ctx = seed_ctx(true, None, None)
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    ctx.seams.engine = Arc::new(INDEXER.running());
+
+    let wirings =
+        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
+            .await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
+/// The curator has not written its key yet, so its application waits while the
+/// indexer itself proceeds.
 #[tokio::test]
 async fn app_sync_skips_only_the_curator_that_has_not_written_its_key() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
-    // The aggregator's key is readable but the curator's is not — the curator came up after
-    // the aggregator — so the curator's application waits while the aggregator itself
-    // proceeds.
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(CURATOR_CONFIG)).only_for_aggregator(),
-        ));
-    let wirings = super::super::seed_applications(&ctx, &services).await;
+    let ctx = indexing(holding_sonarr(), SeedFs::keyed(None));
+    let wirings =
+        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
+            .await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
 }
 
+/// The indexer already holds the curator, so the connection reads back as already
+/// wired.
 #[tokio::test]
 async fn app_sync_registers_a_curator_whose_keys_are_all_readable() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
-    // The seeding routes report the curator already registered — its baseUrl is in the
-    // application list — so the connection reads back as already wired.
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
-    let wirings = super::super::seed_applications(&ctx, &services).await;
+    let ctx = indexing(holding_sonarr(), SeedFs::keyed(Some(CURATOR_CONFIG)));
+    let wirings =
+        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
+            .await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -236,43 +225,28 @@ async fn app_sync_registers_a_curator_whose_keys_are_all_readable() {
     );
 }
 
-/// An indexer aggregator transport that starts with no applications, captures the POST
-/// that registers one, and reports it on the next read — so the orchestrator's
-/// write path runs end to end rather than short-circuiting to already-wired.
-/// The aggregator holding no applications until one is written, then holding it.
-///
-/// The registration is a write followed by a read that has to see it, so the read
-/// answers an empty list and then the list with the curator in it. What was posted is
-/// read off the transport's own record rather than a captured copy.
-fn registering_aggregator() -> Arc<Fake> {
-    Fake::by_route_in_turn(vec![
-        (Method::Post, "", vec![Answer::reply(201, "")]),
-        (
-            Method::Get,
-            "",
-            vec![
-                Answer::reply(200, "[]"),
-                Answer::reply(
-                    200,
-                    r#"[{"id":9,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]}]"#,
-                ),
-            ],
-        ),
-    ])
-}
-
+/// The indexer holds no applications, so the curator is genuinely written and then
+/// read back — the write path a pre-populated list would hide.
 #[tokio::test]
 async fn app_sync_registers_an_absent_curator_and_reads_it_back() {
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
-    // The aggregator holds no applications, so the curator is genuinely written and then
-    // read back — the write path a pre-populated list would hide.
-    let http = registering_aggregator();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let http = Fake::by_path_in_turn(vec![
+        (
+            searching("applications"),
+            vec![
+                answered(&Vec::<RegisteredApplication>::new()),
+                answered(&[RegisteredApplication {
+                    id: "9".to_owned(),
+                    base_url: "http://sonarr:8989".to_owned(),
+                }]),
+            ],
+        ),
+        (searching("register_application"), vec![taken()]),
+    ]);
+    let ctx = indexing(http.clone(), SeedFs::keyed(Some(CURATOR_CONFIG)));
 
-    let wirings = super::super::seed_applications(&ctx, &services).await;
+    let wirings =
+        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
+            .await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -280,35 +254,51 @@ async fn app_sync_registers_an_absent_curator_and_reads_it_back() {
         "an absent application is written and confirmed by read-back"
     );
 
-    // The orchestrator built the registration for the right curator, reaching it
-    // and the aggregator on the stack network, and posted it to the aggregator's v1 API.
-    let posted = http
-        .requests()
-        .into_iter()
-        .find(|request| request.method == Method::Post);
-    assert!(posted
-        .as_ref()
-        .is_some_and(|request| request.url.ends_with("/api/v1/applications")));
-    let body = posted.and_then(|request| request.body).unwrap_or_default();
-    assert!(
-        body.contains("http://sonarr:8989"),
-        "the *arr's address: {body}"
-    );
-    assert!(body.contains(r#""implementation":"Sonarr""#), "{body}");
-    assert!(
-        body.contains("http://prowlarr:9696"),
-        "Prowlarr's callback url: {body}"
+    let told = registered(&http.requests());
+    assert_eq!(
+        told.iter()
+            .map(|one| (
+                one.base_url.as_str(),
+                one.indexer_url.as_str(),
+                one.api_key.as_str()
+            ))
+            .collect::<Vec<_>>(),
+        vec![("http://sonarr:8989", "http://prowlarr:9696", "the-key")]
     );
 }
 
+/// The whole command against the real manifest, its indexer and its three media-filing
+/// curators moved into their plugins, each curator already registered.
 #[tokio::test]
 async fn seed_registers_each_curator_into_the_indexer_aggregator() {
-    // The whole command against the real manifest: the indexer aggregator and the three
-    // media-filing curators, each already registered by the seeding routes.
-    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(true, Vec::new(), Some(vec![0x11; 24]), None)
-        .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let registered: Vec<RegisteredApplication> = [
+        "http://sonarr:8989",
+        "http://radarr:7878",
+        "http://lidarr:8686",
+    ]
+    .iter()
+    .enumerate()
+    .map(|(id, base_url)| RegisteredApplication {
+        id: id.to_string(),
+        base_url: (*base_url).to_owned(),
+    })
+    .collect();
+    let mut ctx = minting_curators(seed_ctx(
+        true,
+        Some(vec![0x11; 24]),
+        Some(crate::test_support::env_without_password(
+            "seed-applications",
+        )),
+    ))
+    .with_http(seeding_with(vec![
+        (searching("applications"), answered(&registered)),
+        (searching("test_application"), taken()),
+    ]));
+    INDEXER.moved_in(&ctx);
+    ctx.seams.engine = Arc::new(
+        crate::test_support::adapted::running(&[TELEVISION, FILM, MUSIC, INDEXER])
+            .alongside(crate::test_support::media::running()),
+    );
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let applications = application_wirings(&report);
@@ -409,4 +399,45 @@ async fn a_contracted_indexer_untrusted_or_unreachable_registers_nothing_and_is_
         );
         assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
     }
+}
+
+/// An indexer the stack publishes on no address has nothing a curator could reach it back
+/// on, so nothing is registered into it and nothing is asked.
+#[tokio::test]
+async fn an_indexer_on_no_address_is_told_about_nobody() {
+    let http = seeding();
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
+    let unreached = manifest_service(
+        "prowlarr",
+        Some(curator_api(Some("/config/config.xml"))),
+        None,
+    );
+    let fillers = fillers_of(vec![unreached, curator("sonarr", 8989, "tv")]);
+
+    let wirings = super::super::seed_applications(&ctx, &fillers).await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// A plugin's curator is never registered into the stack's own indexer either, since the
+/// indexer would hand it its own key: the pair is said as reached by nothing, naming that.
+#[tokio::test]
+async fn the_stacks_indexer_is_never_registered_a_plugin_curator() {
+    let fillers = beside_a_stand_in(
+        vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
+        "movies",
+    );
+
+    let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
+        .into_iter()
+        .filter(|wiring| wiring.connection.starts_with("kept"))
+        .collect();
+
+    assert!(
+        matches!(said.as_slice(), [wiring]
+            if matches!(&wiring.state, crate::seed::State::Unmatched { reason }
+                if reason.contains("hands every service it registers its own API key"))),
+        "{said:?}"
+    );
 }

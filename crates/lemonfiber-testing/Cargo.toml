@@ -16,6 +16,7 @@ lemonfiber-bundled = { workspace = true }
 lemonfiber-contract = { workspace = true }
 lemonfiber-core = { workspace = true }
 lemonfiber-fixtures = { workspace = true }
+lemonfiber-manifest = { workspace = true }
 lemonfiber-plugin = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -5,7 +5,7 @@
 //! text. Four copies is four places for the semantics to drift, and the fifth was
 //! about to be written when this appeared.
 //!
-//! One filesystem with three ways to script what it holds. Nothing is held anywhere
+//! One filesystem with two ways to script what it holds. Nothing is held anywhere
 //! a test did not put it: a read of an unscripted path answers with nothing, which is
 //! what a service that has not written its key yet looks like, so a path a test did
 //! not mean to reach shows up as the skip it should be rather than as a fabricated
@@ -33,10 +33,6 @@ pub enum Held {
     Anywhere(Option<String>),
     /// The text placed at each path exactly, and nothing anywhere else.
     At(Vec<(PathBuf, String)>),
-    /// The text for the first path that ends with the fragment given — for a config
-    /// whose full path is assembled from a project root the test would rather not
-    /// spell out.
-    Ending(Vec<(&'static str, String)>),
 }
 
 /// A filesystem holding what a test placed in it.
@@ -72,17 +68,6 @@ impl Files {
             files
                 .into_iter()
                 .map(|(path, text)| (path, text.to_owned()))
-                .collect(),
-        ))
-    }
-
-    /// Text for each path ending in one of these fragments.
-    #[must_use]
-    pub fn ending(files: Vec<(&'static str, &str)>) -> Arc<Self> {
-        Self::new(Held::Ending(
-            files
-                .into_iter()
-                .map(|(ending, text)| (ending, text.to_owned()))
                 .collect(),
         ))
     }
@@ -165,15 +150,6 @@ fn held_at(held: &Held, path: &Path) -> Option<String> {
             .iter()
             .find(|(at, _)| at == path)
             .map(|(_, text)| text.clone()),
-        Held::Ending(files) => {
-            // Separators normalised, so a fragment spelled the way the stack spells it
-            // matches on a host that spells paths the other way round.
-            let path = path.to_string_lossy().replace('\\', "/");
-            files
-                .iter()
-                .find(|(ending, _)| path.ends_with(ending))
-                .map(|(_, text)| text.clone())
-        }
     }
 }
 

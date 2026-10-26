@@ -63,14 +63,9 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         condition(&services)
     };
 
-    // Read from the manifest rather than from what is running, because a declaration
-    // this build cannot reach is unreachable whether or not the container is up — and
-    // an operator who stopped the service would otherwise be told the declaration had
-    // healed.
-    let project =
-        super::super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let unsupported =
-        super::super::targets::unsupported_here(&manifest.services, project.as_deref());
+    let unsupported = super::super::targets::unsupported_here(
+        &super::super::targets::fillers_here(ctx, &manifest),
+    );
 
     Ok(StatusReport {
         forms: forms.to_vec(),

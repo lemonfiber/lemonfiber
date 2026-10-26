@@ -30,9 +30,10 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::http::Request;
-use lemonfiber_core::ports::service::{Certificate, Member, NamedLibrary};
+use lemonfiber_core::ports::service::{Certificate, Member, NamedLibrary, Requesting};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_testing::media;
+use lemonfiber_testing::requests::{self, REQUESTS};
 
 /// The certificates the media server's rating table names, in one country.
 fn certificates() -> Vec<Certificate> {
@@ -112,13 +113,13 @@ fn the_media_server(libraries: Answer, readying: Answer) -> Vec<(&'static str, V
     routes
 }
 
-/// A context over the shipped stack, with the media server moved into its plugin and up,
-/// and a password recorded.
+/// A context over the shipped stack, with the media server and the request service moved
+/// into their plugins and up, and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    media::keyed_in(
+    REQUESTS.keyed_in(media::keyed_in(
         lemonfiber_testing::a_context()
             .over(crate::common::household::set_up_beside(env))
-            .engine(Arc::new(media::running()))
+            .engine(Arc::new(media::running().alongside(REQUESTS.running())))
             .clock(Arc::new(lemonfiber_adapters::System))
             .settings(Settings {
                 env_file: Some(env.to_path_buf()),
@@ -127,7 +128,7 @@ fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
             })
             .build()
             .with_http(http),
-    )
+    ))
 }
 
 /// Offer somebody an account with what they may watch, and hand back everything that
@@ -159,34 +160,40 @@ async fn driving(
     (http.requests(), made.ok())
 }
 
-/// The account the request service holds for somebody who approves their own requests.
-///
-/// `128` is `AUTO_APPROVE`, read off the pinned image rather than recalled. It is the
-/// whole of how a limit on watching and no limit on requesting come apart.
-const APPROVES_OWN: &str = r#"{"id":4,"permissions":160}"#;
+/// The account the request service holds for Ana, approving their own requests where
+/// `approves_own`.
+fn ana_requesting(approves_own: bool) -> Answer {
+    requests::answered(&Some(Requesting {
+        id: "4".to_owned(),
+        approves_own,
+    }))
+}
 
-/// Where what one member may ask for is written.
-const PERMISSIONS: &str = "/user/4/settings/permissions";
+/// Each account the request service was told to hold to approval first, in order.
+fn held_first(sent: &[Request]) -> Vec<String> {
+    requests::told(sent, "approval_first", "id")
+}
 
-/// A stack whose request service holds an account that approves its own requests.
-fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
+/// A stack whose request service takes lemonfiber's key and holds an account for Ana,
+/// answering asked about it as `member` does and holding it to approval first as
+/// `holding` does.
+fn a_stack_asking(member: Answer, holding: Answer) -> Arc<Fake> {
     let mut routes = vec![
-        ("/auth/me", vec![Answer::reply(200, "{}")]),
-        ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
-        (
-            PERMISSIONS,
-            vec![
-                Answer::reply(200, APPROVES_OWN),
-                Answer::reply(200, APPROVES_OWN),
-            ],
-        ),
-        ("/user/jellyfin/", vec![Answer::reply(200, APPROVES_OWN)]),
+        (requests::intake("answers"), vec![requests::taken()]),
+        (requests::intake("link_members"), vec![requests::taken()]),
+        (requests::intake("requesting"), vec![member]),
+        (requests::intake("approval_first"), vec![holding]),
     ];
     routes.extend(the_media_server(
         media::answered(&libraries()),
         media::taken(),
     ));
     Fake::by_path_in_turn(routes)
+}
+
+/// A stack whose request service holds an account that approves its own requests.
+fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
+    a_stack_asking(ana_requesting(true), requests::taken())
 }
 
 /// What an invitation says about a member being narrowed, for one stack.

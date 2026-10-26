@@ -212,11 +212,24 @@ pub(crate) fn written<'a>(
 /// first-party plugin's service taking its id, the one kind of service that stands in
 /// for the stack's, so no other plugin can put the stack's service out by naming it.
 pub(crate) fn moved_in_place(installed: &[Installed], service: &str) -> bool {
+    moving(installed, service, crate::plugin::first_party::EMBEDDED).is_some()
+}
+
+/// The plugin of `installed` that has moved in place of the stack's service `service`:
+/// one `trusted` holds as first-party, whose own service takes that id in its place.
+pub(crate) fn moving<'a>(
+    installed: &'a [Installed],
+    service: &str,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> Option<&'a Installed> {
     installed
         .iter()
-        .filter(|one| crate::plugin::first_party::holds(crate::plugin::first_party::EMBEDDED, one))
-        .flat_map(|one| &one.services)
-        .any(|placed| placed.service == service && placed.replaces.as_deref() == Some(service))
+        .filter(|one| crate::plugin::first_party::holds(trusted, one))
+        .find(|one| {
+            one.services.iter().any(|placed| {
+                placed.service == service && placed.replaces.as_deref() == Some(service)
+            })
+        })
 }
 
 /// The one service that fills `capability`: the operator's choice where it names a

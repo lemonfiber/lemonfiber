@@ -1,23 +1,34 @@
-use std::sync::Arc;
+use lemonfiber_contract::capabilities::library::curate;
 
 use super::upgrade;
 use super::Ctx;
 use crate::model::Triggered;
 use crate::quality::Preset;
-use crate::test_support::{a_context, nowhere, SeedFs};
-use lemonfiber_fixtures::http::Fake;
+use crate::test_support::adapted;
+use crate::test_support::curators::{refusing, taken, ALL};
+use crate::test_support::{a_context, nowhere};
+use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// The curator config file `SeedFs` hands back for any curator, carrying a readable
-/// key so a target opens.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-
-/// A context over the real stack (which names a TV and a movie curator), the given
-/// filesystem, and HTTP that answers the upgrade POSTs from `replies`.
-fn ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
-    a_context()
-        .build()
-        .with_filesystem(fs)
-        .with_http(Fake::scripted(replies))
+/// A context over the real stack, which names a television, a film and a music curator,
+/// each moved into its plugin and asked through its adapter where `reached`, with HTTP
+/// answering every curator's upgrade search with `searched`.
+fn ctx(reached: bool, searched: Answer) -> Ctx {
+    static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("upgrade-{nth}")).kept();
+    let _ = std::fs::create_dir_all(&dir);
+    let mut context = a_context().build().with_http(Fake::by_path(vec![(
+        adapted::path_of(curate::CAPABILITY, curate::MAJOR, "search_upgrades"),
+        searched,
+    )]));
+    context.settings.env_file = Some(dir.join(".env"));
+    if reached {
+        return adapted::reaching(context, &ALL);
+    }
+    for curator in ALL {
+        curator.recorded(&context);
+    }
+    context
 }
 
 fn outcomes(report: &crate::model::UpgradeReport) -> Vec<Option<&Triggered>> {
@@ -30,7 +41,7 @@ fn outcomes(report: &crate::model::UpgradeReport) -> Vec<Option<&Triggered>> {
 
 #[tokio::test]
 async fn unconfirmed_states_the_cost_per_media_and_triggers_nothing() {
-    let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None)), vec![]), false)
+    let report = upgrade(&ctx(false, taken()), false)
         .await
         .unwrap_or_default();
     assert!(!report.confirmed);
@@ -51,15 +62,7 @@ async fn unconfirmed_states_the_cost_per_media_and_triggers_nothing() {
 #[tokio::test]
 async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_curator() {
     // Both media curators accept the command; music and index services are left out.
-    let report = upgrade(
-        &ctx(
-            Arc::new(SeedFs::keyed(Some(KEYED))),
-            vec![(201, ""), (201, "")],
-        ),
-        true,
-    )
-    .await
-    .unwrap_or_default();
+    let report = upgrade(&ctx(true, taken()), true).await.unwrap_or_default();
     assert!(report.confirmed);
     assert_eq!(
         report.media.len(),
@@ -75,18 +78,19 @@ async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_curator() {
 async fn a_per_type_choice_states_each_types_own_preset() {
     // The report speaks per media type: a maximum-for-film, space-saving-for-tv
     // split is not flattened to one figure.
-    let env = lemonfiber_fixtures::scratch::Scratch::named("upgrade-split");
-    let _ = std::fs::remove_dir_all(&env);
-    let env = env.join(".env");
+    let context = ctx(false, taken());
     let mut selection = crate::quality::Selection::everywhere(Preset::Balanced);
     selection.set_type("movies", Preset::Maximum);
     selection.set_type("tv", Preset::SpaceSaving);
     let _ = crate::config::store::write(
-        &env.with_file_name("quality.json"),
+        &context
+            .settings
+            .env_file
+            .clone()
+            .unwrap_or_default()
+            .with_file_name("quality.json"),
         &serde_json::to_string(&selection).unwrap_or_default(),
     );
-    let mut context = ctx(Arc::new(SeedFs::keyed(None)), vec![]);
-    context.settings.env_file = Some(env);
 
     let report = upgrade(&context, false).await.unwrap_or_default();
     let presets: Vec<&str> = report
@@ -98,10 +102,10 @@ async fn a_per_type_choice_states_each_types_own_preset() {
     assert!(presets.contains(&Preset::SpaceSaving.label()));
 }
 
+/// No adapter runs: the service has not finished starting, so it is not a fault.
 #[tokio::test]
 async fn a_curator_not_yet_started_is_reported_not_started() {
-    // No key on disk: the service has not finished starting, so it is not a fault.
-    let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None)), vec![]), true)
+    let report = upgrade(&ctx(false, taken()), true)
         .await
         .unwrap_or_default();
     assert_eq!(report.media.len(), 2);
@@ -112,15 +116,9 @@ async fn a_curator_not_yet_started_is_reported_not_started() {
 
 #[tokio::test]
 async fn a_curator_that_refuses_the_command_is_reported_failed() {
-    let report = upgrade(
-        &ctx(
-            Arc::new(SeedFs::keyed(Some(KEYED))),
-            vec![(500, "boom"), (500, "boom")],
-        ),
-        true,
-    )
-    .await
-    .unwrap_or_default();
+    let report = upgrade(&ctx(true, refusing()), true)
+        .await
+        .unwrap_or_default();
     assert!(outcomes(&report)
         .iter()
         .all(|outcome| matches!(outcome, Some(Triggered::Failed { .. }))));

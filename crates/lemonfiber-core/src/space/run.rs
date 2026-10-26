@@ -17,7 +17,7 @@ use lemonfiber_contract::capabilities::download::torrent;
 
 use crate::error::codes::space::ANOTHER_OFFER;
 use crate::error::{Diagnose, Problem, Remedy, State};
-use crate::ports::service::{Queued, Queues, Seeded};
+use crate::ports::service::{Queued, Seeded};
 use crate::space::{
     reckon, Counting, Left, Level, Measured, Reckoning, Reclaimed, Role, Stalled, Survey, Tally,
     Volume, HALTED, NOWHERE_TO_MEASURE, WALK_REFUSED,
@@ -220,7 +220,7 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
         walked(walking, |occupant| counting.add(&occupant, &mut services)).await;
     }
 
-    let (awaited, stalled) = queued(ctx, &watched.stack.services, project).await;
+    let (awaited, stalled) = queued(ctx, &watched.stack, project).await;
     let marked = marked(ctx, &held);
     Ok(Gathered {
         measured: Measured {
@@ -277,16 +277,15 @@ async fn holding(holder: Option<&dyn torrent::Fills>) -> Vec<Seeded> {
 /// is the honest one for the second, since silence is not a stalled import.
 async fn queued(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     project: Option<&Path>,
 ) -> (BTreeSet<String>, Vec<Stalled>) {
-    let targets = curator_targets(services, project);
-    let read = futures_util::future::join_all(targets.iter().map(|target| async move {
-        let service = target
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await?;
-        service.queue().await.ok()
-    }))
+    let targets = curator_targets(ctx, &host_fillers(ctx, manifest, project)).await;
+    let read = futures_util::future::join_all(
+        targets
+            .iter()
+            .map(|target| async move { target.asked.as_ref()?.queue().await.ok() }),
+    )
     .await;
 
     let items: Vec<Queued> = read

@@ -48,9 +48,15 @@ async fn acting(ctx: &Ctx, mode: Mode, confirmed: bool) -> Result<Outcome, Box<P
         Mode::Adopt => crate::app::adopt::adopt(ctx, &found.survey, &found.mounts, confirmed)
             .await
             .map(Outcome::Adoption),
-        Mode::Import => crate::app::import::carry(ctx, &found.survey, &found.running, confirmed)
-            .await
-            .map(Outcome::Import),
+        Mode::Import => crate::app::import::carry(
+            ctx,
+            &found.survey,
+            &found.running,
+            confirmed,
+            crate::plugin::first_party::EMBEDDED,
+        )
+        .await
+        .map(Outcome::Import),
         Mode::Beside => {
             crate::app::beside::stand(ctx, &found.survey, confirmed).map(Outcome::Beside)
         }

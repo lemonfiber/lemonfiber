@@ -15,6 +15,7 @@ use std::time::Duration;
 use lemonfiber_core::app::{dispatch, Arranged, Command, Ctx, Outcome};
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_fixtures::http::Fake;
+use lemonfiber_testing::requests;
 
 use crate::common;
 use common::household::{answering, context, table, watched};
@@ -45,13 +46,7 @@ async fn naming_a_period_records_it_and_closes_nothing() {
         arranged.contains("starts nothing by itself"),
         "the arrangement implied a background this product has not got: {arranged}"
     );
-    assert!(
-        !transport
-            .requests()
-            .iter()
-            .any(|asked| asked.url.contains("/request/7/decline")),
-        "arranging a period closed something"
-    );
+    assert!(!closed(&transport), "arranging a period closed something");
 }
 
 /// A period sooner than the reminder is refused, and arranges nothing.
@@ -216,10 +211,14 @@ async fn nobody_is_told_twice_however_often_it_runs() {
 
 /// Whether the request service was asked to close the one request that ran out.
 fn closed(transport: &std::sync::Arc<Fake>) -> bool {
-    transport
-        .requests()
-        .iter()
-        .any(|asked| asked.url.contains("/request/7/decline"))
+    requests::told::<bool>(&transport.requests(), "decide", "approve")
+        .into_iter()
+        .zip(requests::told::<i64>(
+            &transport.requests(),
+            "decide",
+            "request",
+        ))
+        .any(|(approve, request)| !approve && request == 7)
 }
 
 /// The body of the first request sent to a host, or nothing where none was.

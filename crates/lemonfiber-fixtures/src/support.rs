@@ -227,41 +227,14 @@ impl lemonfiber_ports::random::Random for FixedRandom {
     }
 }
 
-/// The routes a whole seed run reads, so its many calls need no exact ordering.
-///
-/// Root-folder, download-client and Prowlarr application lists hold exactly what each
-/// service wants, so every connection reads back as already wired; qBittorrent's auth
-/// and set both answer success. The catch-all is last because the first matching route
-/// wins, and an empty fragment is contained in every URL.
+/// The routes a whole seed run reads where a test answers none of them itself: every call
+/// taken, so a run's many calls need no exact ordering.
 #[must_use]
 pub fn seeding_routes() -> Vec<(&'static str, Answer)> {
-    vec![
-        (
-            "/downloadclient",
-            Answer::reply(
-                200,
-                r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081}]}]"#,
-            ),
-        ),
-        (
-            "/rootfolder",
-            Answer::reply(
-                200,
-                r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#,
-            ),
-        ),
-        (
-            "/applications",
-            Answer::reply(
-                200,
-                r#"[{"id":1,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":2,"fields":[{"name":"baseUrl","value":"http://radarr:7878"}]},{"id":3,"fields":[{"name":"baseUrl","value":"http://lidarr:8686"}]}]"#,
-            ),
-        ),
-        ("", Answer::reply(200, "Ok.")),
-    ]
+    vec![("", Answer::reply(200, "Ok."))]
 }
 
-/// A transport answering a whole seed run, every connection already wired.
+/// A transport answering a whole seed run, every call taken.
 #[must_use]
 pub fn seeding() -> Arc<Fake> {
     Fake::by_path(seeding_routes())
@@ -269,8 +242,8 @@ pub fn seeding() -> Arc<Fake> {
 
 /// A seed run answering `extra` first and falling through to the ordinary routes.
 ///
-/// For the tests that need one service to say something different — a version, a
-/// second download client — without restating the whole table around it.
+/// For the tests that need one service to say something of its own without restating
+/// the rest of the run around it.
 #[must_use]
 pub fn seeding_with(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
     let mut routes = extra;
@@ -289,10 +262,6 @@ pub struct SeedFs {
     /// What the request service's settings say. A JSON of its own, for the same
     /// reason — and under a different config mount again.
     seerr: Option<&'static str>,
-    /// When set, the Servarr configuration is handed back only for Prowlarr's
-    /// path, so a test can make Prowlarr's key readable while an \*arr's is not —
-    /// the case of an \*arr that started after Prowlarr.
-    only_prowlarr: bool,
     /// Path fragments a canonicalize should fail for, standing in for host
     /// directories that are not there — so a root folder's existence check can be
     /// driven to missing. Every path resolves when empty.
@@ -314,7 +283,6 @@ impl SeedFs {
         Self {
             servarr,
             seerr: None,
-            only_prowlarr: false,
             missing: Vec::new(),
             leading_away: Vec::new(),
             elsewhere: Vec::new(),
@@ -333,13 +301,6 @@ impl SeedFs {
     #[must_use]
     pub fn with_requests(mut self, settings: &'static str) -> Self {
         self.seerr = Some(settings);
-        self
-    }
-
-    /// The same, but withholding the Servarr key from every path but Prowlarr's.
-    #[must_use]
-    pub fn only_for_aggregator(mut self) -> Self {
-        self.only_prowlarr = true;
         self
     }
 
@@ -491,9 +452,6 @@ fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
     let path = path.to_string_lossy();
     if path.contains("seerr") {
         return seed.seerr.map(str::to_owned);
-    }
-    if seed.only_prowlarr && !path.contains("prowlarr") {
-        return None;
     }
     seed.servarr.map(str::to_owned)
 }

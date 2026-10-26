@@ -14,6 +14,7 @@
 
 use std::path::Path;
 
+use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_manifest::Service;
 
 use super::connecting::{pairings, Cleared, Connection};
@@ -59,9 +60,9 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
 /// whose credential file was refused, said on the target it would have been.
 ///
 /// Each is read rather than assumed: the profile it fetches at and the folder it
-/// files into are asked of the curator itself, because the request service must name
-/// both when it hands over a request, and an operator may have renamed or replaced
-/// what setup created.
+/// files into are asked of the curator itself over `library.curate`, through the adapter
+/// in front of it, because the request service must name both when it hands over a
+/// request, and an operator may have renamed or replaced what setup created.
 ///
 /// A curator that cannot answer, that this machine cannot reach, or that has no profile
 /// or folder to name, is left out rather than registered half-configured — a target the
@@ -69,6 +70,7 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
 /// because the request is accepted either way and only the second is visibly missing.
 async fn wanted_targets(
     ctx: &Ctx,
+    fillers: &Fillers,
     curators: &[Fulfils<'_>],
 ) -> (Vec<FulfilmentTarget>, Vec<Wiring>) {
     let mut wanted = Vec::new();
@@ -86,19 +88,9 @@ async fn wanted_targets(
                 continue;
             }
         };
-        let (Some(published), Some(version)) = (
-            filler.published,
-            filler.adapter.as_ref().and_then(|api| api.version),
-        ) else {
+        let Some(client) = super::curating::curated(ctx, fillers, filler).await else {
             continue;
         };
-        let client = crate::servarr::Servarr::new(
-            ctx.seams.http.clone(),
-            crate::app::targets::loopback(published),
-            key.clone(),
-            &filler.id,
-            version,
-        );
         let Some(profile) = first_profile(&client).await else {
             continue;
         };
@@ -130,12 +122,12 @@ async fn wanted_targets(
 /// The first the curator reports, which is what setup wired: a stack with several is
 /// one the operator has arranged themselves, and the request service takes one
 /// default rather than choosing between them.
-async fn first_profile(client: &crate::servarr::Servarr) -> Option<QualityProfile> {
+async fn first_profile(client: &curate::Adapter) -> Option<QualityProfile> {
     client.quality_profiles().await.ok()?.into_iter().next()
 }
 
 /// Where what it fetches is filed — the first folder it reports, for the same reason.
-async fn first_folder(client: &crate::servarr::Servarr) -> Option<String> {
+async fn first_folder(client: &curate::Adapter) -> Option<String> {
     client
         .root_folders()
         .await
@@ -189,7 +181,7 @@ async fn handed(
     else {
         return Vec::new();
     };
-    let (wanted, refused) = wanted_targets(ctx, curators).await;
+    let (wanted, refused) = wanted_targets(ctx, fillers, curators).await;
     if wanted.is_empty() {
         return refused;
     }

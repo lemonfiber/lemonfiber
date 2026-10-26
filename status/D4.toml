@@ -2,15 +2,15 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "D4-R1", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs", "crates/lemonfiber-core/tests/integration/one_way_in_and_it_is_the_media_server.rs"] },
-  { id = "D4-R2", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs", "crates/lemonfiber-core/src/doctor/telling.rs"] },
-  { id = "D4-R3", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs", "crates/lemonfiber-core/src/doctor/telling.rs"] },
+  { id = "D4-R1", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/request.rs", "crates/lemonfiber-core/src/seed/run/identity.rs", "crates/lemonfiber-core/src/seed/run/tests/identity.rs"] },
+  { id = "D4-R2", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/request.rs", "crates/lemonfiber-core/src/doctor/telling.rs"] },
+  { id = "D4-R3", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/request.rs", "crates/lemonfiber-core/src/doctor/telling.rs"] },
   { id = "D4-R4", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/fulfilment.rs"] },
-  { id = "D4-R5", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs"] },
-  { id = "D4-R6", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs"] },
+  { id = "D4-R5", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/request.rs"] },
+  { id = "D4-R6", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/request.rs"] },
   { id = "D4-R7", state = "done", evidence = ["crates/lemonfiber-ports/src/service/quality.rs", "crates/lemonfiber-core/src/app/trace.rs"] },
   { id = "D4-R8", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard/run.rs"] },
-  { id = "D4-R9", state = "done", evidence = ["crates/lemonfiber-core/src/admission.rs", "crates/lemonfiber-core/tests/integration/the_household_needs_no_account_here.rs", "crates/lemonfiber-core/src/asking/reasons.rs", "crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-ports/src/service/addressing.rs", "crates/lemonfiber-core/src/seerr/addressing.rs"] },
+  { id = "D4-R9", state = "done", evidence = ["crates/lemonfiber-core/src/admission.rs", "crates/lemonfiber-core/tests/integration/the_household_needs_no_account_here.rs", "crates/lemonfiber-core/src/asking/reasons.rs", "crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-ports/src/service/addressing.rs", "crates/lemonfiber-contract/src/capabilities/request.rs"] },
   { id = "D4-R10", state = "done", evidence = ["lemonfiber-media-stack:stack.toml"] },
   { id = "D4-R11", state = "done", evidence = ["lemonfiber-media-stack:stack.toml"] },
   { id = "D4-R12", state = "done", evidence = ["lemonfiber-media-stack:stack.toml"] },
@@ -21,6 +21,6 @@ requirement = [
   { id = "D4-R17", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/place.rs", "crates/lemonfiber-core/src/wishing/find.rs", "crates/lemonfiber-core/src/wishing/place/tests.rs"] },
   { id = "D4-R18", state = "done", evidence = ["crates/lemonfiber-core/src/wishing.rs", "crates/lemonfiber-core/src/wishing/find/tests.rs"] },
   { id = "D4-R19", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/limits.rs", "crates/lemonfiber-contract/src/capabilities/identity.rs", "crates/lemonfiber-core/src/wishing/limits/tests.rs"] },
-  { id = "D4-R20", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/ask.rs", "crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-core/src/seerr/searching.rs", "crates/lemonfiber-core/src/wishing/ask/tests.rs"] },
-  { id = "D4-R21", state = "done", evidence = ["crates/lemonfiber-core/src/household/run/naming.rs", "crates/lemonfiber-core/src/seerr/records.rs", "crates/lemonfiber-core/src/seerr/searching.rs", "crates/lemonfiber-core/src/household/run/tests/requests.rs"] },
+  { id = "D4-R20", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/ask.rs", "crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-contract/src/capabilities/request.rs", "crates/lemonfiber-core/src/wishing/ask/tests.rs"] },
+  { id = "D4-R21", state = "done", evidence = ["crates/lemonfiber-core/src/household/run/naming.rs", "crates/lemonfiber-contract/src/capabilities/request.rs", "crates/lemonfiber-core/src/household/run/tests/requests.rs"] },
 ]

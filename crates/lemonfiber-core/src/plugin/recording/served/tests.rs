@@ -1,11 +1,9 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::proving::Proving;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::serving::Serves;
 use lemonfiber_plugin::{Health, HealthKind};
 
 use super::super::tests::asking::SERVED;
-use super::super::Recorder;
 use super::{healthy, library, settled};
 use crate::plugin::installed::{Installed, Placed};
 use crate::plugin::program::{Starting, Throwaway};
@@ -136,22 +134,8 @@ async fn health_of(
     http: &Fake,
     port: Option<u16>,
 ) -> Result<(), String> {
-    let program = Proving::unreachable();
     let serving = Serves::on(1).standing(standing);
-    let silent = || -> std::sync::Arc<dyn crate::ports::http::Http> { Fake::silent() };
-    healthy(
-        Recorder {
-            program: program.as_ref(),
-            serving: &serving,
-            transport: &silent,
-            random: &lemonfiber_fixtures::support::FixedRandom(None),
-            taking: &crate::plugin::Retaking::default(),
-        },
-        http,
-        health,
-        &served(port),
-    )
-    .await
+    healthy(&serving, http, health, &served(port)).await
 }
 
 fn health(kind: HealthKind, path: Option<&str>) -> Health {

@@ -1,22 +1,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::super::fixtures::{carrying_it, ctx_downloading, ctx_with, Fake, Ticking};
+use super::super::fixtures::{
+    carrying_it, ctx_downloading, ctx_with, downloading, event, Fake, Ticking,
+};
 use super::{done, first_word, furthest, past_patience, settled, speed_of, what_was_said, Landed};
 use crate::ports::docker::{Health, Lifecycle};
-use crate::ports::service::{QueueItem, TraceEvent};
+use crate::ports::service::QueueItem;
 use crate::test_support::Reporting;
 use crate::trace::{Outcome, Stage};
 use crate::walkthrough::{Reason, Step};
-
-/// A history event of one outcome.
-fn event(outcome: Outcome) -> TraceEvent {
-    TraceEvent {
-        outcome,
-        at: "2026-08-08T00:00:00Z".to_owned(),
-        part: None,
-    }
-}
 
 /// A queue record at one stage.
 const fn queued(stage: Stage, stuck: bool) -> QueueItem {
@@ -138,12 +131,9 @@ fn a_title_is_matched_by_the_word_a_release_name_would_share() {
     assert_eq!(first_word(""), "");
 }
 
-/// The stack's own services, which is what a quote is gathered from.
-fn services(ctx: &crate::app::Ctx) -> Vec<lemonfiber_manifest::Service> {
-    ctx.stack
-        .checked_manifest(ctx.today())
-        .map(|manifest| manifest.services)
-        .unwrap_or_default()
+/// The curators a quote is gathered from.
+fn curators() -> Vec<String> {
+    vec!["sonarr".to_owned()]
 }
 
 #[tokio::test]
@@ -156,7 +146,7 @@ async fn a_failure_is_quoted_with_the_lines_about_the_item_first() {
             .saying("sonarr", "something else entirely")
             .saying("sonarr", "Sintel: no files are eligible for import"),
     );
-    let said = what_was_said(&ctx, &services(&ctx), "Sintel").await;
+    let said = what_was_said(&ctx, &curators(), "Sintel").await;
     assert_eq!(
         said,
         vec!["sonarr: Sintel: no files are eligible for import"]
@@ -180,9 +170,7 @@ async fn what_a_service_was_saying_is_quoted_with_no_credential_in_it() {
             &format!("Sintel: import refused, api_key={secret} was rejected"),
         ),
     );
-    let said = what_was_said(&ctx, &services(&ctx), "Sintel")
-        .await
-        .join("");
+    let said = what_was_said(&ctx, &curators(), "Sintel").await.join("");
     assert!(
         !said.contains(&secret),
         "the credential survived into what the service was quoted as saying"
@@ -209,7 +197,7 @@ async fn a_failure_with_nothing_said_about_the_item_quotes_what_there_is() {
         Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
             .saying("sonarr", "permission denied writing /data/media"),
     );
-    let said = what_was_said(&ctx, &services(&ctx), "Sintel").await;
+    let said = what_was_said(&ctx, &curators(), "Sintel").await;
     assert_eq!(said, vec!["sonarr: permission denied writing /data/media"]);
 }
 
@@ -217,10 +205,14 @@ async fn a_failure_with_nothing_said_about_the_item_quotes_what_there_is() {
 async fn nothing_to_ask_and_nothing_that_answers_are_both_simply_no_quote() {
     let ctx = ctx_with(&Fake::default());
     assert!(what_was_said(&ctx, &[], "Sintel").await.is_empty());
-    // The default fixture's engine is absent, so the logs cannot be read at all.
-    assert!(what_was_said(&ctx, &services(&ctx), "Sintel")
-        .await
-        .is_empty());
+    assert!(what_was_said(&ctx, &curators(), "Sintel").await.is_empty());
+}
+
+#[tokio::test]
+async fn an_engine_that_cannot_be_reached_is_no_quote() {
+    let mut ctx = ctx_with(&Fake::default());
+    ctx.seams.engine = Arc::new(Reporting::absent());
+    assert!(what_was_said(&ctx, &curators(), "Sintel").await.is_empty());
 }
 
 /// A size and a rate are what make a download look like progress rather than a hang,
@@ -259,8 +251,8 @@ async fn a_wait_that_has_not_run_out_looks_again() {
     // of it. Time is faked at both ends: tokio's, so nothing actually sleeps, and the
     // stack's, so the bound is reached deterministically.
     let mut ctx = ctx_with(&Fake {
-        history: r#"{"records":[{"eventType":"grabbed","date":"2026-08-08T00:00:00Z"}]}"#,
-        queue: r#"{"records":[{"seriesId":7,"movieId":7,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}],"totalRecords":1}"#,
+        history: vec![event(Outcome::Grabbed)],
+        queue: downloading(false),
         ..Fake::default()
     });
     ctx.seams.clock = Arc::new(Ticking::by(Duration::from_secs(1)));

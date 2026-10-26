@@ -20,8 +20,7 @@ use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 
-/// The port every adapter is published on, on the host's loopback: the port each listens
-/// on, so the engine's account of it reads as published where it listens.
+/// The port every adapter listens on in its container, which the bundle declares for each.
 pub const PORT: u16 = 8080;
 
 /// The key every adapter is asked with.
@@ -35,6 +34,8 @@ pub struct Adapted {
     pub plugin: &'static str,
     /// The plugin's service speaking the moved service's contracts.
     pub adapter: &'static str,
+    /// The port the engine says the adapter is published on, on the host's loopback.
+    pub port: u16,
 }
 
 impl Adapted {
@@ -54,14 +55,39 @@ impl Adapted {
         Some(installed)
     }
 
-    /// The engine's account of the adapter running healthy, published on [`PORT`].
+    /// The engine's account of the adapter running healthy, published on its port.
     #[must_use]
     pub fn running(self) -> Reporting {
-        Reporting::holding(&[self.adapter], Lifecycle::Running, Health::Healthy).publishing(&[(
+        running(&[self])
+    }
+
+    /// The adapter as the core asks it over `http`, on the loopback port it is published
+    /// on and under [`KEY`].
+    #[must_use]
+    pub fn contracted(
+        self,
+        http: Arc<dyn lemonfiber_core::ports::http::Http>,
+    ) -> lemonfiber_contract::Contracted {
+        lemonfiber_contract::Contracted::new(
+            http,
+            format!("http://127.0.0.1:{}", self.port),
             self.adapter,
-            "127.0.0.1",
-            PORT,
-        )])
+            KEY,
+        )
+    }
+
+    /// Where `operation` of `capability` is asked of this adapter in `major`, on the
+    /// loopback port it is published on, held for as long as a test runs.
+    #[must_use]
+    pub fn at(self, capability: &str, major: u32, operation: &str) -> &'static str {
+        Box::leak(
+            format!(
+                "127.0.0.1:{}{}",
+                self.port,
+                lemonfiber_contract::path(capability, major, operation)
+            )
+            .into_boxed_str(),
+        )
     }
 
     /// Where the adapter's key is written in `ctx`'s stack: nothing where `ctx` names no
@@ -110,6 +136,45 @@ impl Adapted {
         let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
     }
 
+    /// Each secret the plugin mints held as `value` in the secret store beside the env file
+    /// `ctx`'s settings name, beside everything held there before, the store stamped as an
+    /// earlier lemonfiber wrote it. Nothing where `ctx` names no env file.
+    pub fn minted(self, ctx: &Ctx, value: &str) {
+        let secrets = ctx
+            .settings
+            .env_file
+            .as_deref()
+            .map(|env| env.with_file_name(lemonfiber_core::config::paths::SECRETS));
+        for (at, installed) in secrets.into_iter().zip(self.installed()) {
+            let mut held: serde_json::Map<String, serde_json::Value> = std::fs::read_to_string(&at)
+                .ok()
+                .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+                .and_then(|store| store.get("held")?.as_object().cloned())
+                .unwrap_or_default();
+            held.extend(
+                installed
+                    .declared
+                    .secrets
+                    .iter()
+                    .filter(|one| one.minted)
+                    .map(|secret| {
+                        (
+                            format!(
+                                "{}{}{}",
+                                self.plugin,
+                                lemonfiber_manifest::container::NAMESPACED,
+                                secret.id
+                            ),
+                            serde_json::json!({ "value": value, "from": "minted", "at": 0 }),
+                        )
+                    }),
+            );
+            let store = serde_json::json!({ "schema": 1, "written_by": "0.0.0", "held": held });
+            let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
+            let _ = std::fs::write(&at, store.to_string());
+        }
+    }
+
     /// `ctx` reaching the moved service: [`Self::moved_in`], with the engine saying the
     /// adapter runs as [`Self::running`] does.
     #[must_use]
@@ -148,6 +213,41 @@ impl Adapted {
         self.moved_in(&ctx);
         ctx
     }
+}
+
+/// The engine's account of every one of `adapted` running healthy, each published on its
+/// own port of the host's loopback, forwarded to [`PORT`].
+#[must_use]
+pub fn running(adapted: &[Adapted]) -> Reporting {
+    let adapters: Vec<&str> = adapted.iter().map(|one| one.adapter).collect();
+    let forwarded: Vec<(&str, &str, u16, u16)> = adapted
+        .iter()
+        .map(|one| (one.adapter, "127.0.0.1", one.port, PORT))
+        .collect();
+    Reporting::holding(&adapters, Lifecycle::Running, Health::Healthy).forwarding(&forwarded)
+}
+
+/// `ctx` asking every one of `adapted` through fillers it was handed, wherever their stack
+/// is written: the engine saying each runs as [`running`] does, and each one's key held
+/// wherever its configuration directory is.
+#[must_use]
+pub fn asking(mut ctx: Ctx, adapted: &[Adapted]) -> Ctx {
+    let adapters: Vec<&str> = adapted.iter().map(|one| one.adapter).collect();
+    ctx.seams.engine = Arc::new(running(adapted));
+    ctx.seams.confined = Keyed::holding(Arc::clone(&ctx.seams.confined), &adapters);
+    ctx
+}
+
+/// `ctx` reaching every one of `adapted` moved in: each recorded beside the env file its
+/// settings name and keyed where its configuration is written, with the engine saying
+/// each runs as [`running`] does.
+#[must_use]
+pub fn reaching(mut ctx: Ctx, adapted: &[Adapted]) -> Ctx {
+    ctx.seams.engine = Arc::new(running(adapted));
+    for one in adapted {
+        one.moved_in(&ctx);
+    }
+    ctx
 }
 
 /// Where `operation` of `capability` is asked in `major`, held for as long as a test runs.

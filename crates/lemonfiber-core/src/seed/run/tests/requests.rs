@@ -1,117 +1,146 @@
-//! The request service: reached with its own key, and handed the curators.
+//! The request service: reached through its adapter, and handed the curators.
 
 use super::*;
+use crate::ports::service::{
+    Endpoint, FulfilmentTarget, QualityProfile, RegisteredFolder, RegisteredTarget,
+};
+use crate::test_support::curators::{curating as curated_by, TELEVISION};
+use crate::test_support::requests::{answered, intake, taken, told, unavailable, REQUESTS};
 
-/// The registration carries the request service's own key.
-///
-/// Every call the request service takes here is an authenticated one, and after its
-/// setup the key it wrote for itself is what authenticates them: the media server's
-/// administrator password does not pass through it again. Asserted by the calls that
-/// went out, because a registration attempted without the key looks the same from
-/// the outside as one refused for any other reason.
-#[tokio::test]
-async fn the_registration_carries_the_request_services_own_key() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let env = recorded_admin("targets");
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/qualityprofile",
-            vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
-        ),
-        (
-            "/rootfolder",
-            vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
-        ),
-        ("/settings/radarr", vec![Answer::reply(200, "[]")]),
-        (
-            "/settings/sonarr",
-            vec![
-                Answer::reply(200, "[]"),
-                Answer::reply(201, ""),
-                Answer::reply(200, r#"[{"id":1,"hostname":"sonarr","port":8989}]"#),
-            ],
-        ),
-    ]);
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(KEYED)).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
-        ));
-
-    let _ = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[curator("sonarr", 8989, "tv"), requests_with_settings()],
-        &fillers_of(vec![
-            curator("sonarr", 8989, "tv"),
-            requests_with_settings(),
-        ]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
-    )
-    .await;
-
-    let asked = http.requests();
-    let to_the_request_service: Vec<_> = asked
-        .iter()
-        .filter(|request| request.url.contains("/api/v1/"))
+/// The shipped stack's `services` with its television curator and its request service
+/// moved into their plugins, each plugin as `shape` leaves it.
+fn moved(
+    services: Vec<lemonfiber_manifest::Service>,
+    shape: fn(&mut crate::plugin::Installed),
+) -> crate::wiring::Fillers {
+    let mut installed: Vec<_> = TELEVISION
+        .installed()
+        .into_iter()
+        .chain(REQUESTS.installed())
         .collect();
-    assert!(
-        to_the_request_service
-            .iter()
-            .any(|request| request.method == Method::Post
-                && request.url.contains("/settings/sonarr")),
-        "{asked:?}"
-    );
-    assert!(
-        to_the_request_service.iter().all(|request| request
-            .headers
-            .iter()
-            .any(|(name, value)| name == "X-Api-Key" && value == "seerr-own-key")),
-        "a call to the request service went without its key: {asked:?}"
-    );
-    assert!(
-        !asked
-            .iter()
-            .any(|request| request.url.contains("/auth/jellyfin")),
-        "the administrator's password went through the request service again: {asked:?}"
-    );
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    installed.iter_mut().for_each(shape);
+    fillers_beside(services, &installed, stack_root())
 }
 
-/// A rehearsal reads the request service as nobody, and so opens no session.
-///
-/// Every call this step makes is an authenticated one, and the only thing that
-/// opens a session is a sign-in — which is a `POST` that leaves state on somebody
-/// else's service. So the client a rehearsal takes is deliberately unsigned, the
-/// reads that follow come back unauthorised, and each wanted curator says it could not
-/// be told rather than naming a credential fault nobody has. Asserted on the traffic
-/// rather than on the report, because a report that reads right while the sign-in
-/// still goes out is the failure this flag exists to prevent.
+/// The services of `plugin` that file media.
+fn curators(
+    plugin: &mut crate::plugin::Installed,
+) -> impl Iterator<Item = &mut crate::plugin::Placed> {
+    plugin
+        .services
+        .iter_mut()
+        .filter(|placed| !placed.media_types.is_empty())
+}
+
+/// A context over `http` asking `adapted`, the television curator's minted key kept, with
+/// an env file of its own under `name`.
+fn asking(name: &str, http: Arc<Fake>, adapted: &[crate::test_support::adapted::Adapted]) -> Ctx {
+    let ctx = seed_ctx(true, None, Some(recorded_admin(name))).with_http(http);
+    TELEVISION.minted(&ctx, MINTED_CURATOR_KEY);
+    crate::test_support::adapted::asking(ctx, adapted)
+}
+
+/// What the television curator answers when asked for its profiles and its folders, the
+/// folders as `folders`.
+fn a_curator(folders: Answer) -> Vec<(&'static str, Vec<Answer>)> {
+    vec![
+        (
+            curated_by(TELEVISION, "quality_profiles"),
+            vec![answered(&[QualityProfile {
+                id: 4,
+                name: "HD-1080p".to_owned(),
+            }])],
+        ),
+        (curated_by(TELEVISION, "root_folders"), vec![folders]),
+    ]
+}
+
+/// The television folder the curator files into.
+fn television_folder() -> Answer {
+    answered(&[RegisteredFolder {
+        id: "1".to_owned(),
+        path: "/data/media/tv".to_owned(),
+    }])
+}
+
+/// Where the request service reaches the television curator.
+fn sonarr() -> Endpoint {
+    Endpoint {
+        host: "sonarr".to_owned(),
+        port: 8989,
+        base: String::new(),
+    }
+}
+
+/// The moved request service is handed the moved curator over its contract, at the
+/// address it reaches it on and with the key lemonfiber minted for the curator.
 #[tokio::test]
-async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_session() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let env = recorded_admin("targets-rehearsed");
-    let http = Fake::by_path(vec![
+async fn the_moved_request_service_is_handed_each_moved_curator_with_its_minted_key() {
+    let mut routes = a_curator(television_folder());
+    routes.extend([
         (
-            "/qualityprofile",
-            Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#),
+            intake("fulfilment_targets"),
+            vec![
+                answered(&Vec::<RegisteredTarget>::new()),
+                answered(&[RegisteredTarget {
+                    id: "1".to_owned(),
+                    at: sonarr(),
+                    key: MINTED_CURATOR_KEY.to_owned(),
+                    kind: crate::ports::media::Kind::Tv,
+                }]),
+            ],
         ),
-        (
-            "/rootfolder",
-            Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#),
-        ),
-        ("/auth/jellyfin", Answer::reply(200, "")),
-        ("/settings", Answer::reply(200, "[]")),
+        (intake("add_fulfilment_target"), vec![taken()]),
+        (intake("test_fulfilment_target"), vec![taken()]),
     ]);
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-        .rehearsing();
+    let http = Fake::by_path_in_turn(routes);
+    let ctx = asking("targets", http.clone(), &[TELEVISION, REQUESTS]);
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[curator("sonarr", 8989, "tv"), requests_svc()],
-        &fillers_of(vec![curator("sonarr", 8989, "tv"), requests_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        &[],
+        &moved(Vec::new(), |_| {}),
+        Some(stack_root()),
+    )
+    .await;
+
+    assert_eq!(
+        wirings
+            .iter()
+            .map(|wiring| &wiring.state)
+            .collect::<Vec<_>>(),
+        vec![&crate::seed::State::Wired],
+        "{wirings:?}"
+    );
+    assert_eq!(
+        told::<FulfilmentTarget>(&http.requests(), "add_fulfilment_target", "target")
+            .iter()
+            .map(|target| (
+                target.at.clone(),
+                target.key.as_str(),
+                target.folder.as_str()
+            ))
+            .collect::<Vec<_>>(),
+        vec![(sonarr(), MINTED_CURATOR_KEY, "/data/media/tv")]
+    );
+}
+
+/// A rehearsal names where it would hand the curator over, and hands over nothing.
+#[tokio::test]
+async fn a_rehearsed_pass_names_the_curator_and_writes_nothing() {
+    let mut routes = a_curator(television_folder());
+    routes.push((
+        intake("fulfilment_targets"),
+        vec![answered(&Vec::<RegisteredTarget>::new())],
+    ));
+    let http = Fake::by_path_in_turn(routes);
+    let ctx = asking("targets-rehearsed", http.clone(), &[TELEVISION, REQUESTS]).rehearsing();
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[],
+        &moved(Vec::new(), |_| {}),
+        Some(stack_root()),
     )
     .await;
 
@@ -123,18 +152,10 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
         }),
         "{wirings:?}"
     );
-    let asked = http.requests();
     assert!(
-        !asked
-            .iter()
-            .any(|request| request.url.contains("/auth/jellyfin")),
-        "a rehearsal signed in to the request service: {asked:?}"
+        told::<FulfilmentTarget>(&http.requests(), "add_fulfilment_target", "target").is_empty(),
+        "a rehearsal handed a curator over"
     );
-    assert!(
-        asked.iter().all(|request| request.method == Method::Get),
-        "a rehearsal wrote to a service: {asked:?}"
-    );
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
 /// A stack with no request service is asked nothing at all.
@@ -144,7 +165,7 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
 #[tokio::test]
 async fn a_stack_with_no_request_service_is_handed_nothing() {
     let http = Fake::silent();
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -166,48 +187,108 @@ async fn a_stack_with_no_request_service_is_handed_nothing() {
 /// offered at all rather than offered half-configured.
 #[tokio::test]
 async fn a_curator_that_will_not_say_where_it_files_is_left_out() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/qualityprofile",
-            vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
-        ),
-        ("/rootfolder", vec![Answer::Silent]),
-        ("/settings/radarr", vec![Answer::reply(200, "[]")]),
-        ("/settings/sonarr", vec![Answer::reply(200, "[]")]),
-    ]);
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+    let mut routes = a_curator(unavailable());
+    routes.push((
+        intake("fulfilment_targets"),
+        vec![answered(&Vec::<RegisteredTarget>::new())],
+    ));
+    let ctx = asking(
+        "targets-unfiled",
+        Fake::by_path_in_turn(routes),
+        &[TELEVISION, REQUESTS],
+    );
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[curator("sonarr", 8989, "tv"), requests_svc()],
-        &fillers_of(vec![curator("sonarr", 8989, "tv"), requests_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        &[],
+        &moved(Vec::new(), |_| {}),
+        Some(stack_root()),
     )
     .await;
 
     assert!(
         wirings.is_empty(),
-        "an *arr with nowhere to file was handed over: {wirings:?}"
+        "a curator with nowhere to file was handed over: {wirings:?}"
     );
 }
 
-/// A curator publishing no port has no endpoint to hand over.
+/// A curator with no quality profile has nothing to fetch at, so it is left out.
 #[tokio::test]
-async fn a_curator_publishing_no_port_is_left_out() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let mut portless = curator("sonarr", 8989, "tv");
-    portless.port = None;
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+async fn a_curator_with_no_quality_profile_is_left_out() {
+    let ctx = asking(
+        "targets-unprofiled",
+        Fake::by_path_in_turn(vec![
+            (
+                curated_by(TELEVISION, "quality_profiles"),
+                vec![answered(&Vec::<QualityProfile>::new())],
+            ),
+            (
+                curated_by(TELEVISION, "root_folders"),
+                vec![television_folder()],
+            ),
+            (
+                intake("fulfilment_targets"),
+                vec![answered(&Vec::<RegisteredTarget>::new())],
+            ),
+        ]),
+        &[TELEVISION, REQUESTS],
+    );
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[portless.clone(), requests_svc()],
-        &fillers_of(vec![portless, requests_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        &[],
+        &moved(Vec::new(), |_| {}),
+        Some(stack_root()),
+    )
+    .await;
+
+    assert!(
+        wirings.is_empty(),
+        "a curator with no quality profile was handed over: {wirings:?}"
+    );
+}
+
+/// A curator its plugin mints no key for, whose key is read from no file, has no key
+/// to hand over.
+#[tokio::test]
+async fn a_curator_with_no_key_to_read_is_left_out() {
+    let ctx = asking(
+        "targets-keyless",
+        Fake::by_path_in_turn(a_curator(television_folder())),
+        &[TELEVISION, REQUESTS],
+    );
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[],
+        &moved(Vec::new(), |plugin| {
+            for secret in &mut plugin.declared.secrets {
+                secret.minted = false;
+            }
+        }),
+        Some(stack_root()),
+    )
+    .await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+}
+
+/// A curator listening on no port has no endpoint to hand over.
+#[tokio::test]
+async fn a_curator_publishing_no_port_is_left_out() {
+    let ctx = asking(
+        "targets-portless",
+        Fake::by_path_in_turn(a_curator(television_folder())),
+        &[TELEVISION, REQUESTS],
+    );
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[],
+        &moved(Vec::new(), |plugin| {
+            curators(plugin).for_each(|placed| placed.listens = None);
+        }),
+        Some(stack_root()),
     )
     .await;
 
@@ -217,7 +298,7 @@ async fn a_curator_publishing_no_port_is_left_out() {
 /// A stack with no request service has nobody to tell.    /// A stack with no request service has nobody to tell.
 #[tokio::test]
 async fn nothing_is_handed_over_where_there_is_no_request_service() {
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -235,16 +316,19 @@ async fn nothing_is_handed_over_where_there_is_no_request_service() {
 /// A target the request service holds but cannot fetch through is worse than one
 /// it does not hold: the request is accepted either way, and only the second is
 /// visibly missing.
+///
+/// The curator's adapter holds no key, so nothing can be read from it and nothing is
+/// offered.
 #[tokio::test]
 async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
-    // No key on disk, so nothing can be read from it and nothing is offered.
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let http = Fake::by_path_in_turn(a_curator(television_folder()));
+    let ctx = asking("targets-unread", http.clone(), &[REQUESTS]);
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[curator("sonarr", 8989, "tv"), requests_svc()],
-        &fillers_of(vec![curator("sonarr", 8989, "tv"), requests_svc()]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        &[],
+        &moved(Vec::new(), |_| {}),
+        Some(stack_root()),
     )
     .await;
 
@@ -254,19 +338,28 @@ async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
     );
 }
 
-/// A curator whose credential file leads away is refused as a request target rather
-/// than left out, so the operator sees why the request service was not handed it.
+/// A first-party curator whose credential file leads away is refused as a request target
+/// rather than left out, so the operator sees why the request service was not handed it.
 #[tokio::test]
 async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_http(Fake::silent())
-        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
-    let services = vec![requests_svc()];
+    let ctx = crate::test_support::adapted::asking(
+        seed_ctx(true, None, None).with_http(Fake::silent()),
+        &[REQUESTS],
+    )
+    .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+    let mut stand_in = a_stand_in("movies");
+    crate::test_support::CONTRACTED_MANIFEST.clone_into(&mut stand_in.manifest);
+    crate::test_support::A_TREE.clone_into(&mut stand_in.tree);
+    let installed: Vec<_> = REQUESTS.installed().into_iter().chain([stand_in]).collect();
+    let trusted: Vec<_> = first_party("kept")
+        .into_iter()
+        .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
+        .collect();
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &services,
-        &beside_a_stand_in(services.clone(), "movies"),
+        &[],
+        &fillers_trusting(Vec::new(), &installed, stack_root(), &trusted),
         Some(stack_root()),
     )
     .await;
@@ -280,89 +373,22 @@ async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
 }
 
 /// A plugin `intake` whose service stands in for the stack's request service over
-/// `request.intake`, beside a television curator.
+/// `request.intake`, beside the television curator moved into its plugin.
 fn contracted_requests(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
-    fillers_trusting(
-        vec![curator("sonarr", 8989, "tv")],
-        &[contracted("intake", "seerr", "request.intake")],
-        project,
-        trusted,
-    )
-}
-
-/// What a television curator answers when asked for its profiles and folders.
-fn a_curator() -> Vec<(&'static str, Vec<Answer>)> {
-    vec![
-        (
-            "/qualityprofile",
-            vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
-        ),
-        (
-            "/rootfolder",
-            vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
-        ),
-    ]
-}
-
-#[tokio::test]
-async fn a_first_party_request_service_speaking_the_contract_is_handed_each_curator_over_it() {
-    let project = lemonfiber_fixtures::scratch::Scratch::new("requests-contracted");
-    let mut routes = a_curator();
-    routes.extend([
-        (
-            "/lemonfiber/request.intake/v1/fulfilment_targets",
-            vec![
-                Answer::reply(200, "[]"),
-                Answer::reply(
-                    200,
-                    r#"[{"id": "1", "at": {"host": "sonarr", "port": 8989, "base": ""}, "key": "the-key", "kind": "tv"}]"#,
-                ),
-            ],
-        ),
-        (
-            "/lemonfiber/request.intake/v1/add_fulfilment_target",
-            vec![Answer::reply(204, "")],
-        ),
-        (
-            "/lemonfiber/request.intake/v1/test_fulfilment_target",
-            vec![Answer::reply(204, "")],
-        ),
-    ]);
-    let http = Fake::by_path_in_turn(routes);
-    let ctx = contracted_ctx(&project, "seerr", true, http.clone());
-
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[curator("sonarr", 8989, "tv")],
-        &contracted_requests(&project, &first_party("intake")),
-        Some(&project),
-    )
-    .await;
-
-    assert_eq!(
-        wirings
-            .iter()
-            .map(|wiring| &wiring.state)
-            .collect::<Vec<_>>(),
-        vec![&crate::seed::State::Wired],
-        "{wirings:?}"
-    );
-    let asked = http.requests();
-    let added: Vec<String> = asked
+    let trusted: Vec<_> = trusted
         .iter()
-        .filter(|one| {
-            one.url == "http://127.0.0.1:8080/lemonfiber/request.intake/v1/add_fulfilment_target"
-        })
-        .filter_map(|one| one.body.clone())
+        .copied()
+        .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
         .collect();
-    assert!(
-        added.len() == 1 && added.iter().all(|body| body.contains("the-key")),
-        "{asked:?}"
-    );
-    assert!(!asked.iter().any(|one| one.url.contains("/api/v1/")));
+    let installed: Vec<_> = TELEVISION
+        .installed()
+        .into_iter()
+        .chain([contracted("intake", "seerr", "request.intake")])
+        .collect();
+    fillers_trusting(Vec::new(), &installed, project, &trusted)
 }
 
 #[tokio::test]
@@ -374,7 +400,7 @@ async fn a_contracted_request_service_untrusted_or_unreachable_is_handed_nothing
     ] {
         let project =
             lemonfiber_fixtures::scratch::Scratch::new(&format!("requests-contracted-{tag}"));
-        let http = Fake::by_path_in_turn(a_curator());
+        let http = Fake::by_path_in_turn(a_curator(television_folder()));
         let ctx = contracted_ctx(&project, "seerr", keyed, http.clone());
 
         let wirings = super::super::seed_fulfilment_targets(
@@ -422,7 +448,7 @@ async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_
         &project,
         &trusted,
     );
-    let http = Fake::by_path_in_turn(a_curator());
+    let http = Fake::by_path_in_turn(a_curator(television_folder()));
     let ctx = contracted_ctx(&project, "seerr", true, http.clone());
 
     let wirings = super::super::seed_fulfilment_targets(

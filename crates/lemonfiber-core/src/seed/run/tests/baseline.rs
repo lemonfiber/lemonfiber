@@ -106,7 +106,6 @@ async fn a_wired_root_folder_outside_the_data_root_has_no_host_directory_to_chec
 
 #[tokio::test]
 async fn a_reset_previews_then_reverts_a_drifted_connection() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-conn");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
@@ -120,15 +119,17 @@ async fn a_reset_previews_then_reverts_a_drifted_connection() {
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
     );
 
-    let context = minting_torrent(
-        a_context()
-            .settings(Settings {
-                env_file: Some(env.clone()),
-                ..Settings::default()
-            })
-            .build()
-            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-            .with_http(seeding()),
+    let context = curating(
+        minting_torrent(
+            a_context()
+                .settings(Settings {
+                    env_file: Some(env.clone()),
+                    ..Settings::default()
+                })
+                .build()
+                .with_http(seeding_curated(Vec::new())),
+        ),
+        true,
     );
 
     // Preview: the drifted connection is named, and nothing is written.
@@ -151,61 +152,71 @@ async fn a_reset_previews_then_reverts_a_drifted_connection() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// The curator routing, but answering `system/status` with a set version and
-/// holding each download client under a drifted category — so a schema change
-/// (version bumped, every client moved) can be driven end to end.
-/// A seed run whose curators report the given major version, and hold a second
-/// download client the ordinary routes do not.
-///
-/// Three routes over the ordinary table rather than a transport of its own: the
-/// first match wins, so stating what differs is enough and the rest stays shared.
+/// A download client a curator holds, filing television under the category the operator
+/// changed it to.
+fn held_as_shows(id: &str, host: &str, port: u16) -> crate::ports::service::RegisteredClient {
+    crate::ports::service::RegisteredClient {
+        id: id.to_owned(),
+        host: host.to_owned(),
+        port,
+        category: Some(crate::ports::service::Category {
+            field: "tvCategory".to_owned(),
+            value: "shows".to_owned(),
+        }),
+    }
+}
+
+/// A seed run whose curators report `version` and hold both download clients under a
+/// drifted category.
 fn versioned(version: &'static str) -> Arc<Fake> {
-    seeding_with(vec![
+    use crate::test_support::curators::answered;
+    seeding_curated(vec![
         (
-            "system/status",
-            Answer::reply(
-                200,
-                format!(r#"{{"appName":"Sonarr","version":"{version}"}}"#),
-            ),
+            curated("identity"),
+            answered(&crate::ports::service::Identity {
+                name: "Sonarr".to_owned(),
+                version: version.to_owned(),
+            }),
         ),
-        ("/downloadclient/testall", Answer::reply(200, "[]")),
         (
-            "/downloadclient",
-            Answer::reply(
-                200,
-                r#"[{"id":1,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080},{"name":"tvCategory","value":"shows"}]},{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#,
-            ),
+            curated("test_download_clients"),
+            answered(&Vec::<crate::ports::service::ClientProbe>::new()),
+        ),
+        (
+            curated("download_clients"),
+            answered(&[
+                held_as_shows("1", "sabnzbd", 8080),
+                held_as_shows("2", "gluetun", 8081),
+            ]),
         ),
     ])
 }
 
-/// A transport answering the client list with `clients`, and success to everything
+/// A transport answering the curators' client lists with `clients`, and taking everything
 /// else — the reset previews turn on what that one list says, including its refusal.
 fn clients_answering(clients: Answer) -> Arc<Fake> {
-    Fake::by_path(vec![
-        ("/downloadclient", clients),
-        ("", Answer::reply(200, "Ok.")),
-    ])
+    seeding_curated(vec![(curated("download_clients"), clients)])
 }
 
 /// A context seeding the real stack over the given transport, with the torrent client
 /// moved into its plugin and its account minted, and the given baseline written beside
 /// it.
 fn schema_ctx(dir: &std::path::Path, baseline: &str, http: Arc<Fake>) -> Ctx {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let _ = std::fs::create_dir_all(dir);
     let env = dir.join(".env");
     let _ = std::fs::write(&env, "");
     let _ = crate::config::store::write(&dir.join("baseline.json"), baseline);
-    minting_torrent(
-        a_context()
-            .settings(Settings {
-                env_file: Some(env),
-                ..Settings::default()
-            })
-            .build()
-            .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-            .with_http(http),
+    curating(
+        minting_torrent(
+            a_context()
+                .settings(Settings {
+                    env_file: Some(env),
+                    ..Settings::default()
+                })
+                .build()
+                .with_http(http),
+        ),
+        true,
     )
 }
 
@@ -286,25 +297,23 @@ async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
 /// nothing to fail the read — with every other call answered plainly. For the
 /// reset-connection edge cases, where what the service holds decides the preview.
 /// A context for the reset-connection edge cases: the real stack, the torrent client moved
-/// into its plugin with its account minted so a client is wanted, keys per `filesystem`,
-/// over `http`.
-fn reset_ctx(
-    dir: &std::path::Path,
-    filesystem: Arc<SeedFs>,
-    http: Arc<dyn crate::ports::http::Http>,
-) -> Ctx {
+/// into its plugin with its account minted so a client is wanted, every curator moved into
+/// its plugin with its adapter keyed where `keyed`, over `http`.
+fn reset_ctx(dir: &std::path::Path, keyed: bool, http: Arc<dyn crate::ports::http::Http>) -> Ctx {
     let _ = std::fs::create_dir_all(dir);
     let env = dir.join(".env");
     let _ = std::fs::write(&env, "");
-    minting_torrent(
-        a_context()
-            .settings(Settings {
-                env_file: Some(env),
-                ..Settings::default()
-            })
-            .build()
-            .with_filesystem(filesystem)
-            .with_http(http),
+    curating(
+        minting_torrent(
+            a_context()
+                .settings(Settings {
+                    env_file: Some(env),
+                    ..Settings::default()
+                })
+                .build()
+                .with_http(http),
+        ),
+        keyed,
     )
 }
 
@@ -313,10 +322,9 @@ fn reset_ctx(
 /// connections back to a guess.
 #[tokio::test]
 async fn a_reset_over_an_unreadable_register_puts_back_nothing() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-unread");
     let _ = std::fs::remove_dir_all(&dir);
-    let context = reset_ctx(&dir, Arc::new(SeedFs::keyed(Some(KEYED))), seeding());
+    let context = reset_ctx(&dir, true, seeding_curated(Vec::new()));
     let _ = crate::config::store::write(
         &dir.join("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
@@ -334,13 +342,43 @@ async fn a_reset_over_an_unreadable_register_puts_back_nothing() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A curator no download client's credential is held for wants no client, so a reset
+/// passes it over however its baseline reads.
+#[tokio::test]
+async fn a_reset_passes_over_a_curator_no_client_is_held_for() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-unheld");
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let env = dir.join(".env");
+    let _ = std::fs::write(&env, "");
+    let _ = crate::config::store::write(
+        &dir.join("baseline.json"),
+        r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
+    );
+    let ctx = curating(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(seeding_curated(Vec::new())),
+        true,
+    );
+
+    let preview = super::super::reset_connections(&ctx, false).await;
+
+    assert!(preview.is_empty(), "{preview:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[tokio::test]
 async fn a_reset_skips_a_curator_that_has_not_written_its_key() {
     // A client is wanted, but the curator's key is not readable — it has not finished
     // starting — so there is nothing to open and it is passed over rather than reset.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-noopen");
     let _ = std::fs::remove_dir_all(&dir);
-    let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(None)), seeding());
+    let ctx = reset_ctx(&dir, false, seeding_curated(Vec::new()));
     assert!(super::super::reset_connections(&ctx, false)
         .await
         .is_empty());
@@ -349,15 +387,16 @@ async fn a_reset_skips_a_curator_that_has_not_written_its_key() {
 
 #[tokio::test]
 async fn a_reset_preview_passes_over_a_client_the_service_does_not_hold() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     // The service holds none of the wanted clients, so there is nothing whose drift
     // to preview — each wanted one is passed over rather than reported.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-absent");
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,
-        Arc::new(SeedFs::keyed(Some(KEYED))),
-        clients_answering(Answer::reply(200, "[]")),
+        true,
+        clients_answering(crate::test_support::curators::answered(&Vec::<
+            crate::ports::service::RegisteredClient,
+        >::new())),
     );
     assert!(super::super::reset_connections(&ctx, false)
         .await
@@ -367,18 +406,13 @@ async fn a_reset_preview_passes_over_a_client_the_service_does_not_hold() {
 
 #[tokio::test]
 async fn a_reset_preview_names_a_client_whose_category_the_operator_changed() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     // The service holds the wanted client under a category the operator changed from
     // lemonfiber's recorded one — a drift the preview names as one a reset would
     // revert, reading the category the service now holds to judge it.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-drift");
     let _ = std::fs::remove_dir_all(&dir);
-    let held = r#"[{"id":2,"fields":[{"name":"host","value":"gluetun"},{"name":"port","value":8081},{"name":"tvCategory","value":"shows"}]}]"#;
-    let ctx = reset_ctx(
-        &dir,
-        Arc::new(SeedFs::keyed(Some(KEYED))),
-        clients_answering(Answer::reply(200, held)),
-    );
+    let held = crate::test_support::curators::answered(&[held_as_shows("2", "gluetun", 8081)]);
+    let ctx = reset_ctx(&dir, true, clients_answering(held));
     let _ = crate::config::store::write(
         &dir.join("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,
@@ -395,15 +429,14 @@ async fn a_reset_preview_names_a_client_whose_category_the_operator_changed() {
 
 #[tokio::test]
 async fn a_reset_preview_reads_nothing_where_the_client_list_cannot_be_read() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     // The service will not answer its client list, so the preview has nothing to
     // compare against and reports nothing rather than guessing.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-silent");
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = reset_ctx(
         &dir,
-        Arc::new(SeedFs::keyed(Some(KEYED))),
-        clients_answering(Answer::Silent),
+        true,
+        clients_answering(crate::test_support::curators::unavailable()),
     );
     assert!(super::super::reset_connections(&ctx, false)
         .await
@@ -422,7 +455,7 @@ async fn a_lost_baseline_is_reported_and_left_for_a_deliberate_re_baseline() {
     let corrupt = "this is not the baseline you are looking for";
     let _ = crate::config::store::write(&baseline, corrupt);
 
-    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
 
@@ -443,7 +476,7 @@ async fn an_adopt_pass_re_baselines_over_a_lost_record() {
     let baseline = env.with_file_name("baseline.json");
     let _ = crate::config::store::write(&baseline, "not parseable");
 
-    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Assessed);
 
@@ -464,7 +497,7 @@ async fn a_baseline_whose_file_cannot_be_read_is_a_loss() {
     let baseline = env.with_file_name("baseline.json");
     let _ = std::fs::create_dir_all(&baseline);
 
-    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -481,10 +514,9 @@ async fn a_reset_over_a_stack_that_cannot_be_read_puts_back_nothing() {
 
 #[tokio::test]
 async fn each_managed_wiring_carries_what_was_last_recorded_for_its_client() {
-    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let dir = lemonfiber_fixtures::scratch::Scratch::named("managed-recorded");
     let _ = std::fs::remove_dir_all(&dir);
-    let ctx = reset_ctx(&dir, Arc::new(SeedFs::keyed(Some(KEYED))), seeding());
+    let ctx = reset_ctx(&dir, true, seeding_curated(Vec::new()));
     let _ = crate::config::store::write(
         &dir.join("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:gluetun:8081":{"value":"tv","at":"1"}}}}"#,

@@ -25,7 +25,7 @@ use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
 pub(crate) use inputs::filler as placed_at;
 use inputs::Inputs;
-pub(crate) use inputs::{declared, moved_in_place, pass_taken, written};
+pub(crate) use inputs::{declared, moving, pass_taken, written};
 
 /// The file the project is written to, beneath the project directory.
 pub const FILE: &str = "compose.generated.yml";

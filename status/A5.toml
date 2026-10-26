@@ -15,4 +15,5 @@ requirement = [
   { id = "A5-R11", state = "done", evidence = ["crates/lemonfiber-core/src/migration.rs", "crates/lemonfiber-core/src/migration/standing.rs", "crates/lemonfiber-core/src/migration/carrying.rs", "crates/lemonfiber-core/src/migration/mode.rs", "crates/lemonfiber-core/src/migration/image.rs", "crates/lemonfiber-core/src/migration/run.rs"] },
   { id = "A5-R12", state = "done", evidence = ["crates/lemonfiber-core/src/migration.rs", "crates/lemonfiber-core/src/migration/standing.rs", "crates/lemonfiber-core/src/migration/carrying.rs", "crates/lemonfiber-core/src/migration/mode.rs", "crates/lemonfiber-core/src/migration/image.rs", "crates/lemonfiber-core/src/migration/run.rs"] },
   { id = "A5-R13", state = "done", evidence = ["crates/lemonfiber-core/src/app/replace.rs", "crates/lemonfiber-core/src/agreement.rs"] },
+  { id = "A5-R15", state = "done", evidence = ["crates/lemonfiber-core/src/app/import.rs", "crates/lemonfiber-core/src/app/import/tests.rs", "crates/lemonfiber-core/src/plugin/lending.rs"] },
 ]

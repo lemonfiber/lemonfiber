@@ -13,7 +13,7 @@ use super::choose::Chosen;
 use super::walk::Walk;
 use crate::app::engine::diagnose;
 use crate::doctor::{Category, Finding, Narrowing, Verdict};
-use crate::ports::service::{Added, Catalogue, QualityReleases, ReleaseProbe};
+use crate::ports::service::{Added, ReleaseProbe};
 use crate::walkthrough::{Line, Reason, Step};
 
 /// Ask for it, and report what the indexers had to say.

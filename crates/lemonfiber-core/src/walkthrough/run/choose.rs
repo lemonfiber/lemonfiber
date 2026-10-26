@@ -11,7 +11,7 @@
 
 use super::walk::Walk;
 use crate::app::targets::OpenCurator;
-use crate::ports::service::{Catalogue, CatalogueEntry};
+use crate::ports::service::CatalogueEntry;
 use crate::recyclarr::Kind;
 use crate::walkthrough::{Line, Reason, Step, Suggestion};
 

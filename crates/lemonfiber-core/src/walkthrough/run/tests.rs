@@ -1,9 +1,11 @@
 use super::fixtures::{
-    ctx_library_only, ctx_through_a_tunnel, ctx_watching, ctx_with, ctx_with_torrents, Fake,
-    Listening, ADDED, A_RELEASE, HAS_ITEM, HELD, IMPORTED, NOT_HELD, NO_ITEMS, ONE_INDEXER,
-    ONE_WANTED,
+    ctx_library_only, ctx_through_a_tunnel, ctx_watching, ctx_with, ctx_with_torrents, downloading,
+    event, listing, sintel, Fake, Listening,
 };
 use super::{walkthrough, worth_offering};
+use crate::ports::service::{CatalogueEntry, ReleaseProbe};
+use crate::test_support::curators::{answered, refusing, unavailable};
+use crate::trace::Outcome;
 use crate::walkthrough::{Reason, Shape, State, Step};
 
 /// The whole walk, run against a stack answering as `fake` says.
@@ -103,7 +105,7 @@ async fn the_narration_and_the_report_are_the_same_run() {
 #[tokio::test]
 async fn something_already_here_is_detected_rather_than_fetched_again() {
     let ctx = ctx_with(&Fake {
-        lookup: HELD,
+        lookup: listing(&[sintel(Some(7))]),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -129,7 +131,7 @@ async fn a_stack_with_nothing_to_search_is_pointed_at_the_prerequisite() {
     // Offering a walk that must stop at its first step is the product demonstrating
     // it does not know its own state.
     let ctx = ctx_with(&Fake {
-        indexers: "[]",
+        indexers: 0,
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -142,24 +144,11 @@ async fn a_stack_with_nothing_to_search_is_pointed_at_the_prerequisite() {
 }
 
 #[tokio::test]
-async fn an_indexer_that_is_switched_off_is_not_an_indexer() {
-    let ctx = ctx_with(&Fake {
-        indexers: r#"[{"enableAutomaticSearch":false,"enableInteractiveSearch":false}]"#,
-        ..Fake::default()
-    });
-    let (report, _) = walked(&ctx, None).await;
-    assert_eq!(
-        report.stopped.map(|stopped| stopped.reason),
-        Some(Reason::NoIndexers)
-    );
-}
-
-#[tokio::test]
 async fn indexers_that_answered_with_nothing_are_not_indexers_that_failed() {
     // The single most-confused pair in the product, and the acceptance criterion that
     // says so.
     let ctx = ctx_with(&Fake {
-        releases: "[]",
+        releases: answered(&ReleaseProbe::NoneFound),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -174,7 +163,7 @@ async fn indexers_that_answered_with_nothing_are_not_indexers_that_failed() {
 #[tokio::test]
 async fn releases_that_the_preset_refuses_are_their_own_answer() {
     let ctx = ctx_with(&Fake {
-        releases: r#"[{"rejections":["quality"]}]"#,
+        releases: answered(&ReleaseProbe::NoneMatch),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -187,7 +176,7 @@ async fn releases_that_the_preset_refuses_are_their_own_answer() {
 #[tokio::test]
 async fn a_catalogue_that_knows_nothing_by_that_name_says_so() {
     let ctx = ctx_with(&Fake {
-        lookup: "[]",
+        lookup: listing(&[]),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -200,7 +189,7 @@ async fn a_catalogue_that_knows_nothing_by_that_name_says_so() {
 #[tokio::test]
 async fn a_catalogue_that_will_not_answer_is_a_different_problem_again() {
     let ctx = ctx_with(&Fake {
-        refuses: "lookup",
+        lookup: unavailable(),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -213,7 +202,11 @@ async fn a_catalogue_that_will_not_answer_is_a_different_problem_again() {
 #[tokio::test]
 async fn a_result_with_no_identifier_cannot_be_asked_for() {
     let ctx = ctx_with(&Fake {
-        lookup: r#"[{"id":0,"title":"Sintel"}]"#,
+        lookup: listing(&[CatalogueEntry {
+            reference: 0,
+            year: None,
+            ..sintel(None)
+        }]),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -243,7 +236,7 @@ async fn nothing_is_grabbed_for_a_torrent_stack_whose_tunnel_is_not_proved() {
 #[tokio::test]
 async fn a_service_that_will_not_take_it_on_is_reported_as_not_grabbed() {
     let ctx = ctx_with(&Fake {
-        refuses: "/rootfolder",
+        plan: unavailable(),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -256,7 +249,7 @@ async fn a_service_that_will_not_take_it_on_is_reported_as_not_grabbed() {
 #[tokio::test]
 async fn a_stack_with_no_root_folder_yet_is_a_stack_that_was_never_finished() {
     let ctx = ctx_with(&Fake {
-        folders: "[]",
+        plan: refusing(),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -269,7 +262,7 @@ async fn a_stack_with_no_root_folder_yet_is_a_stack_that_was_never_finished() {
 #[tokio::test]
 async fn a_service_that_refuses_to_take_it_on_is_reported_as_not_grabbed() {
     let ctx = ctx_with(&Fake {
-        refuses_writes: true,
+        added: refusing(),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -284,7 +277,7 @@ async fn indexers_that_could_not_be_searched_at_all_are_told_apart_from_empty_on
     // The release search is where the two are distinguished, and it is the request
     // that fails when the indexers are unreachable.
     let ctx = ctx_with(&Fake {
-        refuses: "/wanted",
+        releases: unavailable(),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -301,8 +294,8 @@ async fn a_download_that_outlives_the_wait_is_left_running() {
     // Nothing is cancelled by the operator walking away, and the report says which of
     // the two endings this is.
     let ctx = ctx_with(&Fake {
-        history: r#"{"records":[{"eventType":"grabbed","date":"2026-08-08T00:00:00Z"}]}"#,
-        queue: r#"{"records":[{"seriesId":7,"movieId":7,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}],"totalRecords":1}"#,
+        history: vec![event(Outcome::Grabbed)],
+        queue: downloading(false),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -318,7 +311,7 @@ async fn a_download_that_outlives_the_wait_is_left_running() {
 #[tokio::test]
 async fn a_download_that_never_started_is_a_diagnosis_rather_than_a_handoff() {
     let ctx = ctx_with(&Fake {
-        history: "{}",
+        history: Vec::new(),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -331,8 +324,8 @@ async fn a_download_that_never_started_is_a_diagnosis_rather_than_a_handoff() {
 #[tokio::test]
 async fn a_stuck_download_stops_the_walk_with_what_the_services_were_saying() {
     let ctx = ctx_with(&Fake {
-        history: r#"{"records":[{"eventType":"grabbed","date":"2026-08-08T00:00:00Z"}]}"#,
-        queue: r#"{"records":[{"seriesId":7,"movieId":7,"trackedDownloadState":"downloading","trackedDownloadStatus":"warning"}],"totalRecords":1}"#,
+        history: vec![event(Outcome::Grabbed)],
+        queue: downloading(true),
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -356,7 +349,7 @@ async fn imported_with_no_media_server_to_play_it_from_is_said_plainly() {
 #[tokio::test]
 async fn imported_and_still_not_in_the_library_is_its_own_answer() {
     let ctx = ctx_watching(&Fake {
-        holds: NO_ITEMS,
+        holds: false,
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -383,7 +376,7 @@ async fn a_library_only_household_is_asked_whether_its_own_media_is_visible() {
 #[tokio::test]
 async fn a_library_only_household_whose_media_is_not_there_is_told() {
     let ctx = ctx_library_only(&Fake {
-        holds: NO_ITEMS,
+        holds: false,
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -429,7 +422,7 @@ async fn what_a_stack_is_offered_is_answerable_before_anything_is_promised() {
     );
 
     let bare = worth_offering(&ctx_with(&Fake {
-        indexers: "[]",
+        indexers: 0,
         ..Fake::default()
     }))
     .await;
@@ -506,26 +499,4 @@ async fn a_stack_that_cannot_be_read_at_all_is_a_problem_rather_than_a_report() 
     assert!(walkthrough(&ctx, None, &heard).await.is_err());
     assert!(worth_offering(&ctx).await.is_err());
     assert!(heard.lines().is_empty(), "nothing was said about nothing");
-}
-
-#[test]
-fn the_fixtures_are_the_shapes_the_services_actually_send() {
-    // Guards the fixtures themselves: a test proving something about the wrong shape
-    // proves nothing at all.
-    for body in [
-        NOT_HELD,
-        HELD,
-        ADDED,
-        ONE_WANTED,
-        A_RELEASE,
-        ONE_INDEXER,
-        IMPORTED,
-        HAS_ITEM,
-        NO_ITEMS,
-    ] {
-        assert!(
-            serde_json::from_str::<serde_json::Value>(body).is_ok(),
-            "{body}"
-        );
-    }
 }

@@ -1,14 +1,12 @@
 //! What an invited member may ask for, and what travels back.
 
 use super::{
-    a_stack_where_requests_arrive_unseen, driving, libraries, offering, requesting,
-    the_media_server, APPROVES_OWN, PERMISSIONS,
+    a_stack_asking, a_stack_where_requests_arrive_unseen, ana_requesting, driving, held_first,
+    offering, requesting,
 };
 use lemonfiber_core::app::{Allowance, Outcome};
-use lemonfiber_core::ports::service::Unrated;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_testing::media;
-use std::sync::Arc;
+use lemonfiber_core::ports::service::{Requesting, Unrated};
+use lemonfiber_testing::requests;
 
 /// The gap the setting exists to close: what a narrowed member may ask for is held to
 /// the same decision as what they may watch.
@@ -31,16 +29,9 @@ async fn what_a_narrowed_member_may_ask_for_is_held_to_the_same_decision() {
     .await;
 
     assert!(made.is_some(), "the invitation itself was refused");
-    let held: Vec<serde_json::Value> = sent
-        .iter()
-        .filter(|request| request.url.contains(PERMISSIONS))
-        .filter_map(|request| request.body.as_deref())
-        .filter_map(|body| serde_json::from_str(body).ok())
-        .collect();
-
     assert_eq!(
-        held,
-        vec![serde_json::json!({ "permissions": 32 })],
+        held_first(&sent),
+        vec!["4".to_owned()],
         "what a narrowed member may ask for was left arriving unseen"
     );
 }
@@ -60,7 +51,7 @@ async fn an_offer_that_narrows_nobody_leaves_what_they_may_ask_for_alone() {
 
     assert!(made.is_some(), "the invitation itself was refused");
     assert!(
-        !sent.iter().any(|request| request.url.contains(PERMISSIONS)),
+        held_first(&sent).is_empty(),
         "an offer that narrowed nobody changed what they may ask for"
     );
 }
@@ -114,41 +105,6 @@ async fn what_was_applied_travels_back_with_the_invitation() {
     );
 }
 
-/// The account of somebody whose requests already wait for an adult.
-///
-/// `32` is `REQUEST` and nothing else: they may ask, and what they ask for is seen
-/// first. There is nothing here to take off.
-const ALREADY_WAITING: &str = r#"{"id":4,"permissions":32}"#;
-
-/// A stack whose request service holds an account whose requests already wait.
-fn a_stack_where_requests_already_wait() -> Arc<Fake> {
-    a_stack_asking(
-        Answer::reply(200, ALREADY_WAITING),
-        Answer::reply(200, ALREADY_WAITING),
-    )
-}
-
-/// A stack where the request service holds the account and refuses the write.
-fn a_stack_that_will_not_hold() -> Arc<Fake> {
-    a_stack_asking(Answer::reply(200, APPROVES_OWN), Answer::reply(500, ""))
-}
-
-/// The same stack, with what the request service says about a member and what it does
-/// with the write chosen.
-fn a_stack_asking(member: Answer, written: Answer) -> Arc<Fake> {
-    let mut routes = vec![
-        ("/auth/me", vec![Answer::reply(200, "{}")]),
-        ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
-        (PERMISSIONS, vec![Answer::reply(200, APPROVES_OWN), written]),
-        ("/user/jellyfin/", vec![member]),
-    ];
-    routes.extend(the_media_server(
-        media::answered(&libraries()),
-        media::taken(),
-    ));
-    Fake::by_path_in_turn(routes)
-}
-
 /// A limit set on somebody whose requests already wait writes nothing there.
 ///
 /// The narrowest thing the request service can be told is already true of them, and a
@@ -157,7 +113,7 @@ fn a_stack_asking(member: Answer, written: Answer) -> Arc<Fake> {
 async fn a_member_whose_requests_already_wait_is_left_as_they_are() {
     let (sent, made) = driving(
         "already-waiting",
-        a_stack_where_requests_already_wait(),
+        a_stack_asking(ana_requesting(false), requests::taken()),
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
@@ -172,9 +128,7 @@ async fn a_member_whose_requests_already_wait_is_left_as_they_are() {
         "somebody already held was not reported as held"
     );
     assert!(
-        !sent
-            .iter()
-            .any(|request| request.url.contains(PERMISSIONS) && request.body.is_some()),
+        held_first(&sent).is_empty(),
         "an account that already waits was written to anyway"
     );
 }
@@ -187,7 +141,7 @@ async fn a_member_whose_requests_already_wait_is_left_as_they_are() {
 async fn a_request_service_that_will_not_hold_still_leaves_the_invitation() {
     let (_, made) = driving(
         "will-not-hold",
-        a_stack_that_will_not_hold(),
+        a_stack_asking(ana_requesting(true), requests::unavailable()),
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
@@ -208,7 +162,7 @@ async fn a_request_service_that_will_not_hold_still_leaves_the_invitation() {
 async fn a_request_service_that_will_not_answer_is_said_rather_than_guessed() {
     let (_, made) = driving(
         "will-not-answer",
-        a_stack_asking(Answer::reply(500, ""), Answer::reply(500, "")),
+        a_stack_asking(requests::unavailable(), requests::unavailable()),
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
@@ -222,4 +176,27 @@ async fn a_request_service_that_will_not_answer_is_said_rather_than_guessed() {
         Some(lemonfiber_core::model::Linked::NotYet),
         "a service that would not answer was reported as having held somebody"
     );
+}
+
+/// A member the request service has never heard of has nothing to hold yet: the next run
+/// makes the account and holds it then.
+#[tokio::test]
+async fn a_member_the_request_service_has_not_heard_of_is_not_tried_yet() {
+    let (sent, made) = driving(
+        "never-heard-of",
+        a_stack_asking(requests::answered(&None::<Requesting>), requests::taken()),
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+    )
+    .await;
+
+    assert_eq!(
+        requesting(made),
+        Some(lemonfiber_core::model::Linked::NotTried),
+        "a member the request service does not hold was reported as held"
+    );
+    assert!(held_first(&sent).is_empty(), "{sent:?}");
 }

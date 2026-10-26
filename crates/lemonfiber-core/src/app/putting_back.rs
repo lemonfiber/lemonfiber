@@ -220,9 +220,7 @@ async fn carried_out(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let reached =
-        super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
+    let reached = super::recover::reconfigured(ctx, &undos, &manifest).await;
     // A key goes back through the keys themselves, where the clock and the narrator a
     // revoke is heard through are; everything else on this machine goes back on disk.
     let (revoking, left): (Vec<Undo>, Vec<Undo>) = reached.left.iter().cloned().partition(|undo| {

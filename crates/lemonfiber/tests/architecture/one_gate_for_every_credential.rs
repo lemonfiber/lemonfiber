@@ -42,7 +42,7 @@ const FROM_THE_GATE: [&str; 2] = ["pairings(", "fulfilling("];
 
 /// The seed passes that read another service's credential without taking pairs from the
 /// table themselves, each with why that is still the gate's answer.
-const BESIDE_THE_GATE: [(&str, &str); 3] = [
+const BESIDE_THE_GATE: [(&str, &str); 2] = [
     (
         "crates/lemonfiber-core/src/seed/run/clients.rs",
         "reads every download client's minted credential into the map a curator is told \
@@ -53,11 +53,6 @@ const BESIDE_THE_GATE: [(&str, &str); 3] = [
         "crates/lemonfiber-core/src/seed/run/keys.rs",
         "holds the readers themselves, one calling another for a service of its own; it hands \
          nothing to any asker",
-    ),
-    (
-        "crates/lemonfiber-core/src/seed/run/published.rs",
-        "publishes the stack's own services' keys into the stack's own settings file, \
-         which only the stack's own services read; no plugin's service is among them",
     ),
 ];
 

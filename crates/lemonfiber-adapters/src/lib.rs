@@ -111,5 +111,6 @@ pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
         nntp: Arc::new(Dialer::new()),
         resolver: Arc::new(Lookup),
         program: Arc::new(Daemon::reaching(target.clone())),
+        serving: Arc::new(Daemon::reaching(target.clone())),
     }
 }

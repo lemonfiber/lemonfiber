@@ -1,26 +1,32 @@
-//! The key a service of the curator shape wrote for itself, and what a connection comes
-//! to where the file holding it was refused.
+//! The key a service answers its own API to, and what a connection comes to where the
+//! file holding it was refused.
 
 use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 
-use super::{Ctx, Path};
+use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::Credential;
 
-/// The API key a service of the curator shape answers to: the one lemonfiber minted for
-/// it where its plugin declares one, and otherwise the one it wrote for itself, read from
-/// the file its own declaration names — beneath its own directory where a plugin brought it.
+/// The API key a service answers to: the one lemonfiber minted for it where its plugin
+/// declares one, and otherwise the one it wrote for itself, read from the file its own
+/// declaration names by the shape that declaration gives it, beneath its own directory.
 ///
-/// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
-/// written, and a file refused stays refused, so the caller can say so.
+/// [`Beneath::Read`] holds the key itself; a file holding none, or of a shape no key is
+/// read from, is as absent as one not written, and a file refused stays refused, so the
+/// caller can say so.
 pub(super) async fn curator_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
     if filler.minted.is_some() {
         return minted_key(ctx, filler).map_or(Beneath::Absent, Beneath::Read);
     }
+    let Some(read) = filler
+        .adapter
+        .as_ref()
+        .and_then(|api| crate::credential::written::reader(api.key_source))
+    else {
+        return Beneath::Absent;
+    };
     match crate::app::targets::credential_file(ctx, filler).await {
-        Beneath::Read(text) => {
-            crate::servarr::api_key(&text).map_or(Beneath::Absent, Beneath::Read)
-        }
+        Beneath::Read(text) => read(&text).map_or(Beneath::Absent, Beneath::Read),
         other => other,
     }
 }
@@ -67,15 +73,6 @@ pub(super) fn refusal(filler: &crate::wiring::Filler) -> crate::seed::State {
     crate::seed::State::Refused {
         reason: crate::app::targets::escaped(filler),
     }
-}
-
-/// A curator's API key, read from the configuration file it wrote it
-/// to, or nothing where it has not written one yet.
-pub(super) async fn read_curator_key(ctx: &Ctx, config: &Path) -> Option<String> {
-    let within = crate::within::directory_of(config);
-    let text =
-        crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), config, within).await?;
-    crate::servarr::api_key(&text)
 }
 
 #[cfg(test)]

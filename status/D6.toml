@@ -2,7 +2,7 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "D6-R1", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs", "crates/lemonfiber-core/tests/integration/one_way_in_and_it_is_the_media_server.rs"] },
+  { id = "D6-R1", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/request.rs", "crates/lemonfiber-core/src/seed/run/identity.rs", "crates/lemonfiber-core/src/seed/run/tests/identity.rs"] },
   { id = "D6-R2", state = "done", evidence = ["crates/lemonfiber-contract/src/capabilities/identity.rs", "crates/lemonfiber-core/tests/integration/an_invitation_sets_nobodys_password.rs", "crates/lemonfiber-core/tests/integration/the_household_needs_no_account_here.rs", "crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-core/src/model/invitation.rs", "crates/lemonfiber-core/src/app/invite.rs"] },
   { id = "D6-R3", state = "done", evidence = ["spec:10-functional/features/d-content/d6-household-identity.md", "crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber-core/src/invitation.rs", "crates/lemonfiber-core/src/model/invitation.rs", "crates/lemonfiber-core/src/app/invite.rs"] },
   { id = "D6-R4", state = "done", evidence = ["crates/lemonfiber/src/render/invitation.rs"] },

@@ -72,7 +72,7 @@ async fn held(ctx: &Ctx, to: &Path) -> Option<Vec<Existing>> {
         let Some(client) = curator.client(ctx).await else {
             continue;
         };
-        let Ok(folders) = crate::ports::service::Client::root_folders(client.as_ref()).await else {
+        let Ok(folders) = crate::ports::service::Client::root_folders(&client).await else {
             continue;
         };
         answered = true;

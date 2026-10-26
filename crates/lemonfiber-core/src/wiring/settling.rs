@@ -19,6 +19,7 @@ use lemonfiber_manifest::{Manifest, Wiring};
 
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::origin::Origin;
+use crate::plugin::first_party::FirstParty;
 use crate::plugin::{Asking, Installed};
 
 use super::{Chosen, Contest, Reaches, Settled, Unfilled, Whose, Wired};
@@ -34,12 +35,13 @@ pub(super) fn claimants(
     manifest: &Manifest,
     installed: &[Installed],
     capability: &str,
+    trusted: &[FirstParty],
 ) -> Vec<Claimant> {
     let bundled = manifest
         .services
         .iter()
         .filter(|service| service.provides.iter().any(|named| named == capability))
-        .filter(|service| !crate::project::moved_in_place(installed, &service.id))
+        .filter(|service| crate::project::moving(installed, &service.id, trusted).is_none())
         .map(|service| Claimant {
             service: service.id.clone(),
             plugin: None,
@@ -72,26 +74,20 @@ fn origins(held: &[Claimant]) -> BTreeMap<String, Origin> {
         .collect()
 }
 
-/// What one ask comes to, given its claimants and whatever has been chosen.
+/// What one ask comes to, given its claimants and whatever has been chosen among
+/// everything `installed`, `trusted` holding the plugins that are first-party.
 fn asked(
     wiring: &Wiring,
     capability: &str,
     held: &[Claimant],
     chosen: &Chosen,
+    (installed, trusted): (&[Installed], &[FirstParty]),
 ) -> (Vec<String>, Settled) {
     let names: Vec<String> = held.iter().map(|one| one.service.clone()).collect();
     if wiring.each && !names.is_empty() {
         return (names, Settled::Each);
     }
 
-    // The operator's choice over the stack's, because the stack's is the default they
-    // were offered and theirs is the answer they gave. Either is only a choice while
-    // the service it names still claims the capability — one that stopped claiming it
-    // at a pin bump leaves a contest rather than a filler nothing can demonstrate.
-    //
-    // And only where there is something to choose between. One service claiming it is
-    // answered by the one service, not by crediting whoever wrote the setting with a
-    // decision they were never offered.
     let picked = chosen
         .filler(capability)
         .map(|service| {
@@ -107,17 +103,20 @@ fn asked(
                 .as_deref()
                 .map(|service| (service, Whose::Stack, wiring.why.clone()))
         })
-        .filter(|(service, _, _)| names.len() > 1 && names.iter().any(|one| one == service));
+        .filter(|_| names.len() > 1)
+        .and_then(|(service, whose, why)| {
+            answering(installed, trusted, &names, service).map(|service| (service, whose, why))
+        });
 
     match picked {
         Some((service, whose, why)) => (
-            vec![service.to_owned()],
+            vec![service.clone()],
             Settled::Chosen {
                 whose,
                 why,
                 over: names
                     .iter()
-                    .filter(|one| *one != service)
+                    .filter(|one| **one != service)
                     .cloned()
                     .collect(),
             },
@@ -133,6 +132,27 @@ fn asked(
     }
 }
 
+/// The claimant among `names` answering for the service `chose` names: that service where
+/// it claims, and otherwise the adapter in front of it that the first-party plugin moved
+/// in its place brings, which stands where it stood. Another plugin's service fronting
+/// it is never credited with the choice.
+fn answering(
+    installed: &[Installed],
+    trusted: &[FirstParty],
+    names: &[String],
+    chose: &str,
+) -> Option<String> {
+    if names.iter().any(|one| one == chose) {
+        return Some(chose.to_owned());
+    }
+    crate::project::moving(installed, chose, trusted)?
+        .services
+        .iter()
+        .filter(|placed| placed.fronts.as_deref() == Some(chose))
+        .map(|placed| placed.service.clone())
+        .find(|adapter| names.contains(adapter))
+}
+
 /// Every link the stack declares, then every ask each installed plugin's services make,
 /// answered against everything installed that claims what it asks.
 ///
@@ -146,14 +166,35 @@ fn asked(
 /// be a second opinion on the same file.
 #[must_use]
 pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<Wired> {
+    settle_trusting(
+        manifest,
+        installed,
+        chosen,
+        crate::plugin::first_party::EMBEDDED,
+    )
+}
+
+/// As [`settle`], with `trusted` as the plugins that are first-party.
+#[must_use]
+pub fn settle_trusting(
+    manifest: &Manifest,
+    installed: &[Installed],
+    chosen: &Chosen,
+    trusted: &[FirstParty],
+) -> Vec<Wired> {
     let stack = manifest.wirings.iter().filter_map(|wiring| {
         let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
-            (Some(_), None) if crate::project::moved_in_place(installed, &wiring.by) => {
+            (Some(_), None) if crate::project::moving(installed, &wiring.by, trusted).is_some() => {
                 return None;
             }
-            (Some(capability), None) => {
-                reached(manifest, installed, wiring, capability, None, chosen)
-            }
+            (Some(capability), None) => reached(
+                manifest,
+                (installed, trusted),
+                wiring,
+                capability,
+                None,
+                chosen,
+            ),
             (None, Some(service)) => Reaches::ByName {
                 service: service.to_owned(),
                 why: wiring.why.clone().unwrap_or_default(),
@@ -177,7 +218,7 @@ pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> 
                     },
                     reaches: reached(
                         manifest,
-                        installed,
+                        (installed, trusted),
                         &wiring,
                         &ask.capability,
                         ask.native.as_deref(),
@@ -194,14 +235,14 @@ pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> 
 /// talking in the upstream's own API `native` where it names one.
 fn reached(
     manifest: &Manifest,
-    installed: &[Installed],
+    (installed, trusted): (&[Installed], &[FirstParty]),
     wiring: &Wiring,
     capability: &str,
     native: Option<&str>,
     chosen: &Chosen,
 ) -> Reaches {
-    let held = claimants(manifest, installed, capability);
-    let (services, settled) = asked(wiring, capability, &held, chosen);
+    let held = claimants(manifest, installed, capability, trusted);
+    let (services, settled) = asked(wiring, capability, &held, chosen, (installed, trusted));
     let (services, settled) = match native {
         Some(api) => in_native(installed, &services, settled, api),
         None => (services, settled),

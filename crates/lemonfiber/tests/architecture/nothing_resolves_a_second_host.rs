@@ -54,7 +54,8 @@ fn only_one_place_works_out_which_engine_this_run_operates() {
 
 /// The surface builds every engine seam from the one answer it was given.
 ///
-/// All three — the engine, the image listing and the location seam — come out of
+/// Every one — the engine, the image, network and volume seams, the location seam, the
+/// program a proof runs and the serving a lent adapter runs under — comes out of
 /// `live_reaching`, which builds each from the target it is handed; a seam built from
 /// this machine's defaults would stay behind on the laptop on a remote context.
 #[test]
@@ -83,8 +84,9 @@ fn the_surface_builds_every_engine_seam_from_the_one_answer() {
     );
     assert_eq!(
         adapters.matches("Daemon::reaching(target.clone())").count(),
-        6,
-        "the engine, the image, network and volume seams, the location seam and the program \
-         a proof runs are each built from the target `live_reaching` is handed"
+        7,
+        "the engine, the image, network and volume seams, the location seam, the program \
+         a proof runs and the serving a lent adapter runs under are each built from the target \
+         `live_reaching` is handed"
     );
 }

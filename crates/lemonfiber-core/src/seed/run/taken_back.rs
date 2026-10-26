@@ -3,9 +3,11 @@
 //! A stack whose bundled request service ran without the gate handed it each fulfilling
 //! curator's own key, and the request service minted itself a media server key on the
 //! sign-in that set it up. Moving it to the gate stops it using either, but its settings
-//! file and every backup taken since still hold them. So once it reaches everything
-//! through the gate, each curator key it held is replaced through the same reset a
-//! rotation makes, and its own media server key is revoked.
+//! file and every backup taken since still hold them, and so does the first-party
+//! plugin's request service moved in place of it, which keeps that file. So once it
+//! reaches everything through the gate, each curator key it held is replaced through the
+//! same replacement a rotation makes, and its own media server key is revoked. It is
+//! asked over `request.intake`, through the adapter in front of it.
 //!
 //! **What is owed is remembered across runs.** Which curator keys it held can only be
 //! seen before its targets move, and the move and the reset may land in different runs,
@@ -27,14 +29,20 @@ use crate::credential::{Reach, Settled};
 use crate::ports::media::Kind;
 use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
-use crate::seerr::SEERR_APP;
 use crate::wiring::{Filler, Fillers};
 
-/// The stack's own request service among `fillers`, the one that ran before the gate,
-/// which a plugin's never did, and where the host reaches it.
-fn bundled(fillers: &Fillers) -> Option<(&Filler, String)> {
-    let filler = crate::app::targets::request_service(fillers)?;
-    Some((filler, crate::app::targets::bundled_requests(filler)?))
+/// What the request service files the key it mints for itself under in the media server,
+/// on the sign-in that sets it up without the request gate in front of the media server.
+const SEERR_APP: &str = "Seerr";
+
+/// The request service among `fillers` that may have run before the gate — the stack's
+/// own, or the first-party plugin's moved in place of it, which keeps its settings — as
+/// the service it is, and the service filling `request.intake` for it, which is asked.
+/// Nothing for another plugin's, which never did.
+fn held_before(fillers: &Fillers) -> Option<(&Filler, &Filler)> {
+    let asked = crate::app::targets::request_service(fillers)?;
+    let named = fillers.fronted_by(asked).unwrap_or(asked);
+    (named.holder() == crate::wiring::Holder::Stack || named.stands_in()).then_some((named, asked))
 }
 
 /// What the report calls this connection.
@@ -56,10 +64,12 @@ pub(super) async fn note_held(
     project: Option<&Path>,
     baseline: &mut Baseline,
 ) {
-    let Some((filler, base)) = gated(services, project).and(bundled(fillers)) else {
+    let Some((filler, asked)) = gated(services, project).and(held_before(fillers)) else {
         return;
     };
-    let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
+    let Some(requests) = crate::app::targets::requests_as_owner(ctx, asked).await else {
+        return;
+    };
     let Ok(held) = requests.fulfilment_targets().await else {
         return;
     };
@@ -88,7 +98,7 @@ pub(super) async fn seed_taken_back(
     baseline: &mut Baseline,
 ) -> Option<Wiring> {
     let project = gated(services, project)?;
-    let (filler, base) = bundled(fillers)?;
+    let (filler, asked) = held_before(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
     let media_server = media_server_admin(ctx, fillers).await;
     let minted = match &media_server {
@@ -105,11 +115,20 @@ pub(super) async fn seed_taken_back(
             ours: Some("none".to_owned()),
         }));
     }
-    let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
+    let Some(requests) = crate::app::targets::requests_as_owner(ctx, asked).await else {
+        return Some(settled(State::Skipped {
+            reason: format!(
+                "{name} could not be asked over its contract, so nothing it held is replaced \
+                 yet. A later run replaces them once it answers.",
+                name = filler.name,
+            ),
+        }));
+    };
+    let requests = requests.as_ref();
     let server = media_server
         .as_ref()
         .map(|(_, route, name)| (route.as_str(), name.as_str()));
-    let direct = match still_direct(ctx, &requests, fillers, project, server).await {
+    let direct = match still_direct(ctx, requests, fillers, project, server).await {
         Ok(direct) => direct,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
     };
@@ -153,7 +172,10 @@ pub(super) async fn seed_taken_back(
 }
 
 /// Replace the key of the curator `curator`, owed by the request service `owed_by`,
-/// forgetting it as owed once the reset lands, and say whatever did not land.
+/// forgetting it as owed once the replacement lands, and say whatever did not land.
+///
+/// A curator no longer here is forgotten: there is no key of it left to replace. One
+/// whose key lemonfiber did not mint stays owed, since nothing here can replace it.
 async fn replaced(
     ctx: &Ctx,
     services: &[Service],
@@ -164,12 +186,22 @@ async fn replaced(
     baseline: &mut Baseline,
 ) -> Vec<String> {
     let field = format!("{HELD_KEY}{curator}");
-    let Some(target) = fillers.service(curator).and_then(Filler::target) else {
+    let Some(held) = fillers.service(curator) else {
         baseline.forget(owed_by, &field);
         return Vec::new();
     };
-    let rotation =
-        crate::app::credentials::reset_curator(ctx, services, fillers, Some(project), target).await;
+    let amid = crate::app::credentials::Amid {
+        services,
+        fillers,
+        project: Some(project),
+    };
+    let Some(rotation) = crate::app::credentials::reminted(ctx, held, &amid).await else {
+        return vec![format!(
+            "{}'s key could not be replaced: lemonfiber replaces a key only where it minted it, \
+             and it did not mint {}'s.",
+            held.name, held.name
+        )];
+    };
     if matches!(rotation.settled, Settled::Replaced { .. }) {
         baseline.forget(owed_by, &field);
         return rotation

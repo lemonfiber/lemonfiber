@@ -9,7 +9,7 @@
 //! The choice is recorded first, so it is remembered even when the service cannot be
 //! reached; a rehearsal records nothing and applies nothing.
 
-use super::targets::{curator_targets, project_directory};
+use super::targets::fillers_here;
 use super::Ctx;
 use crate::audio::Format;
 use crate::error::Problem;
@@ -54,32 +54,17 @@ pub(crate) async fn music(ctx: &Ctx, format: Format) -> Result<MusicReport, Box<
 /// read, or no music service in it, or one that has not finished starting, is reported
 /// not-started — the choice is already recorded, and a later run reaches the service.
 async fn apply(ctx: &Ctx, format: Format) -> Triggered {
-    // A stack that cannot be read yields no targets, so an unreadable stack and one
-    // that simply names no music service both arrive here as "no target" — the same
-    // not-started truth, since either way there is nothing to apply to.
-    let target = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .ok()
-        .map(|manifest| {
-            let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-            let curating_music: Vec<_> = manifest
-                .services
-                .into_iter()
-                .filter(|service| service.media_types.iter().any(|media| media == MUSIC))
-                .collect();
-            curator_targets(&curating_music, project.as_deref())
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .next();
-    let Some(target) = target else {
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         return Triggered::NotStarted;
     };
-    match target
-        .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-        .await
-    {
+    let fillers = fillers_here(ctx, &manifest);
+    let Some(curator) = crate::seed::run::curators(&fillers)
+        .into_iter()
+        .find(|curator| curator.media_types().iter().any(|media| media == MUSIC))
+    else {
+        return Triggered::NotStarted;
+    };
+    match curator.client(ctx).await {
         None => Triggered::NotStarted,
         Some(service) => match service.apply_music_format(format).await {
             Ok(()) => Triggered::Started,

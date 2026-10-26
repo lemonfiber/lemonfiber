@@ -1,19 +1,34 @@
 use super::telling::{said, tell_the_household, wanted_telling, TELLING};
 use crate::baseline::Baseline;
+use crate::ports::service::{Occasion, Telling};
 use crate::seed::drift::{intent, Intent, Observed};
 use crate::seed::State;
-use crate::seerr::Seerr;
+use crate::test_support::requests::{answered, intake, refusing, taken, REQUESTS};
+use lemonfiber_contract::capabilities::request::intake as contract;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 /// A telling that is on, but not for the occasions lemonfiber would choose.
-const SOME: &str = r#"{"enabled":true,"types":8}"#;
+fn some() -> Answer {
+    holding(true, &[Occasion::Arrived])
+}
 
-/// The real client over a scripted service, so these read the request this
-/// product actually sends rather than a second description of it.
-fn service(answers: Vec<Answer>) -> (Seerr, Arc<Fake>) {
-    let http = Fake::by_path_in_turn(vec![("/settings/notifications/webpush", answers)]);
-    (Seerr::new(http.clone(), "http://seerr:5055", "seerr"), http)
+/// What the request service answers holding a telling, on where `enabled` says, for
+/// `occasions`.
+fn holding(enabled: bool, occasions: &[Occasion]) -> Answer {
+    answered(&Telling {
+        enabled,
+        occasions: occasions.iter().copied().collect(),
+        others: false,
+    })
+}
+
+/// The request service over its contract, holding what `held` answers and taking a
+/// write as `told` answers, so these read the request this product actually sends rather
+/// than a second description of it.
+fn service(held: Answer, told: Answer) -> (contract::Adapter, Arc<Fake>) {
+    let http = Fake::by_path(vec![(intake("telling"), held), (intake("tell"), told)]);
+    (contract::Adapter(REQUESTS.contracted(http.clone())), http)
 }
 
 /// A baseline holding one value for the telling.
@@ -27,7 +42,7 @@ fn recorded(value: &str, adopted: bool) -> Baseline {
     baseline
 }
 
-async fn against(request_service: &Seerr, baseline: &Baseline) -> State {
+async fn against(request_service: &contract::Adapter, baseline: &Baseline) -> State {
     tell_the_household(request_service, baseline.entry("seerr", TELLING), false)
         .await
         .0
@@ -35,7 +50,7 @@ async fn against(request_service: &Seerr, baseline: &Baseline) -> State {
 
 /// The same comparison over the same service, asked what the pass would do rather
 /// than asked to do it.
-async fn would(request_service: &Seerr, baseline: &Baseline) -> State {
+async fn would(request_service: &contract::Adapter, baseline: &Baseline) -> State {
     tell_the_household(request_service, baseline.entry("seerr", TELLING), true)
         .await
         .0
@@ -45,16 +60,13 @@ async fn would(request_service: &Seerr, baseline: &Baseline) -> State {
 fn written_to(http: &Fake) -> bool {
     http.requests()
         .iter()
-        .any(|asked| asked.method == crate::ports::http::Method::Post)
+        .any(|asked| asked.url.ends_with(intake("tell")))
 }
 
 #[tokio::test]
 async fn a_service_holding_what_was_wanted_is_left_exactly_as_it_is() {
-    let held = format!(
-        r#"{{"enabled":true,"types":{}}}"#,
-        crate::seerr::bits(&wanted_telling().occasions)
-    );
-    let (request_service, http) = service(vec![Answer::reply(200, held)]);
+    let held = answered(&wanted_telling());
+    let (request_service, http) = service(held, taken());
 
     let state = against(&request_service, &recorded(&said(&wanted_telling()), false)).await;
 
@@ -65,7 +77,7 @@ async fn a_service_holding_what_was_wanted_is_left_exactly_as_it_is() {
 #[tokio::test]
 async fn lemonfibers_own_value_behind_its_intent_is_reported_rather_than_rewritten() {
     // The baseline and the service agree; it is lemonfiber that has moved on.
-    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(some(), taken());
 
     let state = against(&request_service, &recorded("on:8", false)).await;
 
@@ -76,7 +88,7 @@ async fn lemonfibers_own_value_behind_its_intent_is_reported_rather_than_rewritt
 #[tokio::test]
 async fn both_sides_moved_is_put_to_the_operator_rather_than_settled() {
     // The baseline matches neither what the service holds nor what is wanted.
-    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(some(), taken());
 
     let state = against(&request_service, &recorded("on:2", false)).await;
 
@@ -90,7 +102,7 @@ async fn both_sides_moved_is_put_to_the_operator_rather_than_settled() {
 
 #[tokio::test]
 async fn a_value_the_operator_had_adopted_stays_theirs() {
-    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(some(), taken());
 
     let state = against(&request_service, &recorded("on:8", true)).await;
 
@@ -101,7 +113,7 @@ async fn a_value_the_operator_had_adopted_stays_theirs() {
 #[tokio::test]
 async fn a_value_set_before_lemonfiber_ever_ran_is_taken_on_rather_than_flagged() {
     // Something is set, and lemonfiber never wrote it: theirs, pre-existing.
-    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(some(), taken());
 
     let state = against(&request_service, &Baseline::new()).await;
 
@@ -111,7 +123,7 @@ async fn a_value_set_before_lemonfiber_ever_ran_is_taken_on_rather_than_flagged(
 
 #[tokio::test]
 async fn a_service_that_will_not_answer_is_reported_rather_than_guessed_at() {
-    let (request_service, http) = service(vec![Answer::Silent]);
+    let (request_service, http) = service(Answer::Silent, taken());
 
     let state = against(&request_service, &Baseline::new()).await;
 
@@ -129,10 +141,7 @@ async fn a_service_that_will_not_answer_is_reported_rather_than_guessed_at() {
 /// believing the loop closes.
 #[tokio::test]
 async fn a_write_the_service_refuses_is_reported_in_its_own_words() {
-    let (request_service, _) = service(vec![
-        Answer::reply(200, r#"{"enabled":false,"types":0}"#),
-        Answer::reply(500, "no"),
-    ]);
+    let (request_service, _) = service(holding(false, &[]), refusing());
 
     let state = against(&request_service, &Baseline::new()).await;
 
@@ -157,8 +166,7 @@ async fn a_rehearsed_telling_says_what_is_set_now_and_sets_nothing() {
     // A service nobody has configured, with nothing recorded against it — the one
     // case that is a connection to make rather than somebody's own choice to leave
     // alone, and so the only one with anything to report in the other tense.
-    let (request_service, http) =
-        service(vec![Answer::reply(200, r#"{"enabled":false,"types":0}"#)]);
+    let (request_service, http) = service(holding(false, &[]), taken());
 
     let state = would(&request_service, &Baseline::new()).await;
 

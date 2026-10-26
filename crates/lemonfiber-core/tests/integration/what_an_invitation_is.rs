@@ -18,26 +18,17 @@ use lemonfiber_core::model::Linked;
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_testing::media;
+use lemonfiber_testing::requests::{self, REQUESTS};
 
 /// A media server that signs in and takes the account it is given, beside a request
-/// service that answers.
-///
-/// `linking` is what the request service says to being told about the household, so a
-/// test about it being down changes one answer and nothing else.
+/// service that takes lemonfiber's key and whose adapter answers being told about the
+/// household as `linking` does.
 fn answering_with(linking: Answer) -> Arc<Fake> {
-    answering_all(Answer::reply(200, "{}"), linking)
-}
-
-/// The same, where the request service's own sign-in answers as the caller says.
-///
-/// Two ways an outage reaches this: the session is refused, or the import is. They are
-/// different calls and the first would leave the second untried, so neither stands in
-/// for the other.
-fn answering_all(session: Answer, linking: Answer) -> Arc<Fake> {
     let mut routes = vec![
-        ("/user/import-from-jellyfin", vec![linking]),
-        ("/auth/me", vec![session]),
+        (requests::intake("answers"), vec![requests::taken()]),
+        (requests::intake("link_members"), vec![linking]),
     ];
     // The owner is the one account the media server already holds, before this
     // invitation.
@@ -54,43 +45,44 @@ fn made_an_account(sent: &[Request]) -> bool {
     !media::asked(sent, "invite").is_empty()
 }
 
-/// A media server and a request service that both answer.
-fn answering() -> Arc<Fake> {
-    answering_with(Answer::reply(201, "{}"))
+/// Everybody the request service was told about, each time it was told.
+fn told_about(sent: &[Request]) -> Vec<Vec<String>> {
+    requests::told(sent, "link_members", "members")
 }
 
-/// A context over the shipped stack, with the media server moved into its plugin and up,
-/// and a password recorded.
+/// A media server and a request service that both answer.
+fn answering() -> Arc<Fake> {
+    answering_with(requests::taken())
+}
+
+/// A context over the shipped stack, with the media server and the request service moved
+/// into their plugins and up, and a password recorded.
 fn context(env: &std::path::Path) -> Ctx {
     context_over(env, answering())
 }
 
 /// The same, over a transport the caller chose.
 fn context_over(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    context_on(env, http, crate::common::household::set_up_beside(env))
+    let stack = crate::common::household::set_up_beside(env);
+    REQUESTS.keyed_in(context_on(env, http, stack, REQUESTS.running()))
 }
 
-/// The same again, over a stack the caller chose — for the one case that is about a
-/// stack which does not carry a request service at all.
-fn context_on(env: &std::path::Path, http: Arc<Fake>, stack: Source) -> Ctx {
-    media::keyed_in(context_unmoved(env, http, stack))
-}
-
-/// The same, with the media server still the stack's own.
-fn context_unmoved(env: &std::path::Path, http: Arc<Fake>, stack: Source) -> Ctx {
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(media::running()))
-        .clock(Arc::new(lemonfiber_adapters::System))
-        .over(stack)
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            // Where the household reaches this machine. Without one there is no
-            // address to send anybody, which is a refusal rather than an invitation.
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+/// The same again, over a stack the caller chose and with the engine also holding what
+/// `beside` holds, the request service moved in only where the caller moves it.
+fn context_on(env: &std::path::Path, http: Arc<Fake>, stack: Source, beside: Reporting) -> Ctx {
+    media::keyed_in(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(media::running().alongside(beside)))
+            .clock(Arc::new(lemonfiber_adapters::System))
+            .over(stack)
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    )
 }
 
 #[tokio::test]
@@ -142,15 +134,9 @@ async fn the_request_service_is_told_about_everybody_and_not_only_the_new_accoun
     )
     .await;
 
-    let told = http
-        .requests()
-        .into_iter()
-        .filter(|request| request.url.contains("/user/import-from-jellyfin"))
-        .filter_map(|request| request.body)
-        .collect::<Vec<String>>();
     assert_eq!(
-        told,
-        [r#"{"jellyfinUserIds":["1","9"]}"#],
+        told_about(&http.requests()),
+        [["1".to_owned(), "9".to_owned()]],
         "the household already here was left out, or told about more than once"
     );
     assert!(
@@ -170,7 +156,7 @@ async fn the_request_service_is_told_about_everybody_and_not_only_the_new_accoun
 #[tokio::test]
 async fn an_invitation_stands_when_the_request_service_will_not_answer() {
     let env = recorded_admin("unlinked");
-    let http = answering_with(Answer::reply(503, ""));
+    let http = answering_with(requests::unavailable());
     let ctx = context_over(&env, http.clone());
 
     let made = dispatch(
@@ -219,15 +205,9 @@ async fn somebody_already_here_is_named_once() {
     )
     .await;
 
-    let told = http
-        .requests()
-        .into_iter()
-        .filter(|request| request.url.contains("/user/import-from-jellyfin"))
-        .filter_map(|request| request.body)
-        .collect::<Vec<String>>();
     assert_eq!(
-        told,
-        [r#"{"jellyfinUserIds":["1"]}"#],
+        told_about(&http.requests()),
+        [["1".to_owned()]],
         "the household already here was named more than once, or not at all"
     );
     assert!(
@@ -263,6 +243,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
         &env,
         http.clone(),
         Source::External(Box::leak(dir.clone().into_boxed_path())),
+        Reporting::default(),
     );
 
     let made = dispatch(
@@ -285,47 +266,8 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
         "a stack with no request service was told one might answer later"
     );
     assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.url.contains("/user/import-from-jellyfin")),
+        !http.asked_for(requests::intake("link_members")),
         "a stack with no request service was asked to link somebody"
-    );
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
-}
-
-/// A request service that refuses the session is the same answer as one that refuses
-/// the import, reached by a different call.
-///
-/// Asserted apart because it *is* apart: a refused sign-in leaves the import untried, so
-/// a test of only the second would pass over a first that had stopped working.
-#[tokio::test]
-async fn a_refused_session_leaves_the_invitation_standing_too() {
-    let env = recorded_admin("no-session");
-    let http = answering_all(Answer::reply(500, ""), Answer::reply(201, "{}"));
-    let ctx = context_over(&env, http.clone());
-
-    let made = dispatch(
-        Command::Invite(Inviting {
-            name: "ana".to_owned(),
-            allowance: Allowance::default(),
-            confirm: true,
-        }),
-        &ctx,
-    )
-    .await;
-
-    let Some(Outcome::Invitation(report)) = made.ok() else {
-        unreachable!("a refused session is not a reason to refuse an invitation")
-    };
-    assert_eq!(report.name, "ana", "the account was not made");
-    assert_eq!(report.linked, Linked::NotYet, "{report:?}");
-    assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.url.contains("/user/import-from-jellyfin")),
-        "the household was named to a service this program had not signed in to"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
@@ -352,10 +294,7 @@ async fn a_rehearsal_tells_the_request_service_nothing() {
         "a rehearsal reported a link it did not make"
     );
     assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.url.contains("/user/import-from-jellyfin")),
+        !http.asked_for(requests::intake("link_members")),
         "a rehearsal told the request service about somebody"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));

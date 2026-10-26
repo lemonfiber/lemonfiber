@@ -1,62 +1,101 @@
 use std::sync::Arc;
 
+use lemonfiber_fixtures::http::Answer;
+
 use super::stands;
 use crate::app::Outcome;
 use crate::model::{AskableReport, Stands, TitleKind};
-use crate::ports::http::Method;
-use crate::ports::service::MediaStatus;
+use crate::ports::media::Kind;
+use crate::ports::service::{Detail, Found, MediaStatus, Page, Season};
+use crate::test_support::requests::{answered, intake, unavailable};
 use crate::wishing::place::Place;
 use crate::wishing::tests::{
-    asked_for, code, ctx_over, ctx_running, found, house, route, Route, APPROVES_OWN,
+    about, account, asked_about, asked_for, call, code, ctx_over, ctx_running, found, house, rated,
+    titled_as, Route,
 };
 
-/// A first page of three: a film here, a series nobody has asked for, and a person, on a
-/// search with a second page.
-const FIRST: &str = r#"{"page":1,"totalPages":2,"results":[
-    {"id":603,"mediaType":"movie","title":"The Matrix","releaseDate":"1999-03-31","mediaInfo":{"status":5}},
-    {"id":1399,"mediaType":"tv","name":"Harbour Lights","firstAirDate":"2011-04-17"},
-    {"id":7,"mediaType":"person","name":"Somebody"}]}"#;
+/// A title the search finds.
+fn finding(id: &str, kind: Kind, title: &str, year: u16, status: MediaStatus) -> Found {
+    Found {
+        id: id.to_owned(),
+        kind,
+        title: title.to_owned(),
+        year: Some(year),
+        status,
+        poster: None,
+    }
+}
+
+/// The film the search finds on both pages, already here.
+fn the_matrix() -> Found {
+    finding(
+        "603",
+        Kind::Movies,
+        "The Matrix",
+        1999,
+        MediaStatus::Available,
+    )
+}
+
+/// A first page of two, a film here and a series nobody has asked for, on a search with a
+/// second page.
+fn first() -> Page {
+    Page {
+        titles: vec![
+            the_matrix(),
+            finding(
+                "1399",
+                Kind::Tv,
+                "Harbour Lights",
+                2011,
+                MediaStatus::Unknown,
+            ),
+        ],
+        next: Some(2),
+    }
+}
 
 /// A second and last page: the film again, and one more film on its way.
-const SECOND: &str = r#"{"page":2,"totalPages":2,"results":[
-    {"id":603,"mediaType":"movie","title":"The Matrix","releaseDate":"1999-03-31","mediaInfo":{"status":5}},
-    {"id":604,"mediaType":"movie","title":"Harbour","releaseDate":"2003-05-15","mediaInfo":{"status":3}}]}"#;
+fn second() -> Page {
+    Page {
+        titles: vec![
+            the_matrix(),
+            finding(
+                "604",
+                Kind::Movies,
+                "Harbour",
+                2003,
+                MediaStatus::Processing,
+            ),
+        ],
+        next: None,
+    }
+}
 
-/// The film, rated fifteen in Britain.
-const FIFTEEN: &str = r#"{"status":"Released","releases":{"results":[
-    {"iso_3166_1":"GB","release_dates":[{"certification":"15"}]}]},"mediaInfo":{"status":5}}"#;
-
-/// The series, rated 12A in Britain.
-const TWELVE: &str = r#"{"status":"Ended","firstAirDate":"2011-04-17",
-    "contentRatings":{"results":[{"iso_3166_1":"GB","rating":"12A"}]},"seasons":[{"seasonNumber":1}]}"#;
-
-/// The series, rated fifteen in Britain.
-const SERIES_FIFTEEN: &str = r#"{"status":"Ended","firstAirDate":"2011-04-17",
-    "contentRatings":{"results":[{"iso_3166_1":"GB","rating":"15"}]}}"#;
-
-/// A film rated 12A in Britain.
-const FILM_TWELVE: &str = r#"{"status":"Released","releases":{"results":[
-    {"iso_3166_1":"GB","release_dates":[{"certification":"12A"}]}]}}"#;
-
-/// A film nobody has rated anywhere.
-const UNRATED: &str = r#"{"status":"Released","releases":{"results":[]}}"#;
+/// The series, rated `certification` in Britain, its one season nobody has asked for.
+fn series(certification: &str) -> Detail {
+    Detail {
+        seasons: vec![Season {
+            number: 1,
+            status: MediaStatus::Unknown,
+        }],
+        ..rated(Some(certification))
+    }
+}
 
 /// The search's two pages.
 fn pages() -> Vec<Route> {
     vec![
-        route(
-            Method::Get,
-            "/api/v1/search?query=harbour&page=1",
-            200,
-            FIRST,
-        ),
-        route(
-            Method::Get,
-            "/api/v1/search?query=harbour&page=2",
-            200,
-            SECOND,
-        ),
+        about("search", r#""page":1"#, answered(&first())),
+        about("search", r#""page":2"#, answered(&second())),
     ]
+}
+
+/// The search's two pages, the film and the series looked up as `film` and `series`.
+fn looked_up(film: Answer, series: Answer) -> Vec<Route> {
+    let mut routes = pages();
+    routes.extend([titled_as("603", film), titled_as("1399", series)]);
+    routes
 }
 
 /// The report a search answered with, or nothing where it was refused.
@@ -120,8 +159,7 @@ async fn a_member_nothing_holds_back_is_shown_every_title_of_a_kind_the_house_fe
             shown: vec!["603".to_owned(), "1399".to_owned()],
         })
     );
-    assert!(!asked_for(&transport, "/api/v1/movie/"));
-    assert!(!asked_for(&transport, "/api/v1/tv/"));
+    assert!(!asked_for(&transport, intake("detail")));
 }
 
 #[tokio::test]
@@ -146,30 +184,21 @@ async fn the_next_page_shows_no_title_an_earlier_page_did_and_is_the_last() {
 
 #[tokio::test]
 async fn a_member_held_to_twelve_is_never_shown_what_is_older_or_unrated() {
-    let mut routes = pages();
-    routes.extend([
-        route(Method::Get, "/api/v1/movie/603", 200, FIFTEEN),
-        route(Method::Get, "/api/v1/tv/1399", 200, TWELVE),
-    ]);
-    let transport = house(routes);
+    let transport = house(looked_up(
+        answered(&Some(rated(Some("15")))),
+        answered(&Some(series("12A"))),
+    ));
     let ctx = ctx_over(Arc::clone(&transport), "find-limited");
 
     let page = report(found(&ctx, "Bea", "harbour", None).await);
 
     assert_eq!(ids(page.as_ref()), vec!["1399"]);
-    assert!(asked_for(&transport, "/api/v1/movie/603"));
+    assert!(asked_about(&transport, "detail", r#""id":"603""#));
 }
 
 #[tokio::test]
 async fn an_unrated_title_follows_the_members_own_unrated_policy() {
-    let routes = || {
-        let mut routes = pages();
-        routes.extend([
-            route(Method::Get, "/api/v1/movie/603", 200, UNRATED),
-            route(Method::Get, "/api/v1/tv/1399", 200, TWELVE),
-        ]);
-        routes
-    };
+    let routes = || looked_up(answered(&Some(rated(None))), answered(&Some(series("12A"))));
     let held = ctx_over(house(routes()), "find-unrated-held");
     let let_through = ctx_over(house(routes()), "find-unrated-let");
 
@@ -182,28 +211,25 @@ async fn an_unrated_title_follows_the_members_own_unrated_policy() {
 
 #[tokio::test]
 async fn a_title_that_cannot_be_looked_up_for_a_held_member_is_left_out() {
-    let mut routes = pages();
-    routes.extend([
-        route(Method::Get, "/api/v1/movie/603", 500, ""),
-        route(Method::Get, "/api/v1/tv/1399", 404, "{}"),
-    ]);
-    let transport = house(routes);
+    let transport = house(looked_up(unavailable(), answered(&None::<Detail>)));
     let ctx = ctx_over(Arc::clone(&transport), "find-unlooked");
 
     let page = report(found(&ctx, "Cy", "harbour", None).await);
 
     assert_eq!(ids(page.as_ref()), Vec::<String>::new());
-    assert!(asked_for(&transport, "page=2"), "an empty page reads on");
+    assert!(
+        asked_about(&transport, "search", r#""page":2"#),
+        "an empty page reads on"
+    );
 }
 
 #[tokio::test]
 async fn a_page_with_nothing_the_member_may_see_reads_on_to_the_next() {
-    let mut routes = pages();
-    routes.extend([
-        route(Method::Get, "/api/v1/movie/603", 200, FIFTEEN),
-        route(Method::Get, "/api/v1/tv/1399", 200, SERIES_FIFTEEN),
-        route(Method::Get, "/api/v1/movie/604", 200, FILM_TWELVE),
-    ]);
+    let mut routes = looked_up(
+        answered(&Some(rated(Some("15")))),
+        answered(&Some(series("15"))),
+    );
+    routes.push(titled_as("604", answered(&Some(rated(Some("12A"))))));
     let transport = house(routes);
     let ctx = ctx_over(Arc::clone(&transport), "find-reads-on");
 
@@ -232,7 +258,7 @@ async fn a_house_with_no_curator_running_cannot_fetch_anything() {
     let refused = found(&ctx, "Ada", "harbour", None).await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-4"));
-    assert!(!asked_for(&transport, "/api/v1/search"));
+    assert!(!asked_for(&transport, intake("search")));
 }
 
 #[tokio::test]
@@ -251,7 +277,7 @@ async fn too_few_or_too_many_letters_are_refused_before_anything_is_asked() {
 
 #[tokio::test]
 async fn a_request_service_that_will_not_search_is_asking_not_working() {
-    let transport = house(vec![route(Method::Get, "/api/v1/search", 500, "")]);
+    let transport = house(vec![call("search", unavailable())]);
     let ctx = ctx_over(Arc::clone(&transport), "find-silent");
 
     let refused = found(&ctx, "Ada", "harbour", None).await;
@@ -261,26 +287,21 @@ async fn a_request_service_that_will_not_search_is_asking_not_working() {
 
 #[tokio::test]
 async fn a_request_service_that_will_not_say_what_the_member_may_ask_for_is_not_working() {
-    let mut routes = pages();
-    routes.push(route(Method::Get, "/quota", 500, ""));
+    let mut routes = vec![call("left", unavailable())];
+    routes.extend(pages());
     let transport = house(routes);
     let ctx = ctx_over(Arc::clone(&transport), "find-allowance-unread");
 
     let refused = found(&ctx, "Ada", "harbour", None).await;
 
     assert_eq!(code(&refused).as_deref(), Some("WISH-8"));
-    assert!(!asked_for(&transport, "/api/v1/search"));
+    assert!(!asked_for(&transport, intake("search")));
 }
 
 #[tokio::test]
 async fn the_page_says_in_the_households_words_what_the_member_may_ask_for() {
-    let mut routes = pages();
-    routes.push(route(
-        Method::Get,
-        "/api/v1/user/jellyfin/",
-        200,
-        APPROVES_OWN,
-    ));
+    let mut routes = vec![call("requesting", account(true))];
+    routes.extend(pages());
     let transport = house(routes);
     let ctx = ctx_over(Arc::clone(&transport), "find-trusted");
 

@@ -1,77 +1,82 @@
 //! What the walkthrough's tests build their stacks out of.
 //!
 //! One transport answering every service the walk touches, because the walk touches all
-//! of them in one run: a curator's catalogue, its root folders and profiles, the add, the
-//! release probe, the history and the queue, and a media server's library and rescan. Splitting that across a fake each would mean a test setting up six things to
-//! say one.
+//! of them in one run: each curator's catalogue, how it would add, the add, the release
+//! probe, the history and the queue, each over `library.curate` through the adapter in
+//! front of it, and a media server's library and rescan. Splitting that across a fake
+//! each would mean a test setting up six things to say one.
 
 use std::sync::Arc;
 
 use crate::app::Ctx;
 use crate::config::Settings;
-use crate::ports::http::Method;
-use crate::ports::service::Download;
+use crate::ports::docker::{Health, Lifecycle};
+use crate::ports::service::{
+    AddPlan, Added, CatalogueEntry, Download, QueueItem, ReleaseProbe, TraceEvent,
+};
+use crate::test_support::adapted::{running, Adapted};
+use crate::test_support::curators::{answered, curated, FILM, TELEVISION};
 use crate::test_support::{a_context, json, media, usenet, Reporting, SeedFs};
+use crate::trace::{Outcome, Stage};
 use crate::walkthrough::{Line, Narrator};
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-/// A curator configuration that opens a target, carrying a readable key.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-
-/// What each of the walk's requests is answered with. Every field is the raw body the
-/// service would send, so a test says what a service said rather than what it meant.
+/// What each of the walk's requests is answered with, as the adapter in front of each
+/// curator answers it, so a test says what a curator said rather than what it meant.
 #[derive(Clone)]
 pub(super) struct Fake {
-    /// What the catalogue lookup returns.
-    pub lookup: &'static str,
-    /// The root folders the service files under.
-    pub folders: &'static str,
-    /// The quality profiles it judges by.
-    pub profiles: &'static str,
-    /// The indexers it can search.
-    pub indexers: &'static str,
-    /// What the add answers with.
-    pub added: &'static str,
-    /// The wanted list a release probe starts from.
-    pub wanted: &'static str,
-    /// What a release search returns.
-    pub releases: &'static str,
+    /// What the catalogue lookup answers.
+    pub lookup: Answer,
+    /// What asking how an add would be filed answers.
+    pub plan: Answer,
+    /// How many indexers each curator searches.
+    pub indexers: usize,
+    /// What the add answers.
+    pub added: Answer,
+    /// What the release probe answers.
+    pub releases: Answer,
     /// The item's history.
-    pub history: &'static str,
+    pub history: Vec<TraceEvent>,
     /// The item's queue.
-    pub queue: &'static str,
-    /// What the media server answers asked whether its library holds the item.
-    pub holds: &'static str,
+    pub queue: Vec<QueueItem>,
+    /// Whether the media server's library holds the item.
+    pub holds: bool,
     /// What the Usenet client says it is moving.
     pub transfers: Vec<Download>,
-    /// A path fragment every request to which fails, for the refusal paths.
-    pub refuses: &'static str,
-    /// Whether writes fail — the add, which is a write to the same path a lookup reads.
-    pub refuses_writes: bool,
 }
 
-/// One indexer, enabled — a stack that can search.
-pub(super) const ONE_INDEXER: &str = r#"[{"enableAutomaticSearch":true}]"#;
+/// A catalogue entry for the title, held in the library as `held_as` where it is.
+pub(super) fn sintel(held_as: Option<i64>) -> CatalogueEntry {
+    CatalogueEntry {
+        title: "Sintel".to_owned(),
+        year: Some(2010),
+        reference: 77,
+        held_as,
+    }
+}
 
-/// A catalogue result the service does not hold yet.
-pub(super) const NOT_HELD: &str =
-    r#"[{"id":0,"title":"Sintel","year":2010,"tvdbId":77,"tmdbId":99}]"#;
+/// A catalogue answering `entries`.
+pub(super) fn listing(entries: &[CatalogueEntry]) -> Answer {
+    answered(&entries)
+}
 
-/// The same title, already in the library.
-pub(super) const HELD: &str = r#"[{"id":7,"title":"Sintel","year":2010,"tvdbId":77,"tmdbId":99}]"#;
+/// A history event of `outcome`.
+pub(super) fn event(outcome: Outcome) -> TraceEvent {
+    TraceEvent {
+        outcome,
+        at: "2026-08-08T00:00:00Z".to_owned(),
+        part: None,
+    }
+}
 
-/// What an add answers with: the service's own id for what it took on.
-pub(super) const ADDED: &str = r#"{"id":7,"title":"Sintel"}"#;
-
-/// A wanted list with one missing item, so a release probe has something to search for.
-pub(super) const ONE_WANTED: &str = r#"{"records":[{"id":11}]}"#;
-
-/// A release the profile would grab.
-pub(super) const A_RELEASE: &str = r#"[{"rejections":[]}]"#;
-
-/// A history in which the item was imported.
-pub(super) const IMPORTED: &str =
-    r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-08-08T00:00:00Z"}]}"#;
+/// A queue holding the item downloading, stuck where `stuck`.
+pub(super) fn downloading(stuck: bool) -> Vec<QueueItem> {
+    vec![QueueItem {
+        part: None,
+        stage: Stage::Downloading,
+        stuck,
+    }]
+}
 
 /// A Usenet client carrying the item, half done at fourteen megabytes a second with
 /// 1050 mebibytes left.
@@ -85,28 +90,26 @@ pub(super) fn carrying_it() -> Vec<Download> {
     }]
 }
 
-/// A media server library holding the item, and one that does not.
-pub(super) const HAS_ITEM: &str = "true";
-pub(super) const NO_ITEMS: &str = "false";
-
 impl Default for Fake {
     /// A stack where everything works and the item lands: the happy path, which each
     /// test then breaks in exactly one place.
     fn default() -> Self {
         Self {
-            lookup: NOT_HELD,
-            folders: r#"[{"path":"/data/media"}]"#,
-            profiles: r#"[{"id":1}]"#,
-            indexers: ONE_INDEXER,
-            added: ADDED,
-            wanted: ONE_WANTED,
-            releases: A_RELEASE,
-            history: IMPORTED,
-            queue: r#"{"records":[],"totalRecords":0}"#,
-            holds: HAS_ITEM,
+            lookup: listing(&[sintel(None)]),
+            plan: answered(&AddPlan {
+                root_folder: "/data/media".to_owned(),
+                quality_profile: 1,
+            }),
+            indexers: 1,
+            added: answered(&Added {
+                id: 7,
+                title: "Sintel".to_owned(),
+            }),
+            releases: answered(&ReleaseProbe::Matching),
+            history: vec![event(Outcome::Imported)],
+            queue: Vec::new(),
+            holds: true,
             transfers: Vec::new(),
-            refuses: "\u{0}",
-            refuses_writes: false,
         }
     }
 }
@@ -116,46 +119,27 @@ impl Default for Fake {
 const EGRESS: &str = "203.0.113.7";
 
 impl Fake {
-    /// The transport this fake describes.
-    ///
-    /// A table rather than a chain of tests, because the chain was one long branch per
-    /// service and read as a decision when it is really a lookup. Ordered most specific
-    /// first: several of these paths are prefixes of each other, and a catalogue lookup is
-    /// a `/series` request with more on the end.
-    ///
-    /// The refusals come first because they are about the request rather than the path —
-    /// a write this stack will not take, or a path that answers nothing at all.
+    /// The transport this fake describes, every curator answering alike.
     pub(super) fn transport(&self) -> Arc<Transport> {
-        let mut routes: Vec<(Option<Method>, &'static str, Answer)> = Vec::new();
-        if self.refuses_writes {
-            routes.push((Some(Method::Post), "", Answer::Silent));
-        }
-        routes.push((None, self.refuses, Answer::Silent));
-        routes.push((
-            None,
-            usenet::operation("transfers"),
-            Answer::reply(200, json(&self.transfers)),
-        ));
-        routes.extend(
-            [
-                ("echo.example", EGRESS),
-                (media::serve("has_item"), self.holds),
-                (media::serve("rescan"), "null"),
-                ("lookup", self.lookup),
-                ("/rootfolder", self.folders),
-                ("/qualityprofile", self.profiles),
-                ("/indexer", self.indexers),
-                ("/wanted/missing", self.wanted),
-                ("/release", self.releases),
-                ("/history", self.history),
-                ("/queue", self.queue),
-                // Everything else is the add, which is a write to the library path itself.
-                ("", self.added),
-            ]
-            .into_iter()
-            .map(|(at, body)| (None, at, Answer::reply(200, body))),
-        );
-        Transport::by_rules(routes)
+        Transport::by_path(vec![
+            (
+                usenet::operation("transfers"),
+                Answer::reply(200, json(&self.transfers)),
+            ),
+            ("echo.example", Answer::reply(200, EGRESS)),
+            (
+                media::serve("has_item"),
+                Answer::reply(200, json(&self.holds)),
+            ),
+            (media::serve("rescan"), Answer::reply(200, "null")),
+            (curated("lookup"), self.lookup.clone()),
+            (curated("add_plan"), self.plan.clone()),
+            (curated("indexer_count"), answered(&self.indexers)),
+            (curated("add"), self.added.clone()),
+            (curated("probe_releases"), self.releases.clone()),
+            (curated("item_history"), answered(&self.history)),
+            (curated("item_queue"), answered(&self.queue)),
+        ])
     }
 }
 
@@ -184,18 +168,39 @@ impl Narrator for Listening {
     }
 }
 
-/// A stack over the real manifest, a filesystem that opens the curators, and a transport
-/// answering as `fake` says — with its media server not moved into its plugin, so the
-/// library stage is simply unreachable.
+/// The curators every stack here files television and film with, moved into their
+/// plugins.
+const CURATORS: [Adapted; 2] = [TELEVISION, FILM];
+
+/// A stack over the real manifest whose curators have moved into their plugins and are
+/// reached, with `also` moved in and reached beside them, the engine holding as well
+/// whatever `engine` holds, and a transport answering as `fake` says.
+fn built(fake: &Fake, also: &[Adapted], engine: Reporting) -> Ctx {
+    let mut ctx = of_its_own(
+        a_context()
+            .settings(over_usenet())
+            .build()
+            .with_filesystem(Arc::new(SeedFs::keyed(None)))
+            .with_http(fake.transport())
+            .with_patience(std::time::Duration::ZERO),
+    );
+    let parts: Vec<Adapted> = CURATORS.iter().chain(also).copied().collect();
+    ctx.seams.engine = Arc::new(running(&parts).alongside(engine));
+    for part in &parts {
+        part.moved_in(&ctx);
+    }
+    ctx
+}
+
+/// Nothing running besides the parts a stack here has moved in.
+fn nothing_else() -> Reporting {
+    Reporting::holding(&[], Lifecycle::Running, Health::Healthy)
+}
+
+/// A stack whose curators are reached, with its media server not moved into its plugin,
+/// so the library stage is simply unreachable.
 pub(super) fn ctx_with(fake: &Fake) -> Ctx {
-    a_context()
-        .settings(over_usenet())
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
-        .with_http(fake.transport())
-        // No waiting: every test would otherwise sit through the real poll, and what the wait
-        // does at its bound is exactly what the tests are about.
-        .with_patience(std::time::Duration::ZERO)
+    built(fake, &[], nothing_else())
 }
 
 /// `ctx` holding an env file of its own, in a scratch directory no other context shares.
@@ -217,13 +222,13 @@ fn of_its_own(mut ctx: Ctx) -> Ctx {
 
 /// The same, reachable media server and all, moved into its plugin.
 pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
-    media::reaching(of_its_own(ctx_with(fake)))
+    built(fake, &[media::MOVED], nothing_else())
 }
 
 /// The same, its Usenet client moved into its plugin and reachable, saying it moves what
 /// `fake` says.
 pub(super) fn ctx_downloading(fake: &Fake) -> Ctx {
-    usenet::reaching(of_its_own(ctx_with(fake)))
+    built(fake, &[usenet::MOVED], nothing_else())
 }
 
 /// Settings that acquire content over usenet — a configured stack with no tunnel to
@@ -301,8 +306,8 @@ pub(super) fn ctx_through_a_tunnel(fake: &Fake) -> Ctx {
     ctx.seams.engine = Arc::new(
         Reporting::holding(
             &["gluetun", "qbittorrent"],
-            crate::ports::docker::Lifecycle::Running,
-            crate::ports::docker::Health::None,
+            Lifecycle::Running,
+            Health::None,
         )
         .with_tunnel(crate::test_support::Tunnel {
             gateway: "gluetun",
@@ -311,7 +316,8 @@ pub(super) fn ctx_through_a_tunnel(fake: &Fake) -> Ctx {
             country: Some("nl"),
             port: Some("51413"),
             second_opinion: None,
-        }),
+        })
+        .alongside(running(&CURATORS)),
     );
     ctx
 }

@@ -11,11 +11,13 @@
 
 use lemonfiber_core::app::{dispatch, Answer as Ruling, Command, Ctx, Decision, Outcome};
 use lemonfiber_core::config::{Reaching, REACH_HOUSEHOLD_KEY};
-use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::Address;
 use lemonfiber_fixtures::http::Answer;
+use lemonfiber_testing::requests;
 
 use crate::common;
-use common::household::{answering, context, reaching, refusing, table, with, HALF_REACHED_AT};
+use common::household::{answering, context, half_reached_at, reaching, refusing, table, with};
 
 /// The reason reaches the person who asked, where they left an address for it.
 ///
@@ -65,11 +67,7 @@ async fn the_reason_reaches_the_person_who_asked_and_carries_nothing_else() {
 /// An agent the member switched off is not somewhere a message may go.
 #[tokio::test]
 async fn an_agent_the_member_switched_off_is_left_alone() {
-    let transport = table(vec![(
-        None,
-        "/user/4/settings/notifications",
-        Answer::reply(200, HALF_REACHED_AT),
-    )]);
+    let transport = table(vec![requests::answering("reachable", &half_reached_at())]);
     let said = decided(&context("half", &transport)).await;
 
     assert!(said.contains("told why, on Pushover"), "{said}");
@@ -128,11 +126,7 @@ async fn a_household_this_machine_may_not_reach_is_said_rather_than_reached() {
 async fn a_member_with_nowhere_to_reach_them_is_not_a_failure() {
     let said = decided(&with(
         "no-address",
-        vec![(
-            None,
-            "/user/4/settings/notifications",
-            Answer::reply(200, "{}"),
-        )],
+        vec![requests::answering("reachable", &Vec::<Address>::new())],
     ))
     .await;
 
@@ -145,12 +139,7 @@ async fn a_member_with_nowhere_to_reach_them_is_not_a_failure() {
 /// says which of the two things happened.
 #[tokio::test]
 async fn where_they_are_reached_that_cannot_be_read_is_said_as_that() {
-    let said = decided(&refusing(
-        "unreadable",
-        Method::Get,
-        "/user/4/settings/notifications",
-    ))
-    .await;
+    let said = decided(&refusing("unreadable", requests::intake("reachable"))).await;
 
     assert!(said.contains("could not be read"), "{said}");
     assert!(said.contains("yours to pass on"), "{said}");
@@ -162,8 +151,8 @@ async fn every_address_refusing_names_them_and_keeps_the_words_here() {
     let said = decided(&with(
         "refused",
         vec![
-            (None, "pushover.net", Answer::reply(500, "no")),
-            (None, "pushbullet.com", Answer::reply(500, "no")),
+            ("pushover.net", Answer::reply(500, "no")),
+            ("pushbullet.com", Answer::reply(500, "no")),
         ],
     ))
     .await;
@@ -180,7 +169,7 @@ async fn every_address_refusing_names_them_and_keeps_the_words_here() {
 async fn one_address_taking_it_and_one_refusing_is_told_once() {
     let said = decided(&with(
         "mixed",
-        vec![(None, "pushbullet.com", Answer::reply(500, "no"))],
+        vec![("pushbullet.com", Answer::reply(500, "no"))],
     ))
     .await;
 

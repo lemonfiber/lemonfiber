@@ -1,10 +1,9 @@
 //! The plumbing every service client shares over the HTTP port.
 //!
-//! Curators and torrent clients speak different APIs, but they reach them the same
-//! way: a base address, a name to blame a failure on, and one reading of what a
-//! transport error or a non-success status means. That common part lives here so
-//! it is written once; each client builds its own requests and holds one of these
-//! to send them.
+//! A client the core holds of one of lemonfiber's own services reaches it this way: a
+//! base address, a name to blame a failure on, and one reading of what a transport
+//! error or a non-success status means. That common part lives here so it is written
+//! once; each client builds its own requests and holds one of these to send them.
 
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -13,9 +12,9 @@ use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::Failure;
 use crate::text::fitted;
 
-/// The header a curator-shape service authenticates with — every curator
-/// and the indexer aggregator read the key from it, and the setup validator sends
-/// it the same way, so its name is written once.
+/// The header a service of the Servarr shape authenticates with — the setup validator
+/// sends a key in it, and a first run presents the key it read in it, so its name is
+/// written once.
 pub(crate) const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// The header a service that takes a scheme and a credential reads them from.
@@ -55,11 +54,6 @@ pub(crate) struct Endpoint {
 
 impl Endpoint {
     /// An endpoint for `service`, reached at `base` over `http`.
-    /// The service this endpoint speaks to, for a failure that has to name it.
-    pub(crate) fn service(&self) -> &str {
-        &self.service
-    }
-
     pub(crate) fn new(
         http: Arc<dyn Http>,
         base: impl Into<String>,
@@ -87,27 +81,6 @@ impl Endpoint {
             method,
             url: self.url(path),
             headers: json_content_type(body.as_ref()).into_iter().collect(),
-            body,
-            pinned: None,
-        }
-    }
-
-    /// A JSON request that also carries a curator-shape API key in its header — the shape
-    /// every keyed service builds from (the curators and the indexer aggregator), differing
-    /// only in the path prefix the caller supplies for its API version.
-    pub(crate) fn keyed_request(
-        &self,
-        method: Method,
-        path: &str,
-        key: &str,
-        body: Option<String>,
-    ) -> Request {
-        let mut headers = vec![(API_KEY_HEADER.to_owned(), key.to_owned())];
-        headers.extend(json_content_type(body.as_ref()));
-        Request {
-            method,
-            url: self.url(path),
-            headers,
             body,
             pinned: None,
         }
@@ -154,27 +127,6 @@ impl Endpoint {
         Failure::Refused {
             service: self.service.clone(),
             detail: detail.to_owned(),
-        }
-    }
-
-    /// The service does not serve the API version this build speaks — the reason
-    /// a versioned endpoint answered `404`. Reported rather than written to.
-    pub(crate) fn unsupported(&self, detail: &str) -> Failure {
-        Failure::Unsupported {
-            service: self.service.clone(),
-            detail: detail.to_owned(),
-        }
-    }
-
-    /// Nothing when the response succeeded, the refusal a non-success status
-    /// amounts to otherwise — the answer to "did it take?" for a call whose body
-    /// the caller discards. Used with `?` it also serves as a guard partway
-    /// through a longer exchange.
-    pub(crate) fn expect_success(&self, response: &Response) -> Result<(), Failure> {
-        if response.is_success() {
-            Ok(())
-        } else {
-            Err(self.refusal(response))
         }
     }
 

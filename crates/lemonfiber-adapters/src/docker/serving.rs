@@ -196,6 +196,7 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
         }),
         image: Some(serve.image.clone()),
         env: Some(serve.env.clone()),
+        cmd: (!serve.command.is_empty()).then(|| serve.command.clone()),
         user: serve.user.clone(),
         attach_stdin: Some(false),
         tty: Some(false),
