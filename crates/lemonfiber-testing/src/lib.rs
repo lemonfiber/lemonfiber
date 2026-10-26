@@ -7,7 +7,10 @@
 //! so the core includes [`context`] as a module of its own rather than as this crate.
 
 pub mod adapted;
+pub mod aggregator;
+pub mod books;
 pub mod context;
+pub mod listening;
 pub mod media;
 pub mod placeholder;
 pub mod subtitles;

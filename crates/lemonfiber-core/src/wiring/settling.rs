@@ -136,6 +136,10 @@ fn asked(
 /// Every link the stack declares, then every ask each installed plugin's services make,
 /// answered against everything installed that claims what it asks.
 ///
+/// An ask the stack declares for a service a first-party part has moved in place of is
+/// left out: the part's own service asks for itself, by its plugin's asks, and each of
+/// those is settled by the stack's choice for that capability as every plugin's ask is.
+///
 /// A link naming a `why` it should not have, or asking for something of the wrong
 /// shape, is the validator's business rather than this one's: what is read here is a
 /// manifest that has already been checked, and a reader that second-guessed it would
@@ -144,6 +148,9 @@ fn asked(
 pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<Wired> {
     let stack = manifest.wirings.iter().filter_map(|wiring| {
         let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
+            (Some(_), None) if crate::project::moved_in_place(installed, &wiring.by) => {
+                return None;
+            }
             (Some(capability), None) => {
                 reached(manifest, installed, wiring, capability, None, chosen)
             }

@@ -15,7 +15,7 @@ use std::fs;
 
 use crate::source_tree::{production, sources, workspace_root};
 
-/// Every API a service can declare is one seeding acts on, or one deferred by name.
+/// Every API a service can declare is one seeding acts on.
 ///
 /// A service's `api.kind` is what decides whether its credential is ever read: adding
 /// a kind to the manifest without a client to answer it leaves that service declaring
@@ -25,35 +25,8 @@ use crate::source_tree::{production, sources, workspace_root};
 /// The stack keeps its own list of kinds it will accept, so this is the second half of
 /// that pair: the stack refuses a kind nothing here implements, and this refuses a kind
 /// nothing here acts on. Two lists agreeing is what makes either of them mean anything.
-///
-/// One kind is deferred rather than missing: the book indexer's wiring waits on a live
-/// instance to pin its endpoints against. The exception is read from `unsupported.rs`,
-/// which is where the runtime reads it, so it is stated once and a shape that stops
-/// being deferred stops being exempt here by the same edit that makes it speakable.
 #[test]
 fn every_api_a_service_can_declare_is_acted_on() {
-    let deferred_source =
-        fs::read_to_string(workspace_root().join("crates/lemonfiber-core/src/unsupported.rs"))
-            .unwrap_or_default();
-    let Some(exception) = deferred_source
-        .split_once("pub const DEFERRED:")
-        .and_then(|(_, rest)| rest.split_once("];"))
-        .map(|(block, _)| block)
-    else {
-        unreachable!("the core declares which API shapes it does not speak");
-    };
-    let deferred: Vec<String> = exception
-        .split("ApiKind::")
-        .skip(1)
-        .filter_map(|rest| rest.split(&[',', ' ', ')'][..]).next())
-        .map(str::to_owned)
-        .collect();
-    assert!(
-        !deferred.is_empty(),
-        "the deferred shapes were not read, so every shape would look exempt: \
-         {deferred:?}"
-    );
-
     let schema =
         fs::read_to_string(workspace_root().join("crates/lemonfiber-manifest/src/schema/api.rs"))
             .unwrap_or_default();
@@ -88,7 +61,6 @@ fn every_api_a_service_can_declare_is_acted_on() {
 
     let ignored: Vec<&str> = declared
         .iter()
-        .filter(|kind| !deferred.iter().any(|named| named == *kind))
         .filter(|kind| !acted_on.contains(&format!("ApiKind::{kind}")))
         .copied()
         .collect();
@@ -98,6 +70,7 @@ fn every_api_a_service_can_declare_is_acted_on() {
          credential is never read: {ignored:?}"
     );
 }
+
 /// The request service is given an owner before anything is registered into it.
 ///
 /// It refuses every call until it has one, and the step that gives it one is the

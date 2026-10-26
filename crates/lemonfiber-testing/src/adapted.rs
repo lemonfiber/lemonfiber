@@ -9,11 +9,13 @@
 
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::plugin::{Installed, Register};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying, Readable};
 use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::Owner;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
@@ -152,6 +154,18 @@ impl Adapted {
 #[must_use]
 pub fn path_of(capability: &str, major: u32, operation: &str) -> &'static str {
     Box::leak(lemonfiber_contract::path(capability, major, operation).into_boxed_str())
+}
+
+/// Where `operation` of `owner.claim` is asked, of whichever adapter speaks it.
+#[must_use]
+pub fn claiming(operation: &str) -> &'static str {
+    path_of(claim::CAPABILITY, claim::MAJOR, operation)
+}
+
+/// The route answering `owner.claim`'s `operation` with `owner`.
+#[must_use]
+pub fn held_by(operation: &str, owner: Owner) -> (&'static str, Answer) {
+    (claiming(operation), answered(&owner))
 }
 
 /// What was asked at `at` in `sent`, in order.

@@ -1,72 +1,5 @@
 name: lemonfiber
 services:
-  audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
-    profiles:
-    - media
-    restart: unless-stopped
-    environment:
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:13378:80
-    volumes:
-    - ./data:/data
-    - ./config/audiobookshelf:/config
-    - ./mounts/audiobookshelf/metadata:/metadata
-    networks:
-    - ask__audiobookshelf__dashboard.show__homepage
-    - ask__audiobookshelf__proxy.front__caddy
-    - own__audiobookshelf
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  bindery:
-    image: ghcr.io/vavallee/bindery:v1.43.1@sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489
-    profiles:
-    - books
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      BINDERY_AUDIOBOOK_DIR: /data/media/audiobooks
-      BINDERY_DOWNLOAD_DIR: /data/downloads
-      BINDERY_LIBRARY_DIR: /data/media/books
-      TZ: Europe/Amsterdam
-    ports:
-    - 127.0.0.1:8787:8787
-    volumes:
-    - ./data:/data
-    - ./config/bindery:/config
-    networks:
-    - ask__bazarr__library.curate__bindery
-    - ask__bindery__download.torrent__gluetun
-    - ask__bindery__download.usenet__sabnzbd
-    - ask__bindery__indexer.search__prowlarr
-    - ask__prowlarr__library.curate__bindery
-    - ask__recyclarr__library.curate__bindery
-    - ask__request-gate__library.curate__bindery
-    - ask__seerr__library.curate__bindery
-    - own__bindery
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   caddy:
     image: ghcr.io/lemonfiber/caddy:main-22eef6b30f45@sha256:dd64ac74c6800d3445072406c3d2e982b530c9be5de747d05c68b50f87301b5a
     profiles:
@@ -84,7 +17,6 @@ services:
     - ./mounts/caddy/data:/data
     - ./mounts/caddy/config:/config
     networks:
-      ask__audiobookshelf__proxy.front__caddy: {}
       ask__calibre-web-automated__proxy.front__caddy: {}
       ask__door__proxy.front__caddy:
         ipv4_address: 10.80.96.3
@@ -270,7 +202,6 @@ services:
     volumes:
     - ./config/homepage:/app/config
     networks:
-    - ask__audiobookshelf__dashboard.show__homepage
     - ask__homepage__proxy.front__caddy
     - ask__jellyfin__dashboard.show__homepage
     - ask__lidarr__dashboard.show__homepage
@@ -349,34 +280,6 @@ services:
     networks:
     - ask__navidrome__dashboard.show__homepage
     - own__navidrome
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  nzbhydra2:
-    image: lscr.io/linuxserver/nzbhydra2:v8.9.0-ls104@sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516
-    profiles:
-    - search
-    restart: unless-stopped
-    environment:
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-    ports:
-    - 127.0.0.1:5076:5076
-    volumes:
-    - ./data:/data
-    - ./config/nzbhydra2:/config
-    networks:
-    - own__nzbhydra2
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -630,6 +533,33 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
+    profiles:
+    - media
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:13378:80
+    volumes:
+    - ./data:/data
+    - ./config/audiobookshelf:/config
+    - ./mounts/audiobookshelf/metadata:/metadata
+    networks:
+    - own__audiobookshelf
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
   bazarr:
     image: lscr.io/linuxserver/bazarr:v1.6.2-ls367@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
     profiles:
@@ -650,6 +580,44 @@ services:
     - ask__bazarr__library.curate__radarr
     - ask__bazarr__library.curate__sonarr
     - own__bazarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  bindery:
+    image: ghcr.io/vavallee/bindery:v1.43.1@sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489
+    profiles:
+    - books
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      BINDERY_AUDIOBOOK_DIR: /data/media/audiobooks
+      BINDERY_DOWNLOAD_DIR: /data/downloads
+      BINDERY_LIBRARY_DIR: /data/media/books
+      TZ: Europe/Amsterdam
+    ports:
+    - 127.0.0.1:8787:8787
+    volumes:
+    - ./data:/data
+    - ./config/bindery:/config
+    networks:
+    - ask__bazarr__library.curate__bindery
+    - ask__bindery__download.torrent__gluetun
+    - ask__bindery__download.usenet__sabnzbd
+    - ask__bindery__indexer.search__prowlarr
+    - ask__prowlarr__library.curate__bindery
+    - ask__recyclarr__library.curate__bindery
+    - ask__request-gate__library.curate__bindery
+    - ask__seerr__library.curate__bindery
+    - own__bindery
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -684,6 +652,34 @@ services:
     - ask__seerr__identity.source__jellyfin
     - link__decline__jellyfin
     - own__jellyfin
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  nzbhydra2:
+    image: lscr.io/linuxserver/nzbhydra2:v8.9.0-ls104@sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516
+    profiles:
+    - search
+    restart: unless-stopped
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+    ports:
+    - 127.0.0.1:5076:5076
+    volumes:
+    - ./data:/data
+    - ./config/nzbhydra2:/config
+    networks:
+    - own__nzbhydra2
     security_opt:
     - no-new-privileges:true
     cap_drop:

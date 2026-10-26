@@ -18,7 +18,6 @@ use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::gating::{Gate, GateRecordCheck};
-use crate::doctor::guarded::GuardedCheck;
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
@@ -241,31 +240,6 @@ fn gate_record(
     GateRecordCheck::new(ctx.seams.filesystem.clone(), gate)
 }
 
-/// Whether the stack's Usenet indexer aggregator keeps its configuration to itself, asked
-/// of the one the stack ships where this machine can reach it.
-fn guarded(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> GuardedCheck {
-    GuardedCheck::new(
-        services
-            .iter()
-            .filter(|service| {
-                service
-                    .api
-                    .as_ref()
-                    .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Nzbhydra2)
-            })
-            .find_map(|service| {
-                Some((
-                    std::sync::Arc::new(crate::nzbhydra2::Nzbhydra2::new(
-                        ctx.seams.http.clone(),
-                        crate::app::targets::loopback(service.port?),
-                        &service.id,
-                    )) as std::sync::Arc<dyn crate::doctor::guarded::Exposure>,
-                    service.name.clone(),
-                ))
-            }),
-    )
-}
-
 /// The checks this stack is examined by, built and ready to run.
 ///
 /// Assembled apart from the running of them because a repair has to ask the very same
@@ -388,7 +362,6 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
             .unwrap_or_default(),
     );
     let telling = deferring::telling(ctx, manifest);
-    let guarded = guarded(ctx, &manifest.services);
     let owned = deferring::owned(ctx, manifest);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
     let decline = deferring::declined(ctx, manifest, project.as_deref());
@@ -427,7 +400,6 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(wiring),
         Box::new(seasons),
         Box::new(telling),
-        Box::new(guarded),
         Box::new(owned),
         Box::new(gate),
         Box::new(decline),
@@ -464,6 +436,3 @@ fn declared_by_plugins(ctx: &Ctx, stack: &Stack) -> Vec<Box<dyn Check>> {
         })
         .collect()
 }
-
-#[cfg(test)]
-mod tests;

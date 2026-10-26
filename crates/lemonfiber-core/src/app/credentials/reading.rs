@@ -157,12 +157,9 @@ fn declared(
 /// request service in JSON, each a file under the service's own configuration directory,
 /// named by the manifest, so the shape decides only which reader opens it.
 ///
-/// The rest are not read here. The subtitle finder is reached through its plugin, whose
-/// key lemonfiber mints; two have no account at all until lemonfiber makes one, the
-/// download clients are reached through their plugins' adapters with what lemonfiber
-/// minted for them, and the Usenet indexer aggregator is reached with the administrator
-/// lemonfiber gives it rather than with the key it writes; all of those are on the
-/// declared list instead, which is where a credential lemonfiber minted belongs.
+/// The rest are not read here: each is reached through its plugin's adapter with what
+/// lemonfiber minted for it, and so is on the declared list instead, which is where a
+/// credential lemonfiber minted belongs.
 pub(crate) fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
     match kind {
         ApiKind::Servarr => Some(crate::servarr::api_key),

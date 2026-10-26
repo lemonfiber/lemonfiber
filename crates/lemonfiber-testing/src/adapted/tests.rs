@@ -236,3 +236,15 @@ fn keyed_records_the_plugin_and_holds_its_key_without_writing_one() {
         .join(lemonfiber_core::config::paths::PLUGINS)
         .exists());
 }
+
+#[test]
+fn a_claim_is_asked_on_the_owner_contracts_path_and_answered_with_who_holds_the_part() {
+    let (at, answer) = super::held_by("claim", lemonfiber_core::ports::service::Owner::Ours);
+
+    assert_eq!(super::claiming("owner"), "/lemonfiber/owner.claim/v1/owner");
+    assert_eq!(at, "/lemonfiber/owner.claim/v1/claim");
+    assert!(
+        matches!(&answer, lemonfiber_fixtures::http::Answer::Reply(200, body) if body == "\"ours\""),
+        "{answer:?}"
+    );
+}

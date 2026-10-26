@@ -32,8 +32,6 @@ mod fulfilment;
 // The request gate's routes, and the key it holds for the media server.
 mod gate;
 // The media server keys minted for the services lemonfiber builds.
-mod claiming;
-mod guarding;
 mod keys;
 mod minted;
 pub(crate) mod owning;
@@ -64,7 +62,6 @@ pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, Held};
 pub(crate) use curating::curators;
 pub(crate) use gate::reroute;
-pub(crate) use guarding::exposure;
 use identity::seed_request_identity;
 pub(crate) use quality::reprofile;
 pub(crate) use reset::reset_connections;
@@ -93,9 +90,8 @@ use withholding::{withheld, withheld_brought};
 ///   claim that it broke something.
 ///
 /// And the keys the stack's own services read are named rather than gathered: the media
-/// server mints its key when it is asked for one, and the listening server has no
-/// account at all until this pass makes one. A question that gathered them would have
-/// created the very things it promised only to describe.
+/// server mints its key when it is asked for one, and a question that gathered it would
+/// have created the very thing it promised only to describe.
 ///
 /// Everything else is the same walk — the same reads, the same three-way comparison,
 /// the same words — with the registering and the minting not done.
@@ -191,8 +187,8 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // it is among the pairs reported above as reached by nothing.
     wirings.extend(seed_applications(ctx, &fillers).await);
 
-    // The book curator, which the aggregator cannot register itself into: it keeps its own
-    // list of aggregators and pulls from them, so it is told where one is instead.
+    // A curator the aggregator cannot register itself into: it keeps its own list of
+    // aggregators and pulls from them, so it is told where one is instead.
     wirings.extend(aggregators::seed_aggregators(ctx, &fillers).await);
 
     // The media server and everything that signs in to it as its administrator.
@@ -230,13 +226,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // its whole configuration over a single undefined name.
     wirings
         .push(published::publish_keys(ctx, &manifest.services, &fillers, project.as_deref()).await);
-
-    // The listening server's first account, which is anybody's until somebody makes it.
-    wirings.extend(claiming::claimed(ctx, &manifest.services).await);
-
-    // The Usenet indexer aggregator's authentication, without which it hands the indexer
-    // accounts it holds to anything that can reach it.
-    wirings.extend(guarding::guarded(ctx, &fillers, &mut baseline).await);
 
     wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
 

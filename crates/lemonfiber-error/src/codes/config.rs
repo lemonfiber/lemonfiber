@@ -59,20 +59,6 @@ codes! {
         remedy: "Check where the value came from, and set it to a single line. The message names \
             the settings file.",
     }
-    /// Raised when the Usenet indexer aggregator answers a read of its whole
-    /// configuration to a caller presenting nothing, or will not say whether it does.
-    AGGREGATOR_EXPOSED = "CONFIG-7" {
-        severity: Warning,
-        status: 500,
-        since: "0.17.0",
-        meaning: "The Usenet indexer aggregator answers its whole configuration — the indexer \
-            accounts it holds, and their keys among it — to anything that can reach it, or could \
-            not be asked whether it does. Nothing has been changed — this is the doctor \
-            reporting what it found.",
-        remedy: "Run lemonfiber seed to turn its authentication on, or lemonfiber reset \
-            where you turned it off yourself. Where it could not be asked, check it is up and \
-            has finished starting, then run the diagnosis again.",
-    }
     /// Raised where the operator's overlay changes services, merged over the project
     /// lemonfiber writes and held to nothing it vets.
     OVERLAY_UNVETTED = "CONFIG-8" {

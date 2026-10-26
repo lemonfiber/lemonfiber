@@ -298,7 +298,7 @@ async fn a_curator_filing_media_no_category_is_filed_under_is_not_handed() {
     let fillers = fillers_trusting(
         vec![
             curator("sonarr", 8989, "tv"),
-            curator("readarr", 8787, "books"),
+            curator("comics", 8787, "comics"),
         ],
         &[the_extractor(true)],
         &project,

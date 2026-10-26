@@ -32,8 +32,8 @@ fn the_usenet_password_reaches_its_service_and_lemonfibers_own_check_at_once() {
 }
 
 #[test]
-fn the_book_key_waits_on_the_restart_that_makes_its_container_again() {
-    let waiting: Vec<Reach> = reached(config::BOOK_CURATOR_API_KEY)
+fn the_tunnel_key_waits_on_the_restart_that_makes_its_container_again() {
+    let waiting: Vec<Reach> = reached(crate::credential::VPN_PRIVATE_KEY)
         .into_iter()
         .map(|one| one.reach)
         .collect();
@@ -41,7 +41,7 @@ fn the_book_key_waits_on_the_restart_that_makes_its_container_again() {
     assert_eq!(
         waiting,
         [Reach::Pending {
-            detail: "lemonfiber restart books".to_owned()
+            detail: "lemonfiber restart torrent".to_owned()
         }]
     );
 }
@@ -64,7 +64,7 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
         .filter(|setting| *setting != config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
         .collect();
 
-    assert_eq!(asked.len(), 6, "{asked:?}");
+    assert_eq!(asked.len(), 3, "{asked:?}");
     for setting in asked {
         let said = elsewhere(setting);
         assert!(said.contains("still in force"), "{setting}: {said}");
@@ -77,8 +77,8 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
 #[test]
 fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
     let held = crate::credential::Held {
-        name: "Book library API key".to_owned(),
-        setting: config::BOOK_CURATOR_API_KEY.to_owned(),
+        name: "VPN private key".to_owned(),
+        setting: crate::credential::VPN_PRIVATE_KEY.to_owned(),
         consumers: Vec::new(),
         location: "the environment file".to_owned(),
         origin: crate::credential::Origin::Lemonfiber,
@@ -103,7 +103,7 @@ fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
     assert!(
         settled.is_some_and(|(_, afterwards)| afterwards
             .iter()
-            .any(|step| step.contains("lemonfiber restart books"))),
+            .any(|step| step.contains("lemonfiber restart torrent"))),
         "the consumers that need a further command are named"
     );
 }

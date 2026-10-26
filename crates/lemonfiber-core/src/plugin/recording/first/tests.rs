@@ -2,20 +2,16 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_fixtures::support::FixedRandom;
 
 use super::super::tests::asking::SERVED;
-use super::{before, performed, Before, Held, Presented, Reaching};
+use super::{performed, Held, Presented, Reaching};
 use crate::plugin::installed::{Installed, Placed};
 use crate::plugin::program::{Starting, Throwaway};
-use crate::ports::http::{Http, Method};
+use crate::ports::http::Http;
 use crate::ports::serving::Served;
 
 const SERVARR: &str =
     "api         = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }";
-
-/// What lemonfiber mints from seven repeated.
-const MINTED: &str = "0707070707070707070707070707070707070707070707070707070707070707";
 
 fn placed(api: &str) -> Option<Placed> {
     let text = SERVED.replace(SERVARR, api);
@@ -64,15 +60,11 @@ async fn first_run_on(
     http: Arc<Fake>,
     served: &Served,
 ) -> Result<Option<Held>, String> {
-    let random = FixedRandom(Some(vec![7; 32]));
-    let settled = before(placed, &random)?;
     performed(&Reaching {
         placed,
         copy,
         served,
         keyed: http as Arc<dyn Http>,
-        random: &random,
-        before: &settled,
     })
     .await
 }
@@ -118,43 +110,22 @@ async fn a_service_with_no_api_or_no_credential_has_no_first_run() {
     }
 }
 
-#[tokio::test]
-async fn a_book_curator_is_handed_a_key_lemonfiber_mints_before_it_starts() {
-    let Some(curator) = placed("api         = { kind = \"bindery\", key_source = \"generated\" }")
-    else {
-        return;
-    };
-    let random = FixedRandom(Some(vec![7; 32]));
-    let settled = before(&curator, &random);
-    assert_eq!(
-        settled.as_ref().map(|settled| settled.env.clone()),
-        Ok(vec![format!("BINDERY_API_KEY={MINTED}")])
-    );
-    assert!(before(&curator, &FixedRandom(None)).is_err());
-    let Some((_source, copy)) = copy("first-bindery") else {
-        return;
-    };
-    assert_eq!(
-        first_run(&curator, &copy, Fake::silent()).await,
-        Ok(Some(Held {
-            presented: Presented("X-Api-Key", MINTED.to_owned()),
-            made: vec![MINTED.to_owned()],
-        }))
-    );
-    let Some(other) = placed(SERVARR) else {
-        return;
-    };
-    assert_eq!(before(&other, &random), Ok(Before::default()));
-}
-
-/// A service naming an API whose first run is an adapter's, such as a torrent client's or
-/// a media server's, has none performed here: it is refused, asking nothing of it.
+/// A service naming an API whose first run is an adapter's, such as a torrent client's, a
+/// media server's or a book curator's, has none performed here: it is refused, asking
+/// nothing of it.
 #[tokio::test]
 async fn a_service_whose_first_run_is_an_adapters_is_refused_asking_nothing() {
     let Some((_source, copy)) = copy("first-adapters") else {
         return;
     };
-    for kind in ["qbittorrent", "sabnzbd", "jellyfin"] {
+    for kind in [
+        "qbittorrent",
+        "sabnzbd",
+        "jellyfin",
+        "audiobookshelf",
+        "nzbhydra2",
+        "bindery",
+    ] {
         let Some(placed) = placed(&format!(
             "api         = {{ kind = \"{kind}\", key_source = \"generated\" }}"
         )) else {
@@ -168,114 +139,6 @@ async fn a_service_whose_first_run_is_an_adapters_is_refused_asking_nothing() {
         );
         assert!(http.requests().is_empty(), "{kind}");
     }
-}
-
-#[tokio::test]
-async fn a_listening_servers_root_account_is_made_and_signed_in_as() {
-    let Some((_source, copy)) = copy("first-audiobookshelf") else {
-        return;
-    };
-    let Some(placed) =
-        placed("api         = { kind = \"audiobookshelf\", key_source = \"generated\" }")
-    else {
-        return;
-    };
-    let http =
-        Fake::by_route(vec![
-        (Method::Get, "/status", Answer::reply(200, "{\"isInit\": false}")),
-        (Method::Post, "/init", Answer::reply(200, "")),
-        (
-            Method::Post,
-            "/login",
-            Answer::reply(
-                200,
-                "{\"user\": {\"accessToken\": \"acc.ess.token\", \"refreshToken\": \"re.fresh\"}}",
-            ),
-        ),
-    ]);
-    let held = first_run(&placed, &copy, Arc::clone(&http)).await;
-    assert_eq!(
-        held,
-        Ok(Some(Held {
-            presented: Presented("Authorization", "Bearer acc.ess.token".to_owned()),
-            made: vec![
-                MINTED.to_owned(),
-                "acc.ess.token".to_owned(),
-                "re.fresh".to_owned()
-            ],
-        }))
-    );
-    assert!(http
-        .requests()
-        .iter()
-        .any(|asked| asked.url.ends_with("/login")
-            && asked
-                .headers
-                .contains(&("x-return-tokens".to_owned(), "true".to_owned()))));
-    let claimed = Fake::by_route(vec![(
-        Method::Get,
-        "/status",
-        Answer::reply(200, "{\"isInit\": true}"),
-    )]);
-    assert!(first_run(&placed, &copy, claimed)
-        .await
-        .is_err_and(|why| why.contains("already holds an account")));
-}
-
-#[tokio::test]
-async fn an_aggregators_authentication_is_turned_on_and_its_restart_waited_out() {
-    let Some((_source, copy)) = copy("first-nzbhydra2") else {
-        return;
-    };
-    let Some(placed) = placed(
-        "api         = { kind = \"nzbhydra2\", key_source = \"config-yaml\", path = \"/config/nzbhydra.yml\" }",
-    ) else {
-        return;
-    };
-    let http = Fake::by_route_in_turn(vec![
-        (
-            Method::Get,
-            "/internalapi/config",
-            vec![
-                Answer::reply(
-                    200,
-                    "{\"auth\": {}, \"main\": {\"apiKey\": \"INSTANCEKEY123\"}, \"indexers\": []}",
-                ),
-                Answer::reply(200, "{}"),
-                Answer::reply(401, ""),
-            ],
-        ),
-        (
-            Method::Put,
-            "/internalapi/config",
-            vec![Answer::reply(200, "{\"ok\": true}")],
-        ),
-        (
-            Method::Get,
-            "/internalapi/control/restart",
-            vec![Answer::reply(200, "")],
-        ),
-    ]);
-    let held = first_run(&placed, &copy, Arc::clone(&http)).await;
-    let pair = base64::Engine::encode(
-        &base64::engine::general_purpose::STANDARD,
-        format!("{}:{MINTED}", crate::config::USENET_AGGREGATOR_ADMIN_USER),
-    );
-    assert_eq!(
-        held,
-        Ok(Some(Held {
-            presented: Presented("Authorization", format!("Basic {pair}")),
-            made: vec![MINTED.to_owned(), "INSTANCEKEY123".to_owned(), pair],
-        }))
-    );
-    assert!(http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Put
-            && asked
-                .body
-                .as_deref()
-                .is_some_and(|body| body.contains(MINTED))));
 }
 
 #[tokio::test]
@@ -347,99 +210,6 @@ async fn a_key_never_written_fails_the_first_run_at_its_limit() {
     assert!(
         said.as_ref()
             .is_err_and(|why| why.contains("wrote no key to /config/config.xml within 60")),
-        "{said:?}"
-    );
-}
-
-fn aggregating(name: &str) -> Option<(Scratch, Throwaway, Placed)> {
-    let (source, copy) = copy(name)?;
-    let placed = placed(
-        "api         = { kind = \"nzbhydra2\", key_source = \"config-yaml\", path = \"/config/nzbhydra.yml\" }",
-    )?;
-    Some((source, copy, placed))
-}
-
-#[tokio::test]
-async fn an_aggregator_that_will_not_take_its_authentication_fails_the_first_run() {
-    let Some((_source, copy, placed)) = aggregating("first-unguarded") else {
-        return;
-    };
-    for status in [500, 400] {
-        let http = Fake::by_route(vec![
-            (
-                Method::Get,
-                "/internalapi/config",
-                Answer::reply(200, "{\"auth\": {}, \"main\": {}, \"indexers\": []}"),
-            ),
-            (
-                Method::Put,
-                "/internalapi/config",
-                Answer::reply(status, "{\"message\": \"no\"}"),
-            ),
-        ]);
-        let said = first_run(&placed, &copy, http).await;
-        assert!(said.is_err(), "{status}: {said:?}");
-    }
-}
-
-#[tokio::test(start_paused = true)]
-async fn an_aggregator_still_answering_anybody_after_its_restart_fails_at_its_limit() {
-    let Some((_source, copy, placed)) = aggregating("first-exposed") else {
-        return;
-    };
-    let http = Fake::by_route(vec![
-        (
-            Method::Get,
-            "/internalapi/config",
-            Answer::reply(200, "{\"auth\": {}, \"main\": {}, \"indexers\": []}"),
-        ),
-        (
-            Method::Put,
-            "/internalapi/config",
-            Answer::reply(200, "{\"ok\": true}"),
-        ),
-        (
-            Method::Get,
-            "/internalapi/control/restart",
-            Answer::reply(200, ""),
-        ),
-    ]);
-    let said = first_run(&placed, &copy, http).await;
-    assert!(
-        said.as_ref()
-            .is_err_and(|why| why.contains("still answered its configuration to anybody 60")),
-        "{said:?}"
-    );
-}
-
-#[tokio::test]
-async fn a_listening_server_that_will_not_make_the_account_or_hand_back_a_token_fails() {
-    let Some((_source, copy)) = copy("first-audiobookshelf-refused") else {
-        return;
-    };
-    let Some(placed) =
-        placed("api         = { kind = \"audiobookshelf\", key_source = \"generated\" }")
-    else {
-        return;
-    };
-    let unreachable = Fake::by_route(vec![(
-        Method::Get,
-        "/status",
-        Answer::reply(200, "{\"isInit\": false}"),
-    )]);
-    assert!(first_run(&placed, &copy, unreachable).await.is_err());
-    let tokenless = Fake::by_route(vec![
-        (
-            Method::Get,
-            "/status",
-            Answer::reply(200, "{\"isInit\": false}"),
-        ),
-        (Method::Post, "/init", Answer::reply(200, "")),
-        (Method::Post, "/login", Answer::reply(200, "{\"user\": {}}")),
-    ]);
-    let said = first_run(&placed, &copy, tokenless).await;
-    assert!(
-        said.as_ref().is_err_and(|why| why.contains("no token")),
         "{said:?}"
     );
 }

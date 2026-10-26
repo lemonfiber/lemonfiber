@@ -4,12 +4,8 @@
 //! aggregator's application sync does not serve keeps its own list of aggregators and
 //! pulls from them, so the connection is made from the other end: it is told where one
 //! is, in the aggregator's native API, and handed a key to read it with. It is asked
-//! over `indexer.pull` where it speaks the contract, and one that answers it cannot
-//! pull from that aggregator is left unpaired.
-//!
-//! Its own key is minted here and handed to the service through its environment, which
-//! it adopts in place of generating one — otherwise the key would live only in a
-//! database, and nothing outside the service could present it.
+//! over `indexer.pull`, and one that answers it cannot pull from that aggregator is left
+//! unpaired.
 
 use lemonfiber_contract::capabilities::indexer::pull;
 
@@ -17,45 +13,8 @@ use super::connecting::{pairings, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::ports::filesystem::Beneath;
-use crate::ports::service::{
-    Aggregator, AggregatorAt, Aggregators as _, Failure, KnownAggregator, Protocol,
-    PullsIndexers as _,
-};
+use crate::ports::service::{AggregatorAt, Failure, Protocol, PullsIndexers as _};
 use crate::wiring::{Filler, Fillers};
-
-/// A curator that pulls its indexers, as this pass tells it about an aggregator.
-enum Puller {
-    /// Over `indexer.pull`, through its plugin's adapter.
-    Over(pull::Adapter),
-    /// The stack's own book curator, through the adapter this build holds.
-    Bundled(crate::bindery::Bindery),
-}
-
-impl Puller {
-    /// The aggregators it already reads from.
-    async fn aggregators(&self) -> Result<Vec<KnownAggregator>, Failure> {
-        match self {
-            Self::Over(adapter) => adapter.aggregators().await,
-            Self::Bundled(client) => client.aggregators().await,
-        }
-    }
-
-    /// Read its indexers from `aggregator` as well.
-    async fn add(&self, aggregator: &AggregatorAt) -> Result<(), Failure> {
-        match self {
-            Self::Over(adapter) => adapter.add_aggregator(aggregator).await,
-            Self::Bundled(client) => {
-                client
-                    .add_aggregator(&Aggregator {
-                        name: aggregator.name.clone(),
-                        url: aggregator.url.clone(),
-                        key: aggregator.key.clone(),
-                    })
-                    .await
-            }
-        }
-    }
-}
 
 /// What this connection is called where it is reported.
 fn connection(asker: &str) -> String {
@@ -72,9 +31,8 @@ fn connection(asker: &str) -> String {
 /// no credential that is not its own. A pair nothing here connects is reported by the
 /// table, never dropped.
 ///
-/// Nothing for the stack's book curator with no key yet — the key is minted on the run
-/// that first reaches it, and a service started before that is completed by a later run
-/// rather than failed — or for an aggregator that has not written its own key yet.
+/// Nothing for an aggregator that has not written its own key yet, which a later run
+/// tells the curator about once it has.
 pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for pairing in pairings(fillers) {
@@ -82,7 +40,7 @@ pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate:
             continue;
         };
         let (Some(puller), Some(native)) = (
-            puller(ctx, fillers, asker.answering()).await,
+            puller(ctx, asker.answering()).await,
             pairing.filler.talks_in(),
         ) else {
             continue;
@@ -110,33 +68,13 @@ pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate:
     wirings
 }
 
-/// The curator as this pass tells it: over `indexer.pull` where it speaks the contract,
-/// otherwise as the stack's own book curator. Nothing where it speaks the contract and
-/// cannot be asked over it.
-async fn puller(ctx: &Ctx, fillers: &Fillers, asker: &Filler) -> Option<Puller> {
+/// The curator as this pass tells it, over `indexer.pull`: nothing where it does not
+/// speak the contract or cannot be asked over it.
+async fn puller(ctx: &Ctx, asker: &Filler) -> Option<pull::Adapter> {
     match spoken(ctx, asker, pull::CAPABILITY, pull::MAJOR).await {
-        Spoken::Over(adapter) => Some(Puller::Over(pull::Adapter(adapter))),
-        Spoken::Unanswered => None,
-        Spoken::Not => reader(ctx, fillers, asker).map(Puller::Bundled),
+        Spoken::Over(adapter) => Some(pull::Adapter(adapter)),
+        Spoken::Unanswered | Spoken::Not => None,
     }
-}
-
-/// The book curator as a client holding the key lemonfiber minted for it, under the setting
-/// kept for it, where it publishes a port and the key is recorded.
-///
-/// The key is minted where the services are started, before this one has ever run, and
-/// the service adopts it from its environment then — so the recorded value is what both
-/// sides hold.
-fn reader(ctx: &Ctx, fillers: &Fillers, asker: &Filler) -> Option<crate::bindery::Bindery> {
-    let port = asker.published?;
-    let setting = fillers.setting(asker, crate::config::API_KEY_SUFFIX)?;
-    let key = crate::app::targets::recorded_secret(ctx, &setting)?;
-    Some(crate::bindery::Bindery::new(
-        ctx.seams.http.clone(),
-        crate::app::targets::loopback(port),
-        &asker.id,
-        key,
-    ))
 }
 
 /// Point the service at the aggregator, leaving it alone where it already is.
@@ -150,7 +88,7 @@ fn reader(ctx: &Ctx, fillers: &Fillers, asker: &Filler) -> Option<crate::bindery
 /// reads no aggregator of that native API, which is a pair nothing here connects rather
 /// than a fault.
 async fn told(
-    puller: &Puller,
+    puller: &pull::Adapter,
     asker: &str,
     aggregator: &AggregatorAt,
     rehearsing: bool,
@@ -173,7 +111,7 @@ async fn told(
             ours: Some(aggregator.url.clone()),
         };
     }
-    if let Err(failure) = puller.add(aggregator).await {
+    if let Err(failure) = puller.add_aggregator(aggregator).await {
         return unreached(asker, aggregator, &failure);
     }
     crate::seed::State::Wired

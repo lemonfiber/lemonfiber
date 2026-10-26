@@ -52,9 +52,6 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
             .await,
         );
     }
-    // The aggregator's authentication, where lemonfiber turned it on and it has been
-    // turned off since: a reset is what turns it back on.
-    wirings.extend(super::guarding::put_back(ctx, &fillers, &baseline, confirm).await);
     wirings.extend(super::owning::put_back(ctx, &fillers, &baseline, confirm).await);
     if confirm {
         save_baseline(ctx, &records);

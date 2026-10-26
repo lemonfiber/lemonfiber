@@ -11,92 +11,26 @@ fn said(waiting: &[&str]) -> Option<String> {
         .map(|manifest| costs(&manifest, &named))
 }
 
-/// A key the service adopts at first start is minted where none is recorded.
-#[tokio::test]
-async fn a_key_the_service_adopts_is_minted_before_it_starts() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("mint");
-    let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
-    let _ = std::fs::write(&env, "DATA_ROOT=/tmp\n");
-
-    let settings = crate::config::Settings {
-        env_file: Some(env.clone()),
-        ..crate::config::Settings::default()
-    };
-    let ctx = crate::test_support::a_context()
-        .settings(settings)
-        .build()
-        .with_random(std::sync::Arc::new(
-            lemonfiber_fixtures::support::FixedRandom(Some(vec![7; 32])),
-        ));
-    let written = Manifest::from_toml(STACK).ok().map(|manifest| {
-        super::mint_adopted_secrets(&ctx, &manifest);
-        std::fs::read_to_string(&env).unwrap_or_default()
-    });
-    let _ = std::fs::remove_dir_all(&dir);
-
-    assert!(
-        written
-            .as_deref()
-            .is_some_and(|written| written.contains("BINDERY_API_KEY=")),
-        "no key was minted for the service that adopts one: {written:?}"
-    );
-}
-
-/// A key that cannot be minted is not recorded, and the start goes on: the connection
-/// that needs it reports its absence.
-#[tokio::test]
-async fn a_key_that_cannot_be_minted_is_left_unrecorded() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("unminted");
-    let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
-    let _ = std::fs::write(&env, "DATA_ROOT=/tmp\n");
-    let ctx = crate::test_support::a_context()
-        .settings(crate::config::Settings {
-            env_file: Some(env.clone()),
-            ..crate::config::Settings::default()
-        })
-        .build()
-        .with_random(std::sync::Arc::new(
-            lemonfiber_fixtures::support::FixedRandom(None),
-        ));
-
-    let written = Manifest::from_toml(STACK).ok().map(|manifest| {
-        super::mint_adopted_secrets(&ctx, &manifest);
-        std::fs::read_to_string(&env).unwrap_or_default()
-    });
-    let _ = std::fs::remove_dir_all(&dir);
-
-    assert_eq!(written.as_deref(), Some("DATA_ROOT=/tmp\n"));
-}
-
-/// Both ways of starting mint the key, because there are two.
-///
-/// A start can be waited on or streamed, and the streamed one is what the command
-/// line uses — so a credential minted on only the waited-on path is one the
-/// operator never gets. That is not hypothetical: it was written on one path
-/// first, and the feature did nothing at all while its own tests passed.
+/// Both ways of starting make the door's certificate before they spawn, because there
+/// are two, and the door will not serve without one.
 ///
 /// Pinned by the call rather than by behaviour, since neither path can be run here
 /// without a container to start.
 #[test]
-fn both_ways_of_starting_mint_the_key_a_service_adopts() {
+fn both_ways_of_starting_make_the_doors_certificate_first() {
     const WAITED: &str = include_str!("../engine.rs");
     const STREAMED: &str = include_str!("../engine/streaming.rs");
     for (path, source) in [("engine.rs", WAITED), ("engine/streaming.rs", STREAMED)] {
-        let before_spawn = source
-            .split_once("mint_adopted_secrets(ctx, &manifest)")
-            .map(|(before, _)| before);
         assert!(
-            before_spawn.is_some(),
-            "{path} starts services without minting the key one of them adopts"
+            source.contains("door::made_before_start(ctx, &manifest)"),
+            "{path} starts services without making the door's certificate"
         );
     }
 }
 
 /// Both ways of starting ask the same two things first, because there are two.
 ///
-/// The same hazard the minting above is pinned against, on two questions asked at
+/// The same hazard the certificate above is pinned against, on two questions asked at
 /// moments nobody is watching. A start recorded on only the waited-on path leaves
 /// the next boot bringing back whatever form the *other* path last named; a data
 /// location proven present on only that path leaves the one an operator actually
@@ -125,25 +59,6 @@ fn both_ways_of_starting_ask_the_same_things_before_they_spawn() {
             "{path} starts services without proving the data location is there"
         );
     }
-}
-
-/// The stack this repository ships declares the service whose key is minted for it.
-///
-/// The minting is gated on that declaration, so a stack that stopped naming it
-/// would silently stop minting — and the service would generate a key of its own
-/// into a database, which is the state nothing outside it can recover from.
-#[test]
-fn the_shipped_stack_declares_the_service_whose_key_is_minted() {
-    let manifest = Manifest::from_toml(STACK).ok();
-    let declared = manifest.is_some_and(|manifest| {
-        manifest.services.iter().any(|service| {
-            service
-                .api
-                .as_ref()
-                .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Bindery)
-        })
-    });
-    assert!(declared, "the shipped stack names no service with that API");
 }
 
 #[test]

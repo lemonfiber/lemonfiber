@@ -395,13 +395,8 @@ async fn worked(
     sweep.taken_away(ctx).await;
     copies.made(ctx).await?;
 
-    // One credential has to exist before the service that uses it has ever run: the
-    // book curator takes a key from its environment on its first start and generates its
-    // own otherwise, and what it generates lives in a database nothing here can read.
-    // Minted here rather than while seeding, because seeding happens after the service
-    // is already up and has therefore already decided.
     if starts(action) {
-        mint_adopted_secrets(ctx, &manifest);
+        crate::screening::door::made_before_start(ctx, &manifest);
     }
 
     // Let go of what is about to start before it runs, and write down what a stop
@@ -454,35 +449,6 @@ async fn pulled(ctx: &Ctx, command: &[String]) -> Result<Output, Failure> {
         }
     }
     Ok(output)
-}
-
-/// Put the credentials a service adopts at first start where it will read them.
-///
-/// Only one service works this way, and only once: given a key in its environment it
-/// takes that value, and without one it makes its own and keeps it somewhere nothing
-/// outside it can read. So the key has to be there before it ever starts, and a key
-/// already recorded is left alone — minting a second would be a value the service has
-/// no reason to adopt.
-///
-/// Silent about failure on purpose: a stack that cannot record this still starts, and
-/// the connection that needs the key reports its own absence rather than this stopping
-/// the services from running at all.
-pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) {
-    crate::screening::door::made_before_start(ctx, manifest);
-    let declares_book_curator = manifest.services.iter().any(|service| {
-        service
-            .api
-            .as_ref()
-            .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Bindery)
-    });
-    if !declares_book_curator
-        || super::targets::recorded_secret(ctx, crate::config::BOOK_CURATOR_API_KEY).is_some()
-    {
-        return;
-    }
-    if let Some(key) = crate::secret::generate(ctx.seams.random.as_ref()) {
-        let _ = super::targets::record_secret(ctx, crate::config::BOOK_CURATOR_API_KEY, &key);
-    }
 }
 
 /// The stack's manifest, and what the named forms come to in it.

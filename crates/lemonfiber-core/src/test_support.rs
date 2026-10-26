@@ -15,6 +15,12 @@ pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
 #[path = "../../lemonfiber-testing/src/adapted.rs"]
 mod adapted;
+#[path = "../../lemonfiber-testing/src/aggregator.rs"]
+pub mod aggregator;
+#[path = "../../lemonfiber-testing/src/books.rs"]
+pub mod books;
+#[path = "../../lemonfiber-testing/src/listening.rs"]
+pub mod listening;
 #[path = "../../lemonfiber-testing/src/media.rs"]
 pub mod media;
 #[path = "../../lemonfiber-testing/src/subtitles.rs"]
@@ -26,6 +32,8 @@ pub mod usenet;
 
 mod crossing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader};
+mod gating;
+pub(crate) use gating::{a_contracted_gate, unaskable_gates, GATE_TRUSTED};
 
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.
 ///
@@ -366,37 +374,6 @@ pub(crate) fn contracted(
     installed.manifest = CONTRACTED_MANIFEST.to_owned();
     installed.tree = crate::test_support::A_TREE.to_owned();
     installed
-}
-
-/// The plugin [`a_contracted_gate`] is installed as.
-pub(crate) const GATE_PLUGIN: &str = "gater";
-
-/// [`GATE_PLUGIN`], whose service stands in for the stack's request gate over
-/// `request.gate`.
-pub(crate) fn a_contracted_gate() -> crate::plugin::Installed {
-    let mut installed = contracted(
-        GATE_PLUGIN,
-        crate::app::gating::SERVICE,
-        lemonfiber_contract::capabilities::request::gate::CAPABILITY,
-    );
-    for placed in &mut installed.services {
-        placed.replaces = Some(crate::app::gating::SERVICE.to_owned());
-    }
-    installed
-}
-
-/// [`GATE_PLUGIN`] as first-party.
-pub(crate) const GATE_TRUSTED: [crate::plugin::first_party::FirstParty; 1] =
-    first_party(GATE_PLUGIN);
-
-/// Each way [`a_contracted_gate`] cannot be asked over its contract, named: untrusted, or
-/// first-party and holding no key — with what is first-party, and whether it is keyed.
-pub(crate) fn unaskable_gates() -> [(
-    &'static str,
-    &'static [crate::plugin::first_party::FirstParty],
-    bool,
-); 2] {
-    [("untrusted", &[], true), ("unkeyed", &GATE_TRUSTED, false)]
 }
 
 /// `plugin`, installed from its contracted manifest, as first-party.

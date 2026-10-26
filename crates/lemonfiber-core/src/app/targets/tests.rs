@@ -25,38 +25,15 @@ fn resolving() -> (
     (services, project)
 }
 
-/// The shipped stack's only unsupported service is the one deferred on purpose.
-///
-/// Not "none", which is what this claimed before somebody ran it: the stack ships
-/// the book indexer, whose shape is the single entry in
-/// [`crate::unsupported::DEFERRED`], so the honest assertion is that the list
-/// holds exactly that and nothing beside it. Written against the declaration
-/// rather than against a name spelled again here — a shape that stops being
-/// deferred stops being expected by the same edit that makes it speakable, and a
-/// second service arriving unsupported fails this whichever shape it declares.
+/// Every service the shipped stack declares is one this build reaches.
 #[test]
-fn the_shipped_stack_defers_one_service_and_only_the_one() {
+fn the_shipped_stack_declares_no_service_this_build_cannot_reach() {
     let (services, project) = resolving();
     let found = super::unsupported_here(&services, project.as_deref());
 
-    let deferred: Vec<&str> = crate::unsupported::DEFERRED
-        .iter()
-        .map(|(_, because)| *because)
-        .collect();
-    let unexpected: Vec<&crate::model::UnsupportedReport> = found
-        .iter()
-        .filter(|report| !deferred.contains(&report.because.as_str()))
-        .collect();
-
     assert!(
-        unexpected.is_empty(),
-        "a service this build ships declares an API it cannot speak or reach, and \
-         it is not one of the shapes deferred on purpose: {unexpected:?}"
-    );
-    assert_eq!(
-        found.len(),
-        1,
-        "the stack ships exactly one deferred service — the book indexer: {found:?}"
+        found.is_empty(),
+        "a service this build ships declares an API it cannot reach: {found:?}"
     );
 }
 
@@ -81,24 +58,16 @@ fn a_declaration_this_build_cannot_reach_is_named_in_the_same_list() {
     );
 }
 
-/// Everything this build cannot cover reads in one order, whichever of the two
-/// sources named each of them.
+/// Everything this build cannot cover reads in the order of the services it names, not
+/// the order the stack declares them in.
 ///
-/// The list is assembled by appending one source to the other, so left alone it
-/// would carry the seam it was built along: the shapes this build does not speak
-/// first, then the declarations it cannot reach, each in manifest order. An
-/// operator reading it has no idea there are two sources and no reason to learn —
-/// what they have is a list of services with something wrong, and two of them next
-/// to each other should be next to each other for a reason they can see.
-///
-/// Driven with two unreachable declarations rather than one, because a single
-/// entry proves nothing about an order and a pair already in order proves nothing
-/// either: the two chosen here are declared the other way round.
+/// Driven with two unreachable declarations rather than one, because a single entry
+/// proves nothing about an order and a pair already in order proves nothing either: the
+/// two chosen here are declared the other way round.
 #[test]
-fn what_this_build_cannot_cover_reads_in_one_order_whichever_source_named_it() {
+fn what_this_build_cannot_cover_reads_in_the_order_of_the_services_it_names() {
     let (services, project) = resolving();
-    // Two curator declarations with the port taken away — unreachable, and so in
-    // the list beside the one shape this build defers on purpose.
+    // Two curator declarations with the port taken away, and so unreachable.
     let theirs: Vec<lemonfiber_manifest::Service> = services
         .into_iter()
         .map(|mut service| {
@@ -123,7 +92,7 @@ fn what_this_build_cannot_cover_reads_in_one_order_whichever_source_named_it() {
     let found = super::unsupported_here(&theirs, project.as_deref());
 
     let named: Vec<&str> = found.iter().map(|report| report.what.as_str()).collect();
-    assert_eq!(named, vec!["bindery", "lidarr", "prowlarr"], "{found:?}");
+    assert_eq!(named, vec!["lidarr", "prowlarr"], "{found:?}");
 }
 
 #[test]

@@ -258,33 +258,23 @@ pub const TORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 /// service's identity wiring reads back. The account name is [`MEDIA_SERVER_ADMIN_USER`].
 pub const MEDIA_SERVER_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 
-/// The environment key holding the listening server's first-account password.
-///
-/// The same shape as the media server's and for the same reason: the service starts with no
-/// account and writes no key, so lemonfiber mints this, creates the account with it,
-/// and keeps it. The account is made so that nobody else on the network can claim the
-/// server first; no token of it is recorded.
+/// The environment key holding the password of the stack's own listening server's first
+/// account, which a first-party listening server moved in its place answers to.
 pub(crate) const LISTENING_SERVER_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 
-/// The environment key holding the Usenet indexer aggregator's administrator password.
-///
-/// The aggregator starts with no authentication, so there is nothing to read: lemonfiber
-/// mints this, turns authentication on with it, and keeps it, so that the indexer
-/// accounts the aggregator holds are not read by anything that can reach it.
+/// The environment key holding the password of the stack's own Usenet indexer
+/// aggregator's administrator, which a first-party aggregator moved in its place answers
+/// to.
 pub(crate) const USENET_AGGREGATOR_ADMIN_PASSWORD_KEY: &str = "NZBHYDRA2_ADMIN_PASSWORD";
 
-/// The name of the administrator lemonfiber gives the Usenet indexer aggregator.
+/// The name of the stack's own Usenet indexer aggregator's administrator.
 pub(crate) const USENET_AGGREGATOR_ADMIN_USER: &str = "admin";
 
-/// The environment key holding the book curator's API key.
-///
-/// The one credential in the stack that lemonfiber mints and the *service* adopts,
-/// rather than one it mints and keeps: given this in its environment the service takes
-/// it verbatim instead of generating its own, which is what lets both sides know it
-/// without reading the database it would otherwise keep it in.
+/// The environment key holding the key the stack's own book curator adopted from its
+/// environment, which a first-party book curator moved in its place answers to.
 pub(crate) const BOOK_CURATOR_API_KEY: &str = "BINDERY_API_KEY";
 
-/// The name of the listening server's first account.
+/// The name of the stack's own listening server's first account.
 pub(crate) const LISTENING_SERVER_USER: &str = "admin";
 
 /// The name of the media server's administrator account lemonfiber creates at setup — the

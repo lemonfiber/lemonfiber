@@ -299,7 +299,7 @@ pub fn every() -> Vec<Code> {
 ///
 /// Each was published with a meaning and nothing raises it. An operator who searches for
 /// one must never land on a different problem that was given its number.
-pub const RETIRED: &[&str] = &["QUOTA-3"];
+pub const RETIRED: &[&str] = &["CONFIG-7", "QUOTA-3"];
 
 /// Where a code sorts: its family, then its number.
 fn ordering(code: &str) -> (&str, u32) {

@@ -26,22 +26,34 @@ const OURS: &str = "ours";
 /// What a part nobody holds is, where a run says what it would do.
 const NOBODY: &str = "nobody holds it";
 
-/// Every service here speaking `owner.claim`, each with its part as asked over the
+/// One part that belongs to whoever claims it first: the service claimed, and the service
+/// speaking `owner.claim` for it.
+#[derive(Clone, Copy)]
+pub(crate) struct Claimable<'f> {
+    /// The service claimed: the upstream the speaker fronts, or the speaker itself.
+    pub(crate) part: &'f Filler,
+    /// The service speaking `owner.claim` for it, whose `upstream.json` holds the
+    /// credential it is claimed with.
+    pub(crate) speaker: &'f Filler,
+}
+
+/// Every part here claimed over `owner.claim`, each with the speaker as asked over the
 /// contract, or nothing where it cannot be asked.
 pub(crate) async fn parts<'f>(
     ctx: &Ctx,
     fillers: &'f Fillers,
-) -> Vec<(&'f Filler, Option<claim::Adapter>)> {
+) -> Vec<(Claimable<'f>, Option<claim::Adapter>)> {
     let mut found = Vec::new();
-    for filler in fillers
+    for speaker in fillers
         .services()
         .filter(|one| one.contracted(claim::CAPABILITY, claim::MAJOR))
     {
-        let part = match spoken(ctx, filler, claim::CAPABILITY, claim::MAJOR).await {
+        let asked = match spoken(ctx, speaker, claim::CAPABILITY, claim::MAJOR).await {
             Spoken::Over(adapter) => Some(claim::Adapter(adapter)),
             Spoken::Unanswered | Spoken::Not => None,
         };
-        found.push((filler, part));
+        let part = fillers.fronted_by(speaker).unwrap_or(speaker);
+        found.push((Claimable { part, speaker }, asked));
     }
     found
 }
@@ -87,18 +99,17 @@ fn connection(name: &str) -> String {
 pub(super) async fn owned(ctx: &Ctx, fillers: &Fillers, baseline: &mut Baseline) -> Vec<Wiring> {
     let at = ctx.stamp();
     let mut wirings = Vec::new();
-    for (filler, part) in parts(ctx, fillers).await {
-        let Some(part) = part else {
-            wirings.push(Wiring::settled(
-                connection(&filler.name),
-                unasked(&filler.name),
-            ));
+    for (claimable, asked) in parts(ctx, fillers).await {
+        let name = claimable.part.name.as_str();
+        let Some(asked) = asked else {
+            wirings.push(Wiring::settled(connection(name), unasked(name)));
             continue;
         };
-        let recorded = baseline.expected(&filler.id, FIELD).is_some();
-        let wiring = owning(ctx, filler, &part, recorded).await;
+        let id = claimable.part.id.as_str();
+        let recorded = baseline.expected(id, FIELD).is_some();
+        let wiring = owning(ctx, claimable, &asked, recorded).await;
         if matches!(wiring.state, State::Wired | State::AlreadyWired) {
-            baseline.record(&filler.id, FIELD, OURS, &at);
+            baseline.record(id, FIELD, OURS, &at);
         }
         wirings.push(wiring);
     }
@@ -107,10 +118,15 @@ pub(super) async fn owned(ctx: &Ctx, fillers: &Fillers, baseline: &mut Baseline)
 
 /// One part, claimed where lemonfiber has not claimed it before and the run is not one
 /// that only says what it would do.
-async fn owning(ctx: &Ctx, filler: &Filler, part: &dyn Ownership, recorded: bool) -> Wiring {
-    let name = filler.name.as_str();
+async fn owning(
+    ctx: &Ctx,
+    claimable: Claimable<'_>,
+    part: &dyn Ownership,
+    recorded: bool,
+) -> Wiring {
+    let name = claimable.part.name.as_str();
     if !recorded && !ctx.dry_run {
-        return Wiring::settled(connection(name), answered(filler, claimed(part).await));
+        return Wiring::settled(connection(name), answered(claimable, claimed(part).await));
     }
     let state = match held(part).await {
         Ok(Owner::Ours) => State::AlreadyWired,
@@ -119,7 +135,7 @@ async fn owning(ctx: &Ctx, filler: &Filler, part: &dyn Ownership, recorded: bool
             yours: Some(NOBODY.to_owned()),
             ours: None,
         },
-        other => answered(filler, other),
+        other => answered(claimable, other),
     };
     Wiring::settled(connection(name), state)
 }
@@ -133,32 +149,35 @@ pub(super) async fn put_back(
     confirm: bool,
 ) -> Vec<Wiring> {
     let mut wirings = Vec::new();
-    for (filler, part) in parts(ctx, fillers).await {
-        let Some(part) = part.filter(|_| baseline.expected(&filler.id, FIELD).is_some()) else {
+    for (claimable, asked) in parts(ctx, fillers).await {
+        let Some(asked) = asked.filter(|_| baseline.expected(&claimable.part.id, FIELD).is_some())
+        else {
             continue;
         };
-        let state = match held(&part).await {
+        let state = match held(&asked).await {
             Ok(Owner::Ours) => continue,
-            Ok(Owner::Open) if confirm => answered(filler, claimed(&part).await),
+            Ok(Owner::Open) if confirm => answered(claimable, claimed(&asked).await),
             Ok(Owner::Open) => State::WouldWire {
                 yours: Some(NOBODY.to_owned()),
                 ours: None,
             },
-            other => answered(filler, other),
+            other => answered(claimable, other),
         };
-        wirings.push(Wiring::settled(connection(&filler.name), state));
+        wirings.push(Wiring::settled(connection(&claimable.part.name), state));
     }
     wirings
 }
 
 /// How a part stands where `owner` is who holds it after lemonfiber claimed it.
-fn answered(filler: &Filler, owner: Result<Owner, Failure>) -> State {
+fn answered(claimable: Claimable<'_>, owner: Result<Owner, Failure>) -> State {
+    let (name, secrets) = (&claimable.part.name, claimable.speaker.upstream_settings());
     match owner {
         Ok(Owner::Theirs) => State::Refused {
-            reason: refusal(&filler.name, &filler.upstream_settings()),
+            reason: refusal(name, &secrets),
         },
-        Ok(owner) => unclaimed(&filler.name, owner, &filler.upstream_settings())
-            .map_or(State::Wired, |detail| State::Failed { detail }),
+        Ok(owner) => {
+            unclaimed(name, owner, &secrets).map_or(State::Wired, |detail| State::Failed { detail })
+        }
         Err(failure) => crate::seed::unreached(&failure),
     }
 }
