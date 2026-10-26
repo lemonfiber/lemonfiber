@@ -257,6 +257,12 @@ impl crate::ports::service::Maintenance for Servarr {
             .await?;
         self.endpoint.expect_success(&response)
     }
+
+    async fn wanting(&self) -> Result<bool, Failure> {
+        quality::first_wanted(self)
+            .await
+            .map(|first| first.is_some())
+    }
 }
 
 /// The API key a Servarr application wrote to its configuration, if it has

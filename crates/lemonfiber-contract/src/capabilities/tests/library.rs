@@ -69,6 +69,9 @@ impl Maintenance for Upstream {
         self.tell(format!("upgrades {kind:?}"));
         Ok(())
     }
+    async fn wanting(&self) -> Result<bool, Failure> {
+        Ok(true)
+    }
 }
 
 #[async_trait]
@@ -256,6 +259,7 @@ where
         format!("{:?}", curator.download_clients().await),
         format!("{:?}", curator.quality_profiles().await),
         format!("{:?}", curator.search_upgrades(Kind::Tv).await),
+        format!("{:?}", curator.wanting().await),
         format!("{:?}", curator.hardlinks().await),
         format!("{:?}", curator.set_hardlinks(false).await),
         format!("{:?}", curator.records(Record::Indexer).await),

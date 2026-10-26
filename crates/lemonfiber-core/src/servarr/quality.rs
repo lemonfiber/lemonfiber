@@ -112,20 +112,8 @@ async fn apply_music_format(
     Ok(())
 }
 
-impl Servarr {
-    /// Whether anything is on the wanted list, which a release search is spent on: read
-    /// from the list alone, so it searches nothing.
-    ///
-    /// # Errors
-    ///
-    /// [`Failure`] where the wanted list cannot be read.
-    pub(crate) async fn wants_any(&self) -> Result<bool, Failure> {
-        first_wanted(self).await.map(|first| first.is_some())
-    }
-}
-
 /// The first item on the wanted list, where there is one.
-async fn first_wanted(servarr: &Servarr) -> Result<Option<i64>, Failure> {
+pub(super) async fn first_wanted(servarr: &Servarr) -> Result<Option<i64>, Failure> {
     let response = servarr
         .probe(&servarr.request(Method::Get, "/wanted/missing?page=1&pageSize=1", None))
         .await?;

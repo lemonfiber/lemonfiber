@@ -179,6 +179,8 @@ crate::contract! {
         impl Maintenance {
             /// Re-search what it holds of one kind for a better release.
             fn search_upgrades(value kind: Kind) -> () where asks = Asked { kind: Kind::Tv };
+            /// Whether anything is on its wanted list, read without searching.
+            fn wanting() -> bool where asks = Asked {};
         }
         impl Importing {
             /// Whether it imports by hard link.
