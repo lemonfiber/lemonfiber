@@ -120,7 +120,7 @@ fn each_installed_part_asks_the_dashboard_from_its_plugin() {
             lemonfiber_testing::subtitles::PLUGIN,
         ),
         (
-            lemonfiber_testing::listening::moved(),
+            lemonfiber_testing::listening::MOVED.installed(),
             lemonfiber_testing::listening::PLUGIN,
         ),
     ] {
@@ -136,7 +136,10 @@ fn each_installed_part_asks_the_dashboard_from_its_plugin() {
 #[test]
 fn the_installed_listening_server_asks_the_proxy_from_its_plugin() {
     assert_eq!(
-        asking_from(lemonfiber_testing::listening::moved(), "proxy.front"),
+        asking_from(
+            lemonfiber_testing::listening::MOVED.installed(),
+            "proxy.front"
+        ),
         vec![lemonfiber_testing::listening::PLUGIN.to_owned()]
     );
 }

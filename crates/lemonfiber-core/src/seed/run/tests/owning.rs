@@ -389,11 +389,14 @@ fn a_refusal_names_every_setting_lemonfiber_holds_for_the_part() {
 /// `http`.
 fn three_moved(http: Arc<Fake>) -> (Ctx, crate::wiring::Fillers) {
     use crate::test_support::{aggregator, books, listening, media};
-    let installed: Vec<crate::plugin::Installed> =
-        [aggregator::moved(), books::moved(), listening::moved()]
-            .into_iter()
-            .flatten()
-            .collect();
+    let installed: Vec<crate::plugin::Installed> = [
+        aggregator::MOVED.installed(),
+        books::moved(),
+        listening::MOVED.installed(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     let fillers = crate::test_support::stack()
         .manifest()
         .map(|manifest| {
@@ -407,9 +410,10 @@ fn three_moved(http: Arc<Fake>) -> (Ctx, crate::wiring::Fillers) {
         .unwrap_or_default();
     let mut ctx = seed_ctx(true, Vec::new(), None, None).with_http(http);
     ctx.seams.engine = Arc::new(
-        aggregator::running()
+        aggregator::MOVED
+            .running()
             .alongside(books::running())
-            .alongside(listening::running()),
+            .alongside(listening::MOVED.running()),
     );
     ctx.seams.confined = media::Keyed::holding(
         Arc::clone(&ctx.seams.confined),

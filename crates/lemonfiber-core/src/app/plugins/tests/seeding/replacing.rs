@@ -714,7 +714,7 @@ fn carried(
 fn the_aggregator_and_the_listening_server_moved_in_place_keep_their_accounts() {
     let aggregator = carried(
         "seeded-carried-aggregator",
-        crate::test_support::aggregator::moved(),
+        crate::test_support::aggregator::MOVED.installed(),
         &[(
             crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
             RECORDED,
@@ -722,7 +722,7 @@ fn the_aggregator_and_the_listening_server_moved_in_place_keep_their_accounts() 
     );
     let listening = carried(
         "seeded-carried-listening",
-        crate::test_support::listening::moved(),
+        crate::test_support::listening::MOVED.installed(),
         &[(crate::config::LISTENING_SERVER_PASSWORD_KEY, RECORDED)],
     );
 
@@ -768,7 +768,7 @@ fn the_book_curator_moved_in_place_keeps_its_key_and_is_minted_an_account() {
 fn a_moved_aggregator_whose_password_was_never_recorded_is_minted_one() {
     let minted = carried(
         "seeded-carried-unrecorded",
-        crate::test_support::aggregator::moved(),
+        crate::test_support::aggregator::MOVED.installed(),
         &[],
     );
 
