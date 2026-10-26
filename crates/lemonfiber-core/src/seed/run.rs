@@ -413,7 +413,7 @@ async fn seed_media_server(
     // Which origins a browser may read the media server from: the front door's alone.
     // After the identity's first half, because that is what records the administrator
     // credential this is written with.
-    wirings.extend(cors::seed_cors(ctx, services, server).await);
+    wirings.extend(cors::seed_cors(ctx, services, fillers, server).await);
 
     // The decline service's key, minted in the server the decline service names.
     wirings.extend(decline::seed_decline_key(ctx, services, fillers, project).await);

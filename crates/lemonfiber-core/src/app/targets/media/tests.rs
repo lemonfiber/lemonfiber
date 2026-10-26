@@ -166,14 +166,14 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
             .wirings
             .retain(|wiring| wiring.asks.as_deref() != Some(super::IDENTITY));
     };
-    let served: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
-    let fillers = shipped(&served, &Chosen::default(), unasked);
+    let moved: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
+    let fillers = shipped(&moved, &Chosen::default(), unasked);
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some("jellyfin"));
     assert_eq!(server.as_ref().and_then(crate::test_support::asker), None);
 
-    let mut both = served;
+    let mut both = moved;
     both.push(a_contracted_media_server(None));
     assert_eq!(
         MediaServer::of(&shipped(&both, &Chosen::default(), unasked)),

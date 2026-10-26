@@ -238,6 +238,14 @@ pub(crate) fn beside_contracted_requests(
     ctx
 }
 
+/// `ctx` with every part the bundle installs recorded beside an env file of its own under
+/// `name`.
+pub(crate) fn parts_recorded(mut ctx: crate::app::Ctx, name: &str) -> crate::app::Ctx {
+    ctx.settings.env_file = Some(env_without_password(name));
+    adapted::parts_recorded(&ctx);
+    ctx
+}
+
 /// A curator configuration carrying a readable key, so the stack resolves its targets.
 pub(crate) const KEYED_CURATOR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 

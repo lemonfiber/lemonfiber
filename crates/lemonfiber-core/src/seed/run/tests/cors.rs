@@ -17,10 +17,17 @@ fn stack() -> Vec<lemonfiber_manifest::Service> {
     vec![published(media_server_svc()), published(requests_svc())]
 }
 
-/// A context whose household is reached at a recorded address, asking the media server
-/// moved into its plugin as its administrator where `administered` says, answering over
-/// `http`.
+/// A context whose household is reached at a recorded address, with every part the bundle
+/// installs recorded, asking the media server moved into its plugin as its administrator
+/// where `administered` says, answering over `http`.
 fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
+    let ctx = unmoved_ctx(name, administered, http);
+    crate::test_support::adapted::parts_recorded(&ctx);
+    ctx
+}
+
+/// As [`cors_ctx`], with no part recorded.
+fn unmoved_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     // Kept rather than scoped to this helper, because the context reads the file long
     // after the helper returns and a scratch directory goes when its handle does.
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
@@ -73,9 +80,21 @@ fn written(http: &Fake) -> Vec<String> {
         .collect()
 }
 
-/// The one wiring this pass reports, and the configurations it wrote.
+/// The one wiring this pass reports over `services`, holding the media server the shipped
+/// stack's identity ask settles on among them.
+async fn seeded(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Option<Wiring> {
+    super::super::cors::seed_cors(
+        ctx,
+        services,
+        &crate::wiring::Fillers::default(),
+        served(services).as_ref(),
+    )
+    .await
+}
+
+/// The one wiring this pass reports over [`stack`], and the configurations it wrote.
 async fn seeded_cors(ctx: &Ctx, http: &Fake) -> (Option<State>, Vec<String>) {
-    let wiring = super::super::cors::seed_cors(ctx, &stack(), served(&stack()).as_ref()).await;
+    let wiring = seeded(ctx, &stack()).await;
     (wiring.map(|one| one.state), written(http))
 }
 
@@ -142,7 +161,7 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
     let mut ctx = cors_ctx("cors-nowhere", true, http.clone());
     ctx.settings.household_host = None;
 
-    let wiring = super::super::cors::seed_cors(&ctx, &stack(), served(&stack()).as_ref()).await;
+    let wiring = seeded(&ctx, &stack()).await;
 
     assert!(
         wiring
@@ -160,16 +179,11 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
 async fn without_a_credential_or_a_media_server_nothing_is_asked() {
     let http = serving(OPEN, true);
     let ctx = cors_ctx("cors-uncredentialled", false, http.clone());
-    assert!(
-        super::super::cors::seed_cors(&ctx, &stack(), served(&stack()).as_ref())
-            .await
-            .is_none()
-    );
+    assert!(seeded(&ctx, &stack()).await.is_none());
 
     let mut rehearsing = cors_ctx("cors-uncredentialled-rehearsed", false, http.clone());
     rehearsing.dry_run = true;
-    let wiring =
-        super::super::cors::seed_cors(&rehearsing, &stack(), served(&stack()).as_ref()).await;
+    let wiring = seeded(&rehearsing, &stack()).await;
     assert_eq!(
         wiring.map(|one| one.state),
         Some(State::WouldWire {
@@ -178,20 +192,10 @@ async fn without_a_credential_or_a_media_server_nothing_is_asked() {
         })
     );
 
-    assert!(super::super::cors::seed_cors(
-        &rehearsing,
-        &[published(media_server_svc())],
-        served(&[published(media_server_svc())]).as_ref()
-    )
-    .await
-    .is_none());
-    assert!(super::super::cors::seed_cors(
-        &ctx,
-        &[published(requests_svc())],
-        served(&[published(requests_svc())]).as_ref()
-    )
-    .await
-    .is_none());
+    assert!(seeded(&rehearsing, &[published(media_server_svc())])
+        .await
+        .is_none());
+    assert!(seeded(&ctx, &[published(requests_svc())]).await.is_none());
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
@@ -247,17 +251,16 @@ async fn a_write_the_media_server_refuses_is_reported() {
 /// leave no origin to name, so nothing is written and the pass warns.
 #[tokio::test]
 async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
-    let mut portless = published(requests_svc());
+    let mut portless = crate::door::fixtures::watching();
     portless.port = None;
     for (name, services) in [
         ("cors-no-door", vec![media_server_svc(), requests_svc()]),
         ("cors-no-port", vec![media_server_svc(), portless]),
     ] {
         let http = serving(OPEN, true);
-        let ctx = cors_ctx(name, true, http.clone());
+        let ctx = unmoved_ctx(name, true, http.clone());
 
-        let wiring =
-            super::super::cors::seed_cors(&ctx, &services, served(&services).as_ref()).await;
+        let wiring = seeded(&ctx, &services).await;
 
         assert!(
             wiring
@@ -269,12 +272,12 @@ async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
     }
 }
 
-/// **A plugin's origin is never allowed to read the media server.** A plugin's request
-/// service installed beside a stack holding only its library, published through the
-/// proxy at a configured domain and named as the front door, does not put its origin
-/// on the media server's allow-list: the list stays on the stack's own front door.
+/// **A stranger's origin is never allowed to read the media server.** Another plugin's
+/// request service, published through the proxy at a configured domain and named as the
+/// front door, does not put its origin on the media server's allow-list: the list stays
+/// on the door the stack and its first-party parts make.
 #[tokio::test]
-async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
+async fn a_strangers_door_never_puts_its_origin_on_the_allow_list() {
     let http = serving(OPEN, true);
     let base = cors_ctx("cors-plugin-door", true, http.clone());
     let ctx = Ctx {
@@ -285,39 +288,25 @@ async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
         },
         ..base
     };
-    let mut register = crate::plugin::Register::empty();
+    let kept = crate::app::targets::beside_env(&ctx, crate::config::paths::PLUGINS);
+    let mut register =
+        crate::app::plugins::read(&ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
     assert!(register
-        .record(crate::door::fixtures::installed(vec![
-            crate::door::fixtures::brought(
-                "requests",
-                Some(lemonfiber_manifest::ApiKind::Seerr),
-                Some("ask"),
-            )
-        ]))
+        .record(crate::door::fixtures::fronted(
+            "requests",
+            Some("request.intake@1"),
+            Some("ask"),
+        ))
         .is_ok());
-    assert!(crate::app::record::keep(
-        crate::app::targets::beside_env(&ctx, crate::config::paths::PLUGINS).as_deref(),
-        &register
-    )
-    .is_ok());
+    assert!(crate::app::record::keep(kept.as_deref(), &register).is_ok());
 
-    let services = [published(media_server_svc())];
-    let wiring = super::super::cors::seed_cors(&ctx, &services, served(&services).as_ref()).await;
+    let wiring = seeded(&ctx, &stack()).await;
     let written = written(&http);
 
     assert!(
-        written.iter().all(|body| !body.contains("home.lan")),
-        "{written:?}"
-    );
-    assert!(
         wiring.is_some_and(|wiring| !matches!(&wiring.state,
             State::WouldWire { ours: Some(origin), .. } if origin.contains("home.lan"))),
-        "a plugin's origin was offered for the allow-list"
+        "a stranger's origin was offered for the allow-list"
     );
-    assert!(
-        written
-            .iter()
-            .any(|body| body.contains("http://192.168.1.20:8096")),
-        "the list did not stay on the stack's own front door: {written:?}"
-    );
+    assert_eq!(written, vec![DOOR.to_owned()]);
 }

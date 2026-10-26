@@ -27,6 +27,7 @@ fn connection(server: &MediaServer) -> String {
 pub(super) async fn seed_cors(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     server: Option<&MediaServer>,
 ) -> Option<Wiring> {
     let server = server?;
@@ -40,7 +41,7 @@ pub(super) async fn seed_cors(
     if client.is_none() && !minting {
         return None;
     }
-    let Some(origin) = front_door_origin(ctx, services).await else {
+    let Some(origin) = front_door_origin(ctx, services, fillers).await else {
         let mut wiring = Wiring::settled(
             connection(server),
             State::Skipped {
@@ -93,13 +94,30 @@ pub(super) async fn seed_cors(
 /// household is handed for it — the same derivation every surface that shows the door
 /// uses, so the list names what the household was told.
 ///
-/// **Over the stack's own services alone.** An origin on this list may read the media
-/// server from a browser, and a plugin's page is a stranger's code: a plugin's service
-/// standing as the door, or named as it, is never given that, and the list stays on the
-/// door the stack's own services make. Nothing a plugin's service does as a door needs
-/// to read the media server from a browser, so nothing is lost by it.
-async fn front_door_origin(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    let candidates = crate::door::candidates(services, &[]);
+/// **Over the stack's own services and its first-party parts alone.** An origin on this
+/// list may read the media server from a browser, and another plugin's page is a
+/// stranger's code: such a plugin's service standing as the door, or named as it, is
+/// never given that, and the list stays on the door the stack and its first-party parts
+/// make. Nothing a stranger's service does as a door needs to read the media server from
+/// a browser, so nothing is lost by it.
+async fn front_door_origin(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
+) -> Option<String> {
+    let first_party: Vec<crate::plugin::Installed> = crate::app::plugins::read(ctx)
+        .map(|register| {
+            register
+                .installed()
+                .iter()
+                .filter(|one| {
+                    crate::plugin::first_party::holds(crate::plugin::first_party::EMBEDDED, one)
+                })
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default();
+    let candidates = crate::door::candidates(services, &first_party, fillers);
     let (_, door) = crate::door::chosen(&candidates, ctx.settings.front_door.as_deref());
     let (_, door) = door?;
     let named = ctx.site.name().await;

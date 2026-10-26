@@ -155,8 +155,8 @@ fn offered<'a, 'b>(
     Err(facing.because().to_owned())
 }
 
-/// The door a service kept to this machine is reached through, where one stands in front
-/// of it: published itself, and met under that service's name.
+/// The guard a service kept to this machine is reached through, where one stands in front
+/// of it: the library the household watches, met under that service's name.
 fn guarded<'a, 'b>(
     candidates: &'b [Candidate<'a>],
     kept: &Candidate<'a>,
@@ -164,11 +164,9 @@ fn guarded<'a, 'b>(
     if kept.facing.is_some() {
         return None;
     }
-    candidates.iter().find(|candidate| {
-        candidate.id == crate::screening::door::SERVICE
-            && candidate.facing.is_some()
-            && candidate.name == kept.name
-    })
+    candidates
+        .iter()
+        .find(|candidate| candidate.facing == Some(Facing::Watching) && candidate.name == kept.name)
 }
 
 #[cfg(test)]
