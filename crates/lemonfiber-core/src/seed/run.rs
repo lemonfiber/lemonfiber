@@ -24,6 +24,7 @@ mod connecting;
 // The media server's cross-origin allow-list, held to the front door's origin on every
 // pass.
 mod cors;
+mod crossing;
 mod proxies;
 // The decline service's own media-server key, minted for it alone.
 mod decline;
@@ -225,6 +226,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // extractor — so without this they run with nothing, and the quality sync refuses
     // its whole configuration over a single undefined name.
     wirings.push(published::publish_keys(ctx, &manifest.services, &fillers).await);
+    wirings.extend(crossing::unhanded(ctx, &manifest, &installed, &fillers));
 
     wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
 

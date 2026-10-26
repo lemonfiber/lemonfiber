@@ -1,46 +1,50 @@
-//! Replacing one of the stack's services with a plugin's that claims what it fills.
+//! Replacing one of the parts the bundle installs with a plugin's service that claims what
+//! it fills.
 //!
-//! Every ask the shipped stack makes, and every service filling it, swapped in turn
-//! for a plugin's service speaking the same adapter on a port of its own. Nothing that
-//! asks is told anything new: what it comes to is what it came to, with the stand-in
-//! named and reached where the stand-in says. The one difference is the gate's, and it
-//! is said: a connection that hands the filler the asker's own credential is withheld
-//! from a plugin, however the plugin came to fill the ask.
+//! Every ask the shipped parts make, and every part filling it, swapped in turn for a
+//! first-party plugin's service answering in the same API on a port of its own. Nothing
+//! that asks is told anything new: what it comes to is what it came to, with the stand-in
+//! named and reached where the stand-in says.
 
 use super::super::connecting::{pairings, Connection, Unmade};
 use crate::app::targets::MediaServer;
-use crate::origin::Origin;
+use crate::plugin::first_party::FirstParty;
+use crate::plugin::Installed;
 use crate::wiring::{Chosen, Filler, Fillers};
-use lemonfiber_manifest::Manifest;
 
-/// The service a plugin brings in place of one of the stack's.
+/// The service a plugin brings in place of one of the parts.
 const STAND_IN: &str = "stand-in";
 
 /// The plugin that brings it.
 const PLUGIN: &str = "replacement";
 
-/// The port it answers on, which none of the stack's services does, so a consumer
-/// reaching it there was told where it is rather than guessing.
+/// The port it answers on, which none of the parts does, so a consumer reaching it there
+/// was told where it is rather than guessing.
 const ITS_PORT: u16 = 4321;
 
 /// What one asker's ask comes to, filler by filler: whom it reaches, and the connection
 /// with where the filler is reached for it, or why there is none.
 type Plan = Vec<(String, Result<(Connection, String), Unmade>)>;
 
-/// The shipped stack, changed by `changing`, with `installed` beside it.
+/// The shipped stack, with every part the bundle installs moved into its plugin as
+/// `moving` leaves those parts and `installed` beside them, answered with `chosen` and the
+/// stand-in's plugin held first-party.
 fn shipped(
-    installed: &[crate::plugin::Installed],
+    installed: &[Installed],
     chosen: &Chosen,
-    changing: impl FnOnce(&mut Manifest),
-) -> Option<(Manifest, Fillers)> {
-    crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            changing(&mut manifest);
-            let fillers = Fillers::of(&manifest, installed, chosen, None);
-            (manifest, fillers)
-        })
-        .ok()
+    moving: impl FnOnce(&mut Vec<Installed>),
+) -> Fillers {
+    let mut parts = crate::test_support::adapted::installed_parts();
+    moving(&mut parts);
+    parts.extend_from_slice(installed);
+    let trusted: Vec<FirstParty> = crate::test_support::first_party(PLUGIN)
+        .iter()
+        .chain(crate::plugin::first_party::EMBEDDED)
+        .copied()
+        .collect();
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .map(|manifest| Fillers::trusting(&manifest, &parts, chosen, None, &trusted))
+        .unwrap_or_default()
 }
 
 /// What `by`'s ask for `capability` comes to among `fillers`.
@@ -56,8 +60,7 @@ fn plan(fillers: &Fillers, by: &str, capability: &str) -> Plan {
 }
 
 /// What `by`'s ask for `capability` should come to once `replaced` is swapped for the
-/// stand-in reached at `at`: the same, apart from the stand-in's name and address, and
-/// the gate's refusal to hand a plugin the asker's own credential.
+/// stand-in reached at `at`: the same, apart from the stand-in's name and address.
 fn expected(before: &Plan, replaced: &str, at: &str) -> Plan {
     before
         .iter()
@@ -65,107 +68,111 @@ fn expected(before: &Plan, replaced: &str, at: &str) -> Plan {
             if filler != replaced {
                 return (filler.clone(), made.clone());
             }
-            let made = match made {
-                Ok((Connection::Application(_), _)) => Err(Unmade::Withheld),
-                Ok((connection, _)) => Ok((connection.clone(), at.to_owned())),
-                Err(why) => Err(*why),
-            };
+            let made = made
+                .clone()
+                .map(|(connection, _)| (connection, at.to_owned()));
             (STAND_IN.to_owned(), made)
         })
         .collect()
 }
 
-/// A plugin bringing a service in place of `filler` for `capability`: its adapter, the
-/// media it files, and a port of its own.
-fn standing_in_for(filler: &Filler, capability: &str) -> crate::plugin::Installed {
+/// A first-party plugin bringing a service in place of `filler` for `capability`: the API
+/// it answers in, the media it files, and a port of its own.
+fn standing_in_for(filler: &Filler, capability: &str) -> Installed {
     let mut placed = crate::test_support::a_placed(
         STAND_IN,
         &[capability],
         filler.adapter.clone(),
         Some(ITS_PORT),
     );
+    placed.native.clone_from(&filler.native);
     placed.media_types.clone_from(&filler.media_types);
-    crate::test_support::an_installed(PLUGIN, vec![placed])
+    let mut installed = crate::test_support::an_installed(PLUGIN, vec![placed]);
+    installed.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
+    installed
 }
 
-/// Whether the stack's ask from `by` for `capability` reaches every claimant at once.
-fn asks_for_each(manifest: &Manifest, by: &str, capability: &str) -> bool {
-    manifest
-        .wirings
+/// The services of `parts` that serve `id`: the service itself and the adapter in front
+/// of it.
+fn serving<'a>(
+    parts: &'a [Installed],
+    id: &'a str,
+) -> impl Iterator<Item = &'a crate::plugin::Placed> {
+    parts
         .iter()
-        .any(|wiring| wiring.by == by && wiring.asks.as_deref() == Some(capability) && wiring.each)
+        .flat_map(|part| &part.services)
+        .filter(move |placed| placed.service == id || placed.fronts.as_deref() == Some(id))
 }
 
-/// The stack with `replaced` swapped for the stand-in on the ask `by` makes for
+/// Whether `by`'s ask for `capability` among `parts` reaches every claimant at once.
+fn asks_for_each(parts: &[Installed], by: &str, capability: &str) -> bool {
+    serving(parts, by)
+        .flat_map(|placed| &placed.asks)
+        .any(|ask| ask.capability == capability && ask.each)
+}
+
+/// The parts with `replaced` swapped for the stand-in on the ask `by` makes for
 /// `capability`, the way an operator would: an ask reaching every claimant reaches the
-/// stand-in once the stack's service no longer fills it, and an ask reaching one is
-/// pointed at the stand-in with `wiring fill`.
-fn swapped(manifest: &Manifest, by: &str, capability: &str, replaced: &Filler) -> Option<Fillers> {
+/// stand-in once the part no longer fills it, and an ask reaching one is pointed at the
+/// stand-in with `wiring fill`.
+fn swapped(by: &str, capability: &str, replaced: &Filler) -> Fillers {
     let installed = [standing_in_for(replaced, capability)];
-    if asks_for_each(manifest, by, capability) {
-        let gone = replaced.id.clone();
-        shipped(&installed, &Chosen::default(), |manifest| {
-            for service in &mut manifest.services {
-                if service.id == gone {
-                    service.provides.retain(|provided| provided != capability);
+    if asks_for_each(
+        &crate::test_support::adapted::installed_parts(),
+        by,
+        capability,
+    ) {
+        shipped(&installed, &Chosen::default(), |parts| {
+            for part in parts.iter_mut() {
+                for placed in &mut part.services {
+                    if placed.service == replaced.id
+                        || placed.fronts.as_deref() == Some(replaced.id.as_str())
+                    {
+                        placed.provides.retain(|provided| provided != capability);
+                    }
                 }
             }
         })
-        .map(|(_, fillers)| fillers)
     } else {
         let chosen = Chosen::read(Some(&format!("{capability}={STAND_IN}")));
-        shipped(&installed, &chosen, |_| ()).map(|(_, fillers)| fillers)
+        shipped(&installed, &chosen, |_| ())
     }
 }
 
 /// **Nothing that asks is changed by a plugin standing in for what answers it.**
 ///
-/// Every ask a pass answers, and every one of the stack's services filling it, in turn:
-/// the asker comes to the connection it came to before, now with the stand-in, reached
-/// at the stand-in's own address, and every other filler of the same ask is left as it
-/// was. A connection that would hand the stand-in the asker's own key is withheld, which
-/// is the gate's rule and not a consumer's.
+/// Every ask a pass answers, and every part filling it, in turn: the asker comes to the
+/// connection it came to before, now with the stand-in, reached at the stand-in's own
+/// address, and every other filler of the same ask is left as it was.
 #[test]
-fn replacing_a_bundled_service_changes_nothing_that_asks() {
-    let shipped_stack = shipped(&[], &Chosen::default(), |_| ());
-    assert!(shipped_stack.is_some(), "the shipped stack reads");
+fn replacing_a_part_changes_nothing_that_asks() {
+    let before = shipped(&[], &Chosen::default(), |_| ());
+    let at = format!("http://{STAND_IN}:{ITS_PORT}");
     let mut swapped_for = std::collections::BTreeSet::new();
-    if let Some((manifest, before)) = &shipped_stack {
-        for ask in before.asks() {
-            let was = plan(before, &ask.by, &ask.capability);
-            let bundled = ask
-                .fillers
-                .iter()
-                .filter(|one| one.origin == Origin::Bundled);
-            for replaced in bundled.filter(|one| was.iter().any(|(id, _)| *id == one.id)) {
-                let after = swapped(manifest, &ask.by, &ask.capability, replaced);
-                let at = format!("http://{STAND_IN}:{ITS_PORT}");
-                assert_eq!(
-                    after
-                        .as_ref()
-                        .and_then(|after| after.service(STAND_IN))
-                        .and_then(|one| one.address.as_ref())
-                        .map(crate::wiring::Address::url),
-                    Some(at.clone())
-                );
-                let mut now = after
-                    .map(|after| plan(&after, &ask.by, &ask.capability))
-                    .unwrap_or_default();
-                let mut then = expected(&was, &replaced.id, &at);
-                now.sort_by(|one, other| one.0.cmp(&other.0));
-                then.sort_by(|one, other| one.0.cmp(&other.0));
-                assert_eq!(
-                    now, then,
-                    "{} asking for {} changed when {} was replaced",
-                    ask.by, ask.capability, replaced.id
-                );
-                swapped_for.insert(ask.capability.clone());
-            }
+    for ask in before.asks() {
+        let was = plan(&before, &ask.by, &ask.capability);
+        for replaced in was.iter().filter_map(|(id, _)| before.service(id)) {
+            let after = swapped(&ask.by, &ask.capability, replaced);
+            assert_eq!(
+                after
+                    .service(STAND_IN)
+                    .and_then(|one| one.address.as_ref())
+                    .map(crate::wiring::Address::url),
+                Some(at.clone())
+            );
+            let mut now = plan(&after, &ask.by, &ask.capability);
+            let mut then = expected(&was, &replaced.id, &at);
+            now.sort_by(|one, other| one.0.cmp(&other.0));
+            then.sort_by(|one, other| one.0.cmp(&other.0));
+            assert_eq!(
+                now, then,
+                "{} asking for {} changed when {} was replaced",
+                ask.by, ask.capability, replaced.id
+            );
+            swapped_for.insert(ask.capability.clone());
         }
     }
-    // Every kind of ask a pass answers was tried: both download clients, the curators
-    // the indexer, the request service and the subtitle finder each reach, and the book
-    // curator's indexer.
     assert_eq!(
         swapped_for,
         [
@@ -179,30 +186,20 @@ fn replacing_a_bundled_service_changes_nothing_that_asks() {
     );
 }
 
-/// The stack with its media server moved into its plugin, and `others` beside it.
-fn moved_beside(others: Vec<crate::plugin::Installed>) -> Vec<crate::plugin::Installed> {
-    crate::test_support::media::moved()
-        .into_iter()
-        .chain(others)
-        .collect()
-}
-
 /// The household's media server, replaced by another plugin's chosen in its place: the
 /// request service that asks is the one it was, and signs in against the replacement's
 /// upstream, with a password kept under a setting naming that plugin.
 #[test]
 fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
-    let was = shipped(&moved_beside(Vec::new()), &Chosen::default(), |_| ())
-        .and_then(|(_, fillers)| MediaServer::of(&fillers));
-    let now = shipped(
-        &moved_beside(vec![crate::test_support::a_contracted_media_server(Some(
+    let was = MediaServer::of(&shipped(&[], &Chosen::default(), |_| ()));
+    let now = MediaServer::of(&shipped(
+        &[crate::test_support::a_contracted_media_server(Some(
             "jellyfin",
-        ))]),
+        ))],
         &chosen,
         |_| (),
-    )
-    .and_then(|(_, fillers)| MediaServer::of(&fillers));
+    ));
 
     assert!(
         was.as_ref().and_then(crate::test_support::asker).is_some(),
@@ -242,22 +239,16 @@ fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
 fn replacing_the_media_server_leaves_the_decline_service_on_its_own_server() {
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
     let after = shipped(
-        &moved_beside(vec![crate::test_support::a_contracted_media_server(Some(
+        &[crate::test_support::a_contracted_media_server(Some(
             "jellyfin",
-        ))]),
+        ))],
         &chosen,
         |_| (),
-    )
-    .map(|(_, fillers)| fillers);
-    let declined = after
-        .as_ref()
-        .and_then(crate::app::targets::declined_server);
+    );
+    let declined = crate::app::targets::declined_server(&after);
 
     assert_eq!(
-        after
-            .as_ref()
-            .and_then(MediaServer::of)
-            .map(|one| one.id().to_owned()),
+        MediaServer::of(&after).map(|one| one.id().to_owned()),
         Some(crate::test_support::MEDIA_UPSTREAM.to_owned())
     );
     assert_eq!(declined.as_ref().map(MediaServer::id), Some("jellyfin"));

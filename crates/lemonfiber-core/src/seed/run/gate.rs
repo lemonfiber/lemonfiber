@@ -8,6 +8,10 @@
 //! and again whenever what they should hold has moved — a curator that regenerated its key
 //! reaches the gate on the next pass.
 //!
+//! **A curator the request service fulfils through that the gate holds no route to is
+//! said**, on a line of its own beside the gate's: one whose credential the gate may not
+//! hold, one that has written no key yet, and one whose key file was refused.
+//!
 //! **The gate is what holds the media server's key.** A key filed under the gate's name
 //! whose SHA-256 the gate does not answer is one nothing holds, and is revoked, as the
 //! decline service's are.
@@ -40,23 +44,14 @@ pub(super) async fn seed_gate_routes(
     match routed {
         Some((server, (_, pairing))) if gating::may_hold(fillers, server.filler.holder()) => {
             let gated = Routed { server, pairing };
-            with_the_media_server(ctx, services, fillers, &gated, project)
-                .await
-                .into_iter()
-                .collect()
+            with_the_media_server(ctx, services, fillers, &gated, project).await
         }
         Some((server, _)) => {
-            let mut wirings: Vec<Wiring> = curators_alone(ctx, services, fillers, project)
-                .await
-                .into_iter()
-                .collect();
+            let mut wirings = curators_alone(ctx, services, fillers, project).await;
             wirings.extend(withheld(ctx, server).await);
             wirings
         }
-        None => curators_alone(ctx, services, fillers, project)
-            .await
-            .into_iter()
-            .collect(),
+        None => curators_alone(ctx, services, fillers, project).await,
     }
 }
 
@@ -104,13 +99,16 @@ async fn curators_alone(
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
-) -> Option<Wiring> {
-    gating::service(services)?;
+) -> Vec<Wiring> {
+    if gating::service(services).is_none() {
+        return Vec::new();
+    }
     let (gate, admitted) = match asked(ctx, fillers, project).await {
         Ok(asked) => asked,
-        Err(state) => return Some(settled(state)),
+        Err(state) => return vec![settled(state)],
     };
-    let wanted = kept_tokens(curator_routes(ctx, fillers).await, &admitted);
+    let (routes, unrouted) = routing(ctx, fillers).await;
+    let wanted = kept_tokens(routes, &admitted);
     let state = if holds(&admitted, &wanted) {
         State::AlreadyWired
     } else if ctx.dry_run {
@@ -124,7 +122,7 @@ async fn curators_alone(
             Err(failure) => unadmitted(&failure),
         }
     };
-    Some(settled(state))
+    said_with(state, unrouted)
 }
 
 /// The gate's routes with one for the media server, as `routed` reaches it, under a key
@@ -135,36 +133,45 @@ async fn with_the_media_server(
     fillers: &crate::wiring::Fillers,
     routed: &Routed<'_>,
     project: Option<&Path>,
-) -> Option<Wiring> {
+) -> Vec<Wiring> {
     let server = routed.server;
     let gating = gating::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up; a rehearsal before the first run finds none recorded yet.
     let Some(client) = server.administering(ctx).await else {
         let minting = server.would_mint(ctx);
-        return (gating && minting).then(|| {
-            settled(State::WouldWire {
-                yours: None,
-                ours: None,
+        return (gating && minting)
+            .then(|| {
+                settled(State::WouldWire {
+                    yours: None,
+                    ours: None,
+                })
             })
-        });
+            .into_iter()
+            .collect();
     };
     let client = client.as_ref();
     let filed = client.filed_as(GATE_APP).await;
     // A stack that does not run the gate asked for nothing here: a key list that could
     // not be read is left for the next run to retire from, not reported.
     if !gating {
-        return minted::retired(ctx, client, GATE_APP, CONNECTION, &filed.ok()?).await;
+        let Ok(filed) = filed else {
+            return Vec::new();
+        };
+        return minted::retired(ctx, client, GATE_APP, CONNECTION, &filed)
+            .await
+            .into_iter()
+            .collect();
     }
     let filed = match filed {
         Ok(filed) => filed,
-        Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
+        Err(failure) => return vec![settled(crate::seed::unreached(&failure))],
     };
     let (gate, admitted) = match asked(ctx, fillers, project).await {
         Ok(asked) => asked,
-        Err(state) => return Some(settled(state)),
+        Err(state) => return vec![settled(state)],
     };
-    let curators = curator_routes(ctx, fillers).await;
+    let (curators, unrouted) = routing(ctx, fillers).await;
     let state = match held(&admitted, &filed) {
         Some(key) => {
             let wanted = kept_tokens(with(&curators, to_media(routed, &key)), &admitted);
@@ -178,22 +185,25 @@ async fn with_the_media_server(
         None => {
             let key = match minted::mint(client, GATE_APP).await {
                 Ok(key) => key,
-                Err(state) => return Some(settled(state)),
+                Err(state) => return said_with(state, unrouted),
             };
             let wanted = kept_tokens(with(&curators, to_media(routed, &key)), &admitted);
             if let Err(failure) = gate.admit(&wanted).await {
                 let _ = client.revoke(&key).await;
-                return Some(settled(State::Failed {
-                    detail: format!(
-                        "the routes could not be handed to the request gate, so the new key \
-                         was revoked again: {failure}"
-                    ),
-                }));
+                return said_with(
+                    State::Failed {
+                        detail: format!(
+                            "the routes could not be handed to the request gate, so the new \
+                             key was revoked again: {failure}"
+                        ),
+                    },
+                    unrouted,
+                );
             }
             minted::revoking(client, &filed).await
         }
     };
-    Some(settled(state))
+    said_with(state, unrouted)
 }
 
 /// The key filed under the gate's name that the gate presents on its media server route,
@@ -310,28 +320,54 @@ async fn kept(
 /// A route for each curator the request service fulfils through, with the key it wrote for
 /// itself. A curator that has written none yet has no route until it has.
 pub(crate) async fn curator_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Gated> {
+    routing(ctx, fillers).await.0
+}
+
+/// [`curator_routes`], and a line for each curator the request service fulfils through
+/// that the gate is handed no route to, saying why: one whose credential the gate may not
+/// hold, one that has written no key yet, and one whose key file was refused.
+async fn routing(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> (Vec<Gated>, Vec<Wiring>) {
     let mut routes = Vec::new();
+    let mut unrouted = Vec::new();
     for fulfils in super::fulfilling(fillers) {
-        if !gating::may_hold(fillers, fulfils.filler.holder()) {
+        let filler = fulfils.filler;
+        let connection = format!("{} routed through the request gate", filler.name);
+        if !gating::may_hold(fillers, filler.holder()) {
+            unrouted.push(Wiring::settled(
+                connection,
+                State::Unmatched {
+                    reason: format!(
+                        "{} is a third-party plugin's service, whose credential is not handed \
+                         to the service filling request.gate",
+                        filler.name
+                    ),
+                },
+            ));
             continue;
         }
-        let crate::ports::filesystem::Beneath::Read(key) =
-            super::keys::curator_key(ctx, fulfils.filler).await
-        else {
-            continue;
+        let key = match super::keys::curator_key(ctx, filler).await {
+            crate::ports::filesystem::Beneath::Read(key) => key,
+            crate::ports::filesystem::Beneath::Absent => {
+                unrouted.push(super::skipped(connection, &filler.name));
+                continue;
+            }
+            crate::ports::filesystem::Beneath::Escaped => {
+                unrouted.push(super::keys::refused(connection, filler));
+                continue;
+            }
         };
         routes.push(Gated {
             target: Target::Curator {
                 media_type: fulfils.kind.media_type().to_owned(),
             },
-            path: fulfils.filler.id.clone(),
+            path: filler.id.clone(),
             address: fulfils.at.url(),
             majors: Vec::new(),
             credential: key,
             tokens: Vec::new(),
         });
     }
-    routes
+    (routes, unrouted)
 }
 
 /// The media server as the gate routes to it: where the API it speaks is answered.
@@ -383,4 +419,9 @@ fn said<'a>(paths: impl Iterator<Item = &'a str>) -> String {
 /// This connection, resting in `state`.
 fn settled(state: State) -> Wiring {
     Wiring::settled(CONNECTION.to_owned(), state)
+}
+
+/// This connection, resting in `state`, and each curator the gate is handed no route to.
+fn said_with(state: State, unrouted: Vec<Wiring>) -> Vec<Wiring> {
+    std::iter::once(settled(state)).chain(unrouted).collect()
 }

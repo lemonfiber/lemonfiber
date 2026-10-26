@@ -1,14 +1,23 @@
 //! What lemonfiber makes of one service asking for what another fills.
 //!
-//! Decided by what the asker speaks, what it asked for and what the filler speaks, and
-//! for a curator by the media it files, which decides what it comes to in the asker.
-//! Never by which services they are, so a plugin standing in for a bundled service and naming the
-//! same adapter is connected exactly as the service it replaced was.
+//! Decided by the contract the asker speaks, what it asked for and what the filler
+//! speaks, and for a curator by the media it files, which decides what it comes to in the
+//! asker. Never by which services they are, so any service speaking the same contract is
+//! connected exactly as another that does.
 //!
 //! **Every credential crosses one gate.** A connection hands the asker the filler's
 //! credential, and the indexer's also hands the filler the asker's; each is made only
 //! where [`crate::wiring::crosses`] lets that credential reach the one receiving it, so
 //! no pass judges for itself whom a credential may reach.
+//!
+//! **It answers for every asker speaking a contract it is paired by, and for no other.**
+//! A curator speaking `library.curate` is told its download clients, one speaking
+//! `indexer.pull` its aggregator, and one speaking `indexer.search`, `request.intake`,
+//! `subtitles.fetch`, `quality.sync` or `archive.extract` the curators. An asker speaking
+//! none of them — one of the stack's own services, or a plugin's that declares no
+//! contract — is wired by the pass that reads what it needs, and that pass says where it
+//! cannot: the credentials it reads out of another service's in [`super::crossing`], and
+//! the request gate's routes in [`super::gate`].
 //!
 //! **A pair this table has no connection for is reported, never dropped.** Something
 //! here fills what was asked for, and an operator reading a report that left it out
@@ -51,10 +60,12 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 /// Books, likewise.
 pub(super) const BOOKS: &str = crate::ports::media::BOOKS;
 
-/// Every capability an ask is answered for here.
+/// Every capability an ask is answered for here, where its asker speaks a contract it is
+/// paired by.
 ///
-/// An ask for anything else is connected where it always was, by the pass that wires
-/// it, and is not reported here as reached by nothing.
+/// An ask for anything else, and one whose asker speaks no such contract, is connected by
+/// the pass that wires it, which reports where it cannot, and is not reported here as
+/// reached by nothing.
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// Every contract an asker is paired by, each with the capability of the asks it is paired
@@ -72,23 +83,13 @@ const CONTRACTED: [(&str, &str, u32); 8] = [
     (CURATES, sync::CAPABILITY, sync::MAJOR),
 ];
 
-/// An asker, as the table pairs it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Asking {
-    /// A service this build holds an adapter for, of this kind.
-    Bundled(ApiKind),
-    /// A service speaking this capability's contract.
-    Over(&'static str),
-}
-
-/// The asker as the table pairs it for an ask of `capability`: by a contract it speaks
-/// for asks of that capability before the adapter it names.
-fn asking(asker: &Filler, capability: &str) -> Option<Asking> {
+/// The contract the asker is paired by for an ask of `capability`: one it speaks for asks
+/// of that capability.
+fn asking(asker: &Filler, capability: &str) -> Option<&'static str> {
     CONTRACTED
         .iter()
         .find(|(asked, contract, major)| *asked == capability && asker.contracted(contract, *major))
-        .map(|(_, contract, _)| Asking::Over(contract))
-        .or_else(|| asker.adapter.as_ref().map(|api| Asking::Bundled(api.kind)))
+        .map(|(_, contract, _)| *contract)
 }
 
 /// What one asker and one filler come to.
@@ -140,7 +141,8 @@ pub(super) enum Unmade {
     NoAdapter,
     /// The filler names an adapter and no port it answers on beside the others.
     NoPort,
-    /// Nothing in this table connects what the asker speaks to what the filler speaks.
+    /// Nothing in this table connects the contract the asker speaks to what the filler
+    /// speaks.
     Unpaired,
     /// The filler's application sync serves the media the asker files, so the filler is
     /// told about the asker rather than the asker about the filler.
@@ -202,62 +204,44 @@ pub(super) struct Pairing<'a> {
     pub(super) made: Result<(Connection, &'a Address, Cleared<'a>), Unmade>,
 }
 
-/// The connection the table holds for `asker`, asking for `capability`, of a filler
-/// speaking `filler`.
+/// The connection the table holds for an asker paired by the contract `asker`, asking for
+/// `capability`, of a filler speaking `filler`.
 ///
 /// A curator comes to whatever its media makes it in the asker, through the same
 /// mapping each asker's own pass uses.
 fn connection(
-    asker: Asking,
+    asker: &str,
     capability: &str,
     filler: ApiKind,
     media: &[String],
     files: &[String],
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
-        (
-            Asking::Bundled(ApiKind::Servarr) | Asking::Over(curate::CAPABILITY),
-            USENET,
-            ApiKind::Sabnzbd,
-        )
-        | (
-            Asking::Bundled(ApiKind::Servarr) | Asking::Over(curate::CAPABILITY),
-            TORRENT,
-            ApiKind::Qbittorrent,
-        ) => Ok(Connection::DownloadClient(Protocol(
-            filler.name().to_owned(),
-        ))),
-        (
-            Asking::Bundled(ApiKind::Servarr) | Asking::Over(search::CAPABILITY),
-            CURATES,
-            ApiKind::Servarr,
-        ) => super::applications::application_kind(media)
-            .map(Connection::Application)
-            .ok_or(Unmade::Files),
-        (
-            Asking::Bundled(ApiKind::Seerr) | Asking::Over(intake::CAPABILITY),
-            CURATES,
-            ApiKind::Servarr,
-        ) => Kind::of_declared(media)
+        (curate::CAPABILITY, USENET, ApiKind::Sabnzbd)
+        | (curate::CAPABILITY, TORRENT, ApiKind::Qbittorrent) => Ok(Connection::DownloadClient(
+            Protocol(filler.name().to_owned()),
+        )),
+        (search::CAPABILITY, CURATES, ApiKind::Servarr) => {
+            super::applications::application_kind(media)
+                .map(Connection::Application)
+                .ok_or(Unmade::Files)
+        }
+        (intake::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(|kind| Connection::Fulfilment { kind })
             .ok_or(Unmade::Files),
-        (
-            Asking::Bundled(ApiKind::Bazarr) | Asking::Over(fetch::CAPABILITY),
-            CURATES,
-            ApiKind::Servarr,
-        ) => Kind::of_declared(media)
+        (fetch::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Subtitles)
             .ok_or(Unmade::Files),
-        (Asking::Over(sync::CAPABILITY), CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+        (sync::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Quality)
             .ok_or(Unmade::Files),
-        (Asking::Over(pull::CAPABILITY), SEARCHES, _)
+        (pull::CAPABILITY, SEARCHES, _)
             if super::applications::application_kind(files).is_some() =>
         {
             Err(Unmade::Synced)
         }
-        (Asking::Over(pull::CAPABILITY), SEARCHES, _) => Ok(Connection::Aggregator),
-        (Asking::Over(extract::CAPABILITY), CURATES, ApiKind::Servarr) => media
+        (pull::CAPABILITY, SEARCHES, _) => Ok(Connection::Aggregator),
+        (extract::CAPABILITY, CURATES, ApiKind::Servarr) => media
             .first()
             .and_then(|kind| {
                 super::clients::category_for(kind).map(|category| Connection::Extraction {
@@ -273,7 +257,7 @@ fn connection(
 /// Every asker paired with each service that fills what it asked for, for the asks
 /// answered here: the upstream it fronts, where that service is an adapter, since the
 /// asker is told about a service in that service's own API. An asker an adapter of its
-/// plugin fronts is paired by what that adapter speaks, and the adapter is asked.
+/// plugin fronts is paired by the contract that adapter speaks, and the adapter is asked.
 ///
 /// An ask whose asker is not on this machine is passed over: the operator took it out of
 /// lemonfiber's hands, and a pass that wrote nothing to it has nothing to say about it.
@@ -287,24 +271,27 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
             continue;
         };
         let answering = fillers.fronting(asker).unwrap_or(asker);
+        let Some(contract) = asking(answering, &ask.capability) else {
+            continue;
+        };
         for filler in &ask.fillers {
             let filler = fillers.fronted_by(filler).unwrap_or(filler);
             found.push(Pairing {
                 asker,
                 ask,
                 filler,
-                made: made(fillers, asker, answering, ask, filler),
+                made: made(fillers, (asker, answering, contract), ask, filler),
             });
         }
     }
     found
 }
 
-/// What one asker, asked through `answering`, and one filler come to.
+/// What one asker, asked through `answering` and paired by `contract`, and one filler come
+/// to.
 fn made<'a>(
     fillers: &Fillers,
-    asker: &'a Filler,
-    answering: &'a Filler,
+    (asker, answering, contract): (&'a Filler, &'a Filler, &'static str),
     ask: &Ask,
     filler: &'a Filler,
 ) -> Result<(Connection, &'a Address, Cleared<'a>), Unmade> {
@@ -313,9 +300,8 @@ fn made<'a>(
     }
     let speaks = filler.talks_in().ok_or(Unmade::NoAdapter)?;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
-    let asks = asking(answering, &ask.capability).ok_or(Unmade::Unpaired)?;
     let made = connection(
-        asks,
+        contract,
         &ask.capability,
         speaks,
         &filler.media_types,
@@ -357,10 +343,15 @@ pub(super) fn unmatched(fillers: &Fillers) -> Vec<Wiring> {
         .collect()
 }
 
-/// Whether the filler asks for something the asker fills.
+/// Whether the filler asks for something the asker fills, itself or through the adapter
+/// in front of it.
 fn from_its_end(fillers: &Fillers, pairing: &Pairing<'_>) -> bool {
     fillers.asks().iter().any(|ask| {
-        ask.by == pairing.filler.id && ask.fillers.iter().any(|one| one.id == pairing.asker.id)
+        ask.by == pairing.filler.id
+            && ask
+                .fillers
+                .iter()
+                .any(|one| fillers.fronted_by(one).unwrap_or(one).id == pairing.asker.id)
     })
 }
 
@@ -393,10 +384,15 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
             "{fills} and files {}, which lemonfiber does not hand {asker}",
             pairing.filler.media_types.join(" and ")
         ),
-        Unmade::Withheld => format!(
+        Unmade::Withheld if matches!(pairing.filler.holder(), Holder::ThirdParty(_)) => format!(
             "{fills} and is a third-party plugin's service; {asker} hands every service it \
              registers its own API key, which opens every indexer it holds, so lemonfiber does \
              not register a third-party plugin's service in it"
+        ),
+        Unmade::Withheld => format!(
+            "{fills} and {asker} is a third-party plugin's service; {asker} hands every service \
+             it registers its own API key, and a third-party plugin's credential is handed only \
+             to its own plugin's services"
         ),
         Unmade::Asked if matches!(pairing.asker.holder(), Holder::ThirdParty(_)) => format!(
             "{fills} and {asker} is a third-party plugin's service, which is handed another \
