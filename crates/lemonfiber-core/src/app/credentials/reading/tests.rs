@@ -129,12 +129,10 @@ fn a_service_whose_api_names_no_file_beneath_its_configuration_writes_no_key_of_
     };
     let project = Path::new("/srv/stack");
     let writes = |service: lemonfiber_manifest::Service| {
-        let fillers = crate::test_support::stack_fillers(vec![service], &[], Some(project), &[]);
-        let writes = fillers
+        crate::test_support::stack_fillers(vec![service], &[], Some(project), &[])
             .services()
             .next()
-            .is_some_and(|filler| super::writes_its_own(filler).is_some());
-        writes
+            .is_some_and(|filler| super::writes_its_own(filler).is_some())
     };
     let unnamed = |path: Option<&str>| {
         let mut moved = service.clone();
