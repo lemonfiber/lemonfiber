@@ -97,9 +97,9 @@ fn minted_for(id: &str) -> bool {
                 .filter(|service| service.fronts.as_deref() == Some(id))
                 .flat_map(|service| service.upstream.values())
                 .any(|named| {
-                    part.secrets
-                        .iter()
-                        .any(|secret| secret.minted && secret.of == id && secret.id == named.secret)
+                    part.secrets.iter().any(|secret| {
+                        secret.minted.is() && secret.of == id && secret.id == named.secret
+                    })
                 });
             moves && handed
         })
