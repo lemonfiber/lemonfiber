@@ -1,4 +1,5 @@
-use super::{declared, refusals, Violation};
+use super::readable::declared;
+use super::{refusals, Violation};
 use crate::schema::Manifest;
 
 /// The identities lemonfiber's own registers hold, which these fixtures avoid.

@@ -38,6 +38,28 @@ pub(super) fn minted(manifest: &Manifest, found: &mut Vec<Violation>) {
     }
 }
 
+/// Whether each secret stood in for when recorded is one lemonfiber does not mint, and
+/// stood in for by a value a reader can see.
+pub(super) fn stood_in(manifest: &Manifest, found: &mut Vec<Violation>) {
+    for secret in &manifest.secrets {
+        let Some(recorded) = &secret.recorded_with else {
+            continue;
+        };
+        let location = format!("secret {}.recorded_with", secret.id);
+        if secret.minted.is() {
+            found.push(Violation {
+                location: location.clone(),
+                message: "stands in for a secret lemonfiber mints, and a stand-in is only for a \
+                          value the operator alone holds"
+                    .to_owned(),
+            });
+        }
+        if let Some(message) = recorded.unshown() {
+            found.push(Violation { location, message });
+        }
+    }
+}
+
 /// Whether a service's `upstream` is an adapter's, each field written as a field of
 /// `upstream.json` is and each naming one of the plugin's own secrets.
 pub(super) fn handed(manifest: &Manifest, service: &Service, found: &mut Vec<Violation>) {

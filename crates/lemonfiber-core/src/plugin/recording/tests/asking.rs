@@ -69,20 +69,20 @@ const GUARDED: &str = "recordings/sonarr/library-curate-guarded.json";
 const WANTED: &str = "recordings/sonarr/library-curate-wanted.json";
 const KEY: &str = "0123456789abcdef0123456789abcdef";
 
-fn source(name: &str, manifest: &str) -> Scratch {
+pub(super) fn source(name: &str, manifest: &str) -> Scratch {
     let at = Scratch::new(name);
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
     at
 }
 
-fn sonarr() -> Serves {
+pub(super) fn sonarr() -> Serves {
     Serves::on(49153).writing(
         "/config/config.xml",
         &format!("<Config><ApiKey>{KEY}</ApiKey></Config>"),
     )
 }
 
-fn answering(wanted: &str) -> Arc<Fake> {
+pub(super) fn answering(wanted: &str) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         ("/ping", vec![Answer::reply(200, "pong")]),
         (
@@ -95,7 +95,7 @@ fn answering(wanted: &str) -> Arc<Fake> {
     ])
 }
 
-async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>) -> Option<Recorded> {
+pub(super) async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>) -> Option<Recorded> {
     let program = Proving::unreachable();
     let shared = || -> Arc<dyn Http> { Arc::clone(http) as Arc<dyn Http> };
     record(
@@ -112,23 +112,23 @@ async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>) -> Option<Recor
     .ok()
 }
 
-fn json(at: &Path, fixture: &str) -> serde_json::Value {
+pub(super) fn json(at: &Path, fixture: &str) -> serde_json::Value {
     std::fs::read_to_string(at.join(fixture))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
 }
 
-fn field(value: &serde_json::Value, pointer: &str) -> serde_json::Value {
+pub(super) fn field(value: &serde_json::Value, pointer: &str) -> serde_json::Value {
     value.pointer(pointer).cloned().unwrap_or_default()
 }
 
-fn took(read: Option<&Recorded>) -> Vec<Took> {
+pub(super) fn took(read: Option<&Recorded>) -> Vec<Took> {
     read.map(|read| read.recordings.iter().map(|one| one.took.clone()).collect())
         .unwrap_or_default()
 }
 
-fn noted(at: &Path, fixture: &str, note: &str) {
+pub(super) fn noted(at: &Path, fixture: &str, note: &str) {
     let path = at.join(fixture);
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);

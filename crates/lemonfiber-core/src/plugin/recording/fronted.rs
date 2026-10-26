@@ -13,6 +13,7 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{ready_path, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
+use lemonfiber_manifest::container::Secret;
 use lemonfiber_plugin::{Health, HealthKind};
 use serde_json::Value;
 
@@ -90,6 +91,7 @@ pub(super) async fn answers(
     health: Option<&Health>,
     adapter: Fronting<'_>,
     items: &[&Item<'_>],
+    secrets: &[Secret],
 ) -> Result<(Vec<Answer>, Vec<Case>), Failed> {
     let failing = |fault: Faulted| Failed {
         service: upstream.service.clone(),
@@ -97,7 +99,7 @@ pub(super) async fn answers(
         why: crate::text::plain(&fault.why),
         log: Vec::new(),
     };
-    let prepared = Prepared::of(recorder, root, upstream, adapter).map_err(failing)?;
+    let prepared = Prepared::of(recorder, root, upstream, adapter, secrets).map_err(failing)?;
     let (reaching, answering) = parties(recorder, adapter, upstream)
         .await
         .map_err(failing)?;

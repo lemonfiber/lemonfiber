@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 
+use lemonfiber_manifest::container::Secret;
 use lemonfiber_plugin::vocabulary::Credential;
 use lemonfiber_plugin::{Manifest, Request};
 use tokio::time::Instant;
@@ -11,6 +12,7 @@ use tokio::time::Instant;
 use super::first::Presented;
 use super::fronted::{self, Fronting};
 use super::served::{answers, POLL};
+use super::stood_in;
 use super::written::{landing, written};
 use super::{Failed, Recorder, Taken, Took};
 use crate::plugin::container::LOOPBACK;
@@ -135,6 +137,7 @@ pub(super) async fn taken(
             placed,
             health: service.health.as_ref(),
             fronting,
+            secrets: &manifest.secrets,
         };
         let took = match recorded(root, recorder, ask, &mine).await {
             Ok((written, cases)) => {
@@ -203,6 +206,8 @@ struct Service<'a> {
     health: Option<&'a lemonfiber_plugin::Health>,
     /// The adapter of the plugin that fronts it, where one does.
     fronting: Option<Fronting<'a>>,
+    /// The secrets the plugin declares.
+    secrets: &'a [Secret],
 }
 
 /// One service's request recordings and the conformance cases of the adapter fronting
@@ -233,14 +238,32 @@ async fn recorded(
     }
     let (answered, cases) = match service.fronting {
         Some(fronting) => {
-            fronted::answers(recorder, root, placed, service.health, fronting, mine).await?
+            fronted::answers(
+                recorder,
+                root,
+                placed,
+                service.health,
+                fronting,
+                mine,
+                service.secrets,
+            )
+            .await?
         }
         None => (
-            answers(recorder, root, placed, service.health, mine).await?,
+            answers(
+                recorder,
+                root,
+                placed,
+                service.health,
+                mine,
+                service.secrets,
+            )
+            .await?,
             Vec::new(),
         ),
     };
     let pinned = format!("{}@{}", placed.image, placed.digest);
+    let stood_in = stood_in::named(placed, service.secrets);
     let took = mine
         .iter()
         .zip(answered)
@@ -258,6 +281,7 @@ async fn recorded(
                     response,
                 },
                 recorder.taking,
+                &stood_in,
             )
         })
         .collect();
@@ -276,6 +300,7 @@ async fn recorded(
                         response: case.answer,
                     },
                     recorder.taking,
+                    &stood_in,
                 ),
                 fixture: Some(fixture),
             }

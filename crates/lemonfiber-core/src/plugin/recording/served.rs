@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use lemonfiber_contract::capabilities::FOLDER;
-use lemonfiber_manifest::container::STREAM_GUARD;
+use lemonfiber_manifest::container::{Secret, STREAM_GUARD};
 use lemonfiber_plugin::{Health, HealthKind};
 use tokio::time::Instant;
 
@@ -13,6 +13,7 @@ use super::addressed::Addressed;
 use super::asked::{answered, Item};
 use super::first::{self, Held, Reaching};
 use super::scrubbed::Scrub;
+use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::Placed;
@@ -47,6 +48,7 @@ pub(super) async fn answers(
     placed: &Placed,
     health: Option<&Health>,
     items: &[&Item<'_>],
+    secrets: &[Secret],
 ) -> Result<Vec<Answer>, Failed> {
     let failing = |step: &'static str| {
         move |why: String| Failed {
@@ -66,13 +68,31 @@ pub(super) async fn answers(
     .map_err(failing("starting files"))?;
     certified(placed, &copy).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;
-    let serve = settled(placed, &copy, data.as_deref());
+    let mut stand_ins = StandIns::of(secrets, recorder.random).map_err(failing(STAND_INS))?;
+    let stood = stand_ins
+        .settings(placed, recorder.random)
+        .map_err(failing(STAND_INS))?;
+    let settled = settled(placed, &copy, data.as_deref());
+    let serve = Serve {
+        env: settled
+            .env
+            .iter()
+            .chain(&stood)
+            .chain(&stand_ins.secrets(placed))
+            .cloned()
+            .collect(),
+        ..settled
+    };
     let served = recorder
         .serving
         .serve(&serve)
         .await
         .map_err(|unran| failing("container")(unran.to_string()))?;
-    let seeded: Vec<String> = copy.made().map(str::to_owned).collect();
+    let seeded: Vec<String> = copy
+        .made()
+        .map(str::to_owned)
+        .chain(stand_ins.made.iter().cloned())
+        .collect();
     let mut scrub = Scrub::of(&seeded, Some(&served));
     let reaching = Reaching {
         placed,
@@ -214,9 +234,8 @@ async fn asked(
             ),
         ));
     }
-    let mut made: Vec<String> = held.iter().flat_map(|held| held.made.clone()).collect();
-    made.extend(reaching.copy.made().map(str::to_owned));
-    *scrub = Scrub::of(&made, Some(served));
+    let made: Vec<String> = held.iter().flat_map(|held| held.made.clone()).collect();
+    *scrub = std::mem::take(scrub).and(&made);
     let port = served.port;
     let mut answers = Vec::new();
     for item in items {

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a recording gives a service in the operator's place: a constant reaching no third\nparty, or, written `\"minted\"`, a value made for that run alone.",
+  "anyOf": [
+    {
+      "description": "A string.",
+      "type": "string"
+    },
+    {
+      "description": "An integer.",
+      "type": "integer",
+      "format": "int64"
+    },
+    {
+      "description": "A boolean.",
+      "type": "boolean"
+    }
+  ]
+}

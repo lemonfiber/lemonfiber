@@ -164,6 +164,13 @@ const MINTING: &[(&str, &str)] = &[
          reinstall elsewhere mints another",
     ),
     (
+        "crates/lemonfiber-core/src/plugin/recording/stood_in.rs",
+        "the stand-in a recording gives a throwaway service for a value only the operator \
+         holds, made for that one run. It reaches only the throwaway container, every answer is \
+         scrubbed of it before a recording is written, and the next run makes another, so it \
+         outlives nothing that could identify this installation",
+    ),
+    (
         "crates/lemonfiber-core/src/secret.rs",
         "the two passwords lemonfiber has to mint rather than read: the torrent client's web UI \
          and the media server's administrator. Recorded in the settings file because the \

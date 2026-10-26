@@ -7,6 +7,17 @@
       "description": "What is written while the operator has recorded no value.",
       "$ref": "ServiceConstant.json"
     },
+    "recorded_with": {
+      "description": "What a recording gives the service in the operator's place, where only the\noperator holds the value and the service needs one to start.",
+      "anyOf": [
+        {
+          "$ref": "RecordedWith.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "setting": {
       "description": "The setting's name.",
       "type": "string"
