@@ -107,11 +107,13 @@ pub(crate) struct Contained {
     pub(crate) read_only: bool,
     /// Its memory ceiling in bytes, where it has one.
     pub(crate) memory: Option<i64>,
+    /// Each device its shape passes in, as `host:container`.
+    pub(crate) devices: Vec<String>,
 }
 
 /// The container lemonfiber makes for the service `placed` records: the entry's
 /// constants, the time zone and the operator's ids as its user mode takes them, and
-/// nothing else, under its posture and memory limit.
+/// nothing else, under its posture and memory limit, with what its shape grants.
 pub(crate) fn contained(placed: &Placed, operator: &Operator) -> Contained {
     let fields = &placed.fields;
     let user = user_of(placed);
@@ -137,13 +139,17 @@ pub(crate) fn contained(placed: &Placed, operator: &Operator) -> Contained {
         cap_add: if confined {
             Vec::new()
         } else {
-            KEPT.map(str::to_owned).to_vec()
+            KEPT.into_iter()
+                .chain(crate::project::entry::granted(placed.shape))
+                .map(str::to_owned)
+                .collect()
         },
         pids_limit: i64::from(PROCESSES),
         read_only: confined,
         memory: fields
             .mem_limit_mib
             .map(|mib| i64::from(mib).saturating_mul(MEBIBYTE)),
+        devices: crate::project::entry::passed(placed.shape).collect(),
     }
 }
 
@@ -163,6 +169,7 @@ pub(crate) fn settled(
         pids_limit,
         read_only,
         memory,
+        devices: _,
     } = contained(placed, operator);
     Run {
         image: format!("{}@{}", placed.image, placed.digest),

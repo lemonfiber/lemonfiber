@@ -147,6 +147,7 @@ pub(super) fn settled_as(
         pids_limit,
         read_only,
         memory,
+        devices,
     } = contained(placed, operator);
     let mut binds = vec![Bound {
         source: copy.path().to_path_buf(),
@@ -167,6 +168,7 @@ pub(super) fn settled_as(
         pids_limit,
         read_only,
         memory,
+        devices,
         binds,
         tmpfs: crate::plugin::container::tmpfs(placed).cloned().collect(),
         listens: inside(placed),

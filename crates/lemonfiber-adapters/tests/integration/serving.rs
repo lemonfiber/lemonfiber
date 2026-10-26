@@ -24,6 +24,7 @@ fn serve() -> Serve {
         tmpfs: Vec::new(),
         listens: Some(8989),
         alias: None,
+        devices: Vec::new(),
     }
 }
 

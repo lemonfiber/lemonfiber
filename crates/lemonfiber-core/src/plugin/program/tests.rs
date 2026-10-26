@@ -7,7 +7,7 @@ use lemonfiber_plugin::{Expect, Manifest};
 use super::super::installed::{Installed, Placed};
 use super::super::recorded::RunResult;
 use super::super::Verdict;
-use super::{limit, performed, recorded, settled, verdict, Came, Operator, Starting};
+use super::{contained, limit, performed, recorded, settled, verdict, Came, Operator, Starting};
 use crate::ports::program::{Configuration, Unran};
 
 /// A plugin whose one service has no port, proved by running its own program.
@@ -153,6 +153,36 @@ fn a_standard_run_is_given_back_six_capabilities_and_a_writable_root() {
     );
     assert!(!asked.read_only);
     assert_eq!(asked.configuration, None);
+}
+
+/// The service of [`RUNNING`], standing rather than confined, written with `shape`.
+fn shaped(shape: &str) -> Option<Placed> {
+    placed(&RUNNING.replace(
+        "posture       = \"confined\"\n",
+        &format!("shape         = \"{shape}\"\n"),
+    ))
+}
+
+#[test]
+fn an_egress_guard_is_given_the_network_capability_and_the_tunnel_device_it_is_written_with() {
+    let Some(asked) = shaped("egress-guard").map(|placed| contained(&placed, &operator())) else {
+        unreachable!("the fixture reads");
+    };
+    assert!(
+        asked.cap_add.iter().any(|one| one == "NET_ADMIN"),
+        "{:?}",
+        asked.cap_add
+    );
+    assert_eq!(asked.devices, vec!["/dev/net/tun:/dev/net/tun".to_owned()]);
+}
+
+#[test]
+fn a_render_shape_passes_no_device_the_host_is_not_asked_about() {
+    let Some(asked) = shaped("render").map(|placed| contained(&placed, &operator())) else {
+        unreachable!("the fixture reads");
+    };
+    assert!(asked.devices.is_empty(), "{:?}", asked.devices);
+    assert!(!asked.cap_add.iter().any(|one| one == "NET_ADMIN"));
 }
 
 #[test]
