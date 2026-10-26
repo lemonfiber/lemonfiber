@@ -59,7 +59,15 @@ pub const STREAM_GUARD: &str = "stream.guard";
 pub const PASS_SERVICE: &str = "pass";
 
 /// The media a service files, in the stack manifest's vocabulary.
-pub const MEDIA: [&str; 5] = ["tv", "movies", "music", "books", "comics"];
+pub const MEDIA: [&str; 7] = [
+    "tv",
+    "movies",
+    "music",
+    "books",
+    "comics",
+    "audiobooks",
+    "podcasts",
+];
 
 /// The capabilities a service may run inside the network of.
 pub const VIA: [&str; 1] = [EGRESS_GUARD];

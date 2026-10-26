@@ -448,6 +448,8 @@ fn an_address_files_a_medium_of_the_vocabulary_and_names_its_api_in_one_word() {
     };
     let named = env(vec![
         ("GOOD", url(Some("comics"), Some("servarr2"))),
+        ("LISTENED", url(Some("audiobooks"), None)),
+        ("SUBSCRIBED", url(Some("podcasts"), None)),
         ("MEDIUM", url(Some("anime"), None)),
         ("API", url(None, Some("Servarr"))),
         ("BOTH", url(Some("tv "), Some("2arr"))),
