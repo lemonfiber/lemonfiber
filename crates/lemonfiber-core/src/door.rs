@@ -223,7 +223,8 @@ pub struct Candidate<'a> {
 }
 
 /// Every service the household might be sent to: the stack's, in the order it declares
-/// them, then each installed plugin's.
+/// them, then each installed plugin's. A service of the stack a first-party part has
+/// moved in place of is met as the part's, once.
 ///
 /// The stack's guard in front of the media server is met under the name of the library
 /// it guards: the upstream behind whatever its ask for `media.serve` settles on among
@@ -234,12 +235,15 @@ pub fn candidates<'a>(
     installed: &'a [Installed],
     fillers: &crate::wiring::Fillers,
 ) -> Vec<Candidate<'a>> {
-    let bundled = services.iter().map(move |service| Candidate {
-        id: &service.id,
-        name: guarded(services, installed, fillers, service).unwrap_or(&service.name),
-        facing: facing(service),
-        reached: Reached::Port(service.port),
-    });
+    let bundled = services
+        .iter()
+        .filter(|service| !crate::project::moved_in_place(installed, &service.id))
+        .map(move |service| Candidate {
+            id: &service.id,
+            name: guarded(services, installed, fillers, service).unwrap_or(&service.name),
+            facing: facing(service),
+            reached: Reached::Port(service.port),
+        });
     let plugins = installed.iter().flat_map(move |plugin| {
         plugin.services.iter().map(move |placed| Candidate {
             id: &placed.service,

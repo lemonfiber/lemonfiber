@@ -23,19 +23,21 @@
 //! because what counts as the admin tier is the stack's own answer and a fixture
 //! that stated it would be this test agreeing with itself.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use crate::common::stack::{frozen_day, stack};
+use lemonfiber_contract::capabilities::{media::serve, stream::guard};
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::FrontDoorReport;
 use lemonfiber_fixtures::ports::Renamed;
 use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_manifest::{Bind, Service};
+use lemonfiber_manifest::{Bind, Manifest, Service};
 use lemonfiber_ports::docker::{Health, Lifecycle};
 
-/// Every service that stack declares.
-fn declared() -> Vec<Service> {
+/// What that stack declares.
+fn declared() -> Manifest {
     let read = stack().checked_manifest(frozen_day()).ok();
     let Some(manifest) = read else {
         unreachable!("the stack this repository ships is one its own parser reads")
@@ -44,41 +46,57 @@ fn declared() -> Vec<Service> {
         manifest.services.len() > 5,
         "a manifest this short means the wrong file was read"
     );
-    manifest.services
+    manifest
 }
 
 /// The services the household tier does not publish — the ones an arrival could
 /// change this stack from.
-fn administrative(services: &[Service]) -> Vec<&Service> {
-    services
+fn administrative(manifest: &Manifest) -> Vec<&Service> {
+    manifest
+        .services
         .iter()
-        .filter(|service| service.bind != Some(Bind::Lan) && !behind_the_door(services, service))
+        .filter(|service| service.bind != Some(Bind::Lan) && !behind_the_door(manifest, service))
         .collect()
 }
 
-/// Whether a service is kept to this machine only because the guarded front door stands
-/// in front of it: the media server, which the household reaches at the door under its
-/// own name, and which is no way to change the stack.
-fn behind_the_door(services: &[Service], service: &Service) -> bool {
-    let door = services.iter().any(|one| {
-        one.id == lemonfiber_core::screening::door::SERVICE && one.bind == Some(Bind::Lan)
-    });
-    door && service
-        .api
-        .as_ref()
-        .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Jellyfin)
+/// Whether a service is kept to this machine only because the guard in front of the
+/// library stands in front of it: the service the guard's ask for `media.serve` is filled
+/// by, which the household reaches at the guard under its own name, and which is no way
+/// to change the stack.
+fn behind_the_door(manifest: &Manifest, service: &Service) -> bool {
+    let guards: Vec<&str> = manifest
+        .services
+        .iter()
+        .filter(|one| {
+            one.bind == Some(Bind::Lan) && one.provides.iter().any(|it| it == guard::CAPABILITY)
+        })
+        .map(|one| one.id.as_str())
+        .collect();
+    manifest.wirings.iter().any(|wiring| {
+        guards.contains(&wiring.by.as_str())
+            && wiring.asks.as_deref() == Some(serve::CAPABILITY)
+            && wiring.filled_by.as_deref() == Some(service.id.as_str())
+    })
 }
 
-/// The answer, over a stack whose household services are up, on a machine that says
-/// what it is called.
+/// The answer, over a stack whose household services are up with every part the bundle
+/// installs recorded, on a machine that says what it is called.
 async fn answered(chose: Option<&str>) -> FrontDoorReport {
+    static ASKED: AtomicU32 = AtomicU32::new(0);
+    let nth = ASKED.fetch_add(1, Ordering::Relaxed);
+    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("handed-{nth}")).kept();
+    let _ = std::fs::remove_dir_all(&at);
+    let _ = std::fs::create_dir_all(&at);
+    let env = at.join(".env");
+    let _ = std::fs::write(&env, "");
     let settings = Settings {
         front_door: chose.map(str::to_owned),
+        env_file: Some(env),
         ..Settings::default()
     };
     let ctx = lemonfiber_testing::a_context()
         .engine(Arc::new(Reporting::holding(
-            &["seerr", "jellyfin"],
+            &["seerr", "door"],
             Lifecycle::Running,
             Health::Healthy,
         )))
@@ -86,6 +104,7 @@ async fn answered(chose: Option<&str>) -> FrontDoorReport {
         .settings(settings)
         .build()
         .with_site(Renamed::called(Some("kitchen-nas")));
+    lemonfiber_testing::adapted::parts_recorded(&ctx);
     let answer = dispatch(Command::FrontDoor, &ctx).await.ok();
     let Some(Outcome::FrontDoor(report)) = answer else {
         unreachable!("the front-door command answers with a front-door report: {answer:?}")
@@ -104,11 +123,11 @@ fn everything(report: &FrontDoorReport) -> String {
 
 #[tokio::test]
 async fn nothing_the_household_is_handed_names_a_service_that_can_change_the_stack() {
-    let services = declared();
+    let manifest = declared();
     let report = answered(None).await;
     let shown = everything(&report).to_lowercase();
 
-    let named: Vec<&str> = administrative(&services)
+    let named: Vec<&str> = administrative(&manifest)
         .iter()
         .filter(|service| {
             shown.contains(&service.id.to_lowercase())
@@ -187,8 +206,8 @@ async fn a_setting_cannot_talk_the_answer_into_naming_an_administrative_service(
     // The one way a name from outside reaches the door. Every service the stack keeps
     // to this machine is put to it in turn, because a rule that held for the one
     // somebody thought of is not a rule.
-    let services = declared();
-    let kept_to_this_machine = administrative(&services);
+    let manifest = declared();
+    let kept_to_this_machine = administrative(&manifest);
     // The filter is what makes this a rule about administrative services, and it is
     // also the way this stops being a rule at all: a stack where every service became
     // reachable would run the sweep below over nothing and report that none of them

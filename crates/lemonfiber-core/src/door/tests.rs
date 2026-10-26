@@ -327,6 +327,11 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
     });
     let candidates = super::candidates(&services, &installed, &fillers.unwrap_or_default());
 
+    let mut ids: Vec<&str> = candidates.iter().map(|one| one.id).collect();
+    let met = ids.len();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(ids.len(), met, "a moved service is met once");
     assert_eq!(
         begins_at(&candidates).map(|(facing, door)| (facing, door.id, door.reached)),
         Some((Facing::Asking, "seerr", super::Reached::Port(Some(5055))))
@@ -351,4 +356,31 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
         Some(Facing::Shelf),
         "the listening server is a shelf"
     );
+}
+
+/// A first-party part moved in place of one of the stack's services, published to the
+/// household with no contract in front of it that says what it is, is what the register
+/// says of the service it stands in for.
+#[test]
+fn a_moved_part_no_contract_settles_is_what_the_register_says() {
+    let mut parts = crate::test_support::adapted::installed_parts();
+    for adapter in parts
+        .iter_mut()
+        .filter(|one| one.plugin == "audiobookshelf")
+        .flat_map(|one| one.services.iter_mut())
+    {
+        adapter.speaks.clear();
+    }
+    let facing = parts
+        .iter()
+        .filter(|one| one.plugin == "audiobookshelf")
+        .flat_map(|plugin| {
+            plugin
+                .services
+                .iter()
+                .filter(|placed| placed.service == "audiobookshelf")
+                .map(|placed| super::brought(&parts, plugin, placed))
+        })
+        .next();
+    assert_eq!(facing, Some(Some(Facing::Shelf)));
 }
