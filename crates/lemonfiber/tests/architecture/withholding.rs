@@ -1,10 +1,8 @@
 //! Which settings are displayed in full, over every namespace that reaches the file.
 //!
-//! Two corpora, because there are two writers. The stack declares its settings in
-//! the embedded `.env.example` — read from the embedded copy rather than from the
-//! checked-out submodule, for the same reason the published ports are: those are
-//! the bytes a machine ends up running, and the directory beside them belongs to
-//! another repository that a clone need not have populated at all.
+//! Two corpora, because there are two writers. The embedded stack's settings are the
+//! names something it runs reads, as [`lemonfiber_core::config::read_by_the_stack`]
+//! lists them: those are the names a machine running this build ends up holding.
 //!
 //! lemonfiber declares its own in [`lemonfiber_core::config::SETTINGS`], and until
 //! that list existed this guard could not see them. That was the whole namespace
@@ -25,32 +23,16 @@
 use crate::source_tree;
 use std::collections::BTreeSet;
 
-use lemonfiber::carried::STACK;
 use lemonfiber_core::config::display::SHOWN;
-use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_core::config::store::showing;
-use lemonfiber_core::config::SETTINGS;
+use lemonfiber_core::config::{read_by_the_stack, SETTINGS};
 
-/// The file the stack declares its settings in.
-const SETTINGS_FILE: &str = ".env.example";
-
-/// The settings the embedded stack declares.
-///
-/// Read through the same parser the binary reads an operator's own file with, so
-/// that what counts as a declared setting is decided once. A second reader would
-/// answer this question about a slightly different set of lines than the one the
-/// configuration surface serves, and the two would drift without either being
-/// wrong.
-fn declared() -> EnvFile {
-    let text = STACK
-        .get_file(SETTINGS_FILE)
-        .and_then(include_dir::File::contents_utf8)
-        .unwrap_or_default();
-    let settings = EnvFile::parse(text);
+/// The settings the embedded stack reads.
+fn declared() -> BTreeSet<String> {
+    let settings: BTreeSet<String> = read_by_the_stack().map(str::to_owned).collect();
     assert!(
-        !settings.keys().is_empty(),
-        "the embedded stack declares no settings in {SETTINGS_FILE}, which means this is \
-         reading the wrong thing"
+        !settings.is_empty(),
+        "the embedded stack reads no settings, which means this is reading the wrong thing"
     );
     settings
 }
@@ -58,11 +40,11 @@ fn declared() -> EnvFile {
 /// Every setting that reaches an operator's file, from either writer.
 fn every_setting() -> BTreeSet<String> {
     let stack = declared();
-    let mut names: BTreeSet<String> = stack.keys().into_iter().map(str::to_owned).collect();
+    let mut names = stack.clone();
     names.extend(SETTINGS.iter().map(|name| (*name).to_owned()));
     assert!(
-        names.len() > stack.keys().len(),
-        "lemonfiber's own settings are all in the stack's file, which means SETTINGS is \
+        names.len() > stack.len(),
+        "lemonfiber's own settings are all among the stack's, which means SETTINGS is \
          not being read"
     );
     names
@@ -70,9 +52,8 @@ fn every_setting() -> BTreeSet<String> {
 
 /// A stand-in for whatever an operator has actually put in a setting.
 ///
-/// Every credential in the shipped file is empty, waiting to be filled in, and an
-/// empty value is displayed as itself. The question is what happens once one is
-/// filled in, so one is.
+/// An empty value is displayed as itself. The question is what happens once a setting
+/// is filled in, so one is.
 fn a_value() -> String {
     "x".repeat(24)
 }

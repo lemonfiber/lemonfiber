@@ -99,7 +99,7 @@ mod tests;
 /// Every name of the operator's environment file something reads: each the project is
 /// written with, and each filed into the settings and secret stores under the name a
 /// service reads.
-pub(crate) fn read_by_the_stack() -> impl Iterator<Item = &'static str> {
+pub fn read_by_the_stack() -> impl Iterator<Item = &'static str> {
     OPERATOR_KEYS
         .into_iter()
         .chain(legacy::TABLE.iter().map(|row| row.key))

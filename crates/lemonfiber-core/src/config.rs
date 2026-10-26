@@ -44,6 +44,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ports::docker::Target;
 
+pub use crate::settings::read_by_the_stack;
 pub use resending::{Resending, IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY};
 
 pub use reaching::{

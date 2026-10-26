@@ -136,6 +136,24 @@ impl Adapted {
         let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
     }
 
+    /// The plugin's manifest kept beside the env file `ctx`'s settings name, as installing
+    /// it keeps one, from the copy the bundle pins. Nothing where `ctx` names no env file.
+    pub fn kept(self, ctx: &Ctx) {
+        let (Some(into), Some(pinned)) = (
+            ctx.settings.env_file.as_deref().map(|env| {
+                env.with_file_name(lemonfiber_core::config::paths::STARTING_KEPT)
+                    .join(self.plugin)
+            }),
+            lemonfiber_bundled::PINNED
+                .iter()
+                .find(|one| one.first_party.plugin == self.plugin),
+        ) else {
+            return;
+        };
+        let _ = std::fs::create_dir_all(&into);
+        let _ = std::fs::write(into.join(lemonfiber_bundle::MANIFEST), pinned.copy);
+    }
+
     /// Each secret the plugin mints held as `value` in the secret store beside the env file
     /// `ctx`'s settings name, beside everything held there before, the store stamped as an
     /// earlier lemonfiber wrote it. Nothing where `ctx` names no env file.

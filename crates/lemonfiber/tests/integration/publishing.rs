@@ -1,17 +1,15 @@
 //! Which interface the stack this binary carries publishes each port on.
 //!
 //! Read from the project generated from the embedded copy — the same `STACK` the binary
-//! runs — rather than from the checked-out submodule. Those are the entries a machine
-//! ends up running, and the directory beside them belongs to another repository that a
-//! clone need not have populated at all. The bytes are fixed into this test binary when
-//! it is compiled, and `build.rs` refuses to produce a build without them, so there is
-//! no arrangement in which this reads nothing and finds nothing to object to.
+//! runs, so these are the entries a machine ends up running. The bytes are fixed into
+//! this test binary when it is compiled, and `build.rs` refuses to produce a build
+//! without them, so there is no arrangement in which this reads nothing and finds
+//! nothing to object to.
 
 use std::collections::BTreeSet;
 use std::net::IpAddr;
 
 use lemonfiber::carried::STACK;
-use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_manifest::{Bind, Service};
 
 /// The address a service reachable only from the host machine is published on.
@@ -28,13 +26,8 @@ const LOOPBACK: &str = "127.0.0.1";
 /// them at once.
 const NARROWED: &str = "192.0.2.7";
 
-/// The file the stack ships its settings in, which an operator's own starts from.
-const SETTINGS_FILE: &str = ".env.example";
-
-/// The setting itself, as that file names it.
-///
-/// Without the shape a mapping wraps it in, because what is read there is a value
-/// rather than an expansion.
+/// The setting that narrows the household tier, as an operator's environment file names
+/// it.
 const SETTING: &str = "LAN_BIND";
 
 /// The services published beyond loopback, and why each one is.
@@ -383,7 +376,7 @@ fn the_one_setting_that_narrows_the_household_tier_reaches_the_network_until_it_
         .filter(|service| household.contains(service.id.as_str()))
         .filter_map(|service| service.port)
         .collect();
-    let mut defaults: Vec<(String, String)> = publications(&|_| None)
+    let defaults: Vec<(String, String)> = publications(&|_| None)
         .into_iter()
         .filter(|published| ports.contains(&published.port))
         .map(|published| {
@@ -393,17 +386,8 @@ fn the_one_setting_that_narrows_the_household_tier_reaches_the_network_until_it_
             )
         })
         .collect();
-    let example = STACK
-        .get_file(SETTINGS_FILE)
-        .and_then(include_dir::File::contents_utf8)
-        .map(EnvFile::parse);
-    let shipped = example
-        .as_ref()
-        .and_then(|settings| settings.get(SETTING))
-        .unwrap_or_default();
-    defaults.push((format!("{SETTINGS_FILE}: {SETTING}"), shipped.to_owned()));
     assert!(
-        defaults.len() > household.len(),
+        defaults.len() >= household.len(),
         "fewer defaults were found than there are household services, so this is reading \
          the wrong thing: {defaults:?}"
     );

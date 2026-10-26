@@ -3,7 +3,7 @@
 
 use toml::{Table, Value};
 
-use crate::assembly::{same_ask, services, stacked};
+use crate::assembly::{services, stacked};
 use crate::{Held, Stage};
 
 /// The fields of an installed part's upstream service its stack service does not carry:
@@ -12,10 +12,13 @@ const PLUGIN_ONLY: [&str; 1] = ["native"];
 
 /// The stack `assembled` with each part `held` installs kept as its copy declares the
 /// service of its id: that one service, providing what any service of the part provides,
-/// without the environment values the plugin's own secrets fill, and a wiring row for
-/// each ask the copy makes for it. A choice of filler
+/// without the environment values the plugin's own secrets fill. A choice of filler
 /// naming any service of an installed part's copy names that one service, which stands
 /// in for every service of the part until it moves.
+///
+/// No ask of the copy is carried: a kept service only keeps its container running until
+/// the part moves, nothing answers its asks before then, and after it the plugin's own
+/// services make them.
 ///
 /// # Errors
 ///
@@ -40,14 +43,7 @@ pub fn kept(assembled: &str, held: &[Held]) -> Result<String, Vec<String>> {
     {
         let id = one.pin.id.as_str();
         match standing_in(one) {
-            Ok((service, asks)) => {
-                services_kept.push(Value::Table(service));
-                for ask in asks {
-                    if !wiring.iter().any(|row| same_ask(row, &ask)) {
-                        wiring.push(ask);
-                    }
-                }
-            }
+            Ok(service) => services_kept.push(Value::Table(service)),
             Err(said) => {
                 problems.push(format!("{id}: {said}"));
                 continue;
@@ -76,9 +72,8 @@ pub fn kept(assembled: &str, held: &[Held]) -> Result<String, Vec<String>> {
     Ok(toml::to_string(&stack).unwrap_or_default())
 }
 
-/// The stack service the installed part `one` stands in for until it moves, with the
-/// asks its copy makes for it as wiring rows.
-fn standing_in(one: &Held) -> Result<(Table, Vec<Value>), String> {
+/// The stack service the installed part `one` stands in for until it moves.
+fn standing_in(one: &Held) -> Result<Table, String> {
     let manifest: Table = toml::from_str(&one.copy).map_err(|refused| refused.to_string())?;
     let mut service = services(&manifest)
         .into_iter()
@@ -107,7 +102,7 @@ fn standing_in(one: &Held) -> Result<(Table, Vec<Value>), String> {
             service.remove("env");
         }
     }
-    stacked(one, &manifest, service)
+    stacked(one, &manifest, service).map(|(service, _)| service)
 }
 
 /// The id of every service the manifest `copy` declares.

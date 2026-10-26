@@ -12,6 +12,7 @@ publish = false
 
 [dependencies]
 lemonfiber-adapters = { workspace = true }
+lemonfiber-bundle = { workspace = true }
 lemonfiber-bundled = { workspace = true }
 lemonfiber-contract = { workspace = true }
 lemonfiber-core = { workspace = true }

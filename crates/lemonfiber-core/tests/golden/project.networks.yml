@@ -1,34 +1,4 @@
 networks:
-  ask__bazarr__library.curate__bindery:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.1.64/29
-  ask__bazarr__library.curate__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.110.104/29
-  ask__bazarr__library.curate__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.49.152/29
-  ask__bazarr__library.curate__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.126.208/29
-  ask__bindery__download.torrent__gluetun:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.245.104/29
-  ask__bindery__download.usenet__sabnzbd:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.43.88/29
   ask__bindery__indexer.search__prowlarr:
     internal: true
     ipam:
@@ -61,61 +31,11 @@ networks:
     ipam:
       config:
       - subnet: 10.80.162.192/29
-  ask__jellyfin__dashboard.show__homepage:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.1.144/29
-  ask__lidarr__download.torrent__gluetun:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.98.32/29
-  ask__lidarr__download.usenet__sabnzbd:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.240.192/29
   ask__navidrome__dashboard.show__homepage:
     internal: true
     ipam:
       config:
       - subnet: 10.80.179.144/29
-  ask__prowlarr__indexer.proxy__flaresolverr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.52.184/29
-  ask__prowlarr__library.curate__bindery:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.204.200/29
-  ask__prowlarr__library.curate__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.131.176/29
-  ask__prowlarr__library.curate__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.206.192/29
-  ask__prowlarr__library.curate__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.56.104/29
-  ask__radarr__download.torrent__gluetun:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.119.16/29
-  ask__radarr__download.usenet__sabnzbd:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.40.176/29
   ask__recyclarr__library.curate__bindery:
     internal: true
     ipam:
@@ -161,41 +81,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.140.168/29
-  ask__seerr__identity.source__jellyfin:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.89.8/29
-  ask__seerr__library.curate__bindery:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.61.136/29
-  ask__seerr__library.curate__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.95.112/29
-  ask__seerr__library.curate__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.156.128/29
-  ask__seerr__library.curate__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.8.40/29
-  ask__sonarr__download.torrent__gluetun:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.6.104/29
-  ask__sonarr__download.usenet__sabnzbd:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.220.88/29
   ask__unpackerr__library.curate__lidarr:
     internal: true
     ipam:
@@ -314,7 +199,7 @@ networks:
   own__sabnzbd:
     ipam:
       config:
-      - subnet: 10.80.220.96/29
+      - subnet: 10.80.220.88/29
   own__seerr:
     ipam:
       config:

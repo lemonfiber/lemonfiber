@@ -11,19 +11,8 @@ use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::settings::legacy;
 
-/// Every key the template an operator's environment file was made from names.
-fn template_keys() -> BTreeSet<String> {
-    let at = Path::new(lemonfiber_bundled::CARRIED_AT).join(".env.example");
-    std::fs::read_to_string(at)
-        .unwrap_or_default()
-        .lines()
-        .filter_map(|line| line.trim_start_matches(['#', ' ']).split_once('='))
-        .map(|(key, _)| key.trim().to_owned())
-        .collect()
-}
-
 #[test]
-fn each_legacy_setting_is_filed_from_a_key_the_template_names_for_a_setting_the_stack_reads() {
+fn each_legacy_setting_is_filed_for_a_setting_the_stack_reads() {
     let ctx = crate::test_support::a_context().build();
     let manifest = ctx.stack.checked_manifest(ctx.today());
     let read: BTreeSet<String> = manifest
@@ -35,13 +24,7 @@ fn each_legacy_setting_is_filed_from_a_key_the_template_names_for_a_setting_the_
             _ => None,
         })
         .collect();
-    let template = template_keys();
     for row in &legacy::TABLE {
-        assert!(
-            template.contains(row.key),
-            "{} is not in the template",
-            row.key
-        );
         assert!(
             row.secret || read.contains(row.name),
             "{} is read by no service",

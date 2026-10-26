@@ -12,6 +12,12 @@
 //! is refused too: a declaration nothing shows is one nothing holds the service to. A
 //! probe with no readable recording of its request establishes nothing either way: it
 //! is reported as unproven, never counted as shown, and refuses nothing.
+//!
+//! **A kept service is not judged here.** A service of a part the bundle pins as
+//! installed only keeps its container running until the part moves, and provides what
+//! its part provides only so a filler the bundle chooses names something in the stack.
+//! The part's adapter carries the claims and is judged against its own repository's
+//! recordings and live check. Which services those are is read from the bundle's pins.
 
 use std::path::Path;
 
@@ -84,7 +90,11 @@ impl Bundled {
 #[must_use]
 pub fn judged(manifest: &Manifest, carried: &Path) -> Bundled {
     let mut report = Bundled::default();
-    for service in &manifest.services {
+    for service in manifest
+        .services
+        .iter()
+        .filter(|service| !kept(&service.id))
+    {
         let read = lemonfiber_plugin::claiming::bundled(service);
         report.refused.extend(read.violations);
         report
@@ -125,6 +135,14 @@ pub fn judged(manifest: &Manifest, carried: &Path) -> Bundled {
         }
     }
     report
+}
+
+/// Whether `service` is the one a part the bundle pins as installed keeps in the stack.
+fn kept(service: &str) -> bool {
+    lemonfiber_bundled::PINNED.iter().any(|pinned| {
+        pinned.stage == Some(lemonfiber_bundled::Stage::Installed)
+            && pinned.first_party.plugin == service
+    })
 }
 
 /// The report as lines, worst first: what refuses, then what refutes, then what is

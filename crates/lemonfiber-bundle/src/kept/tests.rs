@@ -177,7 +177,7 @@ fn an_assembled_part_stays_as_the_bundle_assembled_it() {
 }
 
 #[test]
-fn an_installed_part_asks_by_the_rows_its_copy_makes_for_that_service() {
+fn an_installed_part_s_kept_service_asks_nothing_its_copy_asks() {
     let stack = stack(&[
         held("curator", Stage::Assembled, ""),
         held("player", Stage::Installed, PLAYER),
@@ -187,13 +187,7 @@ fn an_installed_part_asks_by_the_rows_its_copy_makes_for_that_service() {
         .iter()
         .map(|row| (field(row, "by"), field(row, "asks")))
         .collect();
-    assert_eq!(
-        asked,
-        vec![
-            (Some("curator"), Some("indexer.search")),
-            (Some("player"), Some("library.media")),
-        ]
-    );
+    assert_eq!(asked, vec![(Some("curator"), Some("indexer.search"))]);
 }
 
 #[test]

@@ -133,7 +133,6 @@ services:
     volumes:
     - ./config/flaresolverr:/config
     networks:
-    - ask__prowlarr__indexer.proxy__flaresolverr
     - own__flaresolverr
     security_opt:
     - no-new-privileges:true
@@ -165,10 +164,6 @@ services:
     volumes:
     - ./config/gluetun:/config
     networks:
-    - ask__bindery__download.torrent__gluetun
-    - ask__lidarr__download.torrent__gluetun
-    - ask__radarr__download.torrent__gluetun
-    - ask__sonarr__download.torrent__gluetun
     - own__gluetun
     security_opt:
     - no-new-privileges:true
@@ -202,7 +197,6 @@ services:
     - ./config/homepage:/app/config
     networks:
     - ask__homepage__proxy.front__caddy
-    - ask__jellyfin__dashboard.show__homepage
     - ask__navidrome__dashboard.show__homepage
     - own__homepage
     security_opt:
@@ -382,10 +376,6 @@ services:
     - ./data:/data
     - ./config/bazarr:/config
     networks:
-    - ask__bazarr__library.curate__bindery
-    - ask__bazarr__library.curate__lidarr
-    - ask__bazarr__library.curate__radarr
-    - ask__bazarr__library.curate__sonarr
     - own__bazarr
     security_opt:
     - no-new-privileges:true
@@ -416,14 +406,9 @@ services:
     - ./data:/data
     - ./config/bindery:/config
     networks:
-    - ask__bazarr__library.curate__bindery
-    - ask__bindery__download.torrent__gluetun
-    - ask__bindery__download.usenet__sabnzbd
     - ask__bindery__indexer.search__prowlarr
-    - ask__prowlarr__library.curate__bindery
     - ask__recyclarr__library.curate__bindery
     - ask__request-gate__library.curate__bindery
-    - ask__seerr__library.curate__bindery
     - own__bindery
     security_opt:
     - no-new-privileges:true
@@ -438,7 +423,7 @@ services:
     - KILL
     pids_limit: 1024
   jellyfin:
-    image: jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
+    image: docker.io/jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     profiles:
     - media
     restart: unless-stopped
@@ -454,9 +439,7 @@ services:
     networks:
     - ask__decline__identity.source__jellyfin
     - ask__door__media.serve__jellyfin
-    - ask__jellyfin__dashboard.show__homepage
     - ask__request-gate__identity.source__jellyfin
-    - ask__seerr__identity.source__jellyfin
     - link__decline__jellyfin
     - own__jellyfin
     security_opt:
@@ -486,13 +469,8 @@ services:
     - ./data:/data
     - ./config/lidarr:/config
     networks:
-    - ask__bazarr__library.curate__lidarr
-    - ask__lidarr__download.torrent__gluetun
-    - ask__lidarr__download.usenet__sabnzbd
-    - ask__prowlarr__library.curate__lidarr
     - ask__recyclarr__library.curate__lidarr
     - ask__request-gate__library.curate__lidarr
-    - ask__seerr__library.curate__lidarr
     - ask__unpackerr__library.curate__lidarr
     - link__unpackerr__lidarr
     - own__lidarr
@@ -552,11 +530,6 @@ services:
     - ./config/prowlarr:/config
     networks:
     - ask__bindery__indexer.search__prowlarr
-    - ask__prowlarr__indexer.proxy__flaresolverr
-    - ask__prowlarr__library.curate__bindery
-    - ask__prowlarr__library.curate__lidarr
-    - ask__prowlarr__library.curate__radarr
-    - ask__prowlarr__library.curate__sonarr
     - own__prowlarr
     security_opt:
     - no-new-privileges:true
@@ -614,13 +587,8 @@ services:
     - ./data:/data
     - ./config/radarr:/config
     networks:
-    - ask__bazarr__library.curate__radarr
-    - ask__prowlarr__library.curate__radarr
-    - ask__radarr__download.torrent__gluetun
-    - ask__radarr__download.usenet__sabnzbd
     - ask__recyclarr__library.curate__radarr
     - ask__request-gate__library.curate__radarr
-    - ask__seerr__library.curate__radarr
     - ask__unpackerr__library.curate__radarr
     - link__recyclarr__radarr
     - link__unpackerr__radarr
@@ -652,10 +620,6 @@ services:
     - ./data:/data
     - ./config/sabnzbd:/config
     networks:
-    - ask__bindery__download.usenet__sabnzbd
-    - ask__lidarr__download.usenet__sabnzbd
-    - ask__radarr__download.usenet__sabnzbd
-    - ask__sonarr__download.usenet__sabnzbd
     - own__sabnzbd
     security_opt:
     - no-new-privileges:true
@@ -683,11 +647,6 @@ services:
     volumes:
     - ./config/seerr:/app/config
     networks:
-    - ask__seerr__identity.source__jellyfin
-    - ask__seerr__library.curate__bindery
-    - ask__seerr__library.curate__lidarr
-    - ask__seerr__library.curate__radarr
-    - ask__seerr__library.curate__sonarr
     - own__seerr
     security_opt:
     - no-new-privileges:true
@@ -716,13 +675,8 @@ services:
     - ./data:/data
     - ./config/sonarr:/config
     networks:
-    - ask__bazarr__library.curate__sonarr
-    - ask__prowlarr__library.curate__sonarr
     - ask__recyclarr__library.curate__sonarr
     - ask__request-gate__library.curate__sonarr
-    - ask__seerr__library.curate__sonarr
-    - ask__sonarr__download.torrent__gluetun
-    - ask__sonarr__download.usenet__sabnzbd
     - ask__unpackerr__library.curate__sonarr
     - link__recyclarr__sonarr
     - link__unpackerr__sonarr

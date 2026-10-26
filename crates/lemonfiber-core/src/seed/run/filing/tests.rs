@@ -124,16 +124,35 @@ fn shipped_services() -> Vec<lemonfiber_manifest::Service> {
     manifest.services
 }
 
-/// What `services` come to, asked for as the shipped stack asks.
+/// Every curator moved into its plugin, with each of `beside`.
+fn moved_beside(
+    beside: impl IntoIterator<Item = Option<crate::plugin::Installed>>,
+) -> Vec<crate::plugin::Installed> {
+    crate::test_support::curators::ALL
+        .iter()
+        .map(|curator| curator.installed())
+        .chain(beside)
+        .flatten()
+        .collect()
+}
+
+/// What `services` come to, asked for as the shipped stack asks, every curator and both
+/// download clients moved into their plugins.
 fn shipped(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
-    crate::test_support::stack_fillers(services, &[], None, crate::plugin::first_party::EMBEDDED)
+    crate::test_support::stack_fillers(
+        services,
+        &moved_beside([torrent::moved(), crate::test_support::usenet::moved()]),
+        None,
+        crate::plugin::first_party::EMBEDDED,
+    )
 }
 
 /// A context reaching the shipped stack's torrent client moved into its plugin, over
-/// `http`, with the stack's fillers as it is written.
+/// `http`, with the stack's fillers as it is written beside `installed`.
 fn reaching_the_torrent_client(
     name: &str,
     services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
     http: Arc<Fake>,
 ) -> (crate::app::Ctx, crate::wiring::Fillers) {
     let ctx = torrent::reaching(
@@ -151,7 +170,7 @@ fn reaching_the_torrent_client(
     };
     let fillers = crate::test_support::stack_fillers(
         services,
-        &torrent::moved().into_iter().collect::<Vec<_>>(),
+        installed,
         project,
         crate::plugin::first_party::EMBEDDED,
     );
@@ -452,8 +471,12 @@ async fn the_moved_torrent_client_is_told_and_read_back_over_its_contract() {
         ),
         (torrent::operation("file_under"), vec![torrent::taken()]),
     ]);
-    let (ctx, fillers) =
-        reaching_the_torrent_client("filing-torrent", shipped_services(), http.clone());
+    let (ctx, fillers) = reaching_the_torrent_client(
+        "filing-torrent",
+        shipped_services(),
+        &moved_beside([torrent::moved()]),
+        http.clone(),
+    );
     let wanted = categories(&fillers);
     let handed = wanted.get(torrent::ADAPTER).cloned().unwrap_or_default();
     let mut baseline = Baseline::new();
@@ -481,15 +504,21 @@ async fn the_moved_torrent_client_is_told_and_read_back_over_its_contract() {
 
 #[tokio::test]
 async fn a_client_no_curator_hands_a_category_is_told_nothing() {
-    let mut services = shipped_services();
-    for service in &mut services {
-        if !service.media_types.is_empty() {
-            service.media_types = vec!["comics".to_owned()];
-        }
+    let mut installed = moved_beside([torrent::moved()]);
+    for placed in installed
+        .iter_mut()
+        .flat_map(|plugin| plugin.services.iter_mut())
+        .filter(|placed| !placed.media_types.is_empty())
+    {
+        placed.media_types = vec!["comics".to_owned()];
     }
     let http = Fake::always(Answer::reply(200, "{}"));
-    let (ctx, fillers) =
-        reaching_the_torrent_client("filing-uncategorised", services, http.clone());
+    let (ctx, fillers) = reaching_the_torrent_client(
+        "filing-uncategorised",
+        shipped_services(),
+        &installed,
+        http.clone(),
+    );
 
     let (wirings, completed_now) =
         super::seed_completed_folders(&ctx, &fillers, &mut Baseline::new()).await;
