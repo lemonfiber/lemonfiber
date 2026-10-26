@@ -16,7 +16,7 @@ pub(crate) mod store;
 pub(crate) mod undoing;
 
 pub(crate) use files::{text, written};
-pub(crate) use resolved::{holding, Resolved};
+pub(crate) use resolved::{holding, Resolved, OPERATOR_KEYS};
 pub(crate) use restarting::{restarted, running};
 pub(crate) use secrets::{filed, kept, Keeping, Secrets, Source};
 pub(crate) use store::Settings;
@@ -95,3 +95,12 @@ pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {
 
 #[cfg(test)]
 mod tests;
+
+/// Every name of the operator's environment file something reads: each the project is
+/// written with, and each filed into the settings and secret stores under the name a
+/// service reads.
+pub(crate) fn read_by_the_stack() -> impl Iterator<Item = &'static str> {
+    OPERATOR_KEYS
+        .into_iter()
+        .chain(legacy::TABLE.iter().map(|row| row.key))
+}

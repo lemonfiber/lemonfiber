@@ -15,7 +15,7 @@ use crate::stack::Source;
 
 use super::Ctx;
 
-/// The file a stack declares the settings it reads in.
+/// The file a stack on disk declares the settings it reads in.
 const SETTINGS_FILE: &str = ".env.example";
 
 /// Why `key` may not be set to `value`, where it may not.
@@ -49,25 +49,27 @@ async fn known(stack: Source, held: &EnvFile, key: &str) -> bool {
         || declared(stack).await.iter().any(|one| one == key)
 }
 
-/// Every setting the stack declares it reads.
+/// Every setting the stack declares it reads: the embedded stack's are the names
+/// something it runs reads, and a stack on disk declares its own in its `.env.example`.
 async fn declared(stack: Source) -> Vec<String> {
-    let text = match stack {
-        Source::Embedded(dir) => dir
-            .get_file(SETTINGS_FILE)
-            .and_then(include_dir::File::contents_utf8)
-            .map(str::to_owned),
-        Source::External(path) => tokio::fs::read_to_string(path.join(SETTINGS_FILE))
-            .await
-            .ok(),
+    let path = match stack {
+        Source::Embedded(_) => {
+            return crate::settings::read_by_the_stack()
+                .map(str::to_owned)
+                .collect()
+        }
+        Source::External(path) => path,
     };
-    text.map(|text| {
-        EnvFile::parse(&text)
-            .keys()
-            .into_iter()
-            .map(str::to_owned)
-            .collect()
-    })
-    .unwrap_or_default()
+    tokio::fs::read_to_string(path.join(SETTINGS_FILE))
+        .await
+        .map(|text| {
+            EnvFile::parse(&text)
+                .keys()
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Why `value` will not do as the user or group the services run as: it is not a number,

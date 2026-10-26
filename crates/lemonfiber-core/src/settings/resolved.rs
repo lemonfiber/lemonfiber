@@ -153,7 +153,7 @@ fn crossed(
 
 /// The variables of the operator's environment file the project is written with: none of
 /// them a secret.
-const OPERATOR_KEYS: [&str; 5] = [
+pub(crate) const OPERATOR_KEYS: [&str; 5] = [
     crate::config::PUID_KEY,
     crate::config::PGID_KEY,
     crate::config::ZONE_KEY,
