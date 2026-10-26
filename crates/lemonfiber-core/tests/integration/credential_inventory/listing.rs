@@ -52,7 +52,9 @@ async fn a_credential_kept_without_being_proven_is_stale_and_says_so() {
 #[tokio::test]
 async fn the_inventory_names_every_credential_the_operator_supplies_and_every_one_it_mints() {
     let env = env_at("declared", &[]);
-    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+    let ctx = ctx(env, Files::empty(), silent());
+    lemonfiber_testing::adapted::parts_recorded(&ctx);
+    let inventory = asked(&ctx, Asking::Read).await;
     let named: Vec<&str> = inventory.held.iter().map(|one| one.name.as_str()).collect();
 
     assert!(named.len() >= 6, "{named:?}");
@@ -93,6 +95,7 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
         ],
     );
     let ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+    lemonfiber_testing::adapted::parts_recorded(&ctx);
 
     let inventory = asked(&ctx, Asking::Read).await;
     let sent = serde_json::to_string(&inventory).unwrap_or_default();
@@ -133,13 +136,18 @@ async fn what_the_storage_protects_against_is_stated_with_what_it_does_not() {
         .contains("malware"));
 }
 
-/// A service that regenerated its key underneath a stack still handing out the old
-/// one, which is the fault the comparison exists to find.
+/// A service a stack runs its own copy of, which regenerated its key underneath a stack
+/// still handing out the old one: the fault the comparison exists to find.
 #[tokio::test]
 async fn a_service_key_that_no_longer_matches_the_published_copy_is_reported_as_invalid() {
     let stale = format!("{}{}", "0000stale", "keykeykeykey");
     let env = env_at("regenerated", &[("SONARR_API_KEY", &stale)]);
-    let ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+    let mut ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+    ctx.stack = lemonfiber_testing::declaring(
+        "credentials-regenerated",
+        "sonarr",
+        r#"{ kind = "servarr", key_source = "config-xml", path = "/config/config.xml", version = 3 }"#,
+    );
 
     let inventory = asked(&ctx, Asking::Read).await;
     let curator = inventory
@@ -149,7 +157,7 @@ async fn a_service_key_that_no_longer_matches_the_published_copy_is_reported_as_
 
     assert!(
         curator.is_some(),
-        "the stack carries a curator, so its key is listed"
+        "the stack runs its own curator, so its key is listed"
     );
     assert_eq!(curator.map(|one| one.state), Some(State::Invalid));
     let said = curator

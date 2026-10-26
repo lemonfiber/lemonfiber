@@ -34,12 +34,17 @@ async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_say
     assert_eq!(recorded(&env, "INDEXER_APIKEY"), Some(key));
 }
 
-/// A key a stack service wrote for itself is not one lemonfiber replaces or hands out
-/// unproven — seeding already gives it to whatever reads it, and the answer says so.
+/// A key a service a stack runs its own copy of wrote for itself is not one lemonfiber
+/// replaces or hands out unproven — seeding already gives it to whatever reads it, and the answer says so.
 #[tokio::test]
 async fn a_key_a_service_wrote_for_itself_points_at_the_seeding_instead() {
     let env = env_at("notservarr", &[]);
-    let ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+    let mut ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+    ctx.stack = lemonfiber_testing::declaring(
+        "credentials-notservarr",
+        "seerr",
+        r#"{ kind = "seerr", key_source = "config-json", path = "/app/config/settings.json" }"#,
+    );
 
     let inventory = asked(
         &ctx,
@@ -59,6 +64,7 @@ async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
     let password = the_recorded_password();
     let env = env_at("unknown", &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
     let ctx = ctx(env.clone(), Files::empty(), silent());
+    lemonfiber_testing::adapted::parts_recorded(&ctx);
 
     let inventory = asked(
         &ctx,

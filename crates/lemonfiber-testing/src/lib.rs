@@ -20,5 +20,5 @@ pub mod subtitles;
 pub mod torrent;
 pub mod usenet;
 
-pub use context::{a_context, a_live_context, nowhere, repository_stack, Context};
+pub use context::{a_context, a_live_context, declaring, nowhere, repository_stack, Context};
 pub use placeholder::a_word;

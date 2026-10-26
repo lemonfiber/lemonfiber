@@ -110,23 +110,7 @@ impl Adapted {
     /// for it where none is yet, with every plugin recorded there before, its adapter keyed
     /// nowhere. Nothing where `ctx` names no env file.
     pub fn recorded(self, ctx: &Ctx) {
-        let Some(kept) = ctx
-            .settings
-            .env_file
-            .as_deref()
-            .map(|env| env.with_file_name(lemonfiber_core::config::paths::PLUGINS))
-        else {
-            return;
-        };
-        let mut register = std::fs::read_to_string(&kept)
-            .ok()
-            .and_then(|text| Register::parse(&text).ok())
-            .unwrap_or_else(Register::empty);
-        if let Some(installed) = self.installed() {
-            let _ = register.record(installed);
-        }
-        let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
-        let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
+        recorded_beside(ctx, self.installed());
     }
 
     /// The plugin's manifest kept beside the env file `ctx`'s settings name, as installing
@@ -247,6 +231,34 @@ pub fn installed_parts() -> Vec<Installed> {
         .filter(|pinned| pinned.stage == Some(lemonfiber_bundled::Stage::Installed))
         .filter_map(recorded)
         .collect()
+}
+
+/// Every part the bundle installs recorded beside the env file `ctx`'s settings name, with
+/// every plugin recorded there before. Nothing where `ctx` names no env file.
+pub fn parts_recorded(ctx: &Ctx) {
+    recorded_beside(ctx, installed_parts());
+}
+
+/// Each of `installed` recorded beside the env file `ctx`'s settings name, in a directory
+/// made for it where none is yet, with every plugin recorded there before.
+fn recorded_beside(ctx: &Ctx, installed: impl IntoIterator<Item = Installed>) {
+    let Some(kept) = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .map(|env| env.with_file_name(lemonfiber_core::config::paths::PLUGINS))
+    else {
+        return;
+    };
+    let mut register = std::fs::read_to_string(&kept)
+        .ok()
+        .and_then(|text| Register::parse(&text).ok())
+        .unwrap_or_else(Register::empty);
+    for one in installed {
+        let _ = register.record(one);
+    }
+    let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
+    let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
 }
 
 /// The engine's account of every one of `adapted` running healthy, each published on its
