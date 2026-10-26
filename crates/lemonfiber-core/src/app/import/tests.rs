@@ -271,3 +271,94 @@ async fn their_copy_mounting_nothing_is_not_read() {
     assert!(refused_for(&report, UNCONFIGURED), "{report:?}");
     assert!(serves.asked().is_empty());
 }
+
+/// A service lemonfiber does not run is passed over: nothing is lent to it and nothing is
+/// said about it.
+#[tokio::test]
+async fn a_service_lemonfiber_does_not_run_is_passed_over() {
+    let serves = Arc::new(Serves::on(PUBLISHED));
+    let ctx = importing("not-ours", &serves);
+
+    let report = imported_from(
+        &ctx,
+        Container {
+            service: "ombi".to_owned(),
+            ..theirs()
+        },
+        crate::plugin::first_party::EMBEDDED,
+    )
+    .await;
+
+    assert!(report.not_carried.is_empty(), "{report:?}");
+    assert!(serves.asked().is_empty());
+}
+
+/// Their copy answering on this machine's loopback alone is one a lent adapter cannot
+/// reach.
+#[tokio::test]
+async fn their_copy_on_loopback_alone_is_not_lent_to() {
+    let serves = Arc::new(Serves::on(PUBLISHED));
+    let ctx = importing("loopback", &serves);
+
+    let report = imported_from(
+        &ctx,
+        Container {
+            published: vec![Published {
+                address: std::net::IpAddr::from([127, 0, 0, 1]),
+                port: THEIR_PORT,
+                private: 8989,
+            }],
+            ..theirs()
+        },
+        crate::plugin::first_party::EMBEDDED,
+    )
+    .await;
+
+    assert!(
+        refused_for(
+            &report,
+            "it answers on no address but this machine's loopback, which a container cannot reach"
+        ),
+        "{report:?}"
+    );
+    assert!(serves.asked().is_empty());
+}
+
+/// Their copy that has written no key is not read.
+#[tokio::test]
+async fn their_copy_with_no_key_written_is_not_read() {
+    let serves = Arc::new(Serves::on(PUBLISHED));
+    let ctx = importing("keyless", &serves).with_filesystem(Arc::new(SeedFs::keyed(None)));
+
+    let report = imported(&ctx, crate::plugin::first_party::EMBEDDED).await;
+
+    assert!(
+        refused_for(
+            &report,
+            "their copy has written no key lemonfiber could read"
+        ),
+        "{report:?}"
+    );
+    assert!(serves.asked().is_empty());
+}
+
+/// An adapter the engine will not serve is said to have not started.
+#[tokio::test]
+async fn an_adapter_the_engine_will_not_serve_is_said_not_to_have_started() {
+    let serves = Arc::new(Serves::refusing(
+        lemonfiber_ports::program::Unran::Unreachable {
+            reason: "no engine".to_owned(),
+        },
+    ));
+    let ctx = importing("unserved", &serves);
+
+    let report = imported(&ctx, crate::plugin::first_party::EMBEDDED).await;
+
+    assert!(
+        report.not_carried.iter().any(|one| one.what == "sonarr"
+            && one
+                .because
+                .contains("the adapter lent to their copy did not start")),
+        "{report:?}"
+    );
+}

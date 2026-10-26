@@ -368,3 +368,6 @@ fn reached(service: &str, failed: Option<String>) -> Propagation {
         Some(why) => Propagation::failed(service, &why),
     }
 }
+
+#[cfg(test)]
+mod tests;

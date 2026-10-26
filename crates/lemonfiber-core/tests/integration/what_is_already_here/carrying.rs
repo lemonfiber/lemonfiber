@@ -197,6 +197,24 @@ async fn a_service_whose_records_will_not_read_is_named_for_that() {
     assert!(said.contains("could not be read"), "{said}");
 }
 
+/// Ours that will not say what quality profiles it holds is a service nothing can be
+/// matched into, and the import says so.
+#[tokio::test]
+async fn ours_that_will_not_say_its_profiles_is_named_for_that() {
+    let mut routes = vec![(
+        curating(TELEVISION, "quality_profiles"),
+        None,
+        vec![unavailable()],
+    )];
+    routes.extend(stacks(&[taskmaster()], &[], taken()));
+    let ctx = importing_with(SeedFs::keyed(Some(THEIR_KEY)), Fake::by_call(routes));
+    let said = because(carrying(&ctx, false).await);
+    assert!(
+        said.ends_with("its quality profiles could not be read"),
+        "{said}"
+    );
+}
+
 /// A machine that could not be looked at is one there is nothing to carry out of, and
 /// saying so is different from saying the two stacks agree.
 #[tokio::test]
