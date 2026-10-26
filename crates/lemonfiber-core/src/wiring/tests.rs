@@ -122,23 +122,56 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
     );
 }
 
+/// The stack's asks settled with every part the bundle installs moved into its plugin.
+fn moved() -> Vec<super::Wired> {
+    stack()
+        .map(|manifest| {
+            settle(
+                &manifest,
+                &crate::test_support::adapted::installed_parts(),
+                &Chosen::default(),
+            )
+        })
+        .unwrap_or_default()
+}
+
 /// An ask for all of them is not a contest. Four services curate a library here,
 /// and a reader that could only answer "one or refused" would refuse every link
 /// in the stack that reaches all of them.
 #[test]
 fn an_ask_for_every_filler_reaches_every_filler() {
-    let curators = ["sonarr", "radarr", "lidarr", "bindery"];
-    let reaches = came(stack(), &Chosen::default(), "bazarr");
-    let ordered = crate::test_support::in_the_stacks_order(&curators);
-    assert!(ordered.is_some(), "the stack runs every curator");
+    let curators = ["bindery", "lidarr", "radarr", "sonarr"];
+    let reaches = moved()
+        .into_iter()
+        .filter(|one| one.by == "bazarr")
+        .map(|one| one.reaches)
+        .find(|reaches| {
+            matches!(
+                reaches,
+                Reaches::Asked {
+                    settled: Settled::Each,
+                    ..
+                }
+            )
+        });
     assert_eq!(
         reaches,
-        ordered.map(|services| Reaches::Asked {
+        Some(Reaches::Asked {
             native: None,
             capability: "library.curate".to_owned(),
-            services,
+            services: curators.map(|one| format!("{one}-adapter")).to_vec(),
             settled: Settled::Each,
-            origins: bundled(&curators),
+            origins: curators
+                .iter()
+                .map(|one| {
+                    (
+                        format!("{one}-adapter"),
+                        crate::origin::Origin::Plugin {
+                            named: (*one).to_owned(),
+                        },
+                    )
+                })
+                .collect(),
         })
     );
 }
@@ -475,20 +508,18 @@ fn a_substitution_is_journalled_as_a_change_that_can_be_put_back() {
 /// is settled is one map rather than one answer per asker.
 #[test]
 fn what_fills_each_capability_is_one_answer_for_every_asker() {
-    let held = stack()
-        .map(|manifest| filled(&settle(&manifest, &[], &Chosen::default())))
-        .unwrap_or_default();
+    let held = filled(&moved());
     assert_eq!(
         held.get("download.torrent").map(Vec::as_slice),
-        Some(["qbittorrent".to_owned()].as_slice())
+        Some(["qbittorrent-adapter".to_owned()].as_slice())
     );
     assert_eq!(
         held.get("identity.source").map(Vec::as_slice),
-        Some(["jellyfin".to_owned()].as_slice())
+        Some(["jellyfin-adapter".to_owned()].as_slice())
     );
     assert_eq!(
         held.get("indexer.search").map(Vec::as_slice),
-        Some(["prowlarr".to_owned()].as_slice())
+        Some(["prowlarr-adapter".to_owned()].as_slice())
     );
 }
 
