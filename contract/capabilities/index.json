@@ -175,7 +175,7 @@
       "files": [
         {
           "path": "library.curate/v1/openapi.json",
-          "sha256": "849f7f6ff83f296d294ef472efb0368ab7aa8feb6272641530e2b69519d6880a"
+          "sha256": "ed579cb22b3e75f4c07c700dede9dc86d51b4ea51eb9422d9267e716c898abb3"
         },
         {
           "path": "library.curate/v1/operations/identity.json",
@@ -216,6 +216,10 @@
         {
           "path": "library.curate/v1/operations/search_upgrades.json",
           "sha256": "2434fe4fd9d6fc5c9a0236a636c813cb79a163742b7d56bcf0c761f76790d202"
+        },
+        {
+          "path": "library.curate/v1/operations/wanting.json",
+          "sha256": "c7c6d7c73811997fb77643dafef613f5b0d13afd93929086c9c863a8f38c1ef5"
         },
         {
           "path": "library.curate/v1/operations/hardlinks.json",
@@ -287,14 +291,14 @@
         },
         {
           "path": "library.curate/v1/conformance.json",
-          "sha256": "70a7e513396cc7d079d88c7de820c811a80293f59006f9bb9d45e725141f8f4b"
+          "sha256": "ee4c92b4a2202cdbc7069d5eab89efdbdb6e62cd50ed5b269c3f954caf23e162"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "library.curate/v1/openapi.json",
-      "operations": 27
+      "operations": 28
     },
     {
       "capability": "indexer.search",

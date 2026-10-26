@@ -257,6 +257,10 @@ impl crate::ports::service::Maintenance for Servarr {
             .await?;
         self.endpoint.expect_success(&response)
     }
+
+    async fn wanting(&self) -> Result<bool, Failure> {
+        self.wants_any().await
+    }
 }
 
 /// The API key a Servarr application wrote to its configuration, if it has

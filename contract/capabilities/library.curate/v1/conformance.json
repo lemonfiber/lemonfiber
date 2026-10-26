@@ -218,6 +218,16 @@
     },
     {
       "asked": {},
+      "case": "wanting-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "wanting"
+    },
+    {
+      "asked": {},
       "case": "hardlinks-answers",
       "expect": {
         "conforms": true

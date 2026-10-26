@@ -272,6 +272,14 @@ pub trait Maintenance: Send + Sync {
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
     async fn search_upgrades(&self, kind: crate::media::Kind) -> Result<(), Failure>;
+
+    /// Whether anything is on its wanted list, which a release search is spent on: read
+    /// from the list alone, so it searches nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the curator is unreachable or refuses.
+    async fn wanting(&self) -> Result<bool, Failure>;
 }
 
 /// Telling a service how to move files from the download directory into the

@@ -165,6 +165,9 @@
     },
     "/lemonfiber/library.curate/v1/update_download_client": {
       "$ref": "operations/update_download_client.json"
+    },
+    "/lemonfiber/library.curate/v1/wanting": {
+      "$ref": "operations/wanting.json"
     }
   }
 }
