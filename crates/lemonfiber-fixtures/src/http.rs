@@ -166,20 +166,6 @@ impl Fake {
         Self::new(Script::InTurn(Mutex::new(answers.into())))
     }
 
-    /// Each reply in turn, written as the status and body most tests already have.
-    ///
-    /// The same thing as [`Fake::in_turn`], spelled the way a test that only ever
-    /// replies with a status and a body wants to spell it.
-    #[must_use]
-    pub fn scripted(replies: Vec<(u16, &'static str)>) -> Arc<Self> {
-        Self::in_turn(
-            replies
-                .into_iter()
-                .map(|(status, body)| Answer::reply(status, body))
-                .collect(),
-        )
-    }
-
     /// By what was asked for, where some routes care about the method and others do
     /// not — the general form [`Fake::by_path`] and [`Fake::by_route`] are shorthands
     /// for. The first route whose fragment the URL contains wins, so a table can put

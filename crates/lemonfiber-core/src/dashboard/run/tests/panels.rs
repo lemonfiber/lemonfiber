@@ -377,7 +377,7 @@ async fn the_transfers_panel_fills_from_each_download_client() {
 /// reaches, so the panel is ready-but-empty rather than failed.
 #[tokio::test]
 async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
-    let http: Arc<dyn Http> = Fake::scripted(Vec::new());
+    let http: Arc<dyn Http> = Fake::silent();
     let ctx = ctx_downloads(SeedFs::keyed(None), http, None);
     let snapshot = gather(&ctx, None).await;
     assert!(matches!(&snapshot.transfers, Panel::Ready(active) if active.is_empty()));
@@ -387,7 +387,7 @@ async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
 /// be read, so neither appears, and neither is asked.
 #[tokio::test]
 async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
-    let http = Fake::scripted(Vec::new());
+    let http = Fake::silent();
     let ctx = ctx_downloads(
         SeedFs::keyed(None),
         Arc::clone(&http) as Arc<dyn Http>,
@@ -404,7 +404,7 @@ async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
 /// from the panel rather than failing it.
 #[tokio::test]
 async fn a_download_client_that_will_not_answer_is_left_out() {
-    let http: Arc<dyn Http> = Fake::scripted(Vec::new());
+    let http: Arc<dyn Http> = Fake::silent();
     let ctx = ctx_downloads(
         SeedFs::keyed(None),
         http,

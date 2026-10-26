@@ -18,7 +18,6 @@ async fn seed_wires_each_curators_root_folders() {
     let ctx = curating(
         seed_ctx(
             true,
-            Vec::new(),
             Some(vec![0x11; 24]),
             Some(crate::test_support::env_without_password("roots-held")),
         ),
@@ -79,7 +78,6 @@ async fn seed_skips_curator_root_folders_when_the_key_is_not_readable() {
     let ctx = curating(
         seed_ctx(
             true,
-            Vec::new(),
             Some(vec![0x11; 24]),
             Some(crate::test_support::env_without_password("roots-unkeyed")),
         ),
@@ -295,11 +293,11 @@ fn a_curator_with_no_category_is_told_about_no_client() {
 #[test]
 fn a_recorded_password_is_read_back_or_read_as_absent() {
     // Nowhere to read from.
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
     assert!(recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).is_none());
 
     let path = config_scratch("qbt-readback");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(path.to_path_buf()));
+    let ctx = seed_ctx(true, None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
     let _ = store::set(&path, "SOMETHING_ELSE", "x");
     assert!(
@@ -325,13 +323,8 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
     // Both download clients are moved into their plugins with what lemonfiber minted for
     // each in hand; each curator already holds both clients.
     let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(seeding_curated(Vec::new()));
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(seeding_curated(Vec::new()));
     let ctx = curating(minting_torrent(minting_usenet(ctx)), true);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -361,13 +354,8 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     // never registering it a second time. The point guarded here is that the adopt
     // command dispatches and reports every present client.
     let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x22; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(seeding_curated(Vec::new()));
+    let ctx = seed_ctx(true, Some(vec![0x22; 24]), Some(env.to_path_buf()))
+        .with_http(seeding_curated(Vec::new()));
     let ctx = curating(minting_torrent(minting_usenet(ctx)), true);
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
@@ -388,13 +376,8 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
 #[tokio::test]
 async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(seeding_curated(Vec::new()));
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(seeding_curated(Vec::new()));
     let ctx = curating(minting_torrent(minting_usenet(ctx)), false);
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
@@ -518,7 +501,7 @@ async fn a_seed_over_a_record_of_plugins_that_will_not_read_is_refused() {
     let kept = env.with_file_name(crate::config::paths::PLUGINS);
     let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
     let _ = std::fs::write(&kept, "not a register");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_filesystem(Arc::new(
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_filesystem(Arc::new(
         SeedFs::keyed(Some(crate::test_support::KEYED_CURATOR)),
     ));
 
@@ -554,7 +537,7 @@ async fn the_moved_book_curator_is_asked_through_the_adapter_in_front_of_it() {
     use crate::test_support::books;
     let fillers = books_moved();
     let http = Fake::by_path(vec![books::root_folders(&[])]);
-    let ctx = books::asking(seed_ctx(true, Vec::new(), None, None)).with_http(http.clone());
+    let ctx = books::asking(seed_ctx(true, None, None)).with_http(http.clone());
 
     let curating = curators(&fillers);
     let bindery = curating.iter().find(|one| one.id() == books::PLUGIN);
@@ -651,7 +634,7 @@ async fn the_moved_book_curator_is_seeded_its_folder_and_clients_over_its_contra
         ),
         (books::curating("identity"), vec![books::unavailable()]),
     ]);
-    let ctx = books::asking(seed_ctx(true, Vec::new(), None, None)).with_http(http.clone());
+    let ctx = books::asking(seed_ctx(true, None, None)).with_http(http.clone());
     let curating = curators(&fillers);
     let contested = super::super::curating::contested(&curating);
     let held = both_held();

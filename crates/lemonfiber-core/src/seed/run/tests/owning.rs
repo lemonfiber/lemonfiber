@@ -408,7 +408,7 @@ fn three_moved(http: Arc<Fake>) -> (Ctx, crate::wiring::Fillers) {
             )
         })
         .unwrap_or_default();
-    let mut ctx = seed_ctx(true, Vec::new(), None, None).with_http(http);
+    let mut ctx = seed_ctx(true, None, None).with_http(http);
     ctx.seams.engine = Arc::new(
         aggregator::MOVED
             .running()

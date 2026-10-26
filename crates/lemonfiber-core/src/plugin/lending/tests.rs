@@ -190,3 +190,19 @@ async fn an_adapter_the_engine_publishes_no_port_for_is_taken_away_and_said_why(
     );
     assert_eq!(serves.removed().len(), 1);
 }
+
+#[tokio::test]
+async fn nothing_is_lent_where_no_key_can_be_made_for_it() {
+    let serves = Arc::new(Serves::on(PUBLISHED));
+    let ctx = lending("keyless", &serves, Fake::silent())
+        .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(None)));
+    let (installed, adapter) = sonarr();
+
+    let lent = lent(&ctx, &borrowing(&installed, &adapter)).await;
+
+    assert_eq!(
+        lent.err().as_deref(),
+        Some(crate::secret::NO_RANDOMNESS_FOR_PASSWORD)
+    );
+    assert!(serves.asked().is_empty());
+}

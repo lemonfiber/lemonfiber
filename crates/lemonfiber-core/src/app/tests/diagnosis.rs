@@ -102,7 +102,7 @@ async fn asking_twice_is_not_an_error_the_second_time() {
         )))
         .settings(settings)
         .build()
-        .with_http(Fake::scripted(Vec::new()));
+        .with_http(Fake::silent());
 
     for command in [
         Command::Up {

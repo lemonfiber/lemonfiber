@@ -59,7 +59,7 @@ fn reaching(root: &Path) -> Ctx {
 
 fn ctx(root: &Path) -> Ctx {
     lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .settings(Settings {
             env_file: Some(paths(root).env_file()),
             stack_dir: Some(project().to_path_buf()),
@@ -380,7 +380,7 @@ async fn what_a_reversal_could_not_reach_is_reported_beside_what_it_did() {
 #[tokio::test]
 async fn a_machine_that_cannot_say_where_its_record_is_refuses() {
     let nowhere = lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .build()
         .with_http(Fake::silent());
 
@@ -516,7 +516,7 @@ async fn a_stack_that_cannot_be_read_stops_the_reversal() {
     journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
 
     let nowhere = lemonfiber_testing::a_live_context()
-        .filesystem(Files::ending(vec![]))
+        .filesystem(Files::empty())
         .over(lemonfiber_testing::nowhere())
         .settings(Settings {
             env_file: Some(paths(&root).env_file()),

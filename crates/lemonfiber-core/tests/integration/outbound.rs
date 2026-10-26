@@ -310,7 +310,7 @@ async fn unexpected_after_a_diagnosis(settings: Settings) -> Vec<String> {
             lemonfiber_core::ports::docker::Lifecycle::Running,
             lemonfiber_core::ports::docker::Health::Healthy,
         )))
-        .filesystem(lemonfiber_fixtures::files::Files::ending(Vec::new()))
+        .filesystem(lemonfiber_fixtures::files::Files::empty())
         .settings(settings.clone())
         .build()
         .with_http(http.clone());

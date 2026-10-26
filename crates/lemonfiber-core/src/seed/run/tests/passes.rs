@@ -27,9 +27,9 @@ async fn the_baseline_persists_across_runs() {
         r#"{"services":{"sonarr":{"downloadclient:sabnzbd:8080":{"value":"tv","at":"1"}}}}"#;
     let _ = crate::config::store::write(&baseline, recorded);
 
-    let first = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let first = seed_ctx(false, None, Some(env.to_path_buf()));
     let _ = dispatch(Command::Seed, &first).await;
-    let second = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let second = seed_ctx(false, None, Some(env.to_path_buf()));
     let _ = dispatch(Command::Seed, &second).await;
 
     let read_back = std::fs::read_to_string(&baseline).unwrap_or_default();

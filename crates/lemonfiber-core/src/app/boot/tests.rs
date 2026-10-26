@@ -120,7 +120,7 @@ fn ctx_answering(
         .settings(settings)
         .build()
         .with_patience(Duration::ZERO)
-        .with_http(Fake::scripted(Vec::new()))
+        .with_http(Fake::silent())
         .with_started(Arc::clone(&machine) as Arc<dyn Started>)
         .with_power(machine as Arc<dyn Supply>)
 }

@@ -35,7 +35,7 @@ fn curators(
 /// A context over `http` asking `adapted`, the television curator's minted key kept, with
 /// an env file of its own under `name`.
 fn asking(name: &str, http: Arc<Fake>, adapted: &[crate::test_support::adapted::Adapted]) -> Ctx {
-    let ctx = seed_ctx(true, Vec::new(), None, Some(recorded_admin(name))).with_http(http);
+    let ctx = seed_ctx(true, None, Some(recorded_admin(name))).with_http(http);
     TELEVISION.minted(&ctx, MINTED_CURATOR_KEY);
     crate::test_support::adapted::asking(ctx, adapted)
 }
@@ -165,7 +165,7 @@ async fn a_rehearsed_pass_names_the_curator_and_writes_nothing() {
 #[tokio::test]
 async fn a_stack_with_no_request_service_is_handed_nothing() {
     let http = Fake::silent();
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -298,7 +298,7 @@ async fn a_curator_publishing_no_port_is_left_out() {
 /// A stack with no request service has nobody to tell.    /// A stack with no request service has nobody to tell.
 #[tokio::test]
 async fn nothing_is_handed_over_where_there_is_no_request_service() {
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
@@ -343,7 +343,7 @@ async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
 #[tokio::test]
 async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
     let ctx = crate::test_support::adapted::asking(
-        seed_ctx(true, Vec::new(), None, None).with_http(Fake::silent()),
+        seed_ctx(true, None, None).with_http(Fake::silent()),
         &[REQUESTS],
     )
     .with_filesystem(Arc::new(leading_away_from_the_stand_in()));

@@ -12,7 +12,7 @@ use crate::test_support::media;
 async fn each_services_key_is_published_where_the_stack_reads_it() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("published");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, None, Some(env.clone()))
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let wiring = super::super::published::publish_keys(
@@ -36,8 +36,7 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
 #[tokio::test]
 async fn a_key_with_nowhere_to_be_recorded_is_named() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let ctx = seed_ctx(true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+    let ctx = seed_ctx(true, None, None).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
 
     let wiring = super::super::published::publish_keys(
         &ctx,
@@ -111,7 +110,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         (media::serve("revoke"), media::taken()),
         ("/status", Answer::reply(200, r#"{"isInit":true}"#)),
     ]);
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED)).with_requests(r#"{"main":{"apiKey":"request-key"}}"#),
@@ -169,7 +168,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
     let http = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
@@ -206,7 +205,7 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
         ),
         (media::serve("revoke"), media::taken()),
     ]);
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
+    let ctx = seed_ctx(true, None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(None)));
 
@@ -240,7 +239,7 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
 #[tokio::test]
 async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
     let env = config_scratch("publish-rehearsed");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf()))
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf()))
         .with_filesystem(Arc::new(SeedFs::keyed(None)))
         .rehearsing();
 
@@ -273,7 +272,7 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = config_scratch("publish-rehearsed-keys");
     let http = Fake::always(Answer::reply(200, r#"{"isInit":false}"#));
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf()))
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))))
         .rehearsing();
@@ -315,7 +314,7 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
 #[tokio::test]
 async fn a_service_whose_entry_names_no_file_publishes_no_key() {
     let env = recorded_admin("no-file-named");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone())).with_filesystem(Arc::new(
+    let ctx = seed_ctx(true, None, Some(env.clone())).with_filesystem(Arc::new(
         SeedFs::keyed(None).with_requests(r#"{"main":{"apiKey":"unreachable"}}"#),
     ));
     let mut pathless = requests_with_settings();
@@ -350,8 +349,8 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
 #[tokio::test]
 async fn nothing_is_published_where_no_service_has_written_a_key() {
     let env = recorded_admin("unpublished");
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.clone()))
-        .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx =
+        seed_ctx(true, None, Some(env.clone())).with_filesystem(Arc::new(SeedFs::keyed(None)));
 
     let wiring = super::super::published::publish_keys(
         &ctx,

@@ -455,7 +455,7 @@ async fn a_lost_baseline_is_reported_and_left_for_a_deliberate_re_baseline() {
     let corrupt = "this is not the baseline you are looking for";
     let _ = crate::config::store::write(&baseline, corrupt);
 
-    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
 
@@ -476,7 +476,7 @@ async fn an_adopt_pass_re_baselines_over_a_lost_record() {
     let baseline = env.with_file_name("baseline.json");
     let _ = crate::config::store::write(&baseline, "not parseable");
 
-    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Assessed);
 
@@ -497,7 +497,7 @@ async fn a_baseline_whose_file_cannot_be_read_is_a_loss() {
     let baseline = env.with_file_name("baseline.json");
     let _ = std::fs::create_dir_all(&baseline);
 
-    let ctx = seed_ctx(false, Vec::new(), None, Some(env.to_path_buf()));
+    let ctx = seed_ctx(false, None, Some(env.to_path_buf()));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));

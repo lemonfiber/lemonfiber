@@ -82,7 +82,7 @@ async fn a_download_that_has_finished_is_not_in_flight() {
 /// one that is not there would fire exactly when it is least wanted.
 #[tokio::test]
 async fn a_client_that_will_not_answer_contributes_nothing() {
-    let ctx = reaching(Fake::scripted(Vec::new()), None);
+    let ctx = reaching(Fake::silent(), None);
 
     assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());
 }

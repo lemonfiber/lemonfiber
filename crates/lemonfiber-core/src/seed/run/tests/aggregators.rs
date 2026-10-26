@@ -56,7 +56,7 @@ fn moved_trusting(
 /// A context asking the moved curator's adapter over `http`, every curator-shape service's
 /// configuration reading as `keyed` does.
 fn curator_ctx(http: Arc<Fake>, keyed: Option<&'static str>) -> Ctx {
-    books::asking(seed_ctx(true, Vec::new(), None, None))
+    books::asking(seed_ctx(true, None, None))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(keyed)))
 }
@@ -234,7 +234,7 @@ async fn a_first_party_plugin_aggregator_is_told_on_its_own_terms() {
     );
     let http = reading(&[], books::taken());
     let ctx = curator_ctx(http.clone(), Some(KEYED));
-    let escaping = books::asking(seed_ctx(true, Vec::new(), None, None))
+    let escaping = books::asking(seed_ctx(true, None, None))
         .with_http(reading(&[], books::taken()))
         .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
 
@@ -456,7 +456,7 @@ async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull() {
 async fn a_curator_pulling_over_the_contract_its_adapter_does_not_answer_is_told_nothing() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("pulled-unanswered");
     let http = Fake::always(Answer::reply(204, ""));
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
     let wirings =
         super::super::aggregators::seed_aggregators(&ctx, &beside_the_puller(&project, "books"))

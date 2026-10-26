@@ -140,9 +140,7 @@ async fn seeded(
     rehearsing: bool,
 ) -> Vec<Wiring> {
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let mut ctx = asking(
-        seed_ctx(true, Vec::new(), bytes, Some(recorded_admin(name))).with_http(http.clone()),
-    );
+    let mut ctx = asking(seed_ctx(true, bytes, Some(recorded_admin(name))).with_http(http.clone()));
     ctx.dry_run = rehearsing;
     seeded_with(&ctx, services, project).await
 }
@@ -385,7 +383,6 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
     let ctx = asking(
         seed_ctx(
             true,
-            Vec::new(),
             Some(vec![0xab; crate::secret::SECRET_BYTES]),
             Some(recorded_admin("linking-unretired")),
         )

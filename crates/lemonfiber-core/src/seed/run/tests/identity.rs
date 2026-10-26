@@ -86,7 +86,7 @@ async fn identity_at(
 
 #[tokio::test]
 async fn identity_does_nothing_without_both_the_media_server_and_the_request_service() {
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
     // The request service present but no media server, and the other way round: either
     // alone is nothing to wire.
     let base = crate::baseline::Baseline::new();
@@ -113,7 +113,7 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
         "the-stacks-administrator",
     );
     let http = household(true, false);
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(http.clone());
     let impostor = crate::test_support::an_installed(
         "impostor",
         vec![crate::test_support::a_placed(
@@ -162,8 +162,7 @@ async fn identity_leaves_an_already_set_up_household_alone() {
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx =
-        seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_http(household(true, true));
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(household(true, true));
 
     let (wirings, _records) = identity(
         &ctx,
@@ -193,8 +192,8 @@ async fn a_recorded_password_is_handed_to_the_adapter_and_a_rehearsal_hands_noth
             crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             "minted-earlier",
         );
-        let mut ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf()))
-            .with_http(household(true, true));
+        let mut ctx =
+            seed_ctx(true, None, Some(env.to_path_buf())).with_http(household(true, true));
         ctx.dry_run = rehearsing;
 
         let (_, _, project) = identity_in(
@@ -230,8 +229,7 @@ async fn a_recorded_password_the_adapter_cannot_be_handed_fails_the_identity() {
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx =
-        seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_http(household(true, true));
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(household(true, true));
     let project = lemonfiber_fixtures::scratch::Scratch::new("identity-stack-unhanded");
     let _ = std::fs::create_dir_all(
         crate::plugin::key_file(&project, crate::test_support::media::ADAPTER)
@@ -265,13 +263,8 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         let _ = std::fs::create_dir_all(parent);
     }
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(household(false, false));
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(household(false, false));
 
     let (wirings, records) = identity(
         &ctx,
@@ -324,7 +317,7 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
 #[tokio::test]
 async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
     let http = household(false, false);
-    let ctx = seed_ctx(true, Vec::new(), Some(vec![0x11; 24]), None).with_http(http.clone());
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), None).with_http(http.clone());
 
     let (wirings, _) = identity(
         &ctx,
@@ -367,13 +360,8 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answe
         let _ = std::fs::create_dir_all(parent);
     }
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    let ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(super::household_changing(false, false, changed));
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(super::household_changing(false, false, changed));
 
     let (wirings, _) = identity(
         &ctx,
@@ -416,13 +404,8 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
         let _ = std::fs::create_dir_all(parent);
     }
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    let mut ctx = seed_ctx(
-        true,
-        Vec::new(),
-        Some(vec![0x11; 24]),
-        Some(env.to_path_buf()),
-    )
-    .with_http(super::household_changing(false, false, media::refusing()));
+    let mut ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(super::household_changing(false, false, media::refusing()));
     ctx.seams.engine = Arc::new(
         Reporting::holding(&[MEDIA_ADAPTER], Lifecycle::Running, Health::Healthy)
             .publishing(&[(MEDIA_ADAPTER, "127.0.0.1", CONTRACTED_PORT)])
@@ -494,7 +477,7 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(http.clone());
 
     let (wirings, records) = identity(
         &ctx,
@@ -550,7 +533,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    let ctx = seed_ctx(true, Vec::new(), None, Some(env.to_path_buf())).with_http(http.clone());
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(http.clone());
 
     // lemonfiber recorded that it set the telling on; the service now says off.
     let mut baseline = crate::baseline::Baseline::new();
@@ -591,7 +574,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
 #[tokio::test]
 async fn a_contracted_server_whose_upstream_names_no_api_is_paired_with_nothing() {
     let http = Fake::always(Answer::reply(200, "{}"));
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
     let (wirings, _) = identity_beside(
         &ctx,
@@ -620,7 +603,7 @@ async fn a_contracted_server_whose_upstream_names_no_api_is_paired_with_nothing(
 #[tokio::test]
 async fn a_contracted_server_unanswered_over_its_contract_is_not_set_up() {
     let http = Fake::always(Answer::reply(200, "{}"));
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
     let (wirings, _) = identity_beside(
         &ctx,

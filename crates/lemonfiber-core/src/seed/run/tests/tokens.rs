@@ -141,7 +141,7 @@ fn serving(held: Vec<Answer>, added: Answer, moved: Answer) -> Arc<Fake> {
 /// key kept, with randomness that renders to [`minted`] where `random` and none where not.
 fn asking(name: &str, http: &Arc<Fake>, random: bool) -> Ctx {
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let ctx = seed_ctx(true, Vec::new(), bytes, Some(recorded_admin(name))).with_http(http.clone());
+    let ctx = seed_ctx(true, bytes, Some(recorded_admin(name))).with_http(http.clone());
     TELEVISION.minted(&ctx, MINTED_CURATOR_KEY);
     crate::test_support::adapted::asking(ctx, &[TELEVISION, REQUESTS])
 }

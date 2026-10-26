@@ -241,10 +241,11 @@ impl Borrowed {
 const NOT_FIRST_PARTY: &str =
     "its plugin is not first-party, so their copy's key is not handed to it";
 
-/// Why no adapter is lent where lemonfiber's own copy is run from no plugin the record of
-/// what is installed holds.
-const UNRECORDED: &str = "lemonfiber's own copy is run from no plugin the record of what is \
-                          installed holds, so there is no adapter to lend their copy";
+/// Why no adapter is lent where the record of what is installed holds no plugin that runs
+/// lemonfiber's own copy with an adapter in front of it.
+const UNRECORDED: &str = "the record of what is installed holds no plugin that runs \
+                          lemonfiber's own copy with an adapter in front of it, so there is \
+                          no adapter to lend their copy";
 
 /// Why no adapter is lent where it signs in with an account rather than a key.
 const ACCOUNTED: &str =
@@ -269,25 +270,25 @@ async fn borrowed(
     let plugin = fillers
         .service(service)
         .and_then(crate::wiring::Filler::brought_by);
-    let installed = crate::app::plugins::read(ctx)
+    let (installed, adapter) = crate::app::plugins::read(ctx)
         .ok()
         .and_then(|register| {
             register
                 .installed()
                 .iter()
-                .find(|one| Some(one.plugin.as_str()) == plugin)
-                .cloned()
+                .filter(|one| Some(one.plugin.as_str()) == plugin)
+                .find_map(|one| {
+                    let adapter = one
+                        .services
+                        .iter()
+                        .find(|placed| placed.fronts.as_deref() == Some(service))?;
+                    Some((one.clone(), adapter.clone()))
+                })
         })
         .ok_or_else(|| UNRECORDED.to_owned())?;
     if !crate::plugin::first_party::holds(trusted, &installed) {
         return Err(NOT_FIRST_PARTY.to_owned());
     }
-    let adapter = installed
-        .services
-        .iter()
-        .find(|placed| placed.fronts.as_deref() == Some(service))
-        .cloned()
-        .ok_or_else(|| "its plugin brings no adapter in front of it".to_owned())?;
     let key = their_key(ctx, manifest, container).await?;
     let port = container
         .published

@@ -66,7 +66,7 @@ async fn one_service_failing_to_start_never_takes_down_the_rest() {
         )))
         .settings(settings)
         .build()
-        .with_http(Fake::scripted(Vec::new()))
+        .with_http(Fake::silent())
         .with_patience(Duration::ZERO);
 
     let refused = dispatch(

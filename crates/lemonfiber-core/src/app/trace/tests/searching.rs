@@ -3,15 +3,18 @@
 use super::*;
 use crate::ports::service::ReleaseProbe;
 
-/// A context whose Usenet client is reachable through its plugin's adapter as well as the
-/// curators through their keys, so a trace that asks the accounts resolves both readers
-/// rather than only one.
+/// A context whose Usenet client and indexer aggregator are reachable through their
+/// plugins' adapters as well as the curators through their keys, so a trace that asks the
+/// accounts resolves both readers rather than only one.
 fn ctx_with_accounts(fake: &Fake) -> Ctx {
+    use crate::test_support::indexer::INDEXER;
     let mut ctx = ctx_with(fake);
     ctx.seams.engine = Arc::new(
-        curators::running(&curators::ALL).alongside(crate::test_support::usenet::running()),
+        curators::running(&[curators::MUSIC, curators::FILM, TELEVISION, INDEXER])
+            .alongside(crate::test_support::usenet::running()),
     );
     crate::test_support::usenet::moved_in(&ctx);
+    INDEXER.moved_in(&ctx);
     ctx
 }
 

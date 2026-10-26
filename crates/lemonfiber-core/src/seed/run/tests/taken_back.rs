@@ -220,7 +220,7 @@ fn taking_with(
     let project = lemonfiber_fixtures::scratch::Scratch::named(&format!("taken-{name}")).kept();
     let _ = std::fs::remove_dir_all(&project);
     let _ = std::fs::create_dir_all(&project);
-    let mut ctx = seed_ctx(true, Vec::new(), None, Some(recorded_admin(name)))
+    let mut ctx = seed_ctx(true, None, Some(recorded_admin(name)))
         .with_http(http.clone())
         .with_filesystem(Arc::new(Taking))
         .with_random(Arc::new(FixedRandom(

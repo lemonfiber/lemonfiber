@@ -106,14 +106,9 @@ fn is_skipped(wiring: &crate::seed::Wiring) -> bool {
 }
 
 /// A context whose engine runs the media server's and the request service's adapters where
-/// they are `reachable`, each keyed wherever its configuration is, answering seeding's
-/// HTTP from `replies` and its randomness from `bytes`.
-fn seed_ctx(
-    reachable: bool,
-    replies: Vec<(u16, &'static str)>,
-    bytes: Option<Vec<u8>>,
-    env: Option<std::path::PathBuf>,
-) -> Ctx {
+/// they are `reachable`, each keyed wherever its configuration is, answering no HTTP and
+/// its randomness from `bytes`.
+fn seed_ctx(reachable: bool, bytes: Option<Vec<u8>>, env: Option<std::path::PathBuf>) -> Ctx {
     let engine = if reachable {
         crate::test_support::media::running().alongside(REQUESTS.running())
     } else {
@@ -127,7 +122,7 @@ fn seed_ctx(
         .engine(Arc::new(engine))
         .settings(settings)
         .build()
-        .with_http(Fake::scripted(replies))
+        .with_http(Fake::silent())
         .with_random(Arc::new(FixedRandom(bytes)));
     ctx.seams.confined = crate::test_support::media::Keyed::holding(
         Arc::clone(&ctx.seams.confined),
@@ -518,7 +513,7 @@ fn indexed(
 /// `fs` does.
 fn indexing(http: Arc<Fake>, fs: SeedFs) -> Ctx {
     crate::test_support::adapted::asking(
-        seed_ctx(true, Vec::new(), None, None)
+        seed_ctx(true, None, None)
             .with_http(http)
             .with_filesystem(Arc::new(fs)),
         &[INDEXER],

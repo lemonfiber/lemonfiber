@@ -54,6 +54,28 @@ async fn a_refused_reset_is_said_and_stays_owed() {
     assert_eq!(baseline.expected("seerr", OWED_CURATOR), Some("owed"));
 }
 
+/// The television curator's plugin with no secret it mints.
+fn unminted() -> Option<crate::plugin::Installed> {
+    TELEVISION.installed().map(|mut installed| {
+        for secret in &mut installed.declared.secrets {
+            secret.minted = false;
+        }
+        installed
+    })
+}
+
+/// What this step comes to over `ctx` and `fillers` where the curator's key is owed: said
+/// as one lemonfiber did not mint, and still owed.
+async fn said_unminted(ctx: &Ctx, project: &std::path::Path, fillers: &crate::wiring::Fillers) {
+    let (state, baseline) = taken_among(ctx, &gated(), fillers, project, owing()).await;
+    assert!(
+        matches!(&state, Some(State::Failed { detail })
+            if detail.contains("lemonfiber replaces a key only where it minted it")),
+        "{state:?}"
+    );
+    assert_eq!(baseline.expected("seerr", OWED_CURATOR), Some("owed"));
+}
+
 #[tokio::test]
 async fn a_key_lemonfiber_did_not_mint_is_said_and_stays_owed() {
     let http = household(
@@ -63,30 +85,44 @@ async fn a_key_lemonfiber_did_not_mint_is_said_and_stays_owed() {
         media::taken(),
     );
     let (ctx, project) = taking("unminted", &http, false);
-    let mut television = TELEVISION.installed();
-    for secret in television
-        .iter_mut()
-        .flat_map(|installed| installed.declared.secrets.iter_mut())
-    {
-        secret.minted = false;
-    }
     let fillers = moving(
         gated(),
         &project,
         &[
             media::moved(),
-            television,
+            unminted(),
             MUSIC.installed(),
             REQUESTS.installed(),
         ],
     );
-    let (state, baseline) = taken_among(&ctx, &gated(), &fillers, &project, owing()).await;
-    assert!(
-        matches!(&state, Some(State::Failed { detail })
-            if detail.contains("lemonfiber replaces a key only where it minted it")),
-        "{state:?}"
+    said_unminted(&ctx, &project, &fillers).await;
+}
+
+#[tokio::test]
+async fn a_key_the_record_of_what_is_installed_says_was_not_minted_stays_owed() {
+    let http = household(
+        curator_gated(),
+        requests::taken(),
+        keys(false),
+        media::taken(),
     );
-    assert_eq!(baseline.expected("seerr", OWED_CURATOR), Some("owed"));
+    let (ctx, project) = taking("unrecorded-mint", &http, false);
+    let kept = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .map(|env| env.with_file_name(crate::config::paths::PLUGINS))
+        .unwrap_or_default();
+    let mut register =
+        crate::plugin::Register::parse(&std::fs::read_to_string(&kept).unwrap_or_default())
+            .unwrap_or_else(|_| crate::plugin::Register::empty());
+    register.forget(TELEVISION.plugin);
+    if let Some(installed) = unminted() {
+        let _ = register.record(installed);
+    }
+    let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
+
+    said_unminted(&ctx, &project, &moved(gated(), &project)).await;
 }
 
 #[tokio::test]

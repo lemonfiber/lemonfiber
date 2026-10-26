@@ -54,7 +54,7 @@ fn the_application_kind_follows_from_the_media() {
 
 #[tokio::test]
 async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
-    let ctx = seed_ctx(true, Vec::new(), None, None);
+    let ctx = seed_ctx(true, None, None);
     // Only a media-filing curator, so nothing asks for it at all.
     let wirings =
         super::super::seed_applications(&ctx, &fillers_of(vec![curator("sonarr", 8989, "tv")]))
@@ -67,7 +67,7 @@ async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
 #[tokio::test]
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     let http = Fake::always(answered(&Vec::<RegisteredApplication>::new()));
-    let ctx = seed_ctx(true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
 
@@ -119,7 +119,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
 #[tokio::test]
 async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
     let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = asked_by_a_plugin(&aggregator_svc(), vec![curator("sonarr", 8989, "tv")]);
@@ -153,7 +153,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
 /// replaced key, so a replacement owes it nothing yet.
 #[tokio::test]
 async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = seed_ctx(true, None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -166,7 +166,7 @@ async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
 #[tokio::test]
 async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
     let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None)
+    let ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     let fillers = beside_a_stand_in(
@@ -185,7 +185,7 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
 #[tokio::test]
 async fn app_sync_registers_nothing_until_the_indexer_can_be_asked() {
     let http = holding_sonarr();
-    let mut ctx = seed_ctx(true, Vec::new(), None, None)
+    let mut ctx = seed_ctx(true, None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
     ctx.seams.engine = Arc::new(INDEXER.running());
@@ -285,7 +285,6 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
     .collect();
     let mut ctx = minting_curators(seed_ctx(
         true,
-        Vec::new(),
         Some(vec![0x11; 24]),
         Some(crate::test_support::env_without_password(
             "seed-applications",
@@ -407,7 +406,7 @@ async fn a_contracted_indexer_untrusted_or_unreachable_registers_nothing_and_is_
 #[tokio::test]
 async fn an_indexer_on_no_address_is_told_about_nobody() {
     let http = seeding();
-    let ctx = seed_ctx(true, Vec::new(), None, None).with_http(http.clone());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
     let unreached = manifest_service(
         "prowlarr",
         Some(curator_api(Some("/config/config.xml"))),
