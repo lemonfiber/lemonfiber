@@ -31,11 +31,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.162.192/29
-  ask__navidrome__dashboard.show__homepage:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.179.144/29
   ask__recyclarr__library.curate__bindery:
     internal: true
     ipam:

@@ -71,10 +71,19 @@ fn every_service_given_a_household_hostname_asks_the_proxy() {
     );
 }
 
+/// Every service whose panel the dashboard reads is a part the bundle installs, which asks
+/// for it from its plugin, so no service the bundle assembles asks for one.
 #[test]
-fn every_service_whose_panel_reads_it_asks_the_dashboard() {
-    assert_eq!(askers(&stack(), "dashboard.show"), once(&["navidrome"]));
+fn no_service_the_bundle_assembles_asks_the_dashboard() {
+    assert_eq!(askers(&stack(), "dashboard.show"), once(&[]));
 }
+
+/// The music server's plugin and the adapter in front of it.
+const MUSIC: lemonfiber_testing::adapted::Adapted = lemonfiber_testing::adapted::Adapted {
+    plugin: "navidrome",
+    adapter: "navidrome-adapter",
+    port: lemonfiber_testing::adapted::PORT,
+};
 
 /// The services of `moved` asking `capability`.
 fn asking_from(moved: Option<lemonfiber_core::plugin::Installed>, capability: &str) -> Vec<String> {
@@ -90,10 +99,9 @@ fn asking_from(moved: Option<lemonfiber_core::plugin::Installed>, capability: &s
         .unwrap_or_default()
 }
 
-/// Each download client, the subtitle finder, the listening server, the media server, the
-/// curators, the indexer aggregator and the request service, which the bundle installs
-/// rather than assembles, asks the dashboard from its own plugin, as every service the
-/// stack carries whose panel reads it does from the stack.
+/// Each download client, the subtitle finder, the listening server, the music server, the
+/// media server, the curators, the indexer aggregator and the request service, which the
+/// bundle installs rather than assembles, asks the dashboard from its own plugin.
 #[test]
 fn each_installed_part_asks_the_dashboard_from_its_plugin() {
     for (moved, plugin) in [
@@ -137,6 +145,7 @@ fn each_installed_part_asks_the_dashboard_from_its_plugin() {
             lemonfiber_testing::media::moved(),
             lemonfiber_testing::media::PLUGIN,
         ),
+        (MUSIC.installed(), MUSIC.plugin),
     ] {
         assert_eq!(
             asking_from(moved, "dashboard.show"),

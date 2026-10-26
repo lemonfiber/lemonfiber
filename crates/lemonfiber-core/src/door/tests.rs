@@ -308,7 +308,8 @@ fn a_plugins_service_is_reached_through_the_proxy() {
 /// The stack this build carries with every part it installs: the request service moved
 /// into its plugin is the door, judged by the contract its adapter speaks and reached on
 /// the port it is published on as the stack's own was, the guard in front of the library
-/// is met under the library's name, and the listening server is a shelf beside them.
+/// is met under the library's name, and the listening and music servers are shelves beside
+/// them.
 #[test]
 fn the_carried_stack_begins_at_its_moved_request_service() {
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
@@ -347,15 +348,13 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
         .map(|one| one.id)
         .collect();
     assert_eq!(begin, ["door", "seerr"]);
-    let listening = candidates
-        .iter()
-        .find(|one| one.id == "audiobookshelf")
-        .and_then(|one| one.facing);
-    assert_eq!(
-        listening,
-        Some(Facing::Shelf),
-        "the listening server is a shelf"
-    );
+    for shelf in ["audiobookshelf", "navidrome"] {
+        let facing = candidates
+            .iter()
+            .find(|one| one.id == shelf)
+            .and_then(|one| one.facing);
+        assert_eq!(facing, Some(Facing::Shelf), "{shelf} is a shelf");
+    }
 }
 
 /// A first-party part moved in place of one of the stack's services, published to the

@@ -132,10 +132,10 @@ fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
     let shown: Vec<&str> = fillers
         .asks()
         .iter()
-        .filter(|ask| ask.by == "navidrome" && ask.capability == "dashboard.show")
+        .filter(|ask| ask.by == "homepage" && ask.capability == "proxy.front")
         .flat_map(|ask| ask.fillers.iter().map(|one| one.id.as_str()))
         .collect();
-    assert_eq!(shown, vec!["homepage"]);
+    assert_eq!(shown, vec!["caddy"]);
 }
 
 /// A plugin's service is reached at its own id, carries the plugin it came from, and

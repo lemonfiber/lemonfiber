@@ -150,10 +150,10 @@ fn a_wiring_from_a_service_to_itself_is_caught() {
 #[test]
 fn the_same_ask_written_twice_is_caught() {
     fault(
-        "asks = \"dashboard.show\"\nby = \"navidrome\"",
-        "asks = \"dashboard.show\"\nby = \"navidrome\"\n\n[[wiring]]\nasks = \"dashboard.show\"\n\
-         by = \"navidrome\"",
-        "names dashboard.show more than once",
+        "asks = \"proxy.front\"\nby = \"homepage\"",
+        "asks = \"proxy.front\"\nby = \"homepage\"\n\n[[wiring]]\nasks = \"proxy.front\"\n\
+         by = \"homepage\"",
+        "names proxy.front more than once",
     );
 }
 

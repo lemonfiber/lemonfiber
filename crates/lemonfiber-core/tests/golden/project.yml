@@ -197,39 +197,7 @@ services:
     - ./config/homepage:/app/config
     networks:
     - ask__homepage__proxy.front__caddy
-    - ask__navidrome__dashboard.show__homepage
     - own__homepage
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  navidrome:
-    image: ghcr.io/navidrome/navidrome:0.64.2@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
-    profiles:
-    - media
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      ND_DATAFOLDER: /config
-      ND_ENABLEINSIGHTSCOLLECTOR: 'false'
-      ND_MUSICFOLDER: /data/media/music
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:4533:4533
-    volumes:
-    - ./data:/data
-    - ./config/navidrome:/config
-    networks:
-    - ask__navidrome__dashboard.show__homepage
-    - own__navidrome
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -474,6 +442,36 @@ services:
     - ask__unpackerr__library.curate__lidarr
     - link__unpackerr__lidarr
     - own__lidarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  navidrome:
+    image: ghcr.io/navidrome/navidrome:0.64.2@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
+    profiles:
+    - media
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      ND_DATAFOLDER: /config
+      ND_ENABLEINSIGHTSCOLLECTOR: 'false'
+      ND_MUSICFOLDER: /data/media/music
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:4533:4533
+    volumes:
+    - ./data:/data
+    - ./config/navidrome:/config
+    networks:
+    - own__navidrome
     security_opt:
     - no-new-privileges:true
     cap_drop:
