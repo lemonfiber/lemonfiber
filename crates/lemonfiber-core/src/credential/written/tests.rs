@@ -26,6 +26,14 @@ fn a_yaml_key_is_the_one_under_auth_and_not_one_under_another_section() {
         None
     );
     assert_eq!(read(KeySource::ConfigYaml, "auth:\n  apikey: ''\n"), None);
+    assert_eq!(
+        read(
+            KeySource::ConfigYaml,
+            "auth:\n  no entry here\n  apikey: own-key\n"
+        )
+        .as_deref(),
+        Some("own-key")
+    );
 }
 
 #[test]

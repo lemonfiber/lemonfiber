@@ -83,7 +83,7 @@ pub struct CarriedFrom {
 
 /// A format a service writes its configuration in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "SecretFormat")]
 pub enum Format {
     /// XML.
