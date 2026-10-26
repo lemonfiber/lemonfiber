@@ -268,7 +268,7 @@ fn a_minted_password_holds_every_class_however_alike_its_random_bytes() {
         Chance::exactly(Some(vec![0xcd; 80])),
     ] {
         let value = minted_as(&random, Minted::Password).unwrap_or_default();
-        assert!(a_password(&value), "{value}");
+        assert!(a_password(&value));
     }
 }
 
@@ -291,10 +291,10 @@ fn a_key_is_minted_as_before_and_an_unminted_secret_is_minted_nothing() {
 #[test]
 fn the_shapes_a_manifest_declares_are_read_beside_it_and_a_key_is_the_default() {
     let dir = lemonfiber_fixtures::scratch::Scratch::new("minted-shapes");
-    let manifest = crate::plugin::program::tests::RUNNING.to_owned()
-        + "\n[[secret]]\nid     = \"admin-password\"\nof     = \"qualitysync\"\n\
-           minted = \"password\"\nwhy    = \"Its administrator's password\"\n";
-    let _ = std::fs::write(dir.join(lemonfiber_bundle::MANIFEST), manifest);
+    let _ = std::fs::write(
+        dir.join(lemonfiber_bundle::MANIFEST),
+        crate::plugin::program::tests::declaring_a_password(),
+    );
 
     let read = shapes(&dir);
 

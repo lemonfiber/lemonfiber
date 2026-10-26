@@ -63,19 +63,19 @@ async fn a_secret_declared_a_password_is_minted_as_one_at_install() {
         "the seeded plugin was not installed"
     );
 
-    let password = minted(&ctx).unwrap_or_default();
-    assert_eq!(password.len(), 32, "{password:?}");
+    let made = minted(&ctx).unwrap_or_default();
+    assert_eq!(made.len(), 32);
     for class in [
         u8::is_ascii_uppercase,
         u8::is_ascii_lowercase,
         u8::is_ascii_digit,
         |one: &u8| b"-_.~".contains(one),
     ] {
-        assert!(password.bytes().any(|one| class(&one)), "{password}");
+        assert!(made.bytes().any(|one| class(&one)));
     }
     assert_eq!(
         read(&stack_of(&ctx).join("config/komga-adapter/upstream.json")),
-        format!(r#"{{"api_key":"{password}"}}"#)
+        format!(r#"{{"api_key":"{made}"}}"#)
     );
 }
 

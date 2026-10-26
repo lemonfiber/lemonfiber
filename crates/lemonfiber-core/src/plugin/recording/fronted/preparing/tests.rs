@@ -202,10 +202,10 @@ fn a_secret_declared_a_password_is_minted_as_one_and_handed_on_as_it_was_written
         .map(|(_, value)| value.clone())
         .unwrap_or_default();
 
-    assert_eq!(value.len(), 32, "{value}");
-    assert!(value.bytes().any(|one| one.is_ascii_uppercase()), "{value}");
-    assert!(value.bytes().any(|one| one.is_ascii_lowercase()), "{value}");
-    assert!(value.bytes().any(|one| one.is_ascii_digit()), "{value}");
-    assert!(value.bytes().any(|one| b"-_.~".contains(&one)), "{value}");
-    assert!(made.contains(&value), "{made:?}");
+    assert_eq!(value.len(), 32);
+    assert!(value.bytes().any(|one| one.is_ascii_uppercase()));
+    assert!(value.bytes().any(|one| one.is_ascii_lowercase()));
+    assert!(value.bytes().any(|one| one.is_ascii_digit()));
+    assert!(value.bytes().any(|one| b"-_.~".contains(&one)));
+    assert!(made.contains(&value));
 }
