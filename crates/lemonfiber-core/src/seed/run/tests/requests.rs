@@ -180,6 +180,25 @@ async fn a_stack_with_no_request_service_is_handed_nothing() {
     assert!(asked.is_empty(), "the \\*arrs were asked anyway: {asked:?}");
 }
 
+/// A request service whose adapter does not answer is handed nothing, and no curator is
+/// asked what it holds.
+#[tokio::test]
+async fn a_request_service_that_does_not_answer_is_handed_nothing() {
+    let http = Fake::by_path_in_turn(a_curator(television_folder()));
+    let ctx = asking("targets-unanswered", http.clone(), &[TELEVISION]);
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[],
+        &moved(Vec::new(), |_| {}),
+        Some(stack_root()),
+    )
+    .await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
 /// A curator with nowhere to file, or that will not say, is left out.
 ///
 /// The request service must name a folder when it hands a request over. One that

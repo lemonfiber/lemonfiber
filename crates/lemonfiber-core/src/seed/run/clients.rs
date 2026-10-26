@@ -14,7 +14,6 @@ use crate::wiring::Fillers;
 use super::connecting::{BOOKS, FILM, MUSIC, TELEVISION};
 
 use super::Ctx;
-use crate::origin::Origin;
 use crate::wiring::Filler;
 
 /// The category an application files under, named as that application names its
@@ -57,19 +56,8 @@ impl Holder {
     /// Whose `filler`'s credential is.
     pub(super) fn of(filler: &Filler) -> Self {
         Self {
-            plugin: match &filler.origin {
-                Origin::Plugin { named } => Some(named.clone()),
-                _ => None,
-            },
+            plugin: filler.brought_by().map(str::to_owned),
             id: filler.id.clone(),
-        }
-    }
-
-    /// One of the stack's own services.
-    pub(super) fn stack(id: &str) -> Self {
-        Self {
-            plugin: None,
-            id: id.to_owned(),
         }
     }
 }
@@ -84,18 +72,6 @@ impl Holder {
 pub(super) struct Held {
     /// Each credential in hand, by whose it is.
     pub(super) keys: BTreeMap<Holder, Credential>,
-}
-
-/// The credentials of the stack's own services, by id.
-impl From<BTreeMap<String, Credential>> for Held {
-    fn from(keys: BTreeMap<String, Credential>) -> Self {
-        Self {
-            keys: keys
-                .into_iter()
-                .map(|(id, credential)| (Holder::stack(&id), credential))
-                .collect(),
-        }
-    }
 }
 
 impl Held {

@@ -383,3 +383,37 @@ fn a_moved_part_no_contract_settles_is_what_the_register_says() {
         .next();
     assert_eq!(facing, Some(Some(Facing::Shelf)));
 }
+
+/// The stack's guard whose ask for `media.serve` two media servers contest, with nothing
+/// settling it, is met under its own name: there is no one library behind it to name it
+/// after.
+#[test]
+fn a_guard_no_one_library_fills_is_met_under_its_own_name() {
+    let second = [crate::test_support::a_contracted_media_server(None)];
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .ok()
+        .map(|mut manifest| {
+            for wiring in manifest
+                .wirings
+                .iter_mut()
+                .filter(|one| one.asks.as_deref() == Some(super::serve::CAPABILITY))
+            {
+                wiring.filled_by = None;
+            }
+            manifest
+        });
+    let services = manifest
+        .as_ref()
+        .map(|one| one.services.clone())
+        .unwrap_or_default();
+    let fillers = manifest.as_ref().map(|manifest| {
+        crate::wiring::Fillers::of(manifest, &second, &crate::wiring::Chosen::default(), None)
+    });
+    let candidates = super::candidates(&services, &second, &fillers.unwrap_or_default());
+    let guard = candidates
+        .iter()
+        .find(|one| one.id == "door")
+        .map(|one| (one.name, one.facing));
+
+    assert_eq!(guard, Some(("Door", Some(Facing::Watching))));
+}

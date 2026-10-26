@@ -429,6 +429,33 @@ async fn without_the_gate_its_routes_or_a_stack_directory_there_are_no_lines() {
     );
 }
 
+/// A gate the stack's own credentials may not cross to, another plugin's, has no lines:
+/// nothing is read of what it admits.
+#[tokio::test]
+async fn a_gate_another_plugin_brings_has_no_lines() {
+    let (ctx, at) = scene(
+        "tokens-strangers-gate",
+        true,
+        &accepting(&["held"], &[]),
+        taking("held", "linked"),
+        true,
+    );
+    let installed: Vec<_> = REQUESTS
+        .installed()
+        .into_iter()
+        .chain([crate::test_support::contracted(
+            "gatekeeper",
+            "gatekeeper",
+            "request.gate",
+        )])
+        .collect();
+    let fillers = fillers_beside(stack(false), &installed, Some(&at));
+
+    assert!(held(&ctx, &stack(true), &fillers, Some(&at))
+        .await
+        .is_empty());
+}
+
 #[tokio::test]
 async fn a_token_is_never_printed() {
     let http = taking("held", "linked");
