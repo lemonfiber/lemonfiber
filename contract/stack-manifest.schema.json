@@ -380,6 +380,13 @@
       "description": "A value a service holds, declared before anything captures or enters it.",
       "type": "object",
       "properties": {
+        "carried_from": {
+          "description": "Where the service a part moves in place of wrote this credential itself.",
+          "anyOf": [
+            {"$ref": "#/$defs/SecretCarriedFrom"},
+            {"type": "null"}
+          ]
+        },
         "for": {
           "description": "The capability of the plugin's own that a credential crossing to it is needed to fill.",
           "type": ["string", "null"]
@@ -391,6 +398,26 @@
       },
       "additionalProperties": false,
       "required": ["id", "of", "why"]
+    },
+    "SecretCarriedFrom": {
+      "description": "Where a service wrote a credential itself: a file inside its container, the format it\nis written in and the dotted path to the value.",
+      "type": "object",
+      "properties": {
+        "file": {"description": "The file, as a path inside the service's container beneath its configuration\ndirectory.", "type": "string"},
+        "format": {"description": "The format the file is written in.", "$ref": "#/$defs/SecretFormat"},
+        "key": {"description": "The dotted path to the value in the file; for `ini`, its section and entry.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["file", "format", "key"]
+    },
+    "SecretFormat": {
+      "description": "A format a service writes its configuration in.",
+      "oneOf": [
+        {"description": "XML.", "type": "string", "const": "xml"},
+        {"description": "JSON.", "type": "string", "const": "json"},
+        {"description": "YAML.", "type": "string", "const": "yaml"},
+        {"description": "INI.", "type": "string", "const": "ini"}
+      ]
     },
     "Service": {
       "description": "One container in the stack.",

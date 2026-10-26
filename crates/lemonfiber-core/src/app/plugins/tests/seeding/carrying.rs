@@ -11,12 +11,21 @@ const RECORDED: &str = "recorded-by-the-stack";
 
 /// The seeded manifest, its upstream moving in place of [`RESERVED`].
 fn moving() -> Option<lemonfiber_plugin::Manifest> {
-    lemonfiber_plugin::Manifest::from_toml(&seeded().replacen(
-        "id          = \"komga\"\nname        = \"Komga\"\nimage",
-        &format!(
-            "id          = \"komga\"\nname        = \"Komga\"\nreplaces    = \"{RESERVED}\"\nimage"
-        ),
-        1,
+    moving_with("")
+}
+
+/// The seeded manifest, its upstream moving in place of [`RESERVED`] and `extra` closing
+/// its minted secret's declaration.
+fn moving_with(extra: &str) -> Option<lemonfiber_plugin::Manifest> {
+    lemonfiber_plugin::Manifest::from_toml(&format!(
+        "{}{extra}",
+        seeded().replacen(
+            "id          = \"komga\"\nname        = \"Komga\"\nimage",
+            &format!(
+                "id          = \"komga\"\nname        = \"Komga\"\nreplaces    = \"{RESERVED}\"\nimage"
+            ),
+            1,
+        )
     ))
     .ok()
 }
@@ -24,8 +33,16 @@ fn moving() -> Option<lemonfiber_plugin::Manifest> {
 /// What minting the moving manifest leaves held, `trusted` as first-party, in a stack that
 /// published [`RECORDED`] for [`RESERVED`].
 fn minted_moving(name: &str, trusted: &[crate::plugin::first_party::FirstParty]) -> Option<String> {
-    let ctx = seeding(name);
-    let manifest = moving()?;
+    minted_moved(&seeding(name), &moving()?, trusted)
+}
+
+/// What minting `manifest` leaves held in `ctx`, `trusted` as first-party, in a stack that
+/// published [`RECORDED`] for [`RESERVED`].
+fn minted_moved(
+    ctx: &Ctx,
+    manifest: &lemonfiber_plugin::Manifest,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> Option<String> {
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let recorded = format!(
         "{}{}={RECORDED}\n",
@@ -33,12 +50,77 @@ fn minted_moving(name: &str, trusted: &[crate::plugin::first_party::FirstParty])
         crate::seed::run::published_as(RESERVED)
     );
     let _ = std::fs::write(&env, recorded);
-    let mut would = crate::plugin::Installed::of(&manifest);
+    let mut would = crate::plugin::Installed::of(manifest);
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     would.tree = crate::test_support::A_TREE.to_owned();
 
-    super::super::super::minting::minted(&ctx, &would, &manifest, "1", trusted).ok()?;
-    minted(&ctx)
+    super::super::super::minting::minted(ctx, &would, manifest, "1", trusted).ok()?;
+    minted(ctx)
+}
+
+/// The moving manifest, its minted key carried from `file` inside its upstream's
+/// container, written as JSON with the key at `auth.token`.
+fn carrying_from(file: &str) -> Option<lemonfiber_plugin::Manifest> {
+    moving_with(&format!(
+        "carried_from = {{ file = \"{file}\", format = \"json\", key = \"auth.token\" }}\n"
+    ))
+}
+
+/// What minting a part moved in place leaves held for its key when its secret says the
+/// stack's own service wrote it at `file` inside the container, and the service wrote
+/// `holding` at `beneath` in its configuration directory.
+fn minted_carrying(name: &str, file: &str, beneath: &str, holding: &str) -> Option<String> {
+    let ctx = seeding(name);
+    let at = crate::app::targets::service_config_dir(&stack_of(&ctx), RESERVED).join(beneath);
+    let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
+    let _ = std::fs::write(&at, holding);
+    minted_moved(
+        &ctx,
+        &carrying_from(file)?,
+        &crate::test_support::first_party("komga"),
+    )
+}
+
+/// A part whose secret says where the stack's own service wrote its key is handed that
+/// key, though the stack declares no file of its own for it.
+#[test]
+fn a_part_moved_in_place_keeps_the_key_its_secret_says_the_service_wrote() {
+    assert!(carrying_from("/app/data/own/key.json").is_some());
+    assert_eq!(
+        minted_carrying(
+            "seeded-carried",
+            "/app/data/own/key.json",
+            "own/key.json",
+            r#"{"auth":{"token":"written-by-the-service"},"token":"not-this"}"#,
+        )
+        .as_deref(),
+        Some(WRITTEN)
+    );
+}
+
+/// A secret naming a file outside its upstream's configuration directory, or a file that
+/// holds nothing at its key, hands on the key the stack published instead.
+#[test]
+fn a_carried_key_outside_the_configuration_or_not_written_hands_on_the_one_published() {
+    for (tag, file, holding) in [
+        (
+            "outside",
+            "/data/key.json",
+            r#"{"auth":{"token":"written-by-the-service"}}"#,
+        ),
+        (
+            "escaping",
+            "/app/data/../key.json",
+            r#"{"auth":{"token":"written-by-the-service"}}"#,
+        ),
+        ("unwritten", "/app/data/key.json", r#"{"auth":{}}"#),
+    ] {
+        assert_eq!(
+            minted_carrying(&format!("seeded-carried-{tag}"), file, "key.json", holding).as_deref(),
+            Some(RECORDED),
+            "{tag}"
+        );
+    }
 }
 
 #[test]
@@ -262,6 +344,11 @@ fn a_part_moved_in_place_of_a_service_with_no_key_anywhere_is_minted_one() {
 /// The seeded manifest, its adapter handing its upstream an account lemonfiber mints and
 /// its upstream moving in place of the stack's own service `reserved`.
 fn moving_an_account(reserved: &str) -> Option<lemonfiber_plugin::Manifest> {
+    lemonfiber_plugin::Manifest::from_toml(&moving_an_account_text(reserved)).ok()
+}
+
+/// The text of [`moving_an_account`]'s manifest.
+fn moving_an_account_text(reserved: &str) -> String {
     let account = "upstream    = { username = { secret = \"upstream-username\" }, password = \
                    { secret = \"upstream-password\" } }";
     let text = seeded()
@@ -285,7 +372,7 @@ fn moving_an_account(reserved: &str) -> Option<lemonfiber_plugin::Manifest> {
             ),
             1,
         );
-    lemonfiber_plugin::Manifest::from_toml(&text).ok()
+    text
 }
 
 /// The account minting the moving-an-account manifest leaves held for its upstream moving
@@ -297,8 +384,18 @@ fn minted_account(
     recorded: Option<&str>,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> Option<(String, String)> {
+    minted_account_of(name, &moving_an_account(reserved)?, recorded, trusted)
+}
+
+/// The account minting `manifest` leaves held, `trusted` as first-party, in a stack that
+/// recorded `recorded` as its torrent client's password, or none.
+fn minted_account_of(
+    name: &str,
+    manifest: &lemonfiber_plugin::Manifest,
+    recorded: Option<&str>,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> Option<(String, String)> {
     let ctx = seeding(name);
-    let manifest = moving_an_account(reserved)?;
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let _ = match recorded {
         Some(password) => {
@@ -306,11 +403,11 @@ fn minted_account(
         }
         None => crate::config::store::unset(&env, crate::config::TORRENT_PASSWORD_KEY),
     };
-    let mut would = crate::plugin::Installed::of(&manifest);
+    let mut would = crate::plugin::Installed::of(manifest);
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     would.tree = crate::test_support::A_TREE.to_owned();
 
-    super::super::super::minting::minted(&ctx, &would, &manifest, "1", trusted).ok()?;
+    super::super::super::minting::minted(&ctx, &would, manifest, "1", trusted).ok()?;
     let held =
         crate::settings::secrets_at(&ctx).and_then(|at| crate::settings::Secrets::at(&at).ok())?;
     let part = |id: &str| held.value(&format!("komga:{id}")).map(str::to_owned);
@@ -497,4 +594,30 @@ fn a_moved_aggregator_whose_password_was_never_recorded_is_minted_one() {
         Some(32),
         "{minted:?}"
     );
+}
+
+/// A first-party upstream moved in place of a service the stack does not declare keeps
+/// the account lemonfiber set up through the API its own service names as its native, and
+/// one naming none is minted one.
+#[test]
+fn an_account_is_kept_by_the_native_the_moved_service_names_where_the_stack_declares_none() {
+    let reserved = "undeclared";
+    let named = moving_an_account_text(reserved).replacen(
+        &format!("replaces    = \"{reserved}\"\n"),
+        &format!("replaces    = \"{reserved}\"\nnative      = \"qbittorrent\"\n"),
+        1,
+    );
+    let named = lemonfiber_plugin::Manifest::from_toml(&named).ok();
+    assert!(named.is_some());
+    let trusted = crate::test_support::first_party("komga");
+
+    let kept = named.as_ref().and_then(|manifest| {
+        minted_account_of("seeded-account-native", manifest, Some(RECORDED), &trusted)
+    });
+    assert_eq!(kept, Some(("admin".to_owned(), RECORDED.to_owned())));
+
+    let (username, _) =
+        minted_account("seeded-account-unnamed", reserved, Some(RECORDED), &trusted)
+            .unwrap_or_default();
+    assert_ne!(username, "admin");
 }
