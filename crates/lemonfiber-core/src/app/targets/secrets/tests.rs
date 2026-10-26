@@ -25,16 +25,17 @@ fn a_moved_parts_credential_is_the_key_minted_for_its_service() {
     let (minted, _) = moved("moved-credential");
     let (unminted, record) = moved("moved-credential-unminted");
     let mut register = crate::plugin::Register::empty();
-    if let Some(mut installed) = TELEVISION.installed() {
+    let recorded = TELEVISION.installed().map(|mut installed| {
         for secret in &mut installed.declared.secrets {
             secret.minted = false;
         }
-        let _ = register.record(installed);
-    }
+        register.record(installed)
+    });
     let _ = std::fs::write(&record, register.to_json().unwrap_or_default());
     let (unread, record) = moved("moved-credential-unread");
     let _ = std::fs::write(&record, "{");
 
+    assert!(recorded.is_some_and(|recorded| recorded.is_ok()));
     assert_eq!(
         moved_credential(&minted, "sonarr"),
         Some("minted-k3y".to_owned())
