@@ -298,11 +298,15 @@ async fn borrowed(
              reach"
                 .to_owned()
         })?;
+    if adapter
+        .upstream
+        .keys()
+        .any(|field| field == UPSTREAM_USERNAME || field == UPSTREAM_PASSWORD)
+    {
+        return Err(ACCOUNTED.to_owned());
+    }
     let mut credentials = Vec::new();
     for (field, secret) in &adapter.upstream {
-        if field == UPSTREAM_USERNAME || field == UPSTREAM_PASSWORD {
-            return Err(ACCOUNTED.to_owned());
-        }
         let key = their_key(ctx, &installed, secret, container).await?;
         credentials.push((field.clone(), key));
     }

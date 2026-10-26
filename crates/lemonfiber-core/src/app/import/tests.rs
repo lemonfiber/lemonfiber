@@ -73,7 +73,26 @@ fn importing(name: &str, serves: &Arc<Serves>) -> crate::app::Ctx {
             Answer::reply(200, "{}"),
         )]));
     ctx.seams.serving = Arc::clone(serves) as Arc<dyn lemonfiber_ports::serving::Serving>;
-    TELEVISION.reaching(ctx)
+    let ctx = TELEVISION.reaching(ctx);
+    kept_as_installed(&ctx, &dir);
+    ctx
+}
+
+/// The television curator's plugin, its manifest kept beside the install as installing it
+/// keeps one, from the copy the bundle pins.
+fn kept_as_installed(ctx: &crate::app::Ctx, dir: &std::path::Path) {
+    let (Some(installed), Some(pinned)) = (
+        TELEVISION.installed(),
+        lemonfiber_bundled::PINNED
+            .iter()
+            .find(|one| one.first_party.plugin == "sonarr"),
+    ) else {
+        return;
+    };
+    let source = dir.join("sonarr-source");
+    let _ = std::fs::create_dir_all(&source);
+    let _ = std::fs::write(source.join(lemonfiber_bundle::MANIFEST), pinned.copy);
+    crate::app::plugins::kept::kept(ctx, &installed, &source);
 }
 
 /// What an unconfirmed import comes to in `ctx`, `trusted` holding the plugins that are
