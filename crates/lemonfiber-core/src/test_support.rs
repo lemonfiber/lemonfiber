@@ -527,7 +527,7 @@ pub(crate) fn shipped_stack_version() -> String {
         .unwrap_or_default()
 }
 
-/// The stack the tests are written against carried inside the build, as a machine that
+/// The stack this build carries inside it, as a machine that
 /// has chosen no stack directory yet holds it.
 pub(crate) fn embedded() -> crate::stack::Source {
     crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED)

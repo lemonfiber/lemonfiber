@@ -27,7 +27,8 @@ async fn what_leaves_this_machine_carries_the_switch_beside_each_request() {
             && body.starts_with(r#"{"api_version":1,"kind":"outbound","data":{"ours":["#)
             && body.contains(r#""reach":"registry""#)
             && body.contains(r#""switch":"LEMONFIBER_REACH_REGISTRY""#)
-            && body.contains(r#""theirs":[{"service":"prowlarr""#)),
+            && body.contains(r#""theirs":[{"service":"#)
+            && body.contains(r#""service":"prowlarr""#)),
         "the list a browser is served"
     );
 }

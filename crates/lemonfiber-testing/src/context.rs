@@ -26,8 +26,8 @@ use lemonfiber_fixtures::ports::Stopped;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
-/// The stack the tests are written against, copied into a directory of its own, so a run
-/// that writes the project beside it never writes into the repository. Held one level
+/// The stack this build carries, written into a directory of its own as a stack directory
+/// holds it, so a run that writes the project beside it never writes into the repository. Held one level
 /// down, so what a test puts beside the stack stays the test's own too.
 #[must_use]
 pub fn repository_stack() -> Source {

@@ -50,9 +50,9 @@ pub fn manifest_into(into: &Path) {
     written_apart(into, &toml::to_string(&carried()).unwrap_or_default());
 }
 
-/// What the carried stack holds beside its manifest that a run reads: the settings it
-/// declares and the starting files of every service's configuration.
-const BESIDE: [&str; 2] = [".env.example", "config"];
+/// What the carried stack holds beside its manifest that a run reads: the starting files
+/// of every service's configuration.
+const BESIDE: [&str; 1] = ["config"];
 
 /// The carried stack written into `into` as a stack directory holds it: its manifest
 /// without the secrets an assembled part declares, and what a run reads beside it.
