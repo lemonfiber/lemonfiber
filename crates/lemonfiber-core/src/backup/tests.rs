@@ -15,7 +15,7 @@ fn paths() -> Paths {
 }
 
 fn whole_stack_plan() -> Plan {
-    plan(&paths(), &Scope::WholeStack)
+    plan(&paths(), &Scope::WholeStack, &[])
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn a_whole_stack_capture_takes_the_expected_state_baseline() {
     // capture takes whole, so it is carried along by construction — this guards
     // that the baseline stays under the captured area rather than drifting out.
     let paths = paths();
-    let plan = plan(&paths, &Scope::WholeStack);
+    let plan = plan(&paths, &Scope::WholeStack, &[]);
     let config = plan
         .items
         .iter()
@@ -51,7 +51,7 @@ fn a_whole_stack_capture_takes_the_expected_state_baseline() {
 #[test]
 fn a_whole_stack_capture_reads_from_the_install_layout() {
     let paths = paths();
-    let plan = plan(&paths, &Scope::WholeStack);
+    let plan = plan(&paths, &Scope::WholeStack, &[]);
     let sources: Vec<PathBuf> = plan.items.iter().map(|item| item.source.clone()).collect();
     assert_eq!(
         sources,
@@ -90,6 +90,7 @@ fn a_single_service_capture_takes_only_that_service() {
         &Scope::Service {
             name: "sonarr".to_owned(),
         },
+        &[],
     );
     assert_eq!(
         plan.items,
@@ -133,8 +134,38 @@ fn what_a_service_rebuilds_is_left_out_of_the_capture_and_nothing_else_is() {
         &Scope::Service {
             name: "seerr".to_owned(),
         },
+        &[],
     );
     assert!(unnamed.items.iter().all(|item| item.left_out.is_empty()));
+}
+
+#[test]
+fn what_a_manifest_says_its_service_rebuilds_is_left_out_beside_the_table() {
+    let declared = [
+        ("komga".to_owned(), "cache/thumbnails".to_owned()),
+        ("sonarr".to_owned(), "logs".to_owned()),
+        ("komga".to_owned(), "../elsewhere".to_owned()),
+    ];
+    let whole = plan(&paths(), &Scope::WholeStack, &declared);
+    let services = whole
+        .items
+        .iter()
+        .find(|item| item.archive_path == area::SERVICES)
+        .map(|item| item.left_out.clone())
+        .unwrap_or_default();
+    assert!(services.contains(&PathBuf::from("komga/cache/thumbnails")));
+    assert_eq!(services.len(), super::REBUILT.len() + 1, "{services:?}");
+    let one = plan(
+        &paths(),
+        &Scope::Service {
+            name: "komga".to_owned(),
+        },
+        &declared,
+    );
+    assert!(one
+        .items
+        .iter()
+        .all(|item| item.left_out == vec![PathBuf::from("cache/thumbnails")]));
 }
 
 #[test]
@@ -183,6 +214,7 @@ fn a_manifest_round_trips_through_json() {
         &Scope::Service {
             name: "radarr".to_owned(),
         },
+        &[],
     );
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let line = serde_json::to_string(&manifest).unwrap_or_default();
@@ -330,6 +362,7 @@ fn a_clean_single_service_manifest_escapes_nothing() {
         &Scope::Service {
             name: "sonarr".to_owned(),
         },
+        &[],
     );
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     assert!(manifest.escapes().is_empty());
@@ -357,6 +390,7 @@ fn a_single_service_name_that_is_more_than_one_segment_is_caught() {
         &Scope::Service {
             name: "a/b".to_owned(),
         },
+        &[],
     );
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     assert_eq!(manifest.escapes(), vec!["a/b".to_owned()]);
@@ -424,7 +458,7 @@ fn a_capture_of_an_existing_setup_reads_the_host_paths_it_was_given() {
         "media",
         &["/srv/their-media".to_owned(), "/mnt/tv".to_owned()],
     );
-    let made = plan(&paths(), &scope);
+    let made = plan(&paths(), &scope, &[]);
 
     assert_eq!(
         made.items
@@ -457,7 +491,7 @@ fn two_trees_with_the_same_last_name_do_not_land_on_one_archive_path() {
         "media",
         &["/srv/config".to_owned(), "/mnt/other/config".to_owned()],
     );
-    let made = plan(&paths(), &scope);
+    let made = plan(&paths(), &scope, &[]);
     let mut seen: Vec<&str> = made
         .items
         .iter()
@@ -484,7 +518,7 @@ fn the_existing_area_is_not_somewhere_a_restore_can_write() {
 #[test]
 fn an_archive_of_a_setup_we_do_not_manage_is_refused_with_its_paths_named() {
     let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
-    let made = plan(&paths(), &scope);
+    let made = plan(&paths(), &scope, &[]);
     let manifest = Manifest::describe(&made, "0.3.0", "t", "/srv/media");
 
     assert_eq!(
@@ -501,9 +535,9 @@ fn an_archive_of_a_setup_we_do_not_manage_is_refused_with_its_paths_named() {
 #[test]
 fn a_foreign_archive_is_refused_even_where_every_version_agrees() {
     let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
-    let manifest = Manifest::describe(&plan(&paths(), &scope), "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan(&paths(), &scope, &[]), "0.3.0", "t", "/srv/media");
     let whole = Manifest::describe(
-        &plan(&paths(), &Scope::WholeStack),
+        &plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         "t",
         "/srv/media",
@@ -528,7 +562,7 @@ fn a_foreign_archive_is_refused_even_where_every_version_agrees() {
 #[test]
 fn a_foreign_archive_in_an_unreadable_format_is_refused_for_the_format() {
     let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
-    let mut manifest = Manifest::describe(&plan(&paths(), &scope), "0.3.0", "t", "/srv/media");
+    let mut manifest = Manifest::describe(&plan(&paths(), &scope, &[]), "0.3.0", "t", "/srv/media");
     manifest.schema = SCHEMA + 1;
 
     assert_eq!(

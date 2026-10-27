@@ -17,6 +17,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
         minted: Minted::Not,
         carried_from: None,
         recorded_with: None,
+        was: None,
     }]
 });
 
@@ -31,6 +32,9 @@ fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
         config_path: None,
         config_ro: false,
         mounts: &[],
+        shares_config: None,
+        rebuilt: &[],
+        fronts: None,
         tmpfs: &[],
         env,
         secrets: &*DECLARED,
@@ -180,6 +184,7 @@ fn a_setting_is_published_or_the_services_own() {
             setting: name.to_owned(),
             default: Constant::Text(String::new()),
             recorded_with: None,
+            was: None,
         })
     };
     let named = env(vec![
@@ -201,6 +206,7 @@ fn a_setting_named_as_a_declared_secret_is_refused() {
             setting: "jellyfin:admin-key".to_owned(),
             default: Constant::Text(String::new()),
             recorded_with: None,
+            was: None,
         }),
     )]);
     assert_eq!(
@@ -347,6 +353,7 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
                 setting: "domain".to_owned(),
                 default: Constant::Text("x\ry".to_owned()),
                 recorded_with: None,
+                was: None,
             }),
         ),
         (
@@ -355,6 +362,7 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
                 setting: "gluetun:countries".to_owned(),
                 default: Constant::Text("a\tb".to_owned()),
                 recorded_with: None,
+                was: None,
             }),
         ),
         ("PRICE", Value::Constant(Constant::Text("$5".to_owned()))),
@@ -515,6 +523,7 @@ fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
             minted,
             carried_from: None,
             recorded_with: None,
+            was: None,
         };
         let text = toml::to_string(&declared).unwrap_or_default();
         assert_eq!(
@@ -545,6 +554,7 @@ fn a_stand_in_reads_minted_as_one_made_for_the_run_and_anything_else_as_a_consta
             setting: "gluetun:endpoint".to_owned(),
             default: Constant::Text(String::new()),
             recorded_with,
+            was: None,
         })
     };
     let declared = read(
@@ -589,6 +599,7 @@ fn a_stand_in_holding_a_control_character_is_refused_and_one_made_for_the_run_is
             setting: "domain".to_owned(),
             default: Constant::Text(String::new()),
             recorded_with: Some(recorded_with),
+            was: None,
         })
     };
     let named = env(vec![
@@ -603,4 +614,55 @@ fn a_stand_in_holding_a_control_character_is_refused_and_one_made_for_the_run_is
         said,
         vec!["service jellyfin.env.BROKEN: \"a\\nb\" holds a control character".to_owned()]
     );
+}
+
+#[test]
+fn an_adapter_shares_its_upstreams_configuration_only_where_it_fronts_one() {
+    let none = NONE;
+    let mut sharing = plain(&none);
+    sharing.shares_config = Some("/upstream");
+    assert_eq!(
+        wrong(&sharing),
+        [
+            "service jellyfin.shares_config: shares the configuration of the service it fronts, \
+             and fronts none"
+        ]
+    );
+    sharing.fronts = Some("jellyfin-upstream");
+    assert_eq!(wrong(&sharing), Vec::<String>::new());
+    let plain_absolute = "is not one plain absolute path: not the root, with no \"..\", in \
+                          letters, digits and \"._/-\" alone";
+    for (to, said) in [
+        (
+            "/config",
+            "/config is the target of another mount".to_owned(),
+        ),
+        ("/data/x", "/data/x is inside the data mount".to_owned()),
+        ("upstream", format!("upstream {plain_absolute}")),
+    ] {
+        sharing.shares_config = Some(to);
+        assert_eq!(
+            wrong(&sharing),
+            [format!("service jellyfin.shares_config: {said}")]
+        );
+    }
+}
+
+#[test]
+fn what_a_service_rebuilds_lies_beneath_its_configuration_directory() {
+    let none = NONE;
+    let paths = [
+        "cache".to_owned(),
+        "../etc".to_owned(),
+        "/var/log".to_owned(),
+        "${LOGS}".to_owned(),
+    ];
+    let mut rebuilding = plain(&none);
+    rebuilding.rebuilt = &paths;
+    let found = wrong(&rebuilding);
+    assert_eq!(found.len(), 3, "{found:?}");
+    assert!(found
+        .iter()
+        .all(|one| one.ends_with("is not a relative path beneath its configuration directory")));
+    assert!(!found.iter().any(|one| one.contains("rebuilt cache:")));
 }

@@ -127,7 +127,7 @@ pub(crate) const CURRENT: &str = "0.3.0";
 
 /// A whole-stack manifest taken against `/srv/media`, as an archive carries one.
 fn manifest_of(version: &str, schema: u32) -> Manifest {
-    let plan = backup::plan(&paths(), &Scope::WholeStack);
+    let plan = backup::plan(&paths(), &Scope::WholeStack, &[]);
     let mut manifest = Manifest::describe(&plan, version, "t", "/srv/media");
     manifest.schema = schema;
     manifest

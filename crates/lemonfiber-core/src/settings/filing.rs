@@ -1,3 +1,5 @@
+use lemonfiber_manifest::container::earlier::{self, Earlier};
+
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS, SETTINGS};
 use crate::config::storage::{self, Storage};
@@ -5,9 +7,10 @@ use crate::config::store::{self, Failure};
 use crate::config::{DATA_ROOT_KEY, NAS_EXPORT_KEY, NAS_HOST_KEY};
 use crate::credential::fingerprint;
 use crate::journal::{Change, Kind};
+use crate::plugin::first_party::{holds, EMBEDDED};
 use crate::plugin::Installed;
 
-use super::legacy::{self, Legacy};
+use super::legacy;
 use super::secrets::Keeping;
 use super::{Settings, Source};
 
@@ -156,14 +159,20 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
         return Ok(());
     }
     let file = store::read(env)?;
-    let rows: Vec<(&Legacy, &str)> = legacy::TABLE
+    let kept = earlier(ctx);
+    let rows: Vec<(&Earlier, &str)> = kept
         .iter()
         .filter_map(|row| {
-            file.get(row.key)
+            file.get(&row.key)
                 .filter(|value| !value.is_empty())
                 .map(|value| (row, value))
         })
         .collect();
+    let key_of = |name: &str| {
+        rows.iter()
+            .find(|(row, _)| row.name == name)
+            .map(|(row, _)| row.key.clone())
+    };
     if !rows.is_empty() {
         let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
         let journal = paths.journal();
@@ -173,7 +182,7 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
             .iter()
             .filter(|(row, _)| row.secret)
             .map(|(row, value)| Keeping {
-                name: row.name,
+                name: &row.name,
                 value,
                 from: Source::Operator,
                 at,
@@ -182,28 +191,76 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
         super::secrets::filed(&env.with_file_name(SECRETS), &keeping, &|absent| {
             let changes: Vec<Change> = absent
                 .iter()
-                .map(|one| filed_secret(one, legacy::named(one.name), &stamp))
+                .map(|one| filed_secret(one, key_of(one.name), &stamp))
                 .collect();
             crate::app::recover::journalled(&journal, &changes, ctx.seams.random.as_ref())
         })?;
         let filing: Vec<super::store::Filing<'_>> = rows
             .iter()
             .filter(|(row, _)| !row.secret)
-            .map(|(row, value)| (row.name, *value))
+            .map(|(row, value)| (row.name.as_str(), *value))
             .collect();
         super::store::filed(&settings, &filing, &|absent| {
             let changes: Vec<Change> = absent
                 .iter()
-                .map(|(name, value)| filed_setting(name, value, &stamp))
+                .map(|(name, value)| filed_setting(name, value, key_of(name), &stamp))
                 .collect();
             crate::app::recover::journalled(&journal, &changes, ctx.seams.random.as_ref())
         })?;
         for (row, _) in &rows {
-            store::unset(env, row.key)?;
+            store::unset(env, &row.key)?;
         }
     }
     nas_folded(ctx, env, &file)?;
     super::store::marked_stack_filed(&settings)
+}
+
+/// Every variable an earlier release kept a setting's or a secret's value under, one
+/// setting or secret each: what the stack's services and every first-party plugin
+/// installed name in `was`, then each the core's table names that none of them does.
+fn earlier(ctx: &Ctx) -> Vec<Earlier> {
+    let stack = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map(|manifest| {
+            manifest
+                .services
+                .iter()
+                .flat_map(|service| earlier::of([&service.env], &service.id, &service.secret))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let installed = crate::app::plugins::read(ctx)
+        .map(|register| {
+            register
+                .installed()
+                .iter()
+                .filter(|one| holds(EMBEDDED, one))
+                .flat_map(crate::plugin::earlier::of)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let declared = earlier::distinct(stack.into_iter().chain(installed));
+    let table = legacy::TABLE
+        .iter()
+        .filter(|row| {
+            !declared
+                .iter()
+                .any(|one| one.key == row.key || one.name == row.name)
+        })
+        .map(|row| Earlier {
+            key: row.key.to_owned(),
+            name: row.name.to_owned(),
+            secret: row.secret,
+        })
+        .collect::<Vec<_>>();
+    let mut kept: Vec<Earlier> = Vec::new();
+    for one in declared.into_iter().chain(table) {
+        if !kept.iter().any(|held| held.key == one.key) {
+            kept.push(one);
+        }
+    }
+    kept
 }
 
 fn nas_folded(
@@ -251,7 +308,7 @@ fn nas_folded(
     store::set(env, NAS_EXPORT_KEY, "")
 }
 
-fn filed_secret(one: &Keeping<'_>, row: Option<&Legacy>, stamp: &str) -> Change {
+fn filed_secret(one: &Keeping<'_>, key: Option<String>, stamp: &str) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
@@ -261,12 +318,12 @@ fn filed_secret(one: &Keeping<'_>, row: Option<&Legacy>, stamp: &str) -> Change 
             from: one.from.as_str().to_owned(),
             previous: None,
             current: Some(fingerprint(one.value)),
-            filed: row.map(|row| row.key.to_owned()),
+            filed: key,
         },
     }
 }
 
-fn filed_setting(name: &str, value: &str, stamp: &str) -> Change {
+fn filed_setting(name: &str, value: &str, key: Option<String>, stamp: &str) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
@@ -275,7 +332,7 @@ fn filed_setting(name: &str, value: &str, stamp: &str) -> Change {
             name: name.to_owned(),
             previous: None,
             current: Some(value.to_owned()),
-            filed: legacy::setting_key(name).map(str::to_owned),
+            filed: key,
         },
     }
 }

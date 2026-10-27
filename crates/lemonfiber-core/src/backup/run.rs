@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::archive::{Archive, Fault, Space};
-use crate::backup::{self, Manifest, Pace, Retention, Scope};
+use crate::backup::{self, Manifest, Pace, Plan, Retention, Scope};
 use crate::config::paths::Paths;
 use crate::error::{Problem, Remedy, State};
 
@@ -121,14 +121,14 @@ pub struct Report {
 /// older archives is not one of these: the capture has succeeded by then.
 pub async fn capture(
     paths: &Paths,
-    scope: Scope,
+    plan: Plan,
     product_version: &str,
     stamp: &str,
     data_root: &str,
     taking: Taking,
     archive: &dyn Archive,
 ) -> Result<Report, Box<Problem>> {
-    let plan = backup::plan(paths, &scope);
+    let scope = plan.scope.clone();
     let dir = paths.backups();
 
     let space = archive
@@ -212,9 +212,10 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
     };
     let data_root = data_root(ctx);
 
+    let plan = backup::plan(&archives.paths, &scope, &rebuilt(ctx));
     capture(
         &archives.paths,
-        scope,
+        plan,
         env!("CARGO_PKG_VERSION"),
         &ctx.stamp(),
         &data_root,
@@ -222,6 +223,37 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
         archives.vault.as_ref(),
     )
     .await
+}
+
+/// Every path beneath a service's configuration directory its manifest says it rebuilds,
+/// the stack's services' and every installed plugin's, as the service and the path.
+fn rebuilt(ctx: &Ctx) -> Vec<(String, String)> {
+    let stack: Vec<(String, Vec<String>)> = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map(|manifest| {
+            manifest
+                .services
+                .into_iter()
+                .map(|service| (service.id, service.rebuilt))
+                .collect()
+        })
+        .unwrap_or_default();
+    let installed: Vec<(String, Vec<String>)> = crate::app::plugins::read(ctx)
+        .map(|register| {
+            register
+                .installed()
+                .iter()
+                .flat_map(|one| &one.services)
+                .map(|placed| (placed.service.clone(), placed.fields.rebuilt.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    stack
+        .into_iter()
+        .chain(installed)
+        .flat_map(|(service, paths)| paths.into_iter().map(move |path| (service.clone(), path)))
+        .collect()
 }
 
 /// The data root this machine is on, as the manifest records it.
@@ -269,7 +301,7 @@ pub async fn existing(
 
     capture(
         &archives.paths,
-        Scope::existing(project, host_paths),
+        backup::plan(&archives.paths, &Scope::existing(project, host_paths), &[]),
         env!("CARGO_PKG_VERSION"),
         &ctx.stamp(),
         &data_root(ctx),

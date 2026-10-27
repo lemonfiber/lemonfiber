@@ -459,6 +459,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
             of: "komga".to_owned(),
             why: "Read the library counts".to_owned(),
             minted: false,
+            was: None,
         }],
     };
     let said = installs(&Installs {

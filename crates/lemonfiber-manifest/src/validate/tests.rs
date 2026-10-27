@@ -716,3 +716,22 @@ fn a_part_the_bundle_assembles_mints_no_secret() {
         .any(|message| message.contains("secret upstream-key: is minted"));
     assert!(caught, "{:?}", messages(&text));
 }
+
+#[test]
+fn a_variable_two_settings_of_the_stack_name_in_was_is_caught_naming_both() {
+    let text = edited(
+        "setting = \"flaresolverr:log-level\"",
+        "setting = \"flaresolverr:log-level\"\nwas = \"LOG_LEVEL\"",
+    )
+    .replacen(
+        "setting = \"gluetun:countries\"",
+        "setting = \"gluetun:countries\"\nwas = \"LOG_LEVEL\"",
+        1,
+    );
+    let said = messages(&text);
+    assert!(
+        said.iter().any(|one| one.contains("setting gluetun:countries.was")
+            && one.contains("LOG_LEVEL is named by setting flaresolverr:log-level and setting gluetun:countries")),
+        "{said:?}"
+    );
+}

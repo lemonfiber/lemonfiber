@@ -93,6 +93,34 @@ fn further_mounts_come_from_the_mount_tree_and_the_configuration_may_be_read_onl
 }
 
 #[test]
+fn an_adapter_shares_the_whole_configuration_directory_of_the_service_it_fronts() {
+    let sharing = |fronts: Option<&str>, at: &str| {
+        let mut placed = with(Fields {
+            shares_config: Some(at.to_owned()),
+            ..Fields::default()
+        });
+        placed.fronts = fronts.map(str::to_owned);
+        strings(&entry_of(&document(placed)), "volumes")
+    };
+    assert_eq!(
+        sharing(Some("komga-server"), "/upstream"),
+        [
+            "./data:/data",
+            "./config/komga:/config",
+            "./config/komga-server:/upstream",
+        ]
+    );
+    assert_eq!(
+        sharing(None, "/upstream"),
+        ["./data:/data", "./config/komga:/config"]
+    );
+    assert_eq!(
+        sharing(Some("komga-server"), "/data/upstream"),
+        ["./data:/data", "./config/komga:/config"]
+    );
+}
+
+#[test]
 fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
     let url = |capability: &str| {
         Value::Url(UrlOf {
@@ -114,6 +142,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
                 setting: "domain".to_owned(),
                 default: Constant::Text("home.local".to_owned()),
                 recorded_with: None,
+                was: None,
             }),
         ),
         (
@@ -122,6 +151,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
                 setting: "komga:mode".to_owned(),
                 default: Constant::Flag(false),
                 recorded_with: None,
+                was: None,
             }),
         ),
         ("INDEXER".to_owned(), url("indexer.search")),
@@ -339,6 +369,7 @@ fn naming_a_secret() -> Placed {
                     setting: "komga:mode".to_owned(),
                     default: Constant::Text("slow".to_owned()),
                     recorded_with: None,
+                    was: None,
                 }),
             ),
             (
@@ -397,6 +428,7 @@ fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
                 of: "sonarr".to_owned(),
                 why: "reads the curator".to_owned(),
                 minted: false,
+                was: None,
             }],
             ..crate::plugin::Declaration::default()
         },
@@ -440,6 +472,7 @@ fn a_crossing_secret_whose_holder_nothing_here_names_is_withheld_and_an_own_one_
                     of: of.to_owned(),
                     why: "reads it".to_owned(),
                     minted: false,
+                    was: None,
                 }],
                 ..crate::plugin::Declaration::default()
             },

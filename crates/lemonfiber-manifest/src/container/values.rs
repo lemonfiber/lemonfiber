@@ -31,6 +31,10 @@ pub struct Setting {
     /// operator holds the value and the service needs one to start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recorded_with: Option<RecordedWith>,
+    /// The variable an earlier release kept its value under in the stack's environment
+    /// file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub was: Option<String>,
 }
 
 /// What a recording gives a service in the operator's place: a constant reaching no third
@@ -120,6 +124,10 @@ pub struct Secret {
     /// operator holds the value and the service needs one to start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recorded_with: Option<RecordedWith>,
+    /// The variable an earlier release kept its value under in the stack's environment
+    /// file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub was: Option<String>,
 }
 
 /// Where a service wrote a credential itself: a file inside its container, the format it

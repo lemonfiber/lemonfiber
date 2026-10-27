@@ -21,6 +21,13 @@
     "setting": {
       "description": "The setting's name.",
       "type": "string"
+    },
+    "was": {
+      "description": "The variable an earlier release kept its value under in the stack's environment\nfile.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "additionalProperties": false,

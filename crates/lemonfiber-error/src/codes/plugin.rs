@@ -529,4 +529,17 @@ codes! {
         remedy: "See every grant on lemonfiber credentials, and revoke one by the plugin and the \
             credential it names.",
     }
+    /// Raised when a plugin's setting or secret names, as the variable an earlier release
+    /// kept its value under, one another installed plugin's setting or secret names.
+    EARLIER_TAKEN = "PLUGIN-48" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "A setting or a secret of the plugin names in was the variable an earlier \
+            release kept its value under, and another installed plugin's setting or secret names \
+            the same one, so the stack's value would be filed under both. Nothing was written; \
+            the message names both.",
+        remedy: "Remove the other plugin first, or install a version of this one whose was \
+            names the variable its own setting was kept under.",
+    }
 }

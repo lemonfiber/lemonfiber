@@ -92,6 +92,7 @@ fn what_a_plugin_declared_is_kept_as_it_declared_it() {
                 of: "komga".to_owned(),
                 why: "Read the library counts".to_owned(),
                 minted: false,
+                was: None,
             }],
         })
     );

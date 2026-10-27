@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "adapter": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "upstream": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

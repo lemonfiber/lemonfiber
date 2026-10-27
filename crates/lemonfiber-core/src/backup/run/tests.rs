@@ -16,7 +16,7 @@ use crate::ports::docker::{Health, Lifecycle};
 async fn capturing(archive: &FakeArchive) -> Result<Report, Box<crate::error::Problem>> {
     capture(
         &paths(),
-        Scope::WholeStack,
+        crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         "2026-07-30T00:00:00Z",
         "/srv/media",
@@ -33,7 +33,7 @@ async fn rehearsing(
 ) -> Result<Report, Box<crate::error::Problem>> {
     capture(
         &paths(),
-        Scope::WholeStack,
+        crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         "2026-07-30T00:00:00Z",
         "/srv/media",
@@ -118,9 +118,13 @@ async fn a_single_service_capture_is_named_for_its_service() {
     let archive = FakeArchive::roomy();
     let report = capture(
         &paths(),
-        Scope::Service {
-            name: "sonarr".to_owned(),
-        },
+        crate::backup::plan(
+            &paths(),
+            &Scope::Service {
+                name: "sonarr".to_owned(),
+            },
+            &[],
+        ),
         "0.3.0",
         "2026-07-30T00:00:00Z",
         "/srv/media",
@@ -173,7 +177,7 @@ async fn retention_keeps_each_scope_on_its_own_count() {
     };
     let report = capture(
         &paths(),
-        Scope::WholeStack,
+        crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         "2026-07-30T00:00:00Z",
         "/srv/media",
@@ -209,7 +213,7 @@ async fn the_archive_just_written_is_never_pruned() {
     // the fresh archive — so the guard, not the count, is what saves it.
     let report = capture(
         &paths(),
-        Scope::WholeStack,
+        crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         "2026-07-30T00:00:00Z",
         "/srv/media",
@@ -288,7 +292,7 @@ async fn an_old_backup_that_will_not_delete_is_left_and_the_capture_still_succee
     // names nothing pruned even though the removal was attempted.
     let report = capture(
         &paths(),
-        Scope::WholeStack,
+        crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         "2026-07-30T00:00:00Z",
         "/srv/media",
@@ -465,4 +469,36 @@ async fn a_capture_before_a_takeover_with_nowhere_to_keep_it_refuses_rather_than
         .err()
         .map(|problem| problem.code);
     assert_eq!(refusal, Some(NOWHERE_TO_KEEP));
+}
+
+#[test]
+fn what_an_installed_plugins_service_rebuilds_is_read_as_that_service_and_the_path() {
+    let env = crate::test_support::env_without_password("backup-rebuilt");
+    let mut placed = crate::test_support::a_placed("komga", &[], None);
+    placed.fields.rebuilt = vec!["cache".to_owned(), "logs".to_owned()];
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::an_installed("komga", vec![placed]))
+        .is_ok());
+    assert!(std::fs::write(
+        env.with_file_name(crate::config::paths::PLUGINS),
+        register.to_json().unwrap_or_default()
+    )
+    .is_ok());
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env),
+            ..crate::config::Settings::default()
+        })
+        .build();
+
+    let rebuilt = super::rebuilt(&ctx);
+
+    assert_eq!(
+        rebuilt,
+        vec![
+            ("komga".to_owned(), "cache".to_owned()),
+            ("komga".to_owned(), "logs".to_owned()),
+        ]
+    );
 }

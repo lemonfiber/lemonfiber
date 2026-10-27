@@ -86,6 +86,8 @@ pub struct Install {
     /// Every credential of another service that would cross to the plugin, each approved
     /// apart from the offer as its `approval` names it.
     pub granting: Vec<super::Granting>,
+    /// Every adapter that writes the files of the service it fronts.
+    pub sharing: Vec<super::Sharing>,
 }
 
 /// A capability that would have nothing filling it.

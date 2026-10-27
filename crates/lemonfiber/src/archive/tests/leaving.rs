@@ -49,7 +49,7 @@ async fn what_an_item_leaves_out_is_neither_packed_nor_measured() {
         "the left-out cache was measured"
     );
 
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     assert!(tar.write(&dest, &manifest, &items).await.is_ok());
     let back = scratch("left-out-back");
@@ -73,7 +73,7 @@ async fn an_item_whose_source_is_not_there_is_left_out_rather_than_failing() {
     let root = scratch("absent-item");
     let paths = install(&root);
     let dest = root.join("backups/partial.tar.gz");
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let items = vec![Item {
         source: root.join("never-written"),
@@ -104,7 +104,7 @@ async fn a_link_in_a_captured_directory_is_left_out() {
         label: "services".to_owned(),
         left_out: Vec::new(),
     }];
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     assert!(Tar.write(&dest, &manifest, &items).await.is_ok());
 

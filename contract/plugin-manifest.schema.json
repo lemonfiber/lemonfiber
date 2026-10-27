@@ -655,6 +655,12 @@
           "type": ["string", "null"],
           "default": null
         },
+        "rebuilt": {
+          "description": "Paths beneath its configuration directory it rebuilds when they are missing,\nwhich every backup leaves out.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
         "replaces": {
           "description": "The id of the stack's own service this service moves in place of, which is its own\nid: it keeps that service's container, configuration and data, and may take its\nport and the name the proxy answers for it.",
           "type": ["string", "null"],
@@ -666,6 +672,11 @@
             {"$ref": "#/$defs/PluginShape"},
             {"type": "null"}
           ],
+          "default": null
+        },
+        "shares_config": {
+          "description": "Where inside an adapter the whole configuration directory of the service it\nfronts is mounted.",
+          "type": ["string", "null"],
           "default": null
         },
         "speaks": {
@@ -833,6 +844,10 @@
             {"type": "null"}
           ]
         },
+        "was": {
+          "description": "The variable an earlier release kept its value under in the stack's environment\nfile.",
+          "type": ["string", "null"]
+        },
         "why": {"description": "What holding it is for.", "type": "string"}
       },
       "additionalProperties": false,
@@ -944,7 +959,11 @@
             {"type": "null"}
           ]
         },
-        "setting": {"description": "The setting's name.", "type": "string"}
+        "setting": {"description": "The setting's name.", "type": "string"},
+        "was": {
+          "description": "The variable an earlier release kept its value under in the stack's environment\nfile.",
+          "type": ["string", "null"]
+        }
       },
       "additionalProperties": false,
       "required": ["setting", "default"]

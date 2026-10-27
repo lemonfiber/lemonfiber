@@ -580,6 +580,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
                 recipes_ran: Vec::new(),
                 taking: Vec::new(),
                 granting: Vec::new(),
+                sharing: Vec::new(),
             })
         }),
         update: None,

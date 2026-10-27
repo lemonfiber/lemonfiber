@@ -52,6 +52,20 @@
         "$ref": "ServicePublish.json"
       }
     },
+    "rebuilt": {
+      "description": "The paths beneath its configuration directory it rebuilds when they are missing.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "shares_config": {
+      "description": "Where the whole configuration directory of the service it fronts lands in it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "tmpfs": {
       "description": "Its scratch paths in memory.",
       "type": "array",

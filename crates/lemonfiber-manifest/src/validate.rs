@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::container::Shape;
+use crate::container::{earlier, Shape};
 use crate::{Date, Manifest, Protocol, Removed, Service};
 
 mod wiring;
@@ -210,6 +210,17 @@ fn check_services(
             message,
         }));
     }
+    let earlier = earlier::distinct(
+        manifest
+            .services
+            .iter()
+            .flat_map(|service| earlier::of([&service.env], &service.id, &service.secret)),
+    );
+    found.extend(
+        earlier::broken(&earlier)
+            .into_iter()
+            .map(|(location, message)| Violation { location, message }),
+    );
 }
 
 /// Everything a record of a dropped service has to get right.

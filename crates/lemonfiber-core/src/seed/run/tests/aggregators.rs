@@ -217,6 +217,7 @@ fn kept_aggregator() -> crate::plugin::Installed {
         of: "kept".to_owned(),
         why: "The key the aggregator answers to".to_owned(),
         minted: true,
+        was: None,
         serves: None,
     }];
     installed

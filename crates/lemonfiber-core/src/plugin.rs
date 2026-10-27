@@ -28,6 +28,7 @@ mod conforming;
 // out of a manifest.
 mod container;
 mod declared;
+pub mod earlier;
 pub mod first_party;
 mod fronting;
 mod granted;
@@ -110,8 +111,8 @@ pub use reports::{
 };
 pub use source::{unspoken, Source, SPOKEN};
 pub use stating::{
-    asked, changes, overrides, proofs, run_proof, speaking, taking, Changing, Overriding, Proving,
-    Puts, Taking,
+    asked, changes, overrides, proofs, run_proof, sharing, speaking, taking, Changing, Overriding,
+    Proving, Puts, Sharing, Taking,
 };
 pub use verified::{against, Changed, Verification};
 

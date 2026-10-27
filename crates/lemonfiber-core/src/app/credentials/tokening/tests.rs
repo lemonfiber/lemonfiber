@@ -68,6 +68,8 @@ fn service(id: &str, name: &str, port: u16) -> lemonfiber_manifest::Service {
         asks_for: None,
         reaches: None,
         listens: None,
+        shares_config: None,
+        rebuilt: Vec::new(),
     }
 }
 

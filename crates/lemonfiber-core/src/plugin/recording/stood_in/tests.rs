@@ -16,6 +16,7 @@ fn secret(id: &str, recorded_with: Option<RecordedWith>) -> Secret {
         serves: None,
         carried_from: None,
         recorded_with,
+        was: None,
     }
 }
 
@@ -24,6 +25,7 @@ fn setting(name: &str, recorded_with: Option<RecordedWith>) -> Value {
         setting: name.to_owned(),
         default: Constant::Text(String::new()),
         recorded_with,
+        was: None,
     })
 }
 

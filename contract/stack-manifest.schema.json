@@ -361,6 +361,10 @@
             {"type": "null"}
           ]
         },
+        "was": {
+          "description": "The variable an earlier release kept its value under in the stack's environment\nfile.",
+          "type": ["string", "null"]
+        },
         "why": {"description": "What holding it is for.", "type": "string"}
       },
       "additionalProperties": false,
@@ -538,6 +542,12 @@
           "type": ["string", "null"],
           "default": null
         },
+        "rebuilt": {
+          "description": "Paths beneath its configuration directory it rebuilds when they are missing,\nwhich every backup leaves out.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
         "secret": {
           "description": "The values it holds, each declared by the plugin the bundle assembles it from and\nheld in its own id's namespace. A stack directory's service declares none.",
           "type": "array",
@@ -550,6 +560,11 @@
             {"$ref": "#/$defs/PluginShape"},
             {"type": "null"}
           ],
+          "default": null
+        },
+        "shares_config": {
+          "description": "Where inside an adapter the whole configuration directory of the service it\nfronts is mounted.",
+          "type": ["string", "null"],
           "default": null
         },
         "tag": {"description": "Explicit version — a floating tag is a validation failure.\n\nThe version an operator reads, and nothing more: a tag is a label its publisher\ncan move to another image, so what runs is named by [`Self::digest`].", "type": "string"},
@@ -647,7 +662,11 @@
             {"type": "null"}
           ]
         },
-        "setting": {"description": "The setting's name.", "type": "string"}
+        "setting": {"description": "The setting's name.", "type": "string"},
+        "was": {
+          "description": "The variable an earlier release kept its value under in the stack's environment\nfile.",
+          "type": ["string", "null"]
+        }
       },
       "additionalProperties": false,
       "required": ["setting", "default"]

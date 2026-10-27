@@ -143,6 +143,8 @@ impl Placed {
                 publish: service.publish.clone(),
                 config_ro: service.config_ro,
                 mount: service.mount.clone(),
+                shares_config: service.shares_config.clone(),
+                rebuilt: service.rebuilt.clone(),
                 tmpfs: service.tmpfs.clone(),
                 env: service.env.clone(),
                 user_mode: service.user_mode,
