@@ -750,5 +750,6 @@ fn a_key_is_left_standing_and_named() {
 }
 
 mod moving_back;
+mod renaming_back;
 mod rewinding;
 mod settling;

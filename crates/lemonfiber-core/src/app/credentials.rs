@@ -173,6 +173,7 @@ fn named<'a>(held: &'a [Held], asked: &str) -> Option<&'a Held> {
     if asked.is_empty() {
         return None;
     }
+    let asked = crate::config::renamed::asked_now(&asked).unwrap_or(asked);
     held.iter()
         .find(|one| one.name.to_lowercase() == asked || one.setting.to_lowercase() == asked)
         .or_else(|| {

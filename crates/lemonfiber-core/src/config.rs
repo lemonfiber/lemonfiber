@@ -17,6 +17,7 @@ mod keys;
 pub mod paths;
 pub mod reaching;
 mod reading;
+pub(crate) mod renamed;
 pub mod resending;
 pub mod storage;
 pub mod store;

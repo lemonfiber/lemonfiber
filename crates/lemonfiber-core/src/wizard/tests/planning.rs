@@ -13,7 +13,7 @@ fn a_reviewed_wizard_plans_every_setting_it_gathered() {
     assert_eq!(setting(&plan, "PUID"), Some("1000"));
     // Distinct from PUID, so a swapped mapping would not pass unnoticed.
     assert_eq!(setting(&plan, "PGID"), Some("1001"));
-    assert_eq!(setting(&plan, "JELLYFIN_MODE"), Some("docker"));
+    assert_eq!(setting(&plan, "MEDIA_SERVER_MODE"), Some("docker"));
 }
 
 /// Every answer setup writes has a row saying what changing it costs.
@@ -252,7 +252,7 @@ fn an_unanswered_question_contributes_no_setting() {
     // A declined protocol is written off, not omitted.
     assert_eq!(setting(&plan, "LEMONFIBER_TORRENT"), Some("off"));
     assert_eq!(setting(&plan, "DATA_ROOT"), None);
-    assert_eq!(setting(&plan, "JELLYFIN_MODE"), None);
+    assert_eq!(setting(&plan, "MEDIA_SERVER_MODE"), None);
 }
 
 #[test]
@@ -273,17 +273,17 @@ fn the_library_choice_maps_to_its_mode_or_to_nothing() {
     docker
         .answer(Answer::Library(Library::Docker))
         .unwrap_or(());
-    assert_eq!(setting(&docker.plan(), "JELLYFIN_MODE"), Some("docker"));
+    assert_eq!(setting(&docker.plan(), "MEDIA_SERVER_MODE"), Some("docker"));
 
     let mut native = on_macos();
     native
         .answer(Answer::Library(Library::Native))
         .unwrap_or(());
-    assert_eq!(setting(&native.plan(), "JELLYFIN_MODE"), Some("native"));
+    assert_eq!(setting(&native.plan(), "MEDIA_SERVER_MODE"), Some("native"));
 
     let mut none = on_native_linux();
     none.answer(Answer::Library(Library::None)).unwrap_or(());
-    assert_eq!(setting(&none.plan(), "JELLYFIN_MODE"), None);
+    assert_eq!(setting(&none.plan(), "MEDIA_SERVER_MODE"), None);
 }
 
 /// A saved progress sitting at a given lifecycle phase.

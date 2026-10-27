@@ -279,6 +279,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         Action::Restore { key, value, wrote } => put_back(env_file, key, value.as_deref(), wrote),
         Action::Delete { path } => remove(Path::new(path)),
         Action::MoveBack { from, to } => moved_back(confined, Path::new(from), Path::new(to)),
+        Action::RenameBack { from, to } => renamed_back(env_file, from, to),
         Action::KeepCopy { .. } => Ok(Step::Done),
         Action::Withdraw {
             path,
@@ -446,7 +447,7 @@ fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Res
         return Ok(Step::StillSealed(key.to_owned()));
     }
     let file = store::read(env_file).map_err(Fault::Store)?;
-    let holds = file.get(key);
+    let holds = file.written(key);
     if holds == value {
         return Ok(Step::Done);
     }
@@ -460,6 +461,20 @@ fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Res
         None => store::unset(env_file, key)
             .map(|()| Step::Done)
             .map_err(Fault::Store),
+    }
+}
+
+/// Move the value under `to` back to `from`, only where `to` holds one and `from` holds
+/// none, and leave both as they are otherwise.
+fn renamed_back(env_file: &Path, from: &str, to: &str) -> Result<Step, Fault> {
+    let file = store::read(env_file).map_err(Fault::Store)?;
+    match (file.written(from), file.written(to)) {
+        (None, Some(value)) => store::set(env_file, from, value)
+            .and_then(|()| store::unset(env_file, to))
+            .map(|()| Step::Done)
+            .map_err(Fault::Store),
+        (None, None) => Ok(Step::Done),
+        (Some(_), _) => Ok(Step::TheirsNow(from.to_owned())),
     }
 }
 

@@ -15,18 +15,18 @@ pub enum Library {
     /// No media server; an existing player, or downloads only.
     None,
     /// The media server in a container — the portable default that works everywhere.
-    #[serde(rename = "jellyfin-docker")]
+    #[serde(rename = "container", alias = "jellyfin-docker")]
     Docker,
     /// The media server on the host, for a hardware encoder the container cannot reach.
     ///
     /// Only a valid answer where the platform offers it; the wizard rejects it
     /// elsewhere rather than letting a surface record a choice that buys nothing.
-    #[serde(rename = "jellyfin-native")]
+    #[serde(rename = "host", alias = "jellyfin-native")]
     Native,
 }
 
 impl Library {
-    /// The `JELLYFIN_MODE` this choice records, where it runs a media server at all.
+    /// The `MEDIA_SERVER_MODE` this choice records, where it runs a media server at all.
     ///
     /// `None` means no media server, which writes no mode rather than a third one.
     pub(crate) const fn mode(self) -> Option<&'static str> {
@@ -37,7 +37,7 @@ impl Library {
         }
     }
 
-    /// The choice a recorded `JELLYFIN_MODE` stands for — the inverse of
+    /// The choice a recorded `MEDIA_SERVER_MODE` stands for — the inverse of
     /// [`Self::mode`] — or `None` for a value that is neither mode, so a later
     /// reader draws no conclusion from a setting it does not recognise.
     #[must_use]

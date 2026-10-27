@@ -281,6 +281,7 @@ pub fn standing(
         Kind::Set { .. }
         | Kind::Made { .. }
         | Kind::Moved { .. }
+        | Kind::Renamed { .. }
         | Kind::Copied { .. }
         | Kind::Configured { .. }
         | Kind::KeyMinted { .. }

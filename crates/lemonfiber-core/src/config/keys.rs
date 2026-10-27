@@ -181,7 +181,7 @@ pub(crate) const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 /// A single switch is the whole of the difference between the two modes — the
 /// compose stack drops one service and the URLs change, nothing more. Absent
 /// where the operator runs no media server at all.
-pub(crate) const MEDIA_SERVER_MODE_KEY: &str = "JELLYFIN_MODE";
+pub(crate) const MEDIA_SERVER_MODE_KEY: &str = "MEDIA_SERVER_MODE";
 
 /// The address the household's own links are pointed at.
 ///
@@ -426,3 +426,7 @@ pub const SETTINGS: &[&str] = &[
     FILLS_KEY,
     FILLS_WHY_KEY,
 ];
+
+/// What a minted replacement's name ends in, after the name of the credential it
+/// replaces, while the service has not taken it yet.
+pub const PENDING_SUFFIX: &str = "_PENDING";

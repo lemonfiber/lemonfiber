@@ -102,9 +102,17 @@ impl EnvFile {
         out
     }
 
-    /// The value of a setting, as Compose reads it.
+    /// The value of a setting, as Compose reads it, or as it is kept under the key an
+    /// earlier release wrote it under until it is moved to its own.
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
+        self.written(key)
+            .or_else(|| super::renamed::earlier(key).and_then(|earlier| self.written(earlier)))
+    }
+
+    /// The value written under `key` itself, as Compose reads it.
+    #[must_use]
+    pub fn written(&self, key: &str) -> Option<&str> {
         self.lines.iter().rev().find_map(|line| match line {
             Line::Entry { key: k, value, .. } if k == key => Some(value.as_str()),
             _ => None,

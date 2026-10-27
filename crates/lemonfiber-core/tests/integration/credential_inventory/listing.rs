@@ -62,7 +62,7 @@ async fn the_inventory_names_every_credential_the_operator_supplies_and_every_on
         "VPN private key",
         "Usenet provider password",
         "Indexer API key",
-        "Jellyfin administrator password",
+        "Media server administrator password",
     ] {
         assert!(named.contains(&expected), "{expected} is listed: {named:?}");
     }
@@ -158,7 +158,10 @@ async fn asking_to_see_something_this_stack_does_not_hold_says_what_it_does() {
         .map(|one| one.warning)
         .unwrap_or_default();
     assert!(said.contains("Nothing here is called"), "{said}");
-    assert!(said.contains("Jellyfin administrator password"), "{said}");
+    assert!(
+        said.contains("Media server administrator password"),
+        "{said}"
+    );
 }
 
 /// A stack that cannot be read refuses rather than reporting that this machine holds

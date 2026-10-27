@@ -121,6 +121,7 @@ fn did(kind: &Kind) -> String {
         ),
         Kind::Made { path } => format!("made {path}"),
         Kind::Moved { from, to } => format!("moved {from} to {to}"),
+        Kind::Renamed { from, to } => format!("moved the setting {from} to {to}"),
         Kind::Copied { volume, to } => format!("copied the volume {volume} to {to}"),
         Kind::Region { owner, path, .. } => format!("wrote {owner}'s region into {path}"),
         Kind::Rewritten { path, .. } => format!("wrote over {path}"),

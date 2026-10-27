@@ -20,6 +20,14 @@ struct Filing {
 /// File what the operator's environment file and the stack's hold into the stores, saying
 /// so where the stack's could not be filed yet.
 pub(crate) async fn everything(ctx: &Ctx) {
+    if let Err(failure) = super::renaming::renamed(ctx) {
+        ctx.narrator
+            .say(&format!(
+                "the settings an earlier release kept under a part's name could not be moved \
+                 to their own names yet: {failure}"
+            ))
+            .await;
+    }
     filed(ctx);
     if let Err(failure) = stack(ctx) {
         ctx.narrator

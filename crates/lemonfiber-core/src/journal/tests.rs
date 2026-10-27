@@ -243,7 +243,7 @@ fn undoing_a_set_restores_what_was_there() {
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
-            key: "JELLYFIN_MODE".to_owned(),
+            key: "MEDIA_SERVER_MODE".to_owned(),
             previous: Some("docker".to_owned()),
             current: "native".to_owned(),
         },
@@ -251,7 +251,7 @@ fn undoing_a_set_restores_what_was_there() {
     assert_eq!(
         change.undo().action,
         Action::Restore {
-            key: "JELLYFIN_MODE".to_owned(),
+            key: "MEDIA_SERVER_MODE".to_owned(),
             value: Some("docker".to_owned()),
             wrote: "native".to_owned(),
         }
@@ -265,7 +265,7 @@ fn undoing_a_set_that_had_nothing_before_removes_it() {
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
-            key: "JELLYFIN_MODE".to_owned(),
+            key: "MEDIA_SERVER_MODE".to_owned(),
             previous: None,
             current: "docker".to_owned(),
         },
@@ -273,7 +273,7 @@ fn undoing_a_set_that_had_nothing_before_removes_it() {
     assert_eq!(
         change.undo().action,
         Action::Restore {
-            key: "JELLYFIN_MODE".to_owned(),
+            key: "MEDIA_SERVER_MODE".to_owned(),
             value: None,
             wrote: "docker".to_owned(),
         }
