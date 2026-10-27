@@ -66,3 +66,34 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
         "a key nothing reads is still held: {written}"
     );
 }
+
+/// A media server filing a key under lemonfiber's name has it revoked, and the key
+/// published for the dashboard is forgotten.
+#[tokio::test]
+async fn a_key_filed_under_our_name_is_revoked_and_the_published_one_forgotten() {
+    let env = recorded_admin("revoked");
+    let _ = store::set(
+        &env,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
+    let http = Fake::by_path(vec![
+        (media::serve("filed_as"), media::answered(&["ours"])),
+        (media::serve("revoke"), media::taken()),
+    ]);
+    let ctx = seed_ctx(true, None, Some(env.clone()))
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
+
+    super::super::published::retire_keys(&ctx, &super::moved_fillers(vec![media_server_svc()]))
+        .await;
+
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    assert_eq!(media::served(&http.requests(), "revoke").len(), 1);
+    assert!(
+        !written.contains("JELLYFIN_API_KEY"),
+        "a key nothing reads is still held: {written}"
+    );
+}

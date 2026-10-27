@@ -251,17 +251,10 @@ pub fn seeding_with(extra: Vec<(&'static str, Answer)>) -> Arc<Fake> {
     Fake::by_path(routes)
 }
 
-/// The settings file a request service that has been set up writes, holding the key
-/// it answers as its owner.
-pub const SEERR_SETTINGS: &str = r#"{"main":{"apiKey":"seerr-own-key"}}"#;
-
 /// A filesystem that hands back a Servarr configuration for a Servarr path, or nothing.
 /// Only `read` is meaningful to seeding; the rest are unused.
 pub struct SeedFs {
     servarr: Option<&'static str>,
-    /// What the request service's settings say. A JSON of its own, for the same
-    /// reason — and under a different config mount again.
-    seerr: Option<&'static str>,
     /// Path fragments a canonicalize should fail for, standing in for host
     /// directories that are not there — so a root folder's existence check can be
     /// driven to missing. Every path resolves when empty.
@@ -282,7 +275,6 @@ impl SeedFs {
     pub fn keyed(servarr: Option<&'static str>) -> Self {
         Self {
             servarr,
-            seerr: None,
             missing: Vec::new(),
             leading_away: Vec::new(),
             elsewhere: Vec::new(),
@@ -295,13 +287,6 @@ impl SeedFs {
                 total: 0,
             },
         }
-    }
-
-    /// The same, answering the request service's settings path with `settings`.
-    #[must_use]
-    pub fn with_requests(mut self, settings: &'static str) -> Self {
-        self.seerr = Some(settings);
-        self
     }
 
     /// The same, reporting the given volume facts to a describe.
@@ -447,12 +432,8 @@ fn next_answer(sequenced: &Sequenced, argv: &[String]) -> Result<Output, Failure
         })
 }
 
-/// Which service's configuration a path is asking for, and what this fixture holds.
-fn keyed(seed: &SeedFs, path: &std::path::Path) -> Option<String> {
-    let path = path.to_string_lossy();
-    if path.contains("seerr") {
-        return seed.seerr.map(str::to_owned);
-    }
+/// What this fixture holds at every path.
+fn keyed(seed: &SeedFs, _path: &std::path::Path) -> Option<String> {
     seed.servarr.map(str::to_owned)
 }
 

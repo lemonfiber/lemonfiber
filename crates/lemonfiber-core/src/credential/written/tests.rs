@@ -80,3 +80,13 @@ fn a_path_with_an_empty_segment_reads_nothing() {
         );
     }
 }
+
+#[test]
+fn a_yaml_key_is_read_past_comments_list_items_bare_lines_and_closed_sections() {
+    let written = "analytics:\n  nested:\n    apikey: not-this-one\n# auth:\n- stray\nauth:\n  \
+                   no entry here\n  apikey: 'own-key'\n";
+    assert_eq!(
+        at(Format::Yaml, "auth.apikey", written).as_deref(),
+        Some("own-key")
+    );
+}

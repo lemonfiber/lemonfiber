@@ -434,11 +434,13 @@ async fn an_indexer_on_no_address_is_told_about_nobody() {
         placed.listens = None;
         placed.reached = None;
     }
+    let installed: Vec<crate::plugin::Installed> =
+        [indexing].into_iter().chain(moved_tv()).collect();
     let fillers = fillers_trusting(
         vec![curator("sonarr", 8989, "tv")],
-        &[indexing],
+        &installed,
         &project,
-        &first_party("indexing"),
+        &beside_the_bundle(&first_party("indexing")),
     );
 
     let paired = super::super::connecting::pairings(&fillers).len();

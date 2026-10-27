@@ -12,7 +12,7 @@ use crate::plugin::Installed;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::test_support::{
     a_context, a_placed, an_installed, Reporting, SeedFs, CONTRACTED_REQUESTS,
-    CONTRACTED_REQUESTS_AT, SEERR_SETTINGS,
+    CONTRACTED_REQUESTS_AT,
 };
 use crate::wiring::{Chosen, Fillers};
 
@@ -58,8 +58,7 @@ fn beside(installed: &[Installed], own: bool, project: &Path) -> Fillers {
 }
 
 /// A project holding the plugin's key where `keyed`, and a context publishing it on
-/// loopback, reading the stack's request service's settings, and answering every call
-/// with nothing.
+/// loopback and answering every call with nothing.
 fn reaching(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
     let project = Scratch::new(&format!("opening-{tag}"));
     if keyed {
@@ -74,7 +73,7 @@ fn reaching(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
         .engine(Arc::new(engine))
         .build()
         .with_http(fake.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None).with_requests(SEERR_SETTINGS)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
     ctx.settings.env_file = Some(project.join(".env"));
     (project, ctx, fake)
 }

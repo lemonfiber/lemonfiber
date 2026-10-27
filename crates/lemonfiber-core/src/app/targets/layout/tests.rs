@@ -40,3 +40,29 @@ fn a_stack_file_is_held_beneath_its_services_directory_or_the_project() {
     );
     assert_eq!(super::held_beneath(project, Path::new("config/x")), project);
 }
+
+/// What [`super::read_owned`] reads of a service's settings file beneath the directory its
+/// container owns, through `files`.
+async fn read_through(files: crate::test_support::SeedFs) -> Option<String> {
+    let owned = std::path::Path::new("/srv/stack/config/kept");
+    super::read_owned(&files, &owned.join("settings.json"), owned).await
+}
+
+/// A file a service wrote is read only where it lies beneath the directory its container
+/// owns: one that is not there, and one whose path leads away, read as nothing.
+#[tokio::test]
+async fn a_file_is_read_only_where_it_lies_beneath_its_owners_directory() {
+    use crate::test_support::SeedFs;
+    assert_eq!(
+        read_through(SeedFs::keyed(Some("held"))).await.as_deref(),
+        Some("held")
+    );
+    assert_eq!(
+        read_through(SeedFs::keyed(Some("held")).missing(vec!["kept"])).await,
+        None
+    );
+    assert_eq!(
+        read_through(SeedFs::keyed(Some("held")).leading_away(vec!["settings.json"])).await,
+        None
+    );
+}

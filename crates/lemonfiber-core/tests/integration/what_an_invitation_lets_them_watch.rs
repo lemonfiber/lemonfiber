@@ -118,7 +118,7 @@ fn the_media_server(libraries: Answer, readying: Answer) -> Vec<(&'static str, V
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
     REQUESTS.keyed_in(media::keyed_in(
         lemonfiber_testing::a_context()
-            .over(crate::common::household::set_up_beside(env))
+            .over(crate::common::household::stack_beside(env))
             .engine(Arc::new(media::running().alongside(REQUESTS.running())))
             .clock(Arc::new(lemonfiber_adapters::System))
             .settings(Settings {
