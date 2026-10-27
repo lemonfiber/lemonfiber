@@ -83,7 +83,7 @@ pub(crate) async fn rotate(
         Origin::Lemonfiber if super::tokening::is_token(held) => {
             super::tokening::rotate(ctx, held, services, fillers, project).await
         }
-        Origin::Lemonfiber if held.setting == config::MEDIA_SERVER_ADMIN_PASSWORD_KEY => {
+        Origin::Lemonfiber if held.setting == config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await
         }
         // A credential whose replacement comes from somewhere else writes nothing on

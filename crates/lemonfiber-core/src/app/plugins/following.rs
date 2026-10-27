@@ -306,7 +306,7 @@ fn credentials(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Vec<(Str
 /// it publishes for the service otherwise.
 fn credential(ctx: &Ctx, service: &str) -> Option<String> {
     crate::app::targets::moved_credential(ctx, service).or_else(|| {
-        crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(service))
+        crate::app::targets::recorded_credential(ctx, service, crate::config::API_KEY_SUFFIX)
     })
 }
 

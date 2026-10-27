@@ -7,7 +7,7 @@ use crate::settings::Resolved;
 use crate::test_support::a_grant as the_grant;
 use lemonfiber_fixtures::support::Reporting;
 
-const CROSSING: &str = "SONARR_API_KEY";
+const CROSSING: &str = "LIBRARY_CURATE_TV_API_KEY";
 
 /// The reader, its crossing secret naming what it is for, and holding `granted`.
 fn reader(granted: Vec<Grant>) -> Installed {
@@ -217,8 +217,13 @@ async fn a_revoke_writes_the_credential_out_of_a_reader_that_is_not_running() {
 async fn a_revoke_of_a_grant_not_held_or_over_a_moved_offer_is_refused_and_ends_nothing() {
     let machine = granting("granted-unheld", reader(vec![the_grant()]));
 
-    let unheld =
-        crate::app::plugins::granting::revoke(&machine.ctx, "reader", "RADARR_API_KEY", None).await;
+    let unheld = crate::app::plugins::granting::revoke(
+        &machine.ctx,
+        "reader",
+        "LIBRARY_CURATE_MOVIES_API_KEY",
+        None,
+    )
+    .await;
     let moved =
         crate::app::plugins::granting::revoke(&machine.ctx, "reader", CROSSING, Some("moved"))
             .await;
@@ -389,7 +394,7 @@ async fn a_revoke_asked_of_the_credentials_for_a_grant_not_held_is_refused_and_e
         &machine.ctx,
         crate::app::Asking::Revoke {
             plugin: "reader".to_owned(),
-            credential: "RADARR_API_KEY".to_owned(),
+            credential: "LIBRARY_CURATE_MOVIES_API_KEY".to_owned(),
             agreement: None,
         },
     )
@@ -495,7 +500,7 @@ fn every_grant_a_record_holds_is_kept_in_the_order_of_its_credentials() {
     let mut register = Register::empty();
     assert!(register.record(reader(Vec::new())).is_ok());
     let film = Grant {
-        credential: "RADARR_API_KEY".to_owned(),
+        credential: "LIBRARY_CURATE_MOVIES_API_KEY".to_owned(),
         of: "radarr".to_owned(),
         ..the_grant()
     };
@@ -512,5 +517,5 @@ fn every_grant_a_record_holds_is_kept_in_the_order_of_its_credentials() {
                 .collect()
         })
         .unwrap_or_default();
-    assert_eq!(held, vec!["RADARR_API_KEY", CROSSING]);
+    assert_eq!(held, vec!["LIBRARY_CURATE_MOVIES_API_KEY", CROSSING]);
 }

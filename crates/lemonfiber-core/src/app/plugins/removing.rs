@@ -66,6 +66,7 @@ pub(crate) async fn remove(
         &super::super::targets::chosen_fillers(ctx),
         None,
     )
+    .numbered(crate::app::targets::ordinals(ctx))
     .kept_for(&going.plugin);
 
     // What leaves with the plugin, asked for by the same two answers on every call

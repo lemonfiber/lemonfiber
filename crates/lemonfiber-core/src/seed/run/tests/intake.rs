@@ -60,7 +60,7 @@ fn contracted_identity_ctx(
     }
     let _ = store::set(
         env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         ADMINISTRATOR,
     );
     let mut ctx = contracted_ctx(project, CONTRACTED_REQUESTS, keyed, http)

@@ -147,7 +147,7 @@ async fn a_torrent_account_is_in_hand_only_once_minted() {
     );
     let _ = store::set(
         &unmoved_env,
-        crate::config::TORRENT_PASSWORD_KEY,
+        "DOWNLOAD_TORRENT_PASSWORD",
         "recorded-for-the-stacks",
     );
     let unminted = seed_ctx(true, None, Some(unminted_env.to_path_buf()));

@@ -109,7 +109,7 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
     }
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "the-stacks-administrator",
     );
     let http = household(true, false);
@@ -158,7 +158,7 @@ async fn identity_leaves_an_already_set_up_household_alone() {
     // already set up: nothing is minted and nothing re-pointed.
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(household(true, true));
@@ -188,7 +188,7 @@ async fn a_recorded_password_is_handed_to_the_adapter_and_a_rehearsal_hands_noth
         }
         let _ = store::set(
             &env,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+            crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
             "minted-earlier",
         );
         let mut ctx =
@@ -225,7 +225,7 @@ async fn a_recorded_password_the_adapter_cannot_be_handed_fails_the_identity() {
     }
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(household(true, true));
@@ -305,7 +305,7 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
     );
     let written = std::fs::read_to_string(&env).unwrap_or_default();
     assert!(
-        written.contains("JELLYFIN_ADMIN_PASSWORD="),
+        written.contains("IDENTITY_SOURCE_ADMIN_PASSWORD="),
         "the minted password is recorded: {written}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -389,7 +389,10 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answe
         ),
         "{changed:?}"
     );
-    assert!(written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
+    assert!(
+        written.contains("IDENTITY_SOURCE_ADMIN_PASSWORD="),
+        "{written}"
+    );
 }
 
 /// A plugin's media server that will not take its changed password is said the same way,
@@ -433,7 +436,10 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
         written.contains("PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD="),
         "{written}"
     );
-    assert!(!written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
+    assert!(
+        !written.contains("IDENTITY_SOURCE_ADMIN_PASSWORD="),
+        "{written}"
+    );
 }
 
 /// What the request service answers holding a telling, on where `enabled` says, for
@@ -473,7 +479,7 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
     }
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(http.clone());
@@ -529,7 +535,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
     }
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx = seed_ctx(true, None, Some(env.to_path_buf())).with_http(http.clone());

@@ -231,7 +231,7 @@ fn a_stack_value_the_journal_will_not_take_is_not_filed() {
         ("setting", "VPN_COUNTRIES", "Belgium"),
     ] {
         let (ctx, env) = stacked(&format!("unjournalled-{name}"), &[(key, value)]);
-        let blocked = super::changing::blocking_the_journal(&ctx);
+        let blocked = crate::test_support::blocking_the_journal(&ctx);
 
         let filed = crate::filed_stack(&ctx);
 
@@ -328,7 +328,7 @@ fn a_fold_the_journal_will_not_take_is_not_made() {
         "nas-unjournalled",
         &[("NAS_HOST", "nas.local"), ("NAS_EXPORT", "/volume1")],
     );
-    let blocked = super::changing::blocking_the_journal(&ctx);
+    let blocked = crate::test_support::blocking_the_journal(&ctx);
 
     let filed = crate::filed_stack(&ctx);
 

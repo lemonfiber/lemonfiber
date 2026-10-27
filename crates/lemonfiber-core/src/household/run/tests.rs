@@ -303,7 +303,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     }
     let _ = crate::app::targets::record_secret(
         &context,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     let mut context = crate::test_support::adapted::reaching(context, &PARTS);

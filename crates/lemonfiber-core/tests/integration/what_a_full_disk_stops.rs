@@ -83,7 +83,7 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
     let env = dir.join(".env");
     let _ = lemonfiber_core::config::store::set(
         &env,
-        lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        lemonfiber_core::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     REQUESTS.keyed_in(media::keyed_in(

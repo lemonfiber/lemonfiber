@@ -116,18 +116,50 @@ fn moved(ctx: &Ctx, manifest: &Manifest, secret: &Secret) -> Option<String> {
             .and_then(ApiKind::named)
             .and_then(crate::credential::account)
     };
+    if !takes_the_place_of(ctx, manifest, service, reserved) {
+        return None;
+    }
+    let recorded = |holds: &str| crate::app::targets::recorded_credential(ctx, reserved, holds);
     match held_as(manifest, secret) {
         Some(UPSTREAM_USERNAME) => account().map(|account| account.username.to_owned()),
-        Some(UPSTREAM_PASSWORD) => account()
-            .and_then(|account| crate::app::targets::recorded_secret(ctx, account.password)),
+        Some(UPSTREAM_PASSWORD) => account().and_then(|account| recorded(account.holds)),
         _ => secret
             .carried_from
             .as_ref()
             .and_then(|from| carried(ctx, service, reserved, from))
-            .or_else(|| {
-                crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
-            }),
+            .or_else(|| recorded(crate::config::API_KEY_SUFFIX)),
     }
+}
+
+/// Whether `service`, with the adapter of `manifest` in front of it, provides what the
+/// stack's own service `reserved` provides first, which is the capability the
+/// credentials the stack keeps for that service are named for.
+fn takes_the_place_of(
+    ctx: &Ctx,
+    manifest: &Manifest,
+    service: &lemonfiber_plugin::Service,
+    reserved: &str,
+) -> bool {
+    let adapter = manifest
+        .services
+        .iter()
+        .find(|one| one.fronts.as_deref() == Some(service.id.as_str()));
+    let declared = |own: &[String]| match adapter {
+        Some(adapter) if own.is_empty() => adapter.provides.clone(),
+        _ => own.to_vec(),
+    };
+    let provides = declared(&service.provides);
+    ctx.stack
+        .checked_manifest(ctx.today())
+        .ok()
+        .and_then(|stack| {
+            stack
+                .services
+                .into_iter()
+                .find(|one| one.id == reserved)
+                .and_then(|one| one.provides.into_iter().next())
+        })
+        .is_some_and(|first| provides.contains(&first))
 }
 
 /// The credential the stack's own service `reserved` wrote where `from` says, `from`'s

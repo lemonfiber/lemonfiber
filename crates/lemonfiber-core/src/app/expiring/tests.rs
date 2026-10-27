@@ -369,7 +369,7 @@ fn listing(name: &str, closes: Answer, lists: Answer) -> (Ctx, Arc<Transport>) {
     ctx.settings.env_file = Some(env_at(name, &a_password()));
     let _ = crate::app::targets::record_secret(
         &ctx,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     crate::test_support::media::moved_in(&ctx);

@@ -254,7 +254,7 @@ fn replacing_the_media_server_leaves_the_decline_service_on_its_own_server() {
     );
     assert_eq!(
         declined.as_ref().map(|one| one.setting.as_str()),
-        Some(crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
+        Some(crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY)
     );
     assert_eq!(declined.as_ref().and_then(crate::test_support::asker), None);
 }

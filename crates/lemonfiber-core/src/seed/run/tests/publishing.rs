@@ -10,7 +10,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     let env = recorded_admin("unrevoked");
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
@@ -37,7 +37,7 @@ async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_publishe
     let env = recorded_admin("unfiled");
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
@@ -74,7 +74,7 @@ async fn a_key_filed_under_our_name_is_revoked_and_the_published_one_forgotten()
     let env = recorded_admin("revoked");
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
@@ -104,7 +104,7 @@ async fn a_rehearsal_retires_nothing() {
     let env = recorded_admin("rehearsed");
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");

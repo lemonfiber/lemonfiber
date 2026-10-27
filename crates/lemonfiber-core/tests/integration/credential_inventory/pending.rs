@@ -3,7 +3,7 @@
 
 use super::{ctx, env_at, recorded, the_recorded_password};
 use lemonfiber_core::app::{dispatch, Command};
-use lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY;
+use lemonfiber_core::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY;
 use lemonfiber_core::ports::service::Signed;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -11,7 +11,7 @@ use lemonfiber_testing::media;
 use std::sync::Arc;
 
 /// The name the administrator's replacement is kept under.
-const PENDING: &str = "JELLYFIN_ADMIN_PASSWORD_PENDING";
+const PENDING: &str = "IDENTITY_SOURCE_ADMIN_PASSWORD_PENDING";
 
 /// The replacement the earlier run left pending, built as the others are.
 fn the_replacement() -> String {
@@ -45,7 +45,7 @@ fn both(name: &str) -> std::path::PathBuf {
     env_at(
         name,
         &[
-            (MEDIA_SERVER_ADMIN_PASSWORD_KEY, &the_recorded_password()),
+            (IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &the_recorded_password()),
             (PENDING, &the_replacement()),
         ],
     )
@@ -62,7 +62,7 @@ async fn a_replacement_the_service_took_is_moved_into_place() {
     )]);
     any_command(&env, http, false).await;
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(the_replacement())
     );
     assert_eq!(recorded(&env, PENDING), None);
@@ -75,7 +75,7 @@ async fn a_replacement_the_service_never_took_is_taken_away() {
     let http = Fake::by_path(vec![(media::identity("whoever"), signed_in())]);
     any_command(&env, http, false).await;
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(the_recorded_password())
     );
     assert_eq!(recorded(&env, PENDING), None);
@@ -101,7 +101,7 @@ async fn an_unsettled_question_leaves_both_where_they_are() {
         let env = both(name);
         any_command(&env, http, rehearsing).await;
         assert_eq!(
-            recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+            recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
             Some(the_recorded_password()),
             "{name}"
         );
@@ -115,7 +115,7 @@ async fn an_unsettled_question_leaves_both_where_they_are() {
 async fn nothing_pending_asks_no_service_anything() {
     let env = env_at(
         "pending-none",
-        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &the_recorded_password())],
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &the_recorded_password())],
     );
     let http = Fake::by_path(vec![(media::identity("whoever"), signed_in())]);
     any_command(&env, http.clone(), false).await;
@@ -142,7 +142,7 @@ async fn a_stack_that_cannot_be_read_leaves_both_for_later() {
 
     assert!(http.requests().is_empty(), "{:?}", http.requests());
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(the_recorded_password())
     );
     assert_eq!(recorded(&env, PENDING), Some(the_replacement()));

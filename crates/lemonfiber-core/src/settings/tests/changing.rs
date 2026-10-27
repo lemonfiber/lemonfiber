@@ -170,17 +170,6 @@ pub(super) fn code(report: &Result<SettingsReport, Box<Problem>>) -> Option<&str
     report.as_ref().err().map(|problem| problem.code.as_str())
 }
 
-pub(super) fn blocking_the_journal(ctx: &Ctx) -> PathBuf {
-    let journal = crate::app::targets::layout(ctx)
-        .map(|paths| paths.journal())
-        .unwrap_or_default();
-    let mut name = journal.file_name().unwrap_or_default().to_os_string();
-    name.push(".writing");
-    let blocked = journal.with_file_name(name);
-    assert!(std::fs::create_dir_all(blocked.join("held")).is_ok());
-    blocked
-}
-
 fn recorded(machine: &Machine, name: &str) -> Option<String> {
     crate::settings::Settings::at(&machine.env.with_file_name(SETTINGS))
         .ok()
@@ -376,7 +365,7 @@ async fn a_document_edited_while_the_change_is_made_refuses_naming_it() {
 async fn a_change_the_journal_will_not_take_is_not_made() {
     let machine = machine("unjournalled", running(&["komga"]));
     let before = std::fs::read_to_string(&machine.document).ok();
-    let blocked = blocking_the_journal(&machine.ctx);
+    let blocked = crate::test_support::blocking_the_journal(&machine.ctx);
 
     let refused = agreed(&machine.ctx, MODE, Some("fast")).await;
 

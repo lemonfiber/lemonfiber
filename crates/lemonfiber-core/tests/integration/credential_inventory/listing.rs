@@ -2,7 +2,7 @@
 
 use super::{asked, ctx, env_at, silent, the_recorded_password, the_service_key, SERVICE_CONFIG};
 use lemonfiber_core::app::{dispatch, Asking, Command};
-use lemonfiber_core::config::{Settings, MEDIA_SERVER_ADMIN_PASSWORD_KEY};
+use lemonfiber_core::config::{Settings, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY};
 use lemonfiber_core::credential::fingerprint;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::support::Reporting;
@@ -90,7 +90,7 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
     let env = env_at(
         "secrecy",
         &[
-            (MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password),
+            (IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password),
             ("INDEXER_APIKEY", &indexer),
         ],
     );

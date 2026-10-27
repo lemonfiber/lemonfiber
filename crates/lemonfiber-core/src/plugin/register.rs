@@ -275,4 +275,20 @@ impl Register {
         }
         one.granted.len() != before
     }
+
+    /// Name every grant of the credential held as `was` by `now`, answering whether the
+    /// record changed.
+    pub fn regranted_as(&mut self, was: &str, now: &str) -> bool {
+        let mut changed = false;
+        for grant in self
+            .installed
+            .iter_mut()
+            .flat_map(|one| one.granted.iter_mut())
+            .filter(|grant| grant.credential == was)
+        {
+            now.clone_into(&mut grant.credential);
+            changed = true;
+        }
+        changed
+    }
 }

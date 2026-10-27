@@ -89,6 +89,7 @@ pub(crate) fn host_fillers(ctx: &Ctx, manifest: &Manifest, project: Option<&Path
         &chosen_fillers(ctx),
         project,
     )
+    .numbered(super::ordinals(ctx))
 }
 
 /// The download clients among `fillers`, in the order they are declared, each asked over

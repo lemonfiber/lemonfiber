@@ -37,7 +37,7 @@ fn the_usenet_password_names_lemonfibers_own_check_as_well_as_the_client() {
 /// Each account lemonfiber sets up on one of the stack's own services, by the API that
 /// service answers in, and nothing for a service it sets none up on.
 #[test]
-fn the_account_on_each_stack_service_names_its_user_and_where_its_password_is_recorded() {
+fn the_account_on_each_stack_service_names_its_user_and_what_its_password_ends_in() {
     let accounts: Vec<Option<(&str, &str)>> = [
         ApiKind::Qbittorrent,
         ApiKind::Jellyfin,
@@ -46,16 +46,16 @@ fn the_account_on_each_stack_service_names_its_user_and_where_its_password_is_re
         ApiKind::Servarr,
     ]
     .into_iter()
-    .map(|kind| account(kind).map(|one| (one.username, one.password)))
+    .map(|kind| account(kind).map(|one| (one.username, one.holds)))
     .collect();
 
     assert_eq!(
         accounts,
         vec![
-            Some(("admin", "QBITTORRENT_PASSWORD")),
-            Some(("admin", "JELLYFIN_ADMIN_PASSWORD")),
-            Some(("admin", "AUDIOBOOKSHELF_PASSWORD")),
-            Some(("admin", "NZBHYDRA2_ADMIN_PASSWORD")),
+            Some(("admin", "_PASSWORD")),
+            Some(("admin", "_ADMIN_PASSWORD")),
+            Some(("admin", "_PASSWORD")),
+            Some(("admin", "_ADMIN_PASSWORD")),
             None,
         ]
     );

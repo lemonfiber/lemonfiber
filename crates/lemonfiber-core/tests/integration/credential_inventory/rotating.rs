@@ -4,7 +4,7 @@ use super::{asked, ctx, env_at, recorded, sealed, silent, the_recorded_password,
 use lemonfiber_contract::wire::Kind;
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY;
+use lemonfiber_core::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -35,7 +35,10 @@ async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_say
 #[tokio::test]
 async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
     let password = the_recorded_password();
-    let env = env_at("unknown", &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
+    let env = env_at(
+        "unknown",
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
+    );
     let ctx = ctx(env.clone(), Files::empty(), silent());
     lemonfiber_testing::adapted::parts_recorded(&ctx);
 
@@ -56,7 +59,7 @@ async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
     );
     assert!(said.contains("Indexer API key"), "{said}");
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(password)
     );
 }
@@ -66,7 +69,7 @@ async fn asking_to_see_a_credential_once_prints_the_warning_and_not_the_value() 
     let password = the_recorded_password();
     let env = env_at(
         "unconfirmed",
-        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     let ctx = ctx(env, Files::empty(), silent());
 
@@ -89,7 +92,10 @@ async fn asking_to_see_a_credential_once_prints_the_warning_and_not_the_value() 
 #[tokio::test]
 async fn asking_again_prints_the_value_and_the_warning_stays_beside_it() {
     let password = the_recorded_password();
-    let env = env_at("confirmed", &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
+    let env = env_at(
+        "confirmed",
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
+    );
     let ctx = ctx(env, Files::empty(), silent());
 
     let inventory = asked(
@@ -137,7 +143,7 @@ async fn administrator_rotated(
     rehearsing: bool,
 ) -> (String, Option<String>, Arc<Fake>) {
     let password = the_administrator_password();
-    let env = env_at(name, &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
+    let env = env_at(name, &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)]);
     let mut ctx = moved(env.clone(), http.clone());
     ctx.dry_run = rehearsing;
     let inventory = asked(
@@ -148,7 +154,11 @@ async fn administrator_rotated(
     )
     .await;
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-    (said, recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY), http)
+    (
+        said,
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
+        http,
+    )
 }
 
 /// A replacement the media server takes is recorded; the old password is gone.
@@ -223,7 +233,7 @@ async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_i
         ),
     ] {
         let password = the_administrator_password();
-        let env = env_at(name, &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
+        let env = env_at(name, &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)]);
         let _ = asked(
             &moved(env.clone(), http),
             Asking::Rotate {
@@ -232,12 +242,12 @@ async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_i
         )
         .await;
         assert_eq!(
-            recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+            recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
             Some(password),
             "{name}"
         );
         assert_eq!(
-            recorded(&env, "JELLYFIN_ADMIN_PASSWORD_PENDING").is_some(),
+            recorded(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD_PENDING").is_some(),
             kept,
             "{name}"
         );
@@ -274,7 +284,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
     let password = the_administrator_password();
     let env = env_at(
         "admin-unrandom",
-        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     let unrandom = asked(
         &moved(env.clone(), http.clone()).with_random(Arc::new(FixedRandom(None))),
@@ -286,7 +296,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
     let said = format!("{:?}", unrandom.rotated.map(|one| one.settled));
     assert!(said.contains("no randomness"), "{said}");
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(password)
     );
     assert!(http.requests().is_empty());
@@ -298,7 +308,7 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
     let password = the_administrator_password();
     let env = env_at(
         "admin-unrecordable",
-        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     sealed(&env);
     let http = administered(media::taken());
@@ -311,7 +321,7 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
         "a password was set that nothing recorded"
     );
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(password)
     );
 }
@@ -324,7 +334,7 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
     let password = the_administrator_password();
     let env = env_at(
         "unmoved-administrator",
-        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     let http = Arc::new(Sealing {
         inner: administered(media::taken()),
@@ -344,11 +354,11 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
     assert!(said.starts_with("Some(ReplacedUnproven"), "{said}");
     assert!(said.contains("could not be moved into place"), "{said}");
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(password)
     );
     assert!(
-        recorded(&env, "JELLYFIN_ADMIN_PASSWORD_PENDING").is_some(),
+        recorded(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD_PENDING").is_some(),
         "the replacement the service holds has no record"
     );
 }
@@ -367,7 +377,11 @@ async fn rotated_over(
     )
     .await;
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
-    (said, recorded(env, MEDIA_SERVER_ADMIN_PASSWORD_KEY), http)
+    (
+        said,
+        recorded(env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
+        http,
+    )
 }
 
 /// With nothing filling the identity source there is no media server to rotate the
@@ -377,7 +391,7 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
     let password = the_administrator_password();
     let env = env_at(
         "admin-no-server",
-        &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
+        &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     let http = administered(media::taken());
     let ctx = lemonfiber_testing::a_context()
@@ -402,7 +416,7 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
 
     assert!(said.contains("holds no administrator password"), "{said}");
     assert_eq!(
-        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
+        recorded(&env, IDENTITY_SOURCE_ADMIN_PASSWORD_KEY),
         Some(password)
     );
     assert!(http.requests().is_empty(), "{:?}", http.requests());

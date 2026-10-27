@@ -70,7 +70,8 @@ pub(super) fn front_door(
         register.installed(),
         &crate::app::targets::chosen_fillers(ctx),
         None,
-    );
+    )
+    .numbered(crate::app::targets::ordinals(ctx));
     Panel::Ready(crate::door::run::assembled(
         &crate::door::candidates(&manifest.services, register.installed(), &fillers),
         crate::door::run::Running {

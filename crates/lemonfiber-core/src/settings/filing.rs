@@ -31,6 +31,14 @@ pub(crate) async fn everything(ctx: &Ctx) {
             ))
             .await;
     }
+    for name in super::renaming::clashing(ctx) {
+        ctx.narrator
+            .say(&format!(
+                "two services' credentials would both be kept as {name}, so neither is \
+                 kept or read under it"
+            ))
+            .await;
+    }
     filed(ctx);
     if let Err(failure) = stack(ctx) {
         ctx.narrator

@@ -12,11 +12,58 @@ use crate::config::store;
 /// reads the same as an empty value. The one reader for every credential lemonfiber
 /// mints and records rather than reads from a service (the torrent client's password,
 /// the media server's admin password), so the read-back stays identical across them.
+///
+/// A credential named for what it reaches is read under the name an earlier release
+/// gave it while it has not moved yet.
 pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
     let path = ctx.settings.env_file.as_deref()?;
     let file = store::read(path).unwrap_or_default();
-    let value = file.get(key)?;
-    (!value.is_empty()).then(|| value.to_owned())
+    let held = |key: &str| {
+        file.get(key)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+    };
+    held(key).or_else(|| held(&earlier_credential(ctx, key)?))
+}
+
+/// The name an earlier release recorded the credential the stack now keeps as `key`
+/// under, where `key` names one.
+fn earlier_credential(ctx: &Ctx, key: &str) -> Option<String> {
+    let replacing = key.strip_suffix(crate::config::PENDING_SUFFIX);
+    let named = replacing.unwrap_or(key);
+    let endings: Vec<&str> = crate::config::CREDENTIAL_SUFFIXES
+        .into_iter()
+        .filter(|ending| named.ends_with(ending))
+        .collect();
+    if endings.is_empty() {
+        return None;
+    }
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let fillers = super::fillers_here(ctx, &manifest);
+    let earlier = fillers.services().find_map(|filler| {
+        endings
+            .iter()
+            .find(|ending| fillers.setting(filler, ending).as_deref() == Some(named))
+            .and_then(|ending| crate::wiring::Fillers::earlier(filler, ending))
+    })?;
+    Some(if replacing.is_some() {
+        format!("{earlier}{}", crate::config::PENDING_SUFFIX)
+    } else {
+        earlier
+    })
+}
+
+/// The credential lemonfiber records for the service `service` of the stack here, ending
+/// in `holds`: under the name the whole stack gives it, which is the one it is written
+/// under, or under the name an earlier release gave it until it has moved.
+pub(crate) fn recorded_credential(ctx: &Ctx, service: &str, holds: &str) -> Option<String> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let fillers = super::fillers_here(ctx, &manifest);
+    let filler = fillers.service(service)?;
+    fillers
+        .setting(filler, holds)
+        .and_then(|named| recorded_secret(ctx, &named))
+        .or_else(|| recorded_secret(ctx, &crate::wiring::Fillers::earlier(filler, holds)?))
 }
 
 /// Which service the operator chose to fill each capability, and what they said about
@@ -28,6 +75,14 @@ pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
 pub(crate) fn chosen_fillers(ctx: &Ctx) -> crate::wiring::Chosen {
     crate::wiring::Chosen::read(recorded_secret(ctx, crate::wiring::FILLS_KEY).as_deref())
         .because(recorded_secret(ctx, crate::wiring::FILLS_WHY_KEY).as_deref())
+}
+
+/// The ordinal each service holds where two would share a credential's name, as the
+/// environment file records them.
+pub(crate) fn ordinals(ctx: &Ctx) -> crate::config::credentials::Ordinals {
+    crate::config::credentials::Ordinals::read(
+        recorded_secret(ctx, crate::config::credentials::ORDINALS_KEY).as_deref(),
+    )
 }
 
 /// The write side of [`recorded_secret`]: record a credential where a later run — and

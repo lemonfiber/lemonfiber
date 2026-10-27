@@ -146,7 +146,7 @@ fn answering(tag: &str, broken: Vec<(&'static str, Answer)>) -> Ctx {
     context.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &context,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     let mut context = media::reaching(context);

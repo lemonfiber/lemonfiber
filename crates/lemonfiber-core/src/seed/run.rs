@@ -37,7 +37,6 @@ mod keys;
 mod minted;
 pub(crate) mod owning;
 mod published;
-pub(crate) use published::published_as;
 mod quality;
 mod showing;
 mod subtitles;
@@ -129,7 +128,8 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     wirings.extend(kept_back);
     let chosen = crate::app::targets::chosen_fillers(ctx);
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let fillers = crate::wiring::Fillers::of(&manifest, &installed, &chosen, project.as_deref());
+    let fillers = crate::wiring::Fillers::of(&manifest, &installed, &chosen, project.as_deref())
+        .numbered(crate::app::targets::ordinals(ctx));
 
     let held = held(ctx, &fillers);
 
@@ -355,7 +355,8 @@ async fn reading(
     project: Option<&Path>,
 ) -> (crate::wiring::Fillers, Held) {
     let chosen = crate::app::targets::chosen_fillers(ctx);
-    let fillers = crate::wiring::Fillers::of(manifest, installed, &chosen, project);
+    let fillers = crate::wiring::Fillers::of(manifest, installed, &chosen, project)
+        .numbered(crate::app::targets::ordinals(ctx));
     let held = held(ctx, &fillers);
     (fillers, held)
 }

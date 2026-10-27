@@ -137,7 +137,7 @@ async fn a_replacement_pending_over_an_unreadable_stack_stays_for_later() {
         .over(crate::test_support::nowhere())
         .build();
 
-    let left = left_pending(&ctx, config::MEDIA_SERVER_ADMIN_PASSWORD_KEY).await;
+    let left = left_pending(&ctx, config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY).await;
 
     assert_eq!(left.as_deref(), Some("replacement"));
 }
@@ -148,7 +148,7 @@ async fn a_replacement_pending_over_an_unreadable_stack_stays_for_later() {
 async fn a_replacement_pending_where_no_media_server_is_reached_stays_for_later() {
     let ctx = pending_in("pending-unhosted").build();
 
-    let left = left_pending(&ctx, config::MEDIA_SERVER_ADMIN_PASSWORD_KEY).await;
+    let left = left_pending(&ctx, config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY).await;
 
     assert_eq!(left.as_deref(), Some("replacement"));
 }

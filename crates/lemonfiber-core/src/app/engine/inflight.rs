@@ -123,7 +123,8 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
             &stopped_beside(ctx, &profiles),
             &chosen_fillers(ctx),
             project.as_deref(),
-        );
+        )
+        .numbered(crate::app::targets::ordinals(ctx));
         download_targets(ctx, &fillers).await
     };
 

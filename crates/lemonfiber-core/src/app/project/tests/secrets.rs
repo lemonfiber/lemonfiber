@@ -238,7 +238,7 @@ fn an_assembled_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
         manifest.as_ref(),
         &[],
         &resolved,
-        &crate::plugin::Holding::Crossing("SONARR_API_KEY".to_owned()),
+        &crate::plugin::Holding::Crossing("LIBRARY_CURATE_TV_API_KEY".to_owned()),
     );
 
     let rewritten = reread.unwrap_or_default();
@@ -290,7 +290,7 @@ fn a_stack_services_own_key_is_read_under_its_own_name() {
     assert_eq!(
         held,
         Some(crate::plugin::Holding::Crossing(
-            crate::config::for_service("unpackerr", crate::config::API_KEY_SUFFIX)
+            "ARCHIVE_EXTRACT_API_KEY".to_owned()
         ))
     );
 }

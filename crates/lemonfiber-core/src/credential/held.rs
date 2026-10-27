@@ -239,7 +239,7 @@ pub(crate) const MEDIA_SERVER_ADMIN_PASSWORD_NAME: &str = "Media server administ
 /// The media server's administrator password.
 const MEDIA_SERVER: Entry = Entry {
     name: MEDIA_SERVER_ADMIN_PASSWORD_NAME,
-    setting: config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+    setting: config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
     consumers: &[Consumer::at_the_service(
         "the media server's own administrator account",
     )],
@@ -249,36 +249,34 @@ const MEDIA_SERVER: Entry = Entry {
 };
 
 /// An account lemonfiber set up on one of the stack's own services: the name it signs in
-/// under, and the setting the password lemonfiber minted for it is recorded under.
+/// under, and what the setting the password lemonfiber minted for it is recorded under
+/// ends in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Account {
     /// The name it signs in under.
     pub(crate) username: &'static str,
-    /// The setting its password is recorded under.
-    pub(crate) password: &'static str,
+    /// What the setting its password is recorded under ends in.
+    pub(crate) holds: &'static str,
 }
 
 /// The account lemonfiber sets up on the stack's own service answering in `kind`, where
 /// it sets one up.
 #[must_use]
 pub(crate) const fn account(kind: ApiKind) -> Option<Account> {
-    let (username, password) = match kind {
-        ApiKind::Qbittorrent => (config::TORRENT_USER, config::TORRENT_PASSWORD_KEY),
+    let (username, holds) = match kind {
+        ApiKind::Qbittorrent => (config::TORRENT_USER, config::PASSWORD_SUFFIX),
         ApiKind::Jellyfin => (
             config::MEDIA_SERVER_ADMIN_USER,
-            config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+            config::ADMIN_PASSWORD_SUFFIX,
         ),
-        ApiKind::Audiobookshelf => (
-            config::LISTENING_SERVER_USER,
-            config::LISTENING_SERVER_PASSWORD_KEY,
-        ),
+        ApiKind::Audiobookshelf => (config::LISTENING_SERVER_USER, config::PASSWORD_SUFFIX),
         ApiKind::Nzbhydra2 => (
             config::USENET_AGGREGATOR_ADMIN_USER,
-            config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
+            config::ADMIN_PASSWORD_SUFFIX,
         ),
         _ => return None,
     };
-    Some(Account { username, password })
+    Some(Account { username, holds })
 }
 
 /// Every credential named ahead of looking at the stack.

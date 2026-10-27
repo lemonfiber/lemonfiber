@@ -19,8 +19,10 @@ use std::path::Path;
 
 use lemonfiber_manifest::{ApiKind, Manifest, Service};
 
+use crate::config::credentials::Ordinals;
 use crate::origin::Origin;
 use crate::plugin::{Installed, Placed};
+use naming::keeps_the_stacks_names;
 
 pub use super::handing::{crosses, Holder};
 use super::{settle_trusting, Chosen, Reaches};
@@ -163,6 +165,11 @@ pub struct Fillers {
     asks: Vec<Ask>,
     /// Each link the stack makes by name, as the service it runs from and the one it names.
     named: Vec<(String, String)>,
+    /// The ordinal each service holds where two would share a credential's name.
+    ordinals: Ordinals,
+    /// What each of the stack's own services declares it provides and handles, by id,
+    /// which a part moved in place of one is named by.
+    declared: BTreeMap<String, (Vec<String>, Vec<String>)>,
 }
 
 impl Fillers {
@@ -256,7 +263,24 @@ impl Fillers {
             services,
             asks,
             named,
+            ordinals: Ordinals::default(),
+            declared: manifest
+                .services
+                .iter()
+                .map(|service| {
+                    (
+                        service.id.clone(),
+                        (service.provides.clone(), service.media_types.clone()),
+                    )
+                })
+                .collect(),
         }
+    }
+
+    /// These fillers, with `ordinals` as the ones recorded.
+    #[must_use]
+    pub(crate) fn numbered(self, ordinals: Ordinals) -> Self {
+        Self { ordinals, ..self }
     }
 
     /// The stack's own service that `by` is linked to by name, where the stack declares
@@ -335,18 +359,20 @@ impl Fillers {
 
     /// The setting a credential this service holds is kept under, ending in `holds`.
     ///
-    /// A stack service's is named after its id. A plugin's is named in a namespace of its
-    /// own, spelled so no two of its services' settings meet — and where one would still
-    /// land on a setting this build names, or on one any other service here takes for
-    /// any credential, the answer is nothing, so the setting is neither read for the
-    /// plugin nor written for it. So is one ending in anything but a credential's ending,
-    /// which is what the spelling's guarantee is made of.
+    /// A stack service's, and a first-party part's moved in place of one, is named for
+    /// the capability it reaches, and one providing nothing has none. A
+    /// plugin's is named in a namespace of its own, spelled so no two of its services'
+    /// settings meet — and where one would still land on a setting this build names, or
+    /// on one any other service here takes for any credential, the answer is nothing, so
+    /// the setting is neither read for the plugin nor written for it. So is one ending in
+    /// anything but a credential's ending, which is what the spelling's guarantee is made
+    /// of.
     #[must_use]
     pub fn setting(&self, filler: &Filler, holds: &str) -> Option<String> {
-        let setting = spelled(filler, holds);
-        if !matches!(filler.origin, Origin::Plugin { .. }) || filler.stands_in() {
-            return Some(setting);
+        if keeps_the_stacks_names(filler) {
+            return self.spelled(filler, holds);
         }
+        let setting = self.spelled(filler, holds)?;
         let credential = crate::config::CREDENTIAL_SUFFIXES.contains(&holds);
         let taken = self
             .services
@@ -355,7 +381,7 @@ impl Fillers {
             .flat_map(|one| {
                 crate::config::CREDENTIAL_SUFFIXES
                     .iter()
-                    .map(|suffix| spelled(one, suffix))
+                    .filter_map(|suffix| self.spelled(one, suffix))
             })
             .any(|other| other == setting);
         (credential && !taken && !crate::config::SETTINGS.contains(&setting.as_str()))
@@ -380,18 +406,6 @@ impl Fillers {
                     .filter_map(move |suffix| self.setting(one, suffix))
             })
             .collect()
-    }
-}
-
-/// The name a credential `filler` holds would be kept under, ending in `holds`, before
-/// anything is refused: the stack's own name for a service a first-party plugin stands
-/// in for.
-fn spelled(filler: &Filler, holds: &str) -> String {
-    match &filler.origin {
-        Origin::Plugin { named } if !filler.stands_in() => {
-            crate::config::for_plugin(named, &filler.id, holds)
-        }
-        _ => crate::config::for_service(&filler.id, holds),
     }
 }
 
@@ -477,6 +491,8 @@ fn host(service: &Service, services: &[Service]) -> String {
         .inside(services)
         .map_or_else(|| service.id.clone(), |host| host.id.clone())
 }
+
+mod naming;
 
 #[cfg(test)]
 mod tests;

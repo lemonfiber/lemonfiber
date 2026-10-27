@@ -56,7 +56,8 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
         installed,
         &super::targets::chosen_fillers(ctx),
         project.as_deref(),
-    );
+    )
+    .numbered(crate::app::targets::ordinals(ctx));
     let held = reading::taken(
         ctx,
         &manifest.services,

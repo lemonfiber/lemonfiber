@@ -19,13 +19,19 @@ fn moving() -> Option<lemonfiber_plugin::Manifest> {
 fn moving_with(extra: &str) -> Option<lemonfiber_plugin::Manifest> {
     lemonfiber_plugin::Manifest::from_toml(&format!(
         "{}{extra}",
-        seeded().replacen(
-            "id          = \"komga\"\nname        = \"Komga\"\nimage",
-            &format!(
-                "id          = \"komga\"\nname        = \"Komga\"\nreplaces    = \"{RESERVED}\"\nimage"
-            ),
-            1,
-        )
+        seeded()
+            .replacen(
+                "id          = \"komga\"\nname        = \"Komga\"\nimage",
+                &format!(
+                    "id          = \"komga\"\nname        = \"Komga\"\nreplaces    = \"{RESERVED}\"\nimage"
+                ),
+                1,
+            )
+            .replacen(
+                "provides    = [\"media.serve\"]",
+                "provides    = [\"media.serve\", \"identity.source\"]",
+                1,
+            )
     ))
     .ok()
 }
@@ -47,7 +53,7 @@ fn minted_moved(
     let recorded = format!(
         "{}{}={RECORDED}\n",
         std::fs::read_to_string(&env).unwrap_or_default(),
-        crate::seed::run::published_as(RESERVED)
+        crate::config::for_service(RESERVED, crate::config::API_KEY_SUFFIX)
     );
     let _ = std::fs::write(&env, recorded);
     let mut would = crate::plugin::Installed::of(manifest);
@@ -137,6 +143,41 @@ fn a_first_party_part_moved_in_place_keeps_the_key_the_stack_published_for_it() 
     let stranger = minted_moving("seeded-moved-stranger", &[]).unwrap_or_default();
     assert_eq!(stranger.len(), 32, "{stranger:?}");
     assert_ne!(stranger, RECORDED);
+}
+
+/// A part whose own service says what it provides is held to that, not to its adapter's:
+/// providing for itself what the stack's own service provides first, it keeps the key the
+/// stack published; providing something else, it is minted its own.
+#[test]
+fn a_part_saying_what_it_provides_is_held_to_its_own_word() {
+    let saying = |provides: &str| {
+        moving().and_then(|manifest| {
+            let mut manifest = manifest;
+            for service in &mut manifest.services {
+                if service.id == "komga" {
+                    service.provides = vec![provides.to_owned()];
+                }
+            }
+            minted_moved(
+                &seeding(&format!("seeded-moved-saying-{provides}")),
+                &manifest,
+                &crate::test_support::first_party("komga"),
+            )
+        })
+    };
+    let first = crate::test_support::embedded()
+        .checked_manifest(crate::test_support::frozen_day())
+        .ok()
+        .and_then(|stack| {
+            stack
+                .services
+                .into_iter()
+                .find(|one| one.id == RESERVED)
+                .and_then(|one| one.provides.into_iter().next())
+        })
+        .unwrap_or_default();
+    assert_eq!(saying(&first).as_deref(), Some(RECORDED));
+    assert_ne!(saying("download.torrent").as_deref(), Some(RECORDED));
 }
 
 /// A part the bundle installs in place of the stack's own service of its id, and the file
@@ -234,7 +275,11 @@ fn minted_moving_in(
     let plugin = would.plugin.clone();
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     if let Some(key) = recorded {
-        let _ = crate::config::store::set(&env, &crate::seed::run::published_as(&plugin), key);
+        let _ = crate::config::store::set(
+            &env,
+            &crate::config::for_service(&plugin, crate::config::API_KEY_SUFFIX),
+            key,
+        );
     }
     let at = crate::app::targets::service_config_dir(&stack_of(&ctx), &plugin).join(part.file);
     let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
@@ -360,6 +405,11 @@ fn moving_an_account_text(reserved: &str, native: Option<&str>) -> String {
             "upstream    = { api_key = { secret = \"upstream-key\" } }",
             account,
         )
+        .replacen(
+            "provides    = [\"media.serve\"]",
+            "provides    = [\"media.serve\", \"download.torrent\"]",
+            1,
+        )
         .replace(
             "id     = \"upstream-key\"\nof     = \"komga\"\nminted = true\nwhy    = \"The key the \
              adapter signs in to Komga with\"\n",
@@ -391,11 +441,10 @@ fn minted_account(
     let manifest = moving_an_account(reserved, native)?;
     let ctx = seeding(name);
     let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let _ = crate::config::store::unset(&env, "DOWNLOAD_TORRENT_PASSWORD");
     let _ = match recorded {
-        Some(password) => {
-            crate::config::store::set(&env, crate::config::TORRENT_PASSWORD_KEY, password)
-        }
-        None => crate::config::store::unset(&env, crate::config::TORRENT_PASSWORD_KEY),
+        Some(password) => crate::config::store::set(&env, "QBITTORRENT_PASSWORD", password),
+        None => crate::config::store::unset(&env, "QBITTORRENT_PASSWORD"),
     };
     let mut would = crate::plugin::Installed::of(&manifest);
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
@@ -518,15 +567,12 @@ fn the_aggregator_and_the_listening_server_moved_in_place_keep_their_accounts() 
     let aggregator = carried(
         "seeded-carried-aggregator",
         crate::test_support::aggregator::MOVED.installed(),
-        &[(
-            crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
-            RECORDED,
-        )],
+        &[("NZBHYDRA2_ADMIN_PASSWORD", RECORDED)],
     );
     let listening = carried(
         "seeded-carried-listening",
         crate::test_support::listening::MOVED.installed(),
-        &[(crate::config::LISTENING_SERVER_PASSWORD_KEY, RECORDED)],
+        &[("AUDIOBOOKSHELF_PASSWORD", RECORDED)],
     );
 
     let held =
@@ -554,7 +600,7 @@ fn the_book_curator_moved_in_place_keeps_its_key_and_is_minted_an_account() {
     let minted = carried(
         "seeded-carried-books",
         crate::test_support::books::moved(),
-        &[(crate::config::BOOK_CURATOR_API_KEY, RECORDED)],
+        &[("BINDERY_API_KEY", RECORDED)],
     );
 
     assert_eq!(minted.get("api-key").map(String::as_str), Some(RECORDED));
