@@ -3,7 +3,7 @@
 use super::{asked, ctx, env_at, silent, the_recorded_password, the_service_key, SERVICE_CONFIG};
 use lemonfiber_core::app::{dispatch, Asking, Command};
 use lemonfiber_core::config::{Settings, MEDIA_SERVER_ADMIN_PASSWORD_KEY};
-use lemonfiber_core::credential::{fingerprint, State};
+use lemonfiber_core::credential::fingerprint;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::support::Reporting;
 use std::sync::Arc;
@@ -134,40 +134,6 @@ async fn what_the_storage_protects_against_is_stated_with_what_it_does_not() {
         .not_against
         .join(" ")
         .contains("malware"));
-}
-
-/// A service a stack runs its own copy of, which regenerated its key underneath a stack
-/// still handing out the old one: the fault the comparison exists to find.
-#[tokio::test]
-async fn a_service_key_that_no_longer_matches_the_published_copy_is_reported_as_invalid() {
-    let stale = format!("{}{}", "0000stale", "keykeykeykey");
-    let env = env_at("regenerated", &[("SONARR_API_KEY", &stale)]);
-    let mut ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
-    ctx.stack = lemonfiber_testing::declaring(
-        "credentials-regenerated",
-        "sonarr",
-        r#"{ kind = "servarr", key_source = "config-xml", path = "/config/config.xml", version = 3 }"#,
-    );
-
-    let inventory = asked(&ctx, Asking::Read).await;
-    let curator = inventory
-        .held
-        .iter()
-        .find(|one| one.name == "Sonarr API key");
-
-    assert!(
-        curator.is_some(),
-        "the stack runs its own curator, so its key is listed"
-    );
-    assert_eq!(curator.map(|one| one.state), Some(State::Invalid));
-    let said = curator
-        .and_then(|one| one.advisory.clone())
-        .unwrap_or_default();
-    assert!(said.contains("regenerated"), "{said}");
-    assert!(said.contains(&fingerprint(&stale)), "{said}");
-    assert!(said.contains(&fingerprint(&the_service_key())), "{said}");
-    assert!(!said.contains(&stale), "{said}");
-    assert!(!said.contains(&the_service_key()), "{said}");
 }
 
 /// A reveal that names nothing is answered as a reveal, not as a replacement nobody

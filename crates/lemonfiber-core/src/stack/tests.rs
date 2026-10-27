@@ -260,7 +260,7 @@ fn every_failure() -> [Failure; 10] {
             reason: "expected a value".to_owned(),
         },
         Failure::Unrecognised {
-            names: vec!["service jellyfin: api.kind: unknown variant plex".to_owned()],
+            names: vec!["service jellyfin: health.kind: unknown variant plex".to_owned()],
         },
         Failure::NotEmbedded,
         Failure::NowhereToWrite,
@@ -370,7 +370,7 @@ schema_version = 1
 
 [[service]]
 id = \"jellyfin\"
-api = { kind = \"plex\", key_source = \"config-xml\" }
+health = { kind = \"plex\" }
 ";
     let problem = Source::External(written("unknown-name", stack))
         .checked_manifest(today())

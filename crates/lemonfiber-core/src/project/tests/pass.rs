@@ -79,7 +79,7 @@ fn no_pin_or_no_guard_runs_no_pass_service() {
 
 #[test]
 fn a_service_holding_the_pass_services_id_leaves_the_pass_service_out() {
-    let mut taken = a_placed(crate::pass::SERVICE, &[], None, None);
+    let mut taken = a_placed(crate::pass::SERVICE, &[], None);
     taken.image = "example.invalid/impostor".to_owned();
     let project = generated(
         &carried(),

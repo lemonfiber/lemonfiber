@@ -1,4 +1,4 @@
-use super::{ApiKind, Bind, Criticality, HealthKind, KeySource, Manifest, Protocol, Service};
+use super::{ApiKind, Bind, Criticality, HealthKind, Manifest, Protocol, Service};
 use crate::Failure;
 
 const MINIMAL: &str = r#"
@@ -27,7 +27,6 @@ tag = "5.0.3"
 port = 8081
 bind = "loopback"
 health = { kind = "http", path = "/api/v2/app/version", timeout_s = 60 }
-api = { kind = "qbittorrent", key_source = "generated" }
 grants = ["NET_ADMIN"]
 criticality = "core"
 license = "GPL-2.0-only"
@@ -171,13 +170,18 @@ fn reads_the_health_probe_a_service_declares() {
 }
 
 #[test]
-fn reads_how_a_service_is_talked_to() {
-    let api = service(MINIMAL)
-        .and_then(|service| service.api)
-        .map(|api| (api.kind, api.key_source, api.path));
-    assert_eq!(
-        api,
-        Some((ApiKind::Qbittorrent, KeySource::Generated, None))
+fn a_service_naming_an_in_process_adapter_is_refused_naming_the_field() {
+    let named = MINIMAL.replacen(
+        "health = {",
+        "api = { kind = \"qbittorrent\", key_source = \"generated\" }\nhealth = {",
+        1,
+    );
+    let refused = Manifest::from_toml(&named).err().map(|why| why.to_string());
+    assert!(
+        refused.as_deref().is_some_and(
+            |why| why.contains("service qbittorrent.api: the format declares no such field")
+        ),
+        "{refused:?}"
     );
 }
 
@@ -265,7 +269,7 @@ fn a_newer_generation_is_named_as_such_even_when_it_carries_unknown_fields() {
 #[test]
 fn names_every_unrecognised_declaration_in_one_pass() {
     let text = MINIMAL
-        .replace(r#"kind = "qbittorrent""#, r#"kind = "plex""#)
+        .replace(r#"kind = "http""#, r#"kind = "plex""#)
         .replace(r#"criticality = "core""#, r#"criticality = "vital""#);
     let refusal = Manifest::from_toml(&text)
         .err()

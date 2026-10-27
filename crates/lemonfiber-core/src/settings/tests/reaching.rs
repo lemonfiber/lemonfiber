@@ -271,7 +271,7 @@ async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
 #[tokio::test]
 async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
     let machine = machine("reheld", Reporting::absent());
-    let mut holder = crate::test_support::a_placed("holder", &[], None, None);
+    let mut holder = crate::test_support::a_placed("holder", &[], None);
     holder.fields.env.insert(
         "TOKEN".to_owned(),
         Value::Secret(SecretOf {
@@ -317,7 +317,7 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
 #[tokio::test]
 async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
     let machine = machine("entered", Reporting::absent());
-    let mut holder = crate::test_support::a_placed("holder", &[], None, None);
+    let mut holder = crate::test_support::a_placed("holder", &[], None);
     holder.fields.env.insert(
         "WG".to_owned(),
         Value::Secret(SecretOf {

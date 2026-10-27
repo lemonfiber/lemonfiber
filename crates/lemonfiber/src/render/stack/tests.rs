@@ -402,7 +402,6 @@ fn a_status_report_leads_with_the_condition() {
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Unhealthy, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-        unsupported: Vec::new(),
     };
     let text = status(&report).text();
     assert!(text.starts_with("running, and something needs attention"));
@@ -478,7 +477,6 @@ fn a_container_the_stack_never_declared_is_shown_with_an_unknown_description() {
         }],
         services: vec![service("sonarr", State::Absent, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-        unsupported: Vec::new(),
     };
     let text = status(&report).text();
 
@@ -513,7 +511,6 @@ fn a_stranger_that_failed_is_worded_without_an_exit_code_to_quote() {
         }],
         services: vec![service("sonarr", State::Absent, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-        unsupported: Vec::new(),
     };
     let text = status(&report).text();
 
@@ -537,51 +534,9 @@ fn a_stack_with_nothing_strange_running_says_nothing_about_strangers() {
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Absent, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-        unsupported: Vec::new(),
     };
 
     assert!(!status(&report).text().contains("does not declare"));
-}
-
-/// A stack the operator maintains, carrying a declaration lemonfiber cannot reach.
-#[test]
-fn a_service_lemonfiber_cannot_speak_to_is_named_with_why_and_is_not_a_fault() {
-    let report = StatusReport {
-        forms: Vec::new(),
-        active_forms: Vec::new(),
-        filtered: Vec::new(),
-        condition: Condition::Active,
-        services: vec![service("theirs", State::Healthy, None)],
-        unsupported: vec![UnsupportedReport {
-            what: "theirs".to_owned(),
-            because: "it declares an API of the Servarr shape and no port to publish".to_owned(),
-        }],
-        undeclared: Vec::new(),
-        disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-    };
-    let text = status(&report).text();
-    assert!(text.contains("needs to know what they are"), "{text}");
-    assert!(text.contains("theirs — it declares an API"), "{text}");
-    // Still up, and still reported as up: what is unsupported is a feature, not
-    // the service.
-    assert!(text.contains("everything is up"), "{text}");
-}
-
-/// And nothing is said at all where there is nothing to say, which is every stack
-/// this build ships.
-#[test]
-fn a_stack_with_nothing_unsupported_says_nothing_about_it() {
-    let report = StatusReport {
-        forms: Vec::new(),
-        active_forms: Vec::new(),
-        filtered: Vec::new(),
-        condition: Condition::Active,
-        services: vec![service("sonarr", State::Healthy, None)],
-        unsupported: Vec::new(),
-        undeclared: Vec::new(),
-        disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-    };
-    assert!(!status(&report).text().contains("needs to know"));
 }
 
 #[test]
@@ -700,7 +655,6 @@ fn a_status_report_names_the_running_forms_and_what_they_left_out() {
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Healthy, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-        unsupported: Vec::new(),
     };
     let text = status(&report).text();
     assert!(text.contains("running for: tv, movies"), "{text}");

@@ -61,7 +61,7 @@ fn ports(entry: &Yaml) -> Vec<String> {
 }
 
 fn asking(service: &str, key: &str, url: UrlOf) -> Placed {
-    let mut placed = a_placed(service, &[], None, None);
+    let mut placed = a_placed(service, &[], None);
     placed.fields.env = BTreeMap::from([(key.to_owned(), Value::Url(url))]);
     placed
 }
@@ -129,7 +129,7 @@ fn an_address_in_the_upstreams_own_api_reaches_the_upstream_an_adapter_fronts() 
 
 #[test]
 fn a_service_inside_the_egress_guard_activates_the_guards_profile_and_no_other() {
-    let mut inside = a_placed("client", &[], None, None);
+    let mut inside = a_placed("client", &[], None);
     inside.fields.network = Some(Network {
         via: "network.egress-guard".into(),
     });
@@ -153,7 +153,7 @@ fn a_service_inside_the_egress_guard_activates_the_guards_profile_and_no_other()
 
 #[test]
 fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
-    let mut inside = a_placed("client", &[], None, None);
+    let mut inside = a_placed("client", &[], None);
     inside.fields.network = Some(Network {
         via: "network.egress-guard".into(),
     });
@@ -167,7 +167,7 @@ fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
     let installed = [
         an_installed(
             "tunnel",
-            vec![a_placed("tunnel", &["network.egress-guard"], None, None)],
+            vec![a_placed("tunnel", &["network.egress-guard"], None)],
         ),
         an_installed("client", vec![inside]),
     ];
@@ -183,7 +183,7 @@ fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
 
 #[test]
 fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards() {
-    let mut inside = a_placed("client", &[], None, Some(18999));
+    let mut inside = a_placed("client", &[], Some(18999));
     inside.fields.network = Some(Network {
         via: "network.egress-guard".into(),
     });
@@ -203,7 +203,7 @@ fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards
 
 #[test]
 fn a_confined_service_nothing_reaches_and_that_publishes_nothing_is_on_no_network() {
-    let mut loner = a_placed("loner", &[], None, None);
+    let mut loner = a_placed("loner", &[], None);
     loner.fields.posture = lemonfiber_manifest::container::Posture::Confined;
     let project = project(&carried(), &[an_installed("loner", vec![loner])]);
     assert_eq!(project.topology.placed.get("loner"), Some(&Where::Nowhere));
@@ -376,7 +376,7 @@ fn an_adapter_filing_a_medium_is_reached_itself_where_the_ask_is_not_in_its_upst
 
 #[test]
 fn a_chosen_filler_is_the_one_a_service_runs_inside() {
-    let mut inside = a_placed("client", &[], None, None);
+    let mut inside = a_placed("client", &[], None);
     inside.fields.network = Some(Network {
         via: "network.egress-guard".into(),
     });
@@ -395,7 +395,7 @@ fn a_chosen_filler_is_the_one_a_service_runs_inside() {
 
 #[test]
 fn an_adapter_inside_the_guard_has_its_contract_port_published_by_the_guard() {
-    let mut adapter = a_placed("bridge", &[], None, Some(18997));
+    let mut adapter = a_placed("bridge", &[], Some(18997));
     adapter.reached = None;
     adapter.speaks = vec!["media.serve@1".into()];
     adapter.fields.network = Some(Network {
@@ -432,8 +432,8 @@ fn an_adapters_contract_port_is_published_on_loopback_alone() {
 
 #[test]
 fn an_installed_guard_the_operator_chose_holds_the_services_inside_it() {
-    let guard = a_placed("tunnel", &["network.egress-guard"], None, Some(18996));
-    let mut inside = a_placed("client", &[], None, Some(18995));
+    let guard = a_placed("tunnel", &["network.egress-guard"], Some(18996));
+    let mut inside = a_placed("client", &[], Some(18995));
     inside.fields.network = Some(Network {
         via: "network.egress-guard".into(),
     });
@@ -461,7 +461,7 @@ fn solver_installed(reached: Option<u16>) -> Project {
         .services
         .retain(|service| service.id != "flaresolverr");
     let reader = asking_for("reader", "SOLVER_URL", "indexer.proxy");
-    let mut solver = a_placed("solver", &["indexer.proxy"], None, reached);
+    let mut solver = a_placed("solver", &["indexer.proxy"], reached);
     solver.listens = None;
     project(
         &manifest,
@@ -587,7 +587,7 @@ fn a_port_standing_beside_moved_is_published_where_it_was_moved_to() {
 /// the project, and the plugin's service is written under its id.
 #[test]
 fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
-    let mut moved = a_placed("jellyfin", &["media.serve"], None, Some(8096));
+    let mut moved = a_placed("jellyfin", &["media.serve"], Some(8096));
     moved.replaces = Some("jellyfin".to_owned());
     moved.image = "ghcr.io/lemonfiber/plugin-jellyfin".to_owned();
     let project = project(
@@ -630,7 +630,7 @@ fn a_plugin_the_bundle_installs_is_written_into_the_profile_its_entry_names() {
     let moved: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
     let stranger = an_installed(
         "comics",
-        vec![a_placed("comics", &["library.read"], None, Some(25600))],
+        vec![a_placed("comics", &["library.read"], Some(25600))],
     );
     let written = project(&carried(), &[moved.clone(), vec![stranger]].concat());
     let profile: Vec<String> = moved.iter().map(crate::plugin::profile_of).collect();
@@ -662,7 +662,7 @@ fn project_of_the_stack_alone() -> Project {
 #[test]
 fn only_a_first_party_service_taking_its_id_moves_in_place_of_a_stack_service() {
     let replacing = |service: &str| {
-        let mut placed = a_placed(service, &["media.serve"], None, Some(8096));
+        let mut placed = a_placed(service, &["media.serve"], Some(8096));
         placed.replaces = Some("jellyfin".to_owned());
         an_installed("jellyfin", vec![placed])
     };
@@ -686,13 +686,13 @@ fn only_a_first_party_service_taking_its_id_moves_in_place_of_a_stack_service() 
 /// that routes the hostname to it, and one reached only on the loopback interface does not.
 #[test]
 fn a_plugin_service_the_household_reaches_shares_a_network_with_the_proxy() {
-    let mut household = a_placed("shelf", &[], None, Some(13378));
+    let mut household = a_placed("shelf", &[], Some(13378));
     household.reached = Some(crate::plugin::Reached::Household {
         port: 13378,
         hostname: "shelf".to_owned(),
         group: None,
     });
-    let loopback = a_placed("panel", &[], None, Some(13379));
+    let loopback = a_placed("panel", &[], Some(13379));
     let project = project(
         &carried(),
         &[an_installed("shelf", vec![household, loopback])],
@@ -715,7 +715,7 @@ fn a_plugin_service_the_household_reaches_shares_a_network_with_the_proxy() {
 
 #[test]
 fn a_plugin_services_ask_joins_it_to_that_asks_network_and_no_other() {
-    let mut asker = a_placed("subs", &[], None, None);
+    let mut asker = a_placed("subs", &[], None);
     asker.asks = vec![crate::plugin::Asking {
         native: None,
         capability: "media.serve".to_owned(),

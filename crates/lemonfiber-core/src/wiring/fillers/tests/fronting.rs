@@ -5,7 +5,7 @@ use crate::wiring::Chosen;
 
 /// A plugin's adapter, `front`, standing in front of `fronts` where it names one.
 fn an_adapter(fronts: Option<&str>) -> crate::plugin::Placed {
-    let mut adapter = a_placed("front", &[], None, Some(8080));
+    let mut adapter = a_placed("front", &[], Some(8080));
     adapter.fronts = fronts.map(str::to_owned);
     adapter
 }
@@ -24,13 +24,10 @@ fn fronted(fillers: &Fillers) -> Option<&str> {
 #[test]
 fn an_adapter_fronts_its_own_plugins_service_of_that_id() {
     let installed = [
-        an_installed("other", vec![a_placed("back", &[], None, Some(9000))]),
+        an_installed("other", vec![a_placed("back", &[], Some(9000))]),
         an_installed(
             "own",
-            vec![
-                an_adapter(Some("back")),
-                a_placed("back", &[], None, Some(9000)),
-            ],
+            vec![an_adapter(Some("back")), a_placed("back", &[], Some(9000))],
         ),
     ];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
@@ -51,12 +48,12 @@ fn an_adapter_fronts_its_own_plugins_service_of_that_id() {
 fn an_adapter_fronts_nothing_outside_its_own_plugin() {
     let elsewhere = [
         an_installed("own", vec![an_adapter(Some("back"))]),
-        an_installed("other", vec![a_placed("back", &[], None, Some(9000))]),
+        an_installed("other", vec![a_placed("back", &[], Some(9000))]),
     ];
     let the_stacks = [an_installed("own", vec![an_adapter(Some("jellyfin"))])];
     let unnamed = [an_installed(
         "own",
-        vec![an_adapter(None), a_placed("back", &[], None, Some(9000))],
+        vec![an_adapter(None), a_placed("back", &[], Some(9000))],
     )];
 
     for (case, installed, named) in [
@@ -75,10 +72,7 @@ fn an_adapter_fronts_nothing_outside_its_own_plugin() {
 /// brings a service of that id: only a plugin's adapter has a plugin to look in.
 #[test]
 fn a_stack_service_naming_an_upstream_fronts_nothing() {
-    let installed = [an_installed(
-        "own",
-        vec![a_placed("back", &[], None, Some(9000))],
-    )];
+    let installed = [an_installed("own", vec![a_placed("back", &[], Some(9000))])];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
     let bundled = fillers.service("jellyfin").cloned().map(|mut one| {
         one.fronts = Some("back".to_owned());

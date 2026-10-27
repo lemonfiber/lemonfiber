@@ -11,7 +11,6 @@ use tokio::time::Instant;
 
 use super::addressed::Addressed;
 use super::asked::{answered, Item};
-use super::first::{self, Held, Reaching};
 use super::scrubbed::Scrub;
 use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
@@ -96,9 +95,7 @@ pub(super) async fn answers(
     let mut scrub = Scrub::of(&seeded, Some(&served));
     let reaching = Reaching {
         placed,
-        copy: &copy,
         served: &served,
-        keyed: Addressed::to((recorder.transport)(), LOOPBACK, serve.listens),
     };
     let outcome = asked(recorder, health, &reaching, items, &mut scrub).await;
     let finished = match outcome {
@@ -197,6 +194,14 @@ pub(in crate::plugin) fn settled_as(
     }
 }
 
+/// What asking the served service reaches it through.
+pub(super) struct Reaching<'a> {
+    /// The service, as installing it places it.
+    pub(super) placed: &'a Placed,
+    /// The container serving it.
+    pub(super) served: &'a Served,
+}
+
 /// The port the service answers on inside its network.
 pub(super) fn inside(placed: &Placed) -> Option<u16> {
     placed.listens.or_else(|| {
@@ -221,10 +226,7 @@ async fn asked(
     healthy(recorder.serving, plain.as_ref(), health, served)
         .await
         .map_err(|why| ("health".to_owned(), why))?;
-    let held: Option<Held> = first::performed(reaching)
-        .await
-        .map_err(|why| ("first run".to_owned(), why))?;
-    if let Some(operators) = items.iter().find(|item| item.keyed && held.is_none()) {
+    if let Some(operators) = items.iter().find(|item| item.keyed) {
         return Err((
             "first run".to_owned(),
             format!(
@@ -234,8 +236,6 @@ async fn asked(
             ),
         ));
     }
-    let made: Vec<String> = held.iter().flat_map(|held| held.made.clone()).collect();
-    *scrub = std::mem::take(scrub).and(&made);
     let port = served.port;
     let mut answers = Vec::new();
     for item in items {
@@ -246,13 +246,7 @@ async fn asked(
                 "it publishes no port, so there is nowhere to ask it".to_owned(),
             )
         })?;
-        let keyed = held.as_ref().filter(|_| item.keyed);
-        let transport = if keyed.is_some() {
-            reaching.keyed.as_ref()
-        } else {
-            plain.as_ref()
-        };
-        let answer = answered(transport, port, item, keyed.map(|held| &held.presented))
+        let answer = answered(plain.as_ref(), port, item)
             .await
             .map_err(|why| (step.clone(), why))?;
         let answer = scrub.answer(answer);

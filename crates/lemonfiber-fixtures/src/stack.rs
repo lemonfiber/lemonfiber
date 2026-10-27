@@ -103,27 +103,6 @@ pub fn manifest_without(into: &Path, service: &str) {
     written_apart(into, &toml::to_string(&stack).unwrap_or_default());
 }
 
-/// The carried stack's manifest written into `into`, its service `id` declaring the
-/// adapter `api`, an inline table as a stack names one, as a stack running its own copy of
-/// that service declares it.
-pub fn manifest_declaring(into: &Path, id: &str, api: &str) {
-    let mut stack = carried();
-    let declared: Option<Value> = toml::from_str::<Table>(&format!("api = {api}"))
-        .ok()
-        .and_then(|mut table| table.remove("api"));
-    stack
-        .get_mut("service")
-        .and_then(Value::as_array_mut)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_table_mut)
-        .filter(|service| service.get("id").and_then(Value::as_str) == Some(id))
-        .for_each(|service| {
-            service.extend(declared.clone().map(|api| ("api".to_owned(), api)));
-        });
-    written_apart(into, &toml::to_string(&stack).unwrap_or_default());
-}
-
 /// `stack` without each row of its list `list` that is `gone`.
 fn dropped(stack: &mut Table, list: &str, gone: impl Fn(&Value) -> bool) {
     stack

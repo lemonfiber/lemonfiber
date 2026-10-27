@@ -12,8 +12,7 @@ use crate::ports::http::Http;
 use crate::ports::program::Unran;
 use crate::ports::serving::Standing;
 
-/// A plugin whose one service is first-run by reading the key it writes, claiming a
-/// capability with a probe asked as nobody and one asked as the operator.
+/// A plugin whose one service is proved by two requests asked as nobody.
 pub(in crate::plugin::recording) const SERVED: &str = r#"
 schema_version = 1
 
@@ -41,13 +40,31 @@ criticality = "core"
 memory_mib  = 300
 reaches     = "television metadata providers"
 asks_for    = "Reads series, season and episode information."
-provides    = ["library.curate"]
-api         = { kind = "servarr", key_source = "config-xml", path = "/config/config.xml", version = 3 }
 takes_data  = true
 user_mode   = "puid-env"
 media_types = ["tv"]
 replaces    = "sonarr"
 
+[[proof]]
+id      = "sonarr.guarded"
+title   = "It refuses a caller without its key"
+request = { method = "GET", path = "/api/v3/wanted/missing" }
+expect  = { status = 401, json_is_absent = true }
+fixture = "recordings/sonarr/library-curate-guarded.json"
+why     = "It is guarded."
+
+[[proof]]
+id      = "sonarr.wanted"
+title   = "It lists what it wants"
+request = { method = "GET", path = "/api/v3/wanted/missing" }
+expect  = { status = 200, json_types = { records = "list", totalRecords = "int" } }
+fixture = "recordings/sonarr/library-curate-wanted.json"
+why     = "It answers."
+"#;
+
+/// The same service providing a capability it claims with a probe asked as nobody and one
+/// asked as the operator.
+const OPERATED: &str = r#"
 [[claim]]
 capability = "library.curate"
 
@@ -64,10 +81,21 @@ expect  = { status = 200, json_types = { records = "list", totalRecords = "int" 
 fixture = "recordings/sonarr/library-curate-wanted.json"
 "#;
 
+/// [`SERVED`]'s service providing `library.curate` and claiming it as [`OPERATED`] says.
+pub(in crate::plugin::recording) fn operated() -> String {
+    let service = SERVED.split("\n[[proof]]").next().unwrap_or_default();
+    format!(
+        "{}{OPERATED}",
+        service.replace(
+            "takes_data  = true",
+            "takes_data  = true\nprovides    = [\"library.curate\"]"
+        )
+    )
+}
+
 const PINNED: &str = "lscr.io/linuxserver/sonarr@sha256:dffc730adcb8b4f4342792fbb27fcad9c62fb8660523f2aeb082416980d7fe0c";
 const GUARDED: &str = "recordings/sonarr/library-curate-guarded.json";
 const WANTED: &str = "recordings/sonarr/library-curate-wanted.json";
-const KEY: &str = "0123456789abcdef0123456789abcdef";
 
 pub(super) fn source(name: &str, manifest: &str) -> Scratch {
     let at = Scratch::new(name);
@@ -76,10 +104,7 @@ pub(super) fn source(name: &str, manifest: &str) -> Scratch {
 }
 
 pub(super) fn sonarr() -> Serves {
-    Serves::on(49153).writing(
-        "/config/config.xml",
-        &format!("<Config><ApiKey>{KEY}</ApiKey></Config>"),
-    )
+    Serves::on(49153)
 }
 
 pub(super) fn answering(wanted: &str) -> Arc<Fake> {
@@ -145,7 +170,7 @@ pub(super) fn noted(at: &Path, fixture: &str, note: &str) {
 async fn every_request_is_asked_of_one_fresh_container_after_its_first_run_and_written() {
     let at = source("asking-written", SERVED);
     noted(&at, GUARDED, "Refused without the key.");
-    noted(&at, WANTED, "Read with the key it wrote.");
+    noted(&at, WANTED, "Read as nobody.");
     let serving = sonarr();
     let http = answering("{\"page\": 1, \"records\": [], \"totalRecords\": 0}");
     let read = recorded(&at, &serving, &http).await;
@@ -184,12 +209,7 @@ async fn every_request_is_asked_of_one_fresh_container_after_its_first_run_and_w
         .iter()
         .all(|one| one.url.starts_with("http://127.0.0.1:49153/")));
     let host = ("Host".to_owned(), "127.0.0.1:8989".to_owned());
-    assert!(asked
-        .first()
-        .is_some_and(|one| one.headers == vec![host.clone()]));
-    assert!(asked.get(1).is_some_and(
-        |one| one.headers == vec![("X-Api-Key".to_owned(), KEY.to_owned()), host.clone()]
-    ));
+    assert!(asked.iter().all(|one| one.headers == vec![host.clone()]));
 
     let served = serving.asked();
     assert_eq!(served.len(), 1, "one container serves every request");
@@ -233,17 +253,17 @@ why     = \"It is there.\"
     let read = recorded(&at, &sonarr(), &http).await;
     let took = took(read.as_ref());
     assert!(
-        matches!(took.first(), Some(Took::Unrecorded { why }) if why.contains("names no fixture")),
+        matches!(took.last(), Some(Took::Unrecorded { why }) if why.contains("names no fixture")),
         "{took:?}"
     );
-    assert_eq!(took.get(1..), Some(&[Took::Unnoted, Took::Unnoted][..]));
+    assert_eq!(took.get(..2), Some(&[Took::Unnoted, Took::Unnoted][..]));
 }
 
 #[tokio::test]
 async fn recording_again_what_a_fresh_container_answers_the_same_leaves_each_as_it_was() {
     let at = source("asking-again", SERVED);
     noted(&at, GUARDED, "Refused without the key.");
-    noted(&at, WANTED, "Read with the key it wrote.");
+    noted(&at, WANTED, "Read as nobody.");
     let wanted = "{\"page\": 1, \"records\": [], \"totalRecords\": 0}";
     let first = recorded(&at, &sonarr(), &answering(wanted)).await;
     assert_eq!(took(first.as_ref()), vec![Took::Written, Took::Written]);
@@ -257,11 +277,11 @@ async fn recording_again_what_a_fresh_container_answers_the_same_leaves_each_as_
 
 /// A plugin whose one service has no adapter and keeps no library, proved by a request.
 fn plain() -> String {
-    let service = SERVED.split("[[claim]]").next().unwrap_or_default();
+    let service = SERVED.split("[[proof]]").next().unwrap_or_default();
     let kept: Vec<&str> = service
         .lines()
         .filter(|line| {
-            !["provides", "api ", "takes_data", "media_types"]
+            !["takes_data", "media_types"]
                 .iter()
                 .any(|dropped| line.starts_with(dropped))
         })
@@ -319,33 +339,33 @@ async fn a_recording_with_no_note_yet_is_written_with_an_empty_one_and_fails_the
 }
 
 #[tokio::test]
-async fn the_credential_and_the_containers_identity_are_written_as_redacted() {
+async fn the_containers_identity_is_written_as_redacted() {
     let at = source("asking-scrubbed", SERVED);
-    let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, KEY);
-    let echo = format!(
-        "{{\"records\": [\"{}\", \"{encoded}\", \"4f1c2d3e5a6b\", \"172.18.0.2\"], \"{KEY}\": 1}}",
-        KEY.to_uppercase()
-    );
-    let read = recorded(&at, &sonarr(), &answering(&echo)).await;
+    let serving = Serves::up(crate::ports::serving::Served {
+        addresses: vec!["172.18.0.2".to_owned()],
+        ..served_on_loopback()
+    });
+    let echo = "{\"records\": [\"4F1C2D3E5A6B\", \"4f1c2d3e5a6b\", \"172.18.0.2\"], \"4f1c2d3e5a6b7c8d9e0f\": 1}";
+    let read = recorded(&at, &serving, &answering(echo)).await;
     assert!(read.is_some_and(|read| read.failed.is_empty()));
     let text = std::fs::read_to_string(at.join(WANTED)).unwrap_or_default();
-    assert!(!text.to_lowercase().contains(KEY), "{text}");
     assert!(
-        !text.contains(&encoded) && !text.contains("4f1c2d3e5a6b") && !text.contains("172.18.0.2")
+        !text.to_lowercase().contains("4f1c2d3e5a6b") && !text.contains("172.18.0.2"),
+        "{text}"
     );
     assert_eq!(
         field(&json(&at, WANTED), "/response/json/records"),
-        serde_json::json!(["<redacted>", "<redacted>", "<redacted>", "<redacted>"])
+        serde_json::json!(["<redacted>", "<redacted>", "<redacted>"])
     );
 }
 
 #[tokio::test]
 async fn an_answer_still_holding_a_credential_once_scrubbed_writes_nothing() {
     let at = source("asking-unscrubbable", SERVED);
-    let serving = Serves::on(49153).writing(
-        "/config/config.xml",
-        "<Config><ApiKey>123456789012</ApiKey></Config>",
-    );
+    let serving = Serves::up(crate::ports::serving::Served {
+        hostname: "123456789012".to_owned(),
+        ..served_on_loopback()
+    });
     let read = recorded(
         &at,
         &serving,
@@ -355,7 +375,7 @@ async fn an_answer_still_holding_a_credential_once_scrubbed_writes_nothing() {
     assert!(read
         .as_ref()
         .is_some_and(|read| matches!(read.failed.first(),
-            Some(Failed { step, .. }) if step == "scrubbing claim library.curate probe wanted")));
+            Some(Failed { step, .. }) if step == "scrubbing proof sonarr.wanted")));
     assert!(!at.join(GUARDED).exists() && !at.join(WANTED).exists());
 }
 
@@ -421,7 +441,7 @@ async fn a_request_the_service_never_answers_fails_at_it() {
     let http = Fake::by_path(vec![("/ping", Answer::reply(200, "pong"))]);
     let read = recorded(&at, &sonarr(), &http).await;
     assert!(read.is_some_and(|read| matches!(read.failed.first(),
-        Some(Failed { step, why, .. }) if step == "asking claim library.curate probe guarded"
+        Some(Failed { step, why, .. }) if step == "asking proof sonarr.guarded"
             && why.starts_with("it did not answer within 30 seconds"))));
     assert!(!at.join(GUARDED).exists());
 }
@@ -441,28 +461,8 @@ async fn a_service_the_engine_cannot_serve_fails_at_its_container_and_asks_nothi
 }
 
 #[tokio::test]
-async fn a_service_with_no_first_run_lemonfiber_can_perform_fails_at_it() {
-    let at = source(
-        "asking-generated",
-        &SERVED.replace(
-            "api         = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }",
-            "api         = { kind = \"jellyfin\", key_source = \"generated\" }",
-        ),
-    );
-    let read = recorded(&at, &sonarr(), &answering("{}")).await;
-    assert!(read.is_some_and(|read| matches!(read.failed.first(),
-        Some(Failed { step, .. }) if step == "first run")));
-}
-
-#[tokio::test]
 async fn an_operators_probe_on_a_service_no_first_run_leaves_a_credential_for_fails_at_it() {
-    let at = source(
-        "asking-unkeyed",
-        &SERVED.replace(
-            "api         = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }\n",
-            "",
-        ),
-    );
+    let at = source("asking-unkeyed", &operated());
     let http = answering("{}");
     let read = recorded(&at, &sonarr(), &http).await;
     assert!(read.as_ref().is_some_and(|read| matches!(read.failed.first(),

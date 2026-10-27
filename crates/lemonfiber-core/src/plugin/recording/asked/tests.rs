@@ -1,8 +1,7 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_plugin::{Manifest, Request};
 
-use super::super::first::Presented;
-use super::super::tests::asking::SERVED;
+use super::super::tests::asking::{operated, SERVED};
 use super::{answered, items, kept, unrecorded, Item};
 use crate::ports::http::Response;
 
@@ -35,7 +34,7 @@ why    = "It stopped."
 
 #[test]
 fn every_request_recording_is_named_in_order_and_only_an_operators_probe_is_keyed() {
-    let text = format!("{SERVED}{PROVED}");
+    let text = format!("{}{PROVED}", operated());
     let Ok(manifest) = Manifest::from_toml(&text) else {
         return;
     };
@@ -77,7 +76,7 @@ fn every_request_recording_is_named_in_order_and_only_an_operators_probe_is_keye
 
 #[test]
 fn a_claim_probe_asking_nothing_of_the_service_is_no_request_recording() {
-    let text = format!("{SERVED}{PROVED}");
+    let text = format!("{}{PROVED}", operated());
     let Ok(mut manifest) = Manifest::from_toml(&text) else {
         return;
     };
@@ -107,33 +106,23 @@ fn a_claim_probe_asking_nothing_of_the_service_is_no_request_recording() {
 }
 
 #[tokio::test]
-async fn a_key_presented_in_a_header_is_sent_in_it_and_nothing_is_presented_without_one() {
+async fn what_the_request_accepts_is_sent_and_no_credential_beside_it() {
     let http = Fake::always(Answer::reply(200, "{}"));
-    let held = Presented("X-Api-Key", "the-key".to_owned());
     let asked = request("/api/v3/system/status", Some("application/json"));
 
-    let _ = answered(http.as_ref(), 8, &item(&asked, true), Some(&held)).await;
-    let _ = answered(http.as_ref(), 8, &item(&asked, false), None).await;
+    let _ = answered(http.as_ref(), 8, &item(&asked, false)).await;
 
     let sent: Vec<(String, Vec<(String, String)>)> = http
         .requests()
         .into_iter()
         .map(|one| (one.url, one.headers))
         .collect();
-    let accept = ("Accept".to_owned(), "application/json".to_owned());
-    let url = "http://127.0.0.1:8/api/v3/system/status".to_owned();
     assert_eq!(
         sent,
-        vec![
-            (
-                url.clone(),
-                vec![
-                    accept.clone(),
-                    ("X-Api-Key".to_owned(), "the-key".to_owned())
-                ]
-            ),
-            (url, vec![accept]),
-        ]
+        vec![(
+            "http://127.0.0.1:8/api/v3/system/status".to_owned(),
+            vec![("Accept".to_owned(), "application/json".to_owned())]
+        )]
     );
 }
 
@@ -162,11 +151,11 @@ async fn a_request_lemonfiber_cannot_send_as_declared_is_refused_and_never_sent(
         method: "BREW".to_owned(),
         ..request("/x", None)
     };
-    assert!(answered(http.as_ref(), 8, &item(&odd, false), None)
+    assert!(answered(http.as_ref(), 8, &item(&odd, false))
         .await
         .is_err_and(|why| why.contains("BREW")));
     let elsewhere = request("@elsewhere.example/x", None);
-    assert!(answered(http.as_ref(), 8, &item(&elsewhere, false), None)
+    assert!(answered(http.as_ref(), 8, &item(&elsewhere, false))
         .await
         .is_err_and(|why| why.contains("not a route")));
     assert!(http.requests().is_empty());
@@ -260,7 +249,7 @@ fn a_request_with_nowhere_to_write_or_no_service_to_ask_is_said_why() {
 #[tokio::test(start_paused = true)]
 async fn a_service_that_never_answers_a_request_fails_it_at_its_limit() {
     let asked = request("/x", None);
-    let said = answered(Fake::silent().as_ref(), 8, &item(&asked, false), None).await;
+    let said = answered(Fake::silent().as_ref(), 8, &item(&asked, false)).await;
     assert!(
         said.as_ref()
             .is_err_and(|why| why.contains("did not answer within 30 seconds")),

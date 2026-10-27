@@ -3,10 +3,8 @@
 use super::*;
 use crate::ports::media::Kind;
 use crate::ports::service::Watched;
+use crate::test_support::curators::TELEVISION;
 use crate::test_support::subtitles;
-
-/// Every curator's configuration, holding the key it answers to.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// Both curators that file video.
 fn curators() -> Vec<lemonfiber_manifest::Service> {
@@ -27,17 +25,22 @@ fn moved_beside(
     fillers_beside(services, &installed, stack_root())
 }
 
-/// The stack's `services` with its subtitle finder moved into its plugin.
+/// The stack's `services` with its subtitle finder and its curators moved into their
+/// plugins.
 fn moved_finder(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
-    moved_beside(services, Vec::new())
+    let curators = curators_moved(&services);
+    moved_beside(services, curators)
 }
 
-/// A context asking the moved finder's adapter over `http`, its curators' configuration
-/// reading as `curators` does.
-fn finder_ctx(http: Arc<Fake>, curators: Option<&'static str>) -> Ctx {
-    subtitles::asking(seed_ctx(true, None, None))
-        .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(curators)))
+/// A context of the test `name` asking the moved finder's adapter over `http`, holding
+/// [`MINTED`] as the key lemonfiber minted for every curator where `keyed`.
+fn finder_ctx(name: &str, http: Arc<Fake>, keyed: bool) -> Ctx {
+    let curators: &[crate::test_support::adapted::Adapted] = if keyed {
+        &crate::test_support::curators::ALL
+    } else {
+        &[]
+    };
+    subtitles::asking(minted_ctx(name, curators, MINTED)).with_http(http)
 }
 
 /// A finder answering `watching` with `held` for every curator, and taking every watch.
@@ -48,14 +51,14 @@ fn holding(held: &crate::ports::service::Watching) -> Arc<Fake> {
     ])
 }
 
-/// What the curator filing `which` at `host` and `port` is told, with the key it answers
-/// to.
+/// What the curator filing `which` at `host` and `port` is told, with the key lemonfiber
+/// minted for it.
 fn watched(which: Kind, host: &str, port: u16) -> Watched {
     Watched {
         which,
         host: host.to_owned(),
         port,
-        api_key: "the-key".to_owned(),
+        api_key: MINTED.to_owned(),
     }
 }
 
@@ -64,7 +67,11 @@ fn watched(which: Kind, host: &str, port: u16) -> Watched {
 #[tokio::test]
 async fn both_curators_are_told_to_the_moved_finder_over_its_contract() {
     let http = holding(&subtitles::unwatched());
-    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let ctx = finder_ctx(
+        "both_curators_are_told_to_the_moved_finder_over_its_contract",
+        http.clone(),
+        true,
+    );
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
 
@@ -92,7 +99,11 @@ async fn both_curators_are_told_to_the_moved_finder_over_its_contract() {
 #[tokio::test]
 async fn a_curator_filling_two_of_the_finders_asks_is_told_once() {
     let http = holding(&subtitles::unwatched());
-    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let ctx = finder_ctx(
+        "a_curator_filling_two_of_the_finders_asks_is_told_once",
+        http.clone(),
+        true,
+    );
     let fillers = moved_finder(curators()).asked_again();
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
@@ -107,7 +118,11 @@ async fn a_curator_filling_two_of_the_finders_asks_is_told_once() {
 #[tokio::test]
 async fn a_plugin_finder_is_never_handed_a_curators_key() {
     let http = holding(&subtitles::unwatched());
-    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let ctx = finder_ctx(
+        "a_plugin_finder_is_never_handed_a_curators_key",
+        http.clone(),
+        true,
+    );
     let fillers = asked_by_a_plugin(&subtitle_finder_svc(), curators());
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
@@ -119,21 +134,21 @@ async fn a_plugin_finder_is_never_handed_a_curators_key() {
 }
 
 /// A plugin `subber` whose service stands in for the stack's finder over
-/// `subtitles.fetch`, asking for every curator, beside both curators.
+/// `subtitles.fetch`, asking for every curator, beside both curators moved into their
+/// plugins, trusting `trusted` beside the bundle's plugins.
 fn contracted_finder(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
-    fillers_trusting(
-        curators(),
-        &[asking_every_curator(contracted(
-            "subber",
-            "bazarr",
-            "subtitles.fetch",
-        ))],
-        project,
-        trusted,
-    )
+    let installed: Vec<crate::plugin::Installed> = [asking_every_curator(contracted(
+        "subber",
+        "bazarr",
+        "subtitles.fetch",
+    ))]
+    .into_iter()
+    .chain(curators_moved(&curators()))
+    .collect();
+    fillers_trusting(curators(), &installed, project, &beside_the_bundle(trusted))
 }
 
 #[tokio::test]
@@ -194,7 +209,11 @@ async fn a_curator_the_finder_already_watches_is_left_as_it_is() {
             subtitles::answered(&subtitles::watching_at("radarr", 7878)),
         ],
     )]);
-    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let ctx = finder_ctx(
+        "a_curator_the_finder_already_watches_is_left_as_it_is",
+        http.clone(),
+        true,
+    );
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
 
@@ -214,7 +233,11 @@ async fn a_curator_the_finder_already_watches_is_left_as_it_is() {
 /// A stack with no subtitle finder wires nothing, rather than reporting a fault.
 #[tokio::test]
 async fn a_stack_without_a_subtitle_finder_has_nothing_to_wire() {
-    let ctx = finder_ctx(holding(&subtitles::unwatched()), Some(KEYED));
+    let ctx = finder_ctx(
+        "a_stack_without_a_subtitle_finder_has_nothing_to_wire",
+        holding(&subtitles::unwatched()),
+        true,
+    );
     let without = vec![curator("sonarr", 8989, "tv")];
 
     assert!(
@@ -232,10 +255,12 @@ async fn a_finder_that_cannot_be_asked_over_its_contract_is_asked_nothing() {
     let mut stack = curators();
     stack.push(subtitle_finder_svc());
     let http = holding(&subtitles::unwatched());
-    let asking = finder_ctx(http.clone(), Some(KEYED));
-    let mut unkeyed = seed_ctx(true, None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+    let asking = finder_ctx(
+        "a_finder_that_cannot_be_asked_over_its_contract_is_asked_nothing",
+        http.clone(),
+        true,
+    );
+    let mut unkeyed = seed_ctx(true, None, None).with_http(http.clone());
     unkeyed.seams.engine = Arc::new(subtitles::running());
 
     let own = super::super::subtitles::seed_subtitles(&asking, &fillers_of(stack)).await;
@@ -247,14 +272,18 @@ async fn a_finder_that_cannot_be_asked_over_its_contract_is_asked_nothing() {
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// A curator that has not written its key yet is skipped, and said to be skipped.
+/// A curator lemonfiber holds no minted key for is skipped, and said to be skipped.
 ///
-/// The finder needs the curator's own key to read anything from it, so wiring it
-/// without one would point the finder at a service it cannot read.
+/// The finder needs the curator's key to read anything from it, so wiring it without one
+/// would point the finder at a service it cannot read.
 #[tokio::test]
 async fn a_curator_with_no_key_yet_is_skipped_rather_than_wired() {
     let http = holding(&subtitles::unwatched());
-    let ctx = finder_ctx(http.clone(), None);
+    let ctx = finder_ctx(
+        "a_curator_with_no_key_yet_is_skipped_rather_than_wired",
+        http.clone(),
+        false,
+    );
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
 
@@ -274,7 +303,11 @@ async fn a_curator_with_no_key_yet_is_skipped_rather_than_wired() {
 /// telling it about something it has no settings for.
 #[tokio::test]
 async fn a_curator_filing_media_with_no_subtitles_is_passed_over() {
-    let ctx = finder_ctx(holding(&subtitles::unwatched()), Some(KEYED));
+    let ctx = finder_ctx(
+        "a_curator_filing_media_with_no_subtitles_is_passed_over",
+        holding(&subtitles::unwatched()),
+        true,
+    );
     let with_music = vec![
         curator("sonarr", 8989, "tv"),
         curator("lidarr", 8686, "music"),
@@ -290,7 +323,7 @@ async fn a_curator_filing_media_with_no_subtitles_is_passed_over() {
     assert!(
         wirings
             .first()
-            .is_some_and(|wiring| wiring.connection.contains("sonarr")),
+            .is_some_and(|wiring| wiring.connection.contains("Sonarr")),
         "{wirings:?}"
     );
 }
@@ -302,12 +335,24 @@ async fn a_curator_filing_media_with_no_subtitles_is_passed_over() {
 /// written, look wired, and never answer.
 #[tokio::test]
 async fn a_curator_with_no_port_declared_is_passed_over() {
-    let ctx = finder_ctx(holding(&subtitles::unwatched()), Some(KEYED));
-    let mut portless = curator("sonarr", 8989, "tv");
-    portless.listens = None;
+    let ctx = finder_ctx(
+        "a_curator_with_no_port_declared_is_passed_over",
+        holding(&subtitles::unwatched()),
+        true,
+    );
+    let mut portless: Vec<crate::plugin::Installed> = TELEVISION.installed().into_iter().collect();
+    for placed in portless.iter_mut().flat_map(|one| one.services.iter_mut()) {
+        if placed.service == "sonarr" {
+            placed.listens = None;
+            placed.reached = None;
+        }
+    }
 
-    let wirings =
-        super::super::subtitles::seed_subtitles(&ctx, &moved_finder(vec![portless])).await;
+    let wirings = super::super::subtitles::seed_subtitles(
+        &ctx,
+        &moved_beside(vec![curator("sonarr", 8989, "tv")], portless),
+    )
+    .await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
 }
@@ -319,7 +364,11 @@ async fn a_finder_that_refuses_is_reported_rather_than_passed_over() {
         subtitles::operation("watching"),
         subtitles::unavailable(),
     )]);
-    let ctx = finder_ctx(http, Some(KEYED));
+    let ctx = finder_ctx(
+        "a_finder_that_refuses_is_reported_rather_than_passed_over",
+        http,
+        true,
+    );
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
 
@@ -343,7 +392,7 @@ async fn a_write_the_finder_refuses_is_reported() {
         subtitles::watching(&subtitles::unwatched()),
         subtitles::watch(subtitles::refusing()),
     ]);
-    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let ctx = finder_ctx("a_write_the_finder_refuses_is_reported", http.clone(), true);
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
 
@@ -376,7 +425,12 @@ async fn a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere(
             subtitles::answered(&subtitles::unwatched()),
         ],
     )]);
-    let ctx = finder_ctx(http.clone(), Some(KEYED)).rehearsing();
+    let ctx = finder_ctx(
+        "a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere",
+        http.clone(),
+        true,
+    )
+    .rehearsing();
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
 
@@ -402,53 +456,24 @@ async fn a_rehearsed_pass_says_where_the_finder_looks_now_and_points_it_nowhere(
     );
 }
 
-/// A context asking the moved finder over `http`, the movie curator's credential file
-/// resolving away from beneath the directory its container owns.
-fn leading_away_ctx(http: Arc<Fake>) -> Ctx {
-    finder_ctx(http, Some(KEYED)).with_filesystem(Arc::new(
-        SeedFs::keyed(Some(KEYED)).leading_away(vec!["config/radarr/"]),
-    ))
-}
-
-/// A curator whose credential file leads away is refused on its watch, and the finder
-/// is told about the others as ever.
-#[tokio::test]
-async fn a_curator_whose_key_file_leads_away_is_refused_its_watch() {
-    let http = holding(&subtitles::unwatched());
-    let ctx = leading_away_ctx(http.clone());
-
-    let wirings = super::super::subtitles::seed_subtitles(&ctx, &moved_finder(curators())).await;
-
-    assert!(
-        wirings.iter().any(
-            |wiring| wiring.connection == "radarr the app watched for subtitles"
-                && matches!(wiring.state, crate::seed::State::Refused { .. })
-        ),
-        "{wirings:?}"
-    );
-    assert!(
-        wirings.iter().any(
-            |wiring| wiring.connection == "sonarr the app watched for subtitles"
-                && wiring.state == crate::seed::State::Wired
-        ),
-        "{wirings:?}"
-    );
-    assert_eq!(
-        subtitles::told(&http.requests()),
-        vec![watched(Kind::Tv, "sonarr", 8989)]
-    );
-}
-
 /// The moved finder is handed no curator's key the gate does not let cross to it: a
 /// curator another plugin brings is neither told to it nor reported, while the stack's
 /// own curators are.
 #[tokio::test]
 async fn a_curator_another_plugin_brings_is_never_handed_to_the_moved_finder() {
     let http = holding(&subtitles::unwatched());
-    let ctx = finder_ctx(http.clone(), Some(KEYED));
+    let ctx = finder_ctx(
+        "a_curator_another_plugin_brings_is_never_handed_to_the_moved_finder",
+        http.clone(),
+        true,
+    );
     let fillers = moved_beside(
         vec![curator("sonarr", 8989, "tv")],
-        vec![a_stand_in("movies")],
+        TELEVISION
+            .installed()
+            .into_iter()
+            .chain([a_stand_in("movies")])
+            .collect(),
     );
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
@@ -459,7 +484,7 @@ async fn a_curator_another_plugin_brings_is_never_handed_to_the_moved_finder() {
             .iter()
             .map(|wiring| wiring.connection.as_str())
             .collect::<Vec<_>>(),
-        vec!["sonarr the app watched for subtitles"]
+        vec!["Sonarr watched for subtitles"]
     );
     assert!(rewatched.is_empty(), "{rewatched:?}");
     assert_eq!(
@@ -469,29 +494,22 @@ async fn a_curator_another_plugin_brings_is_never_handed_to_the_moved_finder() {
 }
 
 /// What replacing a curator's key owes each finder watching it: the curator pointed at
-/// with the new key, refused where its credential file leads away, and nothing from a
-/// curator that has not written one yet.
+/// with the new key, and nothing from a curator lemonfiber holds no minted key for.
 #[tokio::test]
-async fn a_replaced_key_rewatches_each_finder_and_refuses_one_read_from_a_file_leading_away() {
+async fn a_replaced_key_rewatches_each_finder_and_owes_nothing_for_a_curator_holding_no_key() {
     let http = holding(&subtitles::unwatched());
-    let refusing = leading_away_ctx(http.clone());
-    let unkeyed = finder_ctx(http.clone(), None);
+    let keyed = finder_ctx("subtitles-rewatched", http.clone(), true);
+    let unkeyed = finder_ctx("subtitles-rewatched-unminted", http.clone(), false);
     let fillers = moved_finder(curators());
 
-    let watched_again = super::super::rewatch(&refusing, &fillers, "sonarr").await;
-    let refused = super::super::rewatch(&refusing, &fillers, "radarr").await;
-    let unwritten = super::super::rewatch(&unkeyed, &fillers, "sonarr").await;
+    let watched_again = super::super::rewatch(&keyed, &fillers, "sonarr").await;
+    let unminted = super::super::rewatch(&unkeyed, &fillers, "sonarr").await;
 
     assert!(
         matches!(watched_again.as_slice(), [(_, crate::seed::State::Wired)]),
         "{watched_again:?}"
     );
-    assert!(
-        matches!(refused.as_slice(), [(_, crate::seed::State::Refused { reason })]
-            if reason.starts_with("radarr the app's credential file")),
-        "{refused:?}"
-    );
-    assert!(unwritten.is_empty(), "{unwritten:?}");
+    assert!(unminted.is_empty(), "{unminted:?}");
     assert_eq!(
         subtitles::told(&http.requests()),
         vec![watched(Kind::Tv, "sonarr", 8989)]
@@ -510,15 +528,25 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
             curator("lidarr", 8686, "music"),
         ])
     };
-    let mut stopped = finder_ctx(http.clone(), Some(KEYED));
+    let mut stopped = finder_ctx(
+        "a_replaced_key_owes_a_finder_nothing_it_cannot_be_told",
+        http.clone(),
+        true,
+    );
     stopped.seams.engine = Arc::new(Reporting::absent());
-    let mut unkeyed = seed_ctx(true, None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED))));
+    let mut unkeyed = seed_ctx(true, None, None).with_http(http.clone());
     unkeyed.seams.engine = Arc::new(subtitles::running());
 
-    let not_watched =
-        super::super::rewatch(&finder_ctx(http.clone(), Some(KEYED)), &stack(), "lidarr").await;
+    let not_watched = super::super::rewatch(
+        &finder_ctx(
+            "a_replaced_key_owes_a_finder_nothing_it_cannot_be_told-2",
+            http.clone(),
+            true,
+        ),
+        &stack(),
+        "lidarr",
+    )
+    .await;
     let unreached = super::super::rewatch(&stopped, &stack(), "sonarr").await;
     let no_key = super::super::rewatch(&unkeyed, &stack(), "sonarr").await;
 
@@ -533,7 +561,11 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
 #[tokio::test]
 async fn a_replaced_key_a_finder_will_not_take_is_said_as_failed() {
     let http = Fake::by_path(vec![subtitles::watch(subtitles::refusing())]);
-    let ctx = finder_ctx(http, Some(KEYED));
+    let ctx = finder_ctx(
+        "a_replaced_key_a_finder_will_not_take_is_said_as_failed",
+        http,
+        true,
+    );
 
     let rewatched = super::super::rewatch(&ctx, &moved_finder(curators()), "sonarr").await;
 

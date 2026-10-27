@@ -1,8 +1,7 @@
 //! Building the inventory out of what is on disk, without spending anything.
 //!
-//! Two reads and no requests. What is recorded comes from the settings file, and
-//! what each service holds comes from the file that service wrote its own key into —
-//! so an inventory costs nothing, can be taken while the stack is down, and cannot
+//! Reads and no requests. What is recorded comes from the settings file and the secret
+//! store, so an inventory costs nothing, can be taken while the stack is down, and cannot
 //! itself be the thing that exhausts a provider's quota.
 //!
 //! That is also the limit of what it can claim, and the states say so rather than
@@ -11,11 +10,6 @@
 //! carry a flag recording whether they were, and the ones lemonfiber mints were set on
 //! their service and confirmed there before they were ever written down. Everything
 //! else is stale — present, unproven, and worth a sentence rather than an alarm.
-//!
-//! The comparison in [`service_key`] is the one thing here that finds a fault rather
-//! than reporting a fact. A service that regenerates its API key — which some do after
-//! an upgrade — leaves the copy the stack's own services read pointing at a key that
-//! no longer exists, and every symptom of it looks like something else.
 
 use std::path::Path;
 
@@ -23,9 +17,8 @@ use lemonfiber_manifest::Service;
 
 use crate::app::targets::recorded_secret;
 use crate::app::Ctx;
-use crate::credential::{catalogue, fingerprint, Entry, Held, Origin, Reached, State};
+use crate::credential::{catalogue, fingerprint, Entry, Held, Origin, State};
 use crate::plugin::Installed;
-use crate::seed::run::published_as;
 
 /// Where a credential lives when there is no settings file resolved to name.
 const NOWHERE: &str = "nowhere yet — this machine has no settings file";
@@ -46,27 +39,6 @@ pub(crate) async fn taken(
         .into_iter()
         .map(|entry| recorded(ctx, entry))
         .collect();
-    for filler in fillers
-        .services()
-        .filter(|filler| filler.holder() == crate::wiring::Holder::Stack)
-    {
-        let Some((config, read)) = writes_its_own(filler) else {
-            continue;
-        };
-        let setting = published_as(&filler.id);
-        let held = crate::app::targets::credential_file(ctx, filler)
-            .await
-            .text()
-            .and_then(|text| read(&text));
-        let published = recorded_secret(ctx, &setting);
-        taken.push(service_key(
-            &filler.name,
-            &setting,
-            config,
-            held.as_deref(),
-            published.as_deref(),
-        ));
-    }
     taken.extend(super::declining::held(ctx, services, project).await);
     taken.extend(super::gating::held(ctx, services, fillers, project).await);
     taken.extend(super::tokening::held(ctx, services, fillers, project).await);
@@ -149,20 +121,6 @@ fn declared(
         .collect()
 }
 
-/// Where one of the stack's services keeps the key it wrote for itself, and the reader
-/// that takes it out of that file by the shape its declaration gives it — where it is a
-/// service that writes one at all and the stack is written to disk.
-///
-/// The parts a plugin brings are not read here: each is reached through its adapter with
-/// what lemonfiber minted for it, and so is on the declared list instead, which is where a
-/// credential lemonfiber minted belongs.
-fn writes_its_own(
-    filler: &crate::wiring::Filler,
-) -> Option<(&Path, crate::credential::written::Reader)> {
-    let read = crate::credential::written::reader(filler.adapter.as_ref()?.key_source)?;
-    Some((filler.key_file.as_deref()?, read))
-}
-
 /// The settings file this machine resolved, as something to print.
 fn settings_file(ctx: &Ctx) -> String {
     ctx.settings
@@ -234,102 +192,3 @@ fn standing(ctx: &Ctx, entry: &Entry, present: bool) -> (State, Option<String>) 
 fn proven(ctx: &Ctx, flag: &str) -> Option<bool> {
     recorded_secret(ctx, flag).map(|recorded| crate::config::reads_as_on(&recorded))
 }
-
-/// One service's own API key, read from the file it wrote it to and compared with the
-/// copy the stack's own services read out of the environment.
-///
-/// The four answers are four different situations and only one of them is a fault. A
-/// service that has written no key yet is starting; one whose key has not been copied
-/// out is a stack that has not been seeded since; one whose two copies agree is
-/// working. One whose copies disagree has regenerated its key underneath a stack that
-/// is still handing out the old one, and every consumer of it is quietly failing to
-/// authenticate while the service itself reports perfectly healthy.
-fn service_key(
-    name: &str,
-    setting: &str,
-    config: &Path,
-    held: Option<&str>,
-    published: Option<&str>,
-) -> Held {
-    let (state, advisory) = key_standing(name, setting, held, published);
-    Held {
-        name: format!("{name} API key"),
-        setting: setting.to_owned(),
-        consumers: service_consumers(name, setting)
-            .into_iter()
-            .map(|(consumer, _)| consumer)
-            .collect(),
-        location: config.display().to_string(),
-        origin: Origin::Service,
-        from: crate::origin::Origin::Bundled,
-        state,
-        fingerprint: held.map(fingerprint),
-        advisory,
-    }
-}
-
-/// Everything that authenticates with one service's own API key, and how a fresh
-/// copy of it gets to each.
-///
-/// Shared with the rotation rather than written out there again, so what a rotation
-/// reports having reached and what the inventory says uses it are one list. Two of
-/// them: the service itself, which minted the key and needs nothing done to it, and
-/// everything reading it out of the environment, which is fixed when a container is
-/// created and so needs one.
-pub(crate) fn service_consumers(name: &str, setting: &str) -> Vec<(String, Reached)> {
-    vec![
-        (format!("{name}'s own API"), Reached::AtTheService),
-        (
-            format!(
-                "the stack's own services, which read it from the environment as {setting} — \
-                 the quality sync and archive extractor where they cover \
-                 {name}"
-            ),
-            Reached::FromItsEnvironment {
-                restart: "lemonfiber restart",
-            },
-        ),
-    ]
-}
-
-/// Where one service key stands, given what the service holds and what was published.
-fn key_standing(
-    name: &str,
-    setting: &str,
-    held: Option<&str>,
-    published: Option<&str>,
-) -> (State, Option<String>) {
-    let Some(held) = held else {
-        return (
-            State::Absent,
-            Some(format!(
-                "{name} has not written an API key yet, which is what a service still \
-                 completing its first start looks like."
-            )),
-        );
-    };
-    match published {
-        Some(published) if published == held => (State::Active, None),
-        Some(published) => (
-            State::Invalid,
-            Some(format!(
-                "{name} has regenerated its API key. What it holds now is {}, and the copy the \
-                 stack's own services read as {setting} is still {} — so every one of them is \
-                 authenticating with a key that no longer exists. Run lemonfiber credentials \
-                 rotate {name} to hand them the current one.",
-                fingerprint(held),
-                fingerprint(published)
-            )),
-        ),
-        None => (
-            State::Stale,
-            Some(format!(
-                "{name} has written an API key and nothing has copied it to {setting}, where \
-                 the stack's own services read it. Run lemonfiber seed."
-            )),
-        ),
-    }
-}
-
-#[cfg(test)]
-mod tests;

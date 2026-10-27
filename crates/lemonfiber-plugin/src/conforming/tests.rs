@@ -441,7 +441,6 @@ fn the_format_has_no_field_for_code_for_reach_or_for_content_nobody_can_read() {
 #[test]
 fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
     const PERMITTED: &[&str] = &[
-        "api",
         "asks_for",
         "bind",
         "config_path",

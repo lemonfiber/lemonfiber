@@ -15,7 +15,6 @@ use lemonfiber_contract::capabilities::subtitles::fetch;
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::filesystem::Beneath;
 use crate::ports::media::Kind;
 use crate::ports::service::Watched;
 use crate::wiring::{Address, Filler, Fillers};
@@ -69,9 +68,8 @@ fn for_subtitles(curator: &str) -> String {
 
 /// Tell each subtitle finder about every curator whose media has subtitles.
 ///
-/// Nothing to do where the stack has no subtitle finder, or where its key has not
-/// been written yet — the second is a service still starting rather than a fault, so
-/// it is skipped and a later run completes it.
+/// Nothing to do where the stack has no subtitle finder; a curator lemonfiber holds no
+/// minted key for is skipped.
 pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for watching in watching(fillers) {
@@ -80,16 +78,9 @@ pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::s
         };
         for (curator, which, at) in &watching.curators {
             let connection = for_subtitles(&curator.name);
-            let api_key = match super::keys::curator_key(ctx, curator).await {
-                Beneath::Read(key) => key,
-                Beneath::Absent => {
-                    wirings.push(super::skipped(connection, &curator.name));
-                    continue;
-                }
-                Beneath::Escaped => {
-                    wirings.push(super::keys::refused(connection, curator));
-                    continue;
-                }
+            let Some(api_key) = super::keys::minted_key(ctx, curator) else {
+                wirings.push(super::skipped(connection, &curator.name));
+                continue;
             };
             let watched = Watched {
                 which: *which,
@@ -111,8 +102,8 @@ pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::s
 /// shows whether it holds a key and never which, so there is nothing to read first.
 ///
 /// Answers with each finder's name and how the write came out — none where no finder
-/// watches `curator_id`, and none from one where a key is not written yet, since there is
-/// nothing to hold to it until there is.
+/// watches `curator_id`, and none where lemonfiber holds no minted key for it, since there
+/// is nothing to hold to it.
 pub(crate) async fn rewatch(
     ctx: &Ctx,
     fillers: &Fillers,
@@ -130,13 +121,8 @@ pub(crate) async fn rewatch(
         let Some(finder) = finder(ctx, watching.asker).await else {
             continue;
         };
-        let api_key = match super::keys::curator_key(ctx, curator).await {
-            Beneath::Read(key) => key,
-            Beneath::Absent => continue,
-            Beneath::Escaped => {
-                found.push((watching.asker.name.clone(), super::keys::refusal(curator)));
-                continue;
-            }
+        let Some(api_key) = super::keys::minted_key(ctx, curator) else {
+            continue;
         };
         let watched = Watched {
             which: *which,

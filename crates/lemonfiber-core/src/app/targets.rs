@@ -21,22 +21,6 @@ mod media;
 mod opening;
 mod secrets;
 
-/// Everything among `fillers` that a feature needing to know what a service is cannot
-/// cover, each with why, in one settled order: every stack service declaring a native
-/// API, which this build asks only through a plugin's adapter. A service declaring no API
-/// is not among them — the manifest saying nothing is the stack's own statement that
-/// there is nothing to integrate with, and repeating it back is not information.
-///
-/// Sorted by the service it names, so a report reads the same twice and two reports
-/// carrying it agree line for line.
-pub(crate) fn unsupported_here(
-    fillers: &crate::wiring::Fillers,
-) -> Vec<crate::model::UnsupportedReport> {
-    let mut found = curators::unasked(fillers);
-    found.sort_by(|one, two| one.what.cmp(&two.what));
-    found
-}
-
 pub(crate) use curators::*;
 pub(crate) use downloads::*;
 pub(crate) use filled::{identity, media, served_by, serving, spoken, Media, Spoken};

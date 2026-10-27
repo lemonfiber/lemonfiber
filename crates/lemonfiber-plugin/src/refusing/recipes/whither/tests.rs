@@ -194,7 +194,7 @@ fn an_input_says_what_its_origin_needs_and_nothing_else() {
 /// lemonfiber holds no credential for a service a plugin brings, so an input naming one
 /// is refused whether or not that service names one of lemonfiber's adapters.
 #[test]
-fn a_credential_of_the_plugins_own_service_is_refused_adapter_or_not() {
+fn a_credential_of_the_plugins_own_service_is_refused() {
     let held = carrying("credential-store", r#"of = "komga""#, "komga");
     let without = refused(&held);
     assert!(
@@ -203,30 +203,6 @@ fn a_credential_of_the_plugins_own_service_is_refused_adapter_or_not() {
             &["of", "komga is one of this plugin's own services"]
         ),
         "{without:?}"
-    );
-
-    let adapted = WHOLE.replace(
-        "provides    = [",
-        "api         = { kind = \"seerr\", key_source = \"generated\" }\n\
-         listens     = 25600\nprovides    = [",
-    );
-    let before = adapted.split("[[recipe]]").next().unwrap_or_default();
-    let text = format!(
-        "{before}{held}\n[requires]\ncapabilities = [\"doctor.contribute\", \"recipe.run\"]\n"
-    );
-    let with: Vec<String> = Manifest::from_toml(&text).map_or_else(
-        |refused| vec![refused.to_string()],
-        |manifest| {
-            refusals(&manifest, &["storage.hardlinks"])
-                .iter()
-                .map(ToString::to_string)
-                .filter(|said| said.starts_with("recipe "))
-                .collect()
-        },
-    );
-    assert!(
-        says(&with, &["komga is one of this plugin's own services"]),
-        "{with:?}"
     );
 }
 

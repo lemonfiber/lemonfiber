@@ -85,11 +85,6 @@ fn running() -> Vec<Outcome> {
             undeclared: Vec::new(),
             services: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-            unsupported: vec![lemonfiber_core::model::UnsupportedReport {
-                what: "somebodys-own-service".to_owned(),
-                because: "it declares an API of the Servarr shape and no port to publish"
-                    .to_owned(),
-            }],
         }),
         Outcome::Wizard(a_setup_part_way()),
         Outcome::Watch(SupervisionReport {

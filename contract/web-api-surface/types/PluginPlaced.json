@@ -1,11 +1,5 @@
 {
   "fields": {
-    "api": {
-      "type": [
-        "anyOf(null,ref:Api)"
-      ],
-      "required": false
-    },
     "asks": {
       "type": [
         "array[ref:PluginAsking]"

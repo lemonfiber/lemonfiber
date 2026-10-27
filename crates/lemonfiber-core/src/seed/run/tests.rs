@@ -22,16 +22,9 @@ use crate::test_support::{
 };
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// A manifest service with the few fields the credential resolver reads, and
-/// filler for the rest, so a test can vary the shape, port and key file.
-pub(super) fn manifest_service(
-    id: &str,
-    api: Option<lemonfiber_manifest::Api>,
-    port: Option<u16>,
-) -> lemonfiber_manifest::Service {
-    // Where it answers beside the others, said wherever it names an adapter, as the
-    // validator holds the stack to.
-    let listens = port.filter(|_| api.is_some());
+/// A manifest service with the few fields the seed passes read, and filler for the rest,
+/// answering on `port` where it publishes one.
+pub(super) fn manifest_service(id: &str, port: Option<u16>) -> lemonfiber_manifest::Service {
     lemonfiber_manifest::Service {
         id: id.to_owned(),
         name: format!("{id} the app"),
@@ -42,7 +35,6 @@ pub(super) fn manifest_service(
         port,
         bind: None,
         health: None,
-        api,
         criticality: lemonfiber_manifest::Criticality::Core,
         license: "MIT".to_owned(),
         upstream: "https://example.test".to_owned(),
@@ -72,23 +64,7 @@ pub(super) fn manifest_service(
         shape: None,
         asks_for: None,
         reaches: None,
-        listens,
-    }
-}
-
-/// A curator-shape API declaration naming the given key file, or none, at the
-/// v3 most tests need; the version-specific tests set their own.
-fn curator_api(path: Option<&str>) -> lemonfiber_manifest::Api {
-    curator_api_at(path, Some(3))
-}
-
-/// The same, at a given API version — `None` to omit it entirely.
-fn curator_api_at(path: Option<&str>, version: Option<u32>) -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Servarr,
-        key_source: lemonfiber_manifest::KeySource::ConfigXml,
-        path: path.map(str::to_owned),
-        version,
+        listens: port,
     }
 }
 
@@ -174,6 +150,21 @@ fn keeping_minted(
         .collect();
     let at = crate::settings::secrets_at(ctx).unwrap_or_default();
     assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+}
+
+/// A context as [`seed_ctx`] reaching every service builds it, its settings beside a
+/// scratch env file of the test `name`, holding `key` as the key lemonfiber minted for each
+/// of `parts`.
+fn minted_ctx(name: &str, parts: &[crate::test_support::adapted::Adapted], key: &str) -> Ctx {
+    let env = lemonfiber_fixtures::scratch::Scratch::new(&format!("minted-{name}"))
+        .kept()
+        .join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = seed_ctx(true, None, Some(env));
+    for part in parts {
+        part.minted(&ctx, key);
+    }
+    ctx
 }
 
 /// The key lemonfiber minted for the Usenet client moved into its plugin.
@@ -361,7 +352,6 @@ fn routed(project: &std::path::Path, routes: &[(&str, lemonfiber_sidecar::gate::
 fn request_gate() -> lemonfiber_manifest::Service {
     let mut gate = manifest_service(
         crate::app::gating::SERVICE,
-        None,
         Some(lemonfiber_sidecar::gate::PORT),
     );
     gate.provides = vec![lemonfiber_contract::capabilities::request::gate::CAPABILITY.to_owned()];
@@ -374,14 +364,35 @@ fn request_gate() -> lemonfiber_manifest::Service {
 /// syncable — `manifest_service` alone leaves the media empty, which is what
 /// marks the indexer aggregator.
 fn curator(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
-    let mut service = manifest_service(
-        id,
-        Some(curator_api(Some("/config/config.xml"))),
-        Some(port),
-    );
+    let mut service = manifest_service(id, Some(port));
     service.media_types = vec![media.to_owned()];
     service.provides = vec!["library.curate".to_owned()];
     service
+}
+
+/// Each of the stack's curators among `services` moved into its plugin, in the order
+/// `services` lists them.
+fn curators_moved(services: &[lemonfiber_manifest::Service]) -> Vec<crate::plugin::Installed> {
+    services
+        .iter()
+        .filter_map(|service| {
+            crate::test_support::curators::ALL
+                .iter()
+                .find(|curator| curator.plugin == service.id)
+        })
+        .filter_map(|curator| curator.installed())
+        .collect()
+}
+
+/// `trusted` beside the plugins the bundle pins, which are first-party.
+fn beside_the_bundle(
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> Vec<crate::plugin::first_party::FirstParty> {
+    crate::plugin::first_party::EMBEDDED
+        .iter()
+        .chain(trusted)
+        .copied()
+        .collect()
 }
 
 /// What the shipped stack's asks come to with these services in place of its own —
@@ -444,18 +455,62 @@ fn fillers_trusting(
     crate::test_support::stack_fillers(services, installed, Some(project), trusted)
 }
 
+/// The key lemonfiber minted for every part [`contracted_ctx`] holds one for.
+const MINTED: &str = "the-key";
+
 /// A context reaching `service` on loopback 8080, holding its key in `project` where
-/// `keyed`, with every curator key on file.
+/// `keyed`, its settings beside an env file in `project`, and [`MINTED`] kept as the key
+/// lemonfiber minted for every part the bundle pins.
 fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: Arc<Fake>) -> Ctx {
-    crate::test_support::contracted_context(project, service, keyed)
+    let env = project.join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = crate::test_support::contracted_context(project, service, keyed)
+        .settings(Settings {
+            env_file: Some(env),
+            ..Settings::default()
+        })
         .build()
-        .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(
-            "<Config><ApiKey>the-key</ApiKey></Config>",
-        ))))
+        .with_http(http);
+    minted_for_every_part(&ctx, MINTED);
+    ctx
 }
 
-/// A third-party plugin's curator, `kept`, filing `media` over `library.curate` and keeping
+/// `ctx` with its secret store gone, so lemonfiber holds no key it minted for anything.
+fn forgetting_minted(ctx: Ctx) -> Ctx {
+    let _ = std::fs::remove_file(crate::settings::secrets_at(&ctx).unwrap_or_default());
+    ctx
+}
+
+/// `key` kept in `ctx`'s secret store as the key lemonfiber minted for every part the
+/// bundle pins.
+fn minted_for_every_part(ctx: &Ctx, key: &str) {
+    let names: Vec<String> = lemonfiber_bundled::PINNED
+        .iter()
+        .filter_map(|pinned| lemonfiber_plugin::Manifest::from_toml(pinned.copy).ok())
+        .flat_map(|manifest| {
+            let installed = crate::plugin::Installed::of(&manifest);
+            installed
+                .declared
+                .secrets
+                .iter()
+                .filter(|secret| secret.minted)
+                .map(|secret| crate::settings::named(&installed.plugin, &secret.id))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let keeping: Vec<crate::settings::Keeping<'_>> = names
+        .iter()
+        .map(|name| crate::settings::Keeping {
+            name,
+            value: key,
+            from: crate::settings::Source::Minted,
+            at: 1,
+        })
+        .collect();
+    let at = crate::settings::secrets_at(ctx).unwrap_or_default();
+    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+}
+
 /// `installed`, each of its services asking for every curator.
 fn asking_every_curator(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
     for placed in &mut installed.services {
@@ -468,15 +523,12 @@ fn asking_every_curator(mut installed: crate::plugin::Installed) -> crate::plugi
     installed
 }
 
-/// its key in a file beneath the directory its container owns.
+/// A plugin's curator `kept`, filing `media` over `library.curate` and answering in
+/// `servarr`.
 fn a_stand_in(media: &str) -> crate::plugin::Installed {
-    let mut stand_in = crate::test_support::a_placed(
-        "kept",
-        &["library.curate"],
-        Some(curator_api(Some("/config/config.xml"))),
-        Some(8990),
-    );
+    let mut stand_in = crate::test_support::a_placed("kept", &["library.curate"], Some(8990));
     stand_in.media_types = vec![media.to_owned()];
+    stand_in.native = Some("servarr".to_owned());
     stand_in.speaks = vec!["library.curate@1".to_owned()];
     crate::test_support::an_installed("kept", vec![stand_in])
 }
@@ -495,19 +547,12 @@ fn asked_by_a_plugin(
     asker: &lemonfiber_manifest::Service,
     services: Vec<lemonfiber_manifest::Service>,
 ) -> crate::wiring::Fillers {
-    let stand_in = crate::test_support::a_placed(&asker.id, &[], asker.api.clone(), asker.listens);
+    let stand_in = crate::test_support::a_placed(&asker.id, &[], asker.listens);
     fillers_beside(
         services,
         &[crate::test_support::an_installed("asking", vec![stand_in])],
         stack_root(),
     )
-}
-
-/// A filesystem holding every curator key, the stand-in's resolving away from beneath
-/// the directory its container owns.
-fn leading_away_from_the_stand_in() -> SeedFs {
-    SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
-        .leading_away(vec!["config/kept/"])
 }
 
 /// The stack's `services` with its indexer moved into its plugin, beside `installed`.
@@ -523,40 +568,29 @@ fn indexed(
     fillers_beside(services, &installed, stack_root())
 }
 
-/// A context asking the moved indexer over `http`, holding every stack curator's key as
-/// `fs` does.
-fn indexing(http: Arc<Fake>, fs: SeedFs) -> Ctx {
+/// A context of the test `name` asking the moved indexer over `http`, holding [`MINTED`] as
+/// the key lemonfiber minted for the moved TV curator where `keyed`.
+fn indexing(name: &str, http: Arc<Fake>, keyed: bool) -> Ctx {
+    let parts: &[crate::test_support::adapted::Adapted] = if keyed {
+        &[crate::test_support::curators::TELEVISION]
+    } else {
+        &[]
+    };
     crate::test_support::adapted::asking(
-        seed_ctx(true, None, None)
-            .with_http(http)
-            .with_filesystem(Arc::new(fs)),
+        minted_ctx(name, parts, MINTED).with_http(http),
         &[INDEXER],
     )
 }
 
 /// The indexer aggregator as a manifest service: a curator shape that files no media.
 fn aggregator_svc() -> lemonfiber_manifest::Service {
-    manifest_service(
-        "prowlarr",
-        Some(curator_api(Some("/config/config.xml"))),
-        Some(9696),
-    )
+    manifest_service("prowlarr", Some(9696))
 }
 
 // ---- The media server as the request service's identity, with a minted credential. ----
 
-/// A request-service-shape declaration.
-fn requests_api() -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Seerr,
-        key_source: lemonfiber_manifest::KeySource::ApiSettings,
-        path: None,
-        version: None,
-    }
-}
-
 fn requests_svc() -> lemonfiber_manifest::Service {
-    requesting(manifest_service("seerr", Some(requests_api()), Some(5055)))
+    requesting(manifest_service("seerr", Some(5055)))
 }
 
 /// `service` as the stack's request service: called what the stack calls it and filling
@@ -567,18 +601,9 @@ fn requesting(mut service: lemonfiber_manifest::Service) -> lemonfiber_manifest:
     service
 }
 
-fn media_server_api() -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Jellyfin,
-        key_source: lemonfiber_manifest::KeySource::Generated,
-        path: None,
-        version: None,
-    }
-}
-
 /// The stack's media server, called what the stack calls it and serving its identity.
 fn media_server_svc() -> lemonfiber_manifest::Service {
-    let mut media_server = manifest_service("jellyfin", Some(media_server_api()), Some(8096));
+    let mut media_server = manifest_service("jellyfin", Some(8096));
     media_server.name = "Jellyfin".to_owned();
     media_server.provides = vec!["identity.source".to_owned()];
     media_server
@@ -635,36 +660,9 @@ fn household_changing(completed: bool, signed_in: bool, changed: Answer) -> Arc<
     ])
 }
 
-/// The request service, keeping its configuration beneath its application directory and
-/// declaring the settings file there it writes its key to.
-fn requests_with_settings() -> lemonfiber_manifest::Service {
-    lemonfiber_manifest::Service {
-        config_path: Some("/app/config".to_owned()),
-        ..requesting(manifest_service(
-            "seerr",
-            Some(lemonfiber_manifest::Api {
-                kind: lemonfiber_manifest::ApiKind::Seerr,
-                key_source: lemonfiber_manifest::KeySource::ConfigJson,
-                path: Some("/app/config/settings.json".to_owned()),
-                version: None,
-            }),
-            Some(5055),
-        ))
-    }
-}
-
 /// The book curator, as a manifest service whose key lemonfiber mints for it.
 fn book_curator_svc() -> lemonfiber_manifest::Service {
-    manifest_service(
-        "bindery",
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Bindery,
-            key_source: lemonfiber_manifest::KeySource::Generated,
-            path: None,
-            version: None,
-        }),
-        Some(8787),
-    )
+    manifest_service("bindery", Some(8787))
 }
 
 /// A scratch settings file holding the media server's recorded password, so a
@@ -683,16 +681,7 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
 
 /// The stack's own subtitle finder as a manifest service, naming the YAML it writes its key to.
 fn subtitle_finder_svc() -> lemonfiber_manifest::Service {
-    manifest_service(
-        "bazarr",
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Bazarr,
-            key_source: lemonfiber_manifest::KeySource::ConfigYaml,
-            path: Some("/config/config/config.yaml".to_owned()),
-            version: None,
-        }),
-        Some(6767),
-    )
+    manifest_service("bazarr", Some(6767))
 }
 
 fn stack_root() -> &'static std::path::Path {

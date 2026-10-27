@@ -35,7 +35,7 @@ fn an_unrecognised_name_reports_every_one_of_them() {
     let message = Failure::Unrecognised(vec![
         Violation {
             location: "service jellyfin".to_owned(),
-            message: "api.kind: unknown variant plex".to_owned(),
+            message: "health.kind: unknown variant plex".to_owned(),
         },
         Violation {
             location: "profile tv".to_owned(),

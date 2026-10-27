@@ -137,9 +137,10 @@ impl Connection {
 /// Why one asker and one filler come to nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Unmade {
-    /// The filler names no adapter, so there is nothing lemonfiber speaks to it through.
-    NoAdapter,
-    /// The filler names an adapter and no port it answers on beside the others.
+    /// The filler names no API of its own, so there is nothing lemonfiber could tell the
+    /// asker about it in.
+    NoNative,
+    /// The filler names an API of its own and no port it answers on beside the others.
     NoPort,
     /// Nothing in this table connects the contract the asker speaks to what the filler
     /// speaks.
@@ -298,7 +299,7 @@ fn made<'a>(
     if !fillers.hands(filler, answering) {
         return Err(Unmade::Asked);
     }
-    let speaks = filler.talks_in().ok_or(Unmade::NoAdapter)?;
+    let speaks = filler.talks_in().ok_or(Unmade::NoNative)?;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
     let made = connection(
         contract,
@@ -363,15 +364,15 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
         pairing.ask.capability
     );
     match why {
-        Unmade::NoAdapter => {
-            format!("{fills} and names no adapter lemonfiber could tell {asker} about it through")
-        }
+        Unmade::NoNative => format!(
+            "{fills} and names no API of its own that lemonfiber could tell {asker} about it in"
+        ),
         Unmade::NoPort => {
             format!("{fills} and does not say which port it answers on inside the stack's network")
         }
         Unmade::Unpaired => format!(
-            "{fills} and nothing in lemonfiber tells {asker} about a service that speaks \
-             {filler}'s adapter"
+            "{fills} and nothing in lemonfiber tells {asker} about a service answering in \
+             {filler}'s API"
         ),
         Unmade::Synced => format!(
             "{fills} and syncs the media {asker} files to it itself, so {filler} is told about \

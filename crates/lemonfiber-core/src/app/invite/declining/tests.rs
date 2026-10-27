@@ -257,7 +257,6 @@ fn filled_by_theirs(project: &Path, speaks: bool) -> crate::wiring::Fillers {
             vec![a_placed(
                 THEIRS,
                 &[super::decline::CAPABILITY],
-                None,
                 Some(CONTRACTED_PORT),
             )],
         )

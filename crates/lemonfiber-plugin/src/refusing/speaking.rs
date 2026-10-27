@@ -64,14 +64,6 @@ pub(super) fn spoken(service: &Service, services: &[Service], found: &mut Vec<Vi
                 .to_owned(),
         });
     }
-    if service.api.is_some() {
-        found.push(Violation {
-            location: format!("{at}.api"),
-            message: "names an adapter in lemonfiber beside contracts the service speaks, and a \
-                      service is asked one way"
-                .to_owned(),
-        });
-    }
 }
 
 /// Whether the adapter names one other service of its plugin, one that speaks nothing,

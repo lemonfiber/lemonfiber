@@ -15,14 +15,7 @@ fn a_plugin_media_server_as(
     ctx: &crate::app::Ctx,
     change: impl FnOnce(&mut crate::plugin::Placed),
 ) -> std::path::PathBuf {
-    let api = lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Jellyfin,
-        key_source: lemonfiber_manifest::KeySource::ConfigXml,
-        path: Some("/config/config.xml".to_owned()),
-        version: None,
-    };
-    let mut server =
-        crate::test_support::a_placed("server", &["identity.source"], Some(api), Some(8097));
+    let mut server = crate::test_support::a_placed("server", &["identity.source"], Some(8097));
     change(&mut server);
     let installed = crate::test_support::an_installed("serving", vec![server]);
     let mut register = crate::plugin::Register::empty();

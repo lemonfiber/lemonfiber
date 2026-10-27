@@ -115,17 +115,10 @@ fn a_contract_named_twice_is_refused() {
 }
 
 #[test]
-fn an_adapter_that_says_neither_where_it_answers_nor_one_way_to_ask_it_is_refused() {
-    let said = said(&speaking(
-        r#"["media.serve@1"]"#,
-        "api         = { kind = \"jellyfin\", key_source = \"generated\" }\n",
-    ));
+fn an_adapter_that_says_nowhere_it_answers_is_refused() {
+    let said = said(&speaking(r#"["media.serve@1"]"#, ""));
     assert!(
         names(&said, &["service komga.listens", "speaks a contract"]),
-        "{said:?}"
-    );
-    assert!(
-        names(&said, &["service komga.api", "asked one way"]),
         "{said:?}"
     );
 }

@@ -64,6 +64,28 @@ pub fn scan(text: &str, declared: &[(&str, &[Closed])]) -> Vec<Refusal> {
         .unwrap_or_default()
 }
 
+/// Every entry of `kind` that declares `field`, a field the format does not have, each
+/// placed at the field and told `why`.
+///
+/// Silent on a file that is not TOML at all, as [`scan`] is.
+#[must_use]
+pub fn undeclared(text: &str, kind: &str, field: &str, why: &str) -> Vec<Refusal> {
+    let Ok(tree) = toml::from_str::<Value>(text) else {
+        return Vec::new();
+    };
+    tree.get(kind)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .filter(|(_, entry)| entry.get(field).is_some())
+        .map(|(at, entry)| Refusal {
+            location: format!("{}.{field}", where_it_is(kind, at, entry)),
+            message: format!("the format declares no such field; {why}"),
+        })
+        .collect()
+}
+
 /// What the owning type says about a word, when it does not accept it.
 ///
 /// Only a string is a name. A field holding a number or a table is a type error and a

@@ -3,7 +3,6 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
-use lemonfiber_core::model::UnsupportedReport;
 use lemonfiber_core::seed::{
     Assessment as SeedAssessment, Report as SeedReport, Severity as SeedSeverity,
     State as SeedState,
@@ -94,7 +93,6 @@ pub(super) fn seeding(report: &SeedReport) -> Lines {
     for wiring in &report.wirings {
         lines.extend(connection(wiring));
     }
-    lines.extend(unwirable(&report.unsupported));
     let warnings = report.warnings();
     if !warnings.is_empty() {
         lines.spaced(format!(
@@ -164,25 +162,6 @@ fn would(yours: Option<&str>, ours: Option<&str>) -> String {
         (None, Some(ours)) => format!("would be set to “{ours}”"),
         (Some(yours), Some(ours)) => format!("would be changed from “{yours}” to “{ours}”"),
     }
-}
-
-/// The services a pass could not wire because it cannot speak to them, under the
-/// connections it did attempt.
-///
-/// Under rather than among, because these are not connections: nothing was tried, so
-/// there is no outcome to report beside the others. What there is is a reason, and an
-/// operator who wrote the declaration this is about is the only person who can act on
-/// it.
-fn unwirable(unsupported: &[UnsupportedReport]) -> Lines {
-    let mut lines = Lines::default();
-    if unsupported.is_empty() {
-        return lines;
-    }
-    lines.spaced("These were not wired, because lemonfiber cannot speak to them:");
-    for one in unsupported {
-        lines.put(format!("  {} — {}", one.what, one.because));
-    }
-    lines
 }
 
 #[cfg(test)]

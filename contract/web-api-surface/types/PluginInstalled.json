@@ -1,11 +1,5 @@
 {
   "fields": {
-    "adapters": {
-      "type": [
-        "array[ref:PluginServiceAdapter]"
-      ],
-      "required": false
-    },
     "contributions": {
       "type": [
         "array[ref:Contribution]"

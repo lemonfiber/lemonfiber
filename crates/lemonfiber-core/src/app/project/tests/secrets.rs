@@ -175,7 +175,7 @@ fn a_replaced_key_is_written_into_every_file_that_reads_it() {
 fn a_stack_service_moved_in_place_is_no_longer_written_a_secrets_file() {
     let (ctx, _project) = machine("secrets-moved");
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
-    let mut moved = crate::test_support::a_placed("gluetun", &[], None, None);
+    let mut moved = crate::test_support::a_placed("gluetun", &[], None);
     moved.replaces = Some("gluetun".to_owned());
     let installed = [crate::test_support::pinned_as(
         crate::test_support::an_installed("gluetun", vec![moved]),

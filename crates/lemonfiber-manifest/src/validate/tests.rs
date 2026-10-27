@@ -96,37 +96,6 @@ fn the_stack_this_binary_ships_is_valid() {
     );
 }
 
-/// The servarr shape spans two API versions, so one omitting it cannot be reached at a
-/// known path, and a service declaring one without its version is a surfaced fault, not
-/// a silent exclusion.
-#[test]
-fn a_servarr_service_without_an_api_version_is_caught() {
-    let text = edited(
-        BAZARR,
-        &format!("{BAZARR}\napi = {{ kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\" }}"),
-    );
-    let caught = messages(&text)
-        .iter()
-        .any(|message| message.contains("names no api.version"));
-    assert!(caught);
-}
-
-/// The solver publishes a port and says of none that it answers on inside the stack's
-/// network, so an api on it is one nothing could say where to reach.
-#[test]
-fn a_service_with_an_api_and_no_listens_is_caught() {
-    let text = edited(
-        "id = \"flaresolverr\"",
-        "id = \"flaresolverr\"\napi = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }",
-    );
-    let caught = messages(&text).iter().any(|message| {
-        message
-            == "service flaresolverr: declares an api but no listens, the port it answers on \
-                inside the stack's network"
-    });
-    assert!(caught);
-}
-
 #[test]
 fn a_duplicate_profile_id_is_caught() {
     let text = edited(r#"id = "usenet""#, r#"id = "search""#);

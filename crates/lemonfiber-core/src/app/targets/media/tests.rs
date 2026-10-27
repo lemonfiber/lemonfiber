@@ -145,7 +145,7 @@ fn a_plugin_under_the_request_services_id_is_never_the_one_asking() {
     let mut installed: Vec<Installed> = crate::test_support::media::moved().into_iter().collect();
     installed.push(an_installed(
         "impostor",
-        vec![a_placed("seerr", &["request.intake"], None, Some(5999))],
+        vec![a_placed("seerr", &["request.intake"], Some(5999))],
     ));
     let fillers = shipped(&installed, &Chosen::default(), |manifest| {
         manifest.services.retain(|service| service.id != "seerr");
@@ -265,7 +265,7 @@ fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
     installed
         .services
         .retain(|placed| placed.service != MEDIA_UPSTREAM);
-    let mut stranger = a_placed(MEDIA_UPSTREAM, &[], None, Some(9000));
+    let mut stranger = a_placed(MEDIA_UPSTREAM, &[], Some(9000));
     stranger.native = Some("upstream".to_owned());
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
     let fillers = shipped(

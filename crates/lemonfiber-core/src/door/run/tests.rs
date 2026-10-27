@@ -275,11 +275,7 @@ fn up(id: &str, state: crate::docker::State) -> crate::docker::Service {
 fn a_stack_that_publishes_nothing_to_the_household_is_told_there_is_no_door() {
     // The operator-only configuration: everything it runs answers this machine
     // and nothing else, so there is no address to hand anybody at all.
-    let declared = [service(
-        "sonarr",
-        Some(lemonfiber_manifest::Bind::Loopback),
-        Some(lemonfiber_manifest::ApiKind::Servarr),
-    )];
+    let declared = [service("sonarr", Some(lemonfiber_manifest::Bind::Loopback))];
     let report = assembled(
         &crate::door::candidates(&declared, &[], &crate::wiring::Fillers::default()),
         super::Running {
@@ -556,11 +552,7 @@ fn a_door_nobody_named_says_nothing_about_having_been_named() {
 fn a_refusal_is_said_even_where_there_was_no_door_to_fall_back_to() {
     // Two absences at once: nothing to send anybody to, and a setting that named
     // something that could not have been it either.
-    let declared = [service(
-        "sonarr",
-        Some(lemonfiber_manifest::Bind::Loopback),
-        Some(lemonfiber_manifest::ApiKind::Servarr),
-    )];
+    let declared = [service("sonarr", Some(lemonfiber_manifest::Bind::Loopback))];
     let report = assembled(
         &crate::door::candidates(&declared, &[], &crate::wiring::Fillers::default()),
         super::Running {
@@ -608,7 +600,7 @@ fn over_a_plugin_door(
 ) -> crate::model::FrontDoorReport {
     let declared = [
         watching(),
-        service("caddy", Some(lemonfiber_manifest::Bind::Lan), None),
+        service("caddy", Some(lemonfiber_manifest::Bind::Lan)),
     ];
     let mut surveyed = vec![up("door", crate::docker::State::Healthy)];
     if proxying {

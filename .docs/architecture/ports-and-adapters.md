@@ -127,8 +127,8 @@ but the resulting trait is not object-safe, and every one of these is held as
 - `Ctx` holds `Arc<dyn Runner>`, so a fake substitutes without a generic
   parameter threading through every call site.
 - Doctor checks are values in a collection, which requires `dyn`.
-- Service clients are selected at runtime by the manifest's `api.kind`, which is
-  the entire reason that field exists — a compile-time type could not do it.
+- Service clients are selected at runtime by the API a service's `native` names,
+  which a compile-time type could not do.
 
 The boxing cost is one allocation per call against operations that spawn a
 process or cross a socket.

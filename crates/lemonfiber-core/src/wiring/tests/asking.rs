@@ -10,7 +10,7 @@ use crate::wiring::{
 
 /// A plugin whose one service, `service`, asks for `capability`.
 fn plugin_asking(plugin: &str, service: &str, capability: &str, each: bool) -> Installed {
-    let mut placed = crate::test_support::a_placed(service, &[], None, None);
+    let mut placed = crate::test_support::a_placed(service, &[], None);
     placed.asks = vec![Asking {
         native: None,
         capability: capability.to_owned(),
@@ -222,7 +222,7 @@ fn a_variable_asking_an_address_reaches_the_one_service_its_ask_settles_on() {
     assert_eq!(address(bundled(), &held, "somebody", None), None);
     assert_eq!(address(written(""), &held, "subfinder", None), None);
 
-    let mut finder = crate::test_support::a_placed("finder", &["indexer.search"], None, Some(8080));
+    let mut finder = crate::test_support::a_placed("finder", &["indexer.search"], Some(8080));
     let listening = [
         asker.clone(),
         crate::test_support::an_installed("idx", vec![finder.clone()]),

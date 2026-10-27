@@ -155,18 +155,8 @@ pub(crate) async fn stuck(ctx: &Ctx) -> Result<StuckReport, Box<Problem>> {
             Err(_) => incomplete = true,
         }
     }
-    // The queues that were never asked, as against the ones that were and would not
-    // answer. A service declaring an API this build cannot speak or reach holds a queue
-    // nothing here can read, and leaving it out makes this list exactly as short as an
-    // unreadable queue does — without the sentence that says so.
-    let unsupported =
-        super::targets::unsupported_here(&super::targets::fillers_here(ctx, &manifest));
 
-    Ok(StuckReport {
-        items,
-        incomplete,
-        unsupported,
-    })
+    Ok(StuckReport { items, incomplete })
 }
 
 #[cfg(test)]

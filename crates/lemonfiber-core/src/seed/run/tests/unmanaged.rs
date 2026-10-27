@@ -55,8 +55,8 @@ fn a_plugins_service_declared_unmanaged_is_taken_out_of_the_pass_and_reported() 
     let installed = [crate::test_support::an_installed(
         "pair",
         vec![
-            crate::test_support::a_placed("kept", &[], None, None),
-            crate::test_support::a_placed("left-alone", &[], None, None),
+            crate::test_support::a_placed("kept", &[], None),
+            crate::test_support::a_placed("left-alone", &[], None),
         ],
     )];
     let declared = vec![("left-alone".to_owned(), "mine to run".to_owned())];

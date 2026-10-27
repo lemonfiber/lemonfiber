@@ -3,10 +3,10 @@ use crate::test_support::{a_placed, an_installed};
 
 #[test]
 fn each_plugin_is_named_with_its_version_origin_and_review_and_its_configuration_withheld() {
-    let mut reviewed = an_installed("komga", vec![a_placed("komga", &[], None, None)]);
+    let mut reviewed = an_installed("komga", vec![a_placed("komga", &[], None)]);
     reviewed.from = "https://github.com/example/plugin-komga".to_owned();
     reviewed.declared.reviewed = true;
-    let unrecorded = an_installed("shelf", vec![a_placed("shelf", &[], None, None)]);
+    let unrecorded = an_installed("shelf", vec![a_placed("shelf", &[], None)]);
 
     let said = listed(&[reviewed, unrecorded]);
 

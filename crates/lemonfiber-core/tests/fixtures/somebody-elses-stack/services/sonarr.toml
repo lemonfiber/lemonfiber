@@ -17,8 +17,3 @@ without_it   = "Nothing files series; you move the downloads yourself."
 reaches      = "television metadata providers"
 asks_for     = "Reads series, season and episode information for what this operator's library holds."
 
-[service.api]
-kind       = "servarr"
-key_source = "config-xml"
-path       = "/config/config.xml"
-version    = 3

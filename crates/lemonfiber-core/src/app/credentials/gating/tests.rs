@@ -12,11 +12,7 @@ use crate::test_support::media::serve;
 use crate::test_support::{a_context, json};
 
 /// A service in the stack, with the shape this module reads.
-fn service(
-    id: &str,
-    api: Option<lemonfiber_manifest::ApiKind>,
-    port: u16,
-) -> lemonfiber_manifest::Service {
+fn service(id: &str, port: u16) -> lemonfiber_manifest::Service {
     lemonfiber_manifest::Service {
         id: id.to_owned(),
         name: format!("{id} the app"),
@@ -27,12 +23,6 @@ fn service(
         port: Some(port),
         bind: None,
         health: None,
-        api: api.map(|kind| lemonfiber_manifest::Api {
-            kind,
-            key_source: lemonfiber_manifest::KeySource::Generated,
-            path: None,
-            version: None,
-        }),
         criticality: lemonfiber_manifest::Criticality::Core,
         license: "MIT".to_owned(),
         upstream: "https://example.test".to_owned(),
@@ -68,18 +58,14 @@ fn service(
 
 /// The media server, and the request gate where `gating`.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut media_server = service(
-        "jellyfin",
-        Some(lemonfiber_manifest::ApiKind::Jellyfin),
-        8096,
-    );
+    let mut media_server = service("jellyfin", 8096);
     media_server.provides = vec!["identity.source".to_owned()];
     media_server.listens = Some(8096);
-    let mut request_service = service("seerr", Some(lemonfiber_manifest::ApiKind::Seerr), 5055);
+    let mut request_service = service("seerr", 5055);
     request_service.listens = Some(5055);
     let mut services = vec![media_server, request_service];
     if gating {
-        services.push(service("request-gate", None, PORT));
+        services.push(service("request-gate", PORT));
     }
     services
 }
@@ -298,7 +284,7 @@ async fn without_the_gate_the_media_server_or_a_stack_directory_there_is_no_line
     assert!(held(&ctx, &stack(true), &filling(stack(true), &at), None)
         .await
         .is_none());
-    let gate_alone = vec![service("request-gate", None, PORT)];
+    let gate_alone = vec![service("request-gate", PORT)];
     assert!(held(
         &ctx,
         &gate_alone,
@@ -459,7 +445,7 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
 
     let unadministered = rotate(&ctx, &listed, &filling(stack(true), &at)).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
-    let gate_alone = vec![service("request-gate", None, PORT)];
+    let gate_alone = vec![service("request-gate", PORT)];
     let serverless = rotate(&ctx, &listed, &unserved(gate_alone, &at)).await;
     assert!(unproven(&serverless.settled)
         .is_some_and(|said| said == crate::app::credentials::declining::NO_ADMINISTRATOR));

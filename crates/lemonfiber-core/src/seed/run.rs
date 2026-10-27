@@ -221,11 +221,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         .await,
     );
 
-    // The keys the stack's own services read out of the environment. Two of them are
-    // configured that way and by no other means — the quality sync and the archive
-    // extractor — so without this they run with nothing, and the quality sync refuses
-    // its whole configuration over a single undefined name.
-    wirings.push(published::publish_keys(ctx, &manifest.services, &fillers).await);
+    if !ctx.dry_run {
+        published::retire_keys(ctx, &fillers).await;
+    }
     wirings.extend(crossing::unhanded(ctx, &manifest, &installed, &fillers));
 
     wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
@@ -272,7 +270,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         wirings,
         assessment,
         rehearsed: ctx.dry_run,
-        unsupported: crate::app::targets::unsupported_here(&fillers),
     })
 }
 

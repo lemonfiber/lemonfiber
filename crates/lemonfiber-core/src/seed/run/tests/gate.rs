@@ -34,12 +34,25 @@ fn moved_parts() -> Vec<crate::plugin::Installed> {
         .collect()
 }
 
-/// `services` written at `project`, with [`moved_parts`] moved.
+/// `services` written at `project`, with [`moved_parts`] and each of its curators moved.
 fn routed_at(
     services: Vec<lemonfiber_manifest::Service>,
     project: &std::path::Path,
 ) -> crate::wiring::Fillers {
-    fillers_beside(services, &moved_parts(), project)
+    let installed: Vec<crate::plugin::Installed> = moved_parts()
+        .into_iter()
+        .chain(curators_moved(&services))
+        .collect();
+    fillers_beside(services, &installed, project)
+}
+
+/// `key` kept in `ctx`'s secret store as the key lemonfiber minted for the curator
+/// `curator` moved into its plugin.
+fn minted_for(ctx: &Ctx, curator: &str, key: &str) {
+    crate::test_support::curators::ALL
+        .iter()
+        .filter(|moved| moved.plugin == curator)
+        .for_each(|moved| moved.minted(ctx, key));
 }
 
 /// A media server filing `filed` under the gate's name and minting `minted`, taking a mint
@@ -79,10 +92,10 @@ fn moved_majors() -> Vec<u32> {
         .unwrap_or_default()
 }
 
-/// A stack directory where each of `curators` has written its own key, holding `held` as
-/// the gate's media server key where it holds one, and a context asking the media server
-/// moved into its plugin as its administrator where `administered` says, answering over
-/// `http`.
+/// A stack directory holding the key lemonfiber minted for each of `curators`, and `held`
+/// as the gate's media server key where it holds one, and a context asking the media
+/// server moved into its plugin as its administrator where `administered` says, answering
+/// over `http`.
 fn gate_ctx(
     name: &str,
     administered: bool,
@@ -95,10 +108,6 @@ fn gate_ctx(
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    for (curator, key) in curators {
-        let config = at.join("config").join(curator).join("config.xml");
-        let _ = store::write(&config, &format!("<Config><ApiKey>{key}</ApiKey></Config>"));
-    }
     if let Some(held) = held {
         let _ = store::write(&routes_file(&at), &holding(curators, held).written());
     }
@@ -110,6 +119,9 @@ fn gate_ctx(
         })
         .build()
         .with_http(http);
+    for (curator, key) in curators {
+        minted_for(&ctx, curator, key);
+    }
     (
         if administered {
             media::asking(ctx)
@@ -120,8 +132,8 @@ fn gate_ctx(
     )
 }
 
-/// The routes the gate should hold where `curators` have written their keys and `key` is
-/// its media server key.
+/// The routes the gate should hold where lemonfiber minted each of `curators` its key and
+/// `key` is its media server key.
 fn holding(curators: &[(&str, &str)], key: &str) -> Upstreams {
     let mut upstreams: Vec<Upstream> = curators
         .iter()
@@ -201,14 +213,15 @@ fn revoked(http: &Fake) -> Vec<String> {
         .collect()
 }
 
-/// Both curators, with the keys they wrote.
+/// Both curators, with the keys lemonfiber minted for them.
 const CURATORS: &[(&str, &str)] = &[("sonarr", "sonarrs"), ("radarr", "radarrs")];
 
-/// The movie curator alone: the stack before the TV curator wrote its key.
+/// The movie curator alone: the stack before lemonfiber minted the TV curator a key.
 const MOVIES_ONLY: &[(&str, &str)] = &[("radarr", "radarrs")];
 
 /// A stack whose gate holds nothing has a key minted for it, and is handed a route for
-/// each curator, with the key it wrote, and one for the media server, with the new key.
+/// each curator, with the key lemonfiber minted for it, and one for the media server, with
+/// the new key.
 #[tokio::test]
 async fn the_routes_are_written_with_a_key_of_the_gates_own() {
     let http = serving(&[], "fresh", true, true);
@@ -252,8 +265,8 @@ async fn routes_that_hold_are_left_alone() {
     assert!(revoked.is_empty(), "{revoked:?}");
 }
 
-/// A curator that wrote a new key reaches the gate on the next pass, under the same
-/// media server key, and a key filed under the gate's name that the routes do not hold is
+/// A curator key minted anew reaches the gate on the next pass, under the same media
+/// server key, and a key filed under the gate's name that the routes do not hold is
 /// revoked.
 #[tokio::test]
 async fn a_moved_curator_key_is_written_and_strays_revoked() {
@@ -266,10 +279,7 @@ async fn a_moved_curator_key_is_written_and_strays_revoked() {
         http.clone(),
     );
     let moved = [("sonarr", "regenerated"), ("radarr", "radarrs")];
-    let _ = store::write(
-        &at.join("config/sonarr/config.xml"),
-        "<Config><ApiKey>regenerated</ApiKey></Config>",
-    );
+    minted_for(&ctx, "sonarr", "regenerated");
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
@@ -296,13 +306,12 @@ async fn unrouted(ctx: &Ctx, project: &std::path::Path) -> Vec<(String, State)> 
     .collect()
 }
 
-/// A curator that has written no key yet has no route until it has, and the pass says it
-/// is skipped; one whose key file is a link is refused, and the pass says that.
+/// A curator lemonfiber holds no minted key for has no route, and the pass says it is
+/// skipped.
 #[tokio::test]
-async fn a_curator_without_a_key_has_no_route() {
+async fn a_curator_holding_no_minted_key_has_no_route() {
     let http = serving(&[], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-routes-keyless", true, MOVIES_ONLY, None, http.clone());
-    let connection = "sonarr the app routed through the request gate".to_owned();
 
     let said = unrouted(&ctx, &at).await;
 
@@ -310,24 +319,13 @@ async fn a_curator_without_a_key_has_no_route() {
     assert_eq!(
         said,
         vec![(
-            connection.clone(),
+            "Sonarr routed through the request gate".to_owned(),
             State::Skipped {
-                reason: "sonarr the app has not written its API key yet; a later run completes it"
+                reason: "lemonfiber holds no key it minted for Sonarr; a run once it holds one \
+                         completes it"
                     .to_owned()
             }
         )]
-    );
-
-    let _ = std::fs::create_dir_all(at.join("config/sonarr"));
-    let _ = std::os::unix::fs::symlink(
-        at.join("config/radarr/config.xml"),
-        at.join("config/sonarr/config.xml"),
-    );
-    let refused = unrouted(&ctx, &at).await;
-
-    assert!(
-        matches!(refused.as_slice(), [(named, State::Refused { .. })] if *named == connection),
-        "{refused:?}"
     );
 }
 
@@ -413,10 +411,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
         let written = if moved { MOVIES_ONLY } else { CURATORS };
         let (mut ctx, at) = gate_ctx(name, true, written, held_now, http.clone());
         if moved {
-            let _ = store::write(
-                &at.join("config/sonarr/config.xml"),
-                "<Config><ApiKey>sonarrs</ApiKey></Config>",
-            );
+            minted_for(&ctx, "sonarr", "sonarrs");
         }
         ctx.dry_run = true;
         let before = routes(&at);

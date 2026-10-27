@@ -280,7 +280,6 @@ fn the_first_of_them() -> Vec<Outcome> {
         Outcome::Stuck(StuckReport {
             items: Vec::new(),
             incomplete: false,
-            unsupported: Vec::new(),
         }),
         Outcome::FrontDoor(FrontDoorReport {
             standing: Standing::Absent,
@@ -323,7 +322,6 @@ fn the_rest_of_them() -> Vec<Outcome> {
             undeclared: Vec::new(),
             services: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-            unsupported: Vec::new(),
         }),
         Outcome::Doctor(DoctorReport {
             rehearsed: false,

@@ -4,7 +4,7 @@
 /// crosses to it.
 pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
     let placed = |service: &str| {
-        let mut placed = super::a_placed(service, &[], None, None);
+        let mut placed = super::a_placed(service, &[], None);
         placed.fields.env.insert(
             "SONARR_KEY".to_owned(),
             lemonfiber_manifest::container::Value::Secret(

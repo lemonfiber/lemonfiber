@@ -3,15 +3,14 @@
 //!
 //! The stack's own quality sync is configured by the generated project, which already
 //! names every curator and preset, so this asks only a sync speaking the contract: one
-//! `apply` per curator it reaches, with the curator's own key and the preset chosen for
-//! what it files.
+//! `apply` per curator it reaches, with the key lemonfiber minted for the curator and the
+//! preset chosen for what it files.
 
 use lemonfiber_contract::capabilities::quality::sync;
 
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::filesystem::Beneath;
 use crate::ports::media::Kind;
 use crate::ports::service::{Profiled, Syncing};
 use crate::quality::Selection;
@@ -83,16 +82,9 @@ pub(super) async fn seed_quality(ctx: &Ctx, fillers: &Fillers) -> Vec<Wiring> {
                     continue;
                 }
             };
-            let api_key = match super::keys::curator_key(ctx, curator).await {
-                Beneath::Read(key) => key,
-                Beneath::Absent => {
-                    wirings.push(super::skipped(connection, &curator.name));
-                    continue;
-                }
-                Beneath::Escaped => {
-                    wirings.push(super::keys::refused(connection, curator));
-                    continue;
-                }
+            let Some(api_key) = super::keys::minted_key(ctx, curator) else {
+                wirings.push(super::skipped(connection, &curator.name));
+                continue;
             };
             let profiled = profiled(*which, at, api_key, selection);
             wirings.push(Wiring::settled(
@@ -108,7 +100,7 @@ pub(super) async fn seed_quality(ctx: &Ctx, fillers: &Fillers) -> Vec<Wiring> {
 /// whatever preset it last applied: what replacing that curator's key owes it.
 ///
 /// Answers with each sync's name and how the write came out — none where no sync holds
-/// `curator_id`, and none from one where a key is not written yet.
+/// `curator_id`, and none where lemonfiber holds no minted key for it.
 pub(crate) async fn reprofile(
     ctx: &Ctx,
     fillers: &Fillers,
@@ -126,13 +118,8 @@ pub(crate) async fn reprofile(
         let Some(syncer) = syncer(ctx, holding.asker).await else {
             continue;
         };
-        let api_key = match super::keys::curator_key(ctx, curator).await {
-            Beneath::Read(key) => key,
-            Beneath::Absent => continue,
-            Beneath::Escaped => {
-                found.push((holding.asker.name.clone(), super::keys::refusal(curator)));
-                continue;
-            }
+        let Some(api_key) = super::keys::minted_key(ctx, curator) else {
+            continue;
         };
         let state = match crate::quality::run::load_selection(ctx) {
             Ok(selection) => match syncer

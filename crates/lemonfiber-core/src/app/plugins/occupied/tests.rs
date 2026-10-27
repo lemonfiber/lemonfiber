@@ -19,14 +19,14 @@ fn reached(service: &str, port: u16, label: Option<&str>) -> Placed {
                 }
             }),
         ),
-        ..a_placed(service, &[], None, None)
+        ..a_placed(service, &[], None)
     }
 }
 
 /// A service the operator's overlay declares is refused by name, naming the file.
 #[test]
 fn a_service_the_overlay_declares_is_refused_naming_the_file() {
-    let would = an_installed("tools", vec![a_placed("watchtower", &[], None, None)]);
+    let would = an_installed("tools", vec![a_placed("watchtower", &[], None)]);
     let held = [Declared {
         service: "watchtower".to_owned(),
         file: PathBuf::from("/srv/stack/compose.override.yml"),
@@ -41,7 +41,7 @@ fn a_service_the_overlay_declares_is_refused_naming_the_file() {
         "{said:?}"
     );
     assert!(named(
-        &an_installed("tools", vec![a_placed("other", &[], None, None)]),
+        &an_installed("tools", vec![a_placed("other", &[], None)]),
         &held
     )
     .is_empty());
@@ -211,7 +211,7 @@ fn a_port_standing_beside_moved_is_held_where_it_moved_to() {
 #[test]
 fn a_stack_service_moved_in_place_holds_nothing_of_its_own() {
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
-    let mut moved = crate::test_support::a_placed("jellyfin", &["media.serve"], None, Some(8096));
+    let mut moved = crate::test_support::a_placed("jellyfin", &["media.serve"], Some(8096));
     moved.replaces = Some("jellyfin".to_owned());
     let installed = [crate::test_support::pinned_as(
         crate::test_support::an_installed("jellyfin", vec![moved]),

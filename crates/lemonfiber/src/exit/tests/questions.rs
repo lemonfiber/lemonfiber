@@ -277,7 +277,6 @@ fn a_seed_that_left_work_undone_says_so_and_a_conflict_says_it_differently() {
         }],
         assessment: Assessment::Assessed,
         rehearsed: false,
-        unsupported: Vec::new(),
     };
     assert_eq!(
         format!("{:?}", settled(&Outcome::Seed(settled_seed))),
@@ -295,7 +294,6 @@ fn a_seed_that_left_work_undone_says_so_and_a_conflict_says_it_differently() {
         }],
         assessment: Assessment::Assessed,
         rehearsed: false,
-        unsupported: Vec::new(),
     };
     assert_ne!(format!("{:?}", settled(&Outcome::Seed(blocked))), success());
 }
@@ -338,7 +336,6 @@ fn a_seed_left_only_with_work_to_retry_is_told_from_one_with_a_conflict() {
         }],
         assessment: Assessment::Assessed,
         rehearsed: false,
-        unsupported: Vec::new(),
     };
     assert_ne!(format!("{:?}", settled(&Outcome::Seed(waiting))), success());
 }
@@ -357,7 +354,6 @@ fn a_seed_that_only_said_what_it_would_do_answered_the_question_it_was_asked() {
             severity: SeedSeverity::Informational,
         }],
         assessment: Assessment::Assessed,
-        unsupported: Vec::new(),
         rehearsed: true,
     };
     assert_eq!(
@@ -440,7 +436,6 @@ fn asking_where_something_is_is_never_a_failure_whatever_the_answer() {
             undeclared: Vec::new(),
             services: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
-            unsupported: Vec::new(),
         }),
     ] {
         assert_eq!(format!("{:?}", settled(&outcome)), success());

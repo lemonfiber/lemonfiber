@@ -13,14 +13,6 @@
       "items": {
         "$ref": "StuckEntry.json"
       }
-    },
-    "unsupported": {
-      "description": "Services whose queue lemonfiber cannot read at all, each with why.\n\nApart from [`Self::incomplete`], which is a queue that was asked and would not\nanswer. This is a queue that was never asked, because the service declares an\nAPI shape this build does not speak or a curator declaration it cannot reach\nthrough — and a reading that dropped those would be as short as an unreadable\nqueue makes it, without the sentence that says so.",
-      "type": "array",
-      "default": [],
-      "items": {
-        "$ref": "UnsupportedReport.json"
-      }
     }
   },
   "required": [

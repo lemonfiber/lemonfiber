@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::container::Shape;
-use crate::{ApiKind, Date, Manifest, Protocol, Removed, Service};
+use crate::{Date, Manifest, Protocol, Removed, Service};
 
 mod wiring;
 
@@ -200,8 +200,6 @@ fn check_services(
             .chain(licensed(service, &osi))
             .chain(released(service, today))
             .chain(retired(service))
-            .chain(versioned(service))
-            .chain(listened(service))
             .chain(outbound(service))
             .chain(offered(service))
             .chain(contained(service));
@@ -330,31 +328,6 @@ fn outbound(service: &Service) -> Option<String> {
         (None, Some(_)) => Some("says what it asks for and not where it reaches".to_owned()),
         (Some(_), Some(_)) | (None, None) => None,
     }
-}
-
-/// A Servarr-shape service names the version of the API its client speaks.
-///
-/// The shape spans two — Sonarr and Radarr at v3, Lidarr and Prowlarr at v1 — so
-/// the version cannot be assumed. A servarr service that omits it is a fault
-/// surfaced here, rather than one that silently drops the service from seeding
-/// and the doctor because it cannot be reached at a known path.
-fn versioned(service: &Service) -> Option<String> {
-    let api = service.api.as_ref()?;
-    (api.kind == ApiKind::Servarr && api.version.is_none())
-        .then(|| "has the servarr API shape but names no api.version".to_owned())
-}
-
-/// A service lemonfiber talks to says the port it answers on inside the stack's network.
-///
-/// The port it publishes is the host's end of a mapping, and the other end is not
-/// always the same number. What reaches it from beside it reaches the other end, so
-/// without this lemonfiber would be guessing at it — and a service standing in for
-/// another would be reached wherever the one it replaced answered.
-fn listened(service: &Service) -> Option<String> {
-    (service.api.is_some() && service.listens.is_none()).then(|| {
-        "declares an api but no listens, the port it answers on inside the stack's network"
-            .to_owned()
-    })
 }
 
 /// A service belongs to a profile the stack declares.

@@ -40,7 +40,7 @@ fn keyed(
 fn speaking(listens: Option<u16>) -> crate::plugin::Placed {
     crate::plugin::Placed {
         speaks: vec!["media.serve@1".to_owned()],
-        ..a_placed(ADAPTER, &[], None, listens)
+        ..a_placed(ADAPTER, &[], listens)
     }
 }
 
@@ -161,9 +161,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
             host: ADAPTER.to_owned(),
             port: 8080,
         }),
-        adapter: None,
         published: None,
-        key_file: None,
         confined_to: stack.map(|stack| {
             crate::plugin::key_file(stack, ADAPTER)
                 .parent()

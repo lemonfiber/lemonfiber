@@ -287,7 +287,7 @@ async fn followed(
 /// every recipe call to one of the stack's services is given the adapter it reaches
 /// through, which only the stack and the plugins `installed_beside` it can say.
 pub(super) fn settled(
-    stack: &lemonfiber_manifest::Manifest,
+    _stack: &lemonfiber_manifest::Manifest,
     installed_beside: &[Installed],
     read: &Accepted,
     path: &Path,
@@ -306,7 +306,7 @@ pub(super) fn settled(
         });
     installed.manifest.clone_from(&read.digest);
     installed.tree.clone_from(&read.tree);
-    let settled = installed.reaching(stack, installed_beside);
+    let settled = installed.reaching(installed_beside);
     match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);

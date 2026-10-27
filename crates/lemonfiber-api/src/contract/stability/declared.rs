@@ -25,14 +25,74 @@ pub struct Declared {
 }
 
 /// Every break accepted without moving the wire version.
-pub const DECLARED: &[Declared] = &[Declared {
-    under: 1,
-    what: "PluginPair.approval",
-    moved: Moved::MayBeAbsent,
-    because: "a pair to a service in the stack carries nothing out of the machine, so it \
-              asks for no approval and carries none; a pair to a host outside the stack \
-              carries one, as it always has",
-}];
+pub const DECLARED: &[Declared] = &[
+    Declared {
+        under: 1,
+        what: "PluginPair.approval",
+        moved: Moved::MayBeAbsent,
+        because: "a pair to a service in the stack carries nothing out of the machine, so it \
+                  asks for no approval and carries none; a pair to a host outside the stack \
+                  carries one, as it always has",
+    },
+    Declared {
+        under: 1,
+        what: "PluginPlaced.api",
+        moved: Moved::Gone,
+        because: NO_ADAPTER,
+    },
+    Declared {
+        under: 1,
+        what: "PluginInstalled.adapters",
+        moved: Moved::Gone,
+        because: NO_ADAPTER,
+    },
+    Declared {
+        under: 1,
+        what: "SeedReport.unsupported",
+        moved: Moved::Gone,
+        because: NOTHING_UNASKED,
+    },
+    Declared {
+        under: 1,
+        what: "StatusReport.unsupported",
+        moved: Moved::Gone,
+        because: NOTHING_UNASKED,
+    },
+    Declared {
+        under: 1,
+        what: "StuckReport.unsupported",
+        moved: Moved::Gone,
+        because: NOTHING_UNASKED,
+    },
+    Declared {
+        under: 1,
+        what: "Api",
+        moved: Moved::Gone,
+        because: "it was the type of PluginPlaced.api alone, which is gone, so nothing names it",
+    },
+    Declared {
+        under: 1,
+        what: "KeySource",
+        moved: Moved::Gone,
+        because: "it was a field of Api alone, which is gone, so nothing names it",
+    },
+    Declared {
+        under: 1,
+        what: "PluginServiceAdapter",
+        moved: Moved::Gone,
+        because: "it was the type of PluginInstalled.adapters alone, which is gone, so nothing \
+                  names it",
+    },
+];
+
+/// Why what named an in-process adapter is gone: no service names one.
+const NO_ADAPTER: &str = "no service names an in-process adapter, so there is none to carry";
+
+/// Why a list of services no adapter could ask is gone: no service names an API through
+/// an in-process adapter, so nothing is left unasked for that reason.
+const NOTHING_UNASKED: &str = "it listed each stack service declaring an API through an \
+                               in-process adapter lemonfiber could not ask, and no service \
+                               names one";
 
 /// The breaks no declaration accepts, of those found between two surfaces of
 /// `version`.

@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use lemonfiber_manifest::{Api, ApiKind, Manifest, Service};
+use lemonfiber_manifest::{ApiKind, Manifest, Service};
 
 use crate::origin::Origin;
 use crate::plugin::{Installed, Placed};
@@ -56,13 +56,8 @@ pub struct Filler {
     /// Where it answers beside the others, or nothing where it declares no port it
     /// listens on.
     pub address: Option<Address>,
-    /// The adapter lemonfiber speaks to it through, where it names one.
-    pub adapter: Option<Api>,
     /// The port this machine reaches it on, where it publishes one.
     pub published: Option<u16>,
-    /// Where on this machine the file its credential is read from sits, where its
-    /// adapter names one and the stack has been written to disk.
-    pub key_file: Option<std::path::PathBuf>,
     /// The directory its container owns, which its credential file has to stay beneath
     /// when it is read, where the stack has been written to disk.
     ///
@@ -107,14 +102,10 @@ impl Filler {
         self.first_party && self.replaces.as_deref() == Some(self.id.as_str())
     }
 
-    /// The API lemonfiber speaks to it in: its adapter's, or the upstream's own it declares
-    /// in `native` where it names no adapter.
+    /// The API it answers in, where it declares one as its `native`.
     #[must_use]
     pub fn talks_in(&self) -> Option<ApiKind> {
-        self.adapter
-            .as_ref()
-            .map(|api| api.kind)
-            .or_else(|| self.native.as_deref().and_then(ApiKind::named))
+        self.native.as_deref().and_then(ApiKind::named)
     }
 
     /// Who holds what it holds, as a credential crossing to or from it is judged.
@@ -149,12 +140,6 @@ impl Filler {
     #[must_use]
     pub fn upstream_settings(&self) -> Vec<String> {
         self.upstream.values().cloned().collect()
-    }
-
-    /// Whether lemonfiber speaks to it through this adapter.
-    #[must_use]
-    pub fn speaks(&self, kind: ApiKind) -> bool {
-        self.adapter.as_ref().is_some_and(|api| api.kind == kind)
     }
 }
 
@@ -341,13 +326,7 @@ impl Fillers {
         providing.next().is_none().then_some((one, None))
     }
 
-    /// Every service lemonfiber speaks to through this adapter, the stack's first.
-    pub fn speaking(&self, kind: ApiKind) -> impl Iterator<Item = &Filler> {
-        self.services.iter().filter(move |one| one.speaks(kind))
-    }
-
-    /// Every service lemonfiber speaks to in this API, through its adapter or as the API
-    /// the upstream declares its own, the stack's first.
+    /// Every service answering in this API, as its `native` declares, the stack's first.
     pub fn talking(&self, kind: ApiKind) -> impl Iterator<Item = &Filler> {
         self.services
             .iter()
@@ -426,15 +405,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
             host: host(service, services),
             port,
         }),
-        adapter: service.api.clone(),
         published: service.port,
-        key_file: project.and_then(|project| {
-            crate::app::targets::config_path(
-                project,
-                service,
-                service.api.as_ref().and_then(|api| api.path.as_deref()),
-            )
-        }),
         confined_to: project
             .map(|project| crate::app::targets::service_config_dir(project, &service.id)),
         media_types: service.media_types.clone(),
@@ -468,10 +439,7 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             host: placed.service.clone(),
             port,
         }),
-        adapter: placed.api.clone(),
         published: placed.published(),
-        key_file: project
-            .and_then(|project| crate::app::targets::plugin_config_path(project, placed)),
         confined_to: project
             .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
         media_types: placed.media_types.clone(),

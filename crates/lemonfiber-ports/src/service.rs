@@ -1,7 +1,7 @@
 //! Talking to the services themselves, to wire them to each other.
 //!
-//! One implementation per API *shape*, selected by the manifest's `api.kind` and
-//! never by service name, so a service that reuses an existing shape needs no Rust
+//! One implementation per API *shape*, selected by the API a service's `native` names
+//! and never by service name, so a service that reuses an existing shape needs no Rust
 //! at all.
 
 use std::time::Duration;

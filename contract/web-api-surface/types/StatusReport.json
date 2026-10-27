@@ -41,12 +41,6 @@
         "array[ref:Undeclared]"
       ],
       "required": true
-    },
-    "unsupported": {
-      "type": [
-        "array[ref:UnsupportedReport]"
-      ],
-      "required": false
     }
   },
   "variants": []

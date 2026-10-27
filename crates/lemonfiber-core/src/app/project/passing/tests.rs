@@ -41,7 +41,7 @@ fn machine_with(
     ctx.settings.env_file = Some(env);
     let mut register = crate::plugin::Register::empty();
     for id in also {
-        let service = crate::test_support::a_placed(id, &[], None, None);
+        let service = crate::test_support::a_placed(id, &[], None);
         assert!(register
             .record(crate::test_support::an_installed("other", vec![service]))
             .is_ok());

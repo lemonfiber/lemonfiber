@@ -42,18 +42,6 @@ pub fn repository_stack() -> Source {
     Source::External(Box::leak(copy.into_boxed_path()))
 }
 
-/// The stack this build carries, written beside the tests under `name`, its service `id`
-/// declaring the adapter `api` as a stack running its own copy of that service does.
-#[must_use]
-pub fn declaring(name: &str, id: &str, api: &str) -> Source {
-    let at = Scratch::new(&format!("declaring-{name}"))
-        .kept()
-        .join("stack");
-    lemonfiber_fixtures::stack::directory_into(&at);
-    lemonfiber_fixtures::stack::manifest_declaring(&at, id, api);
-    Source::External(Box::leak(at.into_boxed_path()))
-}
-
 /// What the engine a test leaves unnamed says when asked for its images.
 const NO_ENGINE: &str = "no container engine is asked in a test";
 

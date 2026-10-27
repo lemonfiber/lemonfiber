@@ -19,31 +19,18 @@ use crate::test_support::{
 };
 use crate::wiring::{Chosen, Fillers};
 
-/// A client naming the stack's torrent client's API, as a plugin's service names it.
-const fn torrent_api() -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Qbittorrent,
-        key_source: lemonfiber_manifest::KeySource::ConfigIni,
-        path: None,
-        version: None,
-    }
-}
-
-/// The embedded stack beside a plugin's client naming the stack's torrent client's API
-/// and speaking no contract, published on the host.
-fn beside_an_unadapted_client() -> Fillers {
-    let client = a_placed(
-        "seedbox",
-        &["download.torrent"],
-        Some(torrent_api()),
-        Some(9091),
-    );
+/// The embedded stack beside a plugin's torrent client speaking `download.torrent` that
+/// nothing here can ask, and one speaking no contract.
+fn beside_unasked_clients() -> Fillers {
+    let mut speaking = a_placed("seedbox", &["download.torrent"], Some(9091));
+    speaking.speaks = vec!["download.torrent@1".to_owned()];
+    let silent = a_placed("leecher", &["download.torrent"], Some(9092));
     stack()
         .manifest()
         .map(|manifest| {
             Fillers::of(
                 &manifest,
-                &[an_installed("seeding", vec![client])],
+                &[an_installed("seeding", vec![speaking, silent])],
                 &Chosen::default(),
                 None,
             )
@@ -51,12 +38,12 @@ fn beside_an_unadapted_client() -> Fillers {
         .unwrap_or_default()
 }
 
-/// A plugin's client naming the torrent client's API and speaking no contract is declared
-/// with nothing to reach it by, the stack's kept clients naming no API are not declared at
-/// all, and nothing is asked of any.
+/// A plugin's client speaking its protocol's contract that cannot be asked over it is
+/// declared with nothing to reach it by, one speaking no contract is not declared at all,
+/// and nothing is asked of either.
 #[tokio::test]
-async fn a_client_no_adapter_fronts_is_declared_and_never_reached() {
-    let fillers = beside_an_unadapted_client();
+async fn a_client_that_cannot_be_asked_is_declared_and_never_reached() {
+    let fillers = beside_unasked_clients();
     let http = Fake::always(Answer::reply(200, "[]"));
     let ctx = a_context().build().with_http(http.clone());
 

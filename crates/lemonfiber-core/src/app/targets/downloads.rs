@@ -8,7 +8,7 @@ use std::path::Path;
 
 use lemonfiber_contract::capabilities::download::{torrent, usenet};
 use lemonfiber_contract::Contracted;
-use lemonfiber_manifest::{ApiKind, Manifest};
+use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::ports::service::Download;
@@ -94,8 +94,8 @@ pub(crate) fn host_fillers(ctx: &Ctx, manifest: &Manifest, project: Option<&Path
 /// The download clients among `fillers`, in the order they are declared, each asked over
 /// its protocol's contract with its own key.
 ///
-/// One that cannot be asked over it, and the stack's own clients, which no adapter
-/// fronts, are left out: a read that cannot reach a client has nothing to read.
+/// One that cannot be asked over it is left out: a read that cannot reach a client has
+/// nothing to read.
 pub(crate) async fn download_targets(ctx: &Ctx, fillers: &Fillers) -> Vec<DownloadTarget> {
     declared_downloads(ctx, fillers)
         .await
@@ -145,42 +145,18 @@ const fn contract(protocol: Protocol) -> (&'static str, u32) {
     }
 }
 
-/// How a download client is known to move its protocol.
-#[derive(Clone, Copy)]
-enum Moving {
-    /// It speaks that protocol's contract.
-    Contracted(Protocol),
-    /// It is one of the stack's own clients, which no adapter fronts, so it is declared
-    /// and never reached.
-    Unadapted,
+/// The protocol `filler` moves as a download client: the one whose contract it speaks.
+/// Nothing where it is no download client.
+fn moving(filler: &Filler) -> Option<Protocol> {
+    PROTOCOLS.into_iter().find(|protocol| {
+        let (capability, major) = contract(*protocol);
+        filler.contracted(capability, major)
+    })
 }
 
-/// How `filler` moves a protocol as a download client: by the contract it speaks, or as
-/// one of the stack's own clients by the API it names. Nothing where it is no download
-/// client.
-fn moving(filler: &Filler) -> Option<Moving> {
-    PROTOCOLS
-        .into_iter()
-        .find(|protocol| {
-            let (capability, major) = contract(*protocol);
-            filler.contracted(capability, major)
-        })
-        .map(Moving::Contracted)
-        .or_else(|| {
-            [ApiKind::Qbittorrent, ApiKind::Sabnzbd]
-                .into_iter()
-                .any(|kind| filler.speaks(kind))
-                .then_some(Moving::Unadapted)
-        })
-}
-
-/// How the host asks `filler`, a download client moving as `moving` says: over its
-/// protocol's contract. Nothing where it cannot be asked over it, or is one of the
-/// stack's own clients.
-async fn reached(ctx: &Ctx, filler: &Filler, moving: Moving) -> Option<DownloadTarget> {
-    let Moving::Contracted(protocol) = moving else {
-        return None;
-    };
+/// How the host asks `filler`, a download client moving `protocol`: over its contract.
+/// Nothing where it cannot be asked over it.
+async fn reached(ctx: &Ctx, filler: &Filler, protocol: Protocol) -> Option<DownloadTarget> {
     let (capability, major) = contract(protocol);
     match spoken(ctx, filler, capability, major).await {
         Spoken::Over(adapter) => Some(DownloadTarget {

@@ -15,12 +15,12 @@ pub(crate) fn uninstallable(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn a_service_naming_an_in_process_adapter_is_refused_at_install() {
+fn a_service_naming_an_in_process_adapter_is_refused_naming_the_field() {
     let refused = uninstallable(&with(
         "api = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }\nlistens = 8989\n",
     ));
     assert!(
-        names(&refused, &["service komga.api", "in-process adapter"]),
+        names(&refused, &["service komga.api", "declares no such field"]),
         "{refused:?}"
     );
 }

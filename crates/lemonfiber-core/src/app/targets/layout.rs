@@ -25,23 +25,6 @@ pub(crate) fn project_directory(stack: &Source, stack_dir: Option<&Path>) -> Opt
     }
 }
 
-/// The host path a service's config file is read from: its configuration directory
-/// is `config/<id>` under the project root, mounted where its manifest says, so its
-/// `api.path` beneath that mount is read from there. Nothing where the api names no
-/// path beneath it — the one place the convention is spelled, for every service whose
-/// credential is read from disk.
-pub(crate) fn config_path(
-    project: &Path,
-    service: &lemonfiber_manifest::Service,
-    api_path: Option<&str>,
-) -> Option<PathBuf> {
-    config_file(
-        &service_config_dir(project, &service.id),
-        service.container().configuration(),
-        api_path?,
-    )
-}
-
 /// Where `path`, a file inside a container whose configuration directory is mounted at
 /// `mount`, lies on this machine beneath `directory`, the directory mounted there; nothing
 /// where it lies outside the mount.
@@ -88,32 +71,6 @@ pub(crate) fn held_beneath(project: &Path, relative: &Path) -> PathBuf {
         }
         _ => project.to_path_buf(),
     }
-}
-
-/// The host path an installed plugin's service has its credential read from.
-///
-/// The same convention as a bundled service's, with the one mount the plugin's own
-/// record names in place of the list: lemonfiber mounts a plugin's configuration
-/// directory wherever the plugin said it reads one, so a path beneath anywhere else is
-/// a file nothing on this machine holds. Nothing where its adapter names no path.
-///
-/// **And nothing that could leave that directory.** The path is a stranger's, read back
-/// from a record on disk, and what is read here is handed to the plugin's service as its
-/// credential: a `..` in it, or a service id that is not one plain name, would have this
-/// read any file on the host and send it away. The reader refuses such a manifest at
-/// install, and this is the second wall rather than the first, because what is on disk is
-/// not always what this build wrote.
-///
-/// A path is not the whole of it: the container owns the directory and can put a link
-/// where the file is expected. What reads the file reads it through
-/// [`crate::ports::filesystem::FileSystem::read_beneath`], held to
-/// [`plugin_config_dir`].
-pub(crate) fn plugin_config_path(
-    project: &Path,
-    placed: &crate::plugin::Placed,
-) -> Option<PathBuf> {
-    let inside = beneath(&placed.config_path, placed.api.as_ref()?.path.as_deref()?)?;
-    Some(plugin_config_dir(project, placed)?.join(inside))
 }
 
 /// The directory on this machine an installed plugin's service owns: its configuration

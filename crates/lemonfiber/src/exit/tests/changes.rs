@@ -342,7 +342,6 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         request_proofs: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         recipes: Vec::new(),
-        adapters: Vec::new(),
         from: String::new(),
         revision: String::new(),
         signed: String::new(),

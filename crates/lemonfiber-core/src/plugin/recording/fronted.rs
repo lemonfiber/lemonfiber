@@ -292,7 +292,7 @@ impl Asking<'_> {
                     made.clone(),
                 )
             })?;
-            let answer = answered(reached.upstream.as_ref(), port, item, None)
+            let answer = answered(reached.upstream.as_ref(), port, item)
                 .await
                 .map_err(|why| Faulted::new(&step, why, made.clone()))?;
             upstream.push(answer);

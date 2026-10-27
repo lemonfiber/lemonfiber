@@ -23,7 +23,7 @@ fn a_capability_asked_for_is_filled_as_the_ask_settled() {
 
     let rival = an_installed(
         "emby",
-        vec![a_placed("emby", &["identity.source"], None, Some(8920))],
+        vec![a_placed("emby", &["identity.source"], Some(8920))],
     );
     let contested = shipped(&[rival], &Chosen::default(), |_| ());
     assert_eq!(filled_by(&contested, "identity.source"), None);
@@ -43,7 +43,7 @@ fn a_capability_nothing_asks_for_is_filled_by_its_one_provider() {
 
     let second = an_installed(
         "intake",
-        vec![a_placed("requests", &["request.intake"], None, Some(8080))],
+        vec![a_placed("requests", &["request.intake"], Some(8080))],
     );
     let two = shipped(&[second], &Chosen::default(), |_| ());
     assert_eq!(filled_by(&two, "request.intake"), None);

@@ -126,7 +126,6 @@ fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
         request_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
-        adapters: Vec::new(),
         from: source.to_owned(),
         revision: String::new(),
         signed: String::new(),

@@ -5,7 +5,7 @@ use crate::wiring::{settle, unfilled, Chosen, Reaches, Settled, Unfilled};
 
 /// A plugin whose one service asks for `library.curate` in `native`.
 fn an_asker(native: Option<&str>) -> Installed {
-    let mut placed = crate::test_support::a_placed("finder", &[], None, None);
+    let mut placed = crate::test_support::a_placed("finder", &[], None);
     placed.asks = vec![Asking {
         capability: "library.curate".to_owned(),
         each: false,

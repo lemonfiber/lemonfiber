@@ -449,7 +449,7 @@ fn a_choice_over_a_record_that_will_not_read_is_refused() {
 #[test]
 fn the_listing_carries_an_installed_plugins_ask_after_the_stacks_with_its_origin() {
     let (ctx, at) = ctx("plugin-asks");
-    let mut asker = crate::test_support::a_placed("subfinder", &[], None, None);
+    let mut asker = crate::test_support::a_placed("subfinder", &[], None);
     asker.asks = vec![crate::plugin::Asking {
         native: None,
         capability: "media.serve".to_owned(),

@@ -80,12 +80,7 @@ fn expected(before: &Plan, replaced: &str, at: &str) -> Plan {
 /// A first-party plugin bringing a service in place of `filler` for `capability`: the API
 /// it answers in, the media it files, and a port of its own.
 fn standing_in_for(filler: &Filler, capability: &str) -> Installed {
-    let mut placed = crate::test_support::a_placed(
-        STAND_IN,
-        &[capability],
-        filler.adapter.clone(),
-        Some(ITS_PORT),
-    );
+    let mut placed = crate::test_support::a_placed(STAND_IN, &[capability], Some(ITS_PORT));
     placed.native.clone_from(&filler.native);
     placed.media_types.clone_from(&filler.media_types);
     let mut installed = crate::test_support::an_installed(PLUGIN, vec![placed]);
