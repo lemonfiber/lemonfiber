@@ -17,7 +17,7 @@ fn asked(id: i64) -> HouseholdRequest {
         made: Some(AT.to_owned()),
         member: "Ana".to_owned(),
         member_id: None,
-        kind: Some(crate::recyclarr::Kind::Movies),
+        kind: Some(crate::ports::media::Kind::Movies),
         title_id: None,
         item: None,
         request_status: Some(RequestStatus::Pending),

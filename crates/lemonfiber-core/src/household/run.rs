@@ -29,8 +29,8 @@ use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, Restriction};
+use crate::ports::media::Kind;
 use crate::ports::service::{HouseholdRequest, Member};
-use crate::recyclarr::Kind;
 
 /// Read the household's requests, grouped by the member who made each one.
 ///

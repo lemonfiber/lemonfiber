@@ -8,8 +8,8 @@ use super::{
 };
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy};
+use crate::ports::media::Kind;
 use crate::ports::service::{FoundItem, ItemPart, QueueItem, StuckItem, TraceEvent};
-use crate::recyclarr::Kind;
 use crate::test_support::curators::{self, answered, curated, curating, refusing, TELEVISION};
 use crate::test_support::{a_context, nowhere};
 use crate::trace::{Coverage, Outcome, Presence, Stage};
@@ -123,6 +123,7 @@ fn frags(events: Vec<TraceEvent>, queue: Vec<QueueItem>, library: Option<Presenc
         queue,
         parts: Vec::new(),
         library,
+        server: "Jellyfin".to_owned(),
         reads: Reads::ALL,
     }
 }

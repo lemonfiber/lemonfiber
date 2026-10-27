@@ -30,8 +30,8 @@ use super::{Category, Check, Disruptive, Finding, Verdict};
 use crate::doctor::credentials::Target;
 use crate::error::codes::qual::{NONE_AVAILABLE, PRESET_UNMET};
 use crate::error::{Problem, Remedy, State};
+use crate::ports::media::Kind;
 use crate::ports::service::ReleaseProbe;
-use crate::recyclarr::Kind;
 
 /// The id under which the check reports where there is nothing to run it against.
 const NONE: &str = "services.releases";

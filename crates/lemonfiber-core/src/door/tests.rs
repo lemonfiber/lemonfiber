@@ -58,11 +58,9 @@ fn a_service_reachable_only_from_this_machine_is_no_part_of_this() {
 
 #[test]
 fn a_shelf_is_reached_from_the_library_rather_than_instead_of_it() {
-    for id in ["calibre-web-automated", "audiobookshelf"] {
-        let shelf = service(id, Some(Bind::Lan));
-        assert_eq!(facing(&shelf), Some(Facing::Shelf), "{id}");
-        assert!(!Facing::Shelf.begins());
-    }
+    let shelf = service("calibre-web-automated", Some(Bind::Lan));
+    assert_eq!(facing(&shelf), Some(Facing::Shelf));
+    assert!(!Facing::Shelf.begins());
 }
 
 #[test]
@@ -352,12 +350,17 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
 #[test]
 fn a_moved_part_no_contract_settles_is_what_the_register_says() {
     let mut parts = crate::test_support::adapted::installed_parts();
-    for adapter in parts
+    let moved = "calibre-web-automated";
+    for placed in parts
         .iter_mut()
         .filter(|one| one.plugin == "audiobookshelf")
         .flat_map(|one| one.services.iter_mut())
     {
-        adapter.speaks.clear();
+        placed.speaks.clear();
+        if placed.service == "audiobookshelf" {
+            placed.service = moved.to_owned();
+            placed.replaces = Some(moved.to_owned());
+        }
     }
     let facing = parts
         .iter()
@@ -366,7 +369,7 @@ fn a_moved_part_no_contract_settles_is_what_the_register_says() {
             plugin
                 .services
                 .iter()
-                .filter(|placed| placed.service == "audiobookshelf")
+                .filter(|placed| placed.service == moved)
                 .map(|placed| super::brought(&parts, plugin, placed))
         })
         .next();

@@ -9,7 +9,7 @@
 use super::walk::Walk;
 use crate::app::targets::{household_requests, serving};
 use crate::model::WalkthroughReport;
-use crate::recyclarr::Kind;
+use crate::ports::media::Kind;
 use crate::walkthrough::{Line, Reason, Shape, Step};
 
 /// Point the media server at what is already on disk and confirm it can see it.

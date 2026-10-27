@@ -33,7 +33,7 @@ fn asked(id: i64, made: Option<&str>, request_status: RequestStatus) -> Househol
         made: made.map(str::to_owned),
         member: "Ana".to_owned(),
         member_id: None,
-        kind: Some(crate::recyclarr::Kind::Movies),
+        kind: Some(crate::ports::media::Kind::Movies),
         title_id: None,
         item: None,
         request_status: Some(request_status),

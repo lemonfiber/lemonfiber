@@ -20,9 +20,9 @@ use std::time::SystemTime;
 
 use crate::asking::{Estimate, Policy, Standing};
 use crate::model::{Counted, MemberAsking};
+use crate::ports::media::Kind;
 use crate::ports::service::{Asking, Failure, Headroom, HouseholdRequest, Left, Member};
 use crate::quality::Selection;
-use crate::recyclarr::Kind;
 
 /// What the request service says about the household and about each person in it.
 pub(super) struct Asked {

@@ -264,6 +264,7 @@ fn an_unreadable_history_is_not_read_as_never_found() {
             queue: Vec::new(),
             parts: Vec::new(),
             library: None,
+            server: "Jellyfin".to_owned(),
             reads: Reads {
                 history: false,
                 ..Reads::ALL
@@ -291,6 +292,7 @@ fn an_unreadable_queue_does_not_prove_a_grab_stuck() {
             queue: Vec::new(),
             parts: Vec::new(),
             library: None,
+            server: "Jellyfin".to_owned(),
             reads: Reads {
                 queue: false,
                 ..Reads::ALL

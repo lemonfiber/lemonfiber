@@ -294,15 +294,10 @@ fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
     if BY_RECORD.contains(&operation) {
         return each(
             "/sort",
-            [
-                (Kind::Tv.media_type(), Record::Series),
-                (Kind::Movies.media_type(), Record::Film),
-                (MUSIC, Record::Artist),
-                (BOOKS, Record::Author),
-            ]
-            .iter()
-            .map(|(media_type, sort)| (*media_type, wire(sort)))
-            .collect(),
+            Record::FOLLOWED
+                .iter()
+                .map(|(media_type, sort)| (*media_type, wire(sort)))
+                .collect(),
         );
     }
     if operation == BY_FOLDER {

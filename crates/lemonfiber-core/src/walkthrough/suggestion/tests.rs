@@ -1,5 +1,5 @@
 use super::{Availability, Suggestion, SUGGESTIONS};
-use crate::recyclarr::Kind;
+use crate::ports::media::Kind;
 
 /// Safest first, which is the order the list is held in.
 const ORDER: [Availability; 2] = [Availability::FreelyLicensed, Availability::WidelyCarried];

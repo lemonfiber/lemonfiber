@@ -14,7 +14,7 @@ use crate::app::Ctx;
 use crate::ports::service::UsenetAccounts;
 use crate::wiring::{Filler, Fillers};
 
-use crate::recyclarr::Kind;
+use crate::ports::media::Kind;
 
 use super::curators::curator_targets;
 use super::downloads::{download_targets, DownloadTarget};
