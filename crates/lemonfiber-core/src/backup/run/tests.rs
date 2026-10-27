@@ -470,3 +470,35 @@ async fn a_capture_before_a_takeover_with_nowhere_to_keep_it_refuses_rather_than
         .map(|problem| problem.code);
     assert_eq!(refusal, Some(NOWHERE_TO_KEEP));
 }
+
+#[test]
+fn what_an_installed_plugins_service_rebuilds_is_read_as_that_service_and_the_path() {
+    let env = crate::test_support::env_without_password("backup-rebuilt");
+    let mut placed = crate::test_support::a_placed("komga", &[], None);
+    placed.fields.rebuilt = vec!["cache".to_owned(), "logs".to_owned()];
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::an_installed("komga", vec![placed]))
+        .is_ok());
+    assert!(std::fs::write(
+        env.with_file_name(crate::config::paths::PLUGINS),
+        register.to_json().unwrap_or_default()
+    )
+    .is_ok());
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env),
+            ..crate::config::Settings::default()
+        })
+        .build();
+
+    let rebuilt = super::rebuilt(&ctx);
+
+    assert_eq!(
+        rebuilt,
+        vec![
+            ("komga".to_owned(), "cache".to_owned()),
+            ("komga".to_owned(), "logs".to_owned()),
+        ]
+    );
+}

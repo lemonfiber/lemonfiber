@@ -228,39 +228,32 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
 /// Every path beneath a service's configuration directory its manifest says it rebuilds,
 /// the stack's services' and every installed plugin's, as the service and the path.
 fn rebuilt(ctx: &Ctx) -> Vec<(String, String)> {
-    let stack = ctx
+    let stack: Vec<(String, Vec<String>)> = ctx
         .stack
         .checked_manifest(ctx.today())
         .map(|manifest| {
             manifest
                 .services
                 .into_iter()
-                .flat_map(|service| {
-                    service
-                        .rebuilt
-                        .into_iter()
-                        .map(move |path| (service.id.clone(), path))
-                })
-                .collect::<Vec<_>>()
+                .map(|service| (service.id, service.rebuilt))
+                .collect()
         })
         .unwrap_or_default();
-    let installed = crate::app::plugins::read(ctx)
+    let installed: Vec<(String, Vec<String>)> = crate::app::plugins::read(ctx)
         .map(|register| {
             register
                 .installed()
                 .iter()
                 .flat_map(|one| &one.services)
-                .flat_map(|placed| {
-                    placed
-                        .fields
-                        .rebuilt
-                        .iter()
-                        .map(|path| (placed.service.clone(), path.clone()))
-                })
-                .collect::<Vec<_>>()
+                .map(|placed| (placed.service.clone(), placed.fields.rebuilt.clone()))
+                .collect()
         })
         .unwrap_or_default();
-    stack.into_iter().chain(installed).collect()
+    stack
+        .into_iter()
+        .chain(installed)
+        .flat_map(|(service, paths)| paths.into_iter().map(move |path| (service.clone(), path)))
+        .collect()
 }
 
 /// The data root this machine is on, as the manifest records it.
