@@ -76,7 +76,8 @@ pub(crate) fn asked(
         &crate::app::targets::chosen_fillers(ctx),
         None,
         trusted,
-    );
+    )
+    .numbered(crate::app::targets::ordinals(ctx));
     let mut asked: Vec<Grant> = Vec::new();
     for secret in crossing(would) {
         let Some(serves) = secret.serves.clone() else {

@@ -187,7 +187,7 @@ fn a_plugins_credential_is_kept_apart_from_the_stacks() {
 
     assert_eq!(
         setting("qbittorrent").as_deref(),
-        Some("QBITTORRENT_PASSWORD")
+        Some("DOWNLOAD_TORRENT_PASSWORD")
     );
     assert_eq!(
         setting("qbittorrent-two").as_deref(),
@@ -207,7 +207,7 @@ fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
     let spelled = |id: &str, holds: &str| {
         fillers
             .service(id)
-            .map(|one| super::spelled(one, holds))
+            .and_then(|one| fillers.spelled(one, holds))
             .unwrap_or_default()
     };
 
@@ -293,7 +293,10 @@ fn a_plugin_setting_another_service_takes_is_refused() {
         setting("apart", crate::config::PASSWORD_SUFFIX).as_deref(),
         Some("PLUGIN_THIRD_APART_PASSWORD")
     );
-    assert_eq!(setting("sonarr", "_KEY").as_deref(), Some("SONARR_KEY"));
+    assert_eq!(
+        setting("sonarr", "_KEY").as_deref(),
+        Some("LIBRARY_CURATE_TV_KEY")
+    );
 }
 
 /// The gate lets a credential reach the stack's own services, the owner's own plugin, and
@@ -415,9 +418,9 @@ fn a_first_party_service_standing_in_keeps_the_stacks_names_and_links() {
     assert_eq!(
         fillers
             .service("jellyfin")
-            .and_then(|one| fillers.setting(one, crate::config::API_KEY_SUFFIX))
+            .and_then(|one| fillers.setting(one, crate::config::ADMIN_PASSWORD_SUFFIX))
             .as_deref(),
-        Some("JELLYFIN_API_KEY")
+        Some("IDENTITY_SOURCE_ADMIN_PASSWORD")
     );
     assert!(fillers
         .named_by("decline")
@@ -451,6 +454,8 @@ impl super::Fillers {
             services,
             asks: Vec::new(),
             named: Vec::new(),
+            ordinals: crate::config::credentials::Ordinals::default(),
+            declared: std::collections::BTreeMap::new(),
         }
     }
 

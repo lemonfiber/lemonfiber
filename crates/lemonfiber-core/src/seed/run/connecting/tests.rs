@@ -615,7 +615,11 @@ fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection()
     let stranger = Origin::Plugin {
         named: "comics".to_owned(),
     };
-    let filler = a_service("sonarr", &Origin::Bundled, ApiKind::Servarr);
+    let filler = crate::wiring::Filler {
+        provides: vec!["library.curate".to_owned()],
+        media_types: vec!["tv".to_owned()],
+        ..a_service("sonarr", &Origin::Bundled, ApiKind::Servarr)
+    };
     let asker = an_asker(
         "finder",
         &stranger,

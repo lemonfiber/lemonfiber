@@ -697,14 +697,14 @@ fn a_grant_is_named_by_its_plugin_and_credential() {
         described(&Change {
             at: String::new(),
             operation: "plugin:reader".to_owned(),
-            target: "SONARR_API_KEY".to_owned(),
+            target: "LIBRARY_CURATE_TV_API_KEY".to_owned(),
             kind: Kind::Granted {
                 plugin: "reader".to_owned(),
                 grant: crate::test_support::a_grant(),
                 given: true,
             },
         }),
-        "reader's grant of SONARR_API_KEY"
+        "reader's grant of LIBRARY_CURATE_TV_API_KEY"
     );
 }
 

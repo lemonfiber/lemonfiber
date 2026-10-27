@@ -246,33 +246,16 @@ pub(crate) const PROVIDER_TLS_KEY: &str = "USENET_TLS";
 /// operator chose to proceed with unverified.
 pub(crate) const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
 
-/// The environment key holding the password of the stack's own torrent client's web UI
-/// account, which a first-party torrent client moved in its place answers to.
-pub const TORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
-
 /// The environment key holding the media server's administrator password.
 ///
 /// The bundled media server generates no key on disk and asks for an account to be created,
 /// so seeding mints this password, sets it by driving its own first-run setup, and records
 /// it here — the same shape as the torrent client's, and the credential the request
 /// service's identity wiring reads back. The account name is [`MEDIA_SERVER_ADMIN_USER`].
-pub const MEDIA_SERVER_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
-
-/// The environment key holding the password of the stack's own listening server's first
-/// account, which a first-party listening server moved in its place answers to.
-pub(crate) const LISTENING_SERVER_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
-
-/// The environment key holding the password of the stack's own Usenet indexer
-/// aggregator's administrator, which a first-party aggregator moved in its place answers
-/// to.
-pub(crate) const USENET_AGGREGATOR_ADMIN_PASSWORD_KEY: &str = "NZBHYDRA2_ADMIN_PASSWORD";
+pub const IDENTITY_SOURCE_ADMIN_PASSWORD_KEY: &str = "IDENTITY_SOURCE_ADMIN_PASSWORD";
 
 /// The name of the stack's own Usenet indexer aggregator's administrator.
 pub(crate) const USENET_AGGREGATOR_ADMIN_USER: &str = "admin";
-
-/// The environment key holding the key the stack's own book curator adopted from its
-/// environment, which a first-party book curator moved in its place answers to.
-pub(crate) const BOOK_CURATOR_API_KEY: &str = "BINDERY_API_KEY";
 
 /// The name of the stack's own listening server's first account.
 pub(crate) const LISTENING_SERVER_USER: &str = "admin";
@@ -290,7 +273,7 @@ pub(crate) const MEDIA_SERVER_ADMIN_USER: &str = "admin";
 pub(crate) const TORRENT_USER: &str = "admin";
 
 /// What a setting holding the password a service is reached with ends in, after the
-/// service it is for; the stack's torrent client's is [`TORRENT_PASSWORD_KEY`].
+/// service it is for.
 ///
 /// One of the [`CREDENTIAL_SUFFIXES`], so no plugin's setting is spelled onto one.
 pub(crate) const PASSWORD_SUFFIX: &str = "_PASSWORD";
@@ -307,7 +290,7 @@ pub(crate) const API_KEY_SUFFIX: &str = "_API_KEY";
 /// What the setting holding the password lemonfiber minted for a media server's
 /// administrator ends in.
 ///
-/// The bundled media server's comes out as [`MEDIA_SERVER_ADMIN_PASSWORD_KEY`], and a
+/// The bundled media server's comes out as [`IDENTITY_SOURCE_ADMIN_PASSWORD_KEY`], and a
 /// plugin's standing in for it as one in the plugin's own namespace, so the stack's
 /// administrator password is never read for, or sent to, a plugin's server.
 pub(crate) const ADMIN_PASSWORD_SUFFIX: &str = "_ADMIN_PASSWORD";
@@ -417,11 +400,8 @@ pub const SETTINGS: &[&str] = &[
     PROVIDER_PASS_KEY,
     PROVIDER_TLS_KEY,
     PROVIDER_VALIDATED_KEY,
-    TORRENT_PASSWORD_KEY,
-    MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-    LISTENING_SERVER_PASSWORD_KEY,
-    USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
-    BOOK_CURATOR_API_KEY,
+    IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
+    super::credentials::ORDINALS_KEY,
     FRONT_DOOR_KEY,
     FILLS_KEY,
     FILLS_WHY_KEY,

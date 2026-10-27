@@ -84,7 +84,8 @@ pub(crate) async fn reshow(ctx: &Ctx) -> Option<State> {
         &installed,
         &chosen_fillers(ctx),
         project.as_deref(),
-    );
+    )
+    .numbered(crate::app::targets::ordinals(ctx));
     seed_dashboard(
         ctx,
         &manifest.services,

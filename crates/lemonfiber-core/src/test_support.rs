@@ -13,6 +13,9 @@ pub mod context;
 
 pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
+mod blocking;
+pub(crate) use blocking::{blocking, blocking_the_journal};
+
 #[path = "../../lemonfiber-testing/src/adapted.rs"]
 pub mod adapted;
 #[path = "../../lemonfiber-testing/src/aggregator.rs"]
@@ -130,7 +133,7 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     assert!(
         crate::config::store::set(
             &path,
-            crate::config::TORRENT_PASSWORD_KEY,
+            "DOWNLOAD_TORRENT_PASSWORD",
             password.unwrap_or_default(),
         )
         .is_ok(),
@@ -222,7 +225,7 @@ pub(crate) fn beside_contracted_requests(
     ctx.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &ctx,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     let mut placed = a_placed(CONTRACTED_REQUESTS, &["request.intake"], Some(8080));

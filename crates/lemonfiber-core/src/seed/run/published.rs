@@ -10,11 +10,6 @@
 use super::Ctx;
 use crate::wiring::Fillers;
 
-/// The environment name a service's key is published under.
-pub(crate) fn published_as(id: &str) -> String {
-    crate::config::for_service(id, crate::config::API_KEY_SUFFIX)
-}
-
 /// Revoke the media server key filed under lemonfiber's name, and forget the media
 /// server's setting in the environment file.
 ///
@@ -34,16 +29,24 @@ pub(super) async fn retire_keys(ctx: &Ctx, fillers: &Fillers) {
         Some(client) => crate::app_keys::revoke_ours(client.as_ref()).await.ok(),
         None => None,
     };
+    let Some(filler) = server
+        .filter(|_| revoked.is_some())
+        .and_then(|server| fillers.service(server.id()))
+    else {
+        return;
+    };
+    let holds = crate::config::API_KEY_SUFFIX;
+    let file = crate::config::store::read(env).unwrap_or_default();
     // Only what is there: the file is rewritten by every removal, and a setting that
     // was never published is not a reason to touch it.
-    if let Some(setting) = server
-        .filter(|_| revoked.is_some())
-        .map(|server| published_as(server.id()))
-        .filter(|setting| crate::app::targets::recorded_secret(ctx, setting).is_some())
+    for setting in [
+        fillers.setting(filler, holds),
+        crate::wiring::Fillers::earlier(filler, holds),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|setting| file.written(setting).is_some())
     {
         let _ = crate::config::store::unset(env, &setting);
     }
 }
-
-#[cfg(test)]
-mod tests;

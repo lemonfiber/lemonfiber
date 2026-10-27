@@ -249,39 +249,9 @@ const NAMED: &[Named] = &[
     },
     Named {
         file: "crates/lemonfiber-core/src/config/keys.rs",
-        part: "audiobookshelf",
-        count: 1,
-        until: Until::Migrated,
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/config/keys.rs",
-        part: "bindery",
-        count: 1,
-        until: Until::Migrated,
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/config/keys.rs",
         part: "homepage",
         count: 1,
         until: Until::Moves("homepage"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/config/keys.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Migrated,
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/config/keys.rs",
-        part: "nzbhydra2",
-        count: 1,
-        until: Until::Migrated,
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/config/keys.rs",
-        part: "qbittorrent",
-        count: 1,
-        until: Until::Migrated,
     },
     Named {
         file: "crates/lemonfiber-core/src/credential/held.rs",

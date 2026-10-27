@@ -32,7 +32,7 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
 /// The grant of the series curator's key to the reader, for the capability it fills.
 pub(crate) fn a_grant() -> crate::plugin::Grant {
     crate::plugin::Grant {
-        credential: "SONARR_API_KEY".to_owned(),
+        credential: "LIBRARY_CURATE_TV_API_KEY".to_owned(),
         of: "sonarr".to_owned(),
         serves: "media.serve".to_owned(),
         at: "1".to_owned(),

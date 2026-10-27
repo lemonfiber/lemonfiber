@@ -190,7 +190,7 @@ fn scene(
     let env = at.join(".env");
     let _ = store::set(
         &env,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     for adapter in [crate::test_support::media::ADAPTER, REQUESTS.adapter] {

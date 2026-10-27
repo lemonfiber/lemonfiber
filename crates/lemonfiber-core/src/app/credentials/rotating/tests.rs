@@ -61,7 +61,7 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
     let asked: Vec<&str> = CATALOGUE
         .iter()
         .map(|entry| entry.setting)
-        .filter(|setting| *setting != config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
+        .filter(|setting| *setting != config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY)
         .collect();
 
     assert_eq!(asked.len(), 3, "{asked:?}");
@@ -183,7 +183,7 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
         .unwrap_or_default();
     let held = crate::credential::Held {
         name: "Media server administrator password".to_owned(),
-        setting: config::MEDIA_SERVER_ADMIN_PASSWORD_KEY.to_owned(),
+        setting: config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY.to_owned(),
         consumers: Vec::new(),
         location: "the settings file".to_owned(),
         origin: crate::credential::Origin::Lemonfiber,

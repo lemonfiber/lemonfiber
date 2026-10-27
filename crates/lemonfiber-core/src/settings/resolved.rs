@@ -57,6 +57,7 @@ impl Resolved {
                     None,
                     trusted,
                 )
+                .numbered(crate::app::targets::ordinals(ctx))
             }),
         }
     }
@@ -101,6 +102,17 @@ impl Resolved {
                 Some(crossed(fillers, owner, fillers.service(recipient)))
             })
             .unwrap_or(Holding::Withheld)
+    }
+
+    /// Where the stack's service `service` keeps its own key: under the name the stack
+    /// gives it, and nowhere where it has none.
+    pub(crate) fn own_key(&self, service: &str) -> Holding {
+        self.fillers
+            .as_ref()
+            .and_then(|fillers| {
+                fillers.setting(fillers.service(service)?, crate::config::API_KEY_SUFFIX)
+            })
+            .map_or(Holding::Withheld, Holding::Crossing)
     }
 
     pub(crate) fn reading<T>(&self, write: impl FnOnce(&Reading<'_>) -> T) -> T {

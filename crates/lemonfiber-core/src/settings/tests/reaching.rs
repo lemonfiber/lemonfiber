@@ -11,7 +11,7 @@ use crate::plugin::Installed;
 use crate::ports::process::{Failure, Output};
 use crate::settings::Resolved;
 
-const CROSSING: &str = "SONARR_API_KEY";
+const CROSSING: &str = "LIBRARY_CURATE_TV_API_KEY";
 
 /// `installed` recorded as the one plugin installed on `machine`.
 fn registered(machine: &Machine, installed: Installed) {
@@ -67,7 +67,7 @@ async fn replacing_a_crossing_credential_regenerates_and_restarts_what_reads_it(
     let (machine, installed) = crossed("crossed", running(&["reader"]));
 
     let reached_now = reached(&machine, &installed, CROSSING).await;
-    let elsewhere = reached(&machine, &installed, "RADARR_API_KEY").await;
+    let elsewhere = reached(&machine, &installed, "LIBRARY_CURATE_MOVIES_API_KEY").await;
 
     assert_eq!(reached_now.len(), 2);
     assert!(reached_now

@@ -74,7 +74,8 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         register.installed(),
         &crate::app::targets::chosen_fillers(ctx),
         None,
-    );
+    )
+    .numbered(crate::app::targets::ordinals(ctx));
     Ok(assembled(
         &crate::door::candidates(&manifest.services, register.installed(), &fillers),
         Running {

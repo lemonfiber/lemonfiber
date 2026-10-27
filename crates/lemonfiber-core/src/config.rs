@@ -10,6 +10,7 @@
 //! shape the compose driver reads: enough to decide what runs, and nothing about
 //! how it is stored.
 
+pub(crate) mod credentials;
 pub mod display;
 pub mod env;
 pub(crate) mod held;

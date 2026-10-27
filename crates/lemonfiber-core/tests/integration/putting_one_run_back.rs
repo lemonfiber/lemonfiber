@@ -177,13 +177,13 @@ async fn one_run_goes_back_as_a_unit_and_the_others_stand() {
 #[tokio::test]
 async fn a_reversal_reports_a_credential_without_reporting_its_value() {
     let root = scratch("withheld");
-    env_holds(&root, "QBITTORRENT_PASSWORD=after\n");
+    env_holds(&root, "DOWNLOAD_TORRENT_PASSWORD=after\n");
     journalled(
         &root,
         &[set(
             "1000",
             SEED,
-            "QBITTORRENT_PASSWORD",
+            "DOWNLOAD_TORRENT_PASSWORD",
             Some("before"),
             "after",
         )],
@@ -194,7 +194,7 @@ async fn a_reversal_reports_a_credential_without_reporting_its_value() {
     let env = reading(&root);
 
     assert!(
-        env.contains("QBITTORRENT_PASSWORD=before"),
+        env.contains("DOWNLOAD_TORRENT_PASSWORD=before"),
         "the value still went back: {env}"
     );
     assert!(

@@ -154,7 +154,7 @@ async fn a_crossing_secret_is_read_from_its_holder_and_never_kept() {
         &WITH_A_SECRET.replace(r#""of": "komga""#, r#""of": "sonarr""#),
     );
     let absent = asked(&ctx(env.clone(), Files::empty(), silent()), Asking::Read).await;
-    assert!(store::set(&env, "SONARR_API_KEY", "abc").is_ok());
+    assert!(store::set(&env, "LIBRARY_CURATE_TV_API_KEY", "abc").is_ok());
 
     let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
 
@@ -240,7 +240,7 @@ async fn a_register_that_will_not_read_refuses_the_inventory() {
 }
 
 /// The setting sonarr's credential is held under, granted to the plugin in [`granted`].
-const GRANTED: &str = "SONARR_API_KEY";
+const GRANTED: &str = "LIBRARY_CURATE_TV_API_KEY";
 
 /// The register beside [`WITH_A_SECRET`] with its secret sonarr's credential and that
 /// credential granted to the plugin.
@@ -280,7 +280,11 @@ async fn a_grant_is_revoked_over_its_offer_and_one_not_held_is_refused() {
         .as_ref()
         .map(|revoked| revoked.agreement.clone());
     let ended = asked(&ctx, revoking(GRANTED, agreement)).await;
-    let refused = dispatch(Command::Credentials(revoking("RADARR_API_KEY", None)), &ctx).await;
+    let refused = dispatch(
+        Command::Credentials(revoking("LIBRARY_CURATE_MOVIES_API_KEY", None)),
+        &ctx,
+    )
+    .await;
 
     assert!(
         offered.grants.len() == 1

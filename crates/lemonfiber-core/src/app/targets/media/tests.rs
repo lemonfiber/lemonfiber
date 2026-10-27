@@ -46,7 +46,7 @@ fn a_moved_server_is_asked_at_its_adapter_and_kept_under_the_stacks_names() {
     assert_eq!(server.as_ref().map(|one| one.port), Some(8095));
     assert_eq!(
         server.as_ref().map(|one| one.setting.as_str()),
-        Some(crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
+        Some(crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY)
     );
     assert_eq!(
         server.as_ref().and_then(crate::test_support::asker),

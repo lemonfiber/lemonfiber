@@ -195,10 +195,7 @@ pub(crate) fn stack_holding(service: &Service, id: &str, resolved: &Resolved) ->
     }
     match service.secret.iter().find(|secret| secret.id == id) {
         Some(secret) if secret.of != service.id => resolved.crossing_into(&service.id, &secret.of),
-        _ => Holding::Crossing(crate::config::for_service(
-            &service.id,
-            crate::config::API_KEY_SUFFIX,
-        )),
+        _ => resolved.own_key(&service.id),
     }
 }
 

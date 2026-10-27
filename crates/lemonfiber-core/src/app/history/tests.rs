@@ -229,10 +229,13 @@ fn a_grant_reads_as_given_or_ended_by_its_credential_and_plugin() {
         grant: crate::test_support::a_grant(),
         given,
     };
-    assert_eq!(did(&granted(true)), "granted SONARR_API_KEY to reader");
+    assert_eq!(
+        did(&granted(true)),
+        "granted LIBRARY_CURATE_TV_API_KEY to reader"
+    );
     assert_eq!(
         did(&granted(false)),
-        "ended reader's grant of SONARR_API_KEY"
+        "ended reader's grant of LIBRARY_CURATE_TV_API_KEY"
     );
 }
 
