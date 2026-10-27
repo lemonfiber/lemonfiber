@@ -541,6 +541,13 @@ fn a_move_put_back_and_a_copy_kept_say_what_was_done() {
         }),
         "kept /stack/mounts/komga/cache"
     );
+    assert_eq!(
+        undone(Action::RenameBack {
+            from: "JELLYFIN_MODE".to_owned(),
+            to: "MEDIA_SERVER_MODE".to_owned(),
+        }),
+        "moved MEDIA_SERVER_MODE back to JELLYFIN_MODE"
+    );
 }
 
 /// A grant given back and a grant ended each say which credential and which plugin.

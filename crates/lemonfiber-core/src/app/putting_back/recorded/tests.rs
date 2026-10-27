@@ -107,6 +107,20 @@ fn moving_state_back_is_recorded_as_the_move_the_other_way() {
 }
 
 #[test]
+fn renaming_back_is_recorded_as_the_rename_the_other_way() {
+    assert_eq!(
+        inverted(&Kind::Renamed {
+            from: "JELLYFIN_MODE".to_owned(),
+            to: "MEDIA_SERVER_MODE".to_owned(),
+        }),
+        Some(Kind::Renamed {
+            from: "MEDIA_SERVER_MODE".to_owned(),
+            to: "JELLYFIN_MODE".to_owned(),
+        })
+    );
+}
+
+#[test]
 fn putting_a_grant_back_is_recorded_as_the_grant_the_other_way() {
     let granted = |given: bool| Kind::Granted {
         plugin: "reader".to_owned(),

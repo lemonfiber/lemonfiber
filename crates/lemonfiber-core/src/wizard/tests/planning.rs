@@ -415,6 +415,13 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
         "the directory /srv/media"
     );
     assert_eq!(
+        described(&change(Kind::Renamed {
+            from: "JELLYFIN_MODE".to_owned(),
+            to: "MEDIA_SERVER_MODE".to_owned(),
+        })),
+        "the move of the setting JELLYFIN_MODE to MEDIA_SERVER_MODE"
+    );
+    assert_eq!(
         described(&change(Kind::Created {
             resource: "root folder".to_owned(),
             id: "1".to_owned(),

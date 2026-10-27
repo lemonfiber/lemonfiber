@@ -167,6 +167,28 @@ fn undoing_a_move_moves_it_back_and_undoing_a_copy_keeps_it() {
     );
 }
 
+/// A value moved to the key that says what it holds goes back under the key it left.
+#[test]
+fn undoing_a_rename_moves_the_value_back_under_the_key_it_left() {
+    let renamed = Change {
+        at: "t".to_owned(),
+        operation: "settings".to_owned(),
+        target: "MEDIA_SERVER_MODE".to_owned(),
+        kind: Kind::Renamed {
+            from: "JELLYFIN_MODE".to_owned(),
+            to: "MEDIA_SERVER_MODE".to_owned(),
+        },
+    };
+
+    assert_eq!(
+        renamed.undo().action,
+        Action::RenameBack {
+            from: "JELLYFIN_MODE".to_owned(),
+            to: "MEDIA_SERVER_MODE".to_owned(),
+        }
+    );
+}
+
 #[test]
 fn undoing_a_made_path_removes_exactly_it() {
     assert_eq!(
