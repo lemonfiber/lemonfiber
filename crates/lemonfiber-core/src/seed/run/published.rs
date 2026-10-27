@@ -19,9 +19,10 @@ pub(crate) fn published_as(id: &str) -> String {
 /// server's setting in the environment file.
 ///
 /// Forgotten only once its key is off the server — or was never there — so a revocation
-/// that failed leaves the value where the next run can still find which key it was.
+/// that failed leaves the value where the next run can still find which key it was. A
+/// rehearsal retires nothing.
 pub(super) async fn retire_keys(ctx: &Ctx, fillers: &Fillers) {
-    let Some(env) = ctx.settings.env_file.as_deref() else {
+    let (false, Some(env)) = (ctx.dry_run, ctx.settings.env_file.as_deref()) else {
         return;
     };
     let server = crate::app::targets::MediaServer::of(fillers);

@@ -97,3 +97,34 @@ async fn a_key_filed_under_our_name_is_revoked_and_the_published_one_forgotten()
         "a key nothing reads is still held: {written}"
     );
 }
+
+/// A rehearsal revokes nothing and forgets nothing.
+#[tokio::test]
+async fn a_rehearsal_retires_nothing() {
+    let env = recorded_admin("rehearsed");
+    let _ = store::set(
+        &env,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
+    let http = Fake::by_path(vec![
+        (media::serve("filed_as"), media::answered(&["ours"])),
+        (media::serve("revoke"), media::taken()),
+    ]);
+    let ctx = seed_ctx(true, None, Some(env.clone()))
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None)))
+        .rehearsing();
+
+    super::super::published::retire_keys(&ctx, &super::moved_fillers(vec![media_server_svc()]))
+        .await;
+
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+    assert!(
+        written.contains("JELLYFIN_API_KEY=jellyfin-key"),
+        "{written}"
+    );
+}
