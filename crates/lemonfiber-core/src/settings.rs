@@ -8,6 +8,7 @@ mod listing;
 pub(crate) mod own;
 pub(crate) mod readers;
 mod recorded;
+mod renaming;
 mod resolved;
 mod restarting;
 pub(crate) mod run;

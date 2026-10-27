@@ -152,7 +152,7 @@ fn a_setting_nothing_knows_still_gets_an_answer_rather_than_nothing() {
 #[test]
 fn a_rotation_that_was_stopped_is_not_read_as_one_that_was_rehearsed() {
     let stopped = Rotation::stopped(
-        "Jellyfin administrator password",
+        "Media server administrator password",
         Settled::Refused {
             detail: "the server refused the password lemonfiber holds".to_owned(),
         },
@@ -182,7 +182,7 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
         .map(|manifest| crate::wiring::Fillers::of(&manifest, &installed, &chosen, None))
         .unwrap_or_default();
     let held = crate::credential::Held {
-        name: "Jellyfin administrator password".to_owned(),
+        name: "Media server administrator password".to_owned(),
         setting: config::MEDIA_SERVER_ADMIN_PASSWORD_KEY.to_owned(),
         consumers: Vec::new(),
         location: "the settings file".to_owned(),

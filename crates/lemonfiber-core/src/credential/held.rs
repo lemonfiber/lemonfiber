@@ -233,9 +233,12 @@ const INDEXER: Entry = Entry {
     proven_by: Some(config::INDEXER_VALIDATED_KEY),
 };
 
+/// What the media server's administrator password is called in front of an operator.
+pub(crate) const MEDIA_SERVER_ADMIN_PASSWORD_NAME: &str = "Media server administrator password";
+
 /// The media server's administrator password.
 const MEDIA_SERVER: Entry = Entry {
-    name: "Jellyfin administrator password",
+    name: MEDIA_SERVER_ADMIN_PASSWORD_NAME,
     setting: config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
     consumers: &[Consumer::at_the_service(
         "the media server's own administrator account",

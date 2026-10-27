@@ -44,6 +44,13 @@ fn a_move_and_a_copy_read_as_where_each_went() {
         }),
         "copied the volume lemonfiber_caddy_data to /stack/mounts/caddy/data"
     );
+    assert_eq!(
+        did(&crate::journal::Kind::Renamed {
+            from: "JELLYFIN_MODE".to_owned(),
+            to: "MEDIA_SERVER_MODE".to_owned(),
+        }),
+        "moved the setting JELLYFIN_MODE to MEDIA_SERVER_MODE"
+    );
 }
 
 /// Every stamp this build writes goes out as it was written.

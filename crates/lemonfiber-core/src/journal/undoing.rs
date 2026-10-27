@@ -3,6 +3,16 @@
 use super::{Action, Change, Kind, Undo};
 
 impl Action {
+    /// Put `field` of the service's `resource` `id` back to `value`.
+    fn reconfigure(resource: &str, id: &str, field: &str, value: Option<&str>) -> Self {
+        Self::Reconfigure {
+            resource: resource.to_owned(),
+            id: id.to_owned(),
+            field: field.to_owned(),
+            value: value.map(str::to_owned),
+        }
+    }
+
     /// Give `grant` to `plugin` again where `give`, and end it otherwise.
     fn regrant(plugin: &str, grant: &crate::plugin::Grant, give: bool) -> Self {
         Self::Regrant {
@@ -64,6 +74,10 @@ impl Change {
                 volume: volume.clone(),
                 to: to.clone(),
             },
+            Kind::Renamed { from, to } => Action::RenameBack {
+                from: from.clone(),
+                to: to.clone(),
+            },
             Kind::Moved { from, to } => Action::MoveBack {
                 from: from.clone(),
                 to: to.clone(),
@@ -80,12 +94,7 @@ impl Change {
                 field,
                 previous,
                 ..
-            } => Action::Reconfigure {
-                resource: resource.clone(),
-                id: id.clone(),
-                field: field.clone(),
-                value: previous.clone(),
-            },
+            } => Action::reconfigure(resource, id, field, previous.as_deref()),
             Kind::KeyMinted { name, .. } | Kind::KeyCollected { name, .. } => {
                 Action::Revoke { name: name.clone() }
             }

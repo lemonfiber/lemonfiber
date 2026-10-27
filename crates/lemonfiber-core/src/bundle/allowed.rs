@@ -38,7 +38,7 @@ pub(super) const SHOWN: [&str; 15] = [
     "TZ",
     "VPN_PROVIDER",
     "VPN_PORT_FORWARDING",
-    "JELLYFIN_MODE",
+    "MEDIA_SERVER_MODE",
     "LEMONFIBER_USENET",
     "LEMONFIBER_TORRENT",
     "LEMONFIBER_IP_ECHO",

@@ -359,6 +359,7 @@ fn undone(undo: &Undo) -> String {
         // one of them can appear here, somebody has to say what it reads as.
         Action::Remove { resource, .. } => format!("{resource} on {}", undo.target),
         Action::Restore { key, .. } => format!("put {key} back"),
+        Action::RenameBack { from, to } => format!("moved {to} back to {from}"),
         Action::Repin { previous, .. } => format!("{} back to {previous}", undo.target),
         Action::Reconfigure { field, .. } => format!("put {field} back on {}", undo.target),
         Action::Revoke { name } => format!("revoked the key {name}"),

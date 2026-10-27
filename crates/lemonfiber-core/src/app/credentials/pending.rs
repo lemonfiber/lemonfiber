@@ -16,12 +16,9 @@ use crate::app::targets::{hosted, record_secret, recorded_secret, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 
-/// What a replacement's name ends in, after the name of the credential it replaces.
-const PENDING: &str = "_PENDING";
-
 /// The name a replacement for `setting` is kept under until the service has taken it.
 pub(crate) fn pending(setting: &str) -> String {
-    format!("{setting}{PENDING}")
+    format!("{setting}{}", config::PENDING_SUFFIX)
 }
 
 /// Move a replacement the service has taken into place, and take its pending copy away.
@@ -84,7 +81,11 @@ pub(crate) async fn settled(ctx: &Ctx) {
             return;
         };
         let file = config::store::read(env).unwrap_or_default();
-        if !file.keys().iter().any(|key| key.ends_with(PENDING)) {
+        if !file
+            .keys()
+            .iter()
+            .any(|key| key.ends_with(config::PENDING_SUFFIX))
+        {
             return;
         }
         // A stack that cannot be read has no service to ask, which leaves both for later.

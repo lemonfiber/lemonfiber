@@ -50,7 +50,10 @@ async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
     assert!(inventory.held.len() >= 6, "{}", inventory.held.len());
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     assert!(said.starts_with("Some(Unknown"), "{said}");
-    assert!(said.contains("Jellyfin administrator password"), "{said}");
+    assert!(
+        said.contains("Media server administrator password"),
+        "{said}"
+    );
     assert!(said.contains("Indexer API key"), "{said}");
     assert_eq!(
         recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
@@ -70,7 +73,7 @@ async fn asking_to_see_a_credential_once_prints_the_warning_and_not_the_value() 
     let inventory = asked(
         &ctx,
         Asking::Reveal {
-            credential: "Jellyfin administrator password".to_owned(),
+            credential: "Media server administrator password".to_owned(),
             confirmed: false,
         },
     )
@@ -92,7 +95,7 @@ async fn asking_again_prints_the_value_and_the_warning_stays_beside_it() {
     let inventory = asked(
         &ctx,
         Asking::Reveal {
-            credential: "jellyfin".to_owned(),
+            credential: "media server administrator".to_owned(),
             confirmed: true,
         },
     )
@@ -140,7 +143,7 @@ async fn administrator_rotated(
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "jellyfin".to_owned(),
+            credential: "media server administrator".to_owned(),
         },
     )
     .await;
@@ -224,7 +227,7 @@ async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_i
         let _ = asked(
             &moved(env.clone(), http),
             Asking::Rotate {
-                credential: "jellyfin".to_owned(),
+                credential: "media server administrator".to_owned(),
             },
         )
         .await;
@@ -261,7 +264,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
     let unrecorded = asked(
         &moved(env, http.clone()),
         Asking::Rotate {
-            credential: "jellyfin".to_owned(),
+            credential: "media server administrator".to_owned(),
         },
     )
     .await;
@@ -276,7 +279,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
     let unrandom = asked(
         &moved(env.clone(), http.clone()).with_random(Arc::new(FixedRandom(None))),
         Asking::Rotate {
-            credential: "jellyfin".to_owned(),
+            credential: "media server administrator".to_owned(),
         },
     )
     .await;
@@ -300,7 +303,7 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
     sealed(&env);
     let http = administered(media::taken());
 
-    let (said, _, _) = rotated_over(&env, "jellyfin", http.clone()).await;
+    let (said, _, _) = rotated_over(&env, "media server administrator", http.clone()).await;
 
     assert!(said.contains("could not be recorded"), "{said}");
     assert!(
@@ -332,7 +335,7 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
     let inventory = asked(
         &moved(env.clone(), http),
         Asking::Rotate {
-            credential: "jellyfin".to_owned(),
+            credential: "media server administrator".to_owned(),
         },
     )
     .await;
@@ -391,7 +394,7 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
     let inventory = asked(
         &ctx,
         Asking::Rotate {
-            credential: "jellyfin".to_owned(),
+            credential: "media server administrator".to_owned(),
         },
     )
     .await;

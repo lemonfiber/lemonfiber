@@ -54,9 +54,9 @@ enum Until {
     Product,
     /// Never: the application a native API's stand-in answers as.
     NativeApi,
-    /// The take-back of what a service wrote under its own name before the request gate,
-    /// found by that name, which goes once no stack from before the gate is upgraded.
-    TakenBack,
+    /// A name an earlier release or the service it ran wrote, read so a stack it set up
+    /// keeps working, which goes once no stack from before it is upgraded.
+    Earlier,
 }
 
 /// A part named in one file, how many times, and what removes it.
@@ -212,12 +212,6 @@ const NAMED: &[Named] = &[
         until: Until::Migrated,
     },
     Named {
-        file: "crates/lemonfiber-core/src/bundle/allowed.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Migrated,
-    },
-    Named {
         file: "crates/lemonfiber-core/src/clients.rs",
         part: "jellyfin",
         count: 5,
@@ -248,6 +242,12 @@ const NAMED: &[Named] = &[
         until: Until::Migrated,
     },
     Named {
+        file: "crates/lemonfiber-core/src/config/renamed.rs",
+        part: "jellyfin",
+        count: 2,
+        until: Until::Earlier,
+    },
+    Named {
         file: "crates/lemonfiber-core/src/config/keys.rs",
         part: "audiobookshelf",
         count: 1,
@@ -263,12 +263,12 @@ const NAMED: &[Named] = &[
         file: "crates/lemonfiber-core/src/config/keys.rs",
         part: "homepage",
         count: 1,
-        until: Until::Migrated,
+        until: Until::Moves("homepage"),
     },
     Named {
         file: "crates/lemonfiber-core/src/config/keys.rs",
         part: "jellyfin",
-        count: 2,
+        count: 1,
         until: Until::Migrated,
     },
     Named {
@@ -288,12 +288,6 @@ const NAMED: &[Named] = &[
         part: "gluetun",
         count: 1,
         until: Until::Moves("gluetun"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/credential/held.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Migrated,
     },
     Named {
         file: "crates/lemonfiber-core/src/doctor/vpn.rs",
@@ -359,7 +353,7 @@ const NAMED: &[Named] = &[
         file: "crates/lemonfiber-core/src/seed/run/taken_back.rs",
         part: "seerr",
         count: 1,
-        until: Until::TakenBack,
+        until: Until::Earlier,
     },
     Named {
         file: "crates/lemonfiber-core/src/settings/legacy.rs",
@@ -407,7 +401,7 @@ const NAMED: &[Named] = &[
         file: "crates/lemonfiber-core/src/wizard/answers.rs",
         part: "jellyfin",
         count: 2,
-        until: Until::Migrated,
+        until: Until::Earlier,
     },
     Named {
         file: "crates/lemonfiber-error/src/codes/vpn.rs",

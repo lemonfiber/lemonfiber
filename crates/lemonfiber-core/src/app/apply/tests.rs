@@ -243,7 +243,7 @@ fn every_write_is_journalled_so_it_can_be_unwound() {
             a_fresh_write("DATA_ROOT", &root_shown),
             a_fresh_write("PUID", "1000"),
             a_fresh_write("PGID", "1000"),
-            a_fresh_write("JELLYFIN_MODE", "docker"),
+            a_fresh_write("MEDIA_SERVER_MODE", "docker"),
         ]),
     );
 }
@@ -273,7 +273,7 @@ fn a_data_directory_several_levels_deep_records_every_directory_it_makes() {
             a_fresh_write("DATA_ROOT", &root_shown),
             a_fresh_write("PUID", "1000"),
             a_fresh_write("PGID", "1000"),
-            a_fresh_write("JELLYFIN_MODE", "docker"),
+            a_fresh_write("MEDIA_SERVER_MODE", "docker"),
         ]),
     );
 }

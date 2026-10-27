@@ -140,6 +140,7 @@ pub fn described(change: &Change) -> String {
         Kind::Set { key, .. } => format!("the setting {key}"),
         Kind::Made { path } => format!("the directory {path}"),
         Kind::Moved { from, .. } => format!("the move of {from}"),
+        Kind::Renamed { from, to } => format!("the move of the setting {from} to {to}"),
         Kind::Copied { volume, .. } => format!("the copy of the volume {volume}"),
         // Written by a plugin's install rather than a first run, and named for the same
         // reason the service's own field below is.

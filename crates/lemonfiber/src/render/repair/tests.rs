@@ -243,6 +243,13 @@ fn a_move_put_back_and_a_copy_kept_are_said_as_what_became_of_each() {
                 to: "/stack/mounts/caddy/data".to_owned(),
             },
         },
+        Undo {
+            target: "MEDIA_SERVER_MODE".to_owned(),
+            action: Action::RenameBack {
+                from: "JELLYFIN_MODE".to_owned(),
+                to: "MEDIA_SERVER_MODE".to_owned(),
+            },
+        },
     ];
 
     let said = reversed(&putting_back(undos, Vec::new())).text();
@@ -253,6 +260,10 @@ fn a_move_put_back_and_a_copy_kept_are_said_as_what_became_of_each() {
     );
     assert!(
         said.contains("/stack/mounts/caddy/data kept; the volume it came from is as it was"),
+        "{said}"
+    );
+    assert!(
+        said.contains("MEDIA_SERVER_MODE moved back to JELLYFIN_MODE"),
         "{said}"
     );
 }

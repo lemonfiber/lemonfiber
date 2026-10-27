@@ -132,6 +132,15 @@ pub enum Kind {
         /// Where it is now.
         to: String,
     },
+    /// A value in lemonfiber's environment file was moved from one key to another as it
+    /// stood. Undoing moves it back, only where the key it went to holds a value and the
+    /// key it left holds none. The value is not kept here, since it may be a credential.
+    Renamed {
+        /// The key it was under.
+        from: String,
+        /// The key it is under now.
+        to: String,
+    },
     /// The state a service kept in a volume the engine holds was copied into its mount
     /// tree. The volume was never changed, so undoing it puts nothing back.
     Copied {
@@ -354,6 +363,16 @@ pub enum Action {
         /// Where it goes back to.
         from: String,
         /// Where it is now.
+        to: String,
+    },
+    /// Move a value in the environment file back to the key it was under.
+    ///
+    /// Only where the key it is under now holds a value and the one it goes back to holds
+    /// none.
+    RenameBack {
+        /// The key it goes back to.
+        from: String,
+        /// The key it is under now.
         to: String,
     },
     /// Keep the copy of a volume where it is: the volume was never changed, so nothing

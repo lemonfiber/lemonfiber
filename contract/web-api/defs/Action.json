@@ -162,6 +162,29 @@
       ]
     },
     {
+      "description": "Move a value in the environment file back to the key it was under.\n\nOnly where the key it is under now holds a value and the one it goes back to holds\nnone.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "rename-back"
+        },
+        "from": {
+          "description": "The key it goes back to.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The key it is under now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "from",
+        "to"
+      ]
+    },
+    {
       "description": "Keep the copy of a volume where it is: the volume was never changed, so nothing\nis put back.",
       "type": "object",
       "properties": {

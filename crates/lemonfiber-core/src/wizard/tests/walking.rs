@@ -299,5 +299,5 @@ fn the_serialised_step_and_answers_read_as_their_kebab_names() {
     wizard.progress.at = Step::DataLocation;
     let json = serde_json::to_string(wizard.progress()).unwrap_or_default();
     assert!(json.contains(r#""at":"data-location""#), "{json}");
-    assert!(json.contains(r#""library":"jellyfin-native""#), "{json}");
+    assert!(json.contains(r#""library":"host""#), "{json}");
 }

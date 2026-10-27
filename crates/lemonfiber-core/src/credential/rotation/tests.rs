@@ -95,7 +95,7 @@ fn a_consumer_waiting_on_one_more_step_counts_as_carrying_the_replacement() {
 #[test]
 fn a_rotation_that_reached_everything_strands_nobody() {
     let landed = Rotation::landed(
-        "Jellyfin administrator password",
+        "Media server administrator password",
         "signed in",
         vec![Propagation::updated("Jellyfin")],
     );
