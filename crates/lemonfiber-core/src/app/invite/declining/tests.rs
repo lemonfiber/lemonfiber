@@ -327,17 +327,35 @@ async fn a_decline_service_that_cannot_be_reached_over_its_contract_is_not_asked
     assert!(http.request().is_none());
 }
 
-/// A plugin filling the decline service that neither speaks its contract nor stands in
-/// for the stack's own is asked nothing.
+/// A plugin filling the decline service that speaks no contract is asked nothing, a
+/// first-party one standing in for the stack's own included: only the stack's own decline
+/// service is told through its files.
 #[tokio::test]
-async fn a_plugin_that_neither_speaks_the_contract_nor_stands_in_is_not_asked() {
+async fn a_plugin_speaking_no_contract_is_not_asked_even_standing_in() {
     use lemonfiber_fixtures::http::{Answer, Fake};
     let project = lemonfiber_fixtures::scratch::Scratch::new("decline-asked-unspoken");
     let ctx = reaching_theirs(&project, true, Fake::always(Answer::reply(200, "null")));
-
-    assert!(
-        super::asked(&ctx, &filled_by_theirs(&project, false), &project)
-            .await
-            .is_none()
+    let unspoken = filled_by_theirs(&project, false);
+    let mut standing = crate::test_support::a_placed(
+        THEIRS,
+        &[super::decline::CAPABILITY],
+        Some(crate::test_support::CONTRACTED_PORT),
     );
+    standing.replaces = Some(THEIRS.to_owned());
+    let mut theirs = crate::test_support::an_installed(THEIRS, vec![standing]);
+    theirs.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    theirs.tree = crate::test_support::A_TREE.to_owned();
+    let stood_in = crate::test_support::stack_fillers(
+        Vec::new(),
+        &[theirs],
+        Some(&project),
+        &crate::test_support::first_party(THEIRS),
+    );
+
+    assert!(stood_in
+        .service(THEIRS)
+        .is_some_and(crate::wiring::Filler::stands_in));
+    for fillers in [unspoken, stood_in] {
+        assert!(super::asked(&ctx, &fillers, &project).await.is_none());
+    }
 }

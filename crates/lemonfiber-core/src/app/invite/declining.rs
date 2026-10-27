@@ -84,7 +84,7 @@ pub(crate) async fn asked(
     match spoken(ctx, filler, decline::CAPABILITY, decline::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(decline::Adapter(adapter))),
         Spoken::Unanswered => None,
-        Spoken::Not => (filler.origin == Origin::Bundled || filler.stands_in()).then(|| {
+        Spoken::Not => (filler.origin == Origin::Bundled).then(|| {
             Arc::new(configured::Configured::at(
                 project,
                 ctx.seams.filesystem.clone(),

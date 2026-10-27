@@ -26,6 +26,10 @@ use super::filled::{spoken, Spoken};
 use super::layout::project_directory;
 use super::secrets::{record_secret, recorded_secret};
 
+/// The API the request gate speaks to a media server in: a media server answering in any
+/// other has no route through the gate.
+const GATE_SPEAKS: ApiKind = ApiKind::Jellyfin;
+
 /// What the request service asks the stack for: a service that answers, for the services
 /// that ask, whether a person is who they say they are.
 pub(crate) const IDENTITY: &str = source::CAPABILITY;
@@ -158,7 +162,7 @@ impl MediaServer {
     pub(crate) fn gated(&self) -> Option<(Kind, &Pairing)> {
         self.pairing
             .as_ref()
-            .filter(|pairing| pairing.protocol.0 == ApiKind::Jellyfin.name())
+            .filter(|pairing| pairing.protocol.0 == GATE_SPEAKS.name())
             .map(|pairing| (Kind::Jellyfin, pairing))
     }
 

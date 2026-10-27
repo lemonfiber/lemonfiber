@@ -37,7 +37,7 @@ pub(crate) async fn asked(ctx: &Ctx, fillers: &Fillers, project: &Path) -> Optio
     match spoken(ctx, filler, show::CAPABILITY, show::MAJOR).await {
         Spoken::Over(adapter) => Some(Dashboard::Asked(Arc::new(show::Adapter(adapter)))),
         Spoken::Unanswered => None,
-        Spoken::Not if filler.origin != Origin::Bundled && !filler.stands_in() => None,
+        Spoken::Not if filler.origin != Origin::Bundled => None,
         Spoken::Not if configured::unmanaged(&ctx.settings.unmanaged) => Some(Dashboard::Unmanaged),
         Spoken::Not => Some(Dashboard::Asked(Arc::new(configured::Configured::at(
             project,
