@@ -117,10 +117,11 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         ));
 
     let services = every_keyed_service();
+    let served: Vec<crate::plugin::Installed> = media::moved().into_iter().collect();
     let wiring = super::super::published::publish_keys(
         &ctx,
         &services,
-        &super::moved_fillers(services.clone()),
+        &super::fillers_beside(services.clone(), &served, super::stack_root()),
     )
     .await;
 

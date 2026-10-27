@@ -134,13 +134,22 @@ async fn the_one_address_for_the_household_is_answered_under_its_own_kind() {
     // answer names the request service and names the index over every service as
     // something that is not a way in, rather than leaving a browser to decide.
     let household = Reporting::holding(
-        &["jellyfin", "seerr", "homepage"],
+        &["door", "seerr", "homepage"],
         Lifecycle::Running,
         Health::Healthy,
     );
+    let at = lemonfiber_fixtures::scratch::Scratch::named("front-door-read").kept();
+    let _ = std::fs::remove_dir_all(&at);
+    let _ = std::fs::create_dir_all(&at);
+    let settings = Settings {
+        env_file: Some(at.join(".env")),
+        ..Settings::default()
+    };
     // The machine is scripted: what this one is called differs on every machine the
     // tests run on.
-    let here = world(household, stack()).with_site(Renamed::called(Some("kitchen-nas")));
+    let here =
+        holding(household, stack(), settings).with_site(Renamed::called(Some("kitchen-nas")));
+    lemonfiber_testing::adapted::parts_recorded(&here);
     let seen = asked(here, "/api/front-door").await;
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::OK

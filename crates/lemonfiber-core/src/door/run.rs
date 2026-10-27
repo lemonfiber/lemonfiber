@@ -69,8 +69,14 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
     // Asked now rather than remembered: a machine renamed since the last look
     // answers as it is, which is the whole of how a changed address is noticed.
     let named = ctx.site.name().await;
+    let fillers = crate::wiring::Fillers::of(
+        &manifest,
+        register.installed(),
+        &crate::app::targets::chosen_fillers(ctx),
+        None,
+    );
     Ok(assembled(
-        &crate::door::candidates(&manifest.services, register.installed()),
+        &crate::door::candidates(&manifest.services, register.installed(), &fillers),
         Running {
             surveyed: &surveyed,
             undeclared: &undeclared,

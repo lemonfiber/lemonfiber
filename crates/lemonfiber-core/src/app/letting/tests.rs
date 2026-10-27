@@ -245,8 +245,6 @@ async fn a_client_that_will_not_let_it_go_is_reported_rather_than_called_done() 
 
 #[tokio::test]
 async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
-    static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     let project = Scratch::new("letting-contracted");
     let mut register = crate::plugin::Register::empty();
     assert!(register
@@ -269,7 +267,7 @@ async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
         ),
     ]);
     let ctx = contracted_context(&project, "fetcher", true)
-        .over(crate::stack::Source::Embedded(&EMBEDDED))
+        .over(crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED))
         .settings(Settings {
             data_root: Some(PathBuf::from("/srv/media")),
             env_file: Some(env_without_password("letting-contracted")),

@@ -4,17 +4,15 @@ use super::{declared, identity, refusal};
 use crate::config::env::EnvFile;
 use crate::test_support::a_context;
 
-/// The stack the tests are written against, compiled in.
-static SHIPPED: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
-
 /// A stack compiled in that declares nothing.
 static STACKLET: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
-/// A context whose settings file sits in `config`, with its data in `data`.
+/// A context over the stack this build carries, whose settings file sits in `config`,
+/// with its data in `data`.
 fn ctx_in(config: &Path, data: &Path) -> crate::app::Ctx {
     a_context()
+        .over(crate::test_support::embedded())
         .settings(crate::config::Settings {
             env_file: Some(config.join(".env")),
             stack_dir: Some(data.join("stack")),
@@ -54,7 +52,7 @@ async fn a_name_nothing_reads_is_refused() {
 #[tokio::test]
 async fn the_embedded_stack_declares_what_it_reads_and_one_on_disk_its_own_file() {
     for embedded in [
-        declared(crate::stack::Source::Embedded(&SHIPPED)).await,
+        declared(crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED)).await,
         declared(crate::stack::Source::Embedded(&STACKLET)).await,
     ] {
         for key in [
@@ -71,9 +69,6 @@ async fn the_embedded_stack_declares_what_it_reads_and_one_on_disk_its_own_file(
             "{embedded:?}"
         );
     }
-
-    let on_disk = declared(crate::test_support::stack()).await;
-    assert!(on_disk.iter().any(|key| key == "DATA_ROOT"), "{on_disk:?}");
 
     let dir = lemonfiber_fixtures::scratch::Scratch::new("declared-external");
     let _ = std::fs::write(dir.join(".env.example"), "# ours\nOURS=1\n");

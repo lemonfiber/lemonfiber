@@ -6,14 +6,17 @@
 //! complexity this product exists to remove. So the question has one answer, derived
 //! here rather than decided again by each surface that shows it.
 //!
-//! The two that can be a door are told apart by the shape of their API rather than
-//! by their name, the way every other service resolution here is, so a stack that
-//! ships a different request service under the same shape resolves the same way —
-//! and so does a plugin's service published to the household, judged by the adapter
-//! it names. The rest speak no API lemonfiber knows, so each of the stack's is written
-//! down below with what it is to the household — and one nobody has written down, a
-//! plugin's among them, is not offered, for the reason [`crate::config::display`]
-//! withholds a setting nobody vouched for.
+//! The two that can be a door are told apart by the contract the adapter in front of
+//! them speaks, never by their name or by an API this build holds an adapter for: a
+//! service fronted by one speaking `request.intake` is where asking begins, and one
+//! fronted by one speaking `media.serve` is a library, or a shelf where the adapter
+//! declares [`SHELF_MEDIA`] alone, so any service speaking the same contract resolves the
+//! same way. The stack's guard in front of the media server is
+//! met as the library it guards, under that library's name. The rest speak no such
+//! contract, so each of the stack's is written down below with what it is to the
+//! household — and one nobody has written down, another plugin's among them, is not
+//! offered, for the reason [`crate::config::display`] withholds a setting nobody vouched
+//! for.
 //!
 //! All of which is a default rather than a decree. An operator who disagrees about
 //! their own stack names the service they want, and [`chosen`] is where that name
@@ -26,7 +29,10 @@ pub(crate) mod run;
 
 use serde::Serialize;
 
-use lemonfiber_manifest::{ApiKind, Bind, Service};
+use lemonfiber_contract::capabilities::media::serve;
+use lemonfiber_contract::capabilities::request::intake;
+use lemonfiber_contract::capabilities::stream::guard;
+use lemonfiber_manifest::{Bind, Service};
 
 use crate::plugin::{Installed, Placed};
 
@@ -108,58 +114,89 @@ impl Facing {
     }
 }
 
-/// The services published to the household that speak no API lemonfiber knows.
+/// The media in [`lemonfiber_manifest::container::MEDIA`] that make a media server a
+/// [`Facing::Shelf`] where it declares nothing else: one kind of media, reached from the
+/// library rather than instead of it.
+pub const SHELF_MEDIA: [&str; 5] = ["music", "books", "comics", "audiobooks", "podcasts"];
+
+/// The services published to the household that a contract does not settle.
 ///
 /// A register rather than a rule read off a name, for the reason
 /// [`crate::config::display::SHOWN`] is one: a guess is wrong in whichever direction
 /// nobody chose, and the service that ends up wrongly offered to a household is by
 /// definition the one nobody thought about. So an entry is a decision somebody made
 /// and can be reviewed on; anything else is [`Facing::Unstated`] and is offered to
-/// nobody.
+/// nobody. It names no place to begin: those two are the contracts'.
 const NAMED: &[(&str, Facing)] = &[
     ("calibre-web-automated", Facing::Shelf),
     ("audiobookshelf", Facing::Shelf),
     ("navidrome", Facing::Shelf),
     ("homepage", Facing::Operators),
     ("caddy", Facing::Carriage),
-    (crate::screening::door::SERVICE, Facing::Watching),
 ];
 
-/// What this service is to the household, or nothing where it is not published to
-/// them at all.
+/// What one of the stack's own services is to the household, or nothing where it is not
+/// published to them at all.
 ///
 /// Publication is the manifest's own [`Bind`], so a service reachable only from this
 /// machine is not a candidate for anything here — which is the same fact the admin
 /// tier's loopback binding rests on, read from the same field rather than from a
-/// second list that could disagree with it.
+/// second list that could disagree with it. A service guarding the media stream is how
+/// the household reaches the library; anything else is what the register says.
 #[must_use]
 pub fn facing(service: &Service) -> Option<Facing> {
     if service.bind != Some(Bind::Lan) {
         return None;
     }
-    Some(by_adapter(service.api.as_ref().map(|api| api.kind)).unwrap_or_else(|| named(&service.id)))
+    if service.provides.iter().any(|one| one == guard::CAPABILITY) {
+        return Some(Facing::Watching);
+    }
+    Some(named(&service.id))
 }
 
-/// What a plugin's service is to the household, or nothing where it is not published
-/// to them at all.
+/// What a plugin's service is to the household, or nothing where it is not published to
+/// them at all.
 ///
-/// Published is the household tier its record names, which puts it behind the stack's
-/// proxy and nowhere else: the one way the household reaches it. Judged by the adapter
-/// it names and by nothing else — the register is the stack's account of its own
-/// services, and a plugin's service choosing an id the register names is not thereby
-/// what the register says.
+/// Judged by the contract the adapter of `installed` in front of it speaks. Where none
+/// settles it, a first-party part moved in place of one of the stack's services is what
+/// the register says of the service it stands in for, and any other plugin's service is
+/// unstated: a plugin's service choosing an id the register names is not thereby what
+/// the register says.
 #[must_use]
-pub fn brought(placed: &Placed) -> Option<Facing> {
+pub fn brought(installed: &[Installed], plugin: &Installed, placed: &Placed) -> Option<Facing> {
     placed.reached.as_ref()?.hostname()?;
-    Some(by_adapter(placed.api.as_ref().map(|api| api.kind)).unwrap_or(Facing::Unstated))
+    Some(by_contract(plugin, placed).unwrap_or_else(|| {
+        if crate::project::moved_in_place(installed, &placed.service) {
+            named(&placed.service)
+        } else {
+            Facing::Unstated
+        }
+    }))
 }
 
-/// What the shape of an API makes a service to the household, where it settles it.
-const fn by_adapter(kind: Option<ApiKind>) -> Option<Facing> {
-    match kind {
-        Some(ApiKind::Seerr) => Some(Facing::Asking),
-        Some(ApiKind::Jellyfin) => Some(Facing::Watching),
-        _ => None,
+/// What the contract the adapter of `plugin` in front of `placed` speaks makes it to the
+/// household, where it settles it.
+fn by_contract(plugin: &Installed, placed: &Placed) -> Option<Facing> {
+    let speaking = |capability: &str, major: u32| {
+        let spoken = lemonfiber_contract::spoken(capability, major);
+        plugin.services.iter().find(|adapter| {
+            adapter.fronts.as_deref() == Some(placed.service.as_str())
+                && adapter.speaks.contains(&spoken)
+        })
+    };
+    if speaking(intake::CAPABILITY, intake::MAJOR).is_some() {
+        return Some(Facing::Asking);
+    }
+    speaking(serve::CAPABILITY, serve::MAJOR).map(|adapter| served(&adapter.media_types))
+}
+
+/// What a media server declaring `media` is to the household: a shelf where it declares
+/// shelf media alone, and the library otherwise.
+fn served(media: &[String]) -> Facing {
+    if !media.is_empty() && media.iter().all(|one| SHELF_MEDIA.contains(&one.as_str())) {
+        Facing::Shelf
+    } else {
+        Facing::Watching
     }
 }
 
@@ -186,43 +223,79 @@ pub struct Candidate<'a> {
 }
 
 /// Every service the household might be sent to: the stack's, in the order it declares
-/// them, then each installed plugin's.
+/// them, then each installed plugin's. A service of the stack a first-party part has
+/// moved in place of is met as the part's, once.
+///
+/// The stack's guard in front of the media server is met under the name of the library
+/// it guards: the upstream behind whatever its ask for `media.serve` settles on among
+/// `fillers`, which is what the household arrives at through it.
 #[must_use]
-pub fn candidates<'a>(services: &'a [Service], installed: &'a [Installed]) -> Vec<Candidate<'a>> {
-    // The guard in front of the media server is met as the media server: what the
-    // household arrives at through it is the library, under the library's own name.
-    let library = services
+pub fn candidates<'a>(
+    services: &'a [Service],
+    installed: &'a [Installed],
+    fillers: &crate::wiring::Fillers,
+) -> Vec<Candidate<'a>> {
+    let bundled = services
         .iter()
-        .find(|service| {
-            service
-                .api
-                .as_ref()
-                .is_some_and(|api| api.kind == ApiKind::Jellyfin)
-        })
-        .map(|service| service.name.as_str());
-    let bundled = services.iter().map(move |service| Candidate {
-        id: &service.id,
-        name: match library {
-            Some(library) if service.id == crate::screening::door::SERVICE => library,
-            _ => &service.name,
-        },
-        facing: facing(service),
-        reached: Reached::Port(service.port),
-    });
-    let plugins = installed
-        .iter()
-        .flat_map(|one| one.services.iter())
-        .map(|placed| Candidate {
+        .filter(|service| !crate::project::moved_in_place(installed, &service.id))
+        .map(move |service| Candidate {
+            id: &service.id,
+            name: guarded(services, installed, fillers, service).unwrap_or(&service.name),
+            facing: facing(service),
+            reached: Reached::Port(service.port),
+        });
+    let plugins = installed.iter().flat_map(move |plugin| {
+        plugin.services.iter().map(move |placed| Candidate {
             id: &placed.service,
             name: placed.called(),
-            facing: brought(placed),
-            reached: placed
-                .reached
-                .as_ref()
-                .and_then(crate::plugin::Reached::hostname)
-                .map_or(Reached::Port(None), Reached::Proxied),
-        });
+            facing: brought(installed, plugin, placed),
+            reached: match placed.reached.as_ref() {
+                Some(reached) if crate::project::moved_in_place(installed, &placed.service) => {
+                    Reached::Port(Some(reached.port()))
+                }
+                Some(reached) => reached
+                    .hostname()
+                    .map_or(Reached::Port(None), Reached::Proxied),
+                None => Reached::Port(None),
+            },
+        })
+    });
     bundled.chain(plugins).collect()
+}
+
+/// The name of the library `guard` guards, where it guards the media stream and its ask
+/// for `media.serve` settles on one service among `fillers`: the upstream that service
+/// fronts, or the service itself.
+fn guarded<'a>(
+    services: &'a [Service],
+    installed: &'a [Installed],
+    fillers: &crate::wiring::Fillers,
+    guard: &Service,
+) -> Option<&'a str> {
+    if !guard.provides.iter().any(|one| one == guard::CAPABILITY) {
+        return None;
+    }
+    let [filler] = fillers
+        .asks()
+        .iter()
+        .find(|ask| ask.by == guard.id && ask.capability == serve::CAPABILITY)?
+        .fillers
+        .as_slice()
+    else {
+        return None;
+    };
+    let library = fillers.fronted_by(filler).unwrap_or(filler).id.as_str();
+    installed
+        .iter()
+        .flat_map(|plugin| &plugin.services)
+        .find(|placed| placed.service == library)
+        .map(Placed::called)
+        .or_else(|| {
+            services
+                .iter()
+                .find(|service| service.id == library)
+                .map(|service| service.name.as_str())
+        })
 }
 
 /// What the register says this service is, or that nobody has said.

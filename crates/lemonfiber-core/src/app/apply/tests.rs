@@ -330,15 +330,13 @@ fn a_data_directory_that_cannot_be_made_stops_the_apply() {
 
 #[test]
 fn the_embedded_stack_is_written_where_compose_reads_it_but_not_journalled() {
-    static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     let dir = scratch("stack");
     let paths = layout(&dir);
     let mut wizard = reviewed(&dir.join("data-root"));
 
     assert!(apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
     )
     .is_ok());
 
@@ -377,14 +375,12 @@ fn an_external_stack_is_left_where_it_is_and_not_written_here() {
 /// extraction this replaced would have written over whatever was on disk.
 #[test]
 fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it() {
-    static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     let dir = scratch("stack-edited");
     let paths = layout(&dir);
     let mut first = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut first,
-        &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
     )
     .is_ok());
 
@@ -398,7 +394,7 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     let mut again = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut again,
-        &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
     )
     .is_ok());
 
@@ -418,14 +414,12 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
 /// upgrades.
 #[test]
 fn an_apply_records_the_checksums_of_what_it_wrote() {
-    static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     let dir = scratch("stack-recorded");
     let paths = layout(&dir);
     let mut wizard = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&EMBEDDED), "t")
+        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
     )
     .is_ok());
 
@@ -439,8 +433,6 @@ fn an_apply_records_the_checksums_of_what_it_wrote() {
 
 #[test]
 fn a_stack_that_cannot_be_written_stops_the_apply() {
-    static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
     let dir = scratch("nostack");
     let paths = layout(&dir);
     // A file sits where the stack's own data directory must be created, so
@@ -457,7 +449,7 @@ fn a_stack_that_cannot_be_written_stops_the_apply() {
 
     let stopped = apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&EMBEDDED), "t"),
+        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t"),
     );
 
     assert!(stopped.is_err(), "the stack could not be written");

@@ -4,16 +4,6 @@ use crate::{validate, Manifest};
 /// The stack this build ships.
 const SHIPPED: &str = lemonfiber_bundled::STACK;
 
-/// A stack kept beside these tests, which the rules are exercised on by editing it, so
-/// a change to the shipped stack moves no test written against it.
-static FIXTURE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    crate::read(std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../lemonfiber-fixtures/stack"
-    )))
-    .unwrap_or_default()
-});
-
 /// Everything wrong with a manifest, as one line each.
 fn messages(text: &str) -> Vec<String> {
     Manifest::from_toml(text)
@@ -29,8 +19,11 @@ fn messages(text: &str) -> Vec<String> {
 
 /// Whether the stack this binary carries, edited once, says what it should.
 fn fault(from: &str, to: &str, expected: &str) {
-    assert!(FIXTURE.contains(from), "the fixture must contain {from:?}");
-    let said = messages(&FIXTURE.replacen(from, to, 1));
+    assert!(
+        SHIPPED.contains(from),
+        "the shipped stack must contain {from:?}"
+    );
+    let said = messages(&SHIPPED.replacen(from, to, 1));
     assert!(
         said.iter().any(|message| message.contains(expected)),
         "expected {expected:?} among {said:?}"
@@ -61,8 +54,8 @@ fn a_by_name_wiring_whose_reason_is_blank_is_caught() {
 #[test]
 fn a_wiring_that_asks_and_names_is_caught() {
     fault(
-        "by = \"seerr\"\nasks = \"identity.source\"",
-        "by = \"seerr\"\nasks = \"identity.source\"\nto = \"jellyfin\"\nwhy = \"both\"",
+        "asks = \"identity.source\"\nby = \"request-gate\"",
+        "asks = \"identity.source\"\nby = \"request-gate\"\nto = \"jellyfin\"\nwhy = \"both\"",
         "a wiring does one or the other",
     );
 }
@@ -70,8 +63,8 @@ fn a_wiring_that_asks_and_names_is_caught() {
 #[test]
 fn a_wiring_with_neither_end_is_caught() {
     fault(
-        "by = \"bazarr\"\nasks = \"library.curate\"\neach = true",
-        "by = \"bazarr\"",
+        "asks = \"library.curate\"\nby = \"recyclarr\"\neach = true",
+        "by = \"recyclarr\"",
         "neither asks for a capability nor names a service",
     );
 }
@@ -79,8 +72,8 @@ fn a_wiring_with_neither_end_is_caught() {
 #[test]
 fn a_wiring_from_something_that_is_not_a_service_is_caught() {
     fault(
-        "by = \"bazarr\"\nasks = \"library.curate\"",
-        "by = \"subtitler\"\nasks = \"library.curate\"",
+        "asks = \"library.curate\"\nby = \"recyclarr\"",
+        "asks = \"library.curate\"\nby = \"subtitler\"",
         "by names subtitler, which is not a service",
     );
 }
@@ -99,8 +92,8 @@ fn a_wiring_to_something_that_is_not_a_service_is_caught() {
 #[test]
 fn a_wiring_asking_for_a_name_of_the_wrong_shape_is_caught() {
     fault(
-        "by = \"seerr\"\nasks = \"identity.source\"",
-        "by = \"seerr\"\nasks = \"plex:identity\"",
+        "asks = \"identity.source\"\nby = \"request-gate\"",
+        "asks = \"plex:identity\"\nby = \"request-gate\"",
         "asks for plex:identity, which is not a core capability name",
     );
 }
@@ -110,8 +103,8 @@ fn a_wiring_asking_for_a_name_of_the_wrong_shape_is_caught() {
 #[test]
 fn a_chosen_filler_that_does_not_provide_it_is_caught() {
     fault(
-        "asks = \"indexer.search\"\nfilled_by = \"prowlarr\"",
-        "asks = \"indexer.search\"\nfilled_by = \"sabnzbd\"",
+        "asks = \"indexer.search\"\nby = \"bindery\"\nfilled_by = \"prowlarr\"",
+        "asks = \"indexer.search\"\nby = \"bindery\"\nfilled_by = \"sabnzbd\"",
         "chooses sabnzbd to fill indexer.search, which it does not provide",
     );
 }
@@ -130,8 +123,8 @@ fn a_chosen_filler_with_no_reason_is_caught() {
 #[test]
 fn a_wiring_that_reaches_all_of_them_and_chooses_one_is_caught() {
     fault(
-        "by = \"prowlarr\"\nasks = \"library.curate\"\neach = true",
-        "by = \"prowlarr\"\nasks = \"library.curate\"\neach = true\nfilled_by = \"sonarr\"",
+        "asks = \"library.curate\"\nby = \"recyclarr\"\neach = true",
+        "asks = \"library.curate\"\nby = \"recyclarr\"\neach = true\nfilled_by = \"sonarr\"",
         "it does both only by meaning neither",
     );
 }
@@ -157,10 +150,10 @@ fn a_wiring_from_a_service_to_itself_is_caught() {
 #[test]
 fn the_same_ask_written_twice_is_caught() {
     fault(
-        "by = \"lidarr\"\nasks = \"download.usenet\"",
-        "by = \"lidarr\"\nasks = \"download.usenet\"\n\n[[wiring]]\nby = \"lidarr\"\n\
-         asks = \"download.usenet\"",
-        "names download.usenet more than once",
+        "asks = \"proxy.front\"\nby = \"homepage\"",
+        "asks = \"proxy.front\"\nby = \"homepage\"\n\n[[wiring]]\nasks = \"proxy.front\"\n\
+         by = \"homepage\"",
+        "names proxy.front more than once",
     );
 }
 

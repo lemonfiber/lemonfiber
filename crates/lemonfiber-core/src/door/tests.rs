@@ -1,24 +1,31 @@
-use super::fixtures::{asking, brought, installed, service, watching};
+use super::fixtures::{asking, brought, fronted, installed, service, watching};
 use super::{begins_at, facing, Facing, NAMED};
+use crate::plugin::Installed;
 use lemonfiber_manifest::{ApiKind, Bind};
+
+/// Where the household begins over `services` with `installed` beside them and nothing
+/// filling an ask, as the facing and the id it runs under.
+fn begins(
+    services: &[lemonfiber_manifest::Service],
+    installed: &[Installed],
+) -> Option<(Facing, String)> {
+    let candidates = super::candidates(services, installed, &crate::wiring::Fillers::default());
+    begins_at(&candidates).map(|(facing, candidate)| (facing, candidate.id.to_owned()))
+}
 
 #[test]
 fn the_request_surface_is_the_door_wherever_there_is_one() {
-    let services = [watching(), asking()];
     assert_eq!(
-        begins_at(&super::candidates(&services, &[]))
-            .map(|(facing, candidate)| (facing, candidate.id.to_owned())),
+        begins(&[watching()], &[asking()]),
         Some((Facing::Asking, "seerr".to_owned()))
     );
 }
 
 #[test]
 fn the_library_is_the_door_only_where_nothing_can_be_asked_for() {
-    let services = [watching()];
     assert_eq!(
-        begins_at(&super::candidates(&services, &[]))
-            .map(|(facing, candidate)| (facing, candidate.id.to_owned())),
-        Some((Facing::Watching, "jellyfin".to_owned()))
+        begins(&[watching()], &[]),
+        Some((Facing::Watching, "door".to_owned()))
     );
 }
 
@@ -30,7 +37,7 @@ fn a_stack_publishing_nothing_to_the_household_has_no_door_at_all() {
         service("sonarr", Some(Bind::Loopback), Some(ApiKind::Servarr)),
         service("homepage", Some(Bind::Lan), None),
     ];
-    assert!(begins_at(&super::candidates(&services, &[])).is_none());
+    assert_eq!(begins(&services, &[]), None);
 }
 
 #[test]
@@ -73,15 +80,24 @@ fn a_published_service_nobody_vouched_for_is_offered_to_nobody() {
 }
 
 #[test]
-fn a_download_client_published_to_the_household_is_still_not_a_door() {
-    // The api arm falls through to the register for every shape but the two,
-    // so a stack that published one of these would not have made it a way in.
-    for kind in [ApiKind::Servarr, ApiKind::Sabnzbd, ApiKind::Qbittorrent] {
+fn a_service_is_no_door_by_the_api_it_speaks() {
+    // Only a contract makes a place to begin, so a stack service speaking the API a
+    // request service or a library speaks is what the register says of it.
+    for kind in [
+        ApiKind::Seerr,
+        ApiKind::Jellyfin,
+        ApiKind::Servarr,
+        ApiKind::Sabnzbd,
+        ApiKind::Qbittorrent,
+        ApiKind::Bindery,
+    ] {
         let published = service("client", Some(Bind::Lan), Some(kind));
         assert_eq!(facing(&published), Some(Facing::Unstated), "{kind:?}");
     }
-    let book_curator = service("bindery", Some(Bind::Lan), Some(ApiKind::Bindery));
-    assert_eq!(facing(&book_curator), Some(Facing::Unstated));
+    for id in ["seerr", "jellyfin"] {
+        let named = service(id, Some(Bind::Lan), None);
+        assert_eq!(facing(&named), Some(Facing::Unstated), "{id}");
+    }
 }
 
 #[test]
@@ -107,37 +123,71 @@ fn every_facing_says_why_it_is_or_is_not_a_way_in() {
 }
 
 #[test]
-fn the_register_names_nothing_the_shape_of_an_api_already_answers() {
-    // A name here for the request service or the library would be a second
-    // opinion about the two the shape of the API already decides.
-    assert!(!NAMED
-        .iter()
-        .any(|(id, _)| *id == "seerr" || *id == "jellyfin"));
+fn the_register_names_no_place_to_begin() {
+    // Where to begin is the contracts' to say, so an entry naming one here would be a
+    // second opinion about what they already decide.
+    assert!(!NAMED.iter().any(|(_, facing)| facing.begins()));
 }
 
-/// A plugin's service published to the household is judged by the adapter it names:
-/// a request service asks, a media server watches, anything else is unstated — and the
-/// register, the stack's account of its own services, does not reach it by its id. One
-/// reachable from this machine alone is no part of this.
-#[test]
-fn a_plugins_service_is_judged_by_its_adapter_alone() {
-    use super::brought as facing_of;
+/// What the plugin's first service is to the household, judged among `installed` alone.
+fn judged(plugin: &Installed) -> Option<Facing> {
+    let placed = plugin.services.first()?;
+    super::brought(std::slice::from_ref(plugin), plugin, placed)
+}
 
+/// A plugin's service published to the household is judged by the contract the adapter in
+/// front of it speaks: a request service asks, a media server watches, anything else is
+/// unstated, and the register does not reach a stranger's service by its id. One reachable
+/// from this machine alone is no part of this.
+#[test]
+fn a_plugins_service_is_judged_by_the_contract_in_front_of_it() {
+    for (plugin, expected) in [
+        (
+            fronted("requests", Some("request.intake@1"), Some("ask")),
+            Some(Facing::Asking),
+        ),
+        (
+            fronted("server", Some("media.serve@1"), Some("watch")),
+            Some(Facing::Watching),
+        ),
+        (
+            fronted("server", Some("media.serve@2"), Some("watch")),
+            Some(Facing::Unstated),
+        ),
+        (
+            fronted("curator", Some("library.curate@1"), Some("curate")),
+            Some(Facing::Unstated),
+        ),
+        (
+            fronted("homepage", None, Some("home")),
+            Some(Facing::Unstated),
+        ),
+        (
+            installed(vec![brought("requests", Some("ask"))]),
+            Some(Facing::Unstated),
+        ),
+        (fronted("requests", Some("request.intake@1"), None), None),
+    ] {
+        assert_eq!(judged(&plugin), expected, "{:?}", plugin.services);
+    }
+}
+
+/// An adapter speaking a contract in front of another plugin's service says nothing about
+/// what that service is.
+#[test]
+fn only_the_services_own_plugin_says_what_it_is() {
+    let requests = installed(vec![brought("requests", Some("ask"))]);
+    let mut adapter = crate::test_support::a_placed("requests-adapter", &[], None, Some(8080));
+    adapter.fronts = Some("requests".to_owned());
+    adapter.speaks = vec!["request.intake@1".to_owned()];
+    let both = [
+        requests.clone(),
+        crate::test_support::an_installed("elsewhere", vec![adapter]),
+    ];
+    let placed = requests.services.first();
     assert_eq!(
-        facing_of(&brought("requests", Some(ApiKind::Seerr), Some("ask"))),
-        Some(Facing::Asking)
-    );
-    assert_eq!(
-        facing_of(&brought("server", Some(ApiKind::Jellyfin), Some("watch"))),
-        Some(Facing::Watching)
-    );
-    assert_eq!(
-        facing_of(&brought("homepage", None, Some("home"))),
+        placed.and_then(|placed| super::brought(&both, &requests, placed)),
         Some(Facing::Unstated)
-    );
-    assert_eq!(
-        facing_of(&brought("requests", Some(ApiKind::Seerr), None)),
-        None
     );
 }
 
@@ -146,29 +196,88 @@ fn a_plugins_service_is_judged_by_its_adapter_alone() {
 /// where nothing anywhere can be asked for.
 #[test]
 fn a_plugins_service_can_be_the_door_by_the_same_rule() {
-    let requests = installed(vec![brought("requests", Some(ApiKind::Seerr), Some("ask"))]);
-    let server = installed(vec![brought(
-        "server",
-        Some(ApiKind::Jellyfin),
-        Some("watch"),
-    )]);
-    let door = |services: &[lemonfiber_manifest::Service], plugin: &crate::plugin::Installed| {
-        let candidates = super::candidates(services, std::slice::from_ref(plugin));
-        begins_at(&candidates).map(|(facing, candidate)| (facing, candidate.id.to_owned()))
-    };
+    let requests = fronted("requests", Some("request.intake@1"), Some("ask"));
+    let server = fronted("server", Some("media.serve@1"), Some("watch"));
 
     assert_eq!(
-        door(&[watching(), asking()], &requests),
-        Some((Facing::Asking, "seerr".to_owned()))
-    );
-    assert_eq!(
-        door(&[watching()], &requests),
+        begins(&[watching()], &[requests]),
         Some((Facing::Asking, "requests".to_owned()))
     );
     assert_eq!(
-        door(&[], &server),
+        begins(&[], &[server]),
         Some((Facing::Watching, "server".to_owned()))
     );
+}
+
+/// A plugin bringing `id` behind an adapter speaking `media.serve` and declaring `media`,
+/// published to the household at the label `id`.
+fn serving(id: &str, media: &[&str]) -> Installed {
+    let mut plugin = fronted(id, Some("media.serve@1"), Some(id));
+    for adapter in plugin
+        .services
+        .iter_mut()
+        .filter(|one| one.fronts.is_some())
+    {
+        adapter.media_types = media.iter().map(|one| (*one).to_owned()).collect();
+    }
+    plugin
+}
+
+/// A media server declaring shelf media alone is a shelf, one declaring anything else
+/// beside it is the library, and so is one declaring none.
+#[test]
+fn a_media_server_is_a_shelf_where_it_serves_shelf_media_alone() {
+    for (media, expected) in [
+        (&["audiobooks"][..], Facing::Shelf),
+        (&["audiobooks", "podcasts"][..], Facing::Shelf),
+        (&["music"][..], Facing::Shelf),
+        (&["books", "comics"][..], Facing::Shelf),
+        (&["movies", "audiobooks"][..], Facing::Watching),
+        (&["tv"][..], Facing::Watching),
+        (&["films"][..], Facing::Watching),
+        (&[][..], Facing::Watching),
+    ] {
+        assert_eq!(
+            judged(&serving("server", media)),
+            Some(expected),
+            "{media:?}"
+        );
+    }
+}
+
+/// A shelf is never somewhere to begin: where one stands beside the library and the
+/// request service, the household begins at the request service, and where it stands
+/// alone there is no door at all.
+#[test]
+fn a_shelf_stands_beside_the_door_rather_than_being_it() {
+    let shelf = serving("listening", &["audiobooks", "podcasts"]);
+    let library = serving("library", &["movies", "tv", "music"]);
+    let requests = fronted("requests", Some("request.intake@1"), Some("ask"));
+
+    assert_eq!(
+        begins(&[], &[shelf.clone(), library.clone(), requests]),
+        Some((Facing::Asking, "requests".to_owned()))
+    );
+    assert_eq!(
+        begins(&[], &[shelf.clone(), library]),
+        Some((Facing::Watching, "library".to_owned()))
+    );
+    assert_eq!(begins(&[], &[shelf]), None);
+}
+
+/// The shelf media are the vocabulary's, and every other medium in it is one a library
+/// is watched for.
+#[test]
+fn the_shelf_media_are_the_vocabulary_but_what_is_watched() {
+    let vocabulary = lemonfiber_manifest::container::MEDIA;
+    assert!(super::SHELF_MEDIA
+        .iter()
+        .all(|one| vocabulary.contains(one)));
+    let watched: Vec<&str> = vocabulary
+        .into_iter()
+        .filter(|one| !super::SHELF_MEDIA.contains(one))
+        .collect();
+    assert_eq!(watched, ["tv", "movies"]);
 }
 
 /// A plugin's service is reached through the proxy at its label, and one reachable from
@@ -176,10 +285,14 @@ fn a_plugins_service_can_be_the_door_by_the_same_rule() {
 #[test]
 fn a_plugins_service_is_reached_through_the_proxy() {
     let plugin = installed(vec![
-        brought("requests", Some(ApiKind::Seerr), Some("ask")),
-        brought("hidden", Some(ApiKind::Seerr), None),
+        brought("requests", Some("ask")),
+        brought("hidden", None),
     ]);
-    let candidates = super::candidates(&[], std::slice::from_ref(&plugin));
+    let candidates = super::candidates(
+        &[],
+        std::slice::from_ref(&plugin),
+        &crate::wiring::Fillers::default(),
+    );
     let reached: Vec<super::Reached<'_>> = candidates.iter().map(|one| one.reached).collect();
 
     assert_eq!(
@@ -190,4 +303,117 @@ fn a_plugins_service_is_reached_through_the_proxy() {
         candidates.first().map(|one| one.name),
         Some("requests the plugin's")
     );
+}
+
+/// The stack this build carries with every part it installs: the request service moved
+/// into its plugin is the door, judged by the contract its adapter speaks and reached on
+/// the port it is published on as the stack's own was, the guard in front of the library
+/// is met under the library's name, and the listening and music servers are shelves beside
+/// them.
+#[test]
+fn the_carried_stack_begins_at_its_moved_request_service() {
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let services = manifest
+        .as_ref()
+        .map(|one| one.services.clone())
+        .unwrap_or_default();
+    let installed = crate::test_support::adapted::installed_parts();
+    let fillers = manifest.as_ref().map(|manifest| {
+        crate::wiring::Fillers::of(
+            manifest,
+            &installed,
+            &crate::wiring::Chosen::default(),
+            None,
+        )
+    });
+    let candidates = super::candidates(&services, &installed, &fillers.unwrap_or_default());
+
+    let mut ids: Vec<&str> = candidates.iter().map(|one| one.id).collect();
+    let met = ids.len();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(ids.len(), met, "a moved service is met once");
+    assert_eq!(
+        begins_at(&candidates).map(|(facing, door)| (facing, door.id, door.reached)),
+        Some((Facing::Asking, "seerr", super::Reached::Port(Some(5055))))
+    );
+    let guard = candidates
+        .iter()
+        .find(|one| one.id == crate::screening::door::SERVICE)
+        .map(|one| (one.name, one.facing));
+    assert_eq!(guard, Some(("Jellyfin", Some(Facing::Watching))));
+    let begin: Vec<&str> = candidates
+        .iter()
+        .filter(|one| one.facing.is_some_and(Facing::begins))
+        .map(|one| one.id)
+        .collect();
+    assert_eq!(begin, ["door", "seerr"]);
+    for shelf in ["audiobookshelf", "navidrome"] {
+        let facing = candidates
+            .iter()
+            .find(|one| one.id == shelf)
+            .and_then(|one| one.facing);
+        assert_eq!(facing, Some(Facing::Shelf), "{shelf} is a shelf");
+    }
+}
+
+/// A first-party part moved in place of one of the stack's services, published to the
+/// household with no contract in front of it that says what it is, is what the register
+/// says of the service it stands in for.
+#[test]
+fn a_moved_part_no_contract_settles_is_what_the_register_says() {
+    let mut parts = crate::test_support::adapted::installed_parts();
+    for adapter in parts
+        .iter_mut()
+        .filter(|one| one.plugin == "audiobookshelf")
+        .flat_map(|one| one.services.iter_mut())
+    {
+        adapter.speaks.clear();
+    }
+    let facing = parts
+        .iter()
+        .filter(|one| one.plugin == "audiobookshelf")
+        .flat_map(|plugin| {
+            plugin
+                .services
+                .iter()
+                .filter(|placed| placed.service == "audiobookshelf")
+                .map(|placed| super::brought(&parts, plugin, placed))
+        })
+        .next();
+    assert_eq!(facing, Some(Some(Facing::Shelf)));
+}
+
+/// The stack's guard whose ask for `media.serve` two media servers contest, with nothing
+/// settling it, is met under its own name: there is no one library behind it to name it
+/// after.
+#[test]
+fn a_guard_no_one_library_fills_is_met_under_its_own_name() {
+    let second = [crate::test_support::a_contracted_media_server(None)];
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .ok()
+        .map(|mut manifest| {
+            for wiring in manifest
+                .wirings
+                .iter_mut()
+                .filter(|one| one.asks.as_deref() == Some(super::serve::CAPABILITY))
+            {
+                wiring.filled_by = None;
+            }
+            manifest
+        });
+    let services = manifest
+        .as_ref()
+        .map(|one| one.services.clone())
+        .unwrap_or_default();
+    let fillers = manifest.as_ref().map(|manifest| {
+        crate::wiring::Fillers::of(manifest, &second, &crate::wiring::Chosen::default(), None)
+    });
+    let candidates = super::candidates(&services, &second, &fillers.unwrap_or_default());
+    let guard = candidates
+        .iter()
+        .find(|one| one.id == "door")
+        .map(|one| (one.name, one.facing));
+
+    assert_eq!(guard, Some(("Door", Some(Facing::Watching))));
 }

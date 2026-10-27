@@ -250,16 +250,17 @@ async fn an_engine_that_will_not_say_what_a_project_holds_reports_nothing() {
 #[tokio::test]
 async fn two_ports_held_outside_the_engine_are_reported_lowest_first() {
     let declared = publishers();
-    let (first, high) = declared.first().cloned().unwrap_or_default();
-    let (second, low) = declared.get(1).cloned().unwrap_or_default();
-    // Both nameless on port zero where the stack publishes fewer than two, which
-    // the ordering assertion below refuses: a pair that does not exist cannot be
-    // out of order, and a test that read one would pass having read nothing.
+    let ((first, high), (second, low)) = declared
+        .windows(2)
+        .find_map(|pair| match pair {
+            [one, other] if one.1 > other.1 => Some((one.clone(), other.clone())),
+            _ => None,
+        })
+        .unwrap_or_default();
     assert!(
         high > low,
-        "this reads the first two services the stack publishes ports for, and the \
-         sort is only observable because the stack declares them in the opposite \
-         order to their ports. It no longer does — pick two that are."
+        "the stack declares no two services in the opposite order to the ports they \
+         publish, so the sort is not observable"
     );
 
     // No images, so nothing in the engine explains either port, and a machine

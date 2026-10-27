@@ -114,7 +114,10 @@ async fn the_screen_gathers_the_address_to_hand_the_household() {
     // same reading the panels beside it are, so the screen and the question
     // cannot name different doors.
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let watching = ctx(engine).with_site(Renamed::called(Some("kitchen-nas")));
+    let watching = crate::test_support::parts_recorded(
+        ctx(engine).with_site(Renamed::called(Some("kitchen-nas"))),
+        "panel-door",
+    );
     let door = gather(&watching, None).await.door;
 
     assert_eq!(
@@ -134,7 +137,10 @@ async fn a_machine_renamed_between_refreshes_is_addressed_as_it_is_now() {
     // a screen that is open all day.
     let renamed = Renamed::called(Some("kitchen-nas")).then(Some("cupboard-nas"));
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
-    let watching = ctx(engine).with_site(Arc::clone(&renamed) as Arc<dyn crate::ports::Site>);
+    let watching = crate::test_support::parts_recorded(
+        ctx(engine).with_site(Arc::clone(&renamed) as Arc<dyn crate::ports::Site>),
+        "panel-renamed",
+    );
 
     let first = addressed(&gather(&watching, None).await.door);
     let again = addressed(&gather(&watching, None).await.door);
@@ -163,7 +169,7 @@ async fn an_unreadable_register_leaves_the_door_panel_on_the_stacks_own_door() {
 
     assert_eq!(
         filled(&door).and_then(|door| door.service.clone()),
-        Some("Seerr".to_owned())
+        Some("Jellyfin".to_owned())
     );
 }
 

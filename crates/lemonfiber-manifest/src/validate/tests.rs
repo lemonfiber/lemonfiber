@@ -30,16 +30,6 @@ fn the_licence_list_holds_what_the_catalogue_s_own_copy_holds() {
 /// The stack this build ships.
 const SHIPPED: &str = lemonfiber_bundled::STACK;
 
-/// A stack kept beside these tests, which the rules are exercised on by editing it, so
-/// a change to the shipped stack moves no test written against it.
-static FIXTURE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    crate::read(std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../lemonfiber-fixtures/stack"
-    )))
-    .unwrap_or_default()
-});
-
 /// [`crate::TODAY`] as a date, which is after every date the stack records, and not
 /// the real clock.
 pub(in crate::validate) fn today() -> Date {
@@ -66,8 +56,11 @@ fn messages(text: &str) -> Vec<String> {
 
 /// Replace the first occurrence of `from` with `to`.
 fn edited(from: &str, to: &str) -> String {
-    assert!(FIXTURE.contains(from), "the fixture must contain {from:?}");
-    FIXTURE.replacen(from, to, 1)
+    assert!(
+        SHIPPED.contains(from),
+        "the shipped stack must contain {from:?}"
+    );
+    SHIPPED.replacen(from, to, 1)
 }
 
 /// The day these tests use is after everything the stack records.
@@ -78,7 +71,7 @@ fn edited(from: &str, to: &str) -> String {
 /// clock's tests fail for a reason that has nothing to do with the stack being invalid.
 #[test]
 fn the_day_these_tests_use_is_after_everything_the_stack_records() {
-    let latest = FIXTURE
+    let latest = SHIPPED
         .lines()
         .filter_map(|line| line.trim().strip_prefix("last_release = "))
         .map(|value| value.trim().trim_matches('"').to_owned())
@@ -103,14 +96,14 @@ fn the_stack_this_binary_ships_is_valid() {
     );
 }
 
+/// The servarr shape spans two API versions, so one omitting it cannot be reached at a
+/// known path, and a service declaring one without its version is a surfaced fault, not
+/// a silent exclusion.
 #[test]
 fn a_servarr_service_without_an_api_version_is_caught() {
-    // The servarr shape spans two API versions, so one omitting it cannot be
-    // reached at a known path; dropping the first version the stack records
-    // (Sonarr's v3) must be a surfaced fault, not a silent exclusion.
     let text = edited(
-        r#"path = "/config/config.xml", version = 3 }"#,
-        r#"path = "/config/config.xml" }"#,
+        BAZARR,
+        &format!("{BAZARR}\napi = {{ kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\" }}"),
     );
     let caught = messages(&text)
         .iter()
@@ -118,14 +111,17 @@ fn a_servarr_service_without_an_api_version_is_caught() {
     assert!(caught);
 }
 
+/// The solver publishes a port and says of none that it answers on inside the stack's
+/// network, so an api on it is one nothing could say where to reach.
 #[test]
 fn a_service_with_an_api_and_no_listens_is_caught() {
-    // The first service the stack declares one for is the indexer aggregator, so
-    // taking it away leaves an api nothing could say where to reach.
-    let text = edited("listens = 9696\n", "");
+    let text = edited(
+        "id = \"flaresolverr\"",
+        "id = \"flaresolverr\"\napi = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }",
+    );
     let caught = messages(&text).iter().any(|message| {
         message
-            == "service prowlarr: declares an api but no listens, the port it answers on \
+            == "service flaresolverr: declares an api but no listens, the port it answers on \
                 inside the stack's network"
     });
     assert!(caught);
@@ -166,7 +162,7 @@ fn a_service_in_an_undeclared_profile_is_caught() {
 #[test]
 fn a_floating_tag_is_caught() {
     for floating in ["latest", "stable", "nightly", "main"] {
-        let text = FIXTURE.replacen("tag = ", &format!("tag = \"{floating}\" # "), 1);
+        let text = SHIPPED.replacen("tag = ", &format!("tag = \"{floating}\" # "), 1);
         assert!(
             messages(&text)
                 .iter()
@@ -178,7 +174,7 @@ fn a_floating_tag_is_caught() {
 
 #[test]
 fn an_empty_tag_is_caught() {
-    let text = FIXTURE.replacen("tag = ", "tag = \"\" # ", 1);
+    let text = SHIPPED.replacen("tag = ", "tag = \"\" # ", 1);
     assert!(
         messages(&text)
             .iter()
@@ -206,7 +202,7 @@ fn a_digest_in_another_shape_is_caught() {
         "sha256:abab",
         "md5:abababababababababababababababab",
     ] {
-        let text = FIXTURE.replacen("digest = ", &format!("digest = \"{shape}\" # "), 1);
+        let text = SHIPPED.replacen("digest = ", &format!("digest = \"{shape}\" # "), 1);
         assert!(
             messages(&text).iter().any(|m| m.contains("is not sha256:")),
             "{shape} was accepted as a digest"
@@ -240,7 +236,7 @@ fn a_licence_outside_the_osi_list_is_caught() {
 
 #[test]
 fn an_image_lemonfiber_builds_from_its_own_code_carries_lemonfiber_s_licence_and_no_other() {
-    let own = FIXTURE
+    let own = SHIPPED
         .replacen(
             r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
             r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
@@ -294,7 +290,7 @@ fn lemonfiber_s_licence_on_an_image_it_does_not_build_is_caught() {
 
 #[test]
 fn a_malformed_last_release_is_caught() {
-    let text = FIXTURE.replacen("last_release = ", "last_release = \"26-07-01\" # ", 1);
+    let text = SHIPPED.replacen("last_release = ", "last_release = \"26-07-01\" # ", 1);
     assert!(messages(&text)
         .iter()
         .any(|m| m.contains("which is not YYYY-MM-DD")));
@@ -302,7 +298,7 @@ fn a_malformed_last_release_is_caught() {
 
 #[test]
 fn a_last_release_in_the_future_is_caught() {
-    let text = FIXTURE.replacen("last_release = ", "last_release = \"2099-01-01\" # ", 1);
+    let text = SHIPPED.replacen("last_release = ", "last_release = \"2099-01-01\" # ", 1);
     assert!(messages(&text)
         .iter()
         .any(|m| m.contains("which is in the future")));
@@ -349,6 +345,9 @@ fn an_ordering_edge_is_refused_naming_network_via() {
 
 /// The line every service in the shipped stack has, which these cases add to.
 const AN_ID: &str = "id = \"prowlarr\"";
+
+/// The line declaring the subtitle finder's service, which an edit adds a field beside.
+const BAZARR: &str = "id = \"bazarr\"";
 
 /// The first `provides` the shipped stack declares, which these cases stand in for.
 ///
@@ -433,12 +432,12 @@ const ASKS_FOR: &str = "asks_for = ";
 
 /// The stack with the first line starting `prefix` removed from it.
 fn without(prefix: &str) -> String {
-    let at = FIXTURE
+    let at = SHIPPED
         .lines()
         .position(|line| line.starts_with(prefix))
         .unwrap_or_default();
     assert!(at > 0, "the fixture must declare {prefix:?}");
-    FIXTURE
+    SHIPPED
         .lines()
         .enumerate()
         .filter_map(|(number, line)| (number != at).then_some(line))
@@ -536,7 +535,7 @@ replaced_by = "bindery"
 
 /// The shipped stack with one removal appended to it.
 fn with_removal(record: &str) -> String {
-    format!("{}{record}", *FIXTURE)
+    format!("{SHIPPED}{record}")
 }
 
 /// A record that says what went, why, and what took its place is a record with
@@ -728,7 +727,7 @@ fn a_port_two_services_publish_is_refused_naming_both() {
     let said = messages(&text);
     assert!(
         said.iter().any(|one| one
-            == "service flaresolverr.publish: publishes 9696, which service prowlarr already \
+            == "service prowlarr.publish: publishes 9696, which service flaresolverr already \
                 publishes"),
         "{said:#?}"
     );
@@ -737,9 +736,11 @@ fn a_port_two_services_publish_is_refused_naming_both() {
 #[test]
 fn a_part_the_bundle_assembles_mints_no_secret() {
     let text = edited(
-        r#"path = "/config/config.xml", version = 3 }"#,
-        "path = \"/config/config.xml\", version = 3 }\nsecret = [{ id = \"upstream-key\", of = \
-         \"sonarr\", why = \"Sign in\", minted = true }]",
+        BAZARR,
+        &format!(
+            "{BAZARR}\nsecret = [{{ id = \"upstream-key\", of = \"bazarr\", why = \"Sign in\", \
+             minted = true }}]"
+        ),
     );
     let caught = messages(&text)
         .iter()

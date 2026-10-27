@@ -140,18 +140,24 @@ fn a_category_is_named_by_the_media_the_application_files() {
     assert!(category_for("comics").is_none());
 }
 
-/// Both download clients' credentials, as a pass that read and recorded them holds them.
+/// Both download clients' credentials, as a pass that read and recorded them holds them,
+/// each client moved into its plugin.
 fn both_held() -> Held {
-    Held::from(std::collections::BTreeMap::from([
-        ("sabnzbd".to_owned(), Credential::ApiKey("k".to_owned())),
-        (
-            "qbittorrent".to_owned(),
-            Credential::UserPass {
-                username: "admin".to_owned(),
-                password: "p".to_owned(),
-            },
-        ),
-    ]))
+    Held {
+        keys: std::collections::BTreeMap::from([
+            (
+                holder(Some(crate::test_support::usenet::PLUGIN), "sabnzbd"),
+                Credential::ApiKey("k".to_owned()),
+            ),
+            (
+                holder(Some(crate::test_support::torrent::PLUGIN), "qbittorrent"),
+                Credential::UserPass {
+                    username: "admin".to_owned(),
+                    password: "p".to_owned(),
+                },
+            ),
+        ]),
+    }
 }
 
 /// The clients the shipped stack's TV curator is told about, with `installed` and `chosen`,
@@ -173,7 +179,12 @@ fn told(
             {
                 placed.media_types = vec![media.to_owned()];
             }
-            let installed: Vec<_> = moved.into_iter().chain(installed.iter().cloned()).collect();
+            let installed: Vec<_> = moved
+                .into_iter()
+                .chain(crate::test_support::usenet::moved())
+                .chain(crate::test_support::torrent::moved())
+                .chain(installed.iter().cloned())
+                .collect();
             let fillers =
                 crate::wiring::Fillers::of(&manifest, &installed, chosen, Some(stack_root()));
             curators(&fillers)
@@ -203,10 +214,12 @@ fn reached(told: &[Vec<crate::ports::service::DownloadClient>]) -> Vec<Vec<(Stri
 #[test]
 fn a_download_client_is_built_for_each_filler_whose_credential_is_in_hand() {
     let nothing = crate::wiring::Chosen::default();
-    let usenet_only = Held::from(std::collections::BTreeMap::from([(
-        "sabnzbd".to_owned(),
-        Credential::ApiKey("k".to_owned()),
-    )]));
+    let usenet_only = Held {
+        keys: std::collections::BTreeMap::from([(
+            holder(Some(crate::test_support::usenet::PLUGIN), "sabnzbd"),
+            Credential::ApiKey("k".to_owned()),
+        )]),
+    };
 
     assert_eq!(
         reached(&told(&[], &nothing, &both_held(), "tv")),
@@ -513,7 +526,8 @@ async fn a_seed_over_a_record_of_plugins_that_will_not_read_is_refused() {
     );
 }
 
-/// The shipped stack with its book curator moved into its plugin.
+/// The shipped stack with its book curator and both download clients moved into their
+/// plugins.
 fn books_moved() -> crate::wiring::Fillers {
     crate::test_support::stack()
         .manifest()
@@ -522,6 +536,8 @@ fn books_moved() -> crate::wiring::Fillers {
                 &manifest,
                 &crate::test_support::books::moved()
                     .into_iter()
+                    .chain(crate::test_support::usenet::moved())
+                    .chain(crate::test_support::torrent::moved())
                     .collect::<Vec<_>>(),
                 &crate::wiring::Chosen::default(),
                 Some(stack_root()),

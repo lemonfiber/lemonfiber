@@ -13,6 +13,7 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::capabilities::identity::source;
 use lemonfiber_contract::capabilities::media::serve;
+use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_manifest::{ApiKind, Manifest};
 use lemonfiber_sidecar::gate::Kind;
 
@@ -65,6 +66,24 @@ pub(crate) struct MediaServer {
     pub setting: String,
 }
 
+/// The request service among the services asking `filler` for an identity: the one
+/// asked, itself or through the adapter in front of it, over `request.intake`.
+fn requesting<'a>(fillers: &'a Fillers, filler: &Filler) -> Option<&'a Filler> {
+    fillers
+        .asks()
+        .iter()
+        .filter(|ask| {
+            ask.capability == IDENTITY && ask.fillers.iter().any(|one| one.id == filler.id)
+        })
+        .filter_map(|ask| fillers.service(&ask.by))
+        .find(|asker| {
+            fillers
+                .fronting(asker)
+                .unwrap_or(asker)
+                .contracted(intake::CAPABILITY, intake::MAJOR)
+        })
+}
+
 impl MediaServer {
     /// Whatever fills the identity source, where one service alone does, it speaks the
     /// identity source's contract, the server it serves publishes a port on the host,
@@ -80,11 +99,9 @@ impl MediaServer {
     /// nothing to sign in to rather than something to guess at.
     #[must_use]
     pub(crate) fn of(fillers: &Fillers) -> Option<Self> {
-        let (filler, asker) = fillers.filling(IDENTITY)?;
+        let (filler, _) = fillers.filling(IDENTITY)?;
         let mut server = Self::at(fillers, filler)?;
-        // The request service is handed the server's administrator's password once, to be
-        // set up, so it is named only where the gate lets that password reach it.
-        server.asked_by = asker
+        server.asked_by = requesting(fillers, filler)
             .filter(|asker| crate::wiring::crosses(filler.holder(), asker.holder()))
             .cloned();
         Some(server)

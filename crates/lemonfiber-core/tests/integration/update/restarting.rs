@@ -6,7 +6,8 @@ use lemonfiber_core::ports::process::{Failure as RunFailure, Output};
 use lemonfiber_core::update::{Ending, Reversal, State};
 use std::time::Duration;
 
-/// A version of the second curator, which the manifest declares after it, behind its pin.
+/// A version of the film curator, which the manifest declares before the television
+/// curator, behind its pin.
 const SECOND_CURATOR_BEHIND: &str = "5.13.0";
 
 #[tokio::test]
@@ -37,16 +38,16 @@ async fn a_service_that_does_not_come_back_halts_the_run_and_says_what_did_not_m
             &read,
             Some((
                 State::Failed,
-                Some((Ending::NotStarted, Reversal::Restore)),
                 Some((Ending::NotReached, Reversal::Rollback)),
+                Some((Ending::NotStarted, Reversal::Restore)),
                 said,
-            )) if said.contains("sonarr") && said.contains("lemonfiber up")
+            )) if said.contains("radarr") && said.contains("lemonfiber up")
         ),
         "{read:?}"
     );
     assert_eq!(
         machine.started(),
-        vec!["sonarr".to_owned()],
+        vec!["radarr".to_owned()],
         "the run went on into the rest of the stack"
     );
     assert!(

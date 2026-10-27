@@ -8,8 +8,19 @@ fn project() -> &'static std::path::Path {
     std::path::Path::new("/opt/lemonfiber/stack")
 }
 
-/// The shipped stack's asks, answered against `installed` with `chosen`, with the stack's
-/// services changed by `changing` first.
+/// The adapter a stack declaring its own Usenet client names for it.
+fn its_usenet_adapter() -> lemonfiber_manifest::Api {
+    lemonfiber_manifest::Api {
+        kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+        key_source: lemonfiber_manifest::KeySource::ConfigIni,
+        path: Some("/config/sabnzbd.ini".to_owned()),
+        version: None,
+    }
+}
+
+/// The shipped stack's asks, its Usenet client declaring its adapter as a stack holding
+/// its own does, answered against `installed` with `chosen`, with the stack's services
+/// changed by `changing` first.
 fn shipped(
     installed: &[crate::plugin::Installed],
     chosen: &Chosen,
@@ -18,6 +29,13 @@ fn shipped(
     crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
+            for service in manifest
+                .services
+                .iter_mut()
+                .filter(|one| one.id == "sabnzbd")
+            {
+                service.api = Some(its_usenet_adapter());
+            }
             changing(&mut manifest);
             Fillers::of(&manifest, installed, chosen, Some(project()))
         })
@@ -111,13 +129,13 @@ fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
 
     assert!(asks > 0, "the shipped stack asks for something");
     assert_eq!(fillers.asks().len(), asks);
-    let usenet: Vec<&str> = fillers
+    let shown: Vec<&str> = fillers
         .asks()
         .iter()
-        .filter(|ask| ask.by == "sonarr" && ask.capability == "download.usenet")
+        .filter(|ask| ask.by == "homepage" && ask.capability == "proxy.front")
         .flat_map(|ask| ask.fillers.iter().map(|one| one.id.as_str()))
         .collect();
-    assert_eq!(usenet, vec!["sabnzbd"]);
+    assert_eq!(shown, vec!["caddy"]);
 }
 
 /// A plugin's service is reached at its own id, carries the plugin it came from, and
@@ -125,7 +143,10 @@ fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
 /// chosen for.
 #[test]
 fn a_plugins_service_is_reached_at_its_own_id_and_answers_where_chosen() {
-    let installed = [an_installed("nzbget", vec![usenet_stand_in(Some(6789))])];
+    let installed: Vec<crate::plugin::Installed> = crate::test_support::adapted::installed_parts()
+        .into_iter()
+        .chain([an_installed("nzbget", vec![usenet_stand_in(Some(6789))])])
+        .collect();
     let fillers = shipped(
         &installed,
         &Chosen::read(Some("download.usenet=nzbget")),
@@ -161,7 +182,10 @@ fn a_plugins_service_is_reached_at_its_own_id_and_answers_where_chosen() {
         .filter(|ask| ask.capability == "download.usenet")
         .flat_map(|ask| ask.fillers.iter().map(|one| one.id.as_str()))
         .collect();
-    assert!(asking > 0, "the shipped stack asks for a usenet client");
+    assert!(
+        asking > 0,
+        "a part the bundle installs asks for a usenet client"
+    );
     assert_eq!(answering, vec!["nzbget"; asking]);
 }
 

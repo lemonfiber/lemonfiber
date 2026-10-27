@@ -88,7 +88,7 @@ fn the_listing_answers_every_link_the_pinned_stack_declares() {
     assert_eq!(
         report
             .as_ref()
-            .and_then(|report| asked(report, "seerr", "identity.source")),
+            .and_then(|report| asked(report, "decline", "identity.source")),
         Some(vec!["jellyfin".to_owned()])
     );
 }
@@ -156,7 +156,7 @@ fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
     };
 
     assert_eq!(refused("indexer.search", "sabnzbd"), Some(CANNOT_FILL));
-    assert_eq!(refused("media.serve", "jellyfin"), Some(NOTHING_ASKS));
+    assert_eq!(refused("request.intake", "seerr"), Some(NOTHING_ASKS));
     assert_eq!(refused("identity.source", "jellyfin"), Some(ALREADY_FILLS));
     assert_eq!(
         refused("indexer.search", "plex").map(lemonfiber_error::Code::as_str),

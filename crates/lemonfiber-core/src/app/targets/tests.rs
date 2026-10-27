@@ -56,8 +56,8 @@ fn the_shipped_stack_declares_no_service_this_build_cannot_reach() {
 /// Everything this build cannot cover reads in the order of the services it names, not
 /// the order the stack declares them in.
 ///
-/// Two declarations, declared the other way round from the order they are named in, so
-/// the order is observable.
+/// Two declarations of the episode filer each naming the API it answers in, declared the
+/// other way round from the order they are named in, so the order is observable.
 #[test]
 fn what_this_build_cannot_cover_reads_in_the_order_of_the_services_it_names() {
     let declared = crate::test_support::stack()
@@ -69,6 +69,12 @@ fn what_this_build_cannot_cover_reads_in_the_order_of_the_services_it_names() {
         .filter_map(|id| {
             declared.clone().map(|mut service| {
                 id.clone_into(&mut service.id);
+                service.api = Some(lemonfiber_manifest::Api {
+                    kind: lemonfiber_manifest::ApiKind::Servarr,
+                    key_source: lemonfiber_manifest::KeySource::ConfigXml,
+                    path: Some("/config/config.xml".to_owned()),
+                    version: Some(3),
+                });
                 service
             })
         })

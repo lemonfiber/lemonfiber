@@ -343,13 +343,21 @@ async fn an_install_says_which_asks_it_would_leave_contested() {
         })
         .unwrap_or_default();
 
-    assert_eq!(contests.len(), 1, "{contests:?}");
-    assert!(contests.first().is_some_and(|one| one.by == "seerr"
-        && one.capability == "identity.source"
-        && one
-            .claimants
+    assert_eq!(
+        contests
             .iter()
-            .any(|named| named == "komga (plugin komga)")));
+            .map(|one| one.by.as_str())
+            .collect::<Vec<_>>(),
+        vec!["decline", "request-gate"],
+        "{contests:?}"
+    );
+    assert!(contests
+        .iter()
+        .all(|one| one.capability == "identity.source"
+            && one
+                .claimants
+                .iter()
+                .any(|named| named == "komga (plugin komga)")));
 }
 
 #[tokio::test]

@@ -98,30 +98,24 @@ pub(super) fn minted(
 ///
 /// A part moved in place keeps its configuration, so its upstream answers to the
 /// credential it had; one minted afresh would be one nothing set on it. A username or a
-/// password is the account lemonfiber set up on the stack's service, by the API the stack
-/// declares it answering in or, where it declares none, the one the plugin's service
-/// names as its native. Anything else is the key the service wrote itself, read from
-/// where the secret's `carried_from` says, then from the file the stack's declaration
-/// names, and where neither can be read, the key lemonfiber recorded for it. Asked only
-/// of a first-party plugin: the stack's own credential goes to nothing else.
+/// password is the account lemonfiber set up on the stack's service, by the API the
+/// plugin's service names as its native. Anything else is the key the service wrote
+/// itself, read from where the secret's `carried_from` says, and where that cannot be
+/// read, the key lemonfiber recorded for it. Asked only of a first-party plugin: the
+/// stack's own credential goes to nothing else.
 fn moved(ctx: &Ctx, manifest: &Manifest, secret: &Secret) -> Option<String> {
     let service = manifest
         .services
         .iter()
         .find(|service| service.id == secret.of)?;
     let reserved = service.replaces.as_deref()?;
-    let declared = ctx.stack.manifest().ok().and_then(|stack| {
-        stack
-            .services
-            .into_iter()
-            .find(|service| service.id == reserved)
-    });
-    let kind = declared
-        .as_ref()
-        .and_then(|service| service.api.as_ref())
-        .map(|api| api.kind)
-        .or_else(|| service.native.as_deref().and_then(ApiKind::named));
-    let account = || kind.and_then(crate::credential::account);
+    let account = || {
+        service
+            .native
+            .as_deref()
+            .and_then(ApiKind::named)
+            .and_then(crate::credential::account)
+    };
     match held_as(manifest, secret) {
         Some(UPSTREAM_USERNAME) => account().map(|account| account.username.to_owned()),
         Some(UPSTREAM_PASSWORD) => account()
@@ -130,7 +124,6 @@ fn moved(ctx: &Ctx, manifest: &Manifest, secret: &Secret) -> Option<String> {
             .carried_from
             .as_ref()
             .and_then(|from| carried(ctx, service, reserved, from))
-            .or_else(|| declared.as_ref().and_then(|service| written(ctx, service)))
             .or_else(|| {
                 crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
             }),
@@ -155,21 +148,6 @@ fn carried(
         &from.key,
         &ctx.seams.confined.read(&path, &within).text()?,
     )
-}
-
-/// The key the stack's own `service` wrote into the file its declaration names, read
-/// only where that is a plain file beneath the directory its container owns.
-///
-/// Nothing where its declaration names no file the key is read from, or the file is not
-/// there, holds no key, or leads away.
-fn written(ctx: &Ctx, service: &lemonfiber_manifest::Service) -> Option<String> {
-    let api = service.api.as_ref()?;
-    let read = crate::credential::written::reader(api.key_source)?;
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
-    let path = crate::app::targets::config_path(&project, service, api.path.as_deref())?;
-    let within = crate::app::targets::service_config_dir(&project, &service.id);
-    read(&ctx.seams.confined.read(&path, &within).text()?)
 }
 
 /// The part of an adapter's upstream credential `secret` holds, where an adapter of

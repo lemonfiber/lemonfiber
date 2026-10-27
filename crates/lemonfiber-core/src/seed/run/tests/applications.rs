@@ -313,7 +313,7 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
 }
 
 /// A plugin `indexing` whose service stands in for the stack's indexer over
-/// `indexer.search`, beside both curators.
+/// `indexer.search`, asking for every curator, beside both curators.
 fn contracted_indexer(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
@@ -323,7 +323,11 @@ fn contracted_indexer(
             curator("sonarr", 8989, "tv"),
             curator("radarr", 7878, "movies"),
         ],
-        &[contracted("indexing", "prowlarr", "indexer.search")],
+        &[asking_every_curator(contracted(
+            "indexing",
+            "prowlarr",
+            "indexer.search",
+        ))],
         project,
         trusted,
     )
@@ -408,7 +412,7 @@ async fn an_indexer_on_no_address_is_told_about_nobody() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("applications-unaddressed");
     let http = Fake::always(Answer::reply(200, "[]"));
     let ctx = contracted_ctx(&project, "prowlarr", true, http.clone());
-    let mut indexing = contracted("indexing", "prowlarr", "indexer.search");
+    let mut indexing = asking_every_curator(contracted("indexing", "prowlarr", "indexer.search"));
     for placed in &mut indexing.services {
         placed.listens = None;
         placed.reached = None;
@@ -491,14 +495,7 @@ fn an_indexer_granted_a_plugin_curators_key_is_never_registered_it() {
 /// indexer as the plugin's.
 #[test]
 fn a_plugin_indexer_granted_a_moved_curators_key_is_never_registered_it() {
-    let mut indexing = contracted("indexing", "finder", "indexer.search");
-    for placed in &mut indexing.services {
-        placed.asks = vec![crate::plugin::Asking {
-            capability: "library.curate".to_owned(),
-            each: true,
-            native: None,
-        }];
-    }
+    let indexing = asking_every_curator(contracted("indexing", "finder", "indexer.search"));
     let said = said_with_a_grant(
         Vec::new(),
         &TELEVISION

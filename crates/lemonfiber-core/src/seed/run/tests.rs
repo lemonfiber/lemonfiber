@@ -390,24 +390,26 @@ fn fillers_of(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fil
     fillers_at(services, stack_root())
 }
 
-/// The same, with the stack's media server moved into its plugin.
+/// The same, with the stack's media server moved into its plugin, and its request service
+/// where it runs one.
 fn moved_fillers(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
     moved_at(services, stack_root())
 }
 
 /// The stack's `services`, written at `project`, with its media server moved into its
-/// plugin.
+/// plugin, and its request service where `services` runs one.
 fn moved_at(
     services: Vec<lemonfiber_manifest::Service>,
     project: &std::path::Path,
 ) -> crate::wiring::Fillers {
-    fillers_beside(
-        services,
-        &crate::test_support::media::moved()
-            .into_iter()
-            .collect::<Vec<_>>(),
-        project,
-    )
+    let requesting = services
+        .iter()
+        .any(|service| service.id == requests_svc().id);
+    let installed: Vec<crate::plugin::Installed> = crate::test_support::media::moved()
+        .into_iter()
+        .chain(REQUESTS.installed().filter(|_| requesting))
+        .collect();
+    fillers_beside(services, &installed, project)
 }
 
 /// The same, with the stack written to disk at `project`.
@@ -454,6 +456,18 @@ fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: A
 }
 
 /// A third-party plugin's curator, `kept`, filing `media` over `library.curate` and keeping
+/// `installed`, each of its services asking for every curator.
+fn asking_every_curator(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
+    for placed in &mut installed.services {
+        placed.asks = vec![crate::plugin::Asking {
+            capability: "library.curate".to_owned(),
+            each: true,
+            native: None,
+        }];
+    }
+    installed
+}
+
 /// its key in a file beneath the directory its container owns.
 fn a_stand_in(media: &str) -> crate::plugin::Installed {
     let mut stand_in = crate::test_support::a_placed(

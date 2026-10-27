@@ -202,6 +202,15 @@ fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards
 }
 
 #[test]
+fn a_confined_service_nothing_reaches_and_that_publishes_nothing_is_on_no_network() {
+    let mut loner = a_placed("loner", &[], None, None);
+    loner.fields.posture = lemonfiber_manifest::container::Posture::Confined;
+    let project = project(&carried(), &[an_installed("loner", vec![loner])]);
+    assert_eq!(project.topology.placed.get("loner"), Some(&Where::Nowhere));
+    assert_eq!(text(&entry(&project, "loner"), "network_mode"), "none");
+}
+
+#[test]
 fn a_stack_image_without_a_digest_is_written_by_its_tag() {
     let mut manifest = carried();
     let Some(sonarr) = manifest.services.iter_mut().find(|one| one.id == "sonarr") else {

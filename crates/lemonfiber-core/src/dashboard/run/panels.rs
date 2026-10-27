@@ -65,8 +65,14 @@ pub(super) fn front_door(
     // to answer for the door, as the command that shows it does.
     let register =
         crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let fillers = crate::wiring::Fillers::of(
+        manifest,
+        register.installed(),
+        &crate::app::targets::chosen_fillers(ctx),
+        None,
+    );
     Panel::Ready(crate::door::run::assembled(
-        &crate::door::candidates(&manifest.services, register.installed()),
+        &crate::door::candidates(&manifest.services, register.installed(), &fillers),
         crate::door::run::Running {
             surveyed: running,
             undeclared,

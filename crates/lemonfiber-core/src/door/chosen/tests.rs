@@ -1,14 +1,18 @@
 use super::{chosen, Chosen, Refusal, UNDECLARED, WITHHELD};
-use crate::door::fixtures::{asking, service, watching};
+use crate::door::fixtures::{asking, brought, fronted, installed, service, watching};
 use crate::door::Facing;
+use crate::plugin::Installed;
 use lemonfiber_manifest::{ApiKind, Bind};
 
-/// How the door was chosen, and which service it came out as.
+/// How the door was chosen over `services` with `installed` beside them, and which
+/// service it came out as.
 fn door(
     services: &[lemonfiber_manifest::Service],
+    installed: &[Installed],
     named: Option<&str>,
 ) -> (Chosen, Option<String>) {
-    let candidates = crate::door::candidates(services, &[]);
+    let candidates =
+        crate::door::candidates(services, installed, &crate::wiring::Fillers::default());
     let (chosen, door) = chosen(&candidates, named);
     (chosen, door.map(|(_, candidate)| candidate.id.to_owned()))
 }
@@ -23,15 +27,16 @@ fn refused(named: &str, because: &str) -> Chosen {
 
 #[test]
 fn naming_nothing_leaves_the_door_where_the_stack_puts_it() {
-    let services = [watching(), asking()];
+    let services = [watching()];
+    let installed = [asking()];
     assert_eq!(
-        door(&services, None),
+        door(&services, &installed, None),
         (Chosen::Derived, Some("seerr".to_owned())),
         "the request surface, as it was before there was a setting"
     );
     // A blank is a mistake rather than an intent, and reads as no name at all.
     assert_eq!(
-        door(&services, Some("   ")),
+        door(&services, &installed, Some("   ")),
         (Chosen::Derived, Some("seerr".to_owned()))
     );
 }
@@ -40,25 +45,19 @@ fn naming_nothing_leaves_the_door_where_the_stack_puts_it() {
 fn the_library_can_be_named_over_the_request_surface() {
     // The disagreement the setting exists for: this stack has somewhere to ask,
     // and this operator wants their household sent to what is already there.
-    let services = [asking(), watching()];
+    let services = [watching()];
     assert_eq!(
-        door(&services, Some("jellyfin")),
-        (
-            Chosen::Named("jellyfin".to_owned()),
-            Some("jellyfin".to_owned())
-        )
+        door(&services, &[asking()], Some("door")),
+        (Chosen::Named("door".to_owned()), Some("door".to_owned()))
     );
 }
 
 #[test]
 fn a_name_is_read_the_way_somebody_types_it() {
-    let services = [asking(), watching()];
+    let services = [watching()];
     assert_eq!(
-        door(&services, Some(" Jellyfin ")),
-        (
-            Chosen::Named("jellyfin".to_owned()),
-            Some("jellyfin".to_owned())
-        ),
+        door(&services, &[asking()], Some(" Door ")),
+        (Chosen::Named("door".to_owned()), Some("door".to_owned())),
         "the id the stack declares, whatever case it was written in"
     );
 }
@@ -68,12 +67,13 @@ fn a_service_the_household_tier_does_not_publish_is_refused_and_said() {
     // The refusal this setting exists to make. An admin service answers this
     // machine alone; a front door pointed at one would hand out the address the
     // binding exists to withhold.
-    let services = [
-        asking(),
-        service("sonarr", Some(Bind::Loopback), Some(ApiKind::Servarr)),
-    ];
+    let services = [service(
+        "sonarr",
+        Some(Bind::Loopback),
+        Some(ApiKind::Servarr),
+    )];
     assert_eq!(
-        door(&services, Some("sonarr")),
+        door(&services, &[asking()], Some("sonarr")),
         (refused("sonarr", WITHHELD), Some("seerr".to_owned())),
         "refused, and the worked-out door still stands"
     );
@@ -82,9 +82,8 @@ fn a_service_the_household_tier_does_not_publish_is_refused_and_said() {
 
 #[test]
 fn a_service_this_stack_does_not_declare_at_all_is_refused_and_said() {
-    let services = [asking()];
     assert_eq!(
-        door(&services, Some("plex")),
+        door(&[], &[asking()], Some("plex")),
         (refused("plex", UNDECLARED), Some("seerr".to_owned()))
     );
 }
@@ -95,9 +94,9 @@ fn the_index_over_every_service_is_refused_in_the_registers_own_words() {
     // this stack runs, which is the one thing the register already says it is
     // not for — so the refusal borrows that sentence rather than writing a
     // second one to keep in step with it.
-    let services = [asking(), service("homepage", Some(Bind::Lan), None)];
+    let services = [service("homepage", Some(Bind::Lan), None)];
     assert_eq!(
-        door(&services, Some("homepage")),
+        door(&services, &[asking()], Some("homepage")),
         (
             refused("homepage", Facing::Operators.because()),
             Some("seerr".to_owned())
@@ -107,9 +106,9 @@ fn the_index_over_every_service_is_refused_in_the_registers_own_words() {
 
 #[test]
 fn a_shelf_is_refused_for_the_reason_it_is_not_a_way_in() {
-    let services = [asking(), service("audiobookshelf", Some(Bind::Lan), None)];
+    let services = [service("audiobookshelf", Some(Bind::Lan), None)];
     assert_eq!(
-        door(&services, Some("audiobookshelf")).0,
+        door(&services, &[asking()], Some("audiobookshelf")).0,
         refused("audiobookshelf", Facing::Shelf.because())
     );
 }
@@ -124,7 +123,7 @@ fn a_refused_name_over_a_stack_with_no_door_leaves_there_being_none() {
         Some(ApiKind::Servarr),
     )];
     assert_eq!(
-        door(&services, Some("sonarr")),
+        door(&services, &[], Some("sonarr")),
         (refused("sonarr", WITHHELD), None)
     );
 }
@@ -134,7 +133,7 @@ fn what_was_named_is_carried_back_as_the_operator_wrote_it() {
     // So the answer names the line they have to go and change, rather than a
     // tidied version of it they then cannot find in their file.
     assert_eq!(
-        door(&[asking()], Some("  Not-A-Service  ")).0,
+        door(&[], &[asking()], Some("  Not-A-Service  ")).0,
         refused("Not-A-Service", UNDECLARED)
     );
 }
@@ -187,17 +186,9 @@ fn how_a_door_was_chosen_reads_the_same_way_to_a_browser_as_to_a_person() {
 /// reachable from this machine alone is refused for the reason the stack's would be.
 #[test]
 fn a_plugins_service_can_be_named_and_one_it_keeps_to_this_machine_cannot() {
-    use crate::door::fixtures::{brought, installed};
-    let plugin = installed(vec![
-        brought("requests", Some(ApiKind::Seerr), Some("ask")),
-        brought("hidden", Some(ApiKind::Seerr), None),
-    ]);
-    let services = [watching()];
-    let candidates = crate::door::candidates(&services, std::slice::from_ref(&plugin));
-    let named = |name: &str| {
-        let (chosen, door) = chosen(&candidates, Some(name));
-        (chosen, door.map(|(_, candidate)| candidate.id.to_owned()))
-    };
+    let mut plugin = fronted("requests", Some("request.intake@1"), Some("ask"));
+    plugin.services.push(brought("hidden", None));
+    let named = |name: &str| door(&[watching()], std::slice::from_ref(&plugin), Some(name));
 
     assert_eq!(
         named("requests"),
@@ -209,5 +200,20 @@ fn a_plugins_service_can_be_named_and_one_it_keeps_to_this_machine_cannot() {
     assert_eq!(
         named("hidden"),
         (refused("hidden", WITHHELD), Some("requests".to_owned()))
+    );
+}
+
+/// A library kept to this machine behind the stack's guard is named through the guard,
+/// which is where the household reaches it.
+#[test]
+fn naming_a_library_kept_to_this_machine_names_the_guard_in_front_of_it() {
+    let mut guard = watching();
+    guard.name = "Library".to_owned();
+    let mut library = brought("library", None);
+    library.name = "Library".to_owned();
+
+    assert_eq!(
+        door(&[guard], &[installed(vec![library])], Some("library")),
+        (Chosen::Named("door".to_owned()), Some("door".to_owned()))
     );
 }

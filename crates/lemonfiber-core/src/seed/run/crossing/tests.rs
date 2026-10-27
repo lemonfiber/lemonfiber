@@ -167,7 +167,7 @@ fn a_stack_service_reading_a_key_is_said_and_one_of_nothing_here_is_not() {
             for service in manifest
                 .services
                 .iter_mut()
-                .filter(|one| one.id == "navidrome")
+                .filter(|one| one.id == "calibre-web-automated")
             {
                 service.secret.extend([
                     declared("tv", "sonarr"),
@@ -199,15 +199,15 @@ fn a_stack_service_reading_a_key_is_said_and_one_of_nothing_here_is_not() {
 
     assert_eq!(
         said.iter()
-            .filter(|(connection, _)| connection.ends_with(" into Navidrome"))
+            .filter(|(connection, _)| connection.ends_with(" into Calibre-Web-Automated"))
             .map(|(connection, state)| (
                 connection.as_str(),
                 matches!(state, State::Skipped { .. })
             ))
             .collect::<Vec<_>>(),
         vec![
-            ("Sonarr's key into Navidrome", true),
-            ("Caddy's key into Navidrome", true)
+            ("Sonarr's key into Calibre-Web-Automated", true),
+            ("Caddy's key into Calibre-Web-Automated", true)
         ],
         "{said:?}"
     );

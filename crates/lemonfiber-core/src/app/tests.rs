@@ -138,7 +138,7 @@ fn reported(compose: Option<&str>) -> Outcome {
     Outcome::Version(VersionReport {
         binary: env!("CARGO_PKG_VERSION").to_owned(),
         supported_schema: vec![1],
-        stack: "0.1.0".to_owned(),
+        stack: crate::test_support::shipped_stack_version(),
         compose: compose.map(str::to_owned),
         attestation_status: crate::device_keys::attestation::status::taken(),
         changelog: crate::changelog::notes(env!("CARGO_PKG_VERSION")),

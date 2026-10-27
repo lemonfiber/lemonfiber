@@ -26,8 +26,8 @@ use lemonfiber_fixtures::ports::Stopped;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
-/// The stack the tests are written against, copied into a directory of its own, so a run
-/// that writes the project beside it never writes into the repository. Held one level
+/// The stack this build carries, written into a directory of its own as a stack directory
+/// holds it, so a run that writes the project beside it never writes into the repository. Held one level
 /// down, so what a test puts beside the stack stays the test's own too.
 #[must_use]
 pub fn repository_stack() -> Source {
@@ -38,8 +38,20 @@ pub fn repository_stack() -> Source {
     ))
     .kept()
     .join("stack");
-    lemonfiber_fixtures::stack::fixture_into(&copy);
+    lemonfiber_fixtures::stack::directory_into(&copy);
     Source::External(Box::leak(copy.into_boxed_path()))
+}
+
+/// The stack this build carries, written beside the tests under `name`, its service `id`
+/// declaring the adapter `api` as a stack running its own copy of that service does.
+#[must_use]
+pub fn declaring(name: &str, id: &str, api: &str) -> Source {
+    let at = Scratch::new(&format!("declaring-{name}"))
+        .kept()
+        .join("stack");
+    lemonfiber_fixtures::stack::directory_into(&at);
+    lemonfiber_fixtures::stack::manifest_declaring(&at, id, api);
+    Source::External(Box::leak(at.into_boxed_path()))
 }
 
 /// What the engine a test leaves unnamed says when asked for its images.

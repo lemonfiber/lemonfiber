@@ -91,10 +91,10 @@ async fn an_outcome_serialises_inside_the_versioned_envelope() {
     // this project has cut is in there now, and a literal of it here would be a
     // test that has to be rewritten every time one is tagged.
     assert!(
-        rendered.starts_with(concat!(
-            r#"{"api_version":1,"kind":"version","data":{"binary":""#,
+        rendered.starts_with(&format!(
+            r#"{{"api_version":1,"kind":"version","data":{{"binary":"{}","supported_schema":[1],"stack":"{}","compose":"v2.32.1","#,
             env!("CARGO_PKG_VERSION"),
-            r#"","supported_schema":[1],"stack":"0.1.0","compose":"v2.32.1","#
+            crate::test_support::shipped_stack_version(),
         )),
         "{rendered}"
     );

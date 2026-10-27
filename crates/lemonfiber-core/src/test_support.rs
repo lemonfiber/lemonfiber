@@ -11,7 +11,7 @@ pub(crate) use lemonfiber_fixtures::support::*;
 #[path = "../../lemonfiber-testing/src/context.rs"]
 pub mod context;
 
-pub(crate) use context::{a_context, nowhere, repository_stack as stack};
+pub(crate) use context::{a_context, declaring, nowhere, repository_stack as stack};
 
 #[path = "../../lemonfiber-testing/src/adapted.rs"]
 pub mod adapted;
@@ -235,6 +235,14 @@ pub(crate) fn beside_contracted_requests(
         let _ = std::fs::write(kept, register.to_json().unwrap_or_default());
     }
     media::moved_in(&ctx);
+    ctx
+}
+
+/// `ctx` with every part the bundle installs recorded beside an env file of its own under
+/// `name`.
+pub(crate) fn parts_recorded(mut ctx: crate::app::Ctx, name: &str) -> crate::app::Ctx {
+    ctx.settings.env_file = Some(env_without_password(name));
+    adapted::parts_recorded(&ctx);
     ctx
 }
 
@@ -520,10 +528,15 @@ pub(crate) fn carried_stack() -> crate::stack::Source {
     ))))
 }
 
-/// The stack the tests are written against carried inside the build, as a machine that
+/// The version of the stack this build ships.
+pub(crate) fn shipped_stack_version() -> String {
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .map(|manifest| manifest.stack_version)
+        .unwrap_or_default()
+}
+
+/// The stack this build carries inside it, as a machine that
 /// has chosen no stack directory yet holds it.
 pub(crate) fn embedded() -> crate::stack::Source {
-    static STACK: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../lemonfiber-fixtures/stack");
-    crate::stack::Source::Embedded(&STACK)
+    crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED)
 }
