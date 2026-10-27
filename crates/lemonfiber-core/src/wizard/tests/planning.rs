@@ -391,6 +391,22 @@ fn recovery_reports_exactly_what_the_interrupted_apply_wrote() {
 }
 
 #[test]
+fn a_moved_setting_is_said_by_both_its_names() {
+    assert_eq!(
+        described(&Change {
+            at: String::new(),
+            operation: "settings".to_owned(),
+            target: "MEDIA_SERVER_MODE".to_owned(),
+            kind: Kind::Renamed {
+                from: "JELLYFIN_MODE".to_owned(),
+                to: "MEDIA_SERVER_MODE".to_owned(),
+            },
+        }),
+        "the move of the setting JELLYFIN_MODE to MEDIA_SERVER_MODE"
+    );
+}
+
+#[test]
 fn a_written_change_is_said_plainly_enough_to_recognise() {
     // What whoever is choosing is shown of an interrupted run: the point is
     // that they recognise it, not that it round-trips.
@@ -413,13 +429,6 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
             path: "/srv/media".to_owned()
         })),
         "the directory /srv/media"
-    );
-    assert_eq!(
-        described(&change(Kind::Renamed {
-            from: "JELLYFIN_MODE".to_owned(),
-            to: "MEDIA_SERVER_MODE".to_owned(),
-        })),
-        "the move of the setting JELLYFIN_MODE to MEDIA_SERVER_MODE"
     );
     assert_eq!(
         described(&change(Kind::Created {
