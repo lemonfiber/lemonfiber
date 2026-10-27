@@ -35,7 +35,7 @@ pub enum Record {
 
 impl Record {
     /// Each media type a curator follows media of, and the record it follows it as.
-    pub const FOLLOWED: [(&'static str, Self); 4] = [
+    pub const FOLLOWED: [(&str, Self); 4] = [
         (Kind::Tv.media_type(), Self::Series),
         (Kind::Movies.media_type(), Self::Film),
         (MUSIC, Self::Artist),
