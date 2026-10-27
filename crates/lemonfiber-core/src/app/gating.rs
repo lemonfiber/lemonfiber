@@ -41,7 +41,7 @@ pub(crate) async fn asked(ctx: &Ctx, fillers: &Fillers, project: &Path) -> Optio
     match spoken(ctx, filler, gate::CAPABILITY, gate::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(gate::Adapter(adapter))),
         Spoken::Unanswered => None,
-        Spoken::Not => (filler.origin == Origin::Bundled || filler.stands_in()).then(|| {
+        Spoken::Not => (filler.origin == Origin::Bundled).then(|| {
             Arc::new(configured::Configured::at(
                 project,
                 ctx.seams.filesystem.clone(),

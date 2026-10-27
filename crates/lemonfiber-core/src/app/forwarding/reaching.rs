@@ -10,14 +10,14 @@ use crate::origin::Origin;
 use crate::wiring::{Filler, Fillers};
 
 /// The filler of `network.egress-guard`: over its contract where it speaks one, the
-/// bundled Gluetun where it is that or a first-party stand-in for it, and nothing where
-/// none fills it or it cannot be asked.
+/// bundled Gluetun where it is that, and nothing where none fills it or it cannot be
+/// asked.
 pub(crate) async fn guard(ctx: &Ctx, fillers: &Fillers) -> Option<Box<dyn egress::Fills>> {
     let (filler, _) = fillers.filling(egress::CAPABILITY)?;
     match spoken(ctx, filler, egress::CAPABILITY, egress::MAJOR).await {
         Spoken::Over(adapter) => Some(Box::new(egress::Adapter(adapter))),
         Spoken::Unanswered => None,
-        Spoken::Not => (filler.origin == Origin::Bundled || filler.stands_in()).then(|| {
+        Spoken::Not => (filler.origin == Origin::Bundled).then(|| {
             Box::new(Gluetun::new(
                 ctx.seams.engine.clone(),
                 ctx.settings.project.clone(),
