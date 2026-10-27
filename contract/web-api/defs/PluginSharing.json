@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An adapter that writes the files of the service it fronts, through that service's\nwhole configuration directory mounted into it.",
+  "type": "object",
+  "properties": {
+    "adapter": {
+      "description": "The adapter.",
+      "type": "string"
+    },
+    "at": {
+      "description": "Where that service's configuration directory lands inside the adapter.",
+      "type": "string"
+    },
+    "upstream": {
+      "description": "The service whose files it writes.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "adapter",
+    "upstream",
+    "at"
+  ]
+}

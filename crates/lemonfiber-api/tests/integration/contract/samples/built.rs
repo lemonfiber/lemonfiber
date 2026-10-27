@@ -375,6 +375,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             recipes_ran: Vec::new(),
             taking: Vec::new(),
             granting: Vec::new(),
+            sharing: Vec::new(),
         })),
         update: None,
         substituted: Vec::new(),

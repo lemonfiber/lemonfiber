@@ -84,6 +84,10 @@ pub(crate) fn unit<'a>(
         config_path: &placed.config_path,
         config_ro: fields.config_ro,
         mounts: &fields.mount,
+        shares: placed
+            .fronts
+            .as_deref()
+            .zip(fields.shares_config.as_deref()),
         tmpfs: &fields.tmpfs,
         env: &fields.env,
         user: user_of(placed),

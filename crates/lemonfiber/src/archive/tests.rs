@@ -63,7 +63,7 @@ fn install(root: &Path) -> Paths {
 async fn a_backup_written_reads_its_manifest_and_unpacks_its_contents_back() {
     let root = scratch("round-trip");
     let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
 
@@ -136,6 +136,7 @@ async fn restoring_one_service_leaves_the_others_untouched() {
         &Scope::Service {
             name: "sonarr".to_owned(),
         },
+        &[],
     );
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let dest = paths.backups().join("sonarr.tar.gz");
@@ -261,7 +262,7 @@ async fn a_bundle_is_not_written_over_one_already_there() {
 async fn a_backup_is_not_written_over_one_already_there() {
     let root = scratch("no-overwrite");
     let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
 
@@ -277,7 +278,7 @@ async fn a_backup_is_not_written_over_one_already_there() {
 async fn backups_are_listed_and_pruned() {
     let root = scratch("list");
     let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let tar = Tar;
     for name in ["lemonfiber-full-a.tar.gz", "lemonfiber-full-b.tar.gz"] {
@@ -437,7 +438,7 @@ async fn a_directory_item_is_packed_whole_and_comes_back() {
         label: "services".to_owned(),
         left_out: Vec::new(),
     }];
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     assert!(tar.write(&dest, &manifest, &items).await.is_ok());
 
@@ -605,7 +606,7 @@ async fn a_missing_manifest_is_reported() {
 async fn the_space_check_reports_a_need_and_a_free_figure() {
     let root = scratch("space");
     let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let tar = Tar;
     let space = tar.space(&paths.backups(), &plan.items).await;
     assert!(
@@ -633,7 +634,7 @@ async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
 
     let root = scratch("mode");
     let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
     let written = Tar.write(&dest, &manifest, &plan.items).await;
@@ -695,7 +696,7 @@ fn a_typical_configuration_is_well_inside_what_a_minute_allows() {
 async fn the_room_check_counts_the_bytes_that_are_really_there() {
     let root = scratch("weighed");
     let paths = install(&root);
-    let plan = backup::plan(&paths, &Scope::WholeStack);
+    let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
 
     let measured = Tar.space(&paths.backups(), &plan.items).await;
     let on_disk: u64 = ["DATA_ROOT=/srv/media\n", "<Config/>", "services: {}"]

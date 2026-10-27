@@ -242,3 +242,37 @@ version"#,
     );
     assert_eq!(read(&proxy), before, "nothing of it was written");
 }
+
+/// A second plugin naming in `was` the variable the first one's setting names is refused
+/// before anything of it is written.
+#[tokio::test]
+async fn a_variable_another_plugin_was_kept_under_refuses_the_install() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("was-taken", runner, answering(200));
+    let (proxy, _) = fronted(&ctx);
+    let kept = |namespace: &str| {
+        format!(
+            "\n[service.env]\nLOG = {{ setting = \"{namespace}:log\", default = \"info\", was = \
+             \"KOMGA_LOG\" }}\n"
+        )
+    };
+    let first = PROVING.to_owned() + &kept("komga");
+    let installed = installing(&ctx, &source("was-taken", &first)).await;
+    assert_eq!(counted(installed), Some(1));
+    let before = read(&proxy);
+    let second = PROVING.replace("\"komga\"", "\"shelf\"") + &kept("shelf");
+
+    let refused = installing(&ctx, &source("was-taken-second", &second)).await;
+
+    let said = refused.err();
+    assert_eq!(
+        said.as_ref().map(|problem| problem.code.to_string()),
+        Some("PLUGIN-48".to_owned())
+    );
+    assert!(
+        said.is_some_and(|problem| problem.summary.contains("setting shelf:log")
+            && problem.summary.contains("komga's setting komga:log")),
+        "the refusal names both"
+    );
+    assert_eq!(read(&proxy), before, "nothing of it was written");
+}

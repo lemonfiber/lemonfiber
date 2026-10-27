@@ -21,6 +21,12 @@ pub struct Fields {
     /// Its further mounts.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mount: Vec<Mount>,
+    /// Where the whole configuration directory of the service it fronts lands in it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shares_config: Option<String>,
+    /// The paths beneath its configuration directory it rebuilds when they are missing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rebuilt: Vec<String>,
     /// Its scratch paths in memory.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tmpfs: Vec<String>,

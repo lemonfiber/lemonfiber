@@ -68,6 +68,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(overriding(&install.overrides, install.recorded));
         lines.extend(answering::recipes(&install.would.recipes));
         lines.extend(answering::taking(&install.taking, acted));
+        lines.extend(answering::sharing(&install.sharing, acted));
         lines.extend(answering::granting(&install.would, acted));
         lines.extend(container(&install.would));
         if let Some(put_back) = &install.reversed {

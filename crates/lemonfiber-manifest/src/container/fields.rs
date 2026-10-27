@@ -24,6 +24,14 @@ macro_rules! container_fields {
             /// Each further path mounted from its own mount tree.
             #[serde(default)]
             pub mount: ::std::vec::Vec<$crate::container::Mount>,
+            /// Where inside an adapter the whole configuration directory of the service it
+            /// fronts is mounted.
+            #[serde(default)]
+            pub shares_config: ::std::option::Option<::std::string::String>,
+            /// Paths beneath its configuration directory it rebuilds when they are missing,
+            /// which every backup leaves out.
+            #[serde(default)]
+            pub rebuilt: ::std::vec::Vec<::std::string::String>,
             /// Absolute paths given scratch space in memory.
             #[serde(default)]
             pub tmpfs: ::std::vec::Vec<::std::string::String>,

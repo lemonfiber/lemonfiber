@@ -42,6 +42,8 @@ pub(crate) fn service(id: &str, bind: Option<Bind>) -> Service {
         asks_for: None,
         reaches: None,
         listens: None,
+        shares_config: None,
+        rebuilt: Vec::new(),
     }
 }
 

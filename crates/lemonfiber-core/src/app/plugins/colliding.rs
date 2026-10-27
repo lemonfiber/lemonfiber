@@ -1,5 +1,20 @@
-use crate::error::codes::plugin::{ANSWERED, SPELLED_ALIKE};
+use crate::error::codes::plugin::{ANSWERED, EARLIER_TAKEN, SPELLED_ALIKE};
 use crate::error::{Problem, Remedy, State};
+
+/// Refuse a plugin that would answer on a label, be named as a service, or name an earlier
+/// variable another installed plugin already does, before anything is written.
+///
+/// # Errors
+///
+/// The first of [`unanswered`], [`unshared`] and [`unclaimed`] to refuse it.
+pub(crate) fn apart(
+    would: &crate::plugin::Installed,
+    installed: &[crate::plugin::Installed],
+) -> Result<(), Box<Problem>> {
+    unanswered(would, installed)?;
+    unshared(would, installed)?;
+    unclaimed(would, installed)
+}
 
 /// Refuse a plugin one of whose services would answer on a label another installed
 /// plugin's service already answers on, before anything is written.
@@ -7,7 +22,7 @@ use crate::error::{Problem, Remedy, State};
 /// # Errors
 ///
 /// Where the label is taken, naming it and whose it is.
-pub(crate) fn unanswered(
+fn unanswered(
     would: &crate::plugin::Installed,
     installed: &[crate::plugin::Installed],
 ) -> Result<(), Box<Problem>> {
@@ -37,7 +52,7 @@ pub(crate) fn unanswered(
 /// # Errors
 ///
 /// Where the name is taken, naming both services and whose the other is.
-pub(crate) fn unshared(
+fn unshared(
     would: &crate::plugin::Installed,
     installed: &[crate::plugin::Installed],
 ) -> Result<(), Box<Problem>> {
@@ -56,6 +71,41 @@ pub(crate) fn unshared(
                 Remedy::new(format!(
                     "Remove {plugin} first, or install a version of {} whose service is named \
                      otherwise",
+                    would.plugin
+                )),
+            )
+            .in_state(State::Guided),
+        ))
+    })
+}
+
+/// Refuse a plugin one of whose settings or secrets names, in `was`, a variable another
+/// installed plugin's setting or secret names, before anything is written.
+///
+/// # Errors
+///
+/// Where the variable is taken, naming both and whose the other is.
+fn unclaimed(
+    would: &crate::plugin::Installed,
+    installed: &[crate::plugin::Installed],
+) -> Result<(), Box<Problem>> {
+    crate::plugin::earlier::taken(would, installed).map_or(Ok(()), |(ours, theirs, plugin)| {
+        Err(Box::new(
+            Problem::new(
+                EARLIER_TAKEN,
+                format!(
+                    "{}'s {} names {} as the variable it was kept under, which {plugin}'s {} \
+                     already names",
+                    would.plugin,
+                    ours.named(),
+                    ours.key,
+                    theirs.named()
+                ),
+                "Nothing was written. The stack's value under that variable would be filed \
+                 under both.",
+                Remedy::new(format!(
+                    "Remove {plugin} first, or install a version of {} whose was names the \
+                     variable its own setting was kept under",
                     would.plugin
                 )),
             )

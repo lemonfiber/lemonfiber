@@ -84,6 +84,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         recipes_ran: Vec::new(),
         taking: Vec::new(),
         granting: Vec::new(),
+        sharing: Vec::new(),
     }
 }
 
@@ -160,6 +161,52 @@ fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> 
         sources: Vec::new(),
         unvetted: None,
     }
+}
+
+/// An adapter writing its upstream's files is said to, in the tense the install or the
+/// update is in.
+#[test]
+fn an_adapter_writing_its_upstreams_files_is_said_to() {
+    let shared = vec![lemonfiber_core::plugin::Sharing {
+        adapter: "komga".to_owned(),
+        upstream: "komga-server".to_owned(),
+        at: "/upstream".to_owned(),
+    }];
+    let installing = |recorded: bool| {
+        let mut report = moving(recorded, None, None);
+        report.update = None;
+        report.install = Some(Box::new(Install {
+            sharing: shared.clone(),
+            ..install(self::recorded("komga", None), recorded)
+        }));
+        installs(&report).text()
+    };
+    let updating = {
+        let mut report = moving(true, None, None);
+        if let Some(update) = report.update.as_mut() {
+            update.install.sharing.clone_from(&shared);
+        }
+        installs(&report).text()
+    };
+    let line = "komga writes komga-server's own files, its whole configuration directory \
+                mounted at /upstream";
+    for said in [installing(true), updating] {
+        assert!(
+            said.contains("The files of another service it writes:") && said.contains(line),
+            "{said}"
+        );
+    }
+    let rehearsed = installing(false);
+    assert!(
+        rehearsed.contains("The files of another service it would write:"),
+        "{rehearsed}"
+    );
+    assert!(
+        !installs(&moving(true, None, None))
+            .text()
+            .contains("files of another service"),
+        "nothing is said where nothing is shared"
+    );
 }
 
 mod installed;

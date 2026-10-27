@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::validate::{GATEWAY_GRANT, TUNNEL_DEVICE};
 
+pub mod earlier;
 mod paths;
 mod ports;
 mod record;
@@ -238,6 +239,12 @@ pub struct Container<'a> {
     pub config_ro: bool,
     /// Its further mounts.
     pub mounts: &'a [Mount],
+    /// Where the configuration directory of the service it fronts is mounted.
+    pub shares_config: Option<&'a str>,
+    /// The paths beneath its configuration directory it rebuilds.
+    pub rebuilt: &'a [String],
+    /// The service of its own plugin it stands in front of.
+    pub fronts: Option<&'a str>,
     /// Its scratch paths in memory.
     pub tmpfs: &'a [String],
     /// Its environment.
@@ -344,6 +351,24 @@ impl Container<'_> {
         }
         for path in self.tmpfs {
             self.landed(self.at(&format!("tmpfs {path}")), path, &mut targets, found);
+        }
+        if let Some(path) = self.shares_config {
+            let at = self.at("shares_config");
+            if self.fronts.is_none() {
+                found.push((
+                    at.clone(),
+                    "shares the configuration of the service it fronts, and fronts none".to_owned(),
+                ));
+            }
+            self.landed(at, path, &mut targets, found);
+        }
+        for path in self.rebuilt {
+            if !is_source(path) {
+                found.push((
+                    self.at(&format!("rebuilt {path}")),
+                    format!("{path} is not a relative path beneath its configuration directory"),
+                ));
+            }
         }
     }
 

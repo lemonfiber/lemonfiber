@@ -57,6 +57,7 @@ fn reading(mut installed: Installed, id: &str, of: &str) -> Installed {
         of: of.to_owned(),
         why: "Read what it reaches".to_owned(),
         minted: false,
+        was: None,
         serves: None,
     });
     installed
@@ -161,6 +162,7 @@ fn a_stack_service_reading_a_key_is_said_and_one_of_nothing_here_is_not() {
         serves: None,
         carried_from: None,
         recorded_with: None,
+        was: None,
     };
     let manifest =
         lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).map(|mut manifest| {

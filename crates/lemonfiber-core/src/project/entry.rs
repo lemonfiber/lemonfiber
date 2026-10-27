@@ -116,6 +116,9 @@ pub struct Unit<'a> {
     pub config_ro: bool,
     /// Its further mounts.
     pub mounts: &'a [Mount],
+    /// The service of its own plugin whose whole configuration directory it shares, and
+    /// where that lands inside it.
+    pub shares: Option<(&'a str, &'a str)>,
     /// Its scratch paths in memory.
     pub tmpfs: &'a [String],
     /// Its environment as the manifest declares it.
@@ -442,6 +445,13 @@ fn volumes(unit: &Unit<'_>, values: &Values<'_>) -> Vec<String> {
         configuration(unit.config_path),
         unit.config_ro,
     ));
+    if let Some((fronted, to)) = unit.shares.filter(|(_, to)| is_target(to, unit.takes_data)) {
+        volumes.push(mounted(
+            &format!("./{CONFIGURATION_TREE}/{}", literal(fronted)),
+            to,
+            false,
+        ));
+    }
     volumes.extend(
         mounts(unit.mounts, unit.takes_data).map(|Mount { from, to, ro }| {
             mounted(

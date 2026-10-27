@@ -351,3 +351,78 @@ fn stores_that_cannot_be_read_leave_the_file_as_it_is() {
     assert_eq!(overlaid.get("VPN_COUNTRIES"), Some("Sweden"));
     assert_eq!(listed.get("VPN_COUNTRIES"), Some("Sweden"));
 }
+
+fn keeping(plugin: &str, was: &str) -> crate::plugin::Installed {
+    let mut placed = crate::test_support::a_placed(plugin, &[], None);
+    placed.fields.env.insert(
+        "LEVEL".to_owned(),
+        Value::Setting(lemonfiber_manifest::container::Setting {
+            setting: format!("{plugin}:level"),
+            default: lemonfiber_manifest::container::Constant::Text(String::new()),
+            recorded_with: None,
+            was: Some(format!("{was}_LEVEL")),
+        }),
+    );
+    let mut installed = crate::test_support::an_installed(plugin, vec![placed]);
+    installed.declared.secrets = vec![crate::plugin::Secret {
+        id: "key".to_owned(),
+        of: plugin.to_owned(),
+        why: "Signs in".to_owned(),
+        minted: false,
+        serves: None,
+        was: Some(format!("{was}_KEY")),
+    }];
+    installed
+}
+
+#[test]
+fn a_first_party_plugins_values_are_filed_from_where_its_was_says_and_no_one_elses() {
+    let (ctx, env) = stacked(
+        "was",
+        &[
+            ("OLD_LEVEL", "debug"),
+            ("OLD_KEY", "old-secret"),
+            ("STRANGER_LEVEL", "trace"),
+            ("STRANGER_KEY", "stranger-secret"),
+        ],
+    );
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::pinned_as(keeping("gluetun", "OLD")))
+        .is_ok());
+    assert!(register.record(keeping("stranger", "STRANGER")).is_ok());
+    assert!(std::fs::write(
+        env.with_file_name(crate::config::paths::PLUGINS),
+        register.to_json().unwrap_or_default()
+    )
+    .is_ok());
+
+    assert!(crate::filed_stack(&ctx).is_ok());
+
+    assert_eq!(setting(&env, "gluetun:level").as_deref(), Some("debug"));
+    let secrets = crate::settings::Secrets::at(&env.with_file_name(SECRETS)).ok();
+    assert_eq!(
+        secrets
+            .as_ref()
+            .and_then(|kept| kept.value("gluetun:key"))
+            .map(str::to_owned)
+            .as_deref(),
+        Some("old-secret")
+    );
+    assert_eq!(line(&env, "OLD_LEVEL"), None);
+    assert_eq!(line(&env, "OLD_KEY"), None);
+    assert!(journal(&ctx).iter().any(|change| change.kind
+        == Kind::Setting {
+            name: "gluetun:level".to_owned(),
+            previous: None,
+            current: Some("debug".to_owned()),
+            filed: Some("OLD_LEVEL".to_owned()),
+        }));
+    assert_eq!(setting(&env, "stranger:level"), None);
+    assert!(secrets.is_some_and(|kept| kept.value("stranger:key").is_none()));
+    assert_eq!(line(&env, "STRANGER_LEVEL").as_deref(), Some("trace"));
+    assert_eq!(
+        line(&env, "STRANGER_KEY").as_deref(),
+        Some("stranger-secret")
+    );
+}

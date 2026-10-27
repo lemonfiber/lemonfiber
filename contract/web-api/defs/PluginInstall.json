@@ -78,6 +78,13 @@
         }
       ]
     },
+    "sharing": {
+      "description": "Every adapter that writes the files of the service it fronts.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginSharing.json"
+      }
+    },
     "taking": {
       "description": "Every service taking a privileged shape, with what it is given, each approved\napart from the offer.",
       "type": "array",
@@ -111,6 +118,7 @@
     "overrides",
     "recipes_ran",
     "taking",
-    "granting"
+    "granting",
+    "sharing"
   ]
 }

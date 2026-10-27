@@ -285,6 +285,7 @@ pub(crate) fn a_minting_curator() -> crate::plugin::Installed {
         of: "series-upstream".to_owned(),
         why: "The key the adapter signs in with".to_owned(),
         minted: true,
+        was: None,
         serves: None,
     }];
     curator

@@ -565,6 +565,7 @@ fn a_setting_is_written_as_the_operator_recorded_it_and_as_its_default_otherwise
             setting: name.to_owned(),
             default: Constant::Text("slow".to_owned()),
             recorded_with: None,
+            was: None,
         })
     };
     let mut placed = crate::test_support::a_placed("reader", &[], None);

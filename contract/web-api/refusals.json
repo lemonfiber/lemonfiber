@@ -514,6 +514,11 @@
     "status": 404,
     "description": "Raised when a grant asked to be revoked is not one the plugin holds."
   },
+  "PLUGIN-48": {
+    "name": "EARLIER_TAKEN",
+    "status": 400,
+    "description": "Raised when a plugin's setting or secret names, as the variable an earlier release kept its value under, one another installed plugin's setting or secret names."
+  },
   "PLUGIN-5": {
     "name": "ALREADY",
     "status": 400,

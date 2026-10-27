@@ -68,6 +68,8 @@ fn bundled(id: &str, provides: &[&str]) -> lemonfiber_manifest::Service {
         shape: None,
         asks_for: None,
         reaches: None,
+        shares_config: None,
+        rebuilt: Vec::new(),
     }
 }
 

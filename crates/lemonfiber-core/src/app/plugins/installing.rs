@@ -79,8 +79,7 @@ pub(super) async fn install(
     after
         .record(would.clone())
         .map_err(|there| Box::new(already(&there, &named)))?;
-    super::colliding::unanswered(&would, held.installed())?;
-    super::colliding::unshared(&would, held.installed())?;
+    super::colliding::apart(&would, held.installed())?;
     super::replacing::unreplaced(&would, trusted)?;
     super::granting::aimed(&would, trusted)?;
 
@@ -194,6 +193,7 @@ pub(super) async fn install(
         installed: standing.installed().to_vec(),
         install: Some(Box::new(Install {
             granting: crate::plugin::granting(&would),
+            sharing: crate::plugin::sharing(&would),
             would,
             recorded,
             changes,

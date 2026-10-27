@@ -249,6 +249,7 @@ fn started(
             recipes_ran: Vec::new(),
             taking,
             granting: crate::plugin::granting(would),
+            sharing: crate::plugin::sharing(would),
         },
         stopped: None,
         restored: None,
@@ -526,8 +527,7 @@ fn unheld(
     others: &[Installed],
     stack: &Path,
 ) -> Result<(), Box<Problem>> {
-    super::colliding::unanswered(would, others)?;
-    super::colliding::unshared(would, others)?;
+    super::colliding::apart(would, others)?;
     super::replacing::unreplaced(would, crate::plugin::first_party::EMBEDDED)?;
     super::occupied::unoccupied(ctx, would, others, stack)
 }

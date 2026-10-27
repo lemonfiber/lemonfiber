@@ -17,6 +17,12 @@
         "string"
       ],
       "required": true
+    },
+    "was": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     }
   },
   "variants": []

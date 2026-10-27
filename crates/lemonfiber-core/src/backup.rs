@@ -132,15 +132,26 @@ pub const REBUILT: &[(&str, &str)] = &[
 ];
 
 /// What a capture leaves out of the service configuration directory, or out of one
-/// service's directory within it.
-fn rebuilt(service: Option<&str>) -> Vec<PathBuf> {
-    REBUILT
+/// service's directory within it: what [`REBUILT`] names, and what each service's
+/// manifest says it rebuilds, `declared` as the service and the path.
+fn rebuilt(service: Option<&str>, declared: &[(String, String)]) -> Vec<PathBuf> {
+    let mut left: Vec<PathBuf> = REBUILT
         .iter()
+        .map(|(owner, path)| ((*owner).to_owned(), (*path).to_owned()))
+        .chain(
+            declared
+                .iter()
+                .filter(|(_, path)| lemonfiber_manifest::container::is_source(path))
+                .cloned(),
+        )
         .filter_map(|(owner, path)| match service {
-            None => Some(Path::new(owner).join(path)),
-            Some(named) => (named == *owner).then(|| PathBuf::from(path)),
+            None => Some(Path::new(&owner).join(path)),
+            Some(named) => (named == owner).then(|| PathBuf::from(path)),
         })
-        .collect()
+        .collect();
+    left.sort();
+    left.dedup();
+    left
 }
 
 /// The record written inside an archive, and read back to decide a restore.
@@ -306,7 +317,7 @@ mod area {
 /// holds its API key, so any capture of either is exactly as sensitive as the
 /// secrets inside it.
 #[must_use]
-pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
+pub fn plan(paths: &Paths, scope: &Scope, declared: &[(String, String)]) -> Plan {
     let items = match scope {
         Scope::WholeStack => vec![
             Item {
@@ -319,7 +330,7 @@ pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
                 source: paths.service_config(),
                 archive_path: area::SERVICES.to_owned(),
                 label: "service configuration".to_owned(),
-                left_out: rebuilt(None),
+                left_out: rebuilt(None, declared),
             },
             Item {
                 source: paths.stack(),
@@ -332,7 +343,7 @@ pub fn plan(paths: &Paths, scope: &Scope) -> Plan {
             source: paths.service_config().join(name),
             archive_path: format!("{}/{name}", area::SERVICES),
             label: format!("{name} configuration"),
-            left_out: rebuilt(Some(name)),
+            left_out: rebuilt(Some(name), declared),
         }],
         // The only scope that reads nothing from `paths`: an existing setup keeps
         // its configuration where it keeps it, and the survey is what found out

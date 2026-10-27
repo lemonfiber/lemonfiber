@@ -9,7 +9,7 @@
 //! The manifest's own rules refuse such a word before an install reads it; this is the
 //! second wall, not the first.
 
-use lemonfiber_core::plugin::{Adapter, Installed, Recipe, Taking};
+use lemonfiber_core::plugin::{Adapter, Installed, Recipe, Sharing, Taking};
 use lemonfiber_core::text::plain;
 
 use super::super::super::Lines;
@@ -103,6 +103,27 @@ pub(super) fn taking(taken: &[Taking], acted: bool) -> Lines {
             one.shape.name(),
             one.grants.join(", "),
             one.devices.join(", "),
+        ));
+    }
+    lines
+}
+
+/// Each adapter that writes the files of the service it fronts, and where it reaches them.
+pub(super) fn sharing(shared: &[Sharing], acted: bool) -> Lines {
+    let mut lines = Lines::default();
+    if shared.is_empty() {
+        return lines;
+    }
+    lines.spaced(format!(
+        "    The files of another service it {}:",
+        if acted { "writes" } else { "would write" }
+    ));
+    for one in shared {
+        lines.put(format!(
+            "      {} writes {}'s own files, its whole configuration directory mounted at {}",
+            plain(&one.adapter),
+            plain(&one.upstream),
+            plain(&one.at),
         ));
     }
     lines

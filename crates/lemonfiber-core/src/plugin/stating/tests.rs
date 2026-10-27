@@ -282,3 +282,23 @@ fn a_shape_is_asked_to_be_approved_after_every_value_the_recipes_send_elsewhere(
         ["token@meta.example.org", "egress-guard@gluetun"]
     );
 }
+
+#[test]
+fn an_adapter_sharing_its_upstreams_configuration_is_stated_with_where() {
+    let mut adapter = crate::test_support::a_placed("series", &["library.curate"], None);
+    adapter.fronts = Some("series-upstream".to_owned());
+    adapter.fields.shares_config = Some("/upstream".to_owned());
+    let mut unfronting = crate::test_support::a_placed("lone", &[], None);
+    unfronting.fields.shares_config = Some("/elsewhere".to_owned());
+    let upstream = crate::test_support::a_placed("series-upstream", &[], Some(8989));
+    let installed =
+        crate::test_support::an_installed("series", vec![adapter, unfronting, upstream]);
+    assert_eq!(
+        super::sharing(&installed),
+        vec![super::Sharing {
+            adapter: "series".to_owned(),
+            upstream: "series-upstream".to_owned(),
+            at: "/upstream".to_owned(),
+        }]
+    );
+}

@@ -34,6 +34,10 @@ pub struct Secret {
     /// The capability of the plugin's own that a credential crossing to it is needed to fill.
     #[serde(default, rename = "for", skip_serializing_if = "Option::is_none")]
     pub serves: Option<String>,
+    /// The variable an earlier release kept its value under in the stack's environment
+    /// file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub was: Option<String>,
 }
 
 /// What a plugin declared about itself, as its install read it.
@@ -115,6 +119,7 @@ impl Declaration {
                     why: secret.why.clone(),
                     minted: secret.minted.is(),
                     serves: secret.serves.clone(),
+                    was: secret.was.clone(),
                 })
                 .collect(),
         }

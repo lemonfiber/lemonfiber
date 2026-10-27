@@ -154,6 +154,36 @@ pub fn taking(installed: &Installed) -> Vec<Taking> {
         .collect()
 }
 
+/// An adapter that writes the files of the service it fronts, through that service's
+/// whole configuration directory mounted into it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginSharing")]
+pub struct Sharing {
+    /// The adapter.
+    pub adapter: String,
+    /// The service whose files it writes.
+    pub upstream: String,
+    /// Where that service's configuration directory lands inside the adapter.
+    pub at: String,
+}
+
+/// Every adapter of the plugin sharing the configuration directory of the service it
+/// fronts, in the order the record keeps them.
+#[must_use]
+pub fn sharing(installed: &Installed) -> Vec<Sharing> {
+    installed
+        .services
+        .iter()
+        .filter_map(|placed| {
+            Some(Sharing {
+                adapter: placed.service.clone(),
+                upstream: placed.fronts.clone()?,
+                at: placed.fields.shares_config.clone()?,
+            })
+        })
+        .collect()
+}
+
 /// What the reading lists as approved one by one: each value the recipes would carry
 /// elsewhere, each service taking a privileged shape, and each credential granted to the
 /// plugin.

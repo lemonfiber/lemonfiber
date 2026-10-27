@@ -42,6 +42,18 @@
       ],
       "required": false
     },
+    "rebuilt": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "shares_config": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "tmpfs": {
       "type": [
         "array[string]"

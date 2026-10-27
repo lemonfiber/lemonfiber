@@ -378,6 +378,7 @@ fn installed(
             recipes_ran: Vec::new(),
             taking: Vec::new(),
             granting: Vec::new(),
+            sharing: Vec::new(),
         })),
         update: None,
         substituted: Vec::new(),
@@ -540,6 +541,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
                     recipes_ran: Vec::new(),
                     taking: Vec::new(),
                     granting: Vec::new(),
+                    sharing: Vec::new(),
                 },
                 stopped: None,
                 restored: restored.then(|| lemonfiber_core::plugin::Restored {
