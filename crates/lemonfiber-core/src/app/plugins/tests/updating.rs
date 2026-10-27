@@ -620,8 +620,12 @@ async fn an_update_to_a_version_naming_an_in_process_adapter_is_refused() {
         .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
         .unwrap_or_default();
 
-    assert_eq!(refused.0, "PLUGIN-3");
-    assert!(refused.1.contains("service komga.api"), "{}", refused.1);
+    assert_eq!(refused.0, "PLUGIN-2");
+    assert!(
+        refused.1.contains("service komga.api") && refused.1.contains("no such field"),
+        "{}",
+        refused.1
+    );
     assert_eq!(
         runner.seen().len(),
         before,

@@ -63,7 +63,7 @@ fn context(env: &std::path::Path) -> Ctx {
 
 /// The same, over a transport the caller chose.
 fn context_over(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    let stack = crate::common::household::set_up_beside(env);
+    let stack = crate::common::household::stack_beside(env);
     REQUESTS.keyed_in(context_on(env, http, stack, REQUESTS.running()))
 }
 

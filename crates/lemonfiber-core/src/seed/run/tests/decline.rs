@@ -12,7 +12,7 @@ const APP: &str = crate::app_keys::DECLINE_APP;
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![media_server_svc(), requests_svc()];
     if declining {
-        let mut decline = manifest_service("decline", None, Some(5056));
+        let mut decline = manifest_service("decline", Some(5056));
         decline.provides =
             vec![lemonfiber_contract::capabilities::invite::decline::CAPABILITY.to_owned()];
         services.push(decline);
@@ -214,14 +214,13 @@ async fn a_stranger_filling_decline_is_handed_no_key() {
     let services = vec![
         media_server_svc(),
         requests_svc(),
-        manifest_service("decline", None, Some(5056)),
+        manifest_service("decline", Some(5056)),
     ];
     let stranger = crate::test_support::an_installed(
         "their-decline",
         vec![crate::test_support::a_placed(
             "their-decline",
             &[lemonfiber_contract::capabilities::invite::decline::CAPABILITY],
-            None,
             Some(5057),
         )],
     );
@@ -264,7 +263,6 @@ fn the_media_servers_key_crosses_only_where_any_of_its_credentials_may() {
         vec![a_placed(
             "their-decline",
             &[lemonfiber_contract::capabilities::invite::decline::CAPABILITY],
-            None,
             Some(5057),
         )],
     );
@@ -295,7 +293,7 @@ async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
     let services = vec![
         media_server_svc(),
         requests_svc(),
-        manifest_service("decline", None, Some(5056)),
+        manifest_service("decline", Some(5056)),
     ];
     let theirs = crate::test_support::contracted(
         "their-decline",
@@ -422,7 +420,7 @@ async fn without_an_administrator_only_a_rehearsal_says_anything() {
 async fn a_stack_without_a_media_server_holds_no_key() {
     let http = serving(&[], "fresh", true);
     let (ctx, _) = decline_ctx("decline-key-no-jellyfin", true, None, http.clone());
-    let services = vec![manifest_service("decline", None, Some(5056))];
+    let services = vec![manifest_service("decline", Some(5056))];
 
     let wiring = super::super::decline::seed_decline_key(
         &ctx,

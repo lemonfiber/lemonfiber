@@ -92,12 +92,7 @@ fn a_stack_credential_does_not_cross_to_a_plugin_nobody_vouched_for() {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
     let installed = crate::test_support::an_installed(
         "comics",
-        vec![crate::test_support::a_placed(
-            "comics-reader",
-            &[],
-            None,
-            None,
-        )],
+        vec![crate::test_support::a_placed("comics-reader", &[], None)],
     );
     let resolved =
         crate::settings::Resolved::of(&ctx, manifest.as_ref(), std::slice::from_ref(&installed));
@@ -116,7 +111,7 @@ fn a_minted_key_crosses_by_its_secret_name_only_to_a_plugin_granted_it() {
     let finder = |granted: &[&str]| {
         let mut finder = crate::test_support::an_installed(
             "finder",
-            vec![crate::test_support::a_placed("finder", &[], None, None)],
+            vec![crate::test_support::a_placed("finder", &[], None)],
         );
         finder.granted = granted
             .iter()

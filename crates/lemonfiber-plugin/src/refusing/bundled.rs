@@ -71,12 +71,11 @@ pub(super) fn named(id: &str) -> Option<&'static Service> {
     services().iter().find(|service| service.id == id)
 }
 
-/// Whether lemonfiber holds a credential for the shipped service `id`: its declaration
-/// names the adapter it is reached through, or a part the bundle installs moves its own
-/// service in place of it and hands the adapter in front of that service a key lemonfiber
-/// minted for it.
+/// Whether lemonfiber holds a credential for the shipped service `id`: a part the bundle
+/// installs moves its own service in place of it and hands the adapter in front of that
+/// service a key lemonfiber minted for it.
 pub(super) fn credential_held(id: &str) -> bool {
-    named(id).is_some_and(|service| service.api.is_some()) || minted_for(id)
+    minted_for(id)
 }
 
 /// Whether a part the bundle installs moves its own service in place of the shipped

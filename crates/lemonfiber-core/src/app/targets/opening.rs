@@ -114,41 +114,11 @@ pub(crate) async fn requests_as_owner(
     }
 }
 
-/// What the file a service's credential is read from holds.
-///
-/// Read only where it is a plain file beneath the directory its container owns: whatever
-/// runs there can write that directory, and a link put where the file is expected would
-/// otherwise have lemonfiber read any file on the host and hand it to the container as its
-/// own credential. Absent where the service names no such file.
-pub(crate) async fn credential_file(
-    ctx: &Ctx,
-    filler: &Filler,
-) -> crate::ports::filesystem::Beneath {
-    match (filler.key_file.as_deref(), filler.confined_to.as_deref()) {
-        (Some(file), Some(within)) => ctx.seams.filesystem.read_beneath(file, within).await,
-        _ => crate::ports::filesystem::Beneath::Absent,
-    }
-}
-
-/// Why a service's credential file was refused rather than read, naming the plugin
-/// that brought it where a plugin did.
-pub(crate) fn escaped(filler: &Filler) -> String {
-    let whose = match &filler.origin {
-        crate::origin::Origin::Plugin { named } => named.as_str(),
-        _ => filler.name.as_str(),
-    };
-    format!(
-        "{whose}'s credential file is a link, leads outside the directory its container \
-         owns, is not a file at all, or is too large to be one, so it was not read"
-    )
-}
-
 /// The first Usenet download client among `fillers`, as a reader of the accounts behind
 /// it.
 ///
-/// Nothing where there is no Usenet client, or where the client has not written its key
-/// yet — a service still starting holds nothing to report, the same skip every read here
-/// makes.
+/// Nothing where there is no Usenet client, or where no adapter of its plugin can be asked
+/// for it.
 pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn UsenetAccounts>> {
     let client: Box<dyn UsenetAccounts> = download_targets(ctx, fillers)
         .await

@@ -4,8 +4,8 @@ use super::*;
 use crate::ports::service::{AggregatorAt, Protocol};
 use crate::test_support::books;
 
-/// Every curator-shape service's configuration, holding the key it answers to.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+/// The key lemonfiber minted for the moved indexer.
+const KEYED: &str = "the-key";
 
 /// The stack's indexer, answering the book curator's ask for one.
 fn indexer() -> lemonfiber_manifest::Service {
@@ -15,7 +15,8 @@ fn indexer() -> lemonfiber_manifest::Service {
 }
 
 /// The stack's `services` and its own book curator, the curator moved into its plugin
-/// beside `installed`, with the operator's choices `chosen`.
+/// beside `installed`, and the indexer where `services` runs one filling `indexer.search`,
+/// with the operator's choices `chosen`.
 fn moved_beside(
     services: Vec<lemonfiber_manifest::Service>,
     installed: Vec<crate::plugin::Installed>,
@@ -38,6 +39,10 @@ fn moved_trusting(
 ) -> crate::wiring::Fillers {
     services.push(book_curator_svc());
     installed.extend(books::moved());
+    let indexing = services
+        .iter()
+        .any(|service| service.provides.iter().any(|one| one == "indexer.search"));
+    installed.extend(INDEXER.installed().filter(|_| indexing));
     crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
@@ -53,12 +58,12 @@ fn moved_trusting(
         .unwrap_or_default()
 }
 
-/// A context asking the moved curator's adapter over `http`, every curator-shape service's
-/// configuration reading as `keyed` does.
-fn curator_ctx(http: Arc<Fake>, keyed: Option<&'static str>) -> Ctx {
-    books::asking(seed_ctx(true, None, None))
-        .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(keyed)))
+/// A context of the test `name` asking the moved curator's adapter over `http`, holding
+/// `keyed` as the key lemonfiber minted for the moved indexer where it holds one.
+fn curator_ctx(name: &str, http: Arc<Fake>, keyed: Option<&str>) -> Ctx {
+    let parts: &[crate::test_support::adapted::Adapted] =
+        if keyed.is_some() { &[INDEXER] } else { &[] };
+    books::asking(minted_ctx(name, parts, keyed.unwrap_or_default())).with_http(http)
 }
 
 /// A moved curator reading from `held`, and taking every aggregator it is told about with
@@ -73,11 +78,11 @@ async fn told(ctx: &Ctx) -> Vec<Wiring> {
         .await
 }
 
-/// The stack's indexer as the moved curator is told about it: in its native API, where it
-/// answers on the stack's network, with the key it wrote for itself.
+/// The moved indexer as the moved curator is told about it: in its native API, where it
+/// answers on the stack's network, with the key lemonfiber minted for it.
 fn the_indexer() -> AggregatorAt {
     AggregatorAt {
-        name: "prowlarr the app".to_owned(),
+        name: "Prowlarr".to_owned(),
         url: "http://prowlarr:9696".to_owned(),
         protocol: Protocol("servarr".to_owned()),
         key: "the-key".to_owned(),
@@ -89,7 +94,7 @@ fn the_indexer() -> AggregatorAt {
 #[tokio::test]
 async fn the_moved_book_curator_is_told_where_the_aggregator_is_over_its_contract() {
     let http = reading(&[], books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-told", http.clone(), Some(KEYED));
 
     let wirings = told(&ctx).await;
 
@@ -112,7 +117,7 @@ async fn an_aggregator_already_known_is_not_registered_again() {
         &[books::reading_from("http://prowlarr:9696", true)],
         books::taken(),
     );
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-known", http.clone(), Some(KEYED));
 
     let wirings = told(&ctx).await;
 
@@ -132,7 +137,7 @@ async fn an_entry_the_curator_kept_without_a_key_is_registered_again() {
         &[books::reading_from("http://prowlarr:9696", false)],
         books::taken(),
     );
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-keyless-entry", http.clone(), Some(KEYED));
 
     let wirings = told(&ctx).await;
 
@@ -149,7 +154,7 @@ async fn an_entry_the_curator_kept_without_a_key_is_registered_again() {
 #[tokio::test]
 async fn nothing_is_told_where_a_curator_an_aggregator_or_its_key_is_missing() {
     let http = reading(&[], books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-missing", http.clone(), Some(KEYED));
 
     let unmoved =
         super::super::aggregators::seed_aggregators(&ctx, &fillers_of(vec![indexer()])).await;
@@ -158,7 +163,7 @@ async fn nothing_is_told_where_a_curator_an_aggregator_or_its_key_is_missing() {
         &moved_beside(Vec::new(), Vec::new(), ""),
     )
     .await;
-    let unwritten = told(&curator_ctx(http.clone(), None)).await;
+    let unwritten = told(&curator_ctx("aggregators-unminted", http.clone(), None)).await;
 
     assert!(unmoved.is_empty(), "{unmoved:?}");
     assert!(alone.is_empty(), "{alone:?}");
@@ -171,7 +176,7 @@ async fn nothing_is_told_where_a_curator_an_aggregator_or_its_key_is_missing() {
 #[tokio::test]
 async fn the_stacks_own_book_curator_is_told_nothing() {
     let http = Fake::always(books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-own", http.clone(), Some(KEYED));
 
     let wirings = super::super::aggregators::seed_aggregators(
         &ctx,
@@ -187,7 +192,7 @@ async fn the_stacks_own_book_curator_is_told_nothing() {
 #[tokio::test]
 async fn an_indexer_ask_nothing_fills_registers_nobody() {
     let http = reading(&[], books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-unfilled", http.clone(), Some(KEYED));
 
     let wirings = super::super::aggregators::seed_aggregators(
         &ctx,
@@ -199,26 +204,27 @@ async fn an_indexer_ask_nothing_fills_registers_nobody() {
     assert!(books::added(&http.requests()).is_empty());
 }
 
-/// A plugin `kept` whose aggregator answers `indexer.search`.
+/// A plugin `kept` whose aggregator answers `indexer.search` in `servarr`, holding a key
+/// lemonfiber minted for it.
 fn kept_aggregator() -> crate::plugin::Installed {
-    let mut installed = crate::test_support::an_installed(
-        "kept",
-        vec![crate::test_support::a_placed(
-            "kept",
-            &["indexer.search"],
-            Some(curator_api(Some("/config/config.xml"))),
-            Some(8990),
-        )],
-    );
+    let mut aggregator = crate::test_support::a_placed("kept", &["indexer.search"], Some(8990));
+    aggregator.native = Some("servarr".to_owned());
+    let mut installed = crate::test_support::an_installed("kept", vec![aggregator]);
     installed.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     installed.tree = crate::test_support::A_TREE.to_owned();
+    installed.declared.secrets = vec![crate::plugin::Secret {
+        id: "key".to_owned(),
+        of: "kept".to_owned(),
+        why: "The key the aggregator answers to".to_owned(),
+        minted: true,
+        serves: None,
+    }];
     installed
 }
 
 /// A first-party plugin's aggregator chosen in the stack's place is the one the moved
-/// curator is told about: at its own id on the port it listens on, with the key it wrote
-/// for itself — and one whose key file leads away from beneath its own directory is
-/// refused, naming it, with nothing told.
+/// curator is told about: at its own id on the port it listens on, with the key lemonfiber
+/// minted for it.
 #[tokio::test]
 async fn a_first_party_plugin_aggregator_is_told_on_its_own_terms() {
     let trusted: Vec<crate::plugin::first_party::FirstParty> = crate::plugin::first_party::EMBEDDED
@@ -233,13 +239,10 @@ async fn a_first_party_plugin_aggregator_is_told_on_its_own_terms() {
         &trusted,
     );
     let http = reading(&[], books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
-    let escaping = books::asking(seed_ctx(true, None, None))
-        .with_http(reading(&[], books::taken()))
-        .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
+    let ctx = curator_ctx("aggregators-first-party", http.clone(), None);
+    keeping_minted(&ctx, Some(kept_aggregator()), |_| KEYED);
 
     let wirings = super::super::aggregators::seed_aggregators(&ctx, &fillers).await;
-    let refused = super::super::aggregators::seed_aggregators(&escaping, &fillers).await;
 
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -251,14 +254,7 @@ async fn a_first_party_plugin_aggregator_is_told_on_its_own_terms() {
             .iter()
             .map(|added| (added.url.as_str(), added.key.as_str()))
             .collect::<Vec<_>>(),
-        vec![("http://kept:8990", "the-key")]
-    );
-    assert!(
-        refused
-            .first()
-            .is_some_and(|wiring| wiring.connection == "Indexers into Bindery"
-                && matches!(wiring.state, crate::seed::State::Refused { .. })),
-        "{refused:?}"
+        vec![("http://kept:8990", KEYED)]
     );
 }
 
@@ -272,7 +268,7 @@ async fn a_third_party_aggregator_is_never_handed_to_the_moved_curator() {
         "indexer.search=kept",
     );
     let http = reading(&[], books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED));
+    let ctx = curator_ctx("aggregators-third-party", http.clone(), Some(KEYED));
 
     let wirings = super::super::aggregators::seed_aggregators(&ctx, &fillers).await;
     let reported = super::super::connecting::unmatched(&fillers);
@@ -292,8 +288,14 @@ async fn a_third_party_aggregator_is_never_handed_to_the_moved_curator() {
 /// reported as each is: refused in its own words, and skipped for a later run.
 #[tokio::test]
 async fn a_curator_that_refuses_or_is_not_answering_is_reported_as_such() {
-    let refusing = told(&curator_ctx(Fake::always(books::refusing()), Some(KEYED))).await;
+    let refusing = told(&curator_ctx(
+        "aggregators-refusing",
+        Fake::always(books::refusing()),
+        Some(KEYED),
+    ))
+    .await;
     let silent = told(&curator_ctx(
+        "aggregators-silent",
         Fake::always(books::unavailable()),
         Some(KEYED),
     ))
@@ -312,7 +314,11 @@ async fn a_curator_that_refuses_or_is_not_answering_is_reported_as_such() {
 /// succeeding says nothing about the write.
 #[tokio::test]
 async fn a_registration_the_curator_refuses_is_reported() {
-    let ctx = curator_ctx(reading(&[], books::refusing()), Some(KEYED));
+    let ctx = curator_ctx(
+        "aggregators-refused",
+        reading(&[], books::refusing()),
+        Some(KEYED),
+    );
 
     let wirings = told(&ctx).await;
 
@@ -330,7 +336,7 @@ async fn a_registration_the_curator_refuses_is_reported() {
 #[tokio::test]
 async fn a_rehearsed_pass_names_the_aggregator_it_would_register_and_registers_none() {
     let http = reading(&[], books::taken());
-    let ctx = curator_ctx(http.clone(), Some(KEYED)).rehearsing();
+    let ctx = curator_ctx("aggregators-rehearsed", http.clone(), Some(KEYED)).rehearsing();
 
     let wirings = told(&ctx).await;
 
@@ -360,7 +366,7 @@ const HELD: &str = "/lemonfiber/indexer.pull/v1/aggregators";
 /// [`PULLER`]: a curator filing `media` that asks for an indexer, and the adapter in front
 /// of it speaking `indexer.pull`.
 fn puller(media: &str) -> crate::plugin::Installed {
-    let mut curator = crate::test_support::a_placed(PULLER, &[], None, Some(8787));
+    let mut curator = crate::test_support::a_placed(PULLER, &[], Some(8787));
     curator.media_types = vec![media.to_owned()];
     curator.asks = vec![crate::plugin::Asking {
         capability: "indexer.search".to_owned(),
@@ -370,7 +376,6 @@ fn puller(media: &str) -> crate::plugin::Installed {
     let mut adapter = crate::test_support::a_placed(
         PULLER_ADAPTER,
         &[],
-        None,
         Some(crate::test_support::CONTRACTED_PORT),
     );
     adapter.speaks = vec!["indexer.pull@1".to_owned()];
@@ -381,14 +386,29 @@ fn puller(media: &str) -> crate::plugin::Installed {
     installed
 }
 
-/// The stack's indexer beside [`puller`] filing `media`, written at `project`.
+/// The stack's indexer moved into its plugin beside [`puller`] filing `media`, written at
+/// `project`, trusting `trusted` beside the bundle's plugins.
+fn beside_the_puller_trusting(
+    project: &std::path::Path,
+    media: &str,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
+    let trusted: Vec<crate::plugin::first_party::FirstParty> = crate::plugin::first_party::EMBEDDED
+        .iter()
+        .chain(trusted)
+        .copied()
+        .collect();
+    let installed: Vec<crate::plugin::Installed> = INDEXER
+        .installed()
+        .into_iter()
+        .chain([puller(media)])
+        .collect();
+    fillers_trusting(vec![indexer()], &installed, project, &trusted)
+}
+
+/// The same, with [`puller`] first-party.
 fn beside_the_puller(project: &std::path::Path, media: &str) -> crate::wiring::Fillers {
-    fillers_trusting(
-        vec![indexer()],
-        &[puller(media)],
-        project,
-        &crate::test_support::first_party(PULLER),
-    )
+    beside_the_puller_trusting(project, media, &crate::test_support::first_party(PULLER))
 }
 
 /// What the pass tells [`puller`] filing `media`, beside the stack's indexer, with the
@@ -490,7 +510,7 @@ async fn a_third_party_curator_pulling_over_the_contract_is_never_told_the_index
         (ADD, Answer::reply(204, "")),
     ]);
     let ctx = contracted_ctx(&project, PULLER_ADAPTER, true, http.clone());
-    let fillers = fillers_trusting(vec![indexer()], &[puller("books")], &project, &[]);
+    let fillers = beside_the_puller_trusting(&project, "books", &[]);
 
     let wirings = super::super::aggregators::seed_aggregators(&ctx, &fillers).await;
 

@@ -243,17 +243,7 @@ fn a_download_client_is_built_for_each_filler_whose_credential_is_in_hand() {
 /// service, and the client beside it is told about as ever.
 #[test]
 fn a_third_party_usenet_stand_in_is_not_told_to_a_moved_curator() {
-    let stand_in = crate::test_support::a_placed(
-        "nzbget",
-        &["download.usenet"],
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-            key_source: lemonfiber_manifest::KeySource::ConfigIni,
-            path: Some("/config/sabnzbd.ini".to_owned()),
-            version: None,
-        }),
-        Some(6789),
-    );
+    let stand_in = crate::test_support::a_placed("nzbget", &["download.usenet"], Some(6789));
     let installed = [crate::test_support::an_installed("nzbget", vec![stand_in])];
     let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
     let mut held = both_held();
@@ -277,7 +267,6 @@ fn a_filler_nothing_connects_is_not_told_about() {
         vec![crate::test_support::a_placed(
             "unadapted",
             &["download.usenet"],
-            None,
             Some(6789),
         )],
     )];
@@ -399,8 +388,8 @@ async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     assert!(clients.iter().all(|wiring| is_skipped(wiring)));
 }
 
-/// A plugin `curating` whose service `shows` files `media` over `library.curate` and
-/// declares the bundled curator's adapter as well, beside the stack's own curators.
+/// A plugin `curating` whose service `shows` files `media` over `library.curate`, beside
+/// the stack's own curators.
 fn contracted_curator(
     project: &std::path::Path,
     media: &[&str],
@@ -408,7 +397,6 @@ fn contracted_curator(
     let mut installed = contracted("curating", "shows", "library.curate");
     for placed in &mut installed.services {
         placed.media_types = media.iter().map(|one| (*one).to_owned()).collect();
-        placed.api = Some(curator_api(Some("/config/config.xml")));
     }
     let fillers = fillers_trusting(
         vec![curator("sonarr", 8989, "tv")],
@@ -480,12 +468,7 @@ fn a_contracted_service_filing_no_media_is_no_curator() {
 /// no curator and is told about none of the clients: only the moved curator is told.
 #[test]
 fn a_plugin_under_a_stack_curators_id_is_told_about_none_of_its_clients() {
-    let mut impostor = crate::test_support::a_placed(
-        "sonarr",
-        &["library.curate"],
-        Some(curator_api(Some("/config/config.xml"))),
-        Some(8989),
-    );
+    let mut impostor = crate::test_support::a_placed("sonarr", &["library.curate"], Some(8989));
     impostor.media_types = vec!["tv".to_owned()];
     let installed = [crate::test_support::an_installed(
         "impostor",

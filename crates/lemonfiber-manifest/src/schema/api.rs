@@ -1,30 +1,6 @@
-//! How lemonfiber talks to a service: the adapter it names and where its credential is.
+//! The APIs lemonfiber speaks, and where a credential for one may come from.
 
 use serde::{Deserialize, Serialize};
-
-/// How lemonfiber talks to a service when seeding.
-///
-/// The same shape on a plugin's service as on the stack's own, which is what lets a
-/// plugin name one of these adapters rather than supply one of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Api {
-    /// Selects the client implementation.
-    pub kind: ApiKind,
-    /// Where the credential comes from.
-    pub key_source: KeySource,
-    /// The file holding the credential, where one applies.
-    #[serde(default)]
-    pub path: Option<String>,
-    /// The major version of the service's HTTP API — the `/api/vN` path segment.
-    ///
-    /// Required for the `servarr` shape and read there, because that one shape
-    /// spans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),
-    /// so the version is data rather than a guess from a service's name. Absent
-    /// for the other kinds, whose one fixed version their client already knows.
-    #[serde(default)]
-    pub version: Option<u32>,
-}
 
 /// The API shapes lemonfiber knows how to speak.
 ///
@@ -47,13 +23,13 @@ pub enum ApiKind {
     /// Bindery.
     Bindery,
     /// Jellyfin — a media server whose account lemonfiber creates rather than a
-    /// key it reads, so it has a `key_source` of `generated`.
+    /// key it reads.
     Jellyfin,
     /// Bazarr — the subtitle finder, which is told which \*arrs to watch.
     Bazarr,
     /// Audiobookshelf — a listening server whose first account lemonfiber creates,
-    /// like Jellyfin's, so its `key_source` is `generated` too. The token it hands
-    /// back on sign-in is stable, so it is read again rather than recorded twice.
+    /// like Jellyfin's. The token it hands back on sign-in is stable, so it is read
+    /// again rather than recorded twice.
     Audiobookshelf,
     /// `NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,
     /// so lemonfiber turns it on with an administrator it names and a password it mints.
@@ -103,8 +79,8 @@ impl ApiKind {
         Self::ALL.into_iter().find(|kind| kind.name() == name)
     }
 
-    /// Every adapter lemonfiber implements, which is the whole of what a plugin's
-    /// service may name.
+    /// Every adapter lemonfiber implements, which is the whole of what a recipe step may
+    /// be reached through.
     pub const ALL: [Self; 9] = [
         Self::Servarr,
         Self::Sabnzbd,

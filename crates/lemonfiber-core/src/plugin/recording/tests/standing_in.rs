@@ -25,7 +25,7 @@ const SAID: &str = "Taken with the stand-ins the manifest declares for ENDPOINT,
                     TUNNEL_KEY, VPN_KEY, never with an operator's value.";
 
 fn standing_in() -> String {
-    SERVED.replacen("\n[[claim]]", &format!("{DECLARED}\n[[claim]]"), 1)
+    SERVED.replacen("\n[[proof]]", &format!("{DECLARED}\n[[proof]]"), 1)
 }
 
 fn made() -> String {
@@ -36,7 +36,7 @@ fn made() -> String {
 async fn a_service_is_served_the_stand_ins_its_manifest_declares_and_no_operator_value() {
     let at = source("standing-in-served", &standing_in());
     noted(&at, GUARDED, "Refused without the key.");
-    noted(&at, WANTED, "Read with the key it wrote.");
+    noted(&at, WANTED, "Read as nobody.");
     let serving = sonarr();
     let read = recorded(&at, &serving, &answering("{\"records\": []}")).await;
     assert_eq!(took(read.as_ref()), vec![Took::Written, Took::Written]);
@@ -67,7 +67,7 @@ async fn a_service_is_served_the_stand_ins_its_manifest_declares_and_no_operator
 async fn a_recording_taken_with_stand_ins_says_so_in_its_note_once_however_often_taken() {
     let at = source("standing-in-noted", &standing_in());
     noted(&at, GUARDED, "Refused without the key.");
-    noted(&at, WANTED, "Read with the key it wrote.");
+    noted(&at, WANTED, "Read as nobody.");
     let http = answering("{\"records\": []}");
     let _ = recorded(&at, &sonarr(), &http).await;
     let said = format!("Refused without the key. {SAID}");

@@ -8,7 +8,7 @@ use crate::wiring::Chosen;
 const GUARD: &str = "network.egress-guard";
 
 fn inside_the_guard(service: &str, listens: u16) -> crate::plugin::Placed {
-    let mut placed = a_placed(service, &["download.torrent"], None, Some(listens));
+    let mut placed = a_placed(service, &["download.torrent"], Some(listens));
     placed.fields.network = Some(Network {
         via: GUARD.to_owned(),
     });

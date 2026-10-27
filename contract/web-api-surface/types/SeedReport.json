@@ -12,12 +12,6 @@
       ],
       "required": true
     },
-    "unsupported": {
-      "type": [
-        "array[ref:UnsupportedReport]"
-      ],
-      "required": false
-    },
     "wirings": {
       "type": [
         "array[ref:Wiring]"

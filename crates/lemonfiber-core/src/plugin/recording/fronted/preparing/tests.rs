@@ -11,7 +11,7 @@ use crate::plugin::program::{Starting, Throwaway};
 
 /// An adapter handing `api_key` the plugin's `upstream-key`, and `other` its `other-key`.
 fn adapter() -> crate::plugin::Placed {
-    let mut placed = crate::test_support::a_placed("komga-adapter", &[], None, Some(8080));
+    let mut placed = crate::test_support::a_placed("komga-adapter", &[], Some(8080));
     placed.upstream = [
         ("api_key".to_owned(), "upstream-key".to_owned()),
         ("other".to_owned(), "other-key".to_owned()),
@@ -108,7 +108,7 @@ fn an_adapter_is_handed_nothing_where_the_machine_supplies_no_random_bytes() {
 /// An upstream reading `upstream-key` from `API_KEY` and a constant from `TZ_NAME`.
 fn keyed_by_environment() -> crate::plugin::Placed {
     use lemonfiber_manifest::container::{SecretOf, Value};
-    let mut placed = crate::test_support::a_placed("seerr", &[], None, Some(5055));
+    let mut placed = crate::test_support::a_placed("seerr", &[], Some(5055));
     placed.fields.env = [
         (
             "API_KEY".to_owned(),

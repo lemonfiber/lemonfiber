@@ -12,11 +12,7 @@ use crate::test_support::media::serve;
 use crate::test_support::{a_context, json};
 
 /// A service in the stack, with the shape this module reads.
-fn service(
-    id: &str,
-    api: Option<lemonfiber_manifest::ApiKind>,
-    port: u16,
-) -> lemonfiber_manifest::Service {
+fn service(id: &str, port: u16) -> lemonfiber_manifest::Service {
     lemonfiber_manifest::Service {
         id: id.to_owned(),
         name: format!("{id} the app"),
@@ -27,12 +23,6 @@ fn service(
         port: Some(port),
         bind: None,
         health: None,
-        api: api.map(|kind| lemonfiber_manifest::Api {
-            kind,
-            key_source: lemonfiber_manifest::KeySource::Generated,
-            path: None,
-            version: None,
-        }),
         criticality: lemonfiber_manifest::Criticality::Core,
         license: "MIT".to_owned(),
         upstream: "https://example.test".to_owned(),
@@ -68,16 +58,12 @@ fn service(
 
 /// The media server, and the decline service where `declining`.
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut media_server = service(
-        "jellyfin",
-        Some(lemonfiber_manifest::ApiKind::Jellyfin),
-        8096,
-    );
+    let mut media_server = service("jellyfin", 8096);
     media_server.provides = vec!["identity.source".to_owned()];
     media_server.listens = Some(8096);
     let mut services = vec![media_server];
     if declining {
-        services.push(service("decline", None, 5056));
+        services.push(service("decline", 5056));
     }
     services
 }
@@ -409,7 +395,7 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
 
     let unadministered = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true), &at)).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
-    let declined_alone = vec![service("decline", None, 5056)];
+    let declined_alone = vec![service("decline", 5056)];
     let serverless = rotate(
         &ctx,
         &listed,

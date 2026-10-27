@@ -1,6 +1,5 @@
 //! An engine that serves an image as a test scripts it.
 
-use std::path::Path;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
@@ -13,7 +12,6 @@ pub struct Serves {
     beside: Option<Result<Served, Unran>>,
     standing: Result<Standing, Unran>,
     log: String,
-    writes: Vec<(String, String)>,
     asked: Mutex<Vec<Serve>>,
     removed: Mutex<Vec<Served>>,
     stood_in: Mutex<Vec<StandIn>>,
@@ -34,7 +32,6 @@ impl Serves {
             beside: None,
             standing: Ok(Standing::Running),
             log: String::new(),
-            writes: Vec::new(),
             asked: Mutex::new(Vec::new()),
             removed: Mutex::new(Vec::new()),
             stood_in: Mutex::new(Vec::new()),
@@ -138,14 +135,6 @@ impl Serves {
         }
     }
 
-    /// Once served, every container writes `text` at `path` inside it, where a directory
-    /// is mounted there.
-    #[must_use]
-    pub fn writing(mut self, path: &str, text: &str) -> Self {
-        self.writes.push((path.to_owned(), text.to_owned()));
-        self
-    }
-
     /// Every service asked to be served, in order.
     #[must_use]
     pub fn asked(&self) -> Vec<Serve> {
@@ -164,14 +153,9 @@ impl Serves {
             .unwrap_or_default()
     }
 
-    /// The one answer, with `serve` kept and what the container writes written.
+    /// The one answer, with `serve` kept.
     fn serving(&self, serve: &Serve) -> Result<Served, Unran> {
         let _ = self.asked.lock().map(|mut held| held.push(serve.clone()));
-        if self.answer.is_ok() {
-            for (path, text) in &self.writes {
-                write_into(serve, path, text);
-            }
-        }
         self.answer.clone()
     }
 
@@ -193,21 +177,6 @@ impl Serves {
             .lock()
             .map(|mut held| held.push(served.clone()));
     }
-}
-
-/// Write `text` at `path` inside the container `serve` asks for, through the directory
-/// mounted there.
-fn write_into(serve: &Serve, path: &str, text: &str) {
-    let landed = serve.binds.iter().find_map(|bound| {
-        Path::new(path)
-            .strip_prefix(&bound.target)
-            .ok()
-            .map(|inside| bound.source.join(inside))
-    });
-    let _ = landed.map(|at| {
-        let _ = at.parent().map(std::fs::create_dir_all);
-        std::fs::write(at, text)
-    });
 }
 
 #[async_trait]

@@ -56,8 +56,7 @@ pub use report::{Assessment, Report, Severity, State, Wiring};
 pub(crate) use roots::on_host;
 pub use roots::{contested_roots, wire_root_folders, Backing, Placing};
 pub(crate) use services::{
-    as_request_target, described_target, observed_telling, reached_at, said, wanted_telling,
-    TELLING,
+    described_target, observed_telling, reached_at, said, wanted_telling, TELLING,
 };
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_media_server_admin,

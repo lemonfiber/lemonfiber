@@ -20,7 +20,6 @@ use super::connecting::{pairings, Cleared, Connection};
 use super::filing::{completed, Completed};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Curated, Extracting};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Filler, Fillers};
@@ -83,22 +82,16 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
         let mut curated = Vec::new();
         let mut withheld = None;
         for (curator, at, media, category) in &holding.curators {
-            match super::keys::curator_key(ctx, curator).await {
-                Beneath::Read(key) => curated.push(Curated {
-                    media_type: media.clone(),
-                    address: at.url(),
-                    key,
-                    folder: folder(category, held),
-                }),
-                Beneath::Absent => {
-                    withheld = Some(super::skipped(connection.clone(), &curator.name));
-                    break;
-                }
-                Beneath::Escaped => {
-                    withheld = Some(super::keys::refused(connection.clone(), curator));
-                    break;
-                }
-            }
+            let Some(key) = super::keys::minted_key(ctx, curator) else {
+                withheld = Some(super::skipped(connection.clone(), &curator.name));
+                break;
+            };
+            curated.push(Curated {
+                media_type: media.clone(),
+                address: at.url(),
+                key,
+                folder: folder(category, held),
+            });
         }
         if let Some(wiring) = withheld {
             wirings.push(wiring);

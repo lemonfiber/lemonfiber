@@ -8,7 +8,6 @@ use lemonfiber_contract::capabilities::indexer::search;
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::filesystem::Beneath;
 use crate::ports::service::Application;
 use crate::wiring::{Filler, Fillers};
 
@@ -54,8 +53,8 @@ async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Option<search::Adapter> {
 /// pushes it indexers.
 ///
 /// The indexer is asked over `indexer.search` through the adapter in front of it, and
-/// each curator's key is what lets the indexer write into it; a curator whose key is not
-/// in hand yet is skipped on its own while the others proceed.
+/// each curator's minted key is what lets the indexer write into it; a curator whose key
+/// lemonfiber does not hold is skipped on its own while the others proceed.
 pub(super) async fn seed_applications(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for syncing in syncing(fillers) {
@@ -64,8 +63,8 @@ pub(super) async fn seed_applications(ctx: &Ctx, fillers: &Fillers) -> Vec<crate
     wirings
 }
 
-/// What one indexer comes to: each curator's application wired, or skipped where a key
-/// it needs is not written yet. Only `only` where one is named.
+/// What one indexer comes to: each curator's application wired, or skipped where
+/// lemonfiber holds no key minted for it. Only `only` where one is named.
 async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate::seed::Wiring> {
     let asker = &*syncing.asker;
     let curators: Vec<_> = syncing
@@ -85,9 +84,7 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     let mut wanted = Vec::new();
     let mut passed = Vec::new();
     for (curator, kind, reached) in curators {
-        // A curator the gate let the indexer's key reach, read from its own file: one not
-        // written yet, or in a file it may not be read from, is passed over this run.
-        let Beneath::Read(key) = super::keys::curator_key(ctx, curator).await else {
+        let Some(key) = super::keys::minted_key(ctx, curator) else {
             passed.push(skipped(synced(&curator.name, &asker.name), &curator.name));
             continue;
         };
@@ -151,15 +148,17 @@ pub(super) fn application_kind(
         .and_then(|media| crate::ports::service::ApplicationKind::for_media_type(media))
 }
 
-/// A `Wiring` skipped because the service has not written the key it needs yet — a
-/// re-run completes it. The reason is worded once here so a re-run's report reads
-/// the same across root folders, download clients and application sync; the
-/// `connection` names the specific edge being skipped.
+/// A `Wiring` skipped because lemonfiber holds no key it minted for the service. The
+/// reason is worded once here so the report reads the same across every pass handing a
+/// minted key on; the `connection` names the specific edge being skipped.
 pub(super) fn skipped(connection: String, service: &str) -> crate::seed::Wiring {
     crate::seed::Wiring::settled(
         connection,
         crate::seed::State::Skipped {
-            reason: format!("{service} has not written its API key yet; a later run completes it"),
+            reason: format!(
+                "lemonfiber holds no key it minted for {service}; a run once it holds one \
+                 completes it"
+            ),
         },
     )
 }

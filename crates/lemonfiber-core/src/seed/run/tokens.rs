@@ -71,7 +71,6 @@ impl<'a> Kept<'a> {
     async fn credentials(&self) -> Vec<(String, String)> {
         let mut credentials: Vec<(String, String)> =
             super::gate::curator_routes(self.ctx, self.fillers)
-                .await
                 .into_iter()
                 .map(|route| (route.path, route.credential))
                 .collect();

@@ -3,18 +3,6 @@
   "description": "One service of an installed plugin, as it was placed.",
   "type": "object",
   "properties": {
-    "api": {
-      "description": "The adapter of lemonfiber's its manifest names, which only a part the bundle\nassembles is reached through. A record read from the register holds none, whatever\nan older one carried: an installed plugin is reached over the contracts it speaks.",
-      "anyOf": [
-        {
-          "$ref": "Api.json"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
     "asks": {
       "description": "Every capability it asks for.",
       "type": "array",

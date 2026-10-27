@@ -63,10 +63,6 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         condition(&services)
     };
 
-    let unsupported = super::super::targets::unsupported_here(
-        &super::super::targets::fillers_here(ctx, &manifest),
-    );
-
     Ok(StatusReport {
         forms: forms.to_vec(),
         active_forms,
@@ -75,6 +71,5 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         undeclared: undeclared_beside(&manifest, &beside, &containers, &halted),
         services,
         disturbs: crate::model::Disturbances::all(ctx.patience),
-        unsupported,
     })
 }

@@ -179,10 +179,10 @@ capabilities:
     cargo run --quiet --example capabilities -p lemonfiber-core > contract/capability-vocabulary.json.next
     mv contract/capability-vocabulary.json.next contract/capability-vocabulary.json
 
-# Rewrite the set of adapters a plugin's service may name.
+# Rewrite the set of adapters a recipe step may be reached through.
 #
 # From the adapter kinds and key sources lemonfiber implements, never written, so the
-# set an author reads is the set this build accepts.
+# set an author reads is the set this build implements.
 adapters:
     #!/usr/bin/env bash
     set -euo pipefail

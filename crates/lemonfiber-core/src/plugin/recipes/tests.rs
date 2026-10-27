@@ -1,11 +1,11 @@
 use lemonfiber_manifest::ApiKind;
 use lemonfiber_plugin::Manifest;
 
-use super::{approvals, declared, named, reaching, Adapter, Named, Owner, Pair, Step};
+use super::{approvals, declared, reaching, Adapter, Owner, Pair, Step};
 
-/// A plugin with its own service behind one of lemonfiber's adapters, and one recipe
-/// that calls that service, a service of the stack's, and a host outside both — and
-/// carries a value it captured to that host, and again to a second one.
+/// A plugin with its own service, and one recipe that calls that service, a service of
+/// the stack's, and a host outside both — and carries a value it captured to that host,
+/// and again to a second one.
 const RECIPED: &str = r#"
 schema_version = 1
 
@@ -29,7 +29,6 @@ port        = 25600
 bind        = "lan"
 criticality = "important"
 listens     = 25600
-api         = { kind = "seerr", key_source = "generated" }
 
 [[recipe]]
 id    = "adopt"
@@ -71,16 +70,8 @@ fn manifest() -> Option<Manifest> {
     Manifest::from_toml(RECIPED).ok()
 }
 
-/// The stack this build pins.
-const STACK: &str = lemonfiber_bundled::STACK;
-
-/// The stack this build pins, read the way a run reads it.
-fn stack() -> Option<lemonfiber_manifest::Manifest> {
-    lemonfiber_manifest::Manifest::from_toml(STACK).ok()
-}
-
 #[test]
-fn every_call_is_kept_in_order_with_its_own_services_adapter() {
+fn every_call_is_kept_in_order_with_no_adapter_until_the_stack_is_read() {
     let recipes = manifest().map(|manifest| declared(&manifest));
     let steps: Option<Vec<Step>> = recipes
         .as_ref()
@@ -89,41 +80,16 @@ fn every_call_is_kept_in_order_with_its_own_services_adapter() {
     assert_eq!(
         steps.as_ref().map(|steps| steps
             .iter()
-            .map(|step| step.id.as_str())
+            .map(|step| (step.id.as_str(), step.adapter))
             .collect::<Vec<_>>()),
-        Some(vec!["in", "ask", "tell"])
-    );
-    assert_eq!(
-        steps
-            .as_ref()
-            .and_then(|steps| steps.first())
-            .map(|step| step.adapter),
-        Some(Some(Adapter {
-            kind: ApiKind::Seerr,
-            owner: Owner::Lemonfiber,
-        })),
-        "a call to the plugin's own service names that service's adapter"
-    );
-    assert_eq!(
-        steps.as_ref().map(|steps| steps
-            .iter()
-            .skip(1)
-            .map(|step| step.adapter)
-            .collect::<Vec<_>>()),
-        Some(vec![None, None]),
-        "with no stack read, nothing else has one yet"
+        Some(vec![("in", None), ("ask", None), ("tell", None)])
     );
 }
 
-/// The adapter each step of the first recipe names once the stack is read beside
-/// `installed`.
-fn adapters_against(
-    stack: Option<lemonfiber_manifest::Manifest>,
-    installed: &[crate::plugin::Installed],
-) -> Option<Vec<Option<Adapter>>> {
+/// The adapter each step of the first recipe names once read beside `installed`.
+fn adapters_against(installed: &[crate::plugin::Installed]) -> Option<Vec<Option<Adapter>>> {
     manifest()
-        .zip(stack)
-        .map(|(manifest, stack)| reaching(declared(&manifest), &stack, installed))
+        .map(|manifest| reaching(declared(&manifest), installed))
         .as_ref()
         .and_then(|recipes| recipes.first())
         .map(|recipe| recipe.steps.iter().map(|step| step.adapter).collect())
@@ -132,10 +98,7 @@ fn adapters_against(
 /// What the steps name where sonarr is reached in its servarr API.
 fn through_servarr() -> Vec<Option<Adapter>> {
     vec![
-        Some(Adapter {
-            kind: ApiKind::Seerr,
-            owner: Owner::Lemonfiber,
-        }),
+        None,
         Some(Adapter {
             kind: ApiKind::Servarr,
             owner: Owner::Lemonfiber,
@@ -151,36 +114,14 @@ fn a_call_to_a_moved_part_names_the_api_the_service_moved_in_its_place_answers_i
         .into_iter()
         .collect();
     assert_eq!(
-        adapters_against(stack(), &installed),
+        adapters_against(&installed),
         Some(through_servarr()),
         "sonarr is reached in the servarr API, and a host outside in none"
     );
     assert_eq!(
-        adapters_against(stack(), &[]),
-        Some(vec![
-            Some(Adapter {
-                kind: ApiKind::Seerr,
-                owner: Owner::Lemonfiber,
-            }),
-            None,
-            None,
-        ]),
+        adapters_against(&[]),
+        Some(vec![None, None, None]),
         "with nothing moved in its place, the shipped sonarr names no API"
-    );
-}
-
-/// A call to a service a stack running its own copy of it declares an API for names that
-/// API's adapter.
-#[test]
-fn a_call_to_a_stack_service_declaring_an_api_names_that_adapter() {
-    let declaring = crate::test_support::declaring(
-        "recipes-servarr",
-        "sonarr",
-        r#"{ kind = "servarr", key_source = "config-xml", path = "/config/config.xml", version = 3 }"#,
-    );
-    assert_eq!(
-        adapters_against(declaring.manifest().ok(), &[]),
-        Some(through_servarr())
     );
 }
 
@@ -327,18 +268,6 @@ fn a_recipe_lists_what_it_asks_the_operator_for_and_nothing_the_store_answers() 
                 secret: false,
             },
         ])
-    );
-}
-
-#[test]
-fn every_adapter_the_plugins_services_name_is_said_to_be_lemonfibers() {
-    assert_eq!(
-        manifest().map(|manifest| named(&manifest)),
-        Some(vec![Named {
-            service: "komga".to_owned(),
-            kind: ApiKind::Seerr,
-            owner: Owner::Lemonfiber,
-        }])
     );
 }
 

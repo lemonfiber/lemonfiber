@@ -8,19 +8,8 @@ fn project() -> &'static std::path::Path {
     std::path::Path::new("/opt/lemonfiber/stack")
 }
 
-/// The adapter a stack declaring its own Usenet client names for it.
-fn its_usenet_adapter() -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-        key_source: lemonfiber_manifest::KeySource::ConfigIni,
-        path: Some("/config/sabnzbd.ini".to_owned()),
-        version: None,
-    }
-}
-
-/// The shipped stack's asks, its Usenet client declaring its adapter as a stack holding
-/// its own does, answered against `installed` with `chosen`, with the stack's services
-/// changed by `changing` first.
+/// The shipped stack's asks, answered against `installed` with `chosen`, with the stack's
+/// services changed by `changing` first.
 fn shipped(
     installed: &[crate::plugin::Installed],
     chosen: &Chosen,
@@ -29,32 +18,15 @@ fn shipped(
     crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
-            for service in manifest
-                .services
-                .iter_mut()
-                .filter(|one| one.id == "sabnzbd")
-            {
-                service.api = Some(its_usenet_adapter());
-            }
             changing(&mut manifest);
             Fillers::of(&manifest, installed, chosen, Some(project()))
         })
         .unwrap_or_default()
 }
 
-/// A Usenet client a plugin brought, reading its key from beneath its own directory.
+/// A Usenet client a plugin brought.
 fn usenet_stand_in(listens: Option<u16>) -> crate::plugin::Placed {
-    a_placed(
-        "nzbget",
-        &["download.usenet"],
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-            key_source: lemonfiber_manifest::KeySource::ConfigIni,
-            path: Some("/config/nzbget.conf".to_owned()),
-            version: None,
-        }),
-        listens,
-    )
+    a_placed("nzbget", &["download.usenet"], listens)
 }
 
 /// Each of the stack's services is reached at its own id on the port it says it listens
@@ -73,10 +45,6 @@ fn a_stack_service_is_reached_where_it_says_it_listens() {
         })
     );
     assert_eq!(usenet.and_then(|one| one.published), Some(8085));
-    assert_eq!(
-        usenet.and_then(|one| one.key_file.clone()),
-        Some(project().join("config/sabnzbd/sabnzbd.ini"))
-    );
     assert_eq!(usenet.map(|one| one.origin.clone()), Some(Origin::Bundled));
     assert_eq!(
         fillers
@@ -167,10 +135,6 @@ fn a_plugins_service_is_reached_at_its_own_id_and_answers_where_chosen() {
             named: "nzbget".to_owned()
         })
     );
-    assert_eq!(
-        stand_in.and_then(|one| one.key_file.clone()),
-        Some(project().join("config/nzbget/nzbget.conf"))
-    );
     let asking = fillers
         .asks()
         .iter()
@@ -206,46 +170,13 @@ fn a_plugins_service_with_no_name_or_port_is_called_by_its_id_and_reached_nowher
     assert_eq!(stand_in.map(|one| one.address.clone()), Some(None));
 }
 
-/// What lemonfiber speaks to through an adapter is every service naming it, the
-/// stack's first.
-#[test]
-fn every_service_speaking_an_adapter_is_found_the_stacks_first() {
-    let installed = [an_installed("nzbget", vec![usenet_stand_in(Some(6789))])];
-    let fillers = shipped(&installed, &Chosen::default(), |_| ());
-
-    let speaking: Vec<&str> = fillers
-        .speaking(lemonfiber_manifest::ApiKind::Sabnzbd)
-        .map(|one| one.id.as_str())
-        .collect();
-    assert_eq!(speaking, vec!["sabnzbd", "nzbget"]);
-}
-
-/// Without a project there is no file beneath it to read a credential from.
-#[test]
-fn without_a_project_no_service_has_a_credential_file() {
-    let installed = [an_installed("nzbget", vec![usenet_stand_in(Some(6789))])];
-    let fillers = crate::test_support::stack()
-        .manifest()
-        .map(|manifest| Fillers::of(&manifest, &installed, &Chosen::default(), None))
-        .unwrap_or_default();
-
-    assert_eq!(
-        fillers.service("sabnzbd").map(|one| one.key_file.clone()),
-        Some(None)
-    );
-    assert_eq!(
-        fillers.service("nzbget").map(|one| one.key_file.clone()),
-        Some(None)
-    );
-}
-
 /// A stack service's credential is kept under its own id; a plugin's in a namespace of
 /// its own, so a plugin cannot name its way onto the stack's.
 #[test]
 fn a_plugins_credential_is_kept_apart_from_the_stacks() {
     let installed = [an_installed(
         "namesake",
-        vec![a_placed("qbittorrent-two", &[], None, None)],
+        vec![a_placed("qbittorrent-two", &[], None)],
     )];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
     let setting = |id: &str| {
@@ -270,10 +201,7 @@ fn a_plugins_credential_is_kept_apart_from_the_stacks() {
 fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
     let installed = [an_installed(
         "first",
-        vec![
-            a_placed("a", &[], None, None),
-            a_placed("a-api", &[], None, None),
-        ],
+        vec![a_placed("a", &[], None), a_placed("a-api", &[], None)],
     )];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
     let spelled = |id: &str, holds: &str| {
@@ -292,8 +220,8 @@ fn a_plugin_id_running_into_the_ending_of_another_is_kept_apart() {
 /// two services, and a credential the first was given is never the second's.
 #[test]
 fn a_service_of_the_same_id_from_another_plugin_is_kept_apart() {
-    let first = [an_installed("first", vec![a_placed("x", &[], None, None)])];
-    let second = [an_installed("second", vec![a_placed("x", &[], None, None)])];
+    let first = [an_installed("first", vec![a_placed("x", &[], None)])];
+    let second = [an_installed("second", vec![a_placed("x", &[], None)])];
     let setting = |installed: &[crate::plugin::Installed]| {
         let fillers = shipped(installed, &Chosen::default(), |_| ());
         fillers
@@ -345,11 +273,11 @@ fn a_plugin_setting_another_service_takes_is_refused() {
         an_installed(
             "first",
             vec![
-                a_placed("kept-one", &[], None, None),
-                a_placed("kept_one", &[], None, None),
+                a_placed("kept-one", &[], None),
+                a_placed("kept_one", &[], None),
             ],
         ),
-        an_installed("third", vec![a_placed("apart", &[], None, None)]),
+        an_installed("third", vec![a_placed("apart", &[], None)]),
     ];
     let fillers = shipped(&installed, &Chosen::default(), |_| ());
     let setting = |id: &str, holds: &str| {
@@ -403,12 +331,7 @@ fn a_credential_crosses_to_the_stack_its_own_plugin_and_first_party_alone() {
 fn a_plugins_service_holds_as_first_party_only_where_the_build_trusts_it() {
     let mut installed = crate::test_support::an_installed(
         "bazarr",
-        vec![crate::test_support::a_placed(
-            "subber",
-            &[],
-            None,
-            Some(6767),
-        )],
+        vec![crate::test_support::a_placed("subber", &[], Some(6767))],
     );
     installed.manifest = "ab12".to_owned();
     installed.tree = crate::test_support::A_TREE.to_owned();
@@ -453,7 +376,7 @@ fn a_plugins_service_holds_as_first_party_only_where_the_build_trusts_it() {
 /// The stack's jellyfin as a first-party plugin's service that replaces it, or as one
 /// that is not first-party, saying the same.
 fn a_jellyfin_standing_in(trusted: bool) -> super::Fillers {
-    let mut replacing = crate::test_support::a_placed("jellyfin", &[], None, Some(8096));
+    let mut replacing = crate::test_support::a_placed("jellyfin", &[], Some(8096));
     replacing.replaces = Some("jellyfin".to_owned());
     let mut installed = crate::test_support::an_installed("jellyfin", vec![replacing]);
     installed.manifest = "ab12".to_owned();

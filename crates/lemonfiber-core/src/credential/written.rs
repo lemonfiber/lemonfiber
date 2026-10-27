@@ -1,57 +1,6 @@
 //! A service's own key, read from the file it wrote it into, by the shape of that file.
-//!
-//! One reader per shape a stack service's declaration may name as its `key_source`, each
-//! taking the key from where the service writing that shape keeps its own.
 
 use lemonfiber_manifest::container::Format;
-use lemonfiber_manifest::KeySource;
-
-/// Takes a key out of the contents of a file of one shape, where it is written there.
-pub(crate) type Reader = fn(&str) -> Option<String>;
-
-/// The reader that takes a service's own key out of a file of `source`'s shape, where
-/// keys are read from a file of that shape.
-pub(crate) fn reader(source: KeySource) -> Option<Reader> {
-    match source {
-        KeySource::ConfigXml => Some(xml_key),
-        KeySource::ConfigJson => Some(json_key),
-        KeySource::ConfigYaml => Some(yaml_key),
-        KeySource::ConfigIni => Some(ini_key),
-        KeySource::ApiSettings | KeySource::Generated | KeySource::None => None,
-    }
-}
-
-/// Where a servarr-shaped XML configuration keeps the service's own key.
-const XML_KEY: &str = "Config.ApiKey";
-
-/// Where a JSON configuration of the request service's shape keeps it.
-const JSON_KEY: &str = "main.apiKey";
-
-/// Where a YAML configuration of the subtitle finder's shape keeps it.
-const YAML_KEY: &str = "auth.apikey";
-
-/// Where an INI configuration of the Usenet client's shape keeps it.
-const INI_KEY: &str = "misc.api_key";
-
-/// The key in the `<ApiKey>` element of an XML configuration.
-fn xml_key(text: &str) -> Option<String> {
-    at(Format::Xml, XML_KEY, text)
-}
-
-/// The key under `apiKey` in the `main` object of a JSON configuration.
-fn json_key(text: &str) -> Option<String> {
-    at(Format::Json, JSON_KEY, text)
-}
-
-/// The key under `apikey` in the `auth` section of a YAML configuration.
-fn yaml_key(text: &str) -> Option<String> {
-    at(Format::Yaml, YAML_KEY, text)
-}
-
-/// The key the `api_key` entry of an INI configuration's `misc` section sets.
-fn ini_key(text: &str) -> Option<String> {
-    at(Format::Ini, INI_KEY, text)
-}
 
 /// The key at the dotted path `key` of `text`, a file written in `format`, where it holds
 /// one spelled as a key.

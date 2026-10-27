@@ -12,8 +12,7 @@
 //! media server's administrator password and every secret a plugin declares minted — and
 //! the rest cannot, and the difference is not arbitrary. It cannot invent a Usenet
 //! password: a value this product made up would be one the provider has never heard of,
-//! so what is owed there is a sentence saying where a replacement comes from. Nor can it
-//! replace a key a stack service wrote for itself, which nothing here asks.
+//! so what is owed there is a sentence saying where a replacement comes from.
 
 use std::path::Path;
 
@@ -33,14 +32,6 @@ const ADMINISTERING: &str = "a real run would generate a new administrator passw
      beside the one in force, set it on the media server, sign in with it to prove the server \
      took it, and only then put it in place of the old one. Nothing was generated here, and \
      nothing was set.";
-
-/// Why a key a stack service wrote for itself is not replaced or handed out from here.
-const UNPROVABLE: &str = "this service writes its own key, and lemonfiber asks a service only \
-     over a contract, through the adapter of the plugin that brings it, so there is nothing \
-     here to replace the key through or prove it against, and it is not one this will hand \
-     out unproven. Run lemonfiber seed, which reads it and gives it to everything that reads \
-     it from the environment. Until then the existing credential is untouched and still in \
-     force.";
 
 /// Replace the credential one inventory line names — or, on a run that only says what
 /// it would do, say what replacing it would take.
@@ -92,19 +83,13 @@ pub(crate) async fn rotate(
         Origin::Lemonfiber if super::tokening::is_token(held) => {
             super::tokening::rotate(ctx, held, services, fillers, project).await
         }
-        Origin::Service => Rotation::stopped(
-            &held.name,
-            Settled::Elsewhere {
-                detail: UNPROVABLE.to_owned(),
-            },
-        ),
         Origin::Lemonfiber if held.setting == config::MEDIA_SERVER_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await
         }
         // A credential whose replacement comes from somewhere else writes nothing on
         // any run, so a rehearsal of it *is* the run: the same sentence, saying where a
         // replacement does come from and that the existing one is untouched.
-        Origin::Lemonfiber | Origin::Operator => Rotation::stopped(
+        Origin::Lemonfiber | Origin::Operator | Origin::Service => Rotation::stopped(
             &held.name,
             Settled::Elsewhere {
                 detail: elsewhere(&held.setting),

@@ -408,7 +408,7 @@ fn forgetting_with_nowhere_to_look_touches_nothing() {
         .build();
     let plugin = crate::test_support::an_installed(
         "comics",
-        vec![crate::test_support::a_placed("komga", &[], None, None)],
+        vec![crate::test_support::a_placed("komga", &[], None)],
     );
     super::forgotten(&ctx, &plugin);
     assert_eq!(super::secrets_at(&ctx), None);

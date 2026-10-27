@@ -11,12 +11,6 @@
         "array[ref:StuckEntry]"
       ],
       "required": true
-    },
-    "unsupported": {
-      "type": [
-        "array[ref:UnsupportedReport]"
-      ],
-      "required": false
     }
   },
   "variants": []

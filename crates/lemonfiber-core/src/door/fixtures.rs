@@ -1,8 +1,7 @@
-use lemonfiber_manifest::{Api, ApiKind, Bind, Criticality, KeySource, Service};
+use lemonfiber_manifest::{Bind, Criticality, Service};
 
-/// A service as the manifest declares one, varied by the three fields the rule
-/// reads.
-pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Service {
+/// A service as the manifest declares one, varied by the two fields the rule reads.
+pub(crate) fn service(id: &str, bind: Option<Bind>) -> Service {
     Service {
         id: id.to_owned(),
         name: id.to_owned(),
@@ -13,12 +12,6 @@ pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Ser
         port: Some(1),
         bind,
         health: None,
-        api: api.map(|kind| Api {
-            kind,
-            key_source: KeySource::Generated,
-            path: None,
-            version: None,
-        }),
         criticality: Criticality::Important,
         license: "MIT".to_owned(),
         upstream: "https://example.invalid".to_owned(),
@@ -54,7 +47,7 @@ pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Ser
 
 /// The stack's guard in front of the library, published to the household.
 pub(crate) fn watching() -> Service {
-    let mut guard = service("door", Some(Bind::Lan), None);
+    let mut guard = service("door", Some(Bind::Lan));
     guard.provides = vec![lemonfiber_contract::capabilities::stream::guard::CAPABILITY.to_owned()];
     guard
 }
@@ -73,8 +66,7 @@ pub(crate) fn fronted(
     speaks: Option<&str>,
     label: Option<&str>,
 ) -> crate::plugin::Installed {
-    let mut adapter =
-        crate::test_support::a_placed(&format!("{id}-adapter"), &[], None, Some(8080));
+    let mut adapter = crate::test_support::a_placed(&format!("{id}-adapter"), &[], Some(8080));
     adapter.fronts = Some(id.to_owned());
     adapter.speaks = speaks.map(str::to_owned).into_iter().collect();
     installed(vec![brought(id, label), adapter])
@@ -83,7 +75,7 @@ pub(crate) fn fronted(
 /// A plugin's service, published to the household through the stack's proxy at `label`
 /// where there is one, and reachable from this machine alone where there is not.
 pub(crate) fn brought(id: &str, label: Option<&str>) -> crate::plugin::Placed {
-    let mut placed = crate::test_support::a_placed(id, &[], None, Some(8000));
+    let mut placed = crate::test_support::a_placed(id, &[], Some(8000));
     placed.name = format!("{id} the plugin's");
     placed.reached = Some(match label {
         Some(label) => crate::plugin::Reached::Household {

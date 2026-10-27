@@ -16,7 +16,7 @@ const ADAPTER: &str = "plex-adapter";
 
 /// A plugin whose adapter provides `provides` and speaks `speaks`.
 fn adapting(provides: &[&str], speaks: &[&str]) -> Installed {
-    let mut placed = a_placed(ADAPTER, provides, None, Some(8080));
+    let mut placed = a_placed(ADAPTER, provides, Some(8080));
     placed.speaks = speaks.iter().map(|one| (*one).to_owned()).collect();
     an_installed("plex", vec![placed])
 }

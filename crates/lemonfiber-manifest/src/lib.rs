@@ -22,8 +22,8 @@ pub use assembly::{assemble, read};
 pub use date::Date;
 pub use error::Failure;
 pub use schema::{
-    majors, Api, ApiKind, Bind, Claimed, Criticality, Dashboard, Form, Health, HealthKind,
-    KeySource, Manifest, Profile, Protocol, Removed, Service, Wiring, CLAIM,
+    majors, ApiKind, Bind, Claimed, Criticality, Dashboard, Form, Health, HealthKind, KeySource,
+    Manifest, Profile, Protocol, Removed, Service, Wiring, CLAIM,
 };
 pub use spelling::environment_name;
 pub use validate::{is_core_name, is_digest, validate, Violation, GATEWAY_GRANT, TUNNEL_DEVICE};

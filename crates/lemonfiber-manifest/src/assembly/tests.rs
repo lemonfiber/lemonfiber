@@ -34,10 +34,6 @@ upstream = "https://github.com/example/{id}"
 last_release = "2026-01-09"
 describes = "Does a thing"
 without_it = "The thing is not done"
-
-[service.api]
-kind = "qbittorrent"
-key_source = "generated"
 "#
     )
 }

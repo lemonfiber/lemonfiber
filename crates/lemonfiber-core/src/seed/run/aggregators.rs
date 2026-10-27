@@ -12,7 +12,6 @@ use lemonfiber_contract::capabilities::indexer::pull;
 use super::connecting::{pairings, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::filesystem::Beneath;
 use crate::ports::service::{AggregatorAt, Failure, Protocol, PullsIndexers as _};
 use crate::wiring::{Filler, Fillers};
 
@@ -26,13 +25,12 @@ fn connection(asker: &str) -> String {
 ///
 /// Which service that is comes from what the stack says the curator asks for, not from a
 /// name written here, and it is reached where it says it listens on the stack's network
-/// with the key it wrote for itself. Only a curator the gate lets the aggregator's key
+/// with the key lemonfiber minted for it. Only a curator the gate lets the aggregator's key
 /// reach is told, since it is handed that key: a third-party plugin's service is handed
 /// no credential that is not its own. A pair nothing here connects is reported by the
 /// table, never dropped.
 ///
-/// Nothing for an aggregator that has not written its own key yet, which a later run
-/// tells the curator about once it has.
+/// Nothing for an aggregator lemonfiber holds no minted key for.
 pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for pairing in pairings(fillers) {
@@ -46,13 +44,8 @@ pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate:
             continue;
         };
         let connection = connection(&asker.name);
-        let key = match super::keys::curator_key(ctx, pairing.filler).await {
-            Beneath::Read(key) => key,
-            Beneath::Absent => continue,
-            Beneath::Escaped => {
-                wirings.push(super::keys::refused(connection, pairing.filler));
-                continue;
-            }
+        let Some(key) = super::keys::minted_key(ctx, pairing.filler) else {
+            continue;
         };
         let aggregator = AggregatorAt {
             name: pairing.filler.name.clone(),

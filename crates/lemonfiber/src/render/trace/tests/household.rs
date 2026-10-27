@@ -540,7 +540,6 @@ fn the_stuck_list_names_each_item_and_links_its_trace() {
             stage: Stage::Downloading,
         }],
         incomplete: true,
-        unsupported: Vec::new(),
     };
     let text = stuck(&report).text();
     assert!(text.contains("1 item(s) stuck"));
@@ -548,29 +547,10 @@ fn the_stuck_list_names_each_item_and_links_its_trace() {
     assert!(text.contains("trace 'The Expanse'"));
     assert!(text.contains("may be incomplete"));
 
-    let unreadable = StuckReport {
-        items: Vec::new(),
-        incomplete: false,
-        unsupported: vec![UnsupportedReport {
-            what: "bookish".to_owned(),
-            because: "lemonfiber does not speak this service's API yet".to_owned(),
-        }],
-    };
-    let said = stuck(&unreadable).text();
-    assert!(said.contains("cannot read at all"), "{said}");
-    assert!(
-        said.contains("bookish — lemonfiber does not speak"),
-        "{said}"
-    );
-    // And it is not the sentence a queue that answered badly gets, which would send
-    // the operator looking for a service that is down and find it running.
-    assert!(!said.contains("may be incomplete"), "{said}");
-
     // Nothing stuck is said plainly.
     let clear = StuckReport {
         items: Vec::new(),
         incomplete: false,
-        unsupported: Vec::new(),
     };
     assert!(stuck(&clear).text().contains("Nothing is stuck"));
 }

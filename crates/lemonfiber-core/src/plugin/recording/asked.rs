@@ -9,7 +9,6 @@ use lemonfiber_plugin::vocabulary::Credential;
 use lemonfiber_plugin::{Manifest, Request};
 use tokio::time::Instant;
 
-use super::first::Presented;
 use super::fronted::{self, Fronting};
 use super::served::{answers, POLL};
 use super::stood_in;
@@ -310,12 +309,11 @@ async fn recorded(
 }
 
 /// What the served service answered `item` through `http`, on the loopback interface at
-/// `port`, presenting `presented` where there is a credential to present.
+/// `port`, presenting no credential.
 pub(super) async fn answered(
     http: &dyn Http,
     port: u16,
     item: &Item<'_>,
-    presented: Option<&Presented>,
 ) -> Result<Answer, String> {
     let asked = item.request;
     let method = crate::plugin::judging::method(&asked.method)
@@ -327,9 +325,6 @@ pub(super) async fn answered(
     let mut headers = Vec::new();
     if let Some(accept) = &asked.accept {
         headers.push(("Accept".to_owned(), accept.clone()));
-    }
-    if let Some(Presented(name, value)) = presented {
-        headers.push(((*name).to_owned(), value.clone()));
     }
     let request = crate::ports::http::Request {
         method,

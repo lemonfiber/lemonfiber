@@ -5,8 +5,10 @@ use crate::ports::service::RegisteredApplication;
 use crate::test_support::curators::{FILM, MUSIC, TELEVISION};
 use crate::test_support::indexer::{answered, registered, searching, taken};
 
-/// A curator's configuration, holding the key it answers to.
-const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+/// The stack's TV curator moved into its plugin.
+fn moved_tv() -> Vec<crate::plugin::Installed> {
+    TELEVISION.installed().into_iter().collect()
+}
 
 /// The moved indexer, holding the television curator as an application that answers it.
 fn holding_sonarr() -> Arc<Fake> {
@@ -67,9 +69,7 @@ async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
 #[tokio::test]
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     let http = Fake::always(answered(&Vec::<RegisteredApplication>::new()));
-    let ctx = seed_ctx(true, None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
     let wirings =
         super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
@@ -86,8 +86,12 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
 #[tokio::test]
 async fn app_sync_never_registers_a_plugin_curator() {
     let http = holding_sonarr();
-    let ctx = indexing(http.clone(), SeedFs::keyed(Some(CURATOR_CONFIG)));
-    let fillers = indexed(vec![curator("sonarr", 8989, "tv")], &[a_stand_in("movies")]);
+    let ctx = indexing("applications-plugin-curator", http.clone(), true);
+    let installed: Vec<crate::plugin::Installed> = moved_tv()
+        .into_iter()
+        .chain([a_stand_in("movies")])
+        .collect();
+    let fillers = indexed(vec![curator("sonarr", 8989, "tv")], &installed);
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
     let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
@@ -98,7 +102,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
     assert!(
         wirings
             .iter()
-            .all(|wiring| wiring.connection.starts_with("sonarr the app")),
+            .all(|wiring| wiring.connection.starts_with("Sonarr")),
         "{wirings:?}"
     );
     assert!(!wirings.is_empty());
@@ -119,9 +123,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
 #[tokio::test]
 async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
     let http = seeding();
-    let ctx = seed_ctx(true, None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
     let fillers = asked_by_a_plugin(&aggregator_svc(), vec![curator("sonarr", 8989, "tv")]);
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
@@ -136,8 +138,8 @@ async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
 /// one, and nothing for a curator no indexer registers.
 #[tokio::test]
 async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
-    let ctx = indexing(holding_sonarr(), SeedFs::keyed(Some(CURATOR_CONFIG)));
-    let fillers = indexed(vec![curator("sonarr", 8989, "tv")], &[]);
+    let ctx = indexing("applications-resynced", holding_sonarr(), true);
+    let fillers = indexed(vec![curator("sonarr", 8989, "tv")], &moved_tv());
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
     let nobody = super::super::resync_application(&ctx, &fillers, "radarr").await;
@@ -149,11 +151,11 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
     assert!(nobody.is_empty());
 }
 
-/// An indexer that has not written its key yet holds no application to bring up to a
-/// replaced key, so a replacement owes it nothing yet.
+/// The stack's own indexer, which no adapter fronts, holds no application to bring up to a
+/// replaced key, so a replacement owes it nothing.
 #[tokio::test]
-async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
-    let ctx = seed_ctx(true, None, None).with_filesystem(Arc::new(SeedFs::keyed(None)));
+async fn a_replaced_key_owes_the_stacks_own_indexer_nothing() {
+    let ctx = seed_ctx(true, None, None);
     let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -166,9 +168,7 @@ async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
 #[tokio::test]
 async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
     let http = seeding();
-    let ctx = seed_ctx(true, None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
     let fillers = beside_a_stand_in(
         vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
         "movies",
@@ -185,27 +185,29 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
 #[tokio::test]
 async fn app_sync_registers_nothing_until_the_indexer_can_be_asked() {
     let http = holding_sonarr();
-    let mut ctx = seed_ctx(true, None, None)
-        .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG))));
+    let mut ctx = seed_ctx(true, None, None).with_http(http.clone());
     ctx.seams.engine = Arc::new(INDEXER.running());
 
-    let wirings =
-        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
-            .await;
+    let wirings = super::super::seed_applications(
+        &ctx,
+        &indexed(vec![curator("sonarr", 8989, "tv")], &moved_tv()),
+    )
+    .await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// The curator has not written its key yet, so its application waits while the
+/// lemonfiber holds no key it minted for the curator, so its application waits while the
 /// indexer itself proceeds.
 #[tokio::test]
-async fn app_sync_skips_only_the_curator_that_has_not_written_its_key() {
-    let ctx = indexing(holding_sonarr(), SeedFs::keyed(None));
-    let wirings =
-        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
-            .await;
+async fn app_sync_skips_only_the_curator_lemonfiber_holds_no_minted_key_for() {
+    let ctx = indexing("applications-unminted", holding_sonarr(), false);
+    let wirings = super::super::seed_applications(
+        &ctx,
+        &indexed(vec![curator("sonarr", 8989, "tv")], &moved_tv()),
+    )
+    .await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
 }
@@ -213,11 +215,13 @@ async fn app_sync_skips_only_the_curator_that_has_not_written_its_key() {
 /// The indexer already holds the curator, so the connection reads back as already
 /// wired.
 #[tokio::test]
-async fn app_sync_registers_a_curator_whose_keys_are_all_readable() {
-    let ctx = indexing(holding_sonarr(), SeedFs::keyed(Some(CURATOR_CONFIG)));
-    let wirings =
-        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
-            .await;
+async fn app_sync_reads_back_a_curator_the_indexer_already_holds() {
+    let ctx = indexing("applications-held", holding_sonarr(), true);
+    let wirings = super::super::seed_applications(
+        &ctx,
+        &indexed(vec![curator("sonarr", 8989, "tv")], &moved_tv()),
+    )
+    .await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -242,11 +246,13 @@ async fn app_sync_registers_an_absent_curator_and_reads_it_back() {
         ),
         (searching("register_application"), vec![taken()]),
     ]);
-    let ctx = indexing(http.clone(), SeedFs::keyed(Some(CURATOR_CONFIG)));
+    let ctx = indexing("applications-absent", http.clone(), true);
 
-    let wirings =
-        super::super::seed_applications(&ctx, &indexed(vec![curator("sonarr", 8989, "tv")], &[]))
-            .await;
+    let wirings = super::super::seed_applications(
+        &ctx,
+        &indexed(vec![curator("sonarr", 8989, "tv")], &moved_tv()),
+    )
+    .await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -313,23 +319,34 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
 }
 
 /// A plugin `indexing` whose service stands in for the stack's indexer over
-/// `indexer.search`, asking for every curator, beside both curators.
+/// `indexer.search`, asking for every curator, beside both curators moved into their
+/// plugins, trusting `trusted` beside the bundle's plugins.
 fn contracted_indexer(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
+    let trusted: Vec<crate::plugin::first_party::FirstParty> = crate::plugin::first_party::EMBEDDED
+        .iter()
+        .chain(trusted)
+        .copied()
+        .collect();
+    let installed: Vec<crate::plugin::Installed> = [asking_every_curator(contracted(
+        "indexing",
+        "prowlarr",
+        "indexer.search",
+    ))]
+    .into_iter()
+    .chain(TELEVISION.installed())
+    .chain(FILM.installed())
+    .collect();
     fillers_trusting(
         vec![
             curator("sonarr", 8989, "tv"),
             curator("radarr", 7878, "movies"),
         ],
-        &[asking_every_curator(contracted(
-            "indexing",
-            "prowlarr",
-            "indexer.search",
-        ))],
+        &installed,
         project,
-        trusted,
+        &trusted,
     )
 }
 
@@ -417,11 +434,13 @@ async fn an_indexer_on_no_address_is_told_about_nobody() {
         placed.listens = None;
         placed.reached = None;
     }
+    let installed: Vec<crate::plugin::Installed> =
+        [indexing].into_iter().chain(moved_tv()).collect();
     let fillers = fillers_trusting(
         vec![curator("sonarr", 8989, "tv")],
-        &[indexing],
+        &installed,
         &project,
-        &first_party("indexing"),
+        &beside_the_bundle(&first_party("indexing")),
     );
 
     let paired = super::super::connecting::pairings(&fillers).len();
@@ -474,6 +493,7 @@ fn an_indexer_granted_a_plugin_curators_key_is_never_registered_it() {
         &INDEXER
             .installed()
             .into_iter()
+            .chain(moved_tv())
             .chain([a_stand_in("movies")])
             .collect::<Vec<_>>(),
         "prowlarr",

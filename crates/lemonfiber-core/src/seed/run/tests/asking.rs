@@ -1,5 +1,3 @@
-use lemonfiber_manifest::{Api, ApiKind, KeySource};
-
 use super::super::clients::Held;
 use super::super::connecting::{pairings, Connection, Unmade};
 use super::super::curating::{curators, wanted_clients};
@@ -19,19 +17,9 @@ const FETCHER: &str = "fetcher";
 
 const SUBBER: &str = "subber";
 
-/// A plugin service speaking `kind` on `listens`, asking for each of `asks`.
-fn asker(service: &str, kind: ApiKind, listens: u16, asks: &[(&str, bool)]) -> Placed {
-    let mut placed = a_placed(
-        service,
-        &[],
-        Some(Api {
-            kind,
-            key_source: KeySource::ConfigXml,
-            path: Some("/config/config.xml".to_owned()),
-            version: Some(3),
-        }),
-        Some(listens),
-    );
+/// A plugin service on `listens`, asking for each of `asks`.
+fn asker(service: &str, listens: u16, asks: &[(&str, bool)]) -> Placed {
+    let mut placed = a_placed(service, &[], Some(listens));
     placed.media_types = vec!["tv".to_owned()];
     placed.asks = asks
         .iter()
@@ -50,12 +38,11 @@ fn asker(service: &str, kind: ApiKind, listens: u16, asks: &[(&str, bool)]) -> P
 fn helpers() -> Installed {
     let mut fetcher = asker(
         FETCHER,
-        ApiKind::Servarr,
         8990,
         &[("download.usenet", false), ("download.torrent", false)],
     );
     fetcher.speaks = vec!["library.curate@1".to_owned()];
-    let mut subber = asker(SUBBER, ApiKind::Bazarr, 6768, &[("library.curate", true)]);
+    let mut subber = asker(SUBBER, 6768, &[("library.curate", true)]);
     subber.speaks = vec!["subtitles.fetch@1".to_owned()];
     let mut installed = an_installed(PLUGIN, vec![fetcher, subber]);
     installed.manifest = MANIFEST.to_owned();

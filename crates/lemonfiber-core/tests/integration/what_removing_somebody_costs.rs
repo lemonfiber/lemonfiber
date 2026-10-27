@@ -135,7 +135,7 @@ fn answering() -> Arc<Fake> {
 /// A context over the shipped stack, with the media server and the request service moved
 /// into their plugins and up, and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    let mut ctx = context_on(env, http, crate::common::household::set_up_beside(env));
+    let mut ctx = context_on(env, http, crate::common::household::stack_beside(env));
     ctx.seams.engine = Arc::new(media::running().alongside(REQUESTS.running()));
     REQUESTS.keyed_in(media::keyed_in(ctx))
 }

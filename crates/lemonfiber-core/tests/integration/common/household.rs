@@ -69,31 +69,26 @@ pub fn recorded_admin(name: &str) -> std::path::PathBuf {
     env
 }
 
-/// The shipped stack, in a directory of its own whose request service has been set up:
-/// its settings file holds the key it answers as its owner, which is what lemonfiber
-/// reads and writes it with.
+/// The shipped stack, in a directory of its own.
 ///
 /// Leaked because `Source::External` holds a `&'static Path`.
 #[track_caller]
-pub fn set_up_request_service(name: &str) -> Source {
+pub fn stack_written(name: &str) -> Source {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-stack")).kept();
-    let settings = dir.join("config").join("seerr").join("settings.json");
-    let _ = std::fs::create_dir_all(settings.parent().unwrap_or(&dir));
-    let _ = std::fs::write(&settings, lemonfiber_fixtures::support::SEERR_SETTINGS);
     lemonfiber_fixtures::stack::manifest_into(&dir);
     Source::External(Box::leak(dir.into_boxed_path()))
 }
 
-/// [`set_up_request_service`], named after the scratch directory `env` sits in, for the
+/// [`stack_written`], named after the scratch directory `env` sits in, for the
 /// tests that already keep one per case.
 #[track_caller]
-pub fn set_up_beside(env: &std::path::Path) -> Source {
+pub fn stack_beside(env: &std::path::Path) -> Source {
     let name = env
         .parent()
         .and_then(std::path::Path::file_name)
         .and_then(std::ffi::OsStr::to_str)
         .unwrap_or("beside");
-    set_up_request_service(name)
+    stack_written(name)
 }
 
 /// A context over a transport that answers everything both writes ask.
@@ -219,7 +214,7 @@ pub fn context(name: &str, transport: &Arc<Fake>) -> Ctx {
 /// settings are always the permissive ones.
 pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
     let ctx = lemonfiber_testing::a_context()
-        .over(set_up_request_service(name))
+        .over(stack_written(name))
         .engine(Arc::new(
             Reporting::holding(&["jellyfin", "seerr"], Lifecycle::Running, Health::Healthy)
                 .alongside(media::running())

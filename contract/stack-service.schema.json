@@ -14,42 +14,6 @@
   "additionalProperties": false,
   "required": ["service"],
   "$defs": {
-    "Api": {
-      "description": "How lemonfiber talks to a service when seeding.\n\nThe same shape on a plugin's service as on the stack's own, which is what lets a\nplugin name one of these adapters rather than supply one of its own.",
-      "type": "object",
-      "properties": {
-        "key_source": {"description": "Where the credential comes from.", "$ref": "#/$defs/KeySource"},
-        "kind": {"description": "Selects the client implementation.", "$ref": "#/$defs/ApiKind"},
-        "path": {
-          "description": "The file holding the credential, where one applies.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "version": {
-          "description": "The major version of the service's HTTP API — the `/api/vN` path segment.\n\nRequired for the `servarr` shape and read there, because that one shape\nspans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),\nso the version is data rather than a guess from a service's name. Absent\nfor the other kinds, whose one fixed version their client already knows.",
-          "type": ["integer", "null"],
-          "format": "uint32",
-          "default": null,
-          "minimum": 0
-        }
-      },
-      "additionalProperties": false,
-      "required": ["kind", "key_source"]
-    },
-    "ApiKind": {
-      "description": "The API shapes lemonfiber knows how to speak.\n\nFour services share the `servarr` shape, which is what makes one client\nenough for them. Bindery is its own kind deliberately: it is not a Servarr\napplication and Prowlarr's app sync does not reach it. Bazarr is its own for\nthe neighbouring reason: it is told about the \\*arrs rather than being one of\nthem, in a form body a client of the shared shape could not send.",
-      "oneOf": [
-        {"description": "Sonarr, Radarr, Lidarr and Prowlarr.", "type": "string", "const": "servarr"},
-        {"description": "`SABnzbd`.", "type": "string", "const": "sabnzbd"},
-        {"description": "qBittorrent's `WebUI` API.", "type": "string", "const": "qbittorrent"},
-        {"description": "Seerr.", "type": "string", "const": "seerr"},
-        {"description": "Bindery.", "type": "string", "const": "bindery"},
-        {"description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads, so it has a `key_source` of `generated`.", "type": "string", "const": "jellyfin"},
-        {"description": "Bazarr — the subtitle finder, which is told which \\*arrs to watch.", "type": "string", "const": "bazarr"},
-        {"description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.", "type": "string", "const": "audiobookshelf"},
-        {"description": "`NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,\nso lemonfiber turns it on with an administrator it names and a password it mints.", "type": "string", "const": "nzbhydra2"}
-      ]
-    },
     "Bind": {
       "description": "Which interface a service's port is published on.",
       "oneOf": [
@@ -247,18 +211,6 @@
         {"description": "Trust the container's own reported state.", "type": "string", "const": "container"}
       ]
     },
-    "KeySource": {
-      "description": "Where a service's credential comes from.",
-      "oneOf": [
-        {"description": "The service writes it to an XML file lemonfiber reads.", "type": "string", "const": "config-xml"},
-        {"description": "The service writes it to an INI file lemonfiber reads.", "type": "string", "const": "config-ini"},
-        {"description": "The service writes it to a JSON file lemonfiber reads.", "type": "string", "const": "config-json"},
-        {"description": "The service writes it to a YAML file lemonfiber reads.", "type": "string", "const": "config-yaml"},
-        {"description": "Retrieved over the service's own API once authenticated.", "type": "string", "const": "api-settings"},
-        {"description": "The service offers nothing durable, so lemonfiber mints and records one.", "type": "string", "const": "generated"},
-        {"description": "The API needs no credential.", "type": "string", "const": "none"}
-      ]
-    },
     "PluginRequest": {
       "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
       "type": "object",
@@ -376,14 +328,6 @@
       "description": "One container in the stack.",
       "type": "object",
       "properties": {
-        "api": {
-          "description": "How lemonfiber talks to it when seeding.",
-          "anyOf": [
-            {"$ref": "#/$defs/Api"},
-            {"type": "null"}
-          ],
-          "default": null
-        },
         "asks_for": {
           "description": "What it asks for out there, in the same terms.\n\nDeclared with [`Self::reaches`] or not at all: one without the other is half\nan answer, and validation refuses it by name rather than quietly using the\nhalf that is there.",
           "type": ["string", "null"],

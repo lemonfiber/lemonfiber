@@ -2,7 +2,7 @@ use super::{chosen, Chosen, Refusal, UNDECLARED, WITHHELD};
 use crate::door::fixtures::{asking, brought, fronted, installed, service, watching};
 use crate::door::Facing;
 use crate::plugin::Installed;
-use lemonfiber_manifest::{ApiKind, Bind};
+use lemonfiber_manifest::Bind;
 
 /// How the door was chosen over `services` with `installed` beside them, and which
 /// service it came out as.
@@ -67,11 +67,7 @@ fn a_service_the_household_tier_does_not_publish_is_refused_and_said() {
     // The refusal this setting exists to make. An admin service answers this
     // machine alone; a front door pointed at one would hand out the address the
     // binding exists to withhold.
-    let services = [service(
-        "sonarr",
-        Some(Bind::Loopback),
-        Some(ApiKind::Servarr),
-    )];
+    let services = [service("sonarr", Some(Bind::Loopback))];
     assert_eq!(
         door(&services, &[asking()], Some("sonarr")),
         (refused("sonarr", WITHHELD), Some("seerr".to_owned())),
@@ -94,7 +90,7 @@ fn the_index_over_every_service_is_refused_in_the_registers_own_words() {
     // this stack runs, which is the one thing the register already says it is
     // not for — so the refusal borrows that sentence rather than writing a
     // second one to keep in step with it.
-    let services = [service("homepage", Some(Bind::Lan), None)];
+    let services = [service("homepage", Some(Bind::Lan))];
     assert_eq!(
         door(&services, &[asking()], Some("homepage")),
         (
@@ -106,7 +102,7 @@ fn the_index_over_every_service_is_refused_in_the_registers_own_words() {
 
 #[test]
 fn a_shelf_is_refused_for_the_reason_it_is_not_a_way_in() {
-    let services = [service("audiobookshelf", Some(Bind::Lan), None)];
+    let services = [service("audiobookshelf", Some(Bind::Lan))];
     assert_eq!(
         door(&services, &[asking()], Some("audiobookshelf")).0,
         refused("audiobookshelf", Facing::Shelf.because())
@@ -117,11 +113,7 @@ fn a_shelf_is_refused_for_the_reason_it_is_not_a_way_in() {
 fn a_refused_name_over_a_stack_with_no_door_leaves_there_being_none() {
     // Two absences at once. The setting was wrong and the stack has nowhere to
     // send anybody either, and neither stands in for the other.
-    let services = [service(
-        "sonarr",
-        Some(Bind::Loopback),
-        Some(ApiKind::Servarr),
-    )];
+    let services = [service("sonarr", Some(Bind::Loopback))];
     assert_eq!(
         door(&services, &[], Some("sonarr")),
         (refused("sonarr", WITHHELD), None)

@@ -28,7 +28,7 @@ fn setting(name: &str, recorded_with: Option<RecordedWith>) -> Value {
 }
 
 fn guard() -> crate::plugin::Placed {
-    let mut placed = crate::test_support::a_placed("gluetun", &[], None, None);
+    let mut placed = crate::test_support::a_placed("gluetun", &[], None);
     placed.fields.env = BTreeMap::from([
         (
             "PROVIDER".to_owned(),

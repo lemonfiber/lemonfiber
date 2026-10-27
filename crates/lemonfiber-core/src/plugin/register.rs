@@ -56,6 +56,30 @@ pub struct Register {
     installed: Vec<Installed>,
 }
 
+/// `written` without the in-process adapters an older record named: each installed
+/// plugin's `adapters`, and each of its services' `api`. No service names one now, and a
+/// record this build writes holds neither.
+fn forget_adapters(written: &mut serde_json::Value) {
+    let installed = written
+        .get_mut("installed")
+        .and_then(serde_json::Value::as_array_mut)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_object_mut);
+    for plugin in installed {
+        plugin.remove("adapters");
+        let services = plugin
+            .get_mut("services")
+            .and_then(serde_json::Value::as_array_mut)
+            .into_iter()
+            .flatten()
+            .filter_map(serde_json::Value::as_object_mut);
+        for service in services {
+            service.remove("api");
+        }
+    }
+}
+
 impl Register {
     /// Nothing installed.
     #[must_use]
@@ -84,17 +108,13 @@ impl Register {
         if text.trim().is_empty() {
             return Ok(Self::empty());
         }
-        let mut read: Self =
+        let mut written: serde_json::Value =
             serde_json::from_str(text).map_err(|why| Unreadable::Damaged(why.to_string()))?;
+        forget_adapters(&mut written);
+        let read: Self =
+            serde_json::from_value(written).map_err(|why| Unreadable::Damaged(why.to_string()))?;
         read.once_each()?;
         read.as_written()?;
-        for placed in read
-            .installed
-            .iter_mut()
-            .flat_map(|one| one.services.iter_mut())
-        {
-            placed.api = None;
-        }
         Ok(read)
     }
 

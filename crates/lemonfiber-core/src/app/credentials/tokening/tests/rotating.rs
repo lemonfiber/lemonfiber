@@ -99,6 +99,7 @@ fn beside_contracted_requests(
             manifest.services = services.clone();
             let installed: Vec<_> = crate::test_support::media::moved()
                 .into_iter()
+                .chain(TELEVISION.installed())
                 .chain([asking_curators(crate::test_support::contracted(
                     "intake",
                     crate::test_support::CONTRACTED_REQUESTS,
@@ -447,10 +448,6 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
             ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
                 (tokens_file(&at), &held_text),
                 (crate::app::gating::path(&at, File::Upstreams), &routes_text),
-                (
-                    at.join("config/sonarr/config.xml"),
-                    "<Config><ApiKey>sonarrs</ApiKey></Config>",
-                ),
             ]))
         } else {
             ctx
@@ -497,10 +494,6 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     let ctx = ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
         (tokens_file(&at), &both),
         (crate::app::gating::path(&at, File::Upstreams), &routes_text),
-        (
-            at.join("config/sonarr/config.xml"),
-            "<Config><ApiKey>sonarrs</ApiKey></Config>",
-        ),
     ]));
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,

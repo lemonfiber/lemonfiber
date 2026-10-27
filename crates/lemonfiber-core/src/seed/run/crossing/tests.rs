@@ -66,7 +66,7 @@ fn reading(mut installed: Installed, id: &str, of: &str) -> Installed {
 fn stranger(plugin: &str, service: &str) -> Installed {
     crate::test_support::an_installed(
         plugin,
-        vec![crate::test_support::a_placed(service, &[], None, None)],
+        vec![crate::test_support::a_placed(service, &[], None)],
     )
 }
 

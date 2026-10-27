@@ -1,9 +1,9 @@
 //! The shape of `stack.toml`.
 //!
 //! These types mirror the contract field for field. Nothing here interprets a
-//! manifest — an unknown `api.kind` is a parse failure rather than a service
-//! lemonfiber silently declines to wire up, because a typo that degrades into
-//! "no API integration" is indistinguishable from meaning it.
+//! manifest — an unknown name in a closed field is refused rather than read as
+//! something lemonfiber silently declines to act on, because a typo that degrades
+//! into doing nothing is indistinguishable from meaning it.
 
 use serde::{Deserialize, Serialize};
 
@@ -219,9 +219,6 @@ pub struct Service {
     /// How to tell the service has actually started.
     #[serde(default)]
     pub health: Option<Health>,
-    /// How lemonfiber talks to it when seeding.
-    #[serde(default)]
-    pub api: Option<Api>,
     /// The port it answers on inside the stack's network, where lemonfiber and the
     /// services that ask for what it provides reach it.
     ///
@@ -524,5 +521,5 @@ mod contained;
 #[cfg(test)]
 mod tests;
 
-pub use api::{Api, ApiKind, KeySource};
+pub use api::{ApiKind, KeySource};
 pub use claimed::{Claimed, CLAIM};

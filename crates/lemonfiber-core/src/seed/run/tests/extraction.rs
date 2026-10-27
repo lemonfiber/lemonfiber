@@ -24,17 +24,23 @@ fn the_extractor(speaking: bool) -> crate::plugin::Installed {
     installed
 }
 
-/// [`the_extractor`] beside a curator of television, of films and of music.
+/// [`the_extractor`] beside a curator of television, of films and of music, each moved
+/// into its plugin.
 fn an_extractor(project: &std::path::Path, speaking: bool) -> crate::wiring::Fillers {
+    let curators = vec![
+        curator("sonarr", 8989, "tv"),
+        curator("radarr", 7878, "movies"),
+        curator("lidarr", 8686, "music"),
+    ];
+    let installed: Vec<crate::plugin::Installed> = [the_extractor(speaking)]
+        .into_iter()
+        .chain(curators_moved(&curators))
+        .collect();
     fillers_trusting(
-        vec![
-            curator("sonarr", 8989, "tv"),
-            curator("radarr", 7878, "movies"),
-            curator("lidarr", 8686, "music"),
-        ],
-        &[the_extractor(speaking)],
+        curators,
+        &installed,
         project,
-        &first_party("unpacked"),
+        &beside_the_bundle(&first_party("unpacked")),
     )
 }
 
@@ -223,11 +229,10 @@ async fn an_extractor_that_refuses_is_not_reported_as_watching() {
 }
 
 #[tokio::test]
-async fn a_curator_whose_key_is_not_written_yet_holds_the_whole_watch_back() {
+async fn a_curator_holding_no_minted_key_holds_the_whole_watch_back() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("extract-unkeyed");
     let http = watching(Answer::reply(204, ""));
-    let ctx = contracted_ctx(&project, "extractor", true, http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = forgetting_minted(contracted_ctx(&project, "extractor", true, http.clone()));
 
     let wirings = super::super::extraction::seed_extraction(
         &ctx,
@@ -264,46 +269,26 @@ async fn an_extractor_lemonfiber_cannot_reach_over_its_contract_is_told_nothing(
 }
 
 #[tokio::test]
-async fn a_curator_whose_key_file_leads_away_is_refused_and_nobody_is_handed() {
-    let project = lemonfiber_fixtures::scratch::Scratch::new("extract-leading-away");
-    let http = watching(Answer::reply(204, ""));
-    let ctx = contracted_ctx(&project, "extractor", true, http.clone()).with_filesystem(Arc::new(
-        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
-            .leading_away(vec!["config/radarr/"]),
-    ));
-
-    let wirings = super::super::extraction::seed_extraction(
-        &ctx,
-        &an_extractor(&project, true),
-        &BTreeMap::new(),
-    )
-    .await;
-
-    assert!(
-        matches!(
-            wirings.as_slice(),
-            [one] if matches!(&one.state, crate::seed::State::Refused { reason }
-                if reason.starts_with("radarr"))
-        ),
-        "{wirings:?}"
-    );
-    assert!(watched(&http).is_empty());
-}
-
-#[tokio::test]
 async fn a_curator_filing_media_no_category_is_filed_under_is_not_handed() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("extract-uncategorised");
     let http = watching(Answer::reply(204, ""));
     let ctx = contracted_ctx(&project, "extractor", true, http.clone());
-    let fillers = fillers_trusting(
-        vec![
-            curator("sonarr", 8989, "tv"),
-            curator("comics", 8787, "comics"),
-        ],
-        &[the_extractor(true)],
-        &project,
-        &first_party("unpacked"),
-    );
+    let mut comics = crate::test_support::a_placed("comics", &["library.curate"], Some(8787));
+    comics.media_types = vec!["comics".to_owned()];
+    comics.native = Some("servarr".to_owned());
+    let mut shelf = crate::test_support::an_installed("comics", vec![comics]);
+    shelf.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    shelf.tree = crate::test_support::A_TREE.to_owned();
+    let curators = vec![curator("sonarr", 8989, "tv")];
+    let installed: Vec<crate::plugin::Installed> = [the_extractor(true), shelf]
+        .into_iter()
+        .chain(curators_moved(&curators))
+        .collect();
+    let trusted: Vec<crate::plugin::first_party::FirstParty> = first_party("unpacked")
+        .into_iter()
+        .chain(first_party("comics"))
+        .collect();
+    let fillers = fillers_trusting(curators, &installed, &project, &beside_the_bundle(&trusted));
 
     let wirings = super::super::extraction::seed_extraction(&ctx, &fillers, &BTreeMap::new()).await;
 

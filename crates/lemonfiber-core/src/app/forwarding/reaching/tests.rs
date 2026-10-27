@@ -12,7 +12,7 @@ use crate::wiring::{Chosen, Fillers};
 const GUARD: &str = "network.egress-guard";
 
 fn torrent(service: &str, via: bool) -> crate::plugin::Placed {
-    let mut placed = a_placed(service, &["download.torrent"], None, Some(9091));
+    let mut placed = a_placed(service, &["download.torrent"], Some(9091));
     placed.fields.network = via.then(|| Network {
         via: GUARD.to_owned(),
     });
@@ -58,9 +58,9 @@ async fn only_torrent_fillers_taking_the_guard_are_inside_it() {
 
 #[tokio::test]
 async fn a_torrent_adapter_is_inside_the_guard_its_upstream_takes() {
-    let mut adapter = a_placed("front", &["download.torrent"], None, Some(8080));
+    let mut adapter = a_placed("front", &["download.torrent"], Some(8080));
     adapter.fronts = Some("back".to_owned());
-    let mut upstream = a_placed("back", &[], None, Some(9000));
+    let mut upstream = a_placed("back", &[], Some(9000));
     upstream.fields.network = Some(Network {
         via: GUARD.to_owned(),
     });
@@ -81,7 +81,7 @@ async fn the_stacks_own_guard_is_asked_in_process_and_a_strangers_uncontracted_o
 
     let stranger = [an_installed(
         "wireguard",
-        vec![a_placed("wireguard", &[GUARD], None, Some(8000))],
+        vec![a_placed("wireguard", &[GUARD], Some(8000))],
     )];
     let elsewhere = stack()
         .manifest()

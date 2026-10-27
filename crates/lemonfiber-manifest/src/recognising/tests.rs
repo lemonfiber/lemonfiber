@@ -13,7 +13,7 @@ fn names_the_field_and_the_entry_it_was_declared_on() {
         "
 [[service]]
 id = \"jellyfin\"
-api = { kind = \"plex\", key_source = \"config-xml\" }
+health = { kind = \"carrier-pigeon\" }
 ",
     );
     let said: Vec<String> = found.iter().map(ToString::to_string).collect();
@@ -21,9 +21,31 @@ api = { kind = \"plex\", key_source = \"config-xml\" }
     assert!(
         said.first()
             .is_some_and(|one| one.contains("service jellyfin")
-                && one.contains("api.kind")
-                && one.contains("plex")),
+                && one.contains("health.kind")
+                && one.contains("carrier-pigeon")),
         "got: {said:?}"
+    );
+}
+
+#[test]
+fn a_service_naming_an_in_process_adapter_is_placed_at_the_field() {
+    let found = unrecognised(
+        "
+[[service]]
+id = \"jellyfin\"
+api = { kind = \"jellyfin\" }
+
+[[service]]
+api = { kind = \"servarr\" }
+",
+    );
+    let placed: Vec<&str> = found.iter().map(|one| one.location.as_str()).collect();
+    assert_eq!(placed, ["service jellyfin.api", "service 1.api"]);
+    assert!(
+        found
+            .iter()
+            .all(|one| one.message.contains("no in-process adapter")),
+        "got: {found:?}"
     );
 }
 

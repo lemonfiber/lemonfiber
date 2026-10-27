@@ -250,7 +250,7 @@ fn a_service_answering_its_health_over_http_is_checked_where_the_stack_reaches_i
 
 #[test]
 fn an_installed_plugins_service_is_listed_in_place_of_the_stack_service_it_moved_into() {
-    let mut placed = crate::test_support::a_placed("sonarr", &[], None, Some(8989));
+    let mut placed = crate::test_support::a_placed("sonarr", &[], Some(8989));
     placed.name = "Sonarr, moved".to_owned();
     placed.reached = Some(Reached::Loopback {
         port: 8989,

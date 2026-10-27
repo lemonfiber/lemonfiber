@@ -257,7 +257,7 @@ fn a_shape_is_asked_to_be_approved_after_every_value_the_recipes_send_elsewhere(
         vec![crate::plugin::Placed {
             shape: Some(Shape::EgressGuard),
             asks: Vec::new(),
-            ..crate::test_support::a_placed("gluetun", &[], None, None)
+            ..crate::test_support::a_placed("gluetun", &[], None)
         }],
     );
     shaped.recipes = vec![crate::plugin::Recipe {

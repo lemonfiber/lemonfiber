@@ -46,31 +46,23 @@ fn serving<'a>(
         .filter(move |placed| placed.service == id || placed.fronts.as_deref() == Some(id))
 }
 
-/// The stack with a Usenet client of its own speaking `api` and listening on `listens`,
-/// chosen to answer for the shipped one.
-fn chosen_stand_in(
-    api: Option<lemonfiber_manifest::Api>,
-    listens: Option<u16>,
-) -> (impl FnOnce(&mut lemonfiber_manifest::Manifest), Chosen) {
-    let stand_in = lemonfiber_manifest::Service {
-        provides: vec!["download.usenet".to_owned()],
-        listens,
-        ..crate::seed::run::tests::manifest_service("stand-in", api, None)
-    };
-    (
-        move |manifest: &mut lemonfiber_manifest::Manifest| manifest.services.push(stand_in),
-        Chosen::read(Some("download.usenet=stand-in")),
+/// The shipped stack's asks with every part moved in, its Usenet client's upstream as
+/// `shaping` leaves it.
+fn usenet_as(shaping: fn(&mut crate::plugin::Placed)) -> Fillers {
+    moved(
+        &[],
+        &Chosen::default(),
+        |_| (),
+        |parts| {
+            for upstream in parts
+                .iter_mut()
+                .flat_map(|part| part.services.iter_mut())
+                .filter(|placed| placed.service == "sabnzbd")
+            {
+                shaping(upstream);
+            }
+        },
     )
-}
-
-/// An adapter of this kind, as a plugin's service names one.
-fn speaking(kind: lemonfiber_manifest::ApiKind) -> lemonfiber_manifest::Api {
-    lemonfiber_manifest::Api {
-        kind,
-        key_source: lemonfiber_manifest::KeySource::ConfigIni,
-        path: None,
-        version: Some(3),
-    }
 }
 
 /// The reasons the shipped stack's TV curator is given for each pairing that comes to
@@ -247,67 +239,62 @@ fn a_curator_filing_media_nothing_hands_the_asker_is_said_naming_it() {
     ));
 }
 
-/// A filler naming no adapter is reported, naming what fills, what asked and why.
+/// A filler naming no API of its own is reported, naming what fills, what asked and why.
 #[test]
-fn a_filler_naming_no_adapter_is_reported_as_reached_by_nothing() {
-    let (standing_in, chosen) = chosen_stand_in(None, Some(6789));
-    let fillers = shipped(&[], &chosen, standing_in);
+fn a_filler_naming_no_api_of_its_own_is_reported_as_reached_by_nothing() {
+    let fillers = usenet_as(|upstream| upstream.native = None);
 
     assert_eq!(
         unmatched(&fillers)
             .iter()
             .map(|wiring| wiring.connection.as_str())
-            .filter(|connection| connection.starts_with("stand-in"))
+            .filter(|connection| connection.starts_with("SABnzbd"))
             .collect::<Vec<&str>>(),
         vec![
-            "stand-in the app into Bindery",
-            "stand-in the app into Lidarr",
-            "stand-in the app into Radarr",
-            "stand-in the app into Sonarr",
+            "SABnzbd into Bindery",
+            "SABnzbd into Lidarr",
+            "SABnzbd into Radarr",
+            "SABnzbd into Sonarr",
         ]
     );
     assert_eq!(
         reasons(&fillers),
         vec![
-            "stand-in the app fills download.usenet, which Sonarr asks for, and names no \
-             adapter lemonfiber could tell Sonarr about it through"
+            "SABnzbd fills download.usenet, which Sonarr asks for, and names no API of its \
+             own that lemonfiber could tell Sonarr about it in"
                 .to_owned()
         ]
     );
 }
 
-/// A filler naming an adapter and no port it answers on is reported.
+/// A filler naming an API of its own and no port it answers on is reported.
 #[test]
 fn a_filler_saying_no_port_is_reported_as_reached_by_nothing() {
-    let (standing_in, chosen) =
-        chosen_stand_in(Some(speaking(lemonfiber_manifest::ApiKind::Sabnzbd)), None);
-    let fillers = shipped(&[], &chosen, standing_in);
+    let fillers = usenet_as(|upstream| {
+        upstream.listens = None;
+        upstream.reached = None;
+    });
 
     assert_eq!(
         reasons(&fillers),
         vec![
-            "stand-in the app fills download.usenet, which Sonarr asks for, and does not \
-             say which port it answers on inside the stack's network"
+            "SABnzbd fills download.usenet, which Sonarr asks for, and does not say which \
+             port it answers on inside the stack's network"
                 .to_owned()
         ]
     );
 }
 
-/// A filler speaking an adapter nothing pairs with what asked is reported.
+/// A filler answering in an API nothing pairs with what asked is reported.
 #[test]
-fn a_filler_speaking_an_adapter_nothing_pairs_is_reported_as_reached_by_nothing() {
-    let (standing_in, chosen) = chosen_stand_in(
-        Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
-        Some(6789),
-    );
-    let fillers = shipped(&[], &chosen, standing_in);
+fn a_filler_answering_in_an_api_nothing_pairs_is_reported_as_reached_by_nothing() {
+    let fillers = usenet_as(|upstream| upstream.native = Some("servarr".to_owned()));
 
     assert_eq!(
         reasons(&fillers),
         vec![
-            "stand-in the app fills download.usenet, which Sonarr asks for, and nothing \
-             in lemonfiber tells Sonarr about a service that speaks stand-in the app's \
-             adapter"
+            "SABnzbd fills download.usenet, which Sonarr asks for, and nothing in lemonfiber \
+             tells Sonarr about a service answering in SABnzbd's API"
                 .to_owned()
         ]
     );
@@ -386,19 +373,9 @@ fn a_curator_reaching_the_indexer_itself_is_not_said_to_be_reached_by_nothing() 
 /// one of the stack's own or another plugin's — and each pair is said with why.
 #[test]
 fn a_plugin_asker_is_connected_to_nothing() {
-    let mut curator = a_placed(
-        "kept",
-        &["library.curate"],
-        Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
-        Some(8990),
-    );
+    let mut curator = a_placed("kept", &["library.curate"], Some(8990));
     curator.media_types = vec!["movies".to_owned()];
-    let mut asker = a_placed(
-        "prowlarr",
-        &[],
-        Some(speaking(lemonfiber_manifest::ApiKind::Servarr)),
-        Some(9696),
-    );
+    let mut asker = a_placed("prowlarr", &[], Some(9696));
     asker.speaks = vec![lemonfiber_contract::spoken(
         lemonfiber_contract::capabilities::indexer::search::CAPABILITY,
         lemonfiber_contract::capabilities::indexer::search::MAJOR,
@@ -453,7 +430,7 @@ fn a_plugin_asker_is_connected_to_nothing() {
     ));
 }
 
-/// A service of `origin` speaking `kind`, filing television, reached at its id.
+/// A service of `origin` answering in `kind`, filing television, reached at its id.
 fn a_service(
     id: &str,
     origin: &crate::origin::Origin,
@@ -469,9 +446,7 @@ fn a_service(
             host: id.to_owned(),
             port: 8000,
         }),
-        adapter: Some(speaking(kind)),
         published: Some(8000),
-        key_file: None,
         confined_to: None,
         media_types: vec!["tv".to_owned()],
         provides: Vec::new(),
@@ -480,7 +455,7 @@ fn a_service(
         majors: Vec::new(),
         fronts: None,
         upstream: std::collections::BTreeMap::new(),
-        native: None,
+        native: Some(kind.name().to_owned()),
         replaces: None,
         via: None,
     }
@@ -552,7 +527,7 @@ fn an_asker(
     contract: (&str, u32),
 ) -> crate::wiring::Filler {
     crate::wiring::Filler {
-        adapter: None,
+        native: None,
         contracts: vec![lemonfiber_contract::spoken(contract.0, contract.1)],
         ..a_service(id, origin, lemonfiber_manifest::ApiKind::Servarr)
     }

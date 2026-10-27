@@ -5,8 +5,7 @@
 
 use lemonfiber_core::docker::{Condition, Service, State, Undeclared};
 use lemonfiber_core::model::{
-    ConflictReport, LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched,
-    UnsupportedReport, Vigil,
+    ConflictReport, LifecycleReport, ResetReport, StatusReport, SupervisionReport, Switched, Vigil,
 };
 use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Filtered, Footprint, Plan, Protocol, Running};
@@ -332,7 +331,6 @@ pub(super) fn status(report: &StatusReport) -> Lines {
     lines.extend(show(&report.services));
     lines.extend(filtered(&report.filtered));
     lines.extend(strangers(&report.undeclared));
-    lines.extend(unsupported(&report.unsupported));
     lines
 }
 
@@ -382,29 +380,6 @@ fn strangers(undeclared: &[Undeclared]) -> Lines {
             worded(one.state),
             one.describes
         ));
-    }
-    lines
-}
-
-/// The services lemonfiber runs and cannot speak to, under the states of the ones it
-/// can.
-///
-/// Below rather than beside, and absent entirely on a stack where there are none —
-/// which is every stack this build ships. What it says is deliberately not a fault:
-/// these services are up, and every generic thing works on them. What is missing is
-/// the part that needs to know which service it is talking to, and the operator who
-/// wrote the declaration is the only person who can complete it.
-fn unsupported(reports: &[UnsupportedReport]) -> Lines {
-    let mut lines = Lines::default();
-    if reports.is_empty() {
-        return lines;
-    }
-    lines.spaced(
-        "These run and are yours to start, stop and watch like any other. What \
-         lemonfiber cannot do is anything that needs to know what they are:",
-    );
-    for report in reports {
-        lines.put(format!("  {} — {}", report.what, report.because));
     }
     lines
 }

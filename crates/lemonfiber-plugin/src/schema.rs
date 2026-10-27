@@ -211,16 +211,8 @@ pub struct Service {
     /// The memory it expects to need, in MiB, never written as a limit.
     #[serde(default)]
     pub memory_mib: Option<u32>,
-    /// The adapter lemonfiber reaches it through, in the stack manifest's own shape.
-    ///
-    /// Named from a fixed set rather than supplied: a plugin cannot bring an adapter of
-    /// its own, and naming one is what lets the services that ask for a capability it
-    /// claims be told about it as they are told about a bundled service declaring the
-    /// same. Absent, it is operated generically.
-    #[serde(default)]
-    pub api: Option<lemonfiber_manifest::Api>,
     /// The port it answers on inside the stack's network, where lemonfiber and the
-    /// services that ask reach it. Required where `api` or `speaks` is.
+    /// services that ask reach it. Required where `speaks` is.
     #[serde(default)]
     pub listens: Option<u16>,
     /// Each capability contract it answers, as `capability@major`: the service is an

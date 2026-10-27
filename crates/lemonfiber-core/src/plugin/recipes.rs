@@ -10,8 +10,9 @@
 //! list out would read the same as one that had nothing in it, and *none* and *not
 //! read* are two different things to tell somebody.
 //!
-//! **An adapter is always lemonfiber's.** A plugin names one from the closed set this
-//! build implements and can bring none of its own, so every adapter here says so in a
+//! **An adapter is always lemonfiber's.** A step to a service a plugin's part moved in
+//! place of is reached through the native adapter of the closed set this build
+//! implements, and a plugin can bring none of its own, so every adapter here says so in a
 //! field of its own rather than leaving a client to know it.
 
 use lemonfiber_manifest::ApiKind;
@@ -135,36 +136,6 @@ pub struct Recipe {
     pub pairs: Vec<Pair>,
 }
 
-/// One adapter of lemonfiber's that one of the plugin's own services names.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginServiceAdapter")]
-pub struct Named {
-    /// The service that names it.
-    pub service: String,
-    /// Which of lemonfiber's adapters it is.
-    pub kind: ApiKind,
-    /// Whose it is, which is lemonfiber's.
-    pub owner: Owner,
-}
-
-/// Every adapter of lemonfiber's the plugin's own services name, in the order the
-/// manifest declares the services.
-#[must_use]
-pub fn named(manifest: &Manifest) -> Vec<Named> {
-    manifest
-        .services
-        .iter()
-        .filter_map(|service| {
-            service.api.as_ref().map(|api| Named {
-                service: service.id.clone(),
-                kind: api.kind,
-                owner: Owner::Lemonfiber,
-            })
-        })
-        .collect()
-}
-
 /// What approving one value's carriage to one destination is written as.
 ///
 /// The value first and the destination after an `@`, because a destination is a
@@ -175,22 +146,13 @@ pub fn approval(value: &str, to: &str) -> String {
     format!("{value}@{to}")
 }
 
-/// Every recipe this manifest declares, with the adapter of each call to one of the
-/// plugin's own services.
+/// Every recipe this manifest declares, each call yet to be given an adapter.
 ///
 /// A call to a service of the stack's is given its adapter by [`reaching`], which has
 /// the stack to read it from; read here, it would be a call outside the plugin with no
 /// way to tell a bundled service from a host on the internet.
 #[must_use]
 pub fn declared(manifest: &Manifest) -> Vec<Recipe> {
-    let own = |to: &str| {
-        manifest
-            .services
-            .iter()
-            .find(|service| service.id == to)
-            .and_then(|service| service.api.as_ref())
-            .map(|api| api.kind)
-    };
     manifest
         .recipes
         .iter()
@@ -217,7 +179,7 @@ pub fn declared(manifest: &Manifest) -> Vec<Recipe> {
                     method: step.call.method.clone(),
                     to: step.call.to.clone(),
                     path: step.call.path.clone(),
-                    adapter: own(&step.call.to).map(lemonfibers),
+                    adapter: None,
                 })
                 .collect(),
             pairs: recipe
@@ -272,29 +234,15 @@ fn read_from<'a>(recipe: &'a lemonfiber_plugin::Recipe, value: &str) -> Option<&
 }
 
 /// The same recipes, with the adapter of every call to one of the stack's services: the
-/// API the service a first-party part of `installed` moved in place of it answers in,
-/// and the one the stack's declaration of it names otherwise.
+/// API the service a first-party part of `installed` moved in place of it answers in.
 #[must_use]
-pub fn reaching(
-    mut recipes: Vec<Recipe>,
-    stack: &lemonfiber_manifest::Manifest,
-    installed: &[super::Installed],
-) -> Vec<Recipe> {
+pub fn reaching(mut recipes: Vec<Recipe>, installed: &[super::Installed]) -> Vec<Recipe> {
     for step in recipes
         .iter_mut()
         .flat_map(|recipe| recipe.steps.iter_mut())
     {
         if step.adapter.is_none() {
-            step.adapter = moved_native(installed, &step.to)
-                .or_else(|| {
-                    stack
-                        .services
-                        .iter()
-                        .find(|service| service.id == step.to)
-                        .and_then(|service| service.api.as_ref())
-                        .map(|api| api.kind)
-                })
-                .map(lemonfibers);
+            step.adapter = moved_native(installed, &step.to).map(lemonfibers);
         }
     }
     recipes

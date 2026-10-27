@@ -13,9 +13,13 @@ use crate::config::{store, Settings};
 use crate::credential::{Held, Reach, Settled, State};
 use crate::ports::service::{Endpoint, MediaServerLink, RegisteredTarget};
 use crate::test_support::a_context;
+use crate::test_support::curators::TELEVISION;
 use crate::test_support::requests::{
     answered, intake, refusing, taken, told, unavailable, REQUESTS,
 };
+
+/// The key lemonfiber minted for the curator, which the gate presents on its route.
+const CURATOR_KEY: &str = "sonarrs";
 
 /// What the fixed randomness renders to, which is every token minted here.
 fn minted() -> String {
@@ -23,12 +27,7 @@ fn minted() -> String {
 }
 
 /// A service in the stack, with the shape this module reads.
-fn service(
-    id: &str,
-    name: &str,
-    api: Option<lemonfiber_manifest::ApiKind>,
-    port: u16,
-) -> lemonfiber_manifest::Service {
+fn service(id: &str, name: &str, port: u16) -> lemonfiber_manifest::Service {
     lemonfiber_manifest::Service {
         id: id.to_owned(),
         name: name.to_owned(),
@@ -39,12 +38,6 @@ fn service(
         port: Some(port),
         bind: None,
         health: None,
-        api: api.map(|kind| lemonfiber_manifest::Api {
-            kind,
-            key_source: lemonfiber_manifest::KeySource::Generated,
-            path: None,
-            version: None,
-        }),
         criticality: lemonfiber_manifest::Criticality::Core,
         license: "MIT".to_owned(),
         upstream: "https://example.test".to_owned(),
@@ -93,7 +86,8 @@ fn fillers_from(
     fillers_beside(services, &moved, project)
 }
 
-/// The same, with `installed` beside the stack and the media server moved into its plugin.
+/// The same, with `installed` beside the stack and the media server and the curator moved
+/// into their plugins.
 fn fillers_beside(
     services: Vec<lemonfiber_manifest::Service>,
     installed: &[crate::plugin::Installed],
@@ -101,6 +95,7 @@ fn fillers_beside(
 ) -> crate::wiring::Fillers {
     let installed: Vec<_> = crate::test_support::media::moved()
         .into_iter()
+        .chain(TELEVISION.installed())
         .chain(installed.iter().cloned())
         .collect();
     crate::test_support::stack_fillers(
@@ -113,34 +108,18 @@ fn fillers_beside(
 
 /// The media server, the request service, a curator and, where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut media_server = service(
-        "jellyfin",
-        "Jellyfin",
-        Some(lemonfiber_manifest::ApiKind::Jellyfin),
-        8096,
-    );
+    let mut media_server = service("jellyfin", "Jellyfin", 8096);
     media_server.provides = vec!["media.serve".to_owned(), "identity.source".to_owned()];
     media_server.listens = Some(8096);
-    let mut requests = service(
-        "seerr",
-        "Seerr",
-        Some(lemonfiber_manifest::ApiKind::Seerr),
-        5055,
-    );
+    let mut requests = service("seerr", "Seerr", 5055);
     requests.provides = vec!["request.intake".to_owned()];
-    let mut curator = service("sonarr", "Sonarr", None, 8989);
-    curator.api = Some(lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Servarr,
-        key_source: lemonfiber_manifest::KeySource::ConfigXml,
-        path: Some("/config/config.xml".to_owned()),
-        version: Some(3),
-    });
+    let mut curator = service("sonarr", "Sonarr", 8989);
     curator.media_types = vec!["tv".to_owned()];
     curator.listens = Some(8989);
     curator.provides = vec!["library.curate".to_owned()];
     let mut services = vec![media_server, requests, curator];
     if gating {
-        let mut gate = service("request-gate", "Request gate", None, PORT);
+        let mut gate = service("request-gate", "Request gate", PORT);
         gate.provides = vec!["request.gate".to_owned()];
         services.push(gate);
     }
@@ -154,7 +133,7 @@ fn routes() -> Upstreams {
             route: "sonarr".to_owned(),
             kind: Kind::Sonarr,
             address: "http://sonarr:8989".to_owned(),
-            credential: Credential::new("sonarrs"),
+            credential: Credential::new(CURATOR_KEY),
             majors: Vec::new(),
         },
         Upstream {
@@ -206,10 +185,6 @@ fn scene(
         );
     }
     let _ = store::write(&tokens_file(&at), &accepted.written());
-    let _ = store::write(
-        &at.join("config/sonarr/config.xml"),
-        "<Config><ApiKey>sonarrs</ApiKey></Config>",
-    );
     let env = at.join(".env");
     let _ = store::set(
         &env,
@@ -234,6 +209,7 @@ fn scene(
         .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(
             random.then(|| vec![0xab; crate::secret::SECRET_BYTES]),
         )));
+    TELEVISION.minted(&ctx, CURATOR_KEY);
     (ctx, at)
 }
 

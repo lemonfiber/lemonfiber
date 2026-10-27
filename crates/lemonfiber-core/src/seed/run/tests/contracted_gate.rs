@@ -15,22 +15,23 @@ const ADMITTED: &str = "/lemonfiber/request.gate/v1/admitted";
 /// What the gate is told every route it should admit through.
 const ADMIT: &str = "/lemonfiber/request.gate/v1/admit";
 
-/// [`a_contracted_gate`] beside the request service moved into its plugin and both
-/// curators, trusting `trusted` as first-party beside every plugin this build embeds.
+/// [`a_contracted_gate`] beside the request service and both curators moved into their
+/// plugins, trusting `trusted` as first-party beside every plugin this build embeds.
 fn contracted_gate(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
-    fillers_trusting(
-        vec![
-            requests_svc(),
-            curator("sonarr", 8989, "tv"),
-            curator("radarr", 7878, "movies"),
-        ],
-        &with_the_request_service(vec![a_contracted_gate()]),
-        project,
-        &trusting(trusted),
-    )
+    let services = vec![
+        requests_svc(),
+        curator("sonarr", 8989, "tv"),
+        curator("radarr", 7878, "movies"),
+    ];
+    let installed: Vec<crate::plugin::Installed> =
+        with_the_request_service(vec![a_contracted_gate()])
+            .into_iter()
+            .chain(curators_moved(&services))
+            .collect();
+    fillers_trusting(services, &installed, project, &trusting(trusted))
 }
 
 /// `installed`, with the request service moved into its plugin.
@@ -129,18 +130,15 @@ async fn a_first_party_gate_speaking_the_contract_is_handed_its_routes_over_it()
 }
 
 /// A third-party plugin's curator filing film, beside the request service moved into its
-/// plugin holding `granted`, the first-party gate and the television curator.
+/// plugin holding `granted`, the first-party gate and the television curator moved into
+/// its plugin.
 fn beside_a_stranger(
     project: &std::path::Path,
     granted: &[crate::plugin::Grant],
 ) -> crate::wiring::Fillers {
-    let mut stranger = crate::test_support::a_placed(
-        "kept",
-        &["library.curate"],
-        Some(curator_api(Some("/config/config.xml"))),
-        Some(8990),
-    );
+    let mut stranger = crate::test_support::a_placed("kept", &["library.curate"], Some(8990));
     stranger.media_types = vec!["movies".to_owned()];
+    stranger.native = Some("servarr".to_owned());
     let requests = REQUESTS.installed().map(|mut one| {
         granted.clone_into(&mut one.granted);
         one
@@ -151,6 +149,7 @@ fn beside_a_stranger(
             Some(a_contracted_gate()),
             Some(crate::test_support::an_installed("kept", vec![stranger])),
             requests,
+            TELEVISION.installed(),
         ]
         .into_iter()
         .flatten()

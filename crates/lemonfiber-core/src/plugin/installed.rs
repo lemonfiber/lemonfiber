@@ -87,11 +87,6 @@ pub struct Placed {
     /// Whether its wiring hid it from the dashboard.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
-    /// The adapter of lemonfiber's its manifest names, which only a part the bundle
-    /// assembles is reached through. A record read from the register holds none, whatever
-    /// an older one carried: an installed plugin is reached over the contracts it speaks.
-    #[serde(default)]
-    pub api: Option<lemonfiber_manifest::Api>,
     /// The port it answers on inside the stack's network, where it declared one.
     #[serde(default)]
     pub listens: Option<u16>,
@@ -177,7 +172,6 @@ impl Placed {
                 .as_ref()
                 .filter(|health| health.kind == lemonfiber_plugin::HealthKind::Http)
                 .and_then(|health| health.path.clone()),
-            api: service.api.clone(),
             listens: service.listens,
             media_types: service.media_types.clone(),
             networks: Vec::new(),
@@ -332,9 +326,6 @@ pub struct Installed {
     /// kept, so a list is always there to read.
     #[serde(default)]
     pub recipes: Vec<super::recipes::Recipe>,
-    /// Every adapter of lemonfiber's its own services name, each said to be lemonfiber's.
-    #[serde(default)]
-    pub adapters: Vec<super::recipes::Named>,
     /// The source it was installed from, as the operator named it.
     ///
     /// Empty for a record written before this was kept. A rehearsal's account carries
@@ -414,7 +405,6 @@ impl Installed {
             request_proofs: proved::request_proofs(manifest),
             declared: super::declared::Declaration::of(manifest),
             recipes: super::recipes::declared(manifest),
-            adapters: super::recipes::named(manifest),
             from: String::new(),
             revision: String::new(),
             signed: String::new(),
@@ -441,9 +431,9 @@ impl Installed {
     /// The same record, with the adapter of every recipe call to one of the stack's own
     /// services, `installed` beside it.
     #[must_use]
-    pub fn reaching(self, stack: &lemonfiber_manifest::Manifest, installed: &[Self]) -> Self {
+    pub fn reaching(self, installed: &[Self]) -> Self {
         Self {
-            recipes: super::recipes::reaching(self.recipes, stack, installed),
+            recipes: super::recipes::reaching(self.recipes, installed),
             ..self
         }
     }

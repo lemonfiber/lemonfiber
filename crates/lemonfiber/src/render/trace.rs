@@ -5,7 +5,7 @@
 
 use lemonfiber_core::model::{
     HouseholdMember, HouseholdReport, MemberRequest, MemberStanding, Restriction, StuckReport,
-    TraceReport, UnsupportedReport,
+    TraceReport,
 };
 use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_core::trace::{Confidence, Coverage, Outcome as TraceOutcome, HISTORY_HORIZON};
@@ -435,28 +435,6 @@ pub(super) fn stuck(report: &StuckReport) -> Lines {
     // from being read as "nothing else is stuck", the same honesty a trace keeps.
     if report.incomplete {
         lines.spaced("A curator's queue could not be read, so this list may be incomplete.");
-    }
-    lines.extend(unreadable(&report.unsupported));
-    lines
-}
-
-/// The queues that were never asked, under the ones that were.
-///
-/// A different sentence from the unreadable-queue one above and deliberately so: that
-/// is a service that answered badly, and this is a service lemonfiber cannot speak to
-/// at all. An operator told only the first would go looking for a service that was
-/// down, and find it running.
-fn unreadable(unsupported: &[UnsupportedReport]) -> Lines {
-    let mut lines = Lines::default();
-    if unsupported.is_empty() {
-        return lines;
-    }
-    lines.spaced(
-        "These hold queues lemonfiber cannot read at all, so nothing of theirs is in the \
-         list above:",
-    );
-    for one in unsupported {
-        lines.put(format!("  {} — {}", one.what, one.because));
     }
     lines
 }

@@ -119,7 +119,6 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
         vec![crate::test_support::a_placed(
             "seerr",
             &["request.intake"],
-            Some(requests_api()),
             Some(5999),
         )],
     );

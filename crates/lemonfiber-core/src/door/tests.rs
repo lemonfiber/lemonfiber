@@ -1,7 +1,7 @@
 use super::fixtures::{asking, brought, fronted, installed, service, watching};
 use super::{begins_at, facing, Facing, NAMED};
 use crate::plugin::Installed;
-use lemonfiber_manifest::{ApiKind, Bind};
+use lemonfiber_manifest::Bind;
 
 /// Where the household begins over `services` with `installed` beside them and nothing
 /// filling an ask, as the facing and the id it runs under.
@@ -34,15 +34,15 @@ fn a_stack_publishing_nothing_to_the_household_has_no_door_at_all() {
     // An operator-only configuration. Answered as none rather than filled in
     // with the nearest thing that would open.
     let services = [
-        service("sonarr", Some(Bind::Loopback), Some(ApiKind::Servarr)),
-        service("homepage", Some(Bind::Lan), None),
+        service("sonarr", Some(Bind::Loopback)),
+        service("homepage", Some(Bind::Lan)),
     ];
     assert_eq!(begins(&services, &[]), None);
 }
 
 #[test]
 fn the_operators_index_is_never_offered_as_a_way_in() {
-    let homepage = service("homepage", Some(Bind::Lan), None);
+    let homepage = service("homepage", Some(Bind::Lan));
     assert_eq!(facing(&homepage), Some(Facing::Operators));
     assert!(!Facing::Operators.begins());
     assert!(Facing::Operators.because().contains("never a way in"));
@@ -50,16 +50,16 @@ fn the_operators_index_is_never_offered_as_a_way_in() {
 
 #[test]
 fn a_service_reachable_only_from_this_machine_is_no_part_of_this() {
-    let admin = service("sonarr", Some(Bind::Loopback), Some(ApiKind::Servarr));
+    let admin = service("sonarr", Some(Bind::Loopback));
     assert_eq!(facing(&admin), None);
-    let unpublished = service("recyclarr", None, None);
+    let unpublished = service("recyclarr", None);
     assert_eq!(facing(&unpublished), None);
 }
 
 #[test]
 fn a_shelf_is_reached_from_the_library_rather_than_instead_of_it() {
     for id in ["calibre-web-automated", "audiobookshelf"] {
-        let shelf = service(id, Some(Bind::Lan), None);
+        let shelf = service(id, Some(Bind::Lan));
         assert_eq!(facing(&shelf), Some(Facing::Shelf), "{id}");
         assert!(!Facing::Shelf.begins());
     }
@@ -67,35 +67,24 @@ fn a_shelf_is_reached_from_the_library_rather_than_instead_of_it() {
 
 #[test]
 fn the_proxy_carries_the_others_rather_than_being_one_of_them() {
-    let caddy = service("caddy", Some(Bind::Lan), None);
+    let caddy = service("caddy", Some(Bind::Lan));
     assert_eq!(facing(&caddy), Some(Facing::Carriage));
     assert!(!Facing::Carriage.begins());
 }
 
 #[test]
 fn a_published_service_nobody_vouched_for_is_offered_to_nobody() {
-    let stranger = service("something-new", Some(Bind::Lan), None);
+    let stranger = service("something-new", Some(Bind::Lan));
     assert_eq!(facing(&stranger), Some(Facing::Unstated));
     assert!(!Facing::Unstated.begins());
 }
 
+/// A stack service named for a request service or a library is what the register says of
+/// it: only a contract makes a place to begin.
 #[test]
-fn a_service_is_no_door_by_the_api_it_speaks() {
-    // Only a contract makes a place to begin, so a stack service speaking the API a
-    // request service or a library speaks is what the register says of it.
-    for kind in [
-        ApiKind::Seerr,
-        ApiKind::Jellyfin,
-        ApiKind::Servarr,
-        ApiKind::Sabnzbd,
-        ApiKind::Qbittorrent,
-        ApiKind::Bindery,
-    ] {
-        let published = service("client", Some(Bind::Lan), Some(kind));
-        assert_eq!(facing(&published), Some(Facing::Unstated), "{kind:?}");
-    }
+fn a_service_is_no_door_by_its_name() {
     for id in ["seerr", "jellyfin"] {
-        let named = service(id, Some(Bind::Lan), None);
+        let named = service(id, Some(Bind::Lan));
         assert_eq!(facing(&named), Some(Facing::Unstated), "{id}");
     }
 }
@@ -177,7 +166,7 @@ fn a_plugins_service_is_judged_by_the_contract_in_front_of_it() {
 #[test]
 fn only_the_services_own_plugin_says_what_it_is() {
     let requests = installed(vec![brought("requests", Some("ask"))]);
-    let mut adapter = crate::test_support::a_placed("requests-adapter", &[], None, Some(8080));
+    let mut adapter = crate::test_support::a_placed("requests-adapter", &[], Some(8080));
     adapter.fronts = Some("requests".to_owned());
     adapter.speaks = vec!["request.intake@1".to_owned()];
     let both = [

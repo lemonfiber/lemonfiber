@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_manifest::{Api, ApiKind, KeySource, Manifest};
+use lemonfiber_manifest::Manifest;
 
 use super::{request_service, requests_as_owner, requests_from};
 use crate::app::Ctx;
@@ -12,7 +12,7 @@ use crate::plugin::Installed;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::test_support::{
     a_context, a_placed, an_installed, Reporting, SeedFs, CONTRACTED_REQUESTS,
-    CONTRACTED_REQUESTS_AT, SEERR_SETTINGS,
+    CONTRACTED_REQUESTS_AT,
 };
 use crate::wiring::{Chosen, Fillers};
 
@@ -27,18 +27,9 @@ const FIRST_PARTY: [FirstParty; 1] = [FirstParty {
 }];
 
 /// The request service's own adapter, reading its key from the settings it writes.
-fn requests_api() -> Api {
-    Api {
-        kind: ApiKind::Seerr,
-        key_source: KeySource::ConfigJson,
-        path: Some("/config/settings.json".to_owned()),
-        version: None,
-    }
-}
-
-/// A plugin whose `service` fills `request.intake`, speaking `speaks` and through `api`.
-fn bringing(service: &str, speaks: &[&str], api: Option<Api>) -> Installed {
-    let mut placed = a_placed(service, &["request.intake"], api, Some(8080));
+/// A plugin whose `service` fills `request.intake`, speaking `speaks`.
+fn bringing(service: &str, speaks: &[&str]) -> Installed {
+    let mut placed = a_placed(service, &["request.intake"], Some(8080));
     placed.speaks = speaks.iter().map(|one| (*one).to_owned()).collect();
     let mut installed = an_installed("intake", vec![placed]);
     installed.manifest = MANIFEST.to_owned();
@@ -67,8 +58,7 @@ fn beside(installed: &[Installed], own: bool, project: &Path) -> Fillers {
 }
 
 /// A project holding the plugin's key where `keyed`, and a context publishing it on
-/// loopback, reading the stack's request service's settings, and answering every call
-/// with nothing.
+/// loopback and answering every call with nothing.
 fn reaching(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
     let project = Scratch::new(&format!("opening-{tag}"));
     if keyed {
@@ -83,7 +73,7 @@ fn reaching(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
         .engine(Arc::new(engine))
         .build()
         .with_http(fake.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None).with_requests(SEERR_SETTINGS)));
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
     ctx.settings.env_file = Some(project.join(".env"));
     (project, ctx, fake)
 }
@@ -109,7 +99,7 @@ fn asked(fake: &Fake) -> Vec<(String, Option<String>)> {
 async fn a_first_party_request_service_speaking_the_contract_is_asked_over_it() {
     let (project, ctx, fake) = reaching("contracted", true);
     let fillers = beside(
-        &[bringing(CONTRACTED_REQUESTS, &["request.intake@1"], None)],
+        &[bringing(CONTRACTED_REQUESTS, &["request.intake@1"])],
         false,
         &project,
     );
@@ -126,7 +116,7 @@ async fn a_first_party_request_service_speaking_the_contract_is_asked_over_it() 
 
 /// A request service speaking the contract that cannot be asked over it — holding no
 /// key, or speaking a major this build does not — is asked nothing, and never as the
-/// bundled request service, whatever adapter it also names.
+/// bundled request service.
 #[tokio::test]
 async fn a_contracted_request_service_that_cannot_be_asked_is_asked_nothing() {
     for (tag, keyed, speaks) in [
@@ -134,15 +124,7 @@ async fn a_contracted_request_service_that_cannot_be_asked_is_asked_nothing() {
         ("unspoken", true, "request.intake@2"),
     ] {
         let (project, ctx, fake) = reaching(tag, keyed);
-        let fillers = beside(
-            &[bringing(
-                CONTRACTED_REQUESTS,
-                &[speaks],
-                Some(requests_api()),
-            )],
-            false,
-            &project,
-        );
+        let fillers = beside(&[bringing(CONTRACTED_REQUESTS, &[speaks])], false, &project);
 
         assert!(requests_from(&ctx, &fillers).await.is_none(), "{tag}");
         let owned = match request_service(&fillers) {
@@ -155,16 +137,12 @@ async fn a_contracted_request_service_that_cannot_be_asked_is_asked_nothing() {
 }
 
 /// **A plugin's service is never asked as the stack's own request service.** One
-/// speaking no contract, under the stack's request service's id and adapter, with a key
-/// on file, is asked nothing.
+/// speaking no contract, under the stack's request service's id, with a key on file, is
+/// asked nothing.
 #[tokio::test]
 async fn a_plugin_speaking_no_contract_is_never_asked_as_the_bundled_request_service() {
     let (project, ctx, fake) = reaching("impostor", true);
-    let fillers = beside(
-        &[bringing("seerr", &[], Some(requests_api()))],
-        false,
-        &project,
-    );
+    let fillers = beside(&[bringing("seerr", &[])], false, &project);
 
     assert!(requests_from(&ctx, &fillers).await.is_none());
     assert!(fake.requests().is_empty(), "{:?}", asked(&fake));

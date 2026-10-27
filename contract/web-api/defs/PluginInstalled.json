@@ -3,14 +3,6 @@
   "description": "One plugin's install, as it was decided.",
   "type": "object",
   "properties": {
-    "adapters": {
-      "description": "Every adapter of lemonfiber's its own services name, each said to be lemonfiber's.",
-      "type": "array",
-      "default": [],
-      "items": {
-        "$ref": "PluginServiceAdapter.json"
-      }
-    },
     "contributions": {
       "description": "Every row it adds to a register lemonfiber already runs, as the install settled\nthem, so the doctor reads them off this record rather than off the plugin's files.\nDefaulted for a register written before this field existed.",
       "type": "array",

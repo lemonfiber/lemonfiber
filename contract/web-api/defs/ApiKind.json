@@ -28,7 +28,7 @@
       "const": "bindery"
     },
     {
-      "description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads, so it has a `key_source` of `generated`.",
+      "description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads.",
       "type": "string",
       "const": "jellyfin"
     },
@@ -38,7 +38,7 @@
       "const": "bazarr"
     },
     {
-      "description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.",
+      "description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's. The token it hands back on sign-in is stable, so it is read\nagain rather than recorded twice.",
       "type": "string",
       "const": "audiobookshelf"
     },

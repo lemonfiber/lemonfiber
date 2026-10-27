@@ -313,17 +313,8 @@ async fn the_command_answers_with_the_reading() {
 /// unread rather than read through an adapter only an assembled part is reached by.
 #[tokio::test]
 async fn a_plugin_server_an_older_record_names_an_adapter_for_is_never_asked() {
-    let mut placed = crate::test_support::a_placed(
-        "emby",
-        &["identity.source", "media.serve"],
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Jellyfin,
-            key_source: lemonfiber_manifest::KeySource::Generated,
-            path: None,
-            version: None,
-        }),
-        Some(8920),
-    );
+    let mut placed =
+        crate::test_support::a_placed("emby", &["identity.source", "media.serve"], Some(8920));
     placed.tag = "4.9.1".to_owned();
     let mut register = crate::plugin::Register::empty();
     assert!(register

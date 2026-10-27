@@ -19,7 +19,6 @@ use lemonfiber_manifest::Service;
 
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
-use crate::ports::filesystem::Beneath;
 use crate::ports::media::Kind;
 use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
 use crate::seed::{State, Wiring};
@@ -74,19 +73,11 @@ async fn wanted_targets(
     curators: &[Fulfils<'_>],
 ) -> (Vec<FulfilmentTarget>, Vec<Wiring>) {
     let mut wanted = Vec::new();
-    let mut refused = Vec::new();
+    let refused = Vec::new();
     for fulfils in curators {
         let filler = fulfils.filler;
-        let key = match super::keys::curator_key(ctx, filler).await {
-            Beneath::Read(key) => key,
-            Beneath::Absent => continue,
-            Beneath::Escaped => {
-                refused.push(super::keys::refused(
-                    crate::seed::as_request_target(&filler.name),
-                    filler,
-                ));
-                continue;
-            }
+        let Some(key) = super::keys::minted_key(ctx, filler) else {
+            continue;
         };
         let Some(client) = super::curating::curated(ctx, fillers, filler).await else {
             continue;

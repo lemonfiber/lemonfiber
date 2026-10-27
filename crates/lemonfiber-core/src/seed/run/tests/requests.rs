@@ -357,40 +357,6 @@ async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
     );
 }
 
-/// A first-party curator whose credential file leads away is refused as a request target
-/// rather than left out, so the operator sees why the request service was not handed it.
-#[tokio::test]
-async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
-    let ctx = crate::test_support::adapted::asking(
-        seed_ctx(true, None, None).with_http(Fake::silent()),
-        &[REQUESTS],
-    )
-    .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
-    let mut stand_in = a_stand_in("movies");
-    crate::test_support::CONTRACTED_MANIFEST.clone_into(&mut stand_in.manifest);
-    crate::test_support::A_TREE.clone_into(&mut stand_in.tree);
-    let installed: Vec<_> = REQUESTS.installed().into_iter().chain([stand_in]).collect();
-    let trusted: Vec<_> = first_party("kept")
-        .into_iter()
-        .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
-        .collect();
-
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &fillers_trusting(Vec::new(), &installed, stack_root(), &trusted),
-        Some(stack_root()),
-    )
-    .await;
-
-    assert!(
-        matches!(wirings.as_slice(), [wiring]
-            if wiring.connection == crate::seed::as_request_target("kept the stand-in")
-                && matches!(wiring.state, crate::seed::State::Refused { .. })),
-        "{wirings:?}"
-    );
-}
-
 /// A plugin `intake` whose service stands in for the stack's request service over
 /// `request.intake`, beside the television curator moved into its plugin.
 fn contracted_requests(
@@ -452,7 +418,7 @@ async fn a_contracted_request_service_untrusted_or_unreachable_is_handed_nothing
 async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_with_the_stacks_key(
 ) {
     let project = lemonfiber_fixtures::scratch::Scratch::new("requests-bundled-plugin");
-    let stand_in = crate::test_support::a_placed("seerr", &[], Some(requests_api()), Some(5055));
+    let stand_in = crate::test_support::a_placed("seerr", &[], Some(5055));
     let mut asking = crate::test_support::an_installed("asking", vec![stand_in]);
     asking.manifest = "asking-manifest".to_owned();
     asking.tree = crate::test_support::A_TREE.to_owned();

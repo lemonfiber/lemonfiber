@@ -438,19 +438,14 @@ fn a_secrets_file_is_written_owner_only_and_refused_where_the_store_does_not_rea
 /// written, and a plugin replacing nothing is not asked.
 #[test]
 fn only_a_first_party_plugin_replaces_a_stack_service() {
-    let mut placed = crate::test_support::a_placed("jellyfin", &[], None, Some(8096));
+    let mut placed = crate::test_support::a_placed("jellyfin", &[], Some(8096));
     placed.replaces = Some("jellyfin".to_owned());
     let mut replacing = crate::test_support::an_installed("contracted", vec![placed]);
     replacing.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     replacing.tree = crate::test_support::A_TREE.to_owned();
     let plain = crate::test_support::an_installed(
         "contracted",
-        vec![crate::test_support::a_placed(
-            "komga",
-            &[],
-            None,
-            Some(25600),
-        )],
+        vec![crate::test_support::a_placed("komga", &[], Some(25600))],
     );
 
     let stranger = super::super::replacing::unreplaced(&replacing, &[]);
@@ -505,7 +500,7 @@ fn a_directory_reached_through_a_link_is_not_made() {
 fn a_mount_source_reached_through_a_link_refuses_its_document() {
     let ctx = ctx("linked-mount-source");
     let stack = stack_of(&ctx);
-    let mut placed = crate::test_support::a_placed("komga", &[], None, None);
+    let mut placed = crate::test_support::a_placed("komga", &[], None);
     placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
         from: "Caddyfile".to_owned(),
         to: "/etc/caddy/Caddyfile".to_owned(),
@@ -530,7 +525,7 @@ fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
     use lemonfiber_manifest::container::{UrlOf, Value};
 
     let ctx = ctx("addressed");
-    let mut placed = crate::test_support::a_placed("subfinder", &[], None, None);
+    let mut placed = crate::test_support::a_placed("subfinder", &[], None);
     placed.asks = vec![crate::plugin::Asking {
         native: None,
         capability: "indexer.search".to_owned(),
@@ -572,7 +567,7 @@ fn a_setting_is_written_as_the_operator_recorded_it_and_as_its_default_otherwise
             recorded_with: None,
         })
     };
-    let mut placed = crate::test_support::a_placed("reader", &[], None, None);
+    let mut placed = crate::test_support::a_placed("reader", &[], None);
     placed.fields.env = [
         ("MODE".to_owned(), setting("subs:mode")),
         ("SPEED".to_owned(), setting("subs:speed")),

@@ -120,7 +120,6 @@ fn a_rehearsed_pass_says_it_wrote_nothing_and_what_running_it_for_real_would_tak
             },
         )],
         assessment: SeedAssessment::Assessed,
-        unsupported: Vec::new(),
         rehearsed: true,
     };
     let text = seeding(&waiting).text();
@@ -134,40 +133,11 @@ fn a_rehearsed_pass_says_it_wrote_nothing_and_what_running_it_for_real_would_tak
     let settled = SeedReport {
         wirings: vec![wiring("a", SeedState::AlreadyWired)],
         assessment: SeedAssessment::Assessed,
-        unsupported: Vec::new(),
         rehearsed: true,
     };
     let done = seeding(&settled).text();
     assert!(done.contains("a real run would change nothing"), "{done}");
     assert!(done.contains("Nothing was written."), "{done}");
-}
-
-/// A service the pass could not speak to is named under the connections, with why,
-/// rather than being absent from a report that otherwise reads as complete.
-#[test]
-fn a_service_nothing_could_be_wired_into_is_named_with_why() {
-    let report = SeedReport {
-        wirings: vec![wiring("a", SeedState::Wired)],
-        assessment: SeedAssessment::Assessed,
-        unsupported: vec![lemonfiber_core::model::UnsupportedReport {
-            what: "bookish".to_owned(),
-            because: "lemonfiber does not speak this service's API yet".to_owned(),
-        }],
-        rehearsed: false,
-    };
-    let text = seeding(&report).text();
-    assert!(text.contains("cannot speak to them"), "{text}");
-    assert!(
-        text.contains("bookish — lemonfiber does not speak"),
-        "{text}"
-    );
-}
-
-/// And a stack with nothing of the sort hears nothing about it.
-#[test]
-fn a_pass_that_could_speak_to_everything_says_nothing_about_it() {
-    let report = seed_report(vec![wiring("a", SeedState::Wired)]);
-    assert!(!seeding(&report).text().contains("cannot speak to them"));
 }
 
 #[test]
@@ -234,7 +204,6 @@ fn a_lost_baseline_says_drift_could_not_be_assessed() {
         wirings: vec![wiring("a", SeedState::Wired)],
         assessment: SeedAssessment::Unassessable,
         rehearsed: false,
-        unsupported: Vec::new(),
     };
     assert!(seeding(&report).text().contains("could not be read"));
 }

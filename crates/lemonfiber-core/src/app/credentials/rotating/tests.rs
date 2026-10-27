@@ -170,17 +170,7 @@ fn a_rotation_that_was_stopped_is_not_read_as_one_that_was_rehearsed() {
 /// of its own, so the stack's names no server, and nothing is asked of any.
 #[tokio::test]
 async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_server() {
-    let mut placed = crate::test_support::a_placed(
-        "emby",
-        &["identity.source"],
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Jellyfin,
-            key_source: lemonfiber_manifest::KeySource::Generated,
-            path: None,
-            version: None,
-        }),
-        Some(8920),
-    );
+    let mut placed = crate::test_support::a_placed("emby", &["identity.source"], Some(8920));
     placed.tag = "4.9.1".to_owned();
     let installed = [crate::test_support::an_installed(
         "emby-server",

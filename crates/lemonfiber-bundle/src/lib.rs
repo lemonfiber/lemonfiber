@@ -71,7 +71,7 @@ pub struct Bundle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Stage {
-    /// Its one service is a stack service, its in-process adapter included.
+    /// Its one service is a stack service the bundle assembles into the stack it ships.
     Assembled,
     /// Its adapter has shipped and it moves in place of the service it replaces.
     Installed,

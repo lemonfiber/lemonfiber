@@ -223,29 +223,23 @@ fn a_service_asking_nothing_records_no_asks_and_reads_back_from_a_record_without
     assert_eq!(read.map(|one| one.asks), Some(Vec::new()));
 }
 
-/// The adapter a service names and the port it answers on are what the record keeps,
-/// so whatever later asks for what it fills can be told about it.
+/// The port a service answers on is what the record keeps, so whatever later asks for
+/// what it fills can be told where it answers.
 #[test]
-fn the_adapter_a_service_names_survives_the_install() {
-    let api = lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-        key_source: lemonfiber_manifest::KeySource::ConfigIni,
-        path: Some("/config/sabnzbd.ini".to_owned()),
-        version: None,
-    };
+fn the_port_a_service_answers_on_survives_the_install() {
     let record = installed(|manifest| {
         set(manifest, |service| {
-            service.api = Some(api.clone());
             service.listens = Some(8080);
         });
     });
 
-    let komga = placed(record.as_ref(), "komga");
-    assert_eq!(komga.as_ref().and_then(|one| one.api.clone()), Some(api));
-    assert_eq!(komga.and_then(|one| one.listens), Some(8080));
     assert_eq!(
-        placed(record.as_ref(), "komga-sidecar").map(|one| (one.api, one.listens)),
-        Some((None, None)),
+        placed(record.as_ref(), "komga").and_then(|one| one.listens),
+        Some(8080)
+    );
+    assert_eq!(
+        placed(record.as_ref(), "komga-sidecar").and_then(|one| one.listens),
+        None,
         "and the service that named none keeps none"
     );
 }
@@ -738,33 +732,53 @@ fn the_shape_a_service_took_is_kept_and_a_record_without_one_reads_as_none() {
     );
 }
 
-/// An adapter an older record carries for an installed plugin's service is read back as
-/// none, so the service is never reached through an adapter of lemonfiber's.
+/// A record an older lemonfiber wrote, naming an in-process adapter for a plugin and for
+/// one of its services, still reads, and what is written again names neither.
 #[test]
-fn an_adapter_an_older_record_carries_is_read_back_as_none() {
+fn a_record_naming_in_process_adapters_reads_and_is_written_without_them() {
     let mut register = Register::empty();
-    let named = installed(|manifest| {
-        set(manifest, |service| {
-            service.api = Some(lemonfiber_manifest::Api {
-                kind: lemonfiber_manifest::ApiKind::Sabnzbd,
-                key_source: lemonfiber_manifest::KeySource::ConfigIni,
-                path: Some("/config/sabnzbd.ini".to_owned()),
-                version: None,
-            });
-        });
-    });
-    assert_eq!(named.map(|one| register.record(one)), Some(Ok(())));
-    let text = register.to_json().unwrap_or_default();
-    assert!(text.contains("\"sabnzbd\""), "{text}");
+    assert_eq!(
+        installed(|_| {}).map(|one| register.record(one)),
+        Some(Ok(()))
+    );
+    let mut older: serde_json::Value =
+        serde_json::from_str(&register.to_json().unwrap_or_default()).unwrap_or_default();
+    if let Some(plugin) = older
+        .get_mut("installed")
+        .and_then(|installed| installed.get_mut(0))
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        plugin.insert(
+            "adapters".to_owned(),
+            serde_json::json!([{ "service": "komga", "kind": "sabnzbd", "owner": "lemonfiber" }]),
+        );
+        if let Some(service) = plugin
+            .get_mut("services")
+            .and_then(|services| services.get_mut(0))
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            service.insert(
+                "api".to_owned(),
+                serde_json::json!({ "kind": "sabnzbd", "key_source": "config-ini" }),
+            );
+        }
+    }
+    let text = older.to_string();
+    assert!(
+        text.contains("\"adapters\"") && text.contains("\"api\""),
+        "{text}"
+    );
 
     let read = Register::parse(&text);
+    let again = read
+        .as_ref()
+        .ok()
+        .and_then(Register::to_json)
+        .unwrap_or_default();
 
     assert!(read.is_ok(), "{read:?}");
-    assert!(read
-        .iter()
-        .flat_map(Register::installed)
-        .flat_map(|one| &one.services)
-        .all(|placed| placed.api.is_none()));
+    assert!(!again.contains("\"adapters\""), "{again}");
+    assert!(!again.contains("\"api\""), "{again}");
 }
 
 mod dashboard;

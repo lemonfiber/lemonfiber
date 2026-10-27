@@ -1,16 +1,16 @@
 //! The request gate's routes: each upstream it answers for, and what it presents there.
 //!
 //! The gate holds the credentials the request service would otherwise hold: each
-//! fulfilling curator's own key, read from where the curator wrote it, and a key minted for
-//! the gate alone in the media server, whichever service fills the identity source, and
-//! filed under its name. They are handed over through `request.gate`, which the stack's own
-//! gate is told in owner-only files in its configuration directory, never its environment,
-//! and again whenever what they should hold has moved — a curator that regenerated its key
-//! reaches the gate on the next pass.
+//! fulfilling curator's key, the one lemonfiber minted for it, and a key minted for the
+//! gate alone in the media server, whichever service fills the identity source, and filed
+//! under its name. They are handed over through `request.gate`, which the stack's own gate
+//! is told in owner-only files in its configuration directory, never its environment, and
+//! again whenever what they should hold has moved — a curator key minted anew reaches the
+//! gate on the next pass.
 //!
 //! **A curator the request service fulfils through that the gate holds no route to is
 //! said**, on a line of its own beside the gate's: one whose credential the gate may not
-//! hold, one that has written no key yet, and one whose key file was refused.
+//! hold, and one lemonfiber holds no minted key for.
 //!
 //! **The gate is what holds the media server's key.** A key filed under the gate's name
 //! whose SHA-256 the gate does not answer is one nothing holds, and is revoked, as the
@@ -107,7 +107,7 @@ async fn curators_alone(
         Ok(asked) => asked,
         Err(state) => return vec![settled(state)],
     };
-    let (routes, unrouted) = routing(ctx, fillers).await;
+    let (routes, unrouted) = routing(ctx, fillers);
     let wanted = kept_tokens(routes, &admitted);
     let state = if holds(&admitted, &wanted) {
         State::AlreadyWired
@@ -171,7 +171,7 @@ async fn with_the_media_server(
         Ok(asked) => asked,
         Err(state) => return vec![settled(state)],
     };
-    let (curators, unrouted) = routing(ctx, fillers).await;
+    let (curators, unrouted) = routing(ctx, fillers);
     let state = match held(&admitted, &filed) {
         Some(key) => {
             let wanted = kept_tokens(with(&curators, to_media(routed, &key)), &admitted);
@@ -317,16 +317,16 @@ async fn kept(
     minted::revoking(client, others).await
 }
 
-/// A route for each curator the request service fulfils through, with the key it wrote for
-/// itself. A curator that has written none yet has no route until it has.
-pub(crate) async fn curator_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Gated> {
-    routing(ctx, fillers).await.0
+/// A route for each curator the request service fulfils through, with the key lemonfiber
+/// minted for it. A curator holding no minted key has no route.
+pub(crate) fn curator_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Gated> {
+    routing(ctx, fillers).0
 }
 
 /// [`curator_routes`], and a line for each curator the request service fulfils through
 /// that the gate is handed no route to, saying why: one whose credential the gate may not
-/// hold, one that has written no key yet, and one whose key file was refused.
-async fn routing(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> (Vec<Gated>, Vec<Wiring>) {
+/// hold, and one holding no minted key.
+fn routing(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> (Vec<Gated>, Vec<Wiring>) {
     let mut routes = Vec::new();
     let mut unrouted = Vec::new();
     for fulfils in super::fulfilling(fillers) {
@@ -345,16 +345,9 @@ async fn routing(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> (Vec<Gated>, Ve
             ));
             continue;
         }
-        let key = match super::keys::curator_key(ctx, filler).await {
-            crate::ports::filesystem::Beneath::Read(key) => key,
-            crate::ports::filesystem::Beneath::Absent => {
-                unrouted.push(super::skipped(connection, &filler.name));
-                continue;
-            }
-            crate::ports::filesystem::Beneath::Escaped => {
-                unrouted.push(super::keys::refused(connection, filler));
-                continue;
-            }
+        let Some(key) = super::keys::minted_key(ctx, filler) else {
+            unrouted.push(super::skipped(connection, &filler.name));
+            continue;
         };
         routes.push(Gated {
             target: Target::Curator {

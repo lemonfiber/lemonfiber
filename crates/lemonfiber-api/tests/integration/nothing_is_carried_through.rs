@@ -90,7 +90,7 @@ fn this_surface_cannot_open_a_connection_of_its_own() {
 fn this_surface_never_reaches_the_layer_that_talks_to_them() {
     let named: Vec<String> = source()
         .into_iter()
-        .filter(|(_, text)| text.contains("adapters"))
+        .filter(|(_, text)| text.contains("lemonfiber_adapters"))
         .map(|(path, _)| path.display().to_string())
         .collect();
 

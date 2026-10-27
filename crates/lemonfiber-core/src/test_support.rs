@@ -11,7 +11,7 @@ pub(crate) use lemonfiber_fixtures::support::*;
 #[path = "../../lemonfiber-testing/src/context.rs"]
 pub mod context;
 
-pub(crate) use context::{a_context, declaring, nowhere, repository_stack as stack};
+pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
 #[path = "../../lemonfiber-testing/src/adapted.rs"]
 pub mod adapted;
@@ -139,15 +139,14 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     path
 }
 
-/// One installed plugin's service, filling `provides`, speaking `api` where it names one
-/// and answering on `listens` where it says.
+/// One installed plugin's service, filling `provides` and answering on `listens` where it
+/// says.
 ///
 /// Its configuration directory is the format's fallback, `/config`, so an adapter path
 /// beneath it reads the way a bundled service's does.
 pub(crate) fn a_placed(
     service: &str,
     provides: &[&str],
-    api: Option<lemonfiber_manifest::Api>,
     listens: Option<u16>,
 ) -> crate::plugin::Placed {
     crate::plugin::Placed {
@@ -166,7 +165,6 @@ pub(crate) fn a_placed(
         icon: None,
         hidden: false,
         health: None,
-        api,
         listens,
         media_types: Vec::new(),
         networks: Vec::new(),
@@ -227,7 +225,7 @@ pub(crate) fn beside_contracted_requests(
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
-    let mut placed = a_placed(CONTRACTED_REQUESTS, &["request.intake"], None, Some(8080));
+    let mut placed = a_placed(CONTRACTED_REQUESTS, &["request.intake"], Some(8080));
     placed.speaks = vec!["request.intake@1".to_owned()];
     let mut register = crate::plugin::Register::empty();
     let _ = register.record(an_installed("intake", vec![placed]));
@@ -277,9 +275,9 @@ pub(crate) const A_MINTED_KEY: &str = "series:upstream-key";
 /// upstream `series-upstream`, which talks `servarr` and holds the key lemonfiber minted
 /// for it as [`A_MINTED_KEY`].
 pub(crate) fn a_minting_curator() -> crate::plugin::Installed {
-    let mut adapter = a_placed("series", &["library.curate"], None, None);
+    let mut adapter = a_placed("series", &["library.curate"], None);
     adapter.fronts = Some("series-upstream".to_owned());
-    let mut upstream = a_placed("series-upstream", &[], None, Some(8989));
+    let mut upstream = a_placed("series-upstream", &[], Some(8989));
     upstream.native = Some("servarr".to_owned());
     let mut curator = an_installed("series", vec![adapter, upstream]);
     curator.declared.secrets = vec![crate::plugin::Secret {
@@ -310,7 +308,6 @@ pub(crate) fn an_installed(
         request_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
-        adapters: Vec::new(),
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
@@ -362,12 +359,11 @@ pub(crate) fn a_contracted_media_server(native: Option<&str>) -> crate::plugin::
     let mut adapter = a_placed(
         MEDIA_ADAPTER,
         &["identity.source", "media.serve"],
-        None,
         Some(CONTRACTED_PORT),
     );
     adapter.speaks = vec!["identity.source@1".to_owned(), "media.serve@1".to_owned()];
     adapter.fronts = Some(MEDIA_UPSTREAM.to_owned());
-    let mut upstream = a_placed(MEDIA_UPSTREAM, &[], None, Some(9000));
+    let mut upstream = a_placed(MEDIA_UPSTREAM, &[], Some(9000));
     upstream.native = native.map(str::to_owned);
     let mut installed = an_installed("contracted", vec![adapter, upstream]);
     installed.manifest = CONTRACTED_MANIFEST.to_owned();
@@ -382,7 +378,7 @@ pub(crate) fn contracted(
     service: &str,
     capability: &str,
 ) -> crate::plugin::Installed {
-    let mut placed = a_placed(service, &[capability], None, Some(CONTRACTED_PORT));
+    let mut placed = a_placed(service, &[capability], Some(CONTRACTED_PORT));
     placed.speaks = vec![format!("{capability}@1")];
     let mut installed = an_installed(plugin, vec![placed]);
     installed.manifest = CONTRACTED_MANIFEST.to_owned();

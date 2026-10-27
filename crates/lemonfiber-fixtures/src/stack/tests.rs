@@ -68,7 +68,7 @@ fn a_manifest_in_one_text_is_laid_out_a_file_per_service() {
     let _ = std::fs::remove_dir_all(&into);
     manifest_written(
         &into,
-        "schema_version = 1\n\n[[service]]\nid = \"a\"\n\n[service.api]\nkind = \"x\"\n\n[[wiring]]\nby = \"a\"\n\n[[service]]\nname = \"b\"\n",
+        "schema_version = 1\n\n[[service]]\nid = \"a\"\n\n[service.health]\nkind = \"x\"\n\n[[wiring]]\nby = \"a\"\n\n[[service]]\nname = \"b\"\n",
     );
     let root = std::fs::read_to_string(into.join("stack.toml")).unwrap_or_default();
     assert!(
@@ -82,7 +82,7 @@ fn a_manifest_in_one_text_is_laid_out_a_file_per_service() {
         "{root}"
     );
     let first = std::fs::read_to_string(into.join("services/a.toml")).unwrap_or_default();
-    assert!(first.contains("[service.api]"), "{first}");
+    assert!(first.contains("[service.health]"), "{first}");
     assert!(into.join("services/service-1.toml").is_file());
     let _ = std::fs::remove_dir_all(&into);
 }

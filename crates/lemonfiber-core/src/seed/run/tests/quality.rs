@@ -31,22 +31,23 @@ fn the_sync(speaking: bool) -> crate::plugin::Installed {
     installed
 }
 
-/// [`the_sync`] beside a curator of each kind of video and one of music.
+/// [`the_sync`] beside a curator of each kind of video and one of music, each moved into
+/// its plugin, trusting `trusted` beside the bundle's plugins.
 fn a_sync(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
     speaking: bool,
 ) -> crate::wiring::Fillers {
-    fillers_trusting(
-        vec![
-            curator("sonarr", 8989, "tv"),
-            curator("radarr", 7878, "movies"),
-            curator("lidarr", 8686, "music"),
-        ],
-        &[the_sync(speaking)],
-        project,
-        trusted,
-    )
+    let curators = vec![
+        curator("sonarr", 8989, "tv"),
+        curator("radarr", 7878, "movies"),
+        curator("lidarr", 8686, "music"),
+    ];
+    let installed: Vec<crate::plugin::Installed> = [the_sync(speaking)]
+        .into_iter()
+        .chain(curators_moved(&curators))
+        .collect();
+    fillers_trusting(curators, &installed, project, &beside_the_bundle(trusted))
 }
 
 /// What one `apply` carried.
@@ -89,14 +90,8 @@ async fn a_first_party_sync_holds_each_video_curator_to_the_chosen_preset_over_i
     assert_eq!(
         held,
         vec![
-            (
-                "sonarr the app's quality profiles",
-                &crate::seed::State::Wired
-            ),
-            (
-                "radarr the app's quality profiles",
-                &crate::seed::State::Wired
-            ),
+            ("Sonarr's quality profiles", &crate::seed::State::Wired),
+            ("Radarr's quality profiles", &crate::seed::State::Wired),
         ]
     );
     assert!(http.requests().iter().all(|one| one
@@ -226,11 +221,10 @@ async fn an_unreadable_choice_is_reported_on_every_curator_and_never_applied() {
 }
 
 #[tokio::test]
-async fn a_curator_with_no_key_yet_is_skipped_and_owes_the_sync_nothing() {
+async fn a_curator_holding_no_minted_key_is_skipped_and_owes_the_sync_nothing() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-unkeyed-curator");
     let http = syncing(NOTHING_APPLIED);
-    let ctx = contracted_ctx(&project, "sync", true, http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let ctx = forgetting_minted(contracted_ctx(&project, "sync", true, http.clone()));
     let fillers = a_sync(&project, &first_party("syncer"), true);
 
     let wirings = super::super::quality::seed_quality(&ctx, &fillers).await;
@@ -248,36 +242,6 @@ async fn a_curator_with_no_key_yet_is_skipped_and_owes_the_sync_nothing() {
 }
 
 #[tokio::test]
-async fn a_curator_whose_key_file_leads_away_is_refused_and_never_handed_to_the_sync() {
-    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-leading-away");
-    let http = syncing(NOTHING_APPLIED);
-    let ctx = contracted_ctx(&project, "sync", true, http.clone()).with_filesystem(Arc::new(
-        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"))
-            .leading_away(vec!["config/radarr/"]),
-    ));
-    let fillers = a_sync(&project, &first_party("syncer"), true);
-
-    let wirings = super::super::quality::seed_quality(&ctx, &fillers).await;
-    let reprofiled = super::super::quality::reprofile(&ctx, &fillers, "radarr").await;
-
-    let refused = |state: &crate::seed::State| matches!(state, crate::seed::State::Refused { reason } if reason.starts_with("radarr the app's credential file"));
-    assert!(
-        matches!(wirings.as_slice(), [sonarr, radarr]
-            if sonarr.state == crate::seed::State::Wired
-                && radarr.connection == "radarr the app's quality profiles"
-                && refused(&radarr.state)),
-        "{wirings:?}"
-    );
-    assert!(
-        matches!(reprofiled.as_slice(), [(_, state)] if refused(state)),
-        "{reprofiled:?}"
-    );
-    let told = applied_bodies(&http);
-    assert_eq!(told.len(), 1, "{told:?}");
-    assert!(told.iter().all(|body| body.contains("8989")));
-}
-
-#[tokio::test]
 async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_over() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing");
     let fillers = a_sync(&project, &first_party("syncer"), true);
@@ -292,9 +256,16 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
         &fillers,
     )
     .await;
-    let unwritten_ctx = contracted_ctx(&project, "sync", true, unwritten.clone());
+    let written = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing-written");
+    let unwritten_ctx = contracted_ctx(&written, "sync", true, unwritten.clone());
     let not_written = super::super::quality::seed_quality(&unwritten_ctx, &fillers).await;
-    let not_reprofiled = super::super::quality::reprofile(&unwritten_ctx, &fillers, "radarr").await;
+    let reprofiling = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing-reprofiled");
+    let not_reprofiled = super::super::quality::reprofile(
+        &contracted_ctx(&reprofiling, "sync", true, unwritten.clone()),
+        &fillers,
+        "radarr",
+    )
+    .await;
 
     for wirings in [&not_read, &not_written] {
         assert_eq!(wirings.len(), 2, "{wirings:?}");

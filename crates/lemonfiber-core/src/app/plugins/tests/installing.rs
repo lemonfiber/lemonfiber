@@ -127,9 +127,9 @@ async fn a_service_naming_an_in_process_adapter_is_not_installed() {
         .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
         .unwrap_or_default();
 
-    assert_eq!(refused.0, "PLUGIN-3");
+    assert_eq!(refused.0, "PLUGIN-2");
     assert!(
-        refused.1.contains("service komga.api") && refused.1.contains("in-process adapter"),
+        refused.1.contains("service komga.api") && refused.1.contains("no such field"),
         "{}",
         refused.1
     );
