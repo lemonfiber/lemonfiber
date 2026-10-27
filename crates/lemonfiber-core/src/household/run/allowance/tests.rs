@@ -2,9 +2,9 @@ use super::{counted, estimated, limited, reported, waiting, worth_saying, Asked,
 use crate::asking::{Policy, Standing};
 use crate::household::State;
 use crate::model::{HouseholdMember, MemberRequest};
+use crate::ports::media::Kind;
 use crate::ports::service::{Asking, Headroom, Left, Quota};
 use crate::quality::{Preset, Selection};
-use crate::recyclarr::Kind;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Three days after the moment these fixtures ask at.

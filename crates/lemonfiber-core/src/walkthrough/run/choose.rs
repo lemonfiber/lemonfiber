@@ -11,8 +11,8 @@
 
 use super::walk::Walk;
 use crate::app::targets::OpenCurator;
+use crate::ports::media::Kind;
 use crate::ports::service::CatalogueEntry;
-use crate::recyclarr::Kind;
 use crate::walkthrough::{Line, Reason, Step, Suggestion};
 
 /// What the walk settled on: which service will hold it, and what to ask that service for.

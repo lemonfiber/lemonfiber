@@ -21,8 +21,8 @@ use lemonfiber_core::keys::run::Asked as Keyed;
 use lemonfiber_core::keys::Minter;
 use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::ports::media::offered;
+use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::quality::{self, Preset};
-use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
 

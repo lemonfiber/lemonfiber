@@ -17,3 +17,12 @@ fn each_kind_of_record_names_its_own_path_and_its_own_word() {
     assert_eq!(Record::Artist.plural(), "artists");
     assert_eq!(Record::Author.plural(), "authors");
 }
+
+#[test]
+fn each_media_type_a_curator_follows_is_followed_as_its_own_record() {
+    assert_eq!(Record::followed("tv"), Some(Record::Series));
+    assert_eq!(Record::followed("movies"), Some(Record::Film));
+    assert_eq!(Record::followed("music"), Some(Record::Artist));
+    assert_eq!(Record::followed("books"), Some(Record::Author));
+    assert_eq!(Record::followed("comics"), None);
+}

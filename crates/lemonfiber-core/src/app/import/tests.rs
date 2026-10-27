@@ -364,3 +364,11 @@ async fn an_adapter_the_engine_will_not_serve_is_said_not_to_have_started() {
         "{report:?}"
     );
 }
+
+#[test]
+fn a_service_that_declares_no_media_has_only_its_indexers_carried() {
+    assert_eq!(
+        super::kinds_for(None),
+        [lemonfiber_ports::service::Record::Indexer]
+    );
+}

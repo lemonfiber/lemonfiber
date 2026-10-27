@@ -49,7 +49,7 @@ mod chosen;
 use lemonfiber_api::actions::{named, TAKES_AGREEMENT};
 use lemonfiber_core::app::{Command, Outcome};
 use lemonfiber_core::model::Disposition;
-use lemonfiber_core::recyclarr::Kind;
+use lemonfiber_core::ports::media::Kind;
 
 use super::chooser::{Chooser, Listed};
 use super::reading::{moved, Reading};

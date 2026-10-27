@@ -24,6 +24,7 @@ pub(crate) fn assemble(
         queue,
         parts,
         library,
+        server,
         reads,
     } = fragments;
     // Presence in the media server only means something for availability once a curator is
@@ -106,7 +107,7 @@ pub(crate) fn assemble(
     if present {
         stages.push(TraceStage {
             stage: Stage::Available,
-            service: "Jellyfin".to_owned(),
+            service: server,
             at: None,
         });
     }

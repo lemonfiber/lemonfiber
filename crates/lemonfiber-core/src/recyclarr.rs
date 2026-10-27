@@ -22,7 +22,7 @@
 //! A `- template:` entry, if an operator adds one, is theirs: this touches only the
 //! `- config:` entries it put there.
 
-pub use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::Kind;
 
 use crate::quality::{Preset, Selection};
 

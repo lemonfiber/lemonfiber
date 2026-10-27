@@ -7,12 +7,12 @@ use super::naming::Titled;
 use super::{allowance, assemble, household, reaching, titled, Ctx, Naming};
 use crate::household::State;
 use crate::model::{HouseholdReport, Restriction};
+use crate::ports::media::Kind;
 use crate::ports::service::{
     Access, Certificate, FoundItem, Headroom, Holding, HouseholdRequest, Left, Member,
     NamedLibrary, Requesting, Unrated,
 };
 use crate::quality::Selection;
-use crate::recyclarr::Kind;
 use crate::test_support::curators::curated;
 use crate::test_support::requests as request_service;
 use crate::test_support::{a_context, a_password, json, media, SeedFs};

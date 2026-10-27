@@ -2,7 +2,7 @@
 //!
 //! The mode that leaves both stacks standing. lemonfiber runs its own services and takes
 //! across what the operator built by hand: where releases are searched for, and the
-//! three libraries the curators follow.
+//! libraries the curators follow.
 //!
 //! Nothing of theirs is written to, stopped, or removed — theirs is only ever read. What
 //! is written is written to lemonfiber's own services, and only where they do not
@@ -29,27 +29,21 @@ use crate::plugin::lending::{lent, Borrowing};
 use crate::ports::docker::Container;
 use crate::ports::service::{Carried, Record};
 use crate::reconfigure::Stance;
-use crate::wiring::Fillers;
+use crate::wiring::{Filler, Fillers};
 
 use super::Ctx;
 
-/// The three services that keep a library of their own, and what each keeps.
-const LIBRARIES: [(&str, &[Record]); 3] = [
-    ("sonarr", &[Record::Indexer, Record::Series]),
-    ("radarr", &[Record::Indexer, Record::Film]),
-    ("lidarr", &[Record::Indexer, Record::Artist]),
-];
-
-/// What a service holds worth carrying.
-///
-/// Every service of this shape has indexers, which is why that is the answer for one
-/// this does not otherwise know: an aggregator keeps nothing else, and a service added
-/// to the stack later would still have somewhere its releases are searched for.
-fn kinds_for(service: &str) -> &'static [Record] {
-    LIBRARIES
-        .iter()
-        .find(|(id, _)| *id == service)
-        .map_or(&[Record::Indexer], |(_, kinds)| *kinds)
+/// What `curator` holds worth carrying: where its releases are searched for, and the
+/// record it follows each media type it declares as.
+fn kinds_for(curator: Option<&Filler>) -> Vec<Record> {
+    std::iter::once(Record::Indexer)
+        .chain(
+            curator
+                .into_iter()
+                .flat_map(|one| &one.media_types)
+                .filter_map(|media_type| Record::followed(media_type)),
+        )
+        .collect()
 }
 
 /// Carry what the setup already here holds into lemonfiber's own services, lending their
@@ -87,7 +81,7 @@ pub async fn carry(
         let Some(ours) = target_named(ctx, &fillers, &container.service).await else {
             continue;
         };
-        let (service, kinds) = (ours.id.as_str(), kinds_for(&ours.id));
+        let (service, kinds) = (ours.id.as_str(), kinds_for(fillers.service(&ours.id)));
         let Some(to) = ours.asked.as_ref() else {
             found.refused.push(unreachable(
                 service,
@@ -113,7 +107,7 @@ pub async fn carry(
             }
         };
         let from = curate::Adapter(theirs.adapter.clone());
-        gather((&from, to.as_ref()), service, kinds, confirmed, &mut found).await;
+        gather((&from, to.as_ref()), service, &kinds, confirmed, &mut found).await;
         theirs.returned(ctx).await;
     }
 

@@ -129,8 +129,6 @@ pub const SHELF_MEDIA: [&str; 5] = ["music", "books", "comics", "audiobooks", "p
 /// nobody. It names no place to begin: those two are the contracts'.
 const NAMED: &[(&str, Facing)] = &[
     ("calibre-web-automated", Facing::Shelf),
-    ("audiobookshelf", Facing::Shelf),
-    ("navidrome", Facing::Shelf),
     ("homepage", Facing::Operators),
     ("caddy", Facing::Carriage),
 ];

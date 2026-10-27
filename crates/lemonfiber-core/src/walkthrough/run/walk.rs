@@ -129,7 +129,7 @@ impl<'a> Walk<'a> {
             None,
         );
         report.already_here = true;
-        let kinds: Vec<crate::recyclarr::Kind> =
+        let kinds: Vec<crate::ports::media::Kind> =
             curators.iter().map(|curator| curator.kind).collect();
         report.suggestions = Suggestion::for_kinds(&kinds)
             .into_iter()

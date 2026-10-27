@@ -9,6 +9,7 @@
 use async_trait::async_trait;
 
 use super::Failure;
+use crate::media::{Kind, BOOKS, MUSIC};
 
 /// A kind of record a service holds, for carrying a setup across.
 ///
@@ -33,6 +34,23 @@ pub enum Record {
 }
 
 impl Record {
+    /// Each media type a curator follows media of, and the record it follows it as.
+    pub const FOLLOWED: [(&'static str, Self); 4] = [
+        (Kind::Tv.media_type(), Self::Series),
+        (Kind::Movies.media_type(), Self::Film),
+        (MUSIC, Self::Artist),
+        (BOOKS, Self::Author),
+    ];
+
+    /// The record a curator follows media of `media_type` as, where it follows any.
+    #[must_use]
+    pub fn followed(media_type: &str) -> Option<Self> {
+        Self::FOLLOWED
+            .iter()
+            .find(|(followed, _)| *followed == media_type)
+            .map(|(_, record)| *record)
+    }
+
     /// The path this kind lives at, under the service's versioned API.
     #[must_use]
     pub const fn path(self) -> &'static str {

@@ -53,6 +53,14 @@ pub(crate) fn served_by(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
     provider(&fillers_here(ctx, manifest), serve::CAPABILITY).map(|filler| filler.id.clone())
 }
 
+/// What the media server filling `media.serve` is called in front of an operator: the
+/// service an adapter fills it for, where one does.
+pub(crate) fn server_named(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
+    let fillers = fillers_here(ctx, manifest);
+    let filler = provider(&fillers, serve::CAPABILITY)?;
+    Some(fillers.fronted_by(filler).unwrap_or(filler).name.clone())
+}
+
 /// The media server, where it provides `capability`.
 fn provider<'f>(fillers: &'f Fillers, capability: &str) -> Option<&'f Filler> {
     let (filler, _) = fillers.filling(IDENTITY)?;

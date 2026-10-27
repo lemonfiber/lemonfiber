@@ -13,7 +13,7 @@ fn asked(id: i64, request_status: RequestStatus, media_status: MediaStatus) -> H
         made: Some("2026-08-17T21:04:09".to_owned()),
         member: "Ana".to_owned(),
         member_id: None,
-        kind: Some(crate::recyclarr::Kind::Movies),
+        kind: Some(crate::ports::media::Kind::Movies),
         title_id: None,
         item: None,
         request_status: Some(request_status),

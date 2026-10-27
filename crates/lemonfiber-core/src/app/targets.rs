@@ -23,7 +23,7 @@ mod secrets;
 
 pub(crate) use curators::*;
 pub(crate) use downloads::*;
-pub(crate) use filled::{identity, media, served_by, serving, spoken, Media, Spoken};
+pub(crate) use filled::{identity, media, served_by, server_named, serving, spoken, Media, Spoken};
 pub(crate) use layout::*;
 pub(crate) use media::*;
 pub(crate) use opening::*;

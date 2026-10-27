@@ -1,5 +1,5 @@
+use crate::ports::media::Kind;
 use crate::ports::service::CatalogueEntry;
-use crate::recyclarr::Kind;
 use crate::walkthrough::Suggestion;
 
 #[test]

@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::recyclarr::Kind;
+use crate::ports::media::Kind;
 
 /// How confident the walkthrough is that a search for this will return something.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

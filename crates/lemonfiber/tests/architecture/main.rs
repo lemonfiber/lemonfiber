@@ -15,6 +15,7 @@ mod an_adapter_only_reads_its_upstreams_credential;
 mod every_declared_code_is_raised;
 mod how_long_a_file_may_be;
 mod modest_terminal;
+mod no_part_is_named_in_the_core;
 mod nothing_a_plugin_brings_gets_its_own_account;
 mod nothing_here_runs_what_somebody_sent;
 mod nothing_is_kept_beside_the_configuration_unsaid;

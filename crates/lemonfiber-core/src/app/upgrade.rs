@@ -14,7 +14,7 @@ use super::Ctx;
 use crate::doctor::credentials::Target;
 use crate::error::{Diagnose, Problem};
 use crate::model::{Triggered, UpgradeMedia, UpgradeReport};
-use crate::recyclarr::Kind;
+use crate::ports::media::Kind;
 
 /// State the cost of upgrading existing content to the chosen quality, per media
 /// type, and — only when confirmed — ask each resolution curator to re-search its

@@ -33,7 +33,7 @@ use crate::wiring::{Filler, Fillers};
 
 /// What the request service files the key it mints for itself under in the media server,
 /// on the sign-in that sets it up without the request gate in front of the media server.
-const SEERR_APP: &str = "Seerr";
+const FILED_AS: &str = "Seerr";
 
 /// The request service among `fillers` that may have run before the gate — the stack's
 /// own, or the first-party plugin's moved in place of it, which keeps its settings — as
@@ -102,7 +102,7 @@ pub(super) async fn seed_taken_back(
     let owed = baseline.named(&filler.id, HELD_KEY);
     let media_server = media_server_admin(ctx, fillers).await;
     let minted = match &media_server {
-        Some((client, ..)) => client.filed_as(SEERR_APP).await.unwrap_or_default(),
+        Some((client, ..)) => client.filed_as(FILED_AS).await.unwrap_or_default(),
         None => Vec::new(),
     };
     let count = owed.len() + minted.len();

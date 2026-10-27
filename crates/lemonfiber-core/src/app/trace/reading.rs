@@ -10,10 +10,10 @@ use crate::app::Ctx;
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::{Check, Finding, Verdict};
 use crate::model::TraceReport;
+use crate::ports::media::Kind;
 use crate::ports::service::{
     Indexers, ItemPart, QualityReleases, QueueItem, ReleaseProbe, TraceEvent,
 };
-use crate::recyclarr::Kind;
 use crate::trace::{Presence, Stage};
 
 /// What asking the indexers about a stalled item came to.
@@ -148,6 +148,7 @@ pub(crate) struct Fragments {
     pub(crate) queue: Vec<QueueItem>,
     pub(crate) parts: Vec<ItemPart>,
     pub(crate) library: Option<Presence>,
+    pub(crate) server: String,
     pub(crate) reads: Reads,
 }
 
