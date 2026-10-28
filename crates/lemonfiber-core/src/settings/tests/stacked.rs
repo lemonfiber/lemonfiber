@@ -361,6 +361,8 @@ fn keeping(plugin: &str, was: &str) -> crate::plugin::Installed {
             default: lemonfiber_manifest::container::Constant::Text(String::new()),
             recorded_with: None,
             was: Some(format!("{was}_LEVEL")),
+            needs: lemonfiber_manifest::container::choices::Needs::new(),
+            one_of: None,
         }),
     );
     let mut installed = crate::test_support::an_installed(plugin, vec![placed]);
@@ -371,6 +373,7 @@ fn keeping(plugin: &str, was: &str) -> crate::plugin::Installed {
         minted: false,
         serves: None,
         was: Some(format!("{was}_KEY")),
+        needs: lemonfiber_manifest::container::choices::Needs::new(),
     }];
     installed
 }

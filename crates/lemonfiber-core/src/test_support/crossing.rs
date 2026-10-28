@@ -25,6 +25,7 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
         why: "Asks the series service".to_owned(),
         minted: false,
         was: None,
+        needs: lemonfiber_manifest::container::choices::Needs::new(),
     }];
     reader
 }

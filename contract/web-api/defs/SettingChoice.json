@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One value a setting accepts.",
+  "anyOf": [
+    {
+      "description": "A value that is always a choice.",
+      "$ref": "ServiceConstant.json"
+    },
+    {
+      "description": "Values that are choices only where `needs` is met.",
+      "$ref": "SettingChoiceNeeding.json"
+    }
+  ]
+}

@@ -9,6 +9,8 @@ fn reading(setting: &str, was: Option<&str>) -> Value {
         default: Constant::Text(String::new()),
         recorded_with: None,
         was: was.map(str::to_owned),
+        needs: crate::container::choices::Needs::new(),
+        one_of: None,
     })
 }
 
@@ -22,6 +24,7 @@ fn held(id: &str, was: Option<&str>) -> Secret {
         carried_from: None,
         recorded_with: None,
         was: was.map(str::to_owned),
+        needs: crate::container::choices::Needs::new(),
     }
 }
 

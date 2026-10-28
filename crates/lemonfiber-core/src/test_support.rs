@@ -291,6 +291,7 @@ pub(crate) fn a_minting_curator() -> crate::plugin::Installed {
         minted: true,
         was: None,
         serves: None,
+        needs: lemonfiber_manifest::container::choices::Needs::new(),
     }];
     curator
 }

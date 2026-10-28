@@ -12,6 +12,7 @@
 //! plugin that declared nothing, which is the answer that invents nothing — and says
 //! so, rather than being refused.
 
+use lemonfiber_manifest::container::choices::Needs;
 use lemonfiber_plugin::Manifest;
 use serde::{Deserialize, Serialize};
 
@@ -38,6 +39,9 @@ pub struct Secret {
     /// file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub was: Option<String>,
+    /// The values of the plugin's settings under which it is asked for and written.
+    #[serde(default, skip_serializing_if = "Needs::is_empty")]
+    pub needs: Needs,
 }
 
 /// What a plugin declared about itself, as its install read it.
@@ -120,6 +124,7 @@ impl Declaration {
                     minted: secret.minted.is(),
                     serves: secret.serves.clone(),
                     was: secret.was.clone(),
+                    needs: secret.needs.clone(),
                 })
                 .collect(),
         }

@@ -8,7 +8,6 @@ use lemonfiber_manifest::container::{RecordedWith, Secret, Value, RECORDED_MINTE
 
 use crate::plugin::installed::Placed;
 use crate::ports::random::Random;
-use crate::project::entry::constant_text;
 
 /// The step a recording names where its stand-ins could not be made.
 pub(super) const STAND_INS: &str = "stand-ins";
@@ -88,7 +87,7 @@ impl StandIns {
     /// What `recorded` stands in as for this run.
     fn standing(&mut self, recorded: &RecordedWith, random: &dyn Random) -> Result<String, String> {
         match recorded {
-            RecordedWith::Constant(constant) => Ok(constant_text(constant)),
+            RecordedWith::Constant(constant) => Ok(constant.text()),
             RecordedWith::Minted => {
                 let bytes = random
                     .bytes(RECORDED_MINTED)

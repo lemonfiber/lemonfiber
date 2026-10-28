@@ -93,6 +93,7 @@ fn what_a_plugin_declared_is_kept_as_it_declared_it() {
                 why: "Read the library counts".to_owned(),
                 minted: false,
                 was: None,
+                needs: lemonfiber_manifest::container::choices::Needs::new(),
             }],
         })
     );

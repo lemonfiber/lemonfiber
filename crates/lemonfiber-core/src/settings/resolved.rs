@@ -116,9 +116,11 @@ impl Resolved {
     }
 
     pub(crate) fn reading<T>(&self, write: impl FnOnce(&Reading<'_>) -> T) -> T {
+        let setting = |_: &str, name: &str| self.setting(name);
         let secrets_file = |service: &str| self.secrets_file(service);
         let crossing = |plugin: &str, of: &str| self.crossing(plugin, of);
         write(&Reading {
+            setting: &setting,
             secrets_file: &secrets_file,
             crossing: &crossing,
         })

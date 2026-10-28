@@ -3,7 +3,9 @@
 
 use std::path::PathBuf;
 
-use lemonfiber_manifest::container::{exposes, inside, is_target, Mount, Reach, UserMode, Value};
+use lemonfiber_manifest::container::{
+    choices, exposes, inside, is_target, Mount, Reach, UserMode, Value,
+};
 
 use super::installed::{Installed, Placed, Reached};
 use crate::project::entry::{self, literal, Tier, Unit};
@@ -48,6 +50,8 @@ pub enum Holding {
 
 /// Where a plugin's secrets are read from.
 pub struct Reading<'a> {
+    /// The operator's value for a setting of the named namespace, where one is recorded.
+    pub setting: &'a dyn Fn(&str, &str) -> Option<String>,
     /// The named service's secrets file, where there is somewhere to keep one.
     pub secrets_file: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// Where a credential the named service holds is read from for the named plugin,
@@ -60,6 +64,7 @@ impl Reading<'_> {
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
+            setting: &|_, _| None,
             secrets_file: &|_| None,
             crossing: &|_, _| None,
         }
@@ -150,13 +155,37 @@ pub(crate) fn variables(
         .env
         .iter()
         .filter_map(|(name, value)| match value {
-            Value::Secret(secret) => Some(Variable {
-                name: name.clone(),
-                holding: holding(installed, &secret.secret, reading),
-            }),
+            Value::Secret(secret) if needed(installed, placed, &secret.secret, reading) => {
+                Some(Variable {
+                    name: name.clone(),
+                    holding: holding(installed, &secret.secret, reading),
+                })
+            }
             _ => None,
         })
         .collect()
+}
+
+/// Whether the plugin's secret `id`, written into `placed`'s secrets file, is needed: what
+/// it declares it needs is met by the settings the operator recorded, or `placed`'s
+/// defaults where none is recorded.
+pub(crate) fn needed(
+    installed: &Installed,
+    placed: &Placed,
+    id: &str,
+    reading: &Reading<'_>,
+) -> bool {
+    installed
+        .declared
+        .secrets
+        .iter()
+        .find(|secret| secret.id == id)
+        .is_none_or(|secret| {
+            choices::met(&secret.needs, &|setting| {
+                (reading.setting)(&installed.plugin, setting)
+                    .or_else(|| choices::defaulted(&placed.fields.env, setting))
+            })
+        })
 }
 
 /// Where the plugin's secret `id` is read from: the secret store where it is the plugin's

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::validate::{GATEWAY_GRANT, TUNNEL_DEVICE};
 
+pub mod choices;
 pub mod earlier;
 mod paths;
 mod ports;

@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
+use lemonfiber_manifest::container::choices;
 use lemonfiber_manifest::container::{
-    is_source, is_target, lies_inside, Constant, Mount, Posture, Shape, UrlOf, UserMode, Value,
-    CONFIGURATION,
+    is_source, is_target, lies_inside, Mount, Posture, Shape, UrlOf, UserMode, Value, CONFIGURATION,
 };
 use serde::ser::SerializeMap;
 use serde::Serialize;
@@ -393,25 +393,23 @@ fn operated(values: &Values<'_>, key: &str, fallback: &str) -> String {
     )
 }
 
-/// What one variable is written as, or nothing where it has no value to write.
+/// What one variable is written as, or nothing where it has no value to write: a secret,
+/// an address nothing fills, or a setting whose needs the other settings leave unmet.
 fn valued(unit: &Unit<'_>, value: &Value, values: &Values<'_>) -> Option<String> {
     match value {
-        Value::Constant(constant) => Some(constant_text(constant)),
-        Value::Setting(setting) => Some(
-            (values.setting)(unit.namespace, &setting.setting)
-                .unwrap_or_else(|| constant_text(&setting.default)),
-        ),
+        Value::Constant(constant) => Some(constant.text()),
+        Value::Setting(setting) => {
+            let held = |named: &str| {
+                (values.setting)(unit.namespace, named)
+                    .or_else(|| choices::defaulted(unit.env, named))
+            };
+            choices::met(&setting.needs, &held).then(|| {
+                (values.setting)(unit.namespace, &setting.setting)
+                    .unwrap_or_else(|| setting.default.text())
+            })
+        }
         Value::Url(url) => (values.address)(unit.id, url),
         Value::Secret(_) => None,
-    }
-}
-
-/// A constant as the text an environment variable holds.
-pub(crate) fn constant_text(constant: &Constant) -> String {
-    match constant {
-        Constant::Text(text) => text.clone(),
-        Constant::Number(number) => number.to_string(),
-        Constant::Flag(flag) => flag.to_string(),
     }
 }
 

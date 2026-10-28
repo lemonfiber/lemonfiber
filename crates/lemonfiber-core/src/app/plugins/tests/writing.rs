@@ -566,6 +566,8 @@ fn a_setting_is_written_as_the_operator_recorded_it_and_as_its_default_otherwise
             default: Constant::Text("slow".to_owned()),
             recorded_with: None,
             was: None,
+            needs: lemonfiber_manifest::container::choices::Needs::new(),
+            one_of: None,
         })
     };
     let mut placed = crate::test_support::a_placed("reader", &[], None);

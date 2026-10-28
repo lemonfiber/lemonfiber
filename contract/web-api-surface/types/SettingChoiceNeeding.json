@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "needs": {
+      "type": [
+        "object{array[ref:ServiceConstant]}"
+      ],
+      "required": true
+    },
+    "values": {
+      "type": [
+        "array[ref:ServiceConstant]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

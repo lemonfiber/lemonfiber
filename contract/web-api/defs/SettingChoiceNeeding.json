@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Values that are choices only where the other settings `needs` names hold one of the\nvalues it lists.",
+  "type": "object",
+  "properties": {
+    "needs": {
+      "description": "What they are choices under.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "ServiceConstant.json"
+        }
+      }
+    },
+    "values": {
+      "description": "The values.",
+      "type": "array",
+      "items": {
+        "$ref": "ServiceConstant.json"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "values",
+    "needs"
+  ]
+}

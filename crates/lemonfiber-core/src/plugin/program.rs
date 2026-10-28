@@ -17,9 +17,7 @@ use super::Verdict;
 use crate::app::Ctx;
 use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
 use crate::ports::program::{Configuration, Ended, Program, Run, Unran};
-use crate::project::entry::{
-    configuration, constant_text, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY,
-};
+use crate::project::entry::{configuration, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY};
 
 pub(crate) use throwaway::{digest as starting_digest, held as shipped, keep, Starting, Throwaway};
 
@@ -121,7 +119,7 @@ pub(crate) fn contained(placed: &Placed, operator: &Operator) -> Contained {
         .env
         .iter()
         .filter_map(|(name, value)| match value {
-            Value::Constant(constant) => Some(format!("{name}={}", constant_text(constant))),
+            Value::Constant(constant) => Some(format!("{name}={}", constant.text())),
             Value::Setting(_) | Value::Url(_) | Value::Secret(_) => None,
         })
         .collect();

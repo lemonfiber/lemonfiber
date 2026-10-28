@@ -721,3 +721,4 @@ fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
 
 mod exposing;
 mod model;
+mod needing;

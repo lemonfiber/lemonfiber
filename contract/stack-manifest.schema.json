@@ -353,6 +353,14 @@
         },
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
         "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it, and in what shape.", "$ref": "#/$defs/SecretMinted"},
+        "needs": {
+          "description": "The values of other settings under which it is asked for and held.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/ServiceConstant"}
+          }
+        },
         "of": {"description": "Whose credential it is.", "type": "string"},
         "recorded_with": {
           "description": "What a recording gives the service in the operator's place, where only the\noperator holds the value and the service needs one to start.",
@@ -655,6 +663,19 @@
       "type": "object",
       "properties": {
         "default": {"description": "What is written while the operator has recorded no value.", "$ref": "#/$defs/ServiceConstant"},
+        "needs": {
+          "description": "The values of other settings under which it is written.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/ServiceConstant"}
+          }
+        },
+        "one_of": {
+          "description": "The values its service accepts, where it says.",
+          "type": ["array", "null"],
+          "items": {"$ref": "#/$defs/SettingChoice"}
+        },
         "recorded_with": {
           "description": "What a recording gives the service in the operator's place, where only the\noperator holds the value and the service needs one to start.",
           "anyOf": [
@@ -706,6 +727,34 @@
         {"description": "A capability's filler's address.", "$ref": "#/$defs/ServiceUrlOf"},
         {"description": "A declared secret.", "$ref": "#/$defs/ServiceSecretOf"}
       ]
+    },
+    "SettingChoice": {
+      "description": "One value a setting accepts.",
+      "anyOf": [
+        {"description": "A value that is always a choice.", "$ref": "#/$defs/ServiceConstant"},
+        {"description": "Values that are choices only where `needs` is met.", "$ref": "#/$defs/SettingChoiceNeeding"}
+      ]
+    },
+    "SettingChoiceNeeding": {
+      "description": "Values that are choices only where the other settings `needs` names hold one of the\nvalues it lists.",
+      "type": "object",
+      "properties": {
+        "needs": {
+          "description": "What they are choices under.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/ServiceConstant"}
+          }
+        },
+        "values": {
+          "description": "The values.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/ServiceConstant"}
+        }
+      },
+      "additionalProperties": false,
+      "required": ["values", "needs"]
     },
     "StackClaim": {"$ref": "#/$defs/Claim"},
     "StackProtocol": {
