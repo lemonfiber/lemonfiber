@@ -20,23 +20,26 @@ use serde_json::Value;
 use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
-use super::served::{allowed, healthy, settled, settled_as, LOG_LINES, POLL};
+use super::served::{allowed, healthy, healthy_at, LOG_LINES, POLL};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::Placed;
-use crate::plugin::program::{Operator, Starting, Throwaway};
+use crate::plugin::program::{Starting, Throwaway};
 use crate::plugin::recorded::{Answer, Asked};
 use crate::ports::http::{Http, Method, Request, Response, JSON};
-use crate::ports::serving::{Serve, Served};
+use crate::ports::serving::Served;
 use filling::Filling;
 use preparing::Prepared;
+use serving::{parties, serves};
 use speaking::{contracts, fixture, named};
 use tapped::Tapped;
 
 mod claiming;
+mod enveloping;
 mod filling;
 mod preparing;
+mod serving;
 mod speaking;
 mod tapped;
 
@@ -100,37 +103,24 @@ pub(super) async fn answers(
         log: Vec::new(),
     };
     let prepared = Prepared::of(recorder, root, upstream, adapter, secrets).map_err(failing)?;
-    let (reaching, answering) = parties(recorder, adapter, upstream)
+    let envelope = enveloping::guards(adapter.placed)
+        .then(enveloping::declared)
+        .transpose()
+        .map_err(failing)?;
+    let (reaching, answering) = parties(recorder, adapter, upstream, envelope.is_some())
         .await
         .map_err(failing)?;
-    let settled = settled(upstream, &prepared.copy, prepared.data.as_deref());
-    let serve = Serve {
-        alias: Some(upstream.service.clone()),
-        reaching,
-        env: settled.env.iter().chain(&prepared.env).cloned().collect(),
-        ..settled
-    };
+    let (serve, apart) = serves(recorder, upstream, adapter, &prepared, reaching);
+    let alone = apart.is_none();
     let served = recorder
         .serving
         .serve(&serve)
         .await
         .map_err(|unran| failing(Faulted::new("container", unran.to_string(), Vec::new())))?;
-    let operator = prepared
-        .held
-        .owner()
-        .map_or_else(Operator::recording, |(uid, gid)| Operator {
-            ids: (uid.to_string(), gid.to_string()),
-            ..Operator::recording()
-        });
-    let started = settled_as(adapter.placed, &prepared.held, None, &operator);
-    let started = Serve {
-        image: recorder
-            .taking
-            .adapter()
-            .map_or_else(|| started.image.clone(), str::to_owned),
-        ..started
+    let beside = match &apart {
+        None => Ok(served.clone()),
+        Some(started) => recorder.serving.beside(&served, started).await,
     };
-    let beside = recorder.serving.beside(&served, &started).await;
     let outcome = match &beside {
         Ok(fronting) => {
             Asking {
@@ -140,9 +130,10 @@ pub(super) async fn answers(
                 served: &served,
                 fronting,
                 adapter,
-                held: &prepared.held,
+                held: prepared.held(),
                 key: &prepared.key,
                 made: &prepared.made,
+                envelope: envelope.as_ref(),
             }
             .asked(items)
             .await
@@ -172,41 +163,12 @@ pub(super) async fn answers(
             })
         }
     };
-    if let Ok(fronting) = &beside {
+    if let (Ok(fronting), false) = (&beside, alone) {
         recorder.serving.removed(fronting).await;
     }
     recorder.serving.removed(&served).await;
     drop(answering);
     finished
-}
-
-/// Every party the cases of each contract `adapter` speaks point the upstream at, by the
-/// host they name it on, each answering until it is dropped.
-async fn parties(
-    recorder: Recorder<'_>,
-    adapter: Fronting<'_>,
-    upstream: &Placed,
-) -> Result<(Vec<String>, Vec<Box<dyn crate::ports::serving::Answering>>), Faulted> {
-    let asked: Vec<String> = contracts(adapter.service)
-        .iter()
-        .flat_map(|(_, capability)| filed(capability, &upstream.media_types))
-        .map(|case| case.asks.to_string())
-        .collect();
-    let mut reaching = Vec::new();
-    let mut answering = Vec::new();
-    for party in lemonfiber_contract::capabilities::parties(&upstream.media_types) {
-        if !asked.iter().any(|asks| asks.contains(party.host)) {
-            continue;
-        }
-        let answered = recorder
-            .serving
-            .stand_in(&party.answering)
-            .await
-            .map_err(|unran| Faulted::new(party.named, unran.to_string(), Vec::new()))?;
-        reaching.push(party.host.to_owned());
-        answering.push(answered);
-    }
-    Ok((reaching, answering))
 }
 
 /// A step that failed, why, and every credential the run had made by then.
@@ -252,6 +214,7 @@ struct Asking<'a> {
     held: &'a Throwaway,
     key: &'a str,
     made: &'a [String],
+    envelope: Option<&'a lemonfiber_ports::service::Declared>,
 }
 
 impl Asking<'_> {
@@ -262,6 +225,11 @@ impl Asking<'_> {
             .ready()
             .await
             .map_err(|(step, why)| Faulted::new(step, why, made.clone()))?;
+        if let Some(declared) = self.envelope {
+            self.enveloped(&reached, declared)
+                .await
+                .map_err(|why| Faulted::new(enveloping::STEP, why, made.clone()))?;
+        }
         let contracts = contracts(self.adapter.service);
         let mut heard = BTreeMap::new();
         if contracts.iter().any(|(spoken, _)| *spoken == identity()) {
@@ -317,6 +285,25 @@ impl Asking<'_> {
         self.scrubbed(upstream, asked, filling.made)
     }
 
+    /// The guard handed the envelope its own requests are asked under, over its contract.
+    async fn enveloped(
+        &self,
+        reached: &Reached,
+        declared: &lemonfiber_ports::service::Declared,
+    ) -> Result<(), String> {
+        use crate::ports::service::Guarding;
+        let guard = lemonfiber_contract::capabilities::stream::guard::Adapter(Contracted::new(
+            Arc::clone(&reached.adapter),
+            &reached.base,
+            &self.adapter.placed.service,
+            self.key,
+        ));
+        guard
+            .guard(&enveloping::guarded(declared.clone()))
+            .await
+            .map_err(|failure| failure.to_string())
+    }
+
     /// The upstream healthy and the adapter ready, and where each is asked; or the step
     /// that failed and why.
     async fn ready(&self) -> Result<Reached, (&'static str, String)> {
@@ -340,12 +327,17 @@ impl Asking<'_> {
                 .and_then(|health| health.timeout_s),
         };
         let adapter = (self.recorder.transport)();
-        healthy(serving, adapter.as_ref(), Some(&ready), self.fronting)
-            .await
-            .map_err(|why| ("adapter's health", why))?;
-        let base = self
-            .fronting
-            .port
+        let contract = self.fronting.contract.or(self.fronting.port);
+        healthy_at(
+            serving,
+            adapter.as_ref(),
+            Some(&ready),
+            self.fronting,
+            contract,
+        )
+        .await
+        .map_err(|why| ("adapter's health", why))?;
+        let base = contract
             .map(|port| format!("http://{LOOPBACK}:{port}"))
             .ok_or((
                 "adapter's health",

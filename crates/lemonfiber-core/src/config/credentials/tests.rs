@@ -163,6 +163,12 @@ fn no_two_capabilities_the_vocabulary_carries_spell_alike() {
     unique.sort();
     unique.dedup();
     assert_eq!(unique.len(), names.len(), "{names:?}");
+    assert!(
+        names
+            .iter()
+            .all(|name| !name.starts_with(crate::config::PLUGIN_SETTING)),
+        "no capability is spelled in the namespace a plugin's credentials are kept in"
+    );
     for media in lemonfiber_manifest::container::MEDIA {
         assert!(media.chars().all(|one| one.is_ascii_lowercase()), "{media}");
     }

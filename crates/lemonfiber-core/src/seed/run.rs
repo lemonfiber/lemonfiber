@@ -61,6 +61,7 @@ pub(crate) use applications::resync_application;
 pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, Held};
 pub(crate) use curating::curators;
+pub(crate) use enveloping::guarding_installed;
 pub(crate) use gate::reroute;
 use identity::seed_request_identity;
 pub(crate) use quality::reprofile;

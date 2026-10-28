@@ -19,8 +19,9 @@ pub(super) struct Prepared {
     pub(super) copy: Throwaway,
     /// Its throwaway library, where it takes one.
     pub(super) data: Option<std::path::PathBuf>,
-    /// The throwaway copy of the adapter's starting files, which holds its key.
-    pub(super) held: Throwaway,
+    /// The throwaway copy of the adapter's starting files, which holds its key, where it
+    /// is not its own upstream and so has a copy apart from [`Self::copy`].
+    apart: Option<Throwaway>,
     /// The key lemonfiber minted for the adapter.
     pub(super) key: String,
     /// Every credential minted for the run so far, which every answer is scrubbed of.
@@ -31,8 +32,9 @@ pub(super) struct Prepared {
 }
 
 /// Each secret either copy's files name, with the value written for it.
-fn written(copy: &Throwaway, held: &Throwaway) -> BTreeMap<String, String> {
-    held.written()
+fn written(copy: &Throwaway, held: Option<&Throwaway>) -> BTreeMap<String, String> {
+    held.into_iter()
+        .flat_map(Throwaway::written)
         .chain(copy.written())
         .map(|(secret, value)| (secret.to_owned(), value.to_owned()))
         .collect()
@@ -102,6 +104,12 @@ fn handed(
 }
 
 impl Prepared {
+    /// The copy that holds the adapter's key: its own, or its upstream's where it is its
+    /// own upstream.
+    pub(super) fn held(&self) -> &Throwaway {
+        self.apart.as_ref().unwrap_or(&self.copy)
+    }
+
     /// Both copies and the adapter's key, or why one could not be made.
     pub(super) fn of(
         recorder: Recorder<'_>,
@@ -123,14 +131,20 @@ impl Prepared {
         )
         .map_err(refused("starting files"))?;
         let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
-        let held = Throwaway::of(
-            Some(Starting {
-                root,
-                service: &adapter.placed.service,
-            }),
-            recorder.random,
-        )
-        .map_err(refused("adapter's starting files"))?;
+        super::super::served::certified(upstream, &copy).map_err(refused("certificate"))?;
+        let apart = (adapter.placed.service != upstream.service)
+            .then(|| {
+                Throwaway::of(
+                    Some(Starting {
+                        root,
+                        service: &adapter.placed.service,
+                    }),
+                    recorder.random,
+                )
+            })
+            .transpose()
+            .map_err(refused("adapter's starting files"))?;
+        let held = apart.as_ref().unwrap_or(&copy);
         let key = crate::secret::generate(recorder.random).ok_or_else(|| {
             refused("adapter's key")(crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned())
         })?;
@@ -138,10 +152,10 @@ impl Prepared {
             .map_err(refused("adapter's key"))?;
         let mut made: Vec<String> = std::iter::once(key.clone())
             .chain(copy.made().map(str::to_owned))
-            .chain(held.made().map(str::to_owned))
+            .chain(apart.iter().flat_map(Throwaway::made).map(str::to_owned))
             .chain(stand_ins.made.iter().cloned())
             .collect();
-        let mut secrets = written(&copy, &held);
+        let mut secrets = written(&copy, apart.as_ref());
         for (secret, value) in stand_ins.held() {
             secrets
                 .entry(secret.to_owned())
@@ -157,13 +171,13 @@ impl Prepared {
         let handed = handed(&minting, &mut secrets, adapter.placed, &mut made)
             .map_err(refused("adapter's upstream credentials"))?;
         if !handed.is_empty() {
-            super::filling::handed_over(&held, &handed)
+            super::filling::handed_over(held, &handed)
                 .map_err(refused("adapter's upstream credentials"))?;
         }
         Ok(Self {
             copy,
             data,
-            held,
+            apart,
             key,
             made,
             env,

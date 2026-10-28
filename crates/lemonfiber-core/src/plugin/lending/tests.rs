@@ -175,6 +175,7 @@ async fn an_adapter_the_engine_publishes_no_port_for_is_taken_away_and_said_why(
         addresses: Vec::new(),
         machine: Vec::new(),
         port: None,
+        contract: None,
     }));
     let ctx = lending("portless", &serves, Fake::silent());
     let (installed, adapter) = sonarr();

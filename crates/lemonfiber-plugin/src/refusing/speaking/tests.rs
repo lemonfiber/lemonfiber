@@ -1,4 +1,4 @@
-use crate::refusing::tests::{names, said, speaking, INSTALLABLE};
+use crate::refusing::tests::{names, said, speaking, with, INSTALLABLE};
 
 #[test]
 fn an_adapter_names_one_other_service_of_its_plugin_that_speaks_nothing_as_its_upstream() {
@@ -8,8 +8,8 @@ fn an_adapter_names_one_other_service_of_its_plugin_that_speaks_nothing_as_its_u
                 .replace("fronts      = \"komga-server\"\n", fronts),
         )
     };
+    assert_eq!(fronting(""), Vec::<String>::new(), "it is its own upstream");
     for (fronts, says) in [
-        ("", "an adapter has to name"),
         ("fronts      = \"komga\"\n", "names the adapter itself"),
         (
             "fronts      = \"kavita\"\n",
@@ -91,10 +91,51 @@ fn a_contract_this_build_does_not_speak_is_refused_by_name() {
 }
 
 #[test]
-fn an_adapter_publishing_the_port_it_speaks_on_is_refused() {
-    let said = said(&speaking(r#"["media.serve@1"]"#, "listens     = 25600\n"));
+fn every_way_the_compose_writer_or_the_proxy_reaches_a_contract_port_is_refused() {
+    for (rest, field, says) in [
+        (
+            "listens     = 25600\ncontract    = 25600\n",
+            "contract",
+            "the port it publishes",
+        ),
+        ("listens     = 8080\ncontract    = 25600\n", "contract", "the proxy's route"),
+        (
+            "listens     = 8080\ncontract    = 8920\n[[service.publish]]\nport = 8920\n",
+            "contract",
+            "a further port it publishes",
+        ),
+        (
+            "listens     = 8080\ncontract    = 9000\n[[service.publish]]\nport = 8920\nlistens = 9000\n",
+            "contract",
+            "a further port it publishes",
+        ),
+        ("listens     = 8080\ncontract    = 8080\n", "contract", "the port it publishes"),
+    ] {
+        let said = said(&speaking(r#"["media.serve@1"]"#, rest));
+        assert!(
+            names(
+                &said,
+                &[&format!("service komga.{field}"), says, "loopback alone"]
+            ),
+            "{rest}: {said:?}"
+        );
+    }
+}
+
+#[test]
+fn a_contract_port_reached_by_nothing_but_loopback_is_refused_nothing() {
+    let apart = speaking(
+        r#"["media.serve@1"]"#,
+        "listens     = 8080\ncontract    = 8081\n[[service.publish]]\nport = 8921\n",
+    );
+    assert_eq!(said(&apart), Vec::<String>::new());
+}
+
+#[test]
+fn a_contract_port_declared_by_a_service_speaking_nothing_is_refused_by_name() {
+    let said = said(&with("contract    = 8081\n"));
     assert!(
-        names(&said, &["service komga.port", "loopback alone"]),
+        names(&said, &["service komga.contract", "it speaks none"]),
         "{said:?}"
     );
 }
@@ -116,7 +157,7 @@ fn a_contract_named_twice_is_refused() {
 
 #[test]
 fn an_adapter_that_says_nowhere_it_answers_is_refused() {
-    let said = said(&speaking(r#"["media.serve@1"]"#, ""));
+    let said = said(&speaking(r#"["media.serve@1"]"#, "").replace("contract    = 8081\n", ""));
     assert!(
         names(&said, &["service komga.listens", "speaks a contract"]),
         "{said:?}"

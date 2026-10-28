@@ -37,6 +37,7 @@ pub(super) fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             hidden: false,
             health: None,
             listens: None,
+            contract: None,
             media_types: Vec::new(),
             networks: Vec::new(),
             speaks: Vec::new(),

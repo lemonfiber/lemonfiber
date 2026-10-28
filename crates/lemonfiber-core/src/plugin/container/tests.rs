@@ -64,6 +64,7 @@ fn placed() -> Placed {
         hidden: false,
         health: None,
         listens: None,
+        contract: None,
         media_types: Vec::new(),
         networks: Vec::new(),
         speaks: Vec::new(),
@@ -718,4 +719,5 @@ fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
     );
 }
 
+mod exposing;
 mod model;

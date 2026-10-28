@@ -121,14 +121,20 @@ criticality = "important"
 
 "#;
 
-/// The fixture's service, speaking `speaks` in front of an upstream of its own and
-/// saying `rest`.
+/// The fixture's service, speaking `speaks` in front of an upstream of its own on a
+/// contract port apart from its household one, unless `rest` names its own, and saying
+/// `rest`.
 pub(crate) fn speaking(speaks: &str, rest: &str) -> String {
+    let contract = if rest.contains("contract") {
+        ""
+    } else {
+        "contract    = 8081\n"
+    };
     INSTALLABLE
         .replace(
             "config_path = \"/config\"\n",
             &format!(
-                "config_path = \"/config\"\nspeaks      = {speaks}\nfronts      = \"komga-server\"\n{rest}"
+                "config_path = \"/config\"\nspeaks      = {speaks}\nfronts      = \"komga-server\"\n{contract}{rest}"
             ),
         )
         .replace("[[claim]]\n", &format!("{UPSTREAM}[[claim]]\n"))

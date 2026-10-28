@@ -122,8 +122,11 @@ pub(super) async fn taken(
             .collect();
         let fronting = pairs
             .iter()
-            .find(|(adapter, _)| {
-                adapter.fronts.as_deref() == Some(service.id.as_str()) && !adapter.speaks.is_empty()
+            .find(|(speaker, _)| {
+                !speaker.speaks.is_empty()
+                    && manifest
+                        .upstream_of(speaker)
+                        .is_some_and(|upstream| upstream.id == service.id)
             })
             .map(|(adapter, placed)| Fronting {
                 service: adapter,

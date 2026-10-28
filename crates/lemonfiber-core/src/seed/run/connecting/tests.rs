@@ -447,6 +447,7 @@ fn a_service(
             port: 8000,
         }),
         published: Some(8000),
+        contract: None,
         confined_to: None,
         media_types: vec!["tv".to_owned()],
         provides: Vec::new(),

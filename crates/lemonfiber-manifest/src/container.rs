@@ -16,7 +16,7 @@ mod words;
 
 use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside};
-pub use ports::{doubled, published};
+pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
 pub use record::Fields;
 use values::{narrowed, unshown};
 pub use values::{

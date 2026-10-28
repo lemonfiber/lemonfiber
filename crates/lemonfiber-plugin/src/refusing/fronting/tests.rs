@@ -18,7 +18,7 @@ criticality = "important"
 fn fronting(upstream: &str, adapter: &str) -> Vec<String> {
     said(
         &with(&format!(
-            "speaks      = [\"media.serve@1\"]\nlistens     = 8080\nfronts      = \"{UPSTREAM}\"\n{adapter}"
+            "speaks      = [\"media.serve@1\"]\nlistens     = 8080\ncontract    = 8081\nfronts      = \"{UPSTREAM}\"\n{adapter}"
         ))
         .replace(
             "[[claim]]\n",

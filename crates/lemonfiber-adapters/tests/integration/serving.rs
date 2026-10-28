@@ -24,6 +24,7 @@ fn serve() -> Serve {
         binds: Vec::new(),
         tmpfs: Vec::new(),
         listens: Some(8989),
+        contract: None,
         alias: None,
         devices: Vec::new(),
     }
@@ -153,6 +154,7 @@ fn served_on(network: &str) -> lemonfiber_ports::serving::Served {
         addresses: Vec::new(),
         machine: vec!["recording-host".to_owned()],
         port: Some(49152),
+        contract: None,
     }
 }
 
@@ -408,6 +410,7 @@ async fn a_started_container_the_engine_will_not_describe_is_refused_and_removed
         addresses: Vec::new(),
         machine: Vec::new(),
         port: None,
+        contract: None,
     };
     assert!(matches!(
         daemon.standing(&somebody).await,
@@ -462,6 +465,7 @@ async fn an_engine_that_cannot_be_reached_serves_nothing_says_nothing_and_remove
         addresses: Vec::new(),
         machine: Vec::new(),
         port: None,
+        contract: None,
     };
     assert!(matches!(
         daemon.standing(&somebody).await,

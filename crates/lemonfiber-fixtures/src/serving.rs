@@ -79,7 +79,21 @@ impl Serves {
             addresses: vec!["172.18.0.2".to_owned()],
             machine: vec!["recording-host".to_owned()],
             port: Some(port),
+            contract: None,
         })
+    }
+
+    /// Every service served is reached on the loopback interface at `port` for its
+    /// contracts, apart from its own port.
+    #[must_use]
+    pub fn contracted(self, port: u16) -> Self {
+        Self {
+            answer: self.answer.map(|served| Served {
+                contract: Some(port),
+                ..served
+            }),
+            ..self
+        }
     }
 
     /// No service can be served, because there is no engine in a test.

@@ -169,6 +169,7 @@ pub(crate) fn a_placed(
         hidden: false,
         health: None,
         listens,
+        contract: None,
         media_types: Vec::new(),
         networks: Vec::new(),
         speaks: Vec::new(),

@@ -20,6 +20,7 @@ fn served() -> Served {
             "OrbStack".to_owned(),
         ],
         port: Some(1),
+        contract: None,
     }
 }
 

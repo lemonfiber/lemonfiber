@@ -70,9 +70,7 @@ pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
     {
         let pinned = upstream(&manifest, service);
         let files: Vec<String> = manifest
-            .services
-            .iter()
-            .find(|one| service.fronts.as_deref() == Some(one.id.as_str()))
+            .upstream_of(service)
             .map(|one| one.media_types.clone())
             .unwrap_or_default();
         for named in &service.speaks {
@@ -113,13 +111,11 @@ pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
     })
 }
 
-/// The image the service an adapter fronts is pinned by, as a recording names it.
-fn upstream(manifest: &Manifest, adapter: &Service) -> Option<String> {
-    let fronted = adapter.fronts.as_deref()?;
+/// The image the service a speaker answers for is pinned by, as a recording names it:
+/// the one it fronts, or its own where it fronts none.
+fn upstream(manifest: &Manifest, speaker: &Service) -> Option<String> {
     manifest
-        .services
-        .iter()
-        .find(|one| one.id == fronted)
+        .upstream_of(speaker)
         .map(|one| format!("{}@{}", one.image, one.digest))
 }
 

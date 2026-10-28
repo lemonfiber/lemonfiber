@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use lemonfiber_manifest::container::exposed;
+
 use crate::schema::Service;
 use crate::Violation;
 
@@ -16,6 +18,13 @@ pub(super) fn spoken(service: &Service, services: &[Service], found: &mut Vec<Vi
                 location: format!("{at}.fronts"),
                 message: "names an upstream, and only a service that speaks a contract stands \
                           in front of one"
+                    .to_owned(),
+            });
+        }
+        if service.contract.is_some() {
+            found.push(Violation {
+                location: format!("{at}.contract"),
+                message: "names the port the service speaks its contracts on, and it speaks none"
                     .to_owned(),
             });
         }
@@ -56,24 +65,38 @@ pub(super) fn spoken(service: &Service, services: &[Service], found: &mut Vec<Vi
                 .to_owned(),
         });
     }
-    if service.port.is_some() && service.port == service.listens {
+    unexposed(service, &at, found);
+}
+
+/// Whether the port the service speaks its contracts on is reached by nothing but
+/// lemonfiber on this machine's loopback, as [`exposed`] decides for the compose writer
+/// and the proxy too.
+fn unexposed(service: &Service, at: &str, found: &mut Vec<Violation>) {
+    let Some(contract) = service.contract_port() else {
+        return;
+    };
+    if let Some(how) = exposed(contract, service.port, service.listens, &service.publish) {
+        let field = if service.contract.is_some() {
+            "contract"
+        } else {
+            how.field()
+        };
         found.push(Violation {
-            location: format!("{at}.port"),
-            message: "is the port the service speaks its contracts on, which lemonfiber publishes \
-                      on this machine's loopback alone"
-                .to_owned(),
+            location: format!("{at}.{field}"),
+            message: format!(
+                "is {contract}, the port the service speaks its contracts on, and {} reaches it, \
+                 where lemonfiber publishes that port on this machine's loopback alone",
+                how.said()
+            ),
         });
     }
 }
 
-/// Whether the adapter names one other service of its plugin, one that speaks nothing,
-/// as the upstream it stands in front of.
+/// Whether the service names, where it names an upstream, one other service of its
+/// plugin that speaks nothing; one naming none is its own upstream.
 fn fronting(service: &Service, services: &[Service], at: &str, found: &mut Vec<Violation>) {
     let refused = match service.fronts.as_deref() {
-        None => Some(
-            "is absent, and an adapter has to name the plugin's service it stands in front of"
-                .to_owned(),
-        ),
+        None => None,
         Some(fronted) if fronted == service.id => {
             Some("names the adapter itself, and an adapter stands in front of another".to_owned())
         }
