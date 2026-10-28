@@ -18,7 +18,7 @@ use tokio_rustls::TlsAcceptor;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Served {
     /// `https://127.0.0.1:<port>`.
-    pub base: String,
+    pub base: super::Https,
     /// The SHA-256 of the certificate it presents, as a pin is written.
     pub pin: String,
 }
@@ -59,7 +59,7 @@ fn tls_of(app: Router, versions: &'static [&'static SupportedProtocolVersion]) -
         }),
     );
     Some(Served {
-        base: format!("https://{at}"),
+        base: super::Https::parse(&format!("https://{at}"))?,
         pin,
     })
 }

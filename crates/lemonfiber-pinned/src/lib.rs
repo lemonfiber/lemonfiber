@@ -19,6 +19,9 @@ use rustls::{CertificateError, DigitallySignedStruct, SignatureScheme};
 
 #[cfg(any(test, feature = "test-support"))]
 pub mod fake;
+mod https;
+
+pub use https::Https;
 
 /// How many lower-case hexadecimal digits a certificate's SHA-256 is written in.
 const DIGITS: usize = 64;
@@ -132,26 +135,17 @@ pub fn client(pins: &[String], within: Option<Duration>) -> Option<reqwest::Clie
     .ok()
 }
 
-/// Whether a handshake to `base`, an `https://host:port` address, presents exactly the
-/// certificate whose SHA-256 is `pin`, the server given `within` to answer.
+/// Whether a handshake to `base` presents exactly the certificate whose SHA-256 is `pin`,
+/// the server given `within` to answer.
 ///
 /// Any answer the server makes over that handshake counts, whatever its status: the
-/// question is what it presents, not what it serves. An address not reached over HTTPS
-/// presents nothing, and nothing is sent to it.
-pub async fn presents(base: &str, pin: &str, within: Duration) -> bool {
-    let asked = https(base)
-        .zip(client(&[pin.to_owned()], Some(within)))
-        .map(|(base, client)| client.head(base).send());
+/// question is what it presents, not what it serves.
+pub async fn presents(base: &Https, pin: &str, within: Duration) -> bool {
+    let asked = client(&[pin.to_owned()], Some(within))
+        .map(|client| client.head(base.as_url().clone()).send());
     futures_util::future::OptionFuture::from(asked)
         .await
         .is_some_and(|answered| answered.is_ok())
-}
-
-/// `text` as an address, where it is one reached over HTTPS.
-fn https(text: &str) -> Option<reqwest::Url> {
-    reqwest::Url::parse(text)
-        .ok()
-        .filter(|url| url.scheme() == "https")
 }
 
 #[cfg(test)]
