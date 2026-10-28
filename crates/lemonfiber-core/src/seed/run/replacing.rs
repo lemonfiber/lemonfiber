@@ -9,6 +9,10 @@
 //! certificate kept, so no holder is left without the certificate it is served.
 
 use std::path::Path;
+use std::sync::Arc;
+
+use futures_util::future::OptionFuture;
+use lemonfiber_contract::capabilities::media::serve::Fills;
 
 use super::encrypting::{inside, served};
 use super::Ctx;
@@ -105,13 +109,12 @@ async fn decline_holds(
     project: &Path,
     pin: &str,
 ) -> bool {
-    let Some(decline) = declining::asked(ctx, fillers, project).await else {
-        return false;
-    };
-    decline
-        .held()
+    let decline = declining::asked(ctx, fillers, project).await;
+    OptionFuture::from(decline.as_ref().map(|decline| decline.held()))
         .await
-        .is_ok_and(|held| held.is_none_or(|held| held.pins.iter().any(|one| one == pin)))
+        .is_some_and(|held| {
+            held.is_ok_and(|held| held.is_none_or(|held| held.pins.iter().any(|one| one == pin)))
+        })
 }
 
 /// Whether the request gate's route to the media server holds `pin`, or it has none.
@@ -121,14 +124,16 @@ async fn gate_holds(
     project: &Path,
     pin: &str,
 ) -> bool {
-    let Some(gate) = gating::asked(ctx, fillers, project).await else {
-        return false;
-    };
-    gate.admitted().await.is_ok_and(|admitted| {
-        !admitted.iter().any(|route| {
-            matches!(&route.target, Target::MediaServer { pins } if !pins.iter().any(|one| one == pin))
+    let gate = gating::asked(ctx, fillers, project).await;
+    OptionFuture::from(gate.as_ref().map(|gate| gate.admitted()))
+        .await
+        .is_some_and(|admitted| {
+            admitted.is_ok_and(|admitted| {
+                !admitted.iter().any(|route| {
+                    matches!(&route.target, Target::MediaServer { pins } if !pins.iter().any(|one| one == pin))
+                })
+            })
         })
-    })
 }
 
 /// Replace the media server's internal certificate on the operator's ask: a replacement
@@ -199,16 +204,20 @@ pub(super) async fn advanced(
             ours: Some(rehearsed(stack, server)),
         });
     }
+    let asked = match asked(ctx, server).await {
+        Ok(asked) => asked,
+        Err(detail) => return failed(detail),
+    };
     let state = match &standing.next {
-        Some(next) => serving(ctx, stack, server, config, next).await,
-        None => served_again(ctx, server, config).await,
+        Some(next) => serving(ctx, stack, (server, &asked), config, next).await,
+        None => served_again(ctx, (server, &asked), config).await,
     };
     match state {
         Ok(State::Wired | State::AlreadyWired) => {}
         Ok(state) => return settled(state),
         Err(detail) => return failed(detail),
     }
-    if let Err(detail) = reached(ctx, stack, server, config).await {
+    if let Err(detail) = reached(ctx, stack, (server, &asked), config).await {
         return failed(detail);
     }
     if let Err(unkept) = internal::withdrawn(ctx.seams.confined.as_ref(), config) {
@@ -226,7 +235,7 @@ pub(super) async fn advanced(
 async fn reached(
     ctx: &Ctx,
     stack: Stack<'_>,
-    server: &MediaServer,
+    (server, asked): (&MediaServer, &Asked),
     config: &Path,
 ) -> Result<(), String> {
     let current = internal::kept(ctx.seams.confined.as_ref(), config)
@@ -237,7 +246,7 @@ async fn reached(
         .into_iter()
         .map(|holder| format!("{holder} does not yet hold its SHA-256"))
         .collect();
-    if !server.ready(ctx).await || !presents(ctx, server, &current.fingerprint).await {
+    if !server.ready(ctx).await || !presents(asked, &current.fingerprint).await {
         unreached.push(format!("{} does not yet present it", server.name()));
     }
     if unreached.is_empty() {
@@ -252,35 +261,29 @@ async fn reached(
 
 /// Whether a handshake to the media server's internal port already presents the
 /// certificate whose SHA-256 is `pin`, as its adapter answers serving it again.
-async fn presents(ctx: &Ctx, server: &MediaServer, pin: &str) -> bool {
-    let Ok((path, client)) = asked(ctx, server).await else {
-        return false;
-    };
-    matches!(client.serve_tls(&path, pin).await, Ok(Applied::Now))
+async fn presents((path, client): &Asked, pin: &str) -> bool {
+    matches!(client.serve_tls(path, pin).await, Ok(Applied::Now))
 }
 
 /// What serving the certificate in force again came to, for a replacement taken up after
 /// it was put in place: the media server started again where it serves it only then.
-async fn served_again(ctx: &Ctx, server: &MediaServer, config: &Path) -> Result<State, String> {
+async fn served_again(
+    ctx: &Ctx,
+    (server, (path, client)): (&MediaServer, &Asked),
+    config: &Path,
+) -> Result<State, String> {
     let current = internal::kept(ctx.seams.confined.as_ref(), config)
         .map_err(|unkept| unkept.to_string())?
         .ok_or_else(|| format!("{} keeps no certificate in force", server.name()))?;
-    let (path, client) = asked(ctx, server).await?;
-    Ok(served(ctx, server, client.as_ref(), (&path, &current.fingerprint)).await)
+    Ok(served(ctx, server, client.as_ref(), (path, &current.fingerprint)).await)
 }
 
 /// Where the media server's container holds its certificate, and its adapter asked over
-/// its contract; why not where either is missing.
-async fn asked(
-    ctx: &Ctx,
-    server: &MediaServer,
-) -> Result<
-    (
-        String,
-        std::sync::Arc<dyn lemonfiber_contract::capabilities::media::serve::Fills>,
-    ),
-    String,
-> {
+/// its contract.
+type Asked = (String, Arc<dyn Fills>);
+
+/// The media server's [`Asked`]; why not where either is missing.
+async fn asked(ctx: &Ctx, server: &MediaServer) -> Result<Asked, String> {
     let path = inside(server).ok_or_else(|| {
         format!(
             "{} says nowhere its container holds its certificate",
@@ -303,7 +306,7 @@ async fn asked(
 async fn serving(
     ctx: &Ctx,
     stack: Stack<'_>,
-    server: &MediaServer,
+    (server, (path, client)): (&MediaServer, &Asked),
     config: &Path,
     next: &internal::Internal,
 ) -> Result<State, String> {
@@ -316,7 +319,6 @@ async fn serving(
             server.name()
         ));
     }
-    let (path, client) = asked(ctx, server).await?;
     let previous =
         internal::kept(ctx.seams.confined.as_ref(), config).map_err(|unkept| unkept.to_string())?;
     journalled(
@@ -326,7 +328,7 @@ async fn serving(
         &next.fingerprint,
     )?;
     internal::promoted(ctx.seams.confined.as_ref(), config).map_err(|unkept| unkept.to_string())?;
-    Ok(served(ctx, server, client.as_ref(), (&path, &next.fingerprint)).await)
+    Ok(served(ctx, server, client.as_ref(), (path, &next.fingerprint)).await)
 }
 
 /// The replacement of `service`'s certificate written down, by the SHA-256 of each, before

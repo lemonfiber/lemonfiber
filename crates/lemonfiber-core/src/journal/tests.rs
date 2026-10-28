@@ -555,6 +555,26 @@ fn a_change_to_the_overlay_is_reversed_by_leaving_it() {
 }
 
 #[test]
+fn a_replaced_certificate_is_reversed_by_leaving_it() {
+    let replaced = Change {
+        at: "1".to_owned(),
+        operation: "internal-certificate".to_owned(),
+        target: "jellyfin".to_owned(),
+        kind: Kind::Certified {
+            service: "jellyfin".to_owned(),
+            previous: Some("a".to_owned()),
+            current: "b".to_owned(),
+        },
+    };
+    assert_eq!(
+        replaced.undo().action,
+        Action::Unreplaced {
+            service: "jellyfin".to_owned()
+        }
+    );
+}
+
+#[test]
 fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left() {
     let setting = Change {
         at: "1".to_owned(),

@@ -35,10 +35,9 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
     };
     let confined = ctx.seams.confined.as_ref();
     let service = &server.served.id;
-    if let Ok(kept) = internal::kept_or_made(confined, config, service) {
-        if !kept.made_out_to(service) {
-            let _ = internal::staged(confined, config, service);
-        }
+    let made = internal::kept_or_made(confined, config, service);
+    if made.is_ok_and(|kept| !kept.made_out_to(service)) {
+        let _ = internal::staged(confined, config, service);
     }
 }
 

@@ -689,6 +689,14 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the overlay /cfg/overlay.yml"
     );
+    assert_eq!(
+        described(&change(Kind::Certified {
+            service: "jellyfin".to_owned(),
+            previous: Some("a".to_owned()),
+            current: "b".to_owned(),
+        })),
+        "the internal certificate of jellyfin"
+    );
 }
 
 #[test]

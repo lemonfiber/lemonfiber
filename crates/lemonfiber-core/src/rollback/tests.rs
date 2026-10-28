@@ -502,6 +502,19 @@ fn a_mint_goes_back_and_a_revoke_does_not() {
     assert!(overlaid.refusal.is_some_and(|refusal| refusal
         .because
         .contains("the overlay /cfg/overlay.yml is the operator's own file")));
+    let replaced = standing(
+        &key(Kind::Certified {
+            service: "jellyfin".to_owned(),
+            previous: Some("a".to_owned()),
+            current: "b".to_owned(),
+        }),
+        &[],
+        &holding(&[]),
+        &unread,
+    );
+    assert!(replaced.refusal.is_some_and(|refusal| refusal
+        .because
+        .contains("the internal certificate of jellyfin was replaced")));
 }
 
 /// A plugin's document a choice of filler wrote over, holding `written` in its place.

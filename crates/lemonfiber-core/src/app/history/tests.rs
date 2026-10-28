@@ -107,6 +107,19 @@ fn the_overlay_reads_as_changed_or_taken_away() {
     );
 }
 
+/// A replaced internal certificate reads as replaced, by the service it is of.
+#[test]
+fn a_replaced_certificate_reads_as_its_service() {
+    assert_eq!(
+        did(&crate::journal::Kind::Certified {
+            service: "jellyfin".to_owned(),
+            previous: Some("a".to_owned()),
+            current: "b".to_owned(),
+        }),
+        "replaced the internal certificate of jellyfin"
+    );
+}
+
 /// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {

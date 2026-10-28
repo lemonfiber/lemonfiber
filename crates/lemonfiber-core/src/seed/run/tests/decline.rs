@@ -588,6 +588,15 @@ async fn a_key_held_with_other_pins_is_handed_again_with_the_certificate_kept() 
     assert!(!minted_on(&http));
 
     assert_eq!(seed(&ctx).await, Some(State::AlreadyWired));
+
+    let _ = std::fs::write(
+        at.join("config")
+            .join("jellyfin")
+            .join(crate::certificate::internal::NEXT),
+        "not a certificate",
+    );
+    assert!(matches!(seed(&ctx).await, Some(State::Failed { .. })));
+    assert_eq!(pins(), Some(format!("{}\n", made.fingerprint)));
 }
 
 /// A key that cannot be handed again with the certificate's pin is reported, never called

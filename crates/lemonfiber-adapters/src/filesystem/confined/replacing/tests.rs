@@ -194,6 +194,7 @@ fn a_file_is_taken_away_and_one_not_there_is_nothing_to_take() {
         .is_ok());
     assert!(Disk.removed(&owned, &owned).is_err());
     assert!(Disk.removed(&owned.join("lemonfiber"), &owned).is_err());
+    assert!(Disk.removed(std::path::Path::new("/"), &owned).is_err());
 }
 
 #[cfg(unix)]

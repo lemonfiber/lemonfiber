@@ -45,7 +45,16 @@ fn answering(serving: Answer, ready: bool) -> Arc<Fake> {
 /// A machine whose gate holds its routes and whose media server keeps a certificate,
 /// answering over `http`; with that certificate.
 fn machine(name: &str, http: Arc<Fake>) -> (Ctx, std::path::PathBuf, Internal) {
-    let (mut ctx, at) = gate_ctx(name, true, CURATORS, Some("held"), http);
+    machine_administered(name, true, http)
+}
+
+/// The same, with the media server administered where `administered` says.
+fn machine_administered(
+    name: &str,
+    administered: bool,
+    http: Arc<Fake>,
+) -> (Ctx, std::path::PathBuf, Internal) {
+    let (mut ctx, at) = gate_ctx(name, administered, CURATORS, Some("held"), http);
     ctx.settings.stack_dir = Some(at.join("stack"));
     let made = internal::kept_or_made(&lemonfiber_adapters::Disk, &config(&at), "jellyfin");
     let Ok(made) = made else {
@@ -79,13 +88,24 @@ fn both(one: &Internal, other: &Internal) -> Vec<String> {
     pins
 }
 
-/// Replace the certificate on `ctx` with the stack written at `project`.
-async fn replace(ctx: &Ctx, project: &std::path::Path) -> Vec<crate::seed::Wiring> {
-    let services = stack(true);
+/// The stack written at `project`: its services, who fills each ask, and its media server.
+fn parts(
+    project: &std::path::Path,
+) -> (
+    Vec<lemonfiber_manifest::Service>,
+    crate::wiring::Fillers,
+    crate::app::targets::MediaServer,
+) {
     let fillers = routed_at(stack(true), project);
     let Some(server) = crate::app::targets::MediaServer::of(&fillers) else {
         unreachable!("the moved media server fills the identity source");
     };
+    (stack(true), fillers, server)
+}
+
+/// Replace the certificate on `ctx` with the stack written at `project`.
+async fn replace(ctx: &Ctx, project: &std::path::Path) -> Vec<crate::seed::Wiring> {
+    let (services, fillers, server) = parts(project);
     replacing::replaced(
         ctx,
         Stack {
@@ -94,6 +114,21 @@ async fn replace(ctx: &Ctx, project: &std::path::Path) -> Vec<crate::seed::Wirin
             project: Some(project),
         },
         &server,
+    )
+    .await
+}
+
+/// Take the replacement under way on `ctx` as far as it goes, as the seed does.
+async fn advance(ctx: &Ctx, project: &std::path::Path) -> Vec<crate::seed::Wiring> {
+    let (services, fillers, server) = parts(project);
+    replacing::advanced(
+        ctx,
+        Stack {
+            services: &services,
+            fillers: &fillers,
+            project: Some(project),
+        },
+        Some(&server),
     )
     .await
 }
@@ -148,11 +183,7 @@ async fn a_replacement_the_gate_holds_is_served_journalled_and_the_old_one_withd
 async fn a_replacement_the_gate_cannot_be_handed_is_never_served() {
     let http = answering(now(), true);
     let (ctx, at, old) = machine("rotating-unhanded", http.clone());
-    let services = stack(true);
-    let fillers = routed_at(stack(true), &at);
-    let Some(server) = crate::app::targets::MediaServer::of(&fillers) else {
-        unreachable!("the moved media server fills the identity source");
-    };
+    let (services, fillers, server) = parts(&at);
 
     let wirings = replacing::replaced(
         &ctx,
@@ -295,9 +326,11 @@ async fn a_certificate_kept_that_cannot_be_read_stops_everything_and_hands_nothi
 
     let (state, _) = seeded(&ctx, &http, true, &at).await;
     let wirings = replace(&ctx, &at).await;
+    let advanced = advance(&ctx, &at).await;
 
     assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
     assert!(failed_saying(&wirings, "does not read"), "{wirings:?}");
+    assert!(failed_saying(&advanced, "does not read"), "{advanced:?}");
     assert_eq!(
         gate_pins(&at),
         vec![old.fingerprint],
@@ -529,4 +562,151 @@ async fn a_stack_without_a_media_server_has_no_certificate_to_replace() {
         },
     )
     .is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_media_server_lemonfiber_writes_no_certificate_for_has_none_replaced() {
+    let (ctx, at, old) = machine("rotating-unconfined", answering(now(), true));
+    let (services, fillers, mut server) = parts(&at);
+    server.served.confined_to = None;
+    let stack = Stack {
+        services: &services,
+        fillers: &fillers,
+        project: Some(&at),
+    };
+
+    assert!(replacing::replaced(&ctx, stack, &server).await.is_empty());
+    assert!(replacing::advanced(&ctx, stack, Some(&server))
+        .await
+        .is_empty());
+    assert!(replacing::advanced(&ctx, stack, None).await.is_empty());
+    assert_eq!(kept(&at).current, Some(old));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_media_server_that_cannot_be_asked_to_serve_it_goes_on_serving_the_old_one() {
+    let (ctx, at, old) = machine("rotating-unplaced", answering(now(), true));
+    let (services, fillers, mut server) = parts(&at);
+    server.served.config_at = None;
+    let stack = Stack {
+        services: &services,
+        fillers: &fillers,
+        project: Some(&at),
+    };
+
+    let unplaced = replacing::replaced(&ctx, stack, &server).await;
+
+    assert!(
+        failed_saying(&unplaced, "says nowhere its container holds"),
+        "{unplaced:?}"
+    );
+    assert_eq!(kept(&at).current, Some(old.clone()));
+
+    let http = answering(now(), true);
+    let (ctx, at, old) = machine_administered("rotating-unadministered", false, http.clone());
+
+    let unasked = replace(&ctx, &at).await;
+
+    assert!(
+        failed_saying(&unasked, "cannot be asked over its contract"),
+        "{unasked:?}"
+    );
+    assert_eq!(kept(&at).current, Some(old));
+    assert!(!http.asked_for(media::serve("serve_tls")));
+}
+
+#[cfg(unix)]
+#[tokio::test(start_paused = true)]
+async fn a_certificate_that_cannot_be_withdrawn_stays_handed_beside_the_new_one() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (mut ctx, at, old) = machine("rotating-unwithdrawn", answering(now(), false));
+    let _ = replace(&ctx, &at).await;
+    ctx.seams.http = answering(now(), true);
+    let directory = internal::path(&config(&at))
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500));
+
+    let wirings = advance(&ctx, &at).await;
+
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
+    assert!(
+        wirings
+            .iter()
+            .any(|one| matches!(one.state, State::Failed { .. })),
+        "{wirings:?}"
+    );
+    let after = kept(&at);
+    let Some(new) = after.current.clone() else {
+        unreachable!("the replacement is in place");
+    };
+    assert_eq!(after.previous, Some(old.clone()));
+    assert_eq!(gate_pins(&at), both(&old, &new));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_replacement_with_nobody_to_hand_it_says_so() {
+    let (_, at, _) = machine("rotating-unheld", answering(now(), true));
+    let (_, fillers, server) = parts(&at);
+    let alone = stack(false);
+
+    let said = replacing::rehearsed(
+        Stack {
+            services: &alone,
+            fillers: &fillers,
+            project: Some(&at),
+        },
+        &server,
+    );
+
+    assert!(
+        said.contains("no service holds a media server credential"),
+        "{said}"
+    );
+}
+
+/// A transport that writes over the certificate at `spoiled` once the media server is
+/// asked to serve one, as a disk that fails part-way through a replacement leaves it.
+struct Spoiling {
+    inner: Arc<Fake>,
+    spoiled: std::path::PathBuf,
+}
+
+#[async_trait::async_trait]
+impl crate::ports::http::Http for Spoiling {
+    async fn send(
+        &self,
+        request: &crate::ports::http::Request,
+    ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
+        if request.url.ends_with(&media::serve("serve_tls")) {
+            let _ = std::fs::write(&self.spoiled, "not a certificate");
+        }
+        self.inner.send(request).await
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_replacement_whose_outcome_cannot_be_read_back_is_never_reported_as_landed() {
+    let http = answering(now(), true);
+    let (mut ctx, at, _) = machine("rotating-spoiled", http.clone());
+    let offer = rotated(&ctx, &at, None)
+        .await
+        .ok()
+        .and_then(|read| read.offer)
+        .unwrap_or_default();
+    ctx.seams.http = Arc::new(Spoiling {
+        inner: http,
+        spoiled: internal::path(&config(&at)),
+    });
+
+    let spoiled = rotated(&ctx, &at, Some(&offer)).await;
+
+    assert!(
+        spoiled.as_ref().is_ok_and(|one| matches!(
+            &one.settled,
+            Settled::Unproven { detail } if detail.contains("does not read")
+        )),
+        "{spoiled:?}"
+    );
 }

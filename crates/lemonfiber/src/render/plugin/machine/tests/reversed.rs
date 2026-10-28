@@ -516,6 +516,12 @@ fn a_device_key_put_back_is_said_by_its_name() {
         }),
         "left the overlay /cfg/overlay.yml as it is"
     );
+    assert_eq!(
+        undone(Action::Unreplaced {
+            service: "jellyfin".to_owned()
+        }),
+        "left the internal certificate of jellyfin as it is"
+    );
 }
 
 /// State moved back out of a mount tree, and a volume's copy kept, say what was done.

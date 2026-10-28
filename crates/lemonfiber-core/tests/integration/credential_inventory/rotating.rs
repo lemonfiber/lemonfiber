@@ -430,3 +430,26 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
     );
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
+
+#[tokio::test]
+async fn the_internal_certificate_is_offered_for_replacement_before_anything_moves() {
+    let env = env_at("certificate", &[]);
+    let ctx = ctx(env, Files::empty(), silent());
+    lemonfiber_testing::adapted::parts_recorded(&ctx);
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: Asking::INTERNAL_CERTIFICATE.to_owned(),
+            agreement: None,
+        },
+    )
+    .await;
+
+    let rotated = inventory.rotated.as_ref();
+    assert!(
+        rotated.is_some_and(|one| one.offer.is_some()),
+        "{:?}",
+        rotated.map(|one| &one.settled)
+    );
+}
