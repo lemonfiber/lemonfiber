@@ -28,7 +28,7 @@ fn listed(report: &SettingsReport) -> Lines {
     for secret in &report.secrets {
         lines.extend(secret_lines(secret));
     }
-    lines.spaced("Change one with lemonfiber settings set <setting> <value>; a secret is replaced with lemonfiber credentials --rotate.");
+    lines.spaced("Change one with lemonfiber settings set <setting>=<value>; a secret is replaced with lemonfiber credentials --rotate.");
     lines
 }
 
@@ -103,32 +103,52 @@ fn read_as(reader: &Reader) -> String {
 
 fn changed(change: &SettingChange, rehearsed: bool) -> Lines {
     let mut lines = Lines::default();
-    let now = match (&change.value, change.applied) {
-        (Some(value), true) => format!("{} now holds {value}.", change.setting),
-        (Some(value), false) => format!("{} would hold {value}.", change.setting),
-        (None, true) => format!(
-            "{} was cleared, so its default is written again.",
-            change.setting
-        ),
-        (None, false) => format!(
-            "{} would be cleared, so its default is written again.",
-            change.setting
-        ),
-    };
-    lines.put(now);
-    lines.put(format!(
-        "  was          {}",
-        change.was.as_deref().unwrap_or("at its default")
-    ));
-    lines.put(format!(
+    for (index, one) in change.settings.iter().enumerate() {
+        let now = match (&one.value, change.applied) {
+            (Some(value), true) => format!("{} now holds {value}.", one.setting),
+            (Some(value), false) => format!("{} would hold {value}.", one.setting),
+            (None, true) => format!(
+                "{} was cleared, so its default is written again.",
+                one.setting
+            ),
+            (None, false) => format!(
+                "{} would be cleared, so its default is written again.",
+                one.setting
+            ),
+        };
+        if index == 0 {
+            lines.put(now);
+        } else {
+            lines.spaced(now);
+        }
+        lines.put(format!(
+            "  was          {}",
+            one.was.as_deref().unwrap_or("at its default")
+        ));
+    }
+    let regenerates = format!(
         "  regenerates  {}",
         listed_or(&change.regenerates, "no entry")
-    ));
+    );
+    let unread = if change.settings.len() > 1 {
+        "nothing, as nothing running reads them"
+    } else {
+        "nothing, as nothing running reads it"
+    };
+    if change.settings.len() > 1 {
+        lines.spaced(regenerates);
+    } else {
+        lines.put(regenerates);
+    }
     lines.put(format!(
         "  restarts     {}",
-        listed_or(&change.restarts, "nothing, as nothing running reads it")
+        listed_or(&change.restarts, unread)
     ));
-    if let Some(consequence) = &change.consequence {
+    for consequence in change
+        .settings
+        .iter()
+        .filter_map(|one| one.consequence.as_ref())
+    {
         lines.spaced(consequence.clone());
     }
     if let Some(why) = &change.unrestarted {
@@ -158,10 +178,20 @@ fn answering(change: &SettingChange, rehearsed: bool) -> Lines {
     } else {
         "Nothing has been changed. To make the change, answer this offer by name:"
     });
-    let verb = match &change.value {
-        Some(value) => format!("set {} {}", change.setting, super::wiring::quoted(value)),
-        None => format!("clear {}", change.setting),
-    };
+    let named: Vec<String> = change
+        .settings
+        .iter()
+        .map(|one| match &one.value {
+            Some(value) => super::wiring::quoted(&format!("{}={value}", one.setting)),
+            None => one.setting.clone(),
+        })
+        .collect();
+    let cleared = change.settings.iter().all(|one| one.value.is_none());
+    let verb = format!(
+        "{} {}",
+        if cleared { "clear" } else { "set" },
+        named.join(" ")
+    );
     lines.put(format!(
         "  lemonfiber settings {verb} --offer {}",
         change.agreement

@@ -1,5 +1,5 @@
 use lemonfiber_core::model::{
-    Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingRead, SettingsReport,
+    Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove, SettingRead, SettingsReport,
 };
 
 fn reader(service: &str, variable: &str, default: Option<&str>) -> Reader {
@@ -56,12 +56,14 @@ fn listing() -> SettingsReport {
 
 fn change(value: Option<&str>, applied: bool) -> SettingChange {
     SettingChange {
-        setting: "gluetun:countries".to_owned(),
-        was: Some("Netherlands".to_owned()),
-        value: value.map(str::to_owned),
+        settings: vec![SettingMove {
+            setting: "gluetun:countries".to_owned(),
+            was: Some("Netherlands".to_owned()),
+            value: value.map(str::to_owned),
+            consequence: None,
+        }],
         regenerates: vec!["gluetun".to_owned()],
         restarts: Vec::new(),
-        consequence: None,
         applied,
         agreement: "1a2b3c4d-5e6f7a8b".to_owned(),
         unrestarted: None,
@@ -86,7 +88,7 @@ fn the_listing_reads_each_setting_with_its_readers_and_each_secret_without_its_v
          \n  komga:token  held, captured by a recipe  (komga's)\n\
          \x20   reads     komga as KOMGA_TOKEN\n\
          \n\
-         Change one with lemonfiber settings set <setting> <value>; a secret is replaced \
+         Change one with lemonfiber settings set <setting>=<value>; a secret is replaced \
          with lemonfiber credentials --rotate."
     );
 }
@@ -105,7 +107,7 @@ fn a_change_unanswered_names_what_it_regenerates_and_the_offer_to_answer() {
          \x20 restarts     nothing, as nothing running reads it\n\
          \n\
          Nothing has been changed. To make the change, answer this offer by name:\n\
-         \x20 lemonfiber settings set gluetun:countries \"Belgium, France\" --offer \
+         \x20 lemonfiber settings set \"gluetun:countries=Belgium, France\" --offer \
          1a2b3c4d-5e6f7a8b"
     );
 }
@@ -115,7 +117,10 @@ fn a_clear_made_says_the_default_is_written_again_and_what_was_not_restarted() {
     let mut made = change(None, true);
     made.restarts = vec!["gluetun".to_owned()];
     made.unrestarted = Some("the engine is not running".to_owned());
-    made.consequence = Some("changing this affects which provider carries the torrents".to_owned());
+    for one in &mut made.settings {
+        one.consequence =
+            Some("changing this affects which provider carries the torrents".to_owned());
+    }
     let report = SettingsReport {
         change: Some(made),
         ..listing()
@@ -130,6 +135,44 @@ fn a_clear_made_says_the_default_is_written_again_and_what_was_not_restarted() {
          changing this affects which provider carries the torrents\n\
          \n\
          The change is made, and what reads it was not restarted: the engine is not running"
+    );
+}
+
+#[test]
+fn a_change_moving_several_settings_names_each_and_answers_them_together() {
+    let mut several = change(Some("openvpn"), false);
+    several.settings = vec![
+        SettingMove {
+            setting: "gluetun:provider".to_owned(),
+            was: None,
+            value: Some("private internet access".to_owned()),
+            consequence: None,
+        },
+        SettingMove {
+            setting: "gluetun:vpn-type".to_owned(),
+            was: Some("wireguard".to_owned()),
+            value: Some("openvpn".to_owned()),
+            consequence: None,
+        },
+    ];
+    let report = SettingsReport {
+        change: Some(several),
+        ..listing()
+    };
+    assert_eq!(
+        super::settings(&report).text(),
+        "gluetun:provider would hold private internet access.\n\
+         \x20 was          at its default\n\
+         \n\
+         gluetun:vpn-type would hold openvpn.\n\
+         \x20 was          wireguard\n\
+         \n\
+         \x20 regenerates  gluetun\n\
+         \x20 restarts     nothing, as nothing running reads them\n\
+         \n\
+         Nothing has been changed. To make the change, answer this offer by name:\n\
+         \x20 lemonfiber settings set \"gluetun:provider=private internet access\" \
+         \"gluetun:vpn-type=openvpn\" --offer 1a2b3c4d-5e6f7a8b"
     );
 }
 

@@ -9,8 +9,8 @@ pub(crate) use lemonfiber_api::actions::{
     TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY,
     TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS,
     TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES,
-    TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE,
-    TAKES_WAITING, TAKES_WISH,
+    TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE,
+    TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -41,6 +41,14 @@ pub(crate) fn refusal(action: &str, given: Arguments) -> Option<Refused> {
 
 // ── What the table says each action takes ────────────────────────────────────
 
+/// The one setting an action that `takers` lists is given, and none for any other.
+fn settings_for(action: &str, takers: &[&str]) -> impl Iterator<Item = String> {
+    takers
+        .contains(&action)
+        .then(|| "gluetun:countries".to_owned())
+        .into_iter()
+}
+
 /// Exactly what the table says this action takes, and nothing else.
 ///
 /// Built from the same lists the translation refuses by, so the arguments under
@@ -70,7 +78,10 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         service: takes(TAKES_SERVICE).then(|| "sonarr".to_owned()),
         key: takes(TAKES_KEY).then(|| "DATA_ROOT".to_owned()),
         value: takes(TAKES_VALUE).then(|| "/srv".to_owned()),
-        setting: takes(TAKES_SETTING).then(|| "gluetun:countries".to_owned()),
+        values: settings_for(action, TAKES_VALUES)
+            .map(|setting| (setting, "Belgium".to_owned()))
+            .collect(),
+        settings: settings_for(action, TAKES_SETTINGS).collect(),
         credential: takes(TAKES_CREDENTIAL).then(|| CREDENTIAL.to_owned()),
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),

@@ -22,7 +22,7 @@ pub(crate) fn settings_takes(name: &str, read: bool) -> Result<(), Box<Problem>>
         return Err(Box::new(
             unknown(name).or_try(
                 Remedy::new(format!("{name} is held for the setting {}", row.name))
-                    .with_detail(format!("lemonfiber settings set {} <value>", row.name)),
+                    .with_detail(format!("lemonfiber settings set {}=<value>", row.name)),
             ),
         ));
     }

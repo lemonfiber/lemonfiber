@@ -202,3 +202,26 @@ fn needs_are_met_where_every_setting_holds_a_listed_value_the_default_where_none
     assert!(!super::met(&key.needs, &|_: &str| None));
     assert!(super::met(&super::Needs::new(), &|_: &str| None));
 }
+
+#[test]
+fn a_settings_choices_are_the_values_whose_needs_the_other_settings_meet() {
+    let env = env(GUARD);
+    let wireguard = |setting: &str| super::defaulted(&env, setting);
+    assert_eq!(
+        super::offered(&env, "gluetun:provider", &wireguard),
+        Some(vec!["mullvad".to_owned()])
+    );
+    let openvpn = |setting: &str| (setting == "gluetun:vpn-type").then(|| "openvpn".to_owned());
+    assert_eq!(
+        super::offered(&env, "gluetun:provider", &openvpn),
+        Some(vec![
+            "mullvad".to_owned(),
+            "private internet access".to_owned()
+        ])
+    );
+    assert_eq!(
+        super::offered(&env, "gluetun:wireguard-key", &openvpn),
+        None
+    );
+    assert_eq!(super::offered(&env, "gluetun:nothing", &openvpn), None);
+}

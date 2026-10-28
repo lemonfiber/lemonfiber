@@ -2,14 +2,14 @@
   "action": "settings-clear",
   "arguments": [
     {
-      "name": "setting",
+      "name": "settings",
       "type": {
-        "default": null,
-        "description": "The setting to change or put back to its default, by the name the settings read\nlists it under.",
-        "type": [
-          "string",
-          "null"
-        ]
+        "default": [],
+        "description": "The settings to put back to their defaults, by the names the settings read lists\nthem under.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       }
     },
     {

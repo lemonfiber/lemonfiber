@@ -331,11 +331,14 @@ pub const TAKES_RUN: &[&str] = &["undo"];
 /// The action whose command carries the configuration key it was given.
 pub const TAKES_KEY: &[&str] = &["config-set"];
 
-/// The actions whose command carries the value a key or a setting is changed to.
-pub const TAKES_VALUE: &[&str] = &["config-set", "settings-set"];
+/// The action whose command carries the value a key is changed to.
+pub const TAKES_VALUE: &[&str] = &["config-set"];
 
-/// The actions whose command carries the setting it changes or puts back to its default.
-pub const TAKES_SETTING: &[&str] = &["settings-set", "settings-clear"];
+/// The action whose command carries each setting it changes with the value it is to hold.
+pub const TAKES_VALUES: &[&str] = &["settings-set"];
+
+/// The action whose command carries the settings it puts back to their defaults.
+pub const TAKES_SETTINGS: &[&str] = &["settings-clear"];
 
 /// The action whose command carries the quality it was given.
 ///

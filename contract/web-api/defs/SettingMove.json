@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One setting a change moves.",
+  "type": "object",
+  "properties": {
+    "consequence": {
+      "description": "What moving it costs, where it costs anything.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "setting": {
+      "description": "The setting.",
+      "type": "string"
+    },
+    "value": {
+      "description": "What it is to hold, or nothing where it is cleared.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "was": {
+      "description": "What it holds now.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "setting"
+  ]
+}

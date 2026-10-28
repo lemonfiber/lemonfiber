@@ -49,12 +49,19 @@ impl Settings {
     }
 }
 
-pub(crate) fn recorded(path: &Path, name: &str, value: Option<&str>) -> Result<(), Failure> {
+pub(crate) fn recorded(
+    path: &Path,
+    changing: &BTreeMap<&str, Option<&str>>,
+) -> Result<(), Failure> {
     super::kept::changed(path, &mut |settings: &mut Settings| {
-        match value {
-            Some(value) => settings.values.insert(name.to_owned(), value.to_owned()),
-            None => settings.values.remove(name),
-        };
+        for (name, value) in changing {
+            match value {
+                Some(value) => settings
+                    .values
+                    .insert((*name).to_owned(), (*value).to_owned()),
+                None => settings.values.remove(*name),
+            };
+        }
         Ok(())
     })
 }

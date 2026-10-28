@@ -83,7 +83,37 @@ pub const DECLARED: &[Declared] = &[
         because: "it was the type of PluginInstalled.adapters alone, which is gone, so nothing \
                   names it",
     },
+    Declared {
+        under: 1,
+        what: "SettingChange.setting",
+        moved: Moved::Gone,
+        because: ONE_ACT,
+    },
+    Declared {
+        under: 1,
+        what: "SettingChange.was",
+        moved: Moved::Gone,
+        because: ONE_ACT,
+    },
+    Declared {
+        under: 1,
+        what: "SettingChange.value",
+        moved: Moved::Gone,
+        because: ONE_ACT,
+    },
+    Declared {
+        under: 1,
+        what: "SettingChange.consequence",
+        moved: Moved::Gone,
+        because: ONE_ACT,
+    },
 ];
+
+/// Why a change's one setting is gone: a change moves one or more settings in one act, and
+/// each is carried in its `settings`.
+const ONE_ACT: &str = "a change moves one or more settings in one act, each carried with what \
+                       it held, what it is to hold and what moving it costs in its settings; \
+                       no release carried the one setting a change used to name";
 
 /// Why what named an in-process adapter is gone: no service names one.
 const NO_ADAPTER: &str = "no service names an in-process adapter, so there is none to carry";

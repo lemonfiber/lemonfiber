@@ -172,7 +172,7 @@ OPENVPN_USER = { secret = "openvpn-user" }
     let resolved = crate::settings::Resolved::of(&ctx, None, &installed);
     assert!(named(&resolved).is_empty());
     assert_eq!(
-        named(&resolved.changed("guard:vpn-type", Some("openvpn"))),
+        named(&resolved.changed(&[("guard:vpn-type", Some("openvpn"))].into())),
         ["OPENVPN_USER"]
     );
 }

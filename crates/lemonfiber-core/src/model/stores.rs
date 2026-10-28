@@ -85,25 +85,32 @@ pub struct Reader {
     pub default: Option<String>,
 }
 
-/// A change to one setting.
+/// A change to one or more settings, made in one act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct SettingChange {
-    /// The setting.
-    pub setting: String,
-    /// What it holds now.
-    pub was: Option<String>,
-    /// What it is to hold, or nothing where it is cleared.
-    pub value: Option<String>,
+    /// Each setting the act moves, in name order.
+    pub settings: Vec<SettingMove>,
     /// Every service whose entry the change regenerates.
     pub regenerates: Vec<String>,
     /// Every running service the change restarts.
     pub restarts: Vec<String>,
-    /// What the change costs, where it costs anything.
-    pub consequence: Option<String>,
     /// Whether it was written.
     pub applied: bool,
     /// What this reading names itself, part by part.
     pub agreement: String,
     /// Why the services it restarts were not restarted, where they were not.
     pub unrestarted: Option<String>,
+}
+
+/// One setting a change moves.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct SettingMove {
+    /// The setting.
+    pub setting: String,
+    /// What it holds now.
+    pub was: Option<String>,
+    /// What it is to hold, or nothing where it is cleared.
+    pub value: Option<String>,
+    /// What moving it costs, where it costs anything.
+    pub consequence: Option<String>,
 }

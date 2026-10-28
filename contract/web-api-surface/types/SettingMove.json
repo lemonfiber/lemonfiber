@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "consequence": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "setting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "was": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

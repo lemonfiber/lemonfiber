@@ -640,15 +640,14 @@ fn every_command_that_carries_both_is_split_on_which_it_is() {
         (Command::Settings(Settling::Read), Rehearsal::Reads),
         (
             Command::Settings(Settling::Set {
-                setting: "domain".to_owned(),
-                value: "home.example".to_owned(),
+                values: [("domain".to_owned(), "home.example".to_owned())].into(),
                 agreement: None,
             }),
             Rehearsal::Reports,
         ),
         (
             Command::Settings(Settling::Clear {
-                setting: "domain".to_owned(),
+                settings: vec!["domain".to_owned()],
                 agreement: None,
             }),
             Rehearsal::Reports,

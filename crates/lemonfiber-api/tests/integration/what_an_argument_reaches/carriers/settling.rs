@@ -20,30 +20,38 @@ pub(super) fn give_key(given: &mut Arguments) {
     given.key = Some("DATA_ROOT".to_owned());
 }
 
-/// Whether the command has the value it was given in it, for a key or a setting.
+/// Whether the command has the value it was given for a key in it.
 pub(super) fn carries_value(command: &Command) -> bool {
-    matches!(
-        command,
-        Command::ConfigSet(Setting { value, .. })
-            | Command::Settings(Settling::Set { value, .. }) if value == VALUE
-    )
+    matches!(command, Command::ConfigSet(Setting { value, .. }) if value == VALUE)
 }
 
 pub(super) fn give_value(given: &mut Arguments) {
     given.value = Some(VALUE.to_owned());
 }
 
-/// Whether the command has the setting it was given in it.
-pub(super) fn carries_setting(command: &Command) -> bool {
+/// Whether the command has each setting it was given in it, with the value it was given.
+pub(super) fn carries_values(command: &Command) -> bool {
     matches!(
         command,
-        Command::Settings(Settling::Set { setting, .. } | Settling::Clear { setting, .. })
-            if setting == SETTING
+        Command::Settings(Settling::Set { values, .. })
+            if values.get(SETTING).map(String::as_str) == Some(VALUE)
     )
 }
 
-pub(super) fn give_setting(given: &mut Arguments) {
-    given.setting = Some(SETTING.to_owned());
+pub(super) fn give_values(given: &mut Arguments) {
+    given.values = [(SETTING.to_owned(), VALUE.to_owned())].into();
+}
+
+/// Whether the command has the settings it was given in it.
+pub(super) fn carries_settings(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Settings(Settling::Clear { settings, .. }) if settings == &[SETTING]
+    )
+}
+
+pub(super) fn give_settings(given: &mut Arguments) {
+    given.settings = vec![SETTING.to_owned()];
 }
 
 /// Whether a change to a setting has the offer it answered in it, which is its only yes.

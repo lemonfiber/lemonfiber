@@ -212,7 +212,7 @@ const fn standing(faces: Facing, answering: bool, addressed: bool) -> Standing {
 /// which is the right default for a machine nobody has told where it is and the
 /// wrong address to hand anybody. So it is not handed over — it is said, with the
 /// one thing that fixes it.
-const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another                            device would reach: it does not publish its own name, and the                            address the household's links point at is still the one that means                            this machine and nowhere else. Record this machine's address on your network with                            lemonfiber settings set lan-host <address> and it will be the address                            given here.";
+const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another                            device would reach: it does not publish its own name, and the                            address the household's links point at is still the one that means                            this machine and nowhere else. Record this machine's address on your network with                            lemonfiber settings set lan-host=<address> and it will be the address                            given here.";
 
 /// What is said where nothing here can work out where `door` is reached: the fix for
 /// the way it is published.

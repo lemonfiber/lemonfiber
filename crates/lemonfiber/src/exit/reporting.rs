@@ -99,7 +99,7 @@ fn on_the_command_line(problem: &Problem) -> Option<String> {
         pair::NOT_SERVED => format!("`{PRODUCT} ui --lan --tls --port <port>` serves it so."),
         pair::NO_CERTIFICATE => format!("`{PRODUCT} companion certificate --confirm` replaces it."),
         pair::NO_ADDRESS => {
-            format!("`{PRODUCT} settings set {HOUSEHOLD_HOST_SETTING} <address>` records it.")
+            format!("`{PRODUCT} settings set {HOUSEHOLD_HOST_SETTING}=<address>` records it.")
         }
         _ => return None,
     };

@@ -13,8 +13,8 @@ Each setting with whose it is, every service that reads it and the variable it i
 Usage: lemonfiber settings [OPTIONS] [COMMAND]
 
 Commands:
-  set    Record a value for one setting, regenerating every entry that reads it
-  clear  Take your value away, so the declared default is written again
+  set    Record a value for one or more settings at once, regenerating every entry that reads them
+  clear  Take your value away from one or more settings, so each declared default is written again
   help   Print this message or the help of the given subcommand(s)
 
 Options:
@@ -43,18 +43,15 @@ Options:
 ## `lemonfiber settings set`
 
 ```text
-Record a value for one setting, regenerating every entry that reads it.
+Record a value for one or more settings at once, regenerating every entry that reads them.
 
-Named on its own it says what the change would come to — the entries it regenerates and the running services it restarts — changes nothing, and prints a name for that offer; answering with that name is the yes.
+The settings named are checked together, so settings whose choices depend on each other move in one act. Named on its own it says what the change would come to — the entries it regenerates and the running services it restarts — changes nothing, and prints a name for that offer; answering with that name is the yes.
 
-Usage: lemonfiber settings set [OPTIONS] <SETTING> <VALUE>
+Usage: lemonfiber settings set [OPTIONS] <SETTING=VALUE>...
 
 Arguments:
-  <SETTING>
-          The setting, such as `gluetun:countries`
-
-  <VALUE>
-          The value, written exactly as given
+  <SETTING=VALUE>...
+          Each setting and its value as `SETTING=VALUE`, such as `gluetun:countries=Belgium`; the value is written exactly as given
 
 Options:
       --json
@@ -85,15 +82,15 @@ Options:
 ## `lemonfiber settings clear`
 
 ```text
-Take your value away, so the declared default is written again.
+Take your value away from one or more settings, so each declared default is written again.
 
 Named on its own it says what the change would come to and prints a name for that offer, as `set` does.
 
-Usage: lemonfiber settings clear [OPTIONS] <SETTING>
+Usage: lemonfiber settings clear [OPTIONS] <SETTING>...
 
 Arguments:
-  <SETTING>
-          The setting, such as `gluetun:countries`
+  <SETTING>...
+          Each setting, such as `gluetun:countries`
 
 Options:
       --json

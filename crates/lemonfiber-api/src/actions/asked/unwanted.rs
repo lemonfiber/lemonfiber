@@ -9,8 +9,9 @@ use super::takers::{
     TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION,
     TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING,
     TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING,
+    TAKES_WISH,
 };
 use super::Arguments;
 use crate::actions::Refused;
@@ -65,9 +66,14 @@ pub(crate) const TAKEN: &[Taken] = &[
         given: |arguments| arguments.value.is_some(),
     },
     Taken {
-        name: "setting",
-        takers: TAKES_SETTING,
-        given: |arguments| arguments.setting.is_some(),
+        name: "values",
+        takers: TAKES_VALUES,
+        given: |arguments| !arguments.values.is_empty(),
+    },
+    Taken {
+        name: "settings",
+        takers: TAKES_SETTINGS,
+        given: |arguments| !arguments.settings.is_empty(),
     },
     Taken {
         name: "preset",

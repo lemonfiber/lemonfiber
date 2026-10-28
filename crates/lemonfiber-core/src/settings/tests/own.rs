@@ -105,7 +105,8 @@ fn the_dashboards_search_address_is_the_one_recorded_or_the_default_and_a_bad_on
         .build();
     let settings = env.with_file_name(crate::config::paths::SETTINGS);
     let record = |value: &str| {
-        crate::settings::store::recorded(&settings, DASHBOARD_SEARCH, Some(value)).is_ok()
+        crate::settings::store::recorded(&settings, &[(DASHBOARD_SEARCH, Some(value))].into())
+            .is_ok()
     };
 
     assert_eq!(

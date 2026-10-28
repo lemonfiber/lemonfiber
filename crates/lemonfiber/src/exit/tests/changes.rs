@@ -697,12 +697,14 @@ fn a_setting_changed_and_left_unrestarted_is_a_failure() {
             settings: Vec::new(),
             secrets: Vec::new(),
             change: Some(lemonfiber_core::model::SettingChange {
-                setting: "gluetun:countries".to_owned(),
-                was: None,
-                value: Some("Belgium".to_owned()),
+                settings: vec![lemonfiber_core::model::SettingMove {
+                    setting: "gluetun:countries".to_owned(),
+                    was: None,
+                    value: Some("Belgium".to_owned()),
+                    consequence: None,
+                }],
                 regenerates: vec!["gluetun".to_owned()],
                 restarts: vec!["gluetun".to_owned()],
-                consequence: None,
                 applied: true,
                 agreement: String::new(),
                 unrestarted: unrestarted.map(str::to_owned),

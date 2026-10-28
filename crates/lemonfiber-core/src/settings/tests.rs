@@ -10,6 +10,7 @@ use crate::config::store::Failure;
 use crate::credential::fingerprint;
 
 mod changing;
+mod choosing;
 mod files;
 mod filing;
 mod granting;

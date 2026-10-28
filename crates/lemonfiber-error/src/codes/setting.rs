@@ -63,4 +63,16 @@ codes! {
             nothing needed to be.",
         remedy: "Nothing to do. lemonfiber settings lists what each setting holds.",
     }
+    /// Raised where a change would leave a setting holding a value outside its choices.
+    OUTSIDE_ITS_CHOICES = "SETTING-7" {
+        severity: Error,
+        status: 400,
+        leaves: Validation,
+        since: "0.18.0",
+        meaning: "A setting would hold a value that is not one of its choices, given what the \
+            other settings it depends on would hold. Nothing was changed; the message names \
+            the setting, the value and the choices it has.",
+        remedy: "Give one of the choices the message names, moving the settings it depends \
+            on in the same act where they have to change too.",
+    }
 }

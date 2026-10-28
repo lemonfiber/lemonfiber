@@ -429,12 +429,11 @@ fn only_the_operator_reads_or_changes_the_settings() {
     use lemonfiber_core::app::Settling;
     use lemonfiber_core::keys::Scope;
     let set = Settling::Set {
-        setting: "gluetun:countries".to_owned(),
-        value: "Netherlands".to_owned(),
+        values: [("gluetun:countries".to_owned(), "Netherlands".to_owned())].into(),
         agreement: None,
     };
     let clear = Settling::Clear {
-        setting: "gluetun:countries".to_owned(),
+        settings: vec!["gluetun:countries".to_owned()],
         agreement: None,
     };
     for caller in [Caller::Machine, Caller::Operator] {

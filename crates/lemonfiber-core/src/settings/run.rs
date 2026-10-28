@@ -10,18 +10,21 @@ use super::{restarting, Resolved};
 pub(crate) async fn settings(ctx: &Ctx, asked: &Settling) -> Result<Outcome, Box<Problem>> {
     let asked = match asked {
         Settling::Read => return listing(ctx).map(Outcome::Settings),
-        Settling::Set {
-            setting,
-            value,
-            agreement,
-        } => Asked {
-            setting,
-            value: Some(value),
+        Settling::Set { values, agreement } => Asked {
+            changing: values
+                .iter()
+                .map(|(setting, value)| (setting.as_str(), Some(value.as_str())))
+                .collect(),
             agreement: agreement.as_deref(),
         },
-        Settling::Clear { setting, agreement } => Asked {
-            setting,
-            value: None,
+        Settling::Clear {
+            settings,
+            agreement,
+        } => Asked {
+            changing: settings
+                .iter()
+                .map(|setting| (setting.as_str(), None))
+                .collect(),
             agreement: agreement.as_deref(),
         },
     };

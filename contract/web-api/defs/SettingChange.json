@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "A change to one setting.",
+  "description": "A change to one or more settings, made in one act.",
   "type": "object",
   "properties": {
     "agreement": {
@@ -10,13 +10,6 @@
     "applied": {
       "description": "Whether it was written.",
       "type": "boolean"
-    },
-    "consequence": {
-      "description": "What the change costs, where it costs anything.",
-      "type": [
-        "string",
-        "null"
-      ]
     },
     "regenerates": {
       "description": "Every service whose entry the change regenerates.",
@@ -32,9 +25,12 @@
         "type": "string"
       }
     },
-    "setting": {
-      "description": "The setting.",
-      "type": "string"
+    "settings": {
+      "description": "Each setting the act moves, in name order.",
+      "type": "array",
+      "items": {
+        "$ref": "SettingMove.json"
+      }
     },
     "unrestarted": {
       "description": "Why the services it restarts were not restarted, where they were not.",
@@ -42,24 +38,10 @@
         "string",
         "null"
       ]
-    },
-    "value": {
-      "description": "What it is to hold, or nothing where it is cleared.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "was": {
-      "description": "What it holds now.",
-      "type": [
-        "string",
-        "null"
-      ]
     }
   },
   "required": [
-    "setting",
+    "settings",
     "regenerates",
     "restarts",
     "applied",

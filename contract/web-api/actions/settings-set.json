@@ -2,25 +2,14 @@
   "action": "settings-set",
   "arguments": [
     {
-      "name": "value",
+      "name": "values",
       "type": {
-        "default": null,
-        "description": "What to change the key or the setting to, written as exactly itself.",
-        "type": [
-          "string",
-          "null"
-        ]
-      }
-    },
-    {
-      "name": "setting",
-      "type": {
-        "default": null,
-        "description": "The setting to change or put back to its default, by the name the settings read\nlists it under.",
-        "type": [
-          "string",
-          "null"
-        ]
+        "additionalProperties": {
+          "type": "string"
+        },
+        "default": {},
+        "description": "Each setting to change, by the name the settings read lists it under, with the\nvalue it is to hold, written as exactly itself.",
+        "type": "object"
       }
     },
     {

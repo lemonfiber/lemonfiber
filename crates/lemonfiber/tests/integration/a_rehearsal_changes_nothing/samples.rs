@@ -178,8 +178,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         (
             "settings",
             Command::Settings(Settling::Set {
-                setting: "domain".to_owned(),
-                value: "home.example".to_owned(),
+                values: [("domain".to_owned(), "home.example".to_owned())].into(),
                 agreement: None,
             }),
         ),
