@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::serving::Serves;
 use serde_json::json;
 
-use super::{failed_at, json_at, posted, recorded, source};
+use super::{failed_at, json_at, posted, read_through, recorded, source};
 use crate::plugin::recording::Took;
+use crate::ports::http::{Http, Request, Response, Unreachable};
 
 const GUARD: &str = r#"
 schema_version = 1
@@ -200,4 +204,74 @@ async fn a_guard_refusing_its_envelope_or_without_its_stand_ins_records_nothing(
         failed_at(&read)
     );
     assert!(unanswering.asked().is_empty(), "nothing is started");
+}
+
+/// A guard answering its certificate with the fingerprint of the one it was served with,
+/// and everything else as `fake` does.
+struct Certifying {
+    fake: Arc<Fake>,
+    serving: Arc<Serves>,
+}
+
+#[async_trait]
+impl Http for Certifying {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        if !request.url.ends_with("/certificate") {
+            return self.fake.send(request).await;
+        }
+        let fingerprint = self
+            .serving
+            .asked()
+            .first()
+            .and_then(|served| served.binds.iter().find(|bound| bound.target == "/config"))
+            .and_then(|bound| crate::certificate::kept(&bound.source).ok().flatten())
+            .map(|kept| kept.fingerprint)
+            .unwrap_or_default();
+        Ok(Response {
+            status: 200,
+            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            body: json!({ "fingerprint": fingerprint, "certificate": "cd" }).to_string(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn the_fingerprint_of_the_certificate_a_run_made_is_scrubbed_so_a_rerun_reproduces_it() {
+    let mut taken = Vec::new();
+    for run in ["alone-certified-once", "alone-certified-again"] {
+        let at = source(run, GUARD);
+        let serving = Arc::new(Serves::on(49153).contracted(49155));
+        let fake = Fake::by_path(vec![
+            ("/health", Answer::reply(200, "ok")),
+            ("/lemonfiber/adapter/v1/ready", Answer::reply(200, "{}")),
+            (
+                "/Videos/unknown/stream",
+                Answer::served(403, "application/json", "{\"error\": \"refused\"}"),
+            ),
+            ("/guarding", Answer::served(200, "application/json", "null")),
+            ("/guard", Answer::reply(204, "")),
+        ]);
+        let http = Arc::new(Certifying {
+            fake,
+            serving: Arc::clone(&serving),
+        });
+        let read = read_through(&at, &serving, http, Some(7)).await;
+        assert!(read.is_ok(), "{read:?}");
+        taken.push(json_at(
+            &at,
+            "conformance/stream.guard@1/certificate-answers.json",
+        ));
+    }
+    let fingerprints: Vec<_> = taken
+        .iter()
+        .map(|recorded| recorded.pointer("/response/json/fingerprint").cloned())
+        .collect();
+    assert_eq!(
+        fingerprints,
+        vec![
+            Some(json!(crate::plugin::recording::scrubbed::REDACTED)),
+            Some(json!(crate::plugin::recording::scrubbed::REDACTED))
+        ]
+    );
+    assert_eq!(taken.first(), taken.get(1));
 }

@@ -6,7 +6,7 @@ use std::path::Path;
 
 use lemonfiber_contract::conformance::filed;
 
-use super::super::served::{settled, settled_as};
+use super::super::served::settled_as;
 use super::super::Recorder;
 use super::preparing::Prepared;
 use super::speaking::contracts;
@@ -16,7 +16,8 @@ use crate::plugin::program::Operator;
 use crate::ports::serving::{Bound, Serve};
 
 /// The upstream's container reaching `reaching`, and the adapter's beside it where it is
-/// apart from its upstream: as lemonfiber runs it, run as whoever owns its copy, from the
+/// apart from its upstream: as lemonfiber runs them, both run as whoever owns their copies
+/// as install runs both as the operator, the adapter from the
 /// image a check names in place of its pin, its upstream's copy mounted where it shares
 /// its upstream's configuration. An adapter that is its own upstream is the
 /// one container, run as the adapter.
@@ -66,7 +67,12 @@ pub(super) fn serves(
     let settled = if alone {
         adapting(prepared.data.as_deref())
     } else {
-        settled(upstream, &prepared.copy, prepared.data.as_deref())
+        settled_as(
+            upstream,
+            &prepared.copy,
+            prepared.data.as_deref(),
+            &operator,
+        )
     };
     let serve = Serve {
         alias: Some(upstream.service.clone()),

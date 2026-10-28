@@ -72,7 +72,7 @@ pub(super) async fn answers(
         recorder.random,
     )
     .map_err(failing("starting files"))?;
-    certified(placed, &copy).map_err(failing("certificate"))?;
+    let fingerprint = certified(placed, &copy).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;
     mountable(placed, &copy).map_err(failing(MOUNTS))?;
     let mut stand_ins = StandIns::of(secrets, recorder.random).map_err(failing(STAND_INS))?;
@@ -99,6 +99,7 @@ pub(super) async fn answers(
         .made()
         .map(str::to_owned)
         .chain(stand_ins.made.iter().cloned())
+        .chain(fingerprint)
         .collect();
     let mut scrub = Scrub::of(&seeded, Some(&served));
     let reaching = Reaching {
@@ -124,15 +125,17 @@ pub(super) async fn answers(
 
 /// A throwaway certificate and its key written into `copy` as the core writes them for a
 /// filler of a capability it hands a certificate, and readable by whoever that filler runs
-/// as, where `placed` provides one; nothing otherwise.
-pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<(), String> {
+/// as, where `placed` provides one, with the fingerprint the certificate is answered by,
+/// which the run made; nothing otherwise.
+pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<Option<String>, String> {
     if !placed.provides.iter().any(|name| name == STREAM_GUARD) {
-        return Ok(());
+        return Ok(None);
     }
-    crate::certificate::replaced(copy.path()).map_err(|unkept| unkept.to_string())?;
+    let kept = crate::certificate::replaced(copy.path()).map_err(|unkept| unkept.to_string())?;
     crate::certificate::FILES
         .iter()
-        .try_for_each(|named| copy.readable(named))
+        .try_for_each(|named| copy.readable(named))?;
+    Ok(Some(kept.fingerprint))
 }
 
 /// An empty library beside `copy` holding the folder the conformance cases file into,

@@ -25,6 +25,14 @@ async fn an_adapter_sharing_its_upstreams_configuration_is_recorded_with_its_ups
         shared, upstream,
         "the adapter sees the copy its upstream runs from"
     );
+    let users: Vec<Option<String>> = served.iter().map(|one| one.user.clone()).collect();
+    assert_eq!(users.len(), 2, "{served:?}");
+    assert!(users.first().is_some_and(Option::is_some), "{users:?}");
+    assert_eq!(
+        users.first(),
+        users.get(1),
+        "the upstream and its adapter run as one user, as install runs both"
+    );
 
     let unshared = engine();
     let _ = recorded(

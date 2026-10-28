@@ -137,8 +137,17 @@ async fn read(
     http: &Arc<Fake>,
     random: Option<u8>,
 ) -> Result<Recorded, super::super::Unreadable> {
+    read_through(at, serving, Arc::clone(http) as Arc<dyn Http>, random).await
+}
+
+async fn read_through(
+    at: &Path,
+    serving: &Serves,
+    http: Arc<dyn Http>,
+    random: Option<u8>,
+) -> Result<Recorded, super::super::Unreadable> {
     let program = Proving::unreachable();
-    let shared = || -> Arc<dyn Http> { Arc::clone(http) as Arc<dyn Http> };
+    let shared = || -> Arc<dyn Http> { Arc::clone(&http) };
     record(
         at,
         Recorder {
