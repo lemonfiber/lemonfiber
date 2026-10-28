@@ -14,9 +14,12 @@ pub mod decline;
 pub mod gate;
 pub mod pass;
 
+mod pins;
+
 mod shape;
 mod token;
 mod unreadable;
 
+pub use pins::Pins;
 pub use token::TokenHash;
 pub use unreadable::Unreadable;

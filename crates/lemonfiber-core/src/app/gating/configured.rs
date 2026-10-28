@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_sidecar::gate::{Accepted, Credential, File, Kind, Tokens, Upstream, Upstreams};
-use lemonfiber_sidecar::TokenHash;
+use lemonfiber_sidecar::{Pins, TokenHash};
 
 use super::{path, SERVICE};
 use crate::ports::filesystem::FileSystem;
@@ -108,7 +108,7 @@ impl Gating for Configured {
                     })
                     .unwrap_or_default();
                 Admitted::of(&Gated {
-                    target: target(upstream.kind),
+                    target: target(upstream.kind, &upstream.pins),
                     path: upstream.route.clone(),
                     address: upstream.address.clone(),
                     majors: upstream.majors.clone(),
@@ -128,6 +128,13 @@ fn upstream(route: &Gated) -> Result<Upstream, Failure> {
         address: route.address.clone(),
         credential: Credential::new(route.credential.clone()),
         majors: route.majors.clone(),
+        pins: match &route.target {
+            Target::MediaServer { pins } => Pins::of(pins).map_err(|odd| Failure::Refused {
+                service: SERVICE.to_owned(),
+                detail: odd.why,
+            })?,
+            Target::Curator { .. } => Pins::default(),
+        },
     })
 }
 
@@ -145,13 +152,16 @@ fn kind(target: &Target) -> Result<Kind, Failure> {
     }
 }
 
-/// What a route of `kind` reaches.
-fn target(kind: Kind) -> Target {
-    super::fetching(kind).map_or(Target::MediaServer { pins: Vec::new() }, |fetching| {
-        Target::Curator {
+/// What a route of `kind` reaches, the media server's by the certificates in `pins`.
+fn target(kind: Kind, pins: &Pins) -> Target {
+    super::fetching(kind).map_or_else(
+        || Target::MediaServer {
+            pins: pins.listed().to_vec(),
+        },
+        |fetching| Target::Curator {
             media_type: fetching.media_type().to_owned(),
-        }
-    })
+        },
+    )
 }
 
 #[cfg(test)]

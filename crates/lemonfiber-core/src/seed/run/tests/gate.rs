@@ -150,6 +150,7 @@ fn holding(curators: &[(&str, &str)], key: &str) -> Upstreams {
             ),
             credential: Credential::new(*credential),
             majors: Vec::new(),
+            pins: lemonfiber_sidecar::Pins::default(),
         })
         .collect();
     upstreams.push(Upstream {
@@ -158,6 +159,7 @@ fn holding(curators: &[(&str, &str)], key: &str) -> Upstreams {
         address: media_server_svc_network_url(),
         credential: Credential::new(key),
         majors: moved_majors(),
+        pins: lemonfiber_sidecar::Pins::default(),
     });
     Upstreams::of(upstreams)
 }

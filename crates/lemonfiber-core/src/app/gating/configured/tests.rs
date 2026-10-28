@@ -61,6 +61,7 @@ async fn the_routes_admitted_are_the_files_the_gate_reads_and_answered_by_hash()
                 address: "http://sonarr:8989".to_owned(),
                 credential: Credential::new("sonarrs-key"),
                 majors: Vec::new(),
+                pins: lemonfiber_sidecar::Pins::default(),
             },
             Upstream {
                 route: "jellyfin".to_owned(),
@@ -68,6 +69,7 @@ async fn the_routes_admitted_are_the_files_the_gate_reads_and_answered_by_hash()
                 address: "http://jellyfin:8096".to_owned(),
                 credential: Credential::new("gates-key"),
                 majors: vec![10],
+                pins: lemonfiber_sidecar::Pins::default(),
             },
         ]))
     );

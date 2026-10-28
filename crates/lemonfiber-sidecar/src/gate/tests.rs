@@ -2,7 +2,7 @@ use super::{
     Accepted, Credential, File, Kept, Kind, Outcome, Record, Tokens, Upstream, Upstreams, FORMAT,
     PORT,
 };
-use crate::TokenHash;
+use crate::{Pins, TokenHash};
 
 fn sonarr() -> Upstream {
     Upstream {
@@ -11,6 +11,7 @@ fn sonarr() -> Upstream {
         address: "http://sonarr:8989".to_owned(),
         credential: Credential::new("the-sonarr-key"),
         majors: Vec::new(),
+        pins: Pins::default(),
     }
 }
 
@@ -18,9 +19,10 @@ fn jellyfin() -> Upstream {
     Upstream {
         route: "jellyfin".to_owned(),
         kind: Kind::Jellyfin,
-        address: "http://jellyfin:8096".to_owned(),
+        address: "https://jellyfin:8920".to_owned(),
         credential: Credential::new("the-gates-key"),
         majors: vec![10, 12],
+        pins: Pins::of(&["ab".repeat(32)]).unwrap_or_default(),
     }
 }
 
@@ -60,6 +62,36 @@ fn a_route_carries_its_majors_and_an_arr_route_none() {
         upstreams.route("jellyfin").map(|one| one.majors.clone()),
         Some(vec![10, 12])
     );
+}
+
+#[test]
+fn the_media_servers_route_carries_its_pins_an_arr_route_none_and_an_older_file_reads() {
+    let upstreams = Upstreams::of(vec![sonarr(), jellyfin()]);
+    let written = upstreams.written();
+
+    assert_eq!(written.matches("\"pins\"").count(), 1, "{written}");
+    assert_eq!(
+        upstreams
+            .route("jellyfin")
+            .map(|one| one.pins.listed().to_vec()),
+        Some(vec!["ab".repeat(32)])
+    );
+    let older = written.replace(
+        &format!(
+            ",\n      \"pins\": [\n        \"{}\"\n      ]",
+            "ab".repeat(32)
+        ),
+        "",
+    );
+    assert!(!older.contains("pins"), "{older}");
+    assert_eq!(
+        Upstreams::read(&older)
+            .ok()
+            .and_then(|read| read.route("jellyfin").map(|one| one.pins.is_empty())),
+        Some(true)
+    );
+    let unpinned = written.replace(&"ab".repeat(32), "not-a-pin");
+    assert!(Upstreams::read(&unpinned).is_err());
 }
 
 #[test]

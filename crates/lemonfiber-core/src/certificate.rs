@@ -20,6 +20,8 @@ use std::path::Path;
 
 use base64::Engine as _;
 
+pub mod internal;
+
 /// The certificate, as it is written down.
 const CERTIFICATE: &str = "certificate.pem";
 
