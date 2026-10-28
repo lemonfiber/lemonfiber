@@ -2,7 +2,7 @@ use lemonfiber_ports::http::{Http, Method, Request};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-use super::{bundled_tls, method, query_of, read_as_text, with_tls, withheld, Web};
+use super::{client_builder, method, query_of, read_as_text, with_tls, withheld, Web};
 
 async fn answering(answer: &'static str) -> Option<String> {
     let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
@@ -260,9 +260,7 @@ fn only_a_query_that_holds_something_is_withheld() {
 
 #[test]
 fn a_client_is_built_over_the_bundled_tls() {
-    assert!(with_tls(reqwest::Client::builder(), bundled_tls().ok())
-        .build()
-        .is_ok());
+    assert!(client_builder().build().is_ok());
 }
 
 #[test]

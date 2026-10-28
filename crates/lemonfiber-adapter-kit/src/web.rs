@@ -47,7 +47,7 @@ impl Web {
 
     /// A client, carrying cookies from one call to the next where `sessions` says so.
     fn built(sessions: bool) -> Result<Self, reqwest::Error> {
-        with_tls(reqwest::Client::builder(), bundled_tls().ok())
+        client_builder()
             .redirect(reqwest::redirect::Policy::none())
             .cookie_store(sessions)
             .connect_timeout(CONNECT_TIMEOUT)
@@ -55,6 +55,13 @@ impl Web {
             .build()
             .map(|client| Self { client })
     }
+}
+
+/// A `reqwest` client builder over the TLS an adapter speaks, for a call [`Web`] does not
+/// make. reqwest builds no client over TLS it was not handed, so every client an adapter
+/// builds starts here.
+pub fn client_builder() -> reqwest::ClientBuilder {
+    with_tls(reqwest::Client::builder(), bundled_tls().ok())
 }
 
 /// TLS over ring, trusting the roots bundled into the build, so an adapter reads no
