@@ -2,11 +2,13 @@
 //! and secret is read under, held to the rules every manifest is.
 
 use lemonfiber_manifest::container::choices::{self, Reading};
+use lemonfiber_manifest::container::Value;
 
 use crate::schema::Manifest;
 use crate::Violation;
 
-/// Every rule what the manifest declares about choices and needs breaks.
+/// Every rule what the manifest declares about choices and needs breaks, each secret's
+/// needs judged in each service that reads it.
 pub(super) fn chosen(manifest: &Manifest, found: &mut Vec<Violation>) {
     let secrets: Vec<Vec<&lemonfiber_manifest::container::Secret>> = manifest
         .services
@@ -15,7 +17,11 @@ pub(super) fn chosen(manifest: &Manifest, found: &mut Vec<Violation>) {
             manifest
                 .secrets
                 .iter()
-                .filter(|secret| secret.of == service.id)
+                .filter(|secret| {
+                    service.env.values().any(
+                        |value| matches!(value, Value::Secret(read) if read.secret == secret.id),
+                    )
+                })
                 .collect()
         })
         .collect();

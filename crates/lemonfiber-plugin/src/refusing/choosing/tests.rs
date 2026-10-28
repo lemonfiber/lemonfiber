@@ -37,3 +37,23 @@ fn a_plugins_choices_and_needs_are_held_to_the_rules_every_manifest_is() {
     let fine = said(&fine);
     assert!(!fine.iter().any(|line| line.contains("one_of")), "{fine:?}");
 }
+
+#[test]
+fn a_secrets_needs_are_judged_in_the_service_that_reads_it() {
+    let text = format!(
+        "{}\n[[secret]]\nid = \"openvpn-user\"\nof = \"komga\"\nwhy = \"Signs in over \
+         OpenVPN.\"\nneeds = {{ \"komga:tunnel\" = [\"openvpn\"] }}\n",
+        with("[service.env]\nUSER = { secret = \"openvpn-user\" }\n")
+    );
+    let found = said(&text);
+    assert!(
+        names(
+            &found,
+            &[
+                "secret komga:openvpn-user.needs",
+                "names setting komga:tunnel, which service komga does not read"
+            ]
+        ),
+        "{found:?}"
+    );
+}
