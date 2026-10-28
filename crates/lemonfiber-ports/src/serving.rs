@@ -120,6 +120,8 @@ pub struct Bound {
     pub source: PathBuf,
     /// Where it lands inside the container.
     pub target: String,
+    /// Whether the container may only read it.
+    pub read_only: bool,
 }
 
 /// A service being served.

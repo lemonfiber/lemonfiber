@@ -170,10 +170,15 @@ impl Throwaway {
         self.minted.values().map(String::as_str)
     }
 
+    /// Where `named` lies beside the copy.
+    pub(crate) fn beside(&self, named: &Path) -> PathBuf {
+        self.root.join(named)
+    }
+
     /// A further empty directory beside the copy, open to whoever the service is, and
     /// removed with it.
     pub(crate) fn emptied(&self, named: &Path) -> Result<PathBuf, String> {
-        let at = self.root.join(named);
+        let at = self.beside(named);
         std::fs::create_dir(&at)
             .and_then(|()| opened(&at, 0o777))
             .map(|()| at.clone())

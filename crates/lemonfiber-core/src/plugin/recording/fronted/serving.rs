@@ -40,10 +40,15 @@ pub(super) fn serves(
         .fields
         .shares_config
         .as_ref()
-        .filter(|_| !alone && adapter.placed.fronts.as_deref() == Some(upstream.service.as_str()))
+        .filter(|at| {
+            !alone
+                && adapter.placed.fronts.as_deref() == Some(upstream.service.as_str())
+                && lemonfiber_manifest::container::is_target(at, adapter.placed.takes_data)
+        })
         .map(|at| Bound {
             source: prepared.copy.path().to_path_buf(),
             target: at.clone(),
+            read_only: false,
         });
     let adapting = |data: Option<&Path>| {
         let started = settled_as(adapter.placed, prepared.held(), data, &operator);

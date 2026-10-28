@@ -4,7 +4,7 @@ use lemonfiber_fixtures::serving::Serves;
 use lemonfiber_plugin::{Health, HealthKind};
 
 use super::super::tests::asking::SERVED;
-use super::{healthy, library, settled};
+use super::{healthy, library, mountable, settled};
 use crate::plugin::installed::{Installed, Placed};
 use crate::plugin::program::{Starting, Throwaway};
 use crate::ports::serving::{Served, Standing};
@@ -115,6 +115,51 @@ fn a_service_is_served_as_lemonfiber_runs_it_with_throwaway_files_and_its_port()
         return;
     };
     assert_eq!(settled(&published, &copy, None).listens, Some(7878));
+}
+
+#[test]
+fn each_further_mount_is_served_from_an_empty_directory_of_its_own_as_install_mounts_it() {
+    let Ok(copy) = Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()) else {
+        return;
+    };
+    let mounting = SERVED.replace(
+        "replaces    = \"sonarr\"\n",
+        "replaces    = \"sonarr\"\nconfig_ro   = true\n\n[[service.mount]]\nfrom = \"state\"\nto   = \"/state\"\n\n[[service.mount]]\nfrom = \"seed\"\nto   = \"/seed\"\nro   = true\n",
+    );
+    let Some(mounted) = placed(&mounting) else {
+        unreachable!("the manifest reads");
+    };
+
+    assert_eq!(mountable(&mounted, &copy), Ok(()));
+    let serve = settled(&mounted, &copy, None);
+    let bound: Vec<(&str, bool)> = serve
+        .binds
+        .iter()
+        .map(|bound| (bound.target.as_str(), bound.read_only))
+        .collect();
+    assert_eq!(
+        bound,
+        vec![("/config", true), ("/state", false), ("/seed", true)]
+    );
+    let further: Vec<_> = serve.binds.iter().skip(1).collect();
+    assert!(further.iter().all(|bound| bound.source.is_dir()
+        && bound.source != copy.path()
+        && std::fs::read_dir(&bound.source).is_ok_and(|mut entries| entries.next().is_none())));
+    assert_ne!(
+        further.first().map(|bound| &bound.source),
+        further.get(1).map(|bound| &bound.source)
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        assert!(further.iter().all(|bound| std::fs::metadata(&bound.source)
+            .is_ok_and(|kind| kind.permissions().mode() & 0o777 == 0o777)));
+    }
+    assert!(mountable(&mounted, &copy).is_err(), "each is made once");
+    let Some(bare) = placed(SERVED) else {
+        unreachable!("the manifest reads");
+    };
+    assert_eq!(mountable(&bare, &copy), Ok(()));
 }
 
 fn served(port: Option<u16>) -> Served {

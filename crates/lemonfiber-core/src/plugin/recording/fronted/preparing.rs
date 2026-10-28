@@ -132,6 +132,8 @@ impl Prepared {
         .map_err(refused("starting files"))?;
         let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
         super::super::served::certified(upstream, &copy).map_err(refused("certificate"))?;
+        super::super::served::mountable(upstream, &copy)
+            .map_err(refused(super::super::served::MOUNTS))?;
         let apart = (adapter.placed.service != upstream.service)
             .then(|| {
                 Throwaway::of(
@@ -145,6 +147,10 @@ impl Prepared {
             .transpose()
             .map_err(refused("adapter's starting files"))?;
         let held = apart.as_ref().unwrap_or(&copy);
+        if let Some(apart) = &apart {
+            super::super::served::mountable(adapter.placed, apart)
+                .map_err(refused("adapter's mounts"))?;
+        }
         let key = crate::secret::generate(recorder.random).ok_or_else(|| {
             refused("adapter's key")(crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned())
         })?;
