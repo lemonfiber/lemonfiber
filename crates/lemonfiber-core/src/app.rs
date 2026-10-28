@@ -123,10 +123,9 @@ use self_update::standing as stands;
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, WATCH};
 
-/// Every refusal a run working on the stack answers with before it acts, which a client
-/// names by its code: another run holding it, a registry refusing it, a project the
-/// operator edited that the run would write again, a data location the project cannot
-/// be written from, and a directory the project mounts reached through a link.
+/// Every refusal a run on the stack answers with before it acts, named by its code: another
+/// run holding it, a registry refusing it, a project the operator edited, a data location
+/// the project cannot be written from, and a mount source reached through a link.
 pub const REFUSALS: [Code; 5] = [
     ALREADY_WORKING,
     REGISTRY_REFUSED,
