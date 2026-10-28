@@ -101,10 +101,22 @@ jobs:
         if: steps.tag.outputs.tag != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
           fetch-depth: 0
           persist-credentials: false
           submodules: recursive
+
+      - name: The tree checked out is the commit the release was built from
+        if: steps.tag.outputs.tag != ''
+        env:
+          BUILT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          held=$(git rev-parse HEAD)
+          if [ "$held" != "$BUILT" ]; then
+            echo "::error::The tag moved to ${held} after it was checked, and the release run was for ${BUILT}. Nothing is built from a commit the release was not built from."
+            exit 1
+          fi
 
       # The identifiers a `Spec:` trailer carries say nothing about which page
       # defines them, and this repository does not vendor the spec. Same
