@@ -46,5 +46,5 @@ pub enum Asking {
 
 impl Asking {
     /// The name the media server's internal certificate is replaced by on every surface.
-    pub const INTERNAL_CERTIFICATE: &'static str = "internal-certificate";
+    pub const INTERNAL_CERTIFICATE: &str = "internal-certificate";
 }
