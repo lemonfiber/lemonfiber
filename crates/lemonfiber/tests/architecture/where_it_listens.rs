@@ -114,6 +114,12 @@ const LISTENS: &[(&str, &str)] = &[
          every query it was not given, for as long as that recording runs",
     ),
     (
+        "crates/lemonfiber-pinned/src/fake.rs",
+        "a TLS server on loopback presenting a certificate made for one test, built only into \
+         tests and the test-support feature that crates reaching a pinned service test with, \
+         never into anything released",
+    ),
+    (
         "crates/lemonfiber/src/passing.rs",
         "the pass service answering the stream guard, in its own container, at the one \
          address the core gives it on the network it shares with the guard alone",
