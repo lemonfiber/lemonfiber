@@ -118,11 +118,15 @@ async fn an_adapter_that_never_comes_ready_is_taken_away_and_said_why() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn an_adapter_is_lent_only_once_it_says_its_upstream_answers() {
+async fn an_adapter_is_lent_only_once_it_answers_and_says_its_upstream_does() {
     let serves = Arc::new(Serves::on(PUBLISHED));
     let ready = Fake::by_path_in_turn(vec![(
         "/lemonfiber/adapter/v1/ready",
-        vec![Answer::reply(200, "false"), Answer::reply(200, "true")],
+        vec![
+            Answer::Silent,
+            Answer::reply(200, "false"),
+            Answer::reply(200, "true"),
+        ],
     )]);
     let ctx = lending("settling", &serves, Arc::clone(&ready));
     let (installed, adapter) = sonarr();
@@ -130,7 +134,7 @@ async fn an_adapter_is_lent_only_once_it_says_its_upstream_answers() {
     let lent = lent(&ctx, &borrowing(&installed, &adapter)).await;
 
     assert!(lent.is_ok(), "{:?}", lent.err());
-    assert_eq!(ready.requests().len(), 2);
+    assert_eq!(ready.requests().len(), 3);
 }
 
 #[tokio::test(start_paused = true)]
