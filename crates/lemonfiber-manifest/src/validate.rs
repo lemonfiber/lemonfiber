@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::container::{earlier, Shape};
+use crate::container::{choices, earlier, Shape};
 use crate::{Date, Manifest, Protocol, Removed, Service};
 
 mod wiring;
@@ -218,6 +218,27 @@ fn check_services(
     );
     found.extend(
         earlier::broken(&earlier)
+            .into_iter()
+            .map(|(location, message)| Violation { location, message }),
+    );
+    let secrets: Vec<Vec<&crate::container::Secret>> = manifest
+        .services
+        .iter()
+        .map(|service| service.secret.iter().collect())
+        .collect();
+    let readings: Vec<choices::Reading<'_>> = manifest
+        .services
+        .iter()
+        .zip(&secrets)
+        .map(|(service, secrets)| choices::Reading {
+            service: &service.id,
+            env: &service.env,
+            namespace: &service.id,
+            secrets,
+        })
+        .collect();
+    found.extend(
+        choices::broken(&readings)
             .into_iter()
             .map(|(location, message)| Violation { location, message }),
     );

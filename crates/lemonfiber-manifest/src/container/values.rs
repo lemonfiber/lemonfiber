@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::choices::{Choice, Needs};
 use super::{is_api_name, MEDIA};
 use crate::validate::is_core_name;
 
@@ -16,6 +17,18 @@ pub enum Constant {
     Number(i64),
     /// A boolean.
     Flag(bool),
+}
+
+impl Constant {
+    /// The text an environment variable holding it holds.
+    #[must_use]
+    pub fn text(&self) -> String {
+        match self {
+            Self::Text(text) => text.clone(),
+            Self::Number(number) => number.to_string(),
+            Self::Flag(flag) => flag.to_string(),
+        }
+    }
 }
 
 /// An operator setting, with what is written while none is recorded.
@@ -35,6 +48,12 @@ pub struct Setting {
     /// file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub was: Option<String>,
+    /// The values its service accepts, where it says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub one_of: Option<Vec<Choice>>,
+    /// The values of other settings under which it is written.
+    #[serde(default, skip_serializing_if = "Needs::is_empty")]
+    pub needs: Needs,
 }
 
 /// What a recording gives a service in the operator's place: a constant reaching no third
@@ -128,6 +147,9 @@ pub struct Secret {
     /// file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub was: Option<String>,
+    /// The values of other settings under which it is asked for and held.
+    #[serde(default, skip_serializing_if = "Needs::is_empty")]
+    pub needs: Needs,
 }
 
 /// Where a service wrote a credential itself: a file inside its container, the format it

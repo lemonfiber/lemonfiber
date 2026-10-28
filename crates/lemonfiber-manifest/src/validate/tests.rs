@@ -735,3 +735,17 @@ fn a_variable_two_settings_of_the_stack_name_in_was_is_caught_naming_both() {
         "{said:?}"
     );
 }
+
+#[test]
+fn a_stack_setting_whose_default_is_not_one_of_its_choices_is_caught_naming_it() {
+    let text = edited(
+        "setting = \"gluetun:countries\"",
+        "setting = \"gluetun:countries\"\none_of = [\"Sweden\"]",
+    );
+    let said = messages(&text);
+    assert!(
+        said.iter().any(|one| one.contains(".default")
+            && one.contains("is not one of setting gluetun:countries's values: Sweden")),
+        "{said:?}"
+    );
+}

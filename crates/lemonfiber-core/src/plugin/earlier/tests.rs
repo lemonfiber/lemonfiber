@@ -11,6 +11,8 @@ fn keeping(plugin: &str, setting: &str, was: &str, secret: Option<&str>) -> supe
             default: Constant::Text(String::new()),
             recorded_with: None,
             was: Some(was.to_owned()),
+            needs: lemonfiber_manifest::container::choices::Needs::new(),
+            one_of: None,
         }),
     );
     let mut installed = an_installed(plugin, vec![placed]);

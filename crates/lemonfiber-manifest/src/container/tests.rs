@@ -18,6 +18,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
         carried_from: None,
         recorded_with: None,
         was: None,
+        needs: crate::container::choices::Needs::new(),
     }]
 });
 
@@ -185,6 +186,8 @@ fn a_setting_is_published_or_the_services_own() {
             default: Constant::Text(String::new()),
             recorded_with: None,
             was: None,
+            needs: crate::container::choices::Needs::new(),
+            one_of: None,
         })
     };
     let named = env(vec![
@@ -207,6 +210,8 @@ fn a_setting_named_as_a_declared_secret_is_refused() {
             default: Constant::Text(String::new()),
             recorded_with: None,
             was: None,
+            needs: crate::container::choices::Needs::new(),
+            one_of: None,
         }),
     )]);
     assert_eq!(
@@ -354,6 +359,8 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
                 default: Constant::Text("x\ry".to_owned()),
                 recorded_with: None,
                 was: None,
+                needs: crate::container::choices::Needs::new(),
+                one_of: None,
             }),
         ),
         (
@@ -363,6 +370,8 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
                 default: Constant::Text("a\tb".to_owned()),
                 recorded_with: None,
                 was: None,
+                needs: crate::container::choices::Needs::new(),
+                one_of: None,
             }),
         ),
         ("PRICE", Value::Constant(Constant::Text("$5".to_owned()))),
@@ -524,6 +533,7 @@ fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
             carried_from: None,
             recorded_with: None,
             was: None,
+            needs: crate::container::choices::Needs::new(),
         };
         let text = toml::to_string(&declared).unwrap_or_default();
         assert_eq!(
@@ -555,6 +565,8 @@ fn a_stand_in_reads_minted_as_one_made_for_the_run_and_anything_else_as_a_consta
             default: Constant::Text(String::new()),
             recorded_with,
             was: None,
+            needs: crate::container::choices::Needs::new(),
+            one_of: None,
         })
     };
     let declared = read(
@@ -600,6 +612,8 @@ fn a_stand_in_holding_a_control_character_is_refused_and_one_made_for_the_run_is
             default: Constant::Text(String::new()),
             recorded_with: Some(recorded_with),
             was: None,
+            needs: crate::container::choices::Needs::new(),
+            one_of: None,
         })
     };
     let named = env(vec![

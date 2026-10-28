@@ -29,6 +29,7 @@
 mod asking;
 mod bundled;
 pub mod carried;
+mod choosing;
 mod colliding;
 mod earlier;
 mod evidence;
@@ -91,6 +92,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     recipes::declared(manifest, &mut found);
     readable::readable(manifest, &mut found);
     earlier::named(manifest, &mut found);
+    choosing::chosen(manifest, &mut found);
     found
 }
 

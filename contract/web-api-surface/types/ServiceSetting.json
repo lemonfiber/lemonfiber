@@ -6,6 +6,18 @@
       ],
       "required": true
     },
+    "needs": {
+      "type": [
+        "object{array[ref:ServiceConstant]}"
+      ],
+      "required": false
+    },
+    "one_of": {
+      "type": [
+        "array|null[ref:SettingChoice]"
+      ],
+      "required": false
+    },
     "recorded_with": {
       "type": [
         "anyOf(null,ref:RecordedWith)"

@@ -143,6 +143,8 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
                 default: Constant::Text("home.local".to_owned()),
                 recorded_with: None,
                 was: None,
+                needs: lemonfiber_manifest::container::choices::Needs::new(),
+                one_of: None,
             }),
         ),
         (
@@ -152,6 +154,8 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
                 default: Constant::Flag(false),
                 recorded_with: None,
                 was: None,
+                needs: lemonfiber_manifest::container::choices::Needs::new(),
+                one_of: None,
             }),
         ),
         ("INDEXER".to_owned(), url("indexer.search")),
@@ -370,6 +374,8 @@ fn naming_a_secret() -> Placed {
                     default: Constant::Text("slow".to_owned()),
                     recorded_with: None,
                     was: None,
+                    needs: lemonfiber_manifest::container::choices::Needs::new(),
+                    one_of: None,
                 }),
             ),
             (
