@@ -159,3 +159,21 @@ fn nothing_there_reads_as_nothing_and_what_is_not_a_plain_file_is_refused() {
         )
         .is_ok());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_directory_of_somebody_elses_on_the_way_is_refused_for_a_file_of_the_owners() {
+    if rustix::process::geteuid().is_root() {
+        return;
+    }
+    let refused = Disk.made(
+        std::path::Path::new("/usr/lemonfiber-never-made"),
+        std::path::Path::new("/"),
+        Readable::Owner,
+    );
+    assert!(
+        refused.is_err_and(|fault| fault.message.contains("somebody else's")),
+        "a directory the writer does not own is never written into for it"
+    );
+    assert!(!std::path::Path::new("/usr/lemonfiber-never-made").exists());
+}

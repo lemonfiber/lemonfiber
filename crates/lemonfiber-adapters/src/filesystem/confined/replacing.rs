@@ -34,7 +34,7 @@ pub(super) fn replaced(
         return Err(unwritten(path, "it names no file"));
     };
     let here = walked(parent, within, readable, true)?
-        .ok_or_else(|| unwritten(path, "the directory it is in could not be made"))?;
+        .ok_or(unwritten(path, "the directory it is in could not be made"))?;
     let staging = staging(name);
     let made_as = match readable {
         Readable::Owner | Readable::Private => Mode::RUSR | Mode::WUSR,
@@ -53,8 +53,8 @@ pub(super) fn replaced(
     let written = (&file)
         .write_all(contents)
         .and_then(|()| file.sync_all())
-        .map_err(|error| error.to_string())
-        .and_then(|()| renameat(&here, &staging, &here, name).map_err(|error| error.to_string()));
+        .map_err(worded)
+        .and_then(|()| renameat(&here, &staging, &here, name).map_err(worded));
     if let Err(why) = written {
         let _ = unlinkat(&here, &staging, AtFlags::empty());
         return Err(unwritten(path, &why));
@@ -80,19 +80,23 @@ pub(super) fn bytes(path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault
         Err(rustix::io::Errno::NOENT) => return Ok(None),
         Err(error) => return Err(unread(path, &linked(error))),
     };
-    let stat = fstat(&file).map_err(|error| unread(path, &error.to_string()))?;
-    if FileType::from_raw_mode(stat.st_mode) != FileType::RegularFile {
+    let plain = fstat(&file)
+        .is_ok_and(|stat| FileType::from_raw_mode(stat.st_mode) == FileType::RegularFile);
+    if !plain {
         return Err(unread(path, "it is not a plain file"));
     }
     let mut held = Vec::new();
-    std::fs::File::from(file)
+    let read = std::fs::File::from(file)
         .take(READ_LIMIT + 1)
         .read_to_end(&mut held)
-        .map_err(|error| unread(path, &error.to_string()))?;
-    if held.len() as u64 > READ_LIMIT {
-        return Err(unread(path, "it is larger than lemonfiber reads"));
+        .ok();
+    match read {
+        Some(length) if length as u64 <= READ_LIMIT => Ok(Some(held)),
+        _ => Err(unread(
+            path,
+            "it could not be read whole, or is larger than lemonfiber reads",
+        )),
     }
-    Ok(Some(held))
 }
 
 /// The directory `path` beneath `within`, held open, each step reached through no link
@@ -150,8 +154,8 @@ fn walked(
 /// Whether the directory `here` holds is the writer's own.
 #[cfg(unix)]
 fn owned(here: &rustix::fd::OwnedFd) -> Result<(), &'static str> {
-    let stat = rustix::fs::fstat(here).map_err(|_| "it could not be looked at")?;
-    (stat.st_uid == rustix::process::geteuid().as_raw())
+    rustix::fs::fstat(here)
+        .is_ok_and(|stat| stat.st_uid == rustix::process::geteuid().as_raw())
         .then_some(())
         .ok_or("it is somebody else's")
 }
@@ -218,6 +222,12 @@ pub(super) fn bytes(path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault
         return Err(unread(path, "it is larger than lemonfiber reads"));
     }
     Ok(Some(held))
+}
+
+/// A failure in the platform's own words.
+#[cfg(unix)]
+fn worded(error: impl std::fmt::Display) -> String {
+    error.to_string()
 }
 
 /// The name a file is written under beside `name` before it is renamed over it.

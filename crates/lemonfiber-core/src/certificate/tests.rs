@@ -77,6 +77,11 @@ fn what_cannot_be_read_is_refused_rather_than_made_again() {
     assert!(
         matches!(kept(&lemonfiber_adapters::Disk, &at), Err(Unkept::Unreadable(why)) if why.contains("not a private key"))
     );
+
+    let _ = std::fs::write(at.join(KEY), [0xff, 0xfe]);
+    assert!(
+        matches!(kept(&lemonfiber_adapters::Disk, &at), Err(Unkept::Unreadable(why)) if why.contains("is not text"))
+    );
 }
 
 /// A directory that cannot be written to makes nothing, and says which file.
