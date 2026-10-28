@@ -32,6 +32,7 @@ fn fingerprinted(pem: &str) -> Result<String, String> {
         .args(["x509", "-noout", "-fingerprint", "-sha256"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|why| format!("openssl could not be run: {why}"))?;
     child

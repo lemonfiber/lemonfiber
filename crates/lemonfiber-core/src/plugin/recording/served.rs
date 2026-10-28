@@ -138,6 +138,31 @@ pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<Option<Stri
     Ok(Some(kept.fingerprint))
 }
 
+/// A throwaway internal certificate made out to `upstream` and written into its `copy` as
+/// the core writes it for the media server, where `adapter` speaks `media.serve`, the
+/// contract that hands its upstream that certificate: where the upstream's container holds
+/// it, and the fingerprint it is answered by, which the run made. Nothing otherwise.
+pub(super) fn internal(
+    upstream: &Placed,
+    adapter: &Placed,
+    copy: &Throwaway,
+) -> Result<Option<(String, String)>, String> {
+    let spoken = lemonfiber_contract::spoken(
+        lemonfiber_contract::capabilities::media::serve::CAPABILITY,
+        lemonfiber_contract::capabilities::media::serve::MAJOR,
+    );
+    if !adapter.speaks.contains(&spoken) {
+        return Ok(None);
+    }
+    let made = crate::certificate::internal::made_for(&upstream.service)
+        .map_err(|unkept| unkept.to_string())?;
+    crate::certificate::internal::written(copy.path(), &made)
+        .map_err(|unkept| unkept.to_string())?;
+    let inside = Path::new(crate::project::entry::configuration(&upstream.config_path))
+        .join(crate::certificate::internal::INTERNAL);
+    Ok(Some((inside.display().to_string(), made.fingerprint)))
+}
+
 /// An empty library beside `copy` holding the folder the conformance cases file into,
 /// where `placed` takes one; nothing otherwise.
 pub(super) fn library(placed: &Placed, copy: &Throwaway) -> Result<Option<PathBuf>, String> {

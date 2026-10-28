@@ -29,6 +29,9 @@ pub(super) struct Prepared {
     /// Each variable of the upstream's environment that names a secret or a setting
     /// declaring a stand-in, as `NAME=value`.
     pub(super) env: Vec<String>,
+    /// Where the upstream's container holds the throwaway internal certificate, where the
+    /// adapter speaks the contract that hands it one.
+    pub(super) certificate: Option<String>,
 }
 
 /// Each secret either copy's files name, with the value written for it.
@@ -135,6 +138,8 @@ impl Prepared {
             super::super::served::certified(upstream, &copy).map_err(refused("certificate"))?;
         super::super::served::mountable(upstream, &copy)
             .map_err(refused(super::super::served::MOUNTS))?;
+        let internal = super::super::served::internal(upstream, adapter.placed, &copy)
+            .map_err(refused("internal certificate"))?;
         let apart = (adapter.placed.service != upstream.service)
             .then(|| {
                 Throwaway::of(
@@ -162,6 +167,7 @@ impl Prepared {
             .chain(apart.iter().flat_map(Throwaway::made).map(str::to_owned))
             .chain(stand_ins.made.iter().cloned())
             .chain(fingerprint)
+            .chain(internal.as_ref().map(|(_, pinned)| pinned.clone()))
             .collect();
         let mut secrets = written(&copy, apart.as_ref());
         for (secret, value) in stand_ins.held() {
@@ -189,6 +195,7 @@ impl Prepared {
             key,
             made,
             env,
+            certificate: internal.map(|(inside, _)| inside),
         })
     }
 }
