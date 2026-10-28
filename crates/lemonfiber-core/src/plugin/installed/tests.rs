@@ -581,6 +581,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
                 taking: Vec::new(),
                 granting: Vec::new(),
                 sharing: Vec::new(),
+                waiting: Vec::new(),
             })
         }),
         update: None,

@@ -322,6 +322,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             undeclared: Vec::new(),
             services: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            waiting: Vec::new(),
         }),
         Outcome::Doctor(DoctorReport {
             rehearsed: false,

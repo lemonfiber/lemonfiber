@@ -169,6 +169,12 @@ pub struct StatusReport {
     /// Beside the services rather than among them: a service filtered out is the
     /// configuration being honoured, not a service that did not start.
     pub filtered: Vec<crate::stack::closure::Filtered>,
+    /// The services held back until the operator gives what they need to start, each
+    /// with what it waits for and never a value.
+    ///
+    /// Beside the services, as what was filtered is: one that is not there is listed
+    /// here and nowhere else, because it is waiting rather than failing to start.
+    pub waiting: Vec<crate::model::Waiting>,
     /// What the services amount to, as one word.
     ///
     /// For the whole stack, counted over what the active forms hold and whatever else

@@ -330,6 +330,7 @@ pub(super) fn status(report: &StatusReport) -> Lines {
     }
     lines.extend(show(&report.services));
     lines.extend(filtered(&report.filtered));
+    lines.extend(super::waiting::waiting(&report.waiting));
     lines.extend(strangers(&report.undeclared));
     lines
 }

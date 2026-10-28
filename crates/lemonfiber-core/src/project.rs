@@ -30,6 +30,10 @@ pub(crate) use inputs::{declared, moved_in_place, moving, pass_taken, written};
 /// The file the project is written to, beneath the project directory.
 pub const FILE: &str = "compose.generated.yml";
 
+/// The profile a service held back until the operator gives what it needs to start is
+/// written under: one no start activates, and no form or plugin can be named.
+pub const WAITING: &str = "lemonfiber.waiting";
+
 /// What the project's values are read from beyond the manifest and the register.
 pub struct Reading<'a> {
     /// The operator's value for a setting of the named namespace, where one is recorded.
@@ -52,6 +56,8 @@ pub struct Reading<'a> {
     /// The image the pass service runs, pinned by its digest, where one is pinned for
     /// this release.
     pub pass: Option<&'a str>,
+    /// Whether a secret, by its name in the secret store, holds a value.
+    pub held: &'a dyn Fn(&str) -> bool,
 }
 
 impl Reading<'_> {
@@ -68,6 +74,7 @@ impl Reading<'_> {
             name: crate::PRODUCT,
             operator: &|_| None,
             pass: None,
+            held: &|_| false,
         }
     }
 }
@@ -92,6 +99,16 @@ pub fn generated(
 ) -> Project {
     let inputs = inputs::read(manifest, installed, chosen, reading.pass.is_some());
     let topology = inputs.topology();
+    let waiting: Vec<String> = crate::settings::held_back(
+        manifest,
+        installed,
+        &|name| (reading.setting)("", name),
+        reading.held,
+        &topology,
+    )
+    .into_iter()
+    .map(|held| held.service)
+    .collect();
     let address =
         |service: &str, url: &UrlOf| address(manifest, installed, &inputs, &topology, service, url);
     let values = Values {
@@ -121,6 +138,7 @@ pub fn generated(
             reading.pass,
         ))
         .map(|unit| beside(unit, reading.moved))
+        .map(|unit| waiting_for(unit, &waiting))
         .collect();
     let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for unit in &units {
@@ -226,6 +244,14 @@ fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<
                 .find(|one| one.services.iter().any(|placed| placed.service == id))
                 .map(plugin::profile_of)
         })
+}
+
+/// `unit`, written under [`WAITING`] where it is one of the services `waiting` holds back.
+fn waiting_for<'a>(mut unit: Unit<'a>, waiting: &[String]) -> Unit<'a> {
+    if waiting.iter().any(|held| held == unit.id) {
+        WAITING.clone_into(&mut unit.profile);
+    }
+    unit
 }
 
 /// Nothing in the environment of the pass service, which reads only its own files.

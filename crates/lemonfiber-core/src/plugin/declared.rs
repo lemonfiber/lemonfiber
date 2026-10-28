@@ -42,6 +42,10 @@ pub struct Secret {
     /// The values of the plugin's settings under which it is asked for and written.
     #[serde(default, skip_serializing_if = "Needs::is_empty")]
     pub needs: Needs,
+    /// Whether only the operator holds the value and the service reading it needs one to
+    /// start.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub needed_to_start: bool,
 }
 
 /// What a plugin declared about itself, as its install read it.
@@ -125,6 +129,7 @@ impl Declaration {
                     serves: secret.serves.clone(),
                     was: secret.was.clone(),
                     needs: secret.needs.clone(),
+                    needed_to_start: secret.recorded_with.is_some(),
                 })
                 .collect(),
         }

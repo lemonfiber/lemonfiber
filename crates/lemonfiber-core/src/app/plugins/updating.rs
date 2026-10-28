@@ -78,6 +78,8 @@ pub(crate) async fn update(
     let (acting, taking) =
         super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;
     let mut account = started(&was, &would, &read.manifest, changes, wiring, taking);
+    account.install.waiting =
+        super::standing::waiting(ctx, &stack_manifest, without.installed(), &would);
     let at = crate::plugin::owner(&was.plugin);
     let whose = |change: &crate::journal::Change| {
         crate::plugin::owns(&was.plugin, change) && !super::super::project::holds(ctx, change)
@@ -250,6 +252,7 @@ fn started(
             taking,
             granting: crate::plugin::granting(would),
             sharing: crate::plugin::sharing(would),
+            waiting: Vec::new(),
         },
         stopped: None,
         restored: None,

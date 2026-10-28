@@ -52,6 +52,7 @@ mod trace;
 mod uninstall;
 mod update;
 mod viewing;
+mod waiting;
 pub(crate) mod walkthrough;
 mod wiring;
 mod wishing;

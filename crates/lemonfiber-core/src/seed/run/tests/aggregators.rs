@@ -220,6 +220,7 @@ fn kept_aggregator() -> crate::plugin::Installed {
         was: None,
         serves: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),
+        needed_to_start: false,
     }];
     installed
 }

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a service waits for, never with its value.",
+  "oneOf": [
+    {
+      "description": "A setting only the operator holds, or one holding a value outside its choices.",
+      "type": "object",
+      "properties": {
+        "choices": {
+          "description": "The values it accepts, where it declares choices.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "kind": {
+          "type": "string",
+          "const": "setting"
+        },
+        "setting": {
+          "description": "The setting.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "setting"
+      ]
+    },
+    {
+      "description": "A secret nobody has entered.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "secret"
+        },
+        "secret": {
+          "description": "The secret, by its name in the secret store.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "secret"
+      ]
+    },
+    {
+      "description": "The service it runs through, which is held back itself.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "service"
+        },
+        "service": {
+          "description": "That service.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "service"
+      ]
+    }
+  ]
+}

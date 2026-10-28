@@ -7,7 +7,7 @@ use crate::device_keys::run::apps_changed;
 use crate::error::codes::setting::{ALREADY_HOLDS, SETTINGS_MOVED};
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::journal::{Change, Kind};
-use crate::model::{SettingChange, SettingMove, SettingsReport};
+use crate::model::{SettingChange, SettingMove, SettingsReport, Waiting};
 
 use super::readers::{self, Readers};
 use super::recorded::Recorded;
@@ -18,11 +18,12 @@ pub(super) const REFUSING: writing::Refusing = writing::Refusing {
     unwritten: crate::error::codes::config::CONFIG_NOT_WRITTEN,
 };
 
-const OFFERED: [&str; 4] = [
+const OFFERED: [&str; 5] = [
     "the change itself",
     "what it holds now",
     "the entries it regenerates",
     "the services it restarts",
+    "the services it starts",
 ];
 
 pub(super) struct Asked<'a> {
@@ -85,14 +86,18 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
         &after,
     )?;
     let restarts = restarting::running(ctx, &regenerates).await;
-    let standing = offer(&settings, &regenerates, &restarts);
+    let waiting = super::run::waiting_after(ctx, &manifest, installed, &changing);
+    let starts = released(&super::run::waiting(ctx, &manifest, installed), &waiting);
+    let standing = offer(&settings, &regenerates, &restarts, &starts);
     let mut change = SettingChange {
         settings,
         regenerates,
         restarts,
+        starts,
         applied: false,
         agreement: standing.clone(),
         unrestarted: None,
+        waiting,
     };
     let Some(answered) = asked.agreement else {
         return Ok(super::listing::report(
@@ -165,7 +170,11 @@ async fn written(
         let _ = crate::seed::run::reshow(ctx).await;
     }
     change.applied = true;
-    change.unrestarted = restarting::restarted(ctx, &change.restarts).await;
+    change.unrestarted = restarting::restarted(
+        ctx,
+        &[change.restarts.clone(), change.starts.clone()].concat(),
+    )
+    .await;
     Ok(())
 }
 
@@ -208,7 +217,21 @@ fn consequence(ctx: &Ctx, setting: &str, value: Option<&str>) -> Option<String> 
     crate::app::configuring::consequence(ctx, &held, key, value.unwrap_or_default())
 }
 
-fn offer(moves: &[SettingMove], regenerates: &[String], restarts: &[String]) -> String {
+/// Every service `before` holds back that `after` no longer does.
+fn released(before: &[Waiting], after: &[Waiting]) -> Vec<String> {
+    before
+        .iter()
+        .filter(|held| !after.iter().any(|still| still.service == held.service))
+        .map(|held| held.service.clone())
+        .collect()
+}
+
+fn offer(
+    moves: &[SettingMove],
+    regenerates: &[String],
+    restarts: &[String],
+    starts: &[String],
+) -> String {
     let asked: Vec<&str> = moves
         .iter()
         .flat_map(|one| {
@@ -224,7 +247,8 @@ fn offer(moves: &[SettingMove], regenerates: &[String], restarts: &[String]) -> 
         .collect();
     let regenerates: Vec<&str> = regenerates.iter().map(String::as_str).collect();
     let restarts: Vec<&str> = restarts.iter().map(String::as_str).collect();
-    crate::agreement::parted(&[&asked, &was, &regenerates, &restarts])
+    let starts: Vec<&str> = starts.iter().map(String::as_str).collect();
+    crate::agreement::parted(&[&asked, &was, &regenerates, &restarts, &starts])
 }
 
 /// The names of `changing`'s settings, as one phrase.

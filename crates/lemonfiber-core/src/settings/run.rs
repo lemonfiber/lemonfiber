@@ -50,6 +50,75 @@ pub fn listing(ctx: &Ctx) -> Result<SettingsReport, Box<Problem>> {
     ))
 }
 
+/// Every service held back until the operator gives what it needs to start, each with
+/// what it waits for: the stack's and every installed plugin's, and each running through
+/// one of them.
+pub(crate) fn waiting(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    installed: &[Installed],
+) -> Vec<crate::model::Waiting> {
+    waiting_after(ctx, manifest, installed, &std::collections::BTreeMap::new())
+}
+
+/// This machine's services held back, read each time they are asked after.
+pub(crate) struct HeldBack {
+    /// Where the record of what is installed, the settings and the secrets are read.
+    ctx: Ctx,
+    /// The stack's manifest.
+    manifest: lemonfiber_manifest::Manifest,
+}
+
+impl HeldBack {
+    /// The services held back of `manifest`'s and every installed plugin's, read through
+    /// `ctx`.
+    pub(crate) fn of(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Self {
+        Self {
+            ctx: ctx.clone(),
+            manifest: manifest.clone(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::doctor::waiting::Holds for HeldBack {
+    async fn waiting(&self) -> Result<Vec<crate::model::Waiting>, ()> {
+        let register = crate::app::plugins::read(&self.ctx).map_err(|_| ())?;
+        Ok(waiting(&self.ctx, &self.manifest, register.installed()))
+    }
+}
+
+/// The services [`waiting`] holds back once `changing` is recorded.
+pub(super) fn waiting_after(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    installed: &[Installed],
+    changing: &std::collections::BTreeMap<&str, Option<&str>>,
+) -> Vec<crate::model::Waiting> {
+    let recorded = super::recorded::Recorded::of(ctx);
+    let secrets = super::secrets_at(ctx).and_then(|at| super::Secrets::at(&at).ok());
+    let topology = crate::project::topology(
+        manifest,
+        installed,
+        &crate::app::targets::chosen_fillers(ctx),
+        crate::app::project::pinned(ctx).is_some(),
+    );
+    super::held_back(
+        manifest,
+        installed,
+        &|name| match changing.get(name) {
+            Some(value) => value.map(str::to_owned),
+            None => recorded.value(name).map(str::to_owned),
+        },
+        &|name| {
+            secrets
+                .as_ref()
+                .is_some_and(|kept| kept.value(name).is_some())
+        },
+        &topology,
+    )
+}
+
 pub(crate) async fn crossed(ctx: &Ctx, setting: &str) -> Vec<Propagation> {
     let Ok(register) = crate::app::plugins::read(ctx) else {
         return Vec::new();

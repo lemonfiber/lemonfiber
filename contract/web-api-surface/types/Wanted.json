@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "choices": {
+      "type": [
+        "array|null[string]"
+      ],
+      "required": false
+    },
+    "kind": {
+      "type": [
+        "const:\"secret\"",
+        "const:\"service\"",
+        "const:\"setting\""
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"secret\"",
+    "\"service\"",
+    "\"setting\""
+  ]
+}

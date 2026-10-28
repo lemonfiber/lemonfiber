@@ -48,13 +48,19 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
     let brought = brought(&manifest, protocols, &everything);
     let active_forms: Vec<String> = brought.iter().map(|(form, _)| form.clone()).collect();
     let filtered = left_out(&manifest, &brought);
+    let installed = crate::app::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    let waiting = crate::settings::run::waiting(ctx, &manifest, &installed);
     // A service an active form's closure left out, and that is not there, is reported
     // among what was filtered. Listing it again as absent would say it failed to start.
     let services: Vec<_> = everything
         .into_iter()
         .filter(|service| profiles.contains(&service.profile))
         .filter(|service| {
-            service.state != State::Absent || !filtered.iter().any(|out| out.id == service.id)
+            service.state != State::Absent
+                || !(filtered.iter().any(|out| out.id == service.id)
+                    || waiting.iter().any(|held| held.service == service.id))
         })
         .collect();
     let condition = if forms.is_empty() {
@@ -67,6 +73,7 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         forms: forms.to_vec(),
         active_forms,
         filtered,
+        waiting,
         condition,
         undeclared: undeclared_beside(&manifest, &beside, &containers, &halted),
         services,

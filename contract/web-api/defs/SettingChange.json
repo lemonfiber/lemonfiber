@@ -32,19 +32,35 @@
         "$ref": "SettingMove.json"
       }
     },
+    "starts": {
+      "description": "Every service held back that the change starts, having given the last thing it\nwaited for.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "unrestarted": {
       "description": "Why the services it restarts were not restarted, where they were not.",
       "type": [
         "string",
         "null"
       ]
+    },
+    "waiting": {
+      "description": "The services held back once the change is made, each with what it waits for.",
+      "type": "array",
+      "items": {
+        "$ref": "Waiting.json"
+      }
     }
   },
   "required": [
     "settings",
     "regenerates",
     "restarts",
+    "starts",
     "applied",
-    "agreement"
+    "agreement",
+    "waiting"
   ]
 }

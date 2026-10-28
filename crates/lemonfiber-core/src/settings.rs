@@ -16,12 +16,14 @@ pub(crate) mod run;
 mod secrets;
 pub(crate) mod store;
 pub(crate) mod undoing;
+mod waiting;
 
 pub(crate) use files::{text, written};
 pub(crate) use resolved::{holding, Resolved, OPERATOR_KEYS};
 pub(crate) use restarting::{restarted, running};
 pub(crate) use secrets::{filed, kept, Keeping, Secrets, Source};
 pub(crate) use store::Settings;
+pub(crate) use waiting::held_back;
 
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS, SETTINGS};

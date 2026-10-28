@@ -78,6 +78,12 @@
       ],
       "required": false
     },
+    "waiting": {
+      "type": [
+        "array[ref:Waiting]"
+      ],
+      "required": true
+    },
     "would": {
       "type": [
         "ref:PluginInstalled"

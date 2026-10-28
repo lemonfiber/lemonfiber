@@ -85,6 +85,7 @@ fn running() -> Vec<Outcome> {
             undeclared: Vec::new(),
             services: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+            waiting: Vec::new(),
         }),
         Outcome::Wizard(a_setup_part_way()),
         Outcome::Watch(SupervisionReport {

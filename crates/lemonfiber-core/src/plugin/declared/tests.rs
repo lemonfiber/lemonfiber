@@ -94,6 +94,7 @@ fn what_a_plugin_declared_is_kept_as_it_declared_it() {
                 minted: false,
                 was: None,
                 needs: lemonfiber_manifest::container::choices::Needs::new(),
+                needed_to_start: false,
             }],
         })
     );
