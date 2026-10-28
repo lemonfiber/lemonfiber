@@ -1,0 +1,7 @@
+# A client reqwest builds itself has no TLS to build with and panics for want of a
+# crypto provider, so every client here starts from the kit's own builder.
+disallowed-methods = [
+  { path = "reqwest::Client::new", reason = "build it from `lemonfiber_adapter_kit::web::client_builder`, which hands it the TLS" },
+  { path = "reqwest::Client::builder", reason = "build it from `lemonfiber_adapter_kit::web::client_builder`, which hands it the TLS" },
+  { path = "reqwest::ClientBuilder::new", reason = "build it from `lemonfiber_adapter_kit::web::client_builder`, which hands it the TLS" },
+]

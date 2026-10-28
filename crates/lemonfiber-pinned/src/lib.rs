@@ -123,7 +123,7 @@ pub fn client(pins: &[String], within: Option<Duration>) -> Option<reqwest::Clie
         }))
         .with_no_client_auth();
     let builder = reqwest::Client::builder()
-        .use_preconfigured_tls(config)
+        .tls_backend_preconfigured(config)
         .https_only(true)
         .redirect(reqwest::redirect::Policy::none())
         .no_proxy();

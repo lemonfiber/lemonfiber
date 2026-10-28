@@ -3,14 +3,14 @@
 //! The whole of this adapter is transport: connect, wrap in TLS where asked, read
 //! the greeting, send each command and read its reply, hand the lines back. No
 //! decisions — reading the reply codes into an outcome belongs above the port,
-//! where a fake stands in for this. `rustls` and the socket are confined here.
+//! where a fake stands in for this. The socket is confined here, and the TLS it is
+//! wrapped in is [`crate::tls`]'s.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_ports::nntp::{Endpoint, Nntp, Unreachable};
-use rustls::ClientConfig;
 use rustls_pki_types::ServerName;
 use tokio::io::{
     AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader,
@@ -107,8 +107,13 @@ impl Dialer {
         // Built per dial rather than held: a configuration that could not be built
         // would be an impossible state to carry around, and the one place that
         // cares is here, where it becomes an ordinary unreachable-provider report.
-        let config = tls_config().map_err(|reason| unreachable(&endpoint.host, reason))?;
-        TlsConnector::from(config)
+        let config = crate::tls::bundled().ok_or_else(|| {
+            unreachable(
+                &endpoint.host,
+                "the TLS backend could not be initialised".to_owned(),
+            )
+        })?;
+        TlsConnector::from(Arc::new(config))
             .connect(name, tcp)
             .await
             .map_err(|error| unreachable(&endpoint.host, error.to_string()))
@@ -186,20 +191,6 @@ async fn read_reply(
         ));
     }
     Ok(line.trim_end().to_owned())
-}
-
-/// Build the TLS client configuration over the bundled roots, or say why it could
-/// not be — which, with the bundled provider, it always can.
-fn tls_config() -> Result<Arc<ClientConfig>, String> {
-    let mut roots = rustls::RootCertStore::empty();
-    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let config =
-        ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()
-            .map_err(|error| format!("the TLS backend could not be initialised: {error}"))?
-            .with_root_certificates(roots)
-            .with_no_client_auth();
-    Ok(Arc::new(config))
 }
 
 async fn converse(

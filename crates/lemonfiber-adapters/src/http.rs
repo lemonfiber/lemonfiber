@@ -87,15 +87,16 @@ impl Web {
     /// whatever host the answer named. See [`no_redirect`].
     #[must_use]
     pub fn new() -> Self {
-        // `build` only fails if the TLS backend cannot initialise, which the bundled
+        // Building only fails if the TLS backend cannot initialise, which the bundled
         // rustls provider does not do at runtime — so this is infallible in practice.
         // The `unwrap_or_default` names that rather than `expect` (which the lints
-        // forbid); were it ever to fire, the default client would drop the cookie
-        // store and timeouts these lines set, so the fallback is a degraded client,
-        // not an equivalent one — acceptable only because it is unreachable.
+        // forbid); were it ever to fire, the default client finds no crypto provider
+        // installed and panics — acceptable only because it is unreachable.
         let cookies = Arc::new(PerOrigin::default());
         Self {
-            client: builder(&cookies).build().unwrap_or_default(),
+            client: builder(&cookies)
+                .and_then(|built| built.build().ok())
+                .unwrap_or_default(),
             cookies,
             limit: BODY_LIMIT,
         }
@@ -162,13 +163,23 @@ impl Web {
     }
 }
 
-/// Every client this adapter sends with, before anything one request asks of it.
-fn builder(cookies: &Arc<PerOrigin>) -> reqwest::ClientBuilder {
-    reqwest::Client::builder()
-        .cookie_provider(Arc::clone(cookies))
-        .redirect(no_redirect())
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(REQUEST_TIMEOUT)
+/// Every client this adapter sends with, before anything one request asks of it, or
+/// nothing where its TLS could not be set up.
+fn builder(cookies: &Arc<PerOrigin>) -> Option<reqwest::ClientBuilder> {
+    let tls = crate::tls::bundled()?;
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one builder this adapter makes, which every client takes its TLS from"
+    )]
+    let builder = reqwest::Client::builder();
+    Some(
+        builder
+            .tls_backend_preconfigured(tls)
+            .cookie_provider(Arc::clone(cookies))
+            .redirect(no_redirect())
+            .connect_timeout(CONNECT_TIMEOUT)
+            .timeout(REQUEST_TIMEOUT),
+    )
 }
 
 /// A client that connects to these addresses for the host `url` names, and asks the
@@ -198,9 +209,7 @@ fn pinned(
         .map(|address| SocketAddr::new(*address, 0))
         .collect();
     builder(cookies)
-        .resolve_to_addrs(&host, &held)
-        .build()
-        .ok()
+        .and_then(|built| built.resolve_to_addrs(&host, &held).build().ok())
         .ok_or_else(refused)
 }
 

@@ -21,6 +21,8 @@ pub struct Served {
     pub base: super::Https,
     /// The SHA-256 of the certificate it presents, as a pin is written.
     pub pin: String,
+    /// The certificate it presents, for a client that trusts it as a root.
+    pub certificate: CertificateDer<'static>,
 }
 
 /// TLS 1.2, and no other version.
@@ -48,7 +50,7 @@ fn tls_of(app: Router, versions: &'static [&'static SupportedProtocolVersion]) -
     let at = listener.local_addr().ok()?;
     let listener = TcpListener::from_std(listener).ok()?;
     let pin = super::sha256(&der);
-    let acceptor = acceptor(der, made.signing_key.serialize_der(), versions);
+    let acceptor = acceptor(der.clone(), made.signing_key.serialize_der(), versions);
     tokio::spawn(
         futures_util::stream::unfold(listener, |listener| async move {
             let (tcp, _) = listener.accept().await.ok()?;
@@ -61,6 +63,7 @@ fn tls_of(app: Router, versions: &'static [&'static SupportedProtocolVersion]) -
     Some(Served {
         base: super::Https::parse(&format!("https://{at}"))?,
         pin,
+        certificate: der,
     })
 }
 

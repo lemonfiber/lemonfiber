@@ -69,7 +69,7 @@ libc = "0.2"
 rustix = { version = "1", default-features = false, features = ["std", "fs", "process"] }
 # rustls, not the platform's TLS: it keeps the musl static release target free of
 # an OpenSSL build dependency. json for decoding service API responses.
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json", "cookies"] }
 serde = { version = "1", features = ["derive"] }
 # Building qBittorrent's form-encoded request bodies. Infallible — it returns a
 # String, not a Result — so there is no error to invent for inputs that cannot
@@ -110,9 +110,9 @@ regex = { version = "1", default-features = false, features = ["std", "unicode-c
 # The same patterns parsed, to read where every match must start and end. Already in the
 # tree via regex.
 regex-syntax = { version = "0.8", default-features = false, features = ["std", "unicode-case", "unicode-perl"] }
-# The base64 a PEM key, a registry's signature and the companion certificate are carried in. The 0.22
-# line is the one reqwest and bollard use.
-base64 = "0.22"
+# The base64 a PEM key, a registry's signature and the companion certificate are carried in. The 0.23
+# line is the one reqwest uses.
+base64 = "0.23"
 # Encrypting what the store keeps at rest.
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
 crc32fast = "1"

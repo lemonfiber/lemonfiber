@@ -38,6 +38,7 @@ pub mod registry;
 pub mod resolve;
 pub mod retrying;
 pub mod time;
+mod tls;
 
 pub use docker::context::from_environment as docker_target;
 pub use docker::Daemon;

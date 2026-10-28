@@ -7,6 +7,7 @@ yanked = "deny"
 # remove itself: the older copy belongs to a dependency, and the reason names which.
 multiple-versions = "deny"
 skip = [
+  { crate = "base64@0.22", reason = "bollard is on the 0.22 line" },
   { crate = "getrandom@0.2", reason = "ring, under rustls, is on the 0.2 line" },
   { crate = "hashbrown@0.16", reason = "kasuari, under ratatui, is on the 0.16 line" },
   { crate = "syn@2", reason = "several proc-macro crates are on the 2.x line" },

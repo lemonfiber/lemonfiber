@@ -1,11 +1,13 @@
 //! Speaking HTTP to an upstream, for real: a [`Request`] turned into a `reqwest` call and
 //! what comes back turned into a [`Response`], bounded in time and in size.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_error::withheld::REDACTED;
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
+use rustls::{ClientConfig, RootCertStore};
 
 /// How long reaching the upstream may take.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -45,13 +47,45 @@ impl Web {
 
     /// A client, carrying cookies from one call to the next where `sessions` says so.
     fn built(sessions: bool) -> Result<Self, reqwest::Error> {
-        reqwest::Client::builder()
+        client_builder()
             .redirect(reqwest::redirect::Policy::none())
             .cookie_store(sessions)
             .connect_timeout(CONNECT_TIMEOUT)
             .timeout(REQUEST_TIMEOUT)
             .build()
             .map(|client| Self { client })
+    }
+}
+
+/// A `reqwest` client builder over the TLS an adapter speaks, for a call [`Web`] does not
+/// make. reqwest builds no client over TLS it was not handed, so every client an adapter
+/// builds starts here.
+pub fn client_builder() -> reqwest::ClientBuilder {
+    with_tls(bundled_tls().ok())
+}
+
+/// TLS over ring, trusting the roots bundled into the build, so an adapter reads no
+/// certificate store of the machine it runs on.
+fn bundled_tls() -> Result<ClientConfig, rustls::Error> {
+    let roots: RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
+    Ok(
+        ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_safe_default_protocol_versions()?
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    )
+}
+
+/// A builder holding `tls`, or, where there is none, one reqwest refuses to build.
+fn with_tls(tls: Option<ClientConfig>) -> reqwest::ClientBuilder {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one builder this crate makes, which every client takes its TLS from"
+    )]
+    let builder = reqwest::Client::builder();
+    match tls {
+        Some(tls) => builder.tls_backend_preconfigured(tls),
+        None => builder.tls_backend_preconfigured(()),
     }
 }
 

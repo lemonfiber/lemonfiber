@@ -16,7 +16,7 @@ test-support = ["dep:axum", "dep:hyper", "dep:hyper-util", "dep:rcgen", "dep:tok
 
 [dependencies]
 futures-util = { workspace = true }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-manual-roots"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 ring = { workspace = true }
 rustls = { workspace = true, features = ["std", "tls12"] }
 axum = { workspace = true, optional = true }
