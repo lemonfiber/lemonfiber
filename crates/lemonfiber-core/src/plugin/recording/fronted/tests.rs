@@ -93,6 +93,7 @@ fn adapter(port: Option<u16>) -> Served {
         addresses: vec!["17218003".to_owned()],
         machine: vec!["recording-host".to_owned()],
         port,
+        contract: None,
     }
 }
 
@@ -677,8 +678,10 @@ async fn a_curator_whose_download_client_cannot_answer_fails_at_it_and_starts_no
     assert!(serving.asked().is_empty());
 }
 
+mod alone;
 mod checking;
 mod claiming;
 mod identity;
+mod sharing;
 mod standing_in;
 mod unoffered;

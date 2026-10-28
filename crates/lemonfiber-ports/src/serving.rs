@@ -44,6 +44,10 @@ pub struct Serve {
     /// The port it answers on inside its network, published on the loopback interface
     /// at a port the engine chooses.
     pub listens: Option<u16>,
+    /// The port it speaks its contracts on inside its network where that is not
+    /// [`Self::listens`], published on the loopback interface at a port the engine
+    /// chooses.
+    pub contract: Option<u16>,
     /// The name every other container on its network reaches it by, where it has one.
     pub alias: Option<String>,
     /// Each name it resolves to the machine lemonfiber runs on, where a stand-in answers.
@@ -134,6 +138,9 @@ pub struct Served {
     pub machine: Vec<String>,
     /// Where the loopback interface reaches the port it listens on, where it has one.
     pub port: Option<u16>,
+    /// Where the loopback interface reaches the port it speaks its contracts on, where
+    /// it was served with one apart from where it listens.
+    pub contract: Option<u16>,
 }
 
 /// How a container stands, as the engine reports it.

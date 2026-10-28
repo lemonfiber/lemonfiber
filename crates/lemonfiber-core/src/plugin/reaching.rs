@@ -31,7 +31,7 @@ pub(crate) async fn reached(
     asked(
         ctx,
         &placed.service,
-        placed.listens,
+        placed.contract_port(),
         &key_file(stack, &placed.service),
     )
     .await
@@ -51,21 +51,20 @@ pub(crate) async fn filling(ctx: &Ctx, filler: &Filler) -> Result<Contracted, St
         .as_ref()
         .map(|configuration| configuration.join(KEY_FILE))
         .ok_or_else(|| format!("{service} has no configuration on this machine to hold its key"))?;
-    let listens = filler.address.as_ref().map(|address| address.port);
-    asked(ctx, service, listens, &key).await
+    asked(ctx, service, filler.contract, &key).await
 }
 
-/// `service`, listening on `listens` with its key at `key`, asked over its contracts.
+/// `service`, speaking its contracts on `contract` with its key at `key`, asked over them.
 async fn asked(
     ctx: &Ctx,
     service: &str,
-    listens: Option<u16>,
+    contract: Option<u16>,
     key: &Path,
 ) -> Result<Contracted, String> {
-    let listens =
-        listens.ok_or_else(|| format!("{service} says no port it speaks its contracts on"))?;
+    let contract =
+        contract.ok_or_else(|| format!("{service} says no port it speaks its contracts on"))?;
     let key = keyed(ctx, key, service)?;
-    let port = published(ctx, service, listens).await?;
+    let port = published(ctx, service, contract).await?;
     Ok(Contracted::new(
         Arc::clone(&ctx.seams.http),
         format!("http://{LOOPBACK}:{port}"),

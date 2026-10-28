@@ -50,6 +50,7 @@ fn placed(service: &str) -> Placed {
         hidden: false,
         health: None,
         listens: None,
+        contract: None,
         media_types: Vec::new(),
         networks: Vec::new(),
         speaks: Vec::new(),

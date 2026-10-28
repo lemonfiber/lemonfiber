@@ -90,6 +90,10 @@ pub struct Placed {
     /// The port it answers on inside the stack's network, where it declared one.
     #[serde(default)]
     pub listens: Option<u16>,
+    /// The port inside its container it speaks its contracts on, where it declared one
+    /// apart from where it listens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract: Option<u16>,
     /// The media it files, in the stack manifest's vocabulary, which decides what it
     /// comes to in each service that asks for what it provides; none in an older record.
     #[serde(default)]
@@ -175,6 +179,7 @@ impl Placed {
                 .filter(|health| health.kind == lemonfiber_plugin::HealthKind::Http)
                 .and_then(|health| health.path.clone()),
             listens: service.listens,
+            contract: service.contract,
             media_types: service.media_types.clone(),
             networks: Vec::new(),
             speaks: service.speaks.clone(),
@@ -192,6 +197,16 @@ impl Placed {
             asks_for: service.asks_for.clone(),
             starting: None,
         }
+    }
+
+    /// The port inside its container it speaks its contracts on: the one it declared,
+    /// or where it listens; nothing where it speaks no contract.
+    #[must_use]
+    pub fn contract_port(&self) -> Option<u16> {
+        if self.speaks.is_empty() {
+            return None;
+        }
+        self.contract.or(self.listens)
     }
 
     /// What it is called in front of an operator: the name it was installed with, or its
@@ -368,6 +383,16 @@ pub struct Installed {
 }
 
 impl Installed {
+    /// The service of this plugin `speaker` answers its contracts for: the one it
+    /// `fronts`, or itself where it fronts none.
+    #[must_use]
+    pub fn upstream_of<'a>(&'a self, speaker: &'a Placed) -> Option<&'a Placed> {
+        match speaker.fronts.as_deref() {
+            None => Some(speaker),
+            Some(fronted) => self.services.iter().find(|one| one.service == fronted),
+        }
+    }
+
     /// What installing this manifest would settle.
     ///
     /// A function of the manifest alone, so every decision it takes can be put in

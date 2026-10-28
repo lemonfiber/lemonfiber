@@ -436,11 +436,28 @@ fn a_service_not_first_party_stands_in_for_nothing() {
     assert!(fillers
         .named_by("decline")
         .is_some_and(|one| one.brought_by().is_none()));
-    let plugin = fillers
-        .services()
-        .find(|one| one.brought_by() == Some("jellyfin"))
-        .and_then(|one| fillers.setting(one, crate::config::API_KEY_SUFFIX));
-    assert_ne!(plugin.as_deref(), Some("JELLYFIN_API_KEY"));
+    let endings = crate::config::CREDENTIAL_SUFFIXES;
+    let names = |brought: bool| -> Vec<String> {
+        fillers
+            .services()
+            .filter(|one| one.brought_by().is_some() == brought)
+            .flat_map(|one| {
+                endings
+                    .iter()
+                    .filter_map(|ending| fillers.setting(one, ending))
+            })
+            .collect()
+    };
+    let (plugins, stacks) = (names(true), names(false));
+    assert!(!plugins.is_empty() && !stacks.is_empty());
+    assert!(
+        plugins
+            .iter()
+            .all(|name| name.starts_with(crate::config::PLUGIN_SETTING) && !stacks.contains(name)),
+        "a service not first-party is named in its plugin's namespace and holds none of the \
+         stack's names: {plugins:?}"
+    );
+    assert!(stacks.contains(&"IDENTITY_SOURCE_ADMIN_PASSWORD".to_owned()));
 }
 
 mod filling;

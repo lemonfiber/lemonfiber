@@ -221,6 +221,7 @@ pub(crate) async fn asked(
     stated: &mut [Proving],
 ) {
     let deadline = ctx.seams.clock.now() + ctx.patience;
+    let _ = crate::seed::run::guarding_installed(ctx, installed, deadline).await;
     // Where each of this plugin's services answers, read through the one answer every
     // caller that asks a plugin's service reads: a second way of composing an address
     // is a second port to be wrong about.
@@ -300,10 +301,7 @@ async fn held_to(
             "it says it speaks {said:?}, and its manifest says {declared:?}"
         ));
     }
-    let upstream = placed
-        .fronts
-        .as_deref()
-        .and_then(|fronted| installed.services.iter().find(|one| one.service == fronted));
+    let upstream = installed.upstream_of(placed);
     if let Some(upstream) = upstream.filter(|upstream| {
         !about
             .releases

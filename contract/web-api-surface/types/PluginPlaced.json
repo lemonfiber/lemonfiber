@@ -18,6 +18,12 @@
       ],
       "required": true
     },
+    "contract": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    },
     "description": {
       "type": [
         "string"

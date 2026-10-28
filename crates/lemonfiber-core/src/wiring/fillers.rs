@@ -60,6 +60,8 @@ pub struct Filler {
     pub address: Option<Address>,
     /// The port this machine reaches it on, where it publishes one.
     pub published: Option<u16>,
+    /// The port inside its container it speaks its contracts on, where it speaks any.
+    pub contract: Option<u16>,
     /// The directory its container owns, which its credential file has to stay beneath
     /// when it is read, where the stack has been written to disk.
     ///
@@ -420,6 +422,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
             port,
         }),
         published: service.port,
+        contract: None,
         confined_to: project
             .map(|project| crate::app::targets::service_config_dir(project, &service.id)),
         media_types: service.media_types.clone(),
@@ -454,6 +457,7 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             port,
         }),
         published: placed.published(),
+        contract: placed.contract_port(),
         confined_to: project
             .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
         media_types: placed.media_types.clone(),

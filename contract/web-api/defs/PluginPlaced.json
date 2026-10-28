@@ -21,6 +21,16 @@
       "description": "Where inside the container its one configuration directory is mounted.\n\nResolved rather than optional. The record answers where the directory is, and\na run that re-derived the fallback would answer for a container it did not\nwrite the day that fallback moved.",
       "type": "string"
     },
+    "contract": {
+      "description": "The port inside its container it speaks its contracts on, where it declared one\napart from where it listens.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
     "description": {
       "description": "The line its dashboard entry shows beside it: the one its wiring names, or what\nthe plugin says it does for the operator.",
       "type": "string",

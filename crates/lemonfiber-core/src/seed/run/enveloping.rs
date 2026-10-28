@@ -4,6 +4,7 @@
 
 use std::net::SocketAddr;
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 
 use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::stream::guard;
@@ -20,6 +21,9 @@ use crate::wiring::{Filler, Fillers};
 /// What the report calls the guard's envelope.
 pub(super) const ENVELOPE: &str = "The stream guard's envelope";
 
+/// Why a stream guard was handed no envelope while it does not answer over its contract.
+const UNANSWERED: &str = "the stream guard does not answer over its contract yet";
+
 /// What the report calls the pass service's live-stream paths.
 pub(super) const LIVE: &str = "The pass service's live-stream paths";
 
@@ -34,6 +38,17 @@ pub(super) async fn seed_envelope(
     let Some((guarding, _)) = fillers.filling(guard::CAPABILITY) else {
         return Vec::new();
     };
+    Box::pin(envelope_through(ctx, fillers, guarding, project)).await
+}
+
+/// Apply `guarding` the envelope it enforces where it speaks the contract, and write the
+/// pass service the media server's live-stream paths where it runs.
+async fn envelope_through(
+    ctx: &Ctx,
+    fillers: &Fillers,
+    guarding: &Filler,
+    project: Option<&Path>,
+) -> Vec<Wiring> {
     let Some((served, _)) = fillers.filling(serve::CAPABILITY) else {
         return Vec::new();
     };
@@ -61,6 +76,60 @@ pub(super) async fn seed_envelope(
         wirings.push(settled(ENVELOPE, applied(ctx, &guard, envelope).await));
     }
     wirings
+}
+
+/// How often a guard that does not answer yet is asked again.
+const POLL: Duration = Duration::from_millis(500);
+
+/// How applying the stream guard among `installed`'s services the envelope it enforces came
+/// out, the plugin taken as installed beside every other the register holds, asked again
+/// while the guard does not answer over its contract until `until`; nothing where none of
+/// its services fills `stream.guard` or the stack cannot be read.
+pub(crate) async fn guarding_installed(
+    ctx: &Ctx,
+    installed: &crate::plugin::Installed,
+    until: SystemTime,
+) -> Option<State> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let every: Vec<crate::plugin::Installed> = register
+        .installed()
+        .iter()
+        .filter(|one| one.plugin != installed.plugin)
+        .chain(std::iter::once(installed))
+        .cloned()
+        .collect();
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = Fillers::of(
+        &manifest,
+        &every,
+        &crate::app::targets::chosen_fillers(ctx),
+        project.as_deref(),
+    );
+    let guarding = fillers.services().find(|one| {
+        one.brought_by() == Some(installed.plugin.as_str())
+            && one.provides.iter().any(|name| name == guard::CAPABILITY)
+    })?;
+    loop {
+        let wirings = Box::pin(envelope_through(ctx, &fillers, guarding, None)).await;
+        let state = wirings
+            .into_iter()
+            .find(|wiring| wiring.connection == ENVELOPE)
+            .map_or_else(
+                || State::Skipped {
+                    reason: UNANSWERED.to_owned(),
+                },
+                |wiring| wiring.state,
+            );
+        match &state {
+            State::Skipped { reason } if reason == UNANSWERED && ctx.seams.clock.now() < until => {
+                tokio::time::sleep(POLL).await;
+            }
+            _ => return Some(state),
+        }
+    }
 }
 
 /// The media server's declaration, checked, as its filler answers it over `media.serve`,

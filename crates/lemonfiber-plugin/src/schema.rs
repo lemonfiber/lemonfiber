@@ -215,13 +215,18 @@ pub struct Service {
     /// services that ask reach it. Required where `speaks` is.
     #[serde(default)]
     pub listens: Option<u16>,
+    /// The port inside its container it speaks its contracts on, where that is not
+    /// [`Self::listens`]: published on this machine's loopback alone, and reached by no
+    /// published port, ask or proxy route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract: Option<u16>,
     /// Each capability contract it answers, as `capability@major`: the service is an
     /// adapter, and lemonfiber asks it over those contracts.
     #[serde(default)]
     pub speaks: Vec<String>,
     /// The plugin's own service this adapter stands in front of: the upstream it answers
     /// its contracts for, whose pinned digest its conformance recordings are taken
-    /// against. Required where `speaks` is.
+    /// against. Where a service that speaks names none, it is its own upstream.
     #[serde(default)]
     pub fronts: Option<String>,
     /// Each field of the `upstream.json` lemonfiber writes for this adapter, to the secret
@@ -529,6 +534,8 @@ pub enum HealthKind {
     /// Trust the container's own reported state.
     Container,
 }
+
+mod speaking;
 
 #[cfg(test)]
 pub(crate) mod tests;

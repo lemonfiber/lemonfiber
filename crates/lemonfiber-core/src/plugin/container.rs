@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use lemonfiber_manifest::container::{is_target, Mount, UserMode, Value};
+use lemonfiber_manifest::container::{exposes, inside, is_target, Mount, Reach, UserMode, Value};
 
 use super::installed::{Installed, Placed, Reached};
 use crate::project::entry::{self, literal, Tier, Unit};
@@ -79,7 +79,7 @@ pub(crate) fn unit<'a>(
         profile: super::profile_of(installed),
         image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
         published: published(placed),
-        contract: placed.listens.filter(|_| !placed.speaks.is_empty()),
+        contract: placed.contract_port(),
         takes_data: placed.takes_data,
         config_path: &placed.config_path,
         config_ro: fields.config_ro,
@@ -109,15 +109,17 @@ fn published(placed: &Placed) -> Vec<(Tier, u16, u16)> {
         Reached::Household { .. } => Tier::Household,
     };
     let first = reached.port();
-    std::iter::once((first, placed.listens.unwrap_or(first)))
-        .chain(
-            placed
-                .fields
-                .publish
-                .iter()
-                .map(|further| (further.port, further.listens.unwrap_or(further.port))),
-        )
-        .map(|(host, inside)| (tier, host, inside))
+    let contract = placed.contract_port();
+    std::iter::once((Reach::Port, first, inside(first, placed.listens)))
+        .chain(placed.fields.publish.iter().map(|further| {
+            (
+                Reach::Publish,
+                further.port,
+                inside(further.port, further.listens),
+            )
+        }))
+        .filter(|(how, _, at)| !exposes(*how, *at, contract, placed.listens))
+        .map(|(_, host, at)| (tier, host, at))
         .collect()
 }
 

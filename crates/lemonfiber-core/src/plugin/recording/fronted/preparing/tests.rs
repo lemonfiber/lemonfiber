@@ -47,7 +47,7 @@ fn the_adapter_is_handed_the_value_its_upstream_was_seeded_with_or_one_minted_an
     let (Some(copy), Some(held)) = (copy, held) else {
         return;
     };
-    let mut secrets = written(&copy, &held);
+    let mut secrets = written(&copy, Some(&held));
     assert_eq!(
         secrets.clone().into_iter().collect::<Vec<_>>(),
         vec![(

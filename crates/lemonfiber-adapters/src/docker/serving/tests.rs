@@ -36,6 +36,7 @@ fn serve() -> Serve {
         ],
         tmpfs: vec!["/run".to_owned()],
         listens: Some(8989),
+        contract: None,
         alias: None,
         devices: Vec::new(),
     }
@@ -167,6 +168,52 @@ fn a_service_listening_nowhere_publishes_nothing() {
     assert_eq!(asked.host_config.and_then(|host| host.port_bindings), None);
 }
 
+#[test]
+fn a_contract_port_is_published_on_loopback_beside_its_own_and_read_off_apart() {
+    let contracted = Serve {
+        contract: Some(8081),
+        ..serve()
+    };
+    let asked = body(&contracted, "n");
+    let mut exposed = asked.exposed_ports.clone().unwrap_or_default();
+    exposed.sort();
+    assert_eq!(exposed, vec!["8081/tcp".to_owned(), "8989/tcp".to_owned()]);
+    let bound = asked
+        .host_config
+        .and_then(|host| host.port_bindings)
+        .unwrap_or_default();
+    for port in ["8081/tcp", "8989/tcp"] {
+        assert!(
+            bound
+                .get(port)
+                .is_some_and(|bindings| bindings.as_ref().is_some_and(|all| all
+                    .iter()
+                    .all(|one| one.host_ip.as_deref() == Some("127.0.0.1")))),
+            "{port}: {bound:?}"
+        );
+    }
+    let mut ports = inspected(vec![PortBinding {
+        host_ip: Some("127.0.0.1".to_owned()),
+        host_port: Some("49153".to_owned()),
+    }]);
+    if let Some(held) = ports
+        .network_settings
+        .as_mut()
+        .and_then(|settings| settings.ports.as_mut())
+    {
+        held.insert(
+            "8081/tcp".to_owned(),
+            Some(vec![PortBinding {
+                host_ip: Some("127.0.0.1".to_owned()),
+                host_port: Some("49154".to_owned()),
+            }]),
+        );
+    }
+    let served = read_off(&ports, "c", "n", &contracted);
+    assert_eq!((served.port, served.contract), (Some(49153), Some(49154)));
+    assert_eq!(read_off(&ports, "c", "n", &serve()).contract, None);
+}
+
 fn inspected(ports: Vec<PortBinding>) -> ContainerInspectResponse {
     ContainerInspectResponse {
         config: Some(ContainerConfig {
@@ -205,7 +252,7 @@ fn what_a_started_container_is_known_by_and_where_loopback_reaches_it_is_read_of
         ]),
         "4f1c2d3e5a6b7c8d",
         "lemonfiber-record-1",
-        Some(8989),
+        &serve(),
     );
     assert_eq!(served.container, "4f1c2d3e5a6b7c8d");
     assert_eq!(served.network, "lemonfiber-record-1");
@@ -215,7 +262,7 @@ fn what_a_started_container_is_known_by_and_where_loopback_reaches_it_is_read_of
         vec!["172.18.0.2".to_owned(), "02:42:ac:12:00:02".to_owned()]
     );
     assert_eq!(served.port, Some(49153));
-    let unpublished = read_off(&inspected(Vec::new()), "c", "n", Some(8989));
+    let unpublished = read_off(&inspected(Vec::new()), "c", "n", &serve());
     assert_eq!(unpublished.port, None);
     let wide_only = read_off(
         &inspected(vec![PortBinding {
@@ -224,7 +271,7 @@ fn what_a_started_container_is_known_by_and_where_loopback_reaches_it_is_read_of
         }]),
         "c",
         "n",
-        Some(8989),
+        &serve(),
     );
     assert_eq!(wide_only.port, None, "only the loopback interface is asked");
 }

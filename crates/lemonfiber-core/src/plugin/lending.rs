@@ -112,15 +112,16 @@ async fn ready(ctx: &Ctx, adapter: &Placed, served: &Served) -> Result<String, S
         path: Some(ready_path()),
         timeout_s: None,
     };
-    super::recording::healthy(
+    let contract = served.contract.or(served.port);
+    super::recording::healthy_at(
         ctx.seams.serving.as_ref(),
         ctx.seams.http.as_ref(),
         Some(&health),
         served,
+        contract,
     )
     .await?;
-    served
-        .port
+    contract
         .map(|port| format!("http://{LOOPBACK}:{port}"))
         .ok_or_else(|| {
             format!(

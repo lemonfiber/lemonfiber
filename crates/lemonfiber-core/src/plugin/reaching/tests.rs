@@ -162,6 +162,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
             port: 8080,
         }),
         published: None,
+        contract: Some(8080),
         confined_to: stack.map(|stack| {
             crate::plugin::key_file(stack, ADAPTER)
                 .parent()
@@ -200,4 +201,23 @@ async fn the_service_filling_a_capability_is_asked_beside_its_configuration() {
             .is_err_and(|why| why.contains("no configuration on this machine")),
         "{unwritten:?}"
     );
+}
+
+#[tokio::test]
+async fn a_service_is_asked_on_the_port_it_speaks_its_contracts_on_and_not_where_it_listens() {
+    let (stack, ctx, fake) = keyed(
+        "contract-port",
+        Some("the-key"),
+        &[(ADAPTER, "127.0.0.1", 8081)],
+    );
+    let apart = crate::wiring::Filler {
+        contract: Some(8081),
+        ..filler(Some(&stack))
+    };
+    let asked = filling(&ctx, &apart).await;
+    assert!(asked.is_ok(), "{:?}", asked.err());
+    let mut placed = speaking(Some(8080));
+    placed.contract = Some(8081);
+    assert!(super::reached(&ctx, &stack, &placed).await.is_ok());
+    assert!(fake.request().is_none(), "nothing was asked yet");
 }

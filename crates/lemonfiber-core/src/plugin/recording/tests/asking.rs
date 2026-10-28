@@ -326,6 +326,7 @@ fn served_on_loopback() -> crate::ports::serving::Served {
         addresses: Vec::new(),
         machine: Vec::new(),
         port: Some(49153),
+        contract: None,
     }
 }
 

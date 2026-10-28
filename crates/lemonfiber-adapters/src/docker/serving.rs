@@ -97,7 +97,7 @@ async fn started(
     match inspected {
         Ok(inspected) => Ok(Served {
             machine,
-            ..read_off(&inspected, &container, network, serve.listens)
+            ..read_off(&inspected, &container, network, serve)
         }),
         Err(unran) => {
             gone(docker, &container, network).await;
@@ -175,14 +175,20 @@ fn keyed(listens: u16) -> String {
 
 /// What the engine is asked to create for `serve`, on `network`.
 pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
-    let published = serve.listens.map(|listens| {
-        HashMap::from([(
-            keyed(listens),
-            Some(vec![PortBinding {
-                host_ip: Some(LOOPBACK.to_owned()),
-                host_port: Some(String::new()),
-            }]),
-        )])
+    let ports: Vec<u16> = serve.listens.into_iter().chain(serve.contract).collect();
+    let published = (!ports.is_empty()).then(|| {
+        ports
+            .iter()
+            .map(|port| {
+                (
+                    keyed(*port),
+                    Some(vec![PortBinding {
+                        host_ip: Some(LOOPBACK.to_owned()),
+                        host_port: Some(String::new()),
+                    }]),
+                )
+            })
+            .collect::<HashMap<_, _>>()
     });
     ContainerCreateBody {
         networking_config: serve.alias.as_ref().map(|alias| NetworkingConfig {
@@ -201,7 +207,7 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
         attach_stdin: Some(false),
         tty: Some(false),
         open_stdin: Some(false),
-        exposed_ports: serve.listens.map(|listens| vec![keyed(listens)]),
+        exposed_ports: (!ports.is_empty()).then(|| ports.iter().map(|port| keyed(*port)).collect()),
         labels: Some(labelled()),
         host_config: Some(HostConfig {
             network_mode: Some(network.to_owned()),
@@ -250,12 +256,12 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
 }
 
 /// What the engine says of a started container: its name, its addresses and where the
-/// loopback interface reaches its port.
+/// loopback interface reaches its port and its contract port.
 pub(super) fn read_off(
     inspected: &ContainerInspectResponse,
     container: &str,
     network: &str,
-    listens: Option<u16>,
+    serve: &Serve,
 ) -> Served {
     let settings = inspected.network_settings.as_ref();
     let addresses = settings
@@ -276,10 +282,10 @@ pub(super) fn read_off(
                 .collect()
         })
         .unwrap_or_default();
-    let port = listens.and_then(|listens| {
+    let on_loopback = |inside: u16| {
         settings
             .and_then(|settings| settings.ports.as_ref())
-            .and_then(|ports| ports.get(&keyed(listens)))
+            .and_then(|ports| ports.get(&keyed(inside)))
             .and_then(Option::as_ref)
             .and_then(|bindings| {
                 bindings
@@ -287,7 +293,9 @@ pub(super) fn read_off(
                     .filter(|binding| binding.host_ip.as_deref() == Some(LOOPBACK))
                     .find_map(|binding| binding.host_port.as_deref()?.parse().ok())
             })
-    });
+    };
+    let port = serve.listens.and_then(on_loopback);
+    let contract = serve.contract.and_then(on_loopback);
     Served {
         container: container.to_owned(),
         network: network.to_owned(),
@@ -299,6 +307,7 @@ pub(super) fn read_off(
         addresses,
         machine: Vec::new(),
         port,
+        contract,
     }
 }
 

@@ -16,6 +16,8 @@
 //! Nothing here touches a disk. It answers with text, and where that text goes, and
 //! who owns the region it goes in, is [`super::placing`]'s.
 
+use lemonfiber_manifest::container::{exposes, Reach};
+
 use super::installed::{Installed, Reached};
 
 /// The proxy's configuration, beneath the stack directory.
@@ -33,6 +35,11 @@ pub fn proxied(installed: &Installed) -> String {
         .services
         .iter()
         .filter_map(|placed| match &placed.reached {
+            Some(Reached::Household { port, .. })
+                if exposes(Reach::Route, *port, placed.contract_port(), placed.listens) =>
+            {
+                None
+            }
             Some(Reached::Household { port, hostname, .. }) => Some(format!(
                 "{hostname}.{{$DOMAIN:home.local}} {{\n\treverse_proxy {}:{port}\n}}\n",
                 placed.service

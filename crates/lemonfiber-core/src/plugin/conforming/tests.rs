@@ -205,7 +205,7 @@ async fn a_recording_absent_of_another_build_or_of_another_request_is_unproven()
 
 #[tokio::test]
 async fn an_adapter_naming_no_upstream_or_an_unspoken_contract_is_refused_and_judged_unproven() {
-    let unfronted = MANIFEST.replace("fronts      = \"subber\"\n", "");
+    let unfronted = MANIFEST.replace("fronts      = \"subber\"\n", "fronts      = \"nowhere\"\n");
     let read = judged(&source("unfronted", &unfronted, &conforming())).await;
     assert!(!read.conforms);
     assert!(read
@@ -216,6 +216,18 @@ async fn an_adapter_naming_no_upstream_or_an_unspoken_contract_is_refused_and_ju
         &one.verdict,
         Verdict::Unproven { why } if why.contains("names no upstream")
     )));
+
+    let alone = MANIFEST.replace("fronts      = \"subber\"\n", "");
+    let read = judged(&source("alone", &alone, &conforming())).await;
+    assert!(
+        !read.cases.is_empty()
+            && read.cases.iter().all(|one| matches!(
+                &one.verdict,
+                Verdict::Unproven { why } if why.contains("is pinned at")
+            )),
+        "a speaker fronting nothing is held to its own pin: {:?}",
+        read.cases
+    );
 
     let unspoken = MANIFEST.replace(
         "speaks      = [\"subtitles.fetch@1\"]",

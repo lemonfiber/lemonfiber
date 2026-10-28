@@ -125,6 +125,7 @@ fn served(port: Option<u16>) -> Served {
         addresses: Vec::new(),
         machine: Vec::new(),
         port,
+        contract: None,
     }
 }
 

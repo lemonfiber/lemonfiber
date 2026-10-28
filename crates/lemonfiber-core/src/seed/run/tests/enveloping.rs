@@ -478,3 +478,85 @@ async fn live_stream_paths_that_cannot_be_written_fail_saying_where() {
         "{wirings:?}"
     );
 }
+
+#[tokio::test]
+async fn a_guard_being_installed_is_handed_its_envelope_beside_what_the_register_holds() {
+    let http = answering(&[Answer::reply(200, "null")]);
+    let (ctx, _) = machine("envelope-installed", Arc::clone(&http), false);
+    media::moved_in(&ctx);
+    let guard = crate::test_support::contracted(
+        "guarding",
+        GUARD,
+        lemonfiber_contract::capabilities::stream::guard::CAPABILITY,
+    );
+    let until = ctx.seams.clock.now();
+
+    let handed = super::super::enveloping::guarding_installed(&ctx, &guard, until).await;
+
+    assert_eq!(handed, Some(State::Wired));
+    assert_eq!(envelopes(&http).len(), 1);
+    let moved = media::moved();
+    assert!(moved.is_some(), "the media server's plugin is pinned");
+    if let Some(moved) = moved {
+        assert_eq!(
+            super::super::enveloping::guarding_installed(&ctx, &moved, until).await,
+            None
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_guard_that_does_not_answer_is_asked_again_until_its_time_is_up() {
+    let http = answering(&[Answer::reply(200, "null")]);
+    let (mut ctx, directory) = machine("envelope-unanswered", Arc::clone(&http), false);
+    media::moved_in(&ctx);
+    let _ = std::fs::remove_file(crate::plugin::key_file(&directory, GUARD));
+    ctx.seams.clock = lemonfiber_fixtures::ports::Following::started();
+    let until = ctx.seams.clock.now() + std::time::Duration::from_secs(2);
+    let guard = crate::test_support::contracted(
+        "guarding",
+        GUARD,
+        lemonfiber_contract::capabilities::stream::guard::CAPABILITY,
+    );
+
+    let handed = super::super::enveloping::guarding_installed(&ctx, &guard, until).await;
+
+    assert!(
+        matches!(&handed, Some(State::Skipped { reason }) if reason.contains("does not answer")),
+        "{handed:?}"
+    );
+    assert!(envelopes(&http).is_empty());
+    assert!(ctx.seams.clock.now() >= until);
+}
+
+#[tokio::test]
+async fn nothing_is_handed_where_the_stack_cannot_be_read_and_the_register_is_read_as_empty() {
+    let http = answering(&[Answer::reply(200, "null")]);
+    let guard = crate::test_support::contracted(
+        "guarding",
+        GUARD,
+        lemonfiber_contract::capabilities::stream::guard::CAPABILITY,
+    );
+    let (ctx, _) = machine("envelope-unread", Arc::clone(&http), false);
+    let until = ctx.seams.clock.now();
+    let unread = crate::test_support::a_context()
+        .over(crate::test_support::nowhere())
+        .build();
+    assert_eq!(
+        super::super::enveloping::guarding_installed(&unread, &guard, until).await,
+        None
+    );
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(std::fs::write(
+        env.with_file_name(crate::config::paths::PLUGINS),
+        "not a register"
+    )
+    .is_ok());
+
+    let handed = super::super::enveloping::guarding_installed(&ctx, &guard, until).await;
+
+    assert!(
+        matches!(&handed, Some(State::Skipped { reason }) if reason.contains("media.serve")),
+        "the media server's plugin is not read from a register that will not read: {handed:?}"
+    );
+}

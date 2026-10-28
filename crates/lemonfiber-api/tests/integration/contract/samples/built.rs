@@ -290,6 +290,7 @@ fn komga_placed() -> lemonfiber_core::plugin::Placed {
         hidden: false,
         health: None,
         listens: None,
+        contract: None,
         media_types: Vec::new(),
         networks: Vec::new(),
         speaks: Vec::new(),

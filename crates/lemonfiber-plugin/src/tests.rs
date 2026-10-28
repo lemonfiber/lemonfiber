@@ -40,3 +40,50 @@ fn every_manifest_the_bundle_pins_is_one_this_build_acts_on() {
         }
     }
 }
+
+#[test]
+fn a_speaker_fronting_nothing_is_its_own_upstream_and_speaks_on_its_contract_port() {
+    let text = crate::refusing::tests::speaking(r#"["media.serve@1"]"#, "listens     = 8080\n");
+    let manifest = Manifest::from_toml(&text);
+    assert!(manifest.is_ok(), "{manifest:?}");
+    let Ok(mut manifest) = manifest else { return };
+    let upstream = |manifest: &Manifest| {
+        manifest
+            .services
+            .first()
+            .and_then(|speaker| manifest.upstream_of(speaker))
+            .map(|one| one.id.clone())
+    };
+    assert_eq!(upstream(&manifest).as_deref(), Some("komga-server"));
+    assert_eq!(
+        manifest
+            .services
+            .first()
+            .and_then(super::Service::contract_port),
+        Some(8081)
+    );
+    for service in &mut manifest.services {
+        service.fronts = None;
+        service.contract = None;
+    }
+    assert_eq!(upstream(&manifest).as_deref(), Some("komga"));
+    assert_eq!(
+        manifest
+            .services
+            .first()
+            .and_then(super::Service::contract_port),
+        Some(8080)
+    );
+    assert_eq!(
+        manifest
+            .services
+            .get(1)
+            .and_then(super::Service::contract_port),
+        None,
+        "it speaks nothing"
+    );
+    for service in &mut manifest.services {
+        service.fronts = Some("nowhere".to_owned());
+    }
+    assert_eq!(upstream(&manifest), None);
+}

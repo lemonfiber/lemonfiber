@@ -783,3 +783,5 @@ fn a_record_naming_in_process_adapters_reads_and_is_written_without_them() {
 }
 
 mod dashboard;
+
+mod speaking;

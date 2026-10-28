@@ -190,6 +190,9 @@ pub(in crate::plugin) fn settled_as(
         binds,
         tmpfs: crate::plugin::container::tmpfs(placed).cloned().collect(),
         listens: inside(placed),
+        contract: placed
+            .contract_port()
+            .filter(|port| Some(*port) != inside(placed)),
         alias: None,
     }
 }
@@ -280,6 +283,18 @@ pub(in crate::plugin) async fn healthy(
     health: Option<&Health>,
     served: &Served,
 ) -> Result<(), String> {
+    healthy_at(serving, http, health, served, served.port).await
+}
+
+/// Wait until `served`'s health passes at `port` on the loopback interface, or say why it
+/// will not.
+pub(in crate::plugin) async fn healthy_at(
+    serving: &dyn crate::ports::serving::Serving,
+    http: &dyn Http,
+    health: Option<&Health>,
+    served: &Served,
+    port: Option<u16>,
+) -> Result<(), String> {
     let within = allowed(health);
     let until = Instant::now() + within;
     loop {
@@ -290,7 +305,7 @@ pub(in crate::plugin) async fn healthy(
         if let Standing::Exited(code) = standing {
             return Err(format!("it exited {code} before its health passed"));
         }
-        if passes(http, health, served, standing).await {
+        if passes(http, health, port, standing).await {
             return Ok(());
         }
         if Instant::now() >= until {
@@ -309,11 +324,11 @@ pub(in crate::plugin) async fn healthy(
 async fn passes(
     http: &dyn Http,
     health: Option<&Health>,
-    served: &Served,
+    port: Option<u16>,
     standing: Standing,
 ) -> bool {
     let kind = health.map_or(HealthKind::Container, |health| health.kind);
-    let (HealthKind::Http | HealthKind::Tcp, Some(port)) = (kind, served.port) else {
+    let (HealthKind::Http | HealthKind::Tcp, Some(port)) = (kind, port) else {
         return matches!(standing, Standing::Healthy | Standing::Running);
     };
     let path = health
