@@ -86,14 +86,19 @@ pub fn offered(
         Value::Setting(read) if read.setting == setting => read.one_of.as_deref(),
         _ => None,
     })?;
-    Some(
-        one_of
-            .iter()
-            .filter(|choice| choice.needs().is_none_or(|needs| met(needs, held)))
-            .flat_map(Choice::values)
-            .map(Constant::text)
-            .collect(),
-    )
+    Some(open(one_of, held))
+}
+
+/// The values `one_of` lists whose needs are met, as `held` says what each other setting
+/// holds.
+#[must_use]
+pub fn open(one_of: &[Choice], held: &dyn Fn(&str) -> Option<String>) -> Vec<String> {
+    one_of
+        .iter()
+        .filter(|choice| choice.needs().is_none_or(|needs| met(needs, held)))
+        .flat_map(Choice::values)
+        .map(Constant::text)
+        .collect()
 }
 
 /// One service's settings and secrets, as the rules for choices read them.

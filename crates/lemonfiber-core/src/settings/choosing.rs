@@ -11,7 +11,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::plugin::Installed;
 
 /// One setting a change would leave outside its choices.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub(super) struct Outside {
     /// The setting.
     setting: String,
@@ -34,46 +34,48 @@ pub(super) fn outside(
         Some(value) => value.map(str::to_owned),
         None => recorded(name),
     };
-    let mut found: Vec<Outside> = environments(manifest, installed)
+    let found: BTreeMap<String, Outside> = environments(manifest, installed)
         .flat_map(|env| {
             env.values()
                 .filter_map(|value| match value {
-                    Value::Setting(read) => Some(read),
+                    Value::Setting(read) => Some((read, read.one_of.as_deref()?)),
                     _ => None,
                 })
-                .filter(|read| touched(read, changing))
-                .filter_map(|read| {
+                .filter(|(read, one_of)| touched(&read.setting, one_of, changing))
+                .filter_map(|(read, one_of)| {
                     let value = after(&read.setting)?;
                     let held = |name: &str| after(name).or_else(|| choices::defaulted(env, name));
-                    let choices = choices::offered(env, &read.setting, &held)?;
-                    (!choices.contains(&value)).then(|| Outside {
-                        setting: read.setting.clone(),
-                        value,
-                        choices,
+                    let choices = choices::open(one_of, &held);
+                    (!choices.contains(&value)).then(|| {
+                        (
+                            read.setting.clone(),
+                            Outside {
+                                setting: read.setting.clone(),
+                                value,
+                                choices,
+                            },
+                        )
                     })
                 })
                 .collect::<Vec<_>>()
         })
         .collect();
-    found.sort_by(|one, other| one.setting.cmp(&other.setting));
-    found.dedup();
-    found
+    found.into_values().collect()
 }
 
-/// Whether `changing` reaches the choices `read` declares: it names their setting, or one
-/// their needs name.
+/// Whether `changing` reaches the choices `one_of` declares for `setting`: it names the
+/// setting, or one their needs name.
 fn touched(
-    read: &lemonfiber_manifest::container::Setting,
+    setting: &str,
+    one_of: &[choices::Choice],
     changing: &BTreeMap<&str, Option<&str>>,
 ) -> bool {
-    read.one_of.as_deref().is_some_and(|one_of| {
-        changing.contains_key(read.setting.as_str())
-            || one_of
-                .iter()
-                .filter_map(choices::Choice::needs)
-                .flat_map(|needs| needs.keys())
-                .any(|name| changing.contains_key(name.as_str()))
-    })
+    changing.contains_key(setting)
+        || one_of
+            .iter()
+            .filter_map(choices::Choice::needs)
+            .flat_map(|needs| needs.keys())
+            .any(|name| changing.contains_key(name.as_str()))
 }
 
 /// Every service's environment: the stack's own, then each installed plugin's.
