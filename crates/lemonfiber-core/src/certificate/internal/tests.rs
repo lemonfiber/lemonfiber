@@ -66,7 +66,8 @@ fn the_written_pkcs12_opens_with_the_empty_password_and_holds_the_certificate_pi
         certificate
             .as_ref()
             .is_ok_and(|pem| pem.contains("BEGIN CERTIFICATE")),
-        "{certificate:?}"
+        "openssl would not open it: {:?}",
+        certificate.as_ref().err()
     );
     assert_eq!(
         certificate.and_then(|pem| fingerprinted(&pem)),
@@ -76,14 +77,16 @@ fn the_written_pkcs12_opens_with_the_empty_password_and_holds_the_certificate_pi
     let key = opened(&at, &["-nocerts", "-nodes"]);
     assert!(
         key.as_ref().is_ok_and(|pem| pem.contains("PRIVATE KEY")),
-        "{key:?}"
+        "openssl found no key in it: {:?}",
+        key.as_ref().err()
     );
     let named = opened(&at, &["-nokeys", "-clcerts", "-info"]);
     assert!(
         named
             .as_ref()
             .is_ok_and(|said| said.contains("CN=jellyfin") && said.contains("PBES2")),
-        "{named:?}"
+        "openssl did not read it as made out to jellyfin under PBES2: {:?}",
+        named.as_ref().err()
     );
     #[cfg(unix)]
     {
