@@ -73,7 +73,7 @@ async fn a_media_server_is_handed_a_throwaway_internal_certificate_where_its_con
         ("/health", vec![Answer::reply(200, "ok")]),
         (
             "/lemonfiber/adapter/v1/ready",
-            vec![Answer::reply(200, "{}")],
+            vec![Answer::reply(200, "true")],
         ),
         (
             "/System/Info/Public",

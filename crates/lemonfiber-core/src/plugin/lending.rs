@@ -7,9 +7,8 @@
 //! is asked over its contract like any adapter, and taken away with its network and its
 //! throwaway configuration whatever it came to.
 
-use lemonfiber_contract::adapter::{ready_path, KEY_FILE};
+use lemonfiber_contract::adapter::KEY_FILE;
 use lemonfiber_contract::Contracted;
-use lemonfiber_plugin::{Health, HealthKind};
 
 use super::installed::{Installed, Placed};
 use super::program::{Operator, Starting, Throwaway};
@@ -87,11 +86,11 @@ pub(crate) async fn lent(ctx: &Ctx, borrowing: &Borrowing<'_>) -> Result<Lent, S
         ..super::recording::settled_as(adapter, &held, None, &operator)
     };
     let served = super::recording::started(ctx.seams.serving.as_ref(), &serve, None).await?;
-    match ready(ctx, adapter, &served).await {
-        Ok(base) => Ok(Lent {
+    match ready(ctx, adapter, &served, key).await {
+        Ok(adapter) => Ok(Lent {
             served,
             _held: held,
-            adapter: Contracted::new(ctx.seams.http.clone(), base, &adapter.service, key),
+            adapter,
         }),
         Err(why) => {
             ctx.seams.serving.removed(&served).await;
@@ -100,31 +99,27 @@ pub(crate) async fn lent(ctx: &Ctx, borrowing: &Borrowing<'_>) -> Result<Lent, S
     }
 }
 
-/// Where the loopback interface reaches the adapter `served`, once it says its upstream
-/// answers; or why it did not.
-async fn ready(ctx: &Ctx, adapter: &Placed, served: &Served) -> Result<String, String> {
-    let health = Health {
-        kind: HealthKind::Http,
-        path: Some(ready_path()),
-        timeout_s: None,
-    };
-    let contract = served.contract.or(served.port);
-    super::recording::healthy_at(
-        ctx.seams.serving.as_ref(),
-        ctx.seams.http.as_ref(),
-        Some(&health),
-        served,
-        contract,
-    )
-    .await?;
-    contract
+/// The adapter `served`, asked under `key` on the loopback interface, once it says its
+/// upstream answers; or why it did not.
+async fn ready(
+    ctx: &Ctx,
+    adapter: &Placed,
+    served: &Served,
+    key: String,
+) -> Result<Contracted, String> {
+    let base = served
+        .contract
+        .or(served.port)
         .map(|port| format!("http://{LOOPBACK}:{port}"))
         .ok_or_else(|| {
             format!(
                 "{} publishes no port, so nothing can ask it",
                 adapter.called()
             )
-        })
+        })?;
+    let asked = Contracted::new(ctx.seams.http.clone(), base, &adapter.service, key);
+    super::recording::answering(ctx.seams.serving.as_ref(), &asked, served, None).await?;
+    Ok(asked)
 }
 
 #[cfg(test)]

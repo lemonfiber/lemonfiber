@@ -102,12 +102,13 @@ fn engine() -> Serves {
 }
 
 fn fetching(watching: Vec<Answer>, watch: Answer) -> Arc<Fake> {
+    settling(vec![Answer::reply(200, "true")], watching, watch)
+}
+
+fn settling(ready: Vec<Answer>, watching: Vec<Answer>, watch: Answer) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         ("/health", vec![Answer::reply(200, "ok")]),
-        (
-            "/lemonfiber/adapter/v1/ready",
-            vec![Answer::reply(200, "{}")],
-        ),
+        ("/lemonfiber/adapter/v1/ready", ready),
         (
             "/System/Info/Public",
             vec![Answer::served(
@@ -323,21 +324,77 @@ async fn an_adapter_that_cannot_be_started_leaves_every_case_unrecorded_and_its_
 }
 
 #[tokio::test(start_paused = true)]
-async fn an_adapter_never_ready_fails_at_its_health_and_both_are_removed() {
+async fn an_adapter_saying_its_upstream_does_not_answer_fails_at_its_health_and_both_are_removed() {
     let at = source("fronted-unready", FRONTED);
     let serving = engine();
     let http = Fake::by_path(vec![
         ("/health", Answer::reply(200, "ok")),
-        ("/ready", Answer::reply(503, "starting")),
+        ("/ready", Answer::reply(200, "false")),
     ]);
     let read = recorded(&at, &serving, &http, Some(7)).await;
     assert_eq!(
         failed_at(&read),
         vec![(
             "adapter's health".to_owned(),
-            "its health did not pass within 2 seconds".to_owned()
+            "it did not say its upstream answers within 2 seconds".to_owned()
         )]
     );
+    assert!(http
+        .requests()
+        .iter()
+        .filter(|request| request.url.ends_with("/lemonfiber/adapter/v1/ready"))
+        .all(|request| request
+            .headers
+            .iter()
+            .any(|(name, value)| name == "Authorization" && value.starts_with("Bearer "))));
+    assert_eq!(serving.removed().len(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_adapter_is_asked_nothing_until_it_says_its_upstream_answers() {
+    let at = source("fronted-settling", FRONTED);
+    let http = settling(
+        vec![Answer::reply(200, "false"), Answer::reply(200, "true")],
+        vec![Answer::served(200, "application/json", "[]")],
+        Answer::served(200, "application/json", "null"),
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+    assert_eq!(failed_at(&read), Vec::new());
+    let asked: Vec<String> = http
+        .requests()
+        .into_iter()
+        .map(|request| request.url)
+        .filter(|url| url.contains(":49154/"))
+        .collect();
+    let waited = asked
+        .iter()
+        .take_while(|url| url.ends_with("/lemonfiber/adapter/v1/ready"))
+        .count();
+    assert_eq!(waited, 2, "{asked:?}");
+    assert!(asked.len() > waited, "{asked:?}");
+    let presented = format!("Bearer {MINTED}");
+    let readies = posted(&http, "/lemonfiber/adapter/v1/ready");
+    let keys: Vec<Option<&str>> = readies.iter().map(bearer).collect();
+    assert_eq!(keys, vec![Some(presented.as_str()); 2]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_adapter_refusing_its_key_fails_at_its_health_without_waiting_out_its_limit() {
+    let at = source("fronted-unkeyed", FRONTED);
+    let serving = engine();
+    let http = Fake::by_path(vec![
+        ("/health", Answer::reply(200, "ok")),
+        ("/ready", Answer::reply(401, "")),
+    ]);
+    let started = tokio::time::Instant::now();
+    let read = recorded(&at, &serving, &http, Some(7)).await;
+    let failed = failed_at(&read);
+    assert!(
+        matches!(failed.as_slice(), [(step, why)]
+            if step == "adapter's health" && why.ends_with("rejected the credential")),
+        "{failed:?}"
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(2));
     assert_eq!(serving.removed().len(), 2);
 }
 
@@ -364,7 +421,7 @@ async fn an_adapter_or_upstream_publishing_no_port_cannot_be_asked() {
         "",
     );
     let _ = std::fs::write(at.join("plugin.toml"), &health);
-    let http = Fake::always(Answer::reply(200, "{}"));
+    let http = Fake::always(Answer::reply(200, "true"));
     let read = recorded(&at, &serving, &http, Some(7)).await;
     assert_eq!(
         failed_at(&read),
@@ -461,7 +518,7 @@ async fn an_upstream_request_never_answered_fails_at_it_and_asks_the_adapter_not
         ("/health", vec![Answer::reply(200, "ok")]),
         (
             "/lemonfiber/adapter/v1/ready",
-            vec![Answer::reply(200, "{}")],
+            vec![Answer::reply(200, "true")],
         ),
     ]);
     let read = recorded(&at, &engine(), &http, Some(7)).await;

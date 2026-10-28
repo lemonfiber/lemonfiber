@@ -10,17 +10,17 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use lemonfiber_contract::adapter::{ready_path, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
+use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::container::Secret;
-use lemonfiber_plugin::{Health, HealthKind};
+use lemonfiber_plugin::Health;
 use serde_json::Value;
 
 use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
-use super::served::{allowed, healthy, healthy_at, started, LOG_LINES, POLL};
+use super::served::{allowed, answering, healthy, started, LOG_LINES, POLL};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
@@ -198,6 +198,8 @@ struct Reached {
     base: String,
     /// A transport to it.
     adapter: Arc<dyn Http>,
+    /// It, asked over its contracts under the plugin's key.
+    asked: Contracted,
     /// A transport to the upstream, addressed as the stack addresses it.
     upstream: Arc<dyn Http>,
 }
@@ -293,16 +295,17 @@ impl Asking<'_> {
         declared: &lemonfiber_ports::service::Declared,
     ) -> Result<(), String> {
         use crate::ports::service::Guarding;
-        let guard = lemonfiber_contract::capabilities::stream::guard::Adapter(Contracted::new(
-            Arc::clone(&reached.adapter),
-            &reached.base,
-            &self.adapter.placed.service,
-            self.key,
-        ));
+        let guard =
+            lemonfiber_contract::capabilities::stream::guard::Adapter(reached.asked.clone());
         guard
             .guard(&enveloping::guarded(declared.clone()))
             .await
             .map_err(|failure| failure.to_string())
+    }
+
+    /// The adapter at `base` through `http`, asked over its contracts under the plugin's key.
+    fn contracted(&self, http: Arc<dyn Http>, base: &str) -> Contracted {
+        Contracted::new(http, base, &self.adapter.placed.service, self.key)
     }
 
     /// The upstream healthy and the adapter ready, and where each is asked; or the step
@@ -317,36 +320,25 @@ impl Asking<'_> {
         healthy(serving, upstream.as_ref(), self.health, self.served)
             .await
             .map_err(|why| ("health", why))?;
-        let ready = Health {
-            kind: HealthKind::Http,
-            path: Some(ready_path()),
-            timeout_s: self
-                .adapter
-                .service
-                .health
-                .as_ref()
-                .and_then(|health| health.timeout_s),
-        };
         let adapter = (self.recorder.transport)();
-        let contract = self.fronting.contract.or(self.fronting.port);
-        healthy_at(
-            serving,
-            adapter.as_ref(),
-            Some(&ready),
-            self.fronting,
-            contract,
-        )
-        .await
-        .map_err(|why| ("adapter's health", why))?;
-        let base = contract
+        let base = self
+            .fronting
+            .contract
+            .or(self.fronting.port)
             .map(|port| format!("http://{LOOPBACK}:{port}"))
             .ok_or((
                 "adapter's health",
                 "it publishes no port, so nothing can ask it".to_owned(),
             ))?;
+        let asked = self.contracted(Arc::clone(&adapter), &base);
+        let health = self.adapter.service.health.as_ref();
+        answering(serving, &asked, self.fronting, health)
+            .await
+            .map_err(|why| ("adapter's health", why))?;
         Ok(Reached {
             base,
             adapter,
+            asked,
             upstream,
         })
     }
@@ -473,12 +465,9 @@ impl Asking<'_> {
         reached: &Reached,
     ) -> Result<(String, BTreeMap<String, Response>), String> {
         let tapped = Arc::new(Tapped::through(Arc::clone(&reached.adapter)));
-        let source = lemonfiber_contract::capabilities::identity::source::Adapter(Contracted::new(
-            Arc::clone(&tapped) as Arc<dyn Http>,
-            &reached.base,
-            &self.adapter.placed.service,
-            self.key,
-        ));
+        let source = lemonfiber_contract::capabilities::identity::source::Adapter(
+            self.contracted(Arc::clone(&tapped) as Arc<dyn Http>, &reached.base),
+        );
         let keep = |password: &str| {
             filling::handed_over(
                 self.held,

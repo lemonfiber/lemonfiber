@@ -61,7 +61,7 @@ async fn a_speaker_fronting_nothing_is_its_own_upstream_enveloped_before_its_pro
         ("/health", vec![Answer::reply(200, "ok")]),
         (
             "/lemonfiber/adapter/v1/ready",
-            vec![Answer::reply(200, "{}")],
+            vec![Answer::reply(200, "true")],
         ),
         (
             "/Videos/unknown/stream",
@@ -157,7 +157,7 @@ async fn a_guard_refusing_its_envelope_or_without_its_stand_ins_records_nothing(
         ("/health", vec![Answer::reply(200, "ok")]),
         (
             "/lemonfiber/adapter/v1/ready",
-            vec![Answer::reply(200, "{}")],
+            vec![Answer::reply(200, "true")],
         ),
         (
             "/guard",
@@ -247,7 +247,7 @@ async fn the_fingerprint_of_the_certificate_a_run_made_is_scrubbed_so_a_rerun_re
         let serving = Arc::new(Serves::on(49153).contracted(49155));
         let fake = Fake::by_path(vec![
             ("/health", Answer::reply(200, "ok")),
-            ("/lemonfiber/adapter/v1/ready", Answer::reply(200, "{}")),
+            ("/lemonfiber/adapter/v1/ready", Answer::reply(200, "true")),
             (
                 "/Videos/unknown/stream",
                 Answer::served(403, "application/json", "{\"error\": \"refused\"}"),

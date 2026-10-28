@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::owner::claim;
-use lemonfiber_contract::Contracted;
 
 use super::super::served::{allowed, POLL};
 use super::{Asking, Reached, Tapped};
@@ -27,12 +26,8 @@ impl Asking<'_> {
         reached: &Reached,
     ) -> Result<BTreeMap<String, Response>, String> {
         let tapped = Arc::new(Tapped::through(Arc::clone(&reached.adapter)));
-        let part = claim::Adapter(Contracted::new(
-            Arc::clone(&tapped) as Arc<dyn Http>,
-            &reached.base,
-            &self.adapter.placed.service,
-            self.key,
-        ));
+        let part =
+            claim::Adapter(self.contracted(Arc::clone(&tapped) as Arc<dyn Http>, &reached.base));
         let until = tokio::time::Instant::now() + allowed(self.health);
         let mut settling = false;
         loop {
