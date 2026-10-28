@@ -159,6 +159,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `ENV-3` | `COMPOSE_UNUSABLE` | error | 1 | 500 | 0.1.0 | Raised when the Compose plugin is missing or too old to drive. |
 | `ENV-4` | `ENGINE_NOT_AT_BOOT` | warning | 1 | 500 | 0.15.0 | Raised when the container engine is confirmed not to start with this machine. One code for both arrangements it can be. What is not set differs by platform — Docker Desktop's open-at-login setting on macOS and Windows, the daemon's own unit on native Linux — and what has gone wrong is the same thing either way: nothing brings the engine up, so nothing reads the restart policies that would bring the containers back. |
 | `ENV-5` | `API_MISMATCH` | warning | 1 | 500 | 0.15.0 | Raised when this machine and the daemon speak different Docker API generations. |
+| `ENV-6` | `NETWORKS_MIRRORED` | warning | 1 | 500 | 0.18.0 | Raised when the stack's engine is `OrbStack` with its network bridge on. |
 
 ## `FORM` — choosing what to run
 

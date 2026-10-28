@@ -296,6 +296,10 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let manifest = &stack.manifest;
     let environment =
         EnvironmentCheck::reaching(ctx.seams.runner.clone(), ctx.settings.docker.clone());
+    let bridging = crate::doctor::bridging::BridgingCheck::new(
+        ctx.seams.runner.clone(),
+        ctx.settings.docker.clone(),
+    );
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let storage = deferring::stored(ctx, manifest, project.as_deref());
     let vpn = deferring::tunnel(ctx, manifest, project.as_deref(), disruptive);
@@ -376,6 +380,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     .beside(crate::app::project::directory(ctx));
     let mut checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
+        Box::new(bridging),
         Box::new(autostart),
         Box::new(bindings),
         Box::new(storage),

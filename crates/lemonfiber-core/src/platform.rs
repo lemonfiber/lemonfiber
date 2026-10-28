@@ -22,6 +22,12 @@ const DESKTOP_CONTEXT: &str = "desktop-linux";
 /// Where under a home directory Docker Desktop's own socket lives on Linux.
 const DESKTOP_SOCKET: &str = "/.docker/desktop/";
 
+/// The name `OrbStack` gives the context it installs.
+const ORBSTACK_CONTEXT: &str = "orbstack";
+
+/// Where under a home directory `OrbStack`'s own socket lives.
+const ORBSTACK_SOCKET: &str = "/.orbstack/";
+
 /// The operating system this build targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -118,6 +124,16 @@ impl Environment {
     pub fn engine_is_desktop(target: &Target) -> bool {
         let named = matches!(&target.origin, Origin::Context(name) if name == DESKTOP_CONTEXT);
         let socket = matches!(&target.reach, Reach::Socket(path) if path.contains(DESKTOP_SOCKET));
+        named || socket
+    }
+
+    /// Whether the engine a run is pointed at is `OrbStack`'s, read off where the engine was
+    /// found as [`Self::engine_is_desktop`] reads Docker Desktop: the context `OrbStack`
+    /// installs, named `orbstack`, or a socket under `~/.orbstack/`.
+    #[must_use]
+    pub fn engine_is_orbstack(target: &Target) -> bool {
+        let named = matches!(&target.origin, Origin::Context(name) if name == ORBSTACK_CONTEXT);
+        let socket = matches!(&target.reach, Reach::Socket(path) if path.contains(ORBSTACK_SOCKET));
         named || socket
     }
 

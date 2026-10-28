@@ -18,6 +18,7 @@ pub mod acknowledged;
 mod asking;
 pub mod autostart;
 pub mod bindings;
+pub mod bridging;
 mod bundled;
 pub mod contributed;
 pub mod credentials;

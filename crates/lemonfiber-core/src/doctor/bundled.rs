@@ -38,6 +38,7 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "environment.autostart",
     "environment.compose",
     "environment.engine",
+    "environment.network-bridge",
     "network.bindings",
     "providers.indexer.",
     "providers.indexers",

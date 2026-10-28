@@ -158,3 +158,36 @@ fn docker_desktop_is_told_apart_by_where_its_engine_was_found() {
         Environment::LinuxNative
     );
 }
+
+/// `OrbStack` is told apart by the context it installs and the socket it listens on.
+#[test]
+fn orbstack_is_told_apart_by_where_its_engine_was_found() {
+    use crate::ports::docker::{Origin, Target};
+
+    let orbstack = [
+        Target::at(
+            "unix:///Users/ana/.orbstack/run/docker.sock",
+            Origin::Context("orbstack".to_owned()),
+        ),
+        Target::socket("/Users/ana/.orbstack/run/docker.sock"),
+        Target {
+            origin: Origin::Context("orbstack".to_owned()),
+            ..Target::local()
+        },
+    ];
+    for one in &orbstack {
+        assert!(Environment::engine_is_orbstack(one), "{one:?}");
+    }
+    let other = [
+        Target::local(),
+        Target::socket("/var/run/docker.sock"),
+        Target::socket("/Users/ana/.docker/run/docker.sock"),
+        Target::at(
+            "unix:///Users/ana/.docker/run/docker.sock",
+            Origin::Context("desktop-linux".to_owned()),
+        ),
+    ];
+    for one in &other {
+        assert!(!Environment::engine_is_orbstack(one), "{one:?}");
+    }
+}
