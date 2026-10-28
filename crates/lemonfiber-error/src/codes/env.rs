@@ -63,7 +63,7 @@ codes! {
         severity: Warning,
         status: 500,
         since: "0.18.0",
-        meaning: "OrbStack mirrors every container network into macOS while its network bridge \
+        meaning: "OrbStack mirrors every container network into the Mac while its network bridge \
             is on. The stack gives every link between two services a network of its own, and \
             with that many networks mirrored each container start can take tens of seconds. \
             lemonfiber reaches every service through a published port, never through a \

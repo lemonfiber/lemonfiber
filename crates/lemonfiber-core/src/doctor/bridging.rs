@@ -92,12 +92,12 @@ fn bridged(shown: &str) -> Option<bool> {
 fn verdict(bridged: Option<bool>) -> Verdict {
     match bridged {
         Some(false) => Verdict::Pass {
-            note: Some("OrbStack does not mirror the stack's networks into macOS".to_owned()),
+            note: Some("OrbStack does not mirror the stack's networks into the Mac".to_owned()),
         },
         Some(true) => Verdict::Warn(
             Problem::new(
                 NETWORKS_MIRRORED,
-                "OrbStack mirrors every container network into macOS",
+                "OrbStack mirrors every container network into the Mac",
                 "The stack gives every link between two services a network of its own, and \
                  with each of them mirrored a container start can take tens of seconds. \
                  lemonfiber reaches every service through a published port, so nothing of the \
