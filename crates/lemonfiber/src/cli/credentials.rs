@@ -25,6 +25,10 @@ pub struct RawCredentials {
     /// Yes, print it in the clear — having read what that costs.
     #[arg(long, requires = "reveal")]
     pub confirm: bool,
+    /// The offer a reading of a replacement named, which is the yes to it. Replacing the
+    /// media server's internal certificate is read first and answered with its offer.
+    #[arg(long, value_name = "OFFER", requires = "rotate")]
+    pub offer: Option<String>,
     /// End a grant of another service's credential to a third-party plugin.
     #[command(subcommand)]
     pub grant: Option<Granting>,

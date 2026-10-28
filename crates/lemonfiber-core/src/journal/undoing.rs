@@ -130,6 +130,9 @@ impl Change {
                 given,
             } => Action::regrant(plugin, grant, !given),
             Kind::Overlaid { path, .. } => Action::Leave { path: path.clone() },
+            Kind::Certified { service, .. } => Action::Unreplaced {
+                service: service.clone(),
+            },
         }
     }
 }

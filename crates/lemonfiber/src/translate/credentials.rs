@@ -29,7 +29,10 @@ pub(crate) fn credentials(asked: RawCredentials) -> Command {
             credential,
             confirmed: asked.confirm,
         },
-        (None, Some(credential)) => Asking::Rotate { credential },
+        (None, Some(credential)) => Asking::Rotate {
+            credential,
+            agreement: asked.offer,
+        },
         (None, None) => Asking::Read,
     })
 }

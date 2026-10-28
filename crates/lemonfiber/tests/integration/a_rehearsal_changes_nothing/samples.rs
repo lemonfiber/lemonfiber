@@ -186,6 +186,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             "credentials",
             Command::Credentials(Asking::Rotate {
                 credential: "qbittorrent".to_owned(),
+                agreement: None,
             }),
         ),
         ("stored", Command::Stored),

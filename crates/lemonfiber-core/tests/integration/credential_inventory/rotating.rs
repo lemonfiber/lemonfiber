@@ -22,6 +22,7 @@ async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_say
         &ctx,
         Asking::Rotate {
             credential: "Indexer API key".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -46,6 +47,7 @@ async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
         &ctx,
         Asking::Rotate {
             credential: "the wifi password".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -150,6 +152,7 @@ async fn administrator_rotated(
         &ctx,
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -238,6 +241,7 @@ async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_i
             &moved(env.clone(), http),
             Asking::Rotate {
                 credential: "media server administrator".to_owned(),
+                agreement: None,
             },
         )
         .await;
@@ -275,6 +279,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
         &moved(env, http.clone()),
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -290,6 +295,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
         &moved(env.clone(), http.clone()).with_random(Arc::new(FixedRandom(None))),
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -346,6 +352,7 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
         &moved(env.clone(), http),
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -373,6 +380,7 @@ async fn rotated_over(
         &moved(env.to_path_buf(), http.clone()),
         Asking::Rotate {
             credential: credential.to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -409,6 +417,7 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
         &ctx,
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
+            agreement: None,
         },
     )
     .await;

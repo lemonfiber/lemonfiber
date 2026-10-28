@@ -272,6 +272,17 @@ pub enum Kind {
         /// Whether it was given, rather than ended.
         given: bool,
     },
+    /// The certificate the media server presents at its internal TLS port was replaced,
+    /// recorded by the SHA-256 of each. Nothing undoes it: putting the old one back is a
+    /// replacement of its own, handed to every holder of a media server credential first.
+    Certified {
+        /// The media server's service.
+        service: String,
+        /// The SHA-256 of the certificate it replaced, where there was one.
+        previous: Option<String>,
+        /// The SHA-256 of the certificate in force now.
+        current: String,
+    },
     /// The operator's overlay was written, changed or taken away, recorded by the
     /// fingerprint of what it held. Nothing undoes it: the file is the operator's.
     Overlaid {
@@ -469,6 +480,14 @@ pub enum Action {
         kept: Option<String>,
         /// The environment file's setting it goes back to, where it was moved out of one.
         filed: Option<String>,
+    },
+    /// Leave the media server's internal certificate as it is.
+    ///
+    /// Worked out so the record of a replacement has a reversal to name, and never carried
+    /// out: the certificate is put back only by replacing it again.
+    Unreplaced {
+        /// The media server's service.
+        service: String,
     },
     /// Leave the operator's overlay as it is.
     ///

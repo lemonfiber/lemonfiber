@@ -177,6 +177,7 @@ async fn rotated(ctx: &lemonfiber_core::app::Ctx) -> Inventory {
         ctx,
         Asking::Rotate {
             credential: MINTED.to_owned(),
+            agreement: None,
         },
     )
     .await

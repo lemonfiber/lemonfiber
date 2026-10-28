@@ -249,3 +249,14 @@ fn a_link_planted_at_any_step_to_the_certificate_is_never_followed() {
         made.ok().map(|made| made.fingerprint)
     );
 }
+
+#[test]
+fn a_certificate_naming_nothing_or_not_one_at_all_is_made_out_to_nobody() {
+    assert!(super::named(b"not a certificate").is_empty());
+    let unnamed = rcgen::CertificateParams::new(Vec::<String>::new())
+        .ok()
+        .zip(rcgen::KeyPair::generate().ok())
+        .and_then(|(params, key)| params.self_signed(&key).ok())
+        .map(|certificate| certificate.der().to_vec());
+    assert!(unnamed.is_some_and(|der| super::named(&der).is_empty()));
+}

@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "offer": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "settled": {
       "type": [
         "ref:Settled"

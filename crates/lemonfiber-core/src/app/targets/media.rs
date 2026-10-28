@@ -228,6 +228,15 @@ impl MediaServer {
             Spoken::Unanswered | Spoken::Not => None,
         }
     }
+
+    /// Whether the adapter in front of the media server says its upstream answers; not
+    /// where it cannot be asked over its contract.
+    pub(crate) async fn ready(&self, ctx: &Ctx) -> bool {
+        match Box::pin(spoken(ctx, &self.filler, serve::CAPABILITY, serve::MAJOR)).await {
+            Spoken::Over(adapter) => adapter.ready().await.unwrap_or(false),
+            Spoken::Unanswered | Spoken::Not => false,
+        }
+    }
 }
 
 /// Where the upstream the adapter `filler` fronts answers the services beside it, in the

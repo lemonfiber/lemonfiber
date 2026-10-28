@@ -192,6 +192,13 @@ fn rotation(rotated: &Rotation) -> Lines {
     if let Settled::Rehearsed { afterwards, .. } = &rotated.settled {
         owed(&mut lines, afterwards);
     }
+    if let (Settled::Rehearsed { .. }, Some(offer)) = (&rotated.settled, &rotated.offer) {
+        lines.spaced(
+            "Nothing was replaced. To replace it, run the same command again without \
+             --dry-run, answering this offer by name:",
+        );
+        lines.put(format!("  --offer {}", plain(offer)));
+    }
     if rotated.consumers.is_empty() {
         return lines;
     }

@@ -28,4 +28,15 @@ codes! {
             or quota limit that lifts on its own. The key is not wrong.",
         remedy: "Leave it a while and check again.",
     }
+    /// Raised where a replacement of the media server's internal certificate answers an
+    /// offer that is not the one a fresh reading builds.
+    REPLACEMENT_MOVED = "CRED-4" {
+        severity: Warning,
+        status: 400,
+        since: "0.18.0",
+        meaning: "What was agreed to is not what replacing the certificate would do now: the \
+            certificate in force, who is handed the new one, or the media server has changed \
+            since it was read, so nothing was replaced.",
+        remedy: "Read the replacement again, and answer the offer it gives now.",
+    }
 }

@@ -184,6 +184,7 @@ fn a_credentials_command_with_no_flags_is_the_reading() {
             reveal: None,
             rotate: None,
             confirm: false,
+            offer: None,
             grant: None,
         }),
         Command::Credentials(Asking::Read)
@@ -203,6 +204,7 @@ fn a_reveal_carries_the_name_and_whether_it_was_confirmed() {
             reveal: Some("Indexer API key".to_owned()),
             rotate: None,
             confirm: true,
+            offer: None,
             grant: None,
         }),
         Command::Credentials(Asking::Reveal {
@@ -218,6 +220,7 @@ fn a_reveal_carries_the_name_and_whether_it_was_confirmed() {
             reveal: Some("Indexer API key".to_owned()),
             rotate: Some("Sonarr API key".to_owned()),
             confirm: false,
+            offer: None,
             grant: None,
         }),
         Command::Credentials(Asking::Reveal {
@@ -228,16 +231,31 @@ fn a_reveal_carries_the_name_and_whether_it_was_confirmed() {
 }
 
 #[test]
-fn a_rotation_carries_the_name_and_nothing_else() {
+fn a_rotation_carries_the_name_and_the_offer_it_answers() {
     assert_eq!(
         credentials(RawCredentials {
             reveal: None,
             rotate: Some("Indexer API key".to_owned()),
             confirm: false,
+            offer: None,
             grant: None,
         }),
         Command::Credentials(Asking::Rotate {
             credential: "Indexer API key".to_owned(),
+            agreement: None,
+        })
+    );
+    assert_eq!(
+        credentials(RawCredentials {
+            reveal: None,
+            rotate: Some("internal-certificate".to_owned()),
+            confirm: false,
+            offer: Some("1a2b3c4d".to_owned()),
+            grant: None,
+        }),
+        Command::Credentials(Asking::Rotate {
+            credential: "internal-certificate".to_owned(),
+            agreement: Some("1a2b3c4d".to_owned()),
         })
     );
 }
@@ -249,6 +267,7 @@ fn a_revoke_carries_the_plugin_the_credential_and_the_offer_it_answers() {
             reveal: None,
             rotate: None,
             confirm: false,
+            offer: None,
             grant: Some(lemonfiber::cli::Granting::Revoke {
                 plugin: "comics".to_owned(),
                 credential: "SONARR_API_KEY".to_owned(),

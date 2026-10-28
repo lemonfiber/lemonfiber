@@ -726,3 +726,5 @@ async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
 mod refusing;
 
 mod pinning;
+
+mod rotating;

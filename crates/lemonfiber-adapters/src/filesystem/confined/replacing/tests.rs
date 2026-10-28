@@ -177,3 +177,41 @@ fn a_directory_of_somebody_elses_on_the_way_is_refused_for_a_file_of_the_owners(
     );
     assert!(!std::path::Path::new("/usr/lemonfiber-never-made").exists());
 }
+
+#[test]
+fn a_file_is_taken_away_and_one_not_there_is_nothing_to_take() {
+    let (_dir, owned, _) = owned();
+    let path = owned.join("lemonfiber").join("internal.previous.p12");
+    assert!(Disk
+        .replaced(&path, &owned, b"old", Readable::Owner)
+        .is_ok());
+
+    assert!(Disk.removed(&path, &owned).is_ok());
+    assert!(!path.exists());
+    assert!(Disk.removed(&path, &owned).is_ok());
+    assert!(Disk
+        .removed(&owned.join("absent").join("internal.p12"), &owned)
+        .is_ok());
+    assert!(Disk.removed(&owned, &owned).is_err());
+    assert!(Disk.removed(&owned.join("lemonfiber"), &owned).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_on_the_way_to_a_file_taken_away_is_refused_and_one_at_its_name_is_what_goes() {
+    use std::os::unix::fs::symlink;
+    let (_dir, owned, operator) = owned();
+    let _ = symlink(&operator, owned.join("lemonfiber"));
+    assert!(Disk
+        .removed(&owned.join("lemonfiber").join("secret"), &owned)
+        .is_err());
+    assert!(operator.join("secret").exists());
+
+    let _ = std::fs::remove_file(owned.join("lemonfiber"));
+    let _ = std::fs::create_dir_all(owned.join("lemonfiber"));
+    let named = owned.join("lemonfiber").join("internal.p12");
+    let _ = symlink(operator.join("secret"), &named);
+    assert!(Disk.removed(&named, &owned).is_ok());
+    assert!(operator.join("secret").exists());
+    assert!(std::fs::symlink_metadata(&named).is_err());
+}

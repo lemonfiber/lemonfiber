@@ -102,6 +102,7 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
     };
     let rotated = match asked(lemonfiber_core::app::Asking::Rotate {
         credential: "Request gate token for Sonarr".to_owned(),
+        agreement: None,
     })
     .await
     {

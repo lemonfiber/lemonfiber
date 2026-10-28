@@ -203,6 +203,8 @@ fn a_keyed_disk_holds_the_adapters_key_and_reads_every_other_file_as_the_disk_do
         keyed.bytes(&replaced, &directory),
         Ok(Some(b"whole".to_vec()))
     );
+    assert_eq!(keyed.removed(&replaced, &directory), Ok(()));
+    assert_eq!(keyed.bytes(&replaced, &directory), Ok(None));
 }
 
 #[test]

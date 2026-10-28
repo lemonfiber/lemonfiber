@@ -171,6 +171,9 @@ fn did(kind: &Kind) -> String {
             ..
         } => format!("saw the overlay {path} taken away"),
         Kind::Overlaid { path, .. } => format!("saw the overlay {path} change"),
+        Kind::Certified { service, .. } => {
+            format!("replaced the internal certificate of {service}")
+        }
     }
 }
 

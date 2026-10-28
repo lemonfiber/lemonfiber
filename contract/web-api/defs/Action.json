@@ -444,6 +444,24 @@
       ]
     },
     {
+      "description": "Leave the media server's internal certificate as it is.\n\nWorked out so the record of a replacement has a reversal to name, and never carried\nout: the certificate is put back only by replacing it again.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "unreplaced"
+        },
+        "service": {
+          "description": "The media server's service.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "service"
+      ]
+    },
+    {
       "description": "Leave the operator's overlay as it is.\n\nWorked out so the record of a change to it has a reversal to name, and never\ncarried out: lemonfiber does not write the operator's own file.",
       "type": "object",
       "properties": {

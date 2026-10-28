@@ -15,7 +15,7 @@ use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 
 /// What the report calls this connection.
-fn connection(server: &MediaServer) -> String {
+pub(super) fn connection(server: &MediaServer) -> String {
     format!(
         "{} serving its internal encrypted port with the certificate lemonfiber made for it",
         server.name()
@@ -23,35 +23,50 @@ fn connection(server: &MediaServer) -> String {
 }
 
 /// Make the media server's internal certificate before the stack starts, where the stack
-/// has a media server and has been written to disk.
+/// has a media server and has been written to disk, and begin replacing the one kept
+/// where it is not made out to the service the media server runs as: the seed hands every
+/// holder the replacement beside it, then serves it.
 pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) {
     let Some(server) = crate::app::targets::hosted(ctx, manifest) else {
         return;
     };
-    if let Some(config) = server.served.confined_to.as_deref() {
-        let _ = internal::kept_or_made(ctx.seams.confined.as_ref(), config, &server.served.id);
+    let Some(config) = server.served.confined_to.as_deref() else {
+        return;
+    };
+    let confined = ctx.seams.confined.as_ref();
+    let service = &server.served.id;
+    if let Ok(kept) = internal::kept_or_made(confined, config, service) {
+        if !kept.made_out_to(service) {
+            let _ = internal::staged(confined, config, service);
+        }
     }
 }
 
-/// The pins every holder of a credential of `server` is handed: the certificate kept for
-/// its internal TLS port. None where none is kept, which reaches nothing.
-pub(crate) fn pins(ctx: &Ctx, server: &MediaServer) -> Vec<String> {
-    server
-        .served
-        .confined_to
-        .as_deref()
-        .and_then(|config| {
-            internal::kept(ctx.seams.confined.as_ref(), config)
-                .ok()
-                .flatten()
+/// The pins every holder of a credential of `server` is handed: every certificate kept for
+/// its internal TLS port, the one in force and any replacing it or replaced by it. None
+/// where none is kept, which reaches nothing.
+///
+/// # Errors
+///
+/// Where one that is kept cannot be read, so no holder is handed fewer than it holds.
+pub(crate) fn pins(ctx: &Ctx, server: &MediaServer) -> Result<Vec<String>, String> {
+    let Some(config) = server.served.confined_to.as_deref() else {
+        return Ok(Vec::new());
+    };
+    internal::replacing(ctx.seams.confined.as_ref(), config)
+        .map(|kept| kept.pins())
+        .map_err(|unkept| {
+            format!(
+                "the certificates kept for {} could not be read, so every holder keeps what it \
+                 holds: {unkept}",
+                server.name()
+            )
         })
-        .map(|kept| vec![kept.fingerprint])
-        .unwrap_or_default()
 }
 
 /// Where the media server's container holds its internal certificate, where the server
 /// is a plugin's service whose manifest says where its configuration is mounted.
-fn inside(server: &MediaServer) -> Option<String> {
+pub(super) fn inside(server: &MediaServer) -> Option<String> {
     server.served.config_at.as_deref().map(|config| {
         Path::new(config)
             .join(internal::INTERNAL)
@@ -104,8 +119,9 @@ fn in_force(ctx: &Ctx, server: &MediaServer) -> Result<String, String> {
 }
 
 /// What telling `client` to serve the certificate at `path` with the SHA-256 `pin` comes to,
-/// waiting until it answers again where it had to start again.
-async fn served(
+/// asking the media server nothing else until it says it is ready again where it had to
+/// start again.
+pub(super) async fn served(
     ctx: &Ctx,
     server: &MediaServer,
     client: &dyn serve::Fills,
@@ -116,7 +132,7 @@ async fn served(
         Ok(Applied::OnRestart) => match restarted(ctx, server).await {
             Ok(()) => {
                 let _ = crate::patience::RESTART
-                    .until(|| client.declared(), Result::is_ok)
+                    .until(|| server.ready(ctx), |ready| *ready)
                     .await;
                 State::Wired
             }

@@ -21,6 +21,7 @@
     "household-approve": "actions/household-approve.json",
     "household-decline": "actions/household-decline.json",
     "household-handoff": "actions/household-handoff.json",
+    "internal-certificate-replace": "actions/internal-certificate-replace.json",
     "invite": "actions/invite.json",
     "migrate-adopt": "actions/migrate-adopt.json",
     "migrate-beside": "actions/migrate-beside.json",

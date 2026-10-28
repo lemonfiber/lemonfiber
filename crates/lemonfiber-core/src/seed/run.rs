@@ -39,6 +39,7 @@ mod minted;
 pub(crate) mod owning;
 mod published;
 mod quality;
+pub(crate) mod replacing;
 mod showing;
 mod subtitles;
 mod taken_back;
@@ -424,6 +425,15 @@ async fn seed_media_server(
         ))
         .await,
     );
+
+    // A replacement of the media server's internal certificate taken as far as the holders
+    // handed its SHA-256 just above let it go.
+    let stack = replacing::Stack {
+        services,
+        fillers,
+        project,
+    };
+    wirings.extend(Box::pin(replacing::advanced(ctx, stack, server)).await);
 
     // The second half: the request service pointed at the media server, through the
     // gate where the stack runs one, whose routes the step above wrote.

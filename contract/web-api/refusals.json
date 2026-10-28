@@ -124,6 +124,11 @@
     "status": 404,
     "description": "Raised when a name does not name one of the bundles this run kept."
   },
+  "CRED-4": {
+    "name": "REPLACEMENT_MOVED",
+    "status": 400,
+    "description": "Raised where a replacement of the media server's internal certificate answers an offer that is not the one a fresh reading builds."
+  },
   "DEVICE-1": {
     "name": "NOT_A_DEVICE_NAME",
     "status": 400,

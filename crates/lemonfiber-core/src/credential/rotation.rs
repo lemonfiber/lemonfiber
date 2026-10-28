@@ -181,6 +181,9 @@ pub struct Rotation {
     pub settled: Settled,
     /// Every consumer, and how far the rotation reached it.
     pub consumers: Vec<Propagation>,
+    /// The offer a replacement that takes one answers, where this reading named one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offer: Option<String>,
 }
 
 impl Rotation {
@@ -192,6 +195,7 @@ impl Rotation {
             credential: credential.to_owned(),
             settled,
             consumers: Vec::new(),
+            offer: None,
         }
     }
 
@@ -211,6 +215,7 @@ impl Rotation {
                 afterwards,
             },
             consumers: Vec::new(),
+            offer: None,
         }
     }
 
@@ -223,6 +228,16 @@ impl Rotation {
                 observed: observed.to_owned(),
             },
             consumers,
+            offer: None,
+        }
+    }
+
+    /// The same, answering `offer` where it is carried out.
+    #[must_use]
+    pub fn offering(self, offer: &str) -> Self {
+        Self {
+            offer: Some(offer.to_owned()),
+            ..self
         }
     }
 

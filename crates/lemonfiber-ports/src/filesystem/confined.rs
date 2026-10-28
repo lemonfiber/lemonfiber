@@ -100,6 +100,16 @@ pub trait Confined: Send + Sync {
     /// Returns a [`Fault`] where a link, a path leading outside `within`, something that is
     /// not a plain file or a file past the limit is met, or where it cannot be read.
     fn bytes(&self, path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault>;
+
+    /// Take away the file `path`, reached through no link at any step and taken away
+    /// through the handle of the directory it is in, so a link at its name is what is
+    /// taken away rather than what it points at; nothing where it is not there.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where a link, a path leading outside `within` or something that
+    /// is not a directory is met on the way, or where it cannot be taken away.
+    fn removed(&self, path: &Path, within: &Path) -> Result<(), Fault>;
 }
 
 /// Who may read a file written beneath a directory a container can write.
