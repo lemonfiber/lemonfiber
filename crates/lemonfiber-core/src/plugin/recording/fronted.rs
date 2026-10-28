@@ -132,7 +132,7 @@ pub(super) async fn answers(
                 key: &prepared.key,
                 made: &prepared.made,
                 envelope: envelope.as_ref(),
-                certificate: prepared.certificate.as_deref(),
+                certificate: prepared.certificate.as_ref(),
             }
             .asked(items)
             .await
@@ -214,7 +214,7 @@ struct Asking<'a> {
     key: &'a str,
     made: &'a [String],
     envelope: Option<&'a lemonfiber_ports::service::Declared>,
-    certificate: Option<&'a str>,
+    certificate: Option<&'a (String, String)>,
 }
 
 impl Asking<'_> {
@@ -270,7 +270,7 @@ impl Asking<'_> {
             held: self.held,
             answers: BTreeMap::new(),
             made,
-            certificate: self.certificate.map(str::to_owned),
+            certificate: self.certificate.cloned(),
         };
         let mut asked = Vec::new();
         for (spoken, capability) in &contracts {

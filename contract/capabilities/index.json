@@ -747,11 +747,11 @@
         },
         {
           "path": "media.serve/v1/operations/serve_tls.json",
-          "sha256": "64a29bf6c2d0799b52c16f7779a79ab0e4389427d240d5d1f0bf3f031365d00c"
+          "sha256": "e20bc99579de8bdf3575d5f4da87c471304cef5c62943525bde785f15af56577"
         },
         {
           "path": "media.serve/v1/conformance.json",
-          "sha256": "c805f366ab724ffb5c6b4ccbe40290dfaa013ad2b291d1c12e9e88ce2fe03c39"
+          "sha256": "7092df1c85a971af486f3cc37d03a70e28ba074cafaa5767c1752a2e78d8b438"
         }
       ],
       "majors": [

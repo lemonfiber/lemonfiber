@@ -147,8 +147,11 @@ crate::contract! {
             fn declared() -> Declared where asks = Asked {};
         }
         impl Encrypting {
-            /// Serve the internal TLS port with the PKCS#12 at this path inside the upstream's container.
-            fn serve_tls(str path: &str) -> Applied where asks = Asked { path: Placeholder::Certificate.written() };
+            /// Serve the internal TLS port with the PKCS#12 at this path inside the upstream's container, whose certificate has this SHA-256.
+            fn serve_tls(str path: &str, str pin: &str) -> Applied where asks = Asked {
+                path: Placeholder::Certificate.written(),
+                pin: Placeholder::Pinned.written(),
+            };
         }
     }
 }

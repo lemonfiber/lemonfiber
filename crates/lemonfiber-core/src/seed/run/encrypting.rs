@@ -83,13 +83,35 @@ pub(super) async fn seed_internal_tls(ctx: &Ctx, server: Option<&MediaServer>) -
             ours: Some(path),
         });
     }
-    settled(served(ctx, server, client.as_ref(), &path).await)
+    match in_force(ctx, server) {
+        Ok(pin) => settled(served(ctx, server, client.as_ref(), (&path, &pin)).await),
+        Err(detail) => settled(State::Failed { detail }),
+    }
 }
 
-/// What telling `client` to serve the certificate at `path` comes to, waiting until it
-/// answers again where it had to start again.
-async fn served(ctx: &Ctx, server: &MediaServer, client: &dyn serve::Fills, path: &str) -> State {
-    match client.serve_tls(path).await {
+/// The SHA-256 of the certificate kept for `server`, made first where none is; why not
+/// where it has no configuration directory lemonfiber writes, or none could be kept.
+fn in_force(ctx: &Ctx, server: &MediaServer) -> Result<String, String> {
+    let config = server.served.confined_to.as_deref().ok_or_else(|| {
+        format!(
+            "{} has no configuration directory lemonfiber writes its certificate into",
+            server.name()
+        )
+    })?;
+    internal::kept_or_made(ctx.seams.confined.as_ref(), config, &server.served.id)
+        .map(|kept| kept.fingerprint)
+        .map_err(|unkept| unkept.to_string())
+}
+
+/// What telling `client` to serve the certificate at `path` with the SHA-256 `pin` comes to,
+/// waiting until it answers again where it had to start again.
+async fn served(
+    ctx: &Ctx,
+    server: &MediaServer,
+    client: &dyn serve::Fills,
+    (path, pin): (&str, &str),
+) -> State {
+    match client.serve_tls(path, pin).await {
         Ok(Applied::Now) => State::AlreadyWired,
         Ok(Applied::OnRestart) => match restarted(ctx, server).await {
             Ok(()) => {

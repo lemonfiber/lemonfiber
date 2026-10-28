@@ -8,11 +8,13 @@ use super::{Applied, Failure};
 #[async_trait]
 pub trait Encrypting: Send + Sync {
     /// Serve the internal TLS port its declaration names with the PKCS#12 at `path`
-    /// inside its upstream's container, written with an empty password.
+    /// inside its upstream's container, written with an empty password, whose certificate
+    /// has the SHA-256 `pin`: served now only where a handshake to that port already
+    /// presents it.
     ///
     /// # Errors
     ///
     /// Returns [`Failure::Unsupported`] where its upstream serves no internal TLS port,
     /// and [`Failure`] where it is unreachable or refuses.
-    async fn serve_tls(&self, path: &str) -> Result<Applied, Failure>;
+    async fn serve_tls(&self, path: &str, pin: &str) -> Result<Applied, Failure>;
 }

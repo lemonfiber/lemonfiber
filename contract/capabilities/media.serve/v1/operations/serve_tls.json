@@ -12,10 +12,15 @@
               "path": {
                 "description": "The port's `path`.",
                 "type": "string"
+              },
+              "pin": {
+                "description": "The port's `pin`.",
+                "type": "string"
               }
             },
             "required": [
-              "path"
+              "path",
+              "pin"
             ],
             "title": "Asked",
             "type": "object"
