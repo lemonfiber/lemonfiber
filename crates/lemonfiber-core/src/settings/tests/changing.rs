@@ -71,8 +71,8 @@ pub(super) struct Machine {
     pub(super) document: PathBuf,
 }
 
-fn installed() -> Installed {
-    let mut installing: Vec<Installed> = Manifest::from_toml(PLUGIN)
+fn installed(plugin: &str) -> Installed {
+    let mut installing: Vec<Installed> = Manifest::from_toml(plugin)
         .iter()
         .map(Installed::of)
         .collect();
@@ -83,9 +83,14 @@ fn installed() -> Installed {
 }
 
 pub(super) fn machine(name: &str, engine: Reporting) -> Machine {
+    holding(name, engine, PLUGIN)
+}
+
+/// A machine with the plugin `plugin` describes installed, its project written.
+pub(super) fn holding(name: &str, engine: Reporting, plugin: &str) -> Machine {
     let env = env_without_password(&format!("changing-{name}"));
     let stack = env.with_file_name("data").join("stack");
-    let comics = installed();
+    let comics = installed(plugin);
     let mut register = Register::empty();
     assert!(register.record(comics.clone()).is_ok());
     assert!(std::fs::write(
@@ -133,15 +138,38 @@ pub(super) async fn asked(
     value: Option<&str>,
     agreement: Option<&str>,
 ) -> Result<SettingsReport, Box<Problem>> {
+    asking(ctx, &[(setting, value)], agreement).await
+}
+
+/// What asking for every change `changing` names in one act answers.
+pub(super) async fn asking(
+    ctx: &Ctx,
+    changing: &[(&str, Option<&str>)],
+    agreement: Option<&str>,
+) -> Result<SettingsReport, Box<Problem>> {
     changed(
         ctx,
         &Asked {
-            setting,
-            value,
+            changing: changing.iter().copied().collect(),
             agreement,
         },
     )
     .await
+}
+
+/// Each setting `change` moves, as its name, what it held and what it is to hold.
+pub(super) fn moved(change: &SettingChange) -> Vec<(&str, Option<&str>, Option<&str>)> {
+    change
+        .settings
+        .iter()
+        .map(|one| {
+            (
+                one.setting.as_str(),
+                one.was.as_deref(),
+                one.value.as_deref(),
+            )
+        })
+        .collect()
 }
 
 pub(super) fn change(report: Result<SettingsReport, Box<Problem>>) -> Option<SettingChange> {
@@ -170,7 +198,7 @@ pub(super) fn code(report: &Result<SettingsReport, Box<Problem>>) -> Option<&str
     report.as_ref().err().map(|problem| problem.code.as_str())
 }
 
-fn recorded(machine: &Machine, name: &str) -> Option<String> {
+pub(super) fn recorded(machine: &Machine, name: &str) -> Option<String> {
     crate::settings::Settings::at(&machine.env.with_file_name(SETTINGS))
         .ok()
         .and_then(|settings| settings.value(name).map(str::to_owned))
@@ -292,8 +320,7 @@ async fn an_offer_answered_after_the_setting_moved_is_refused_naming_what_moved(
         .unwrap_or_default();
     assert!(crate::settings::store::recorded(
         &machine.env.with_file_name(SETTINGS),
-        MODE,
-        Some("medium")
+        &[(MODE, Some("medium"))].into()
     )
     .is_ok());
 
@@ -333,7 +360,7 @@ async fn a_document_edited_while_the_change_is_made_refuses_naming_it() {
         .and_then(|(manifest, register)| {
             let after =
                 crate::settings::Resolved::of(&machine.ctx, Some(manifest), register.installed())
-                    .changed(MODE, Some("fast"));
+                    .changed(&[(MODE, Some("fast"))].into());
             crate::app::plugins::writing::regenerated(
                 &machine.ctx,
                 manifest,
@@ -495,27 +522,27 @@ async fn setting_and_clearing_through_the_command_answers_with_the_settings() {
     let set = crate::settings::run::settings(
         &machine.ctx,
         &crate::app::Settling::Set {
-            setting: MODE.to_owned(),
-            value: "fast".to_owned(),
+            values: [(MODE.to_owned(), "fast".to_owned())].into(),
             agreement: None,
         },
     )
     .await;
     assert!(matches!(set, Ok(crate::app::Outcome::Settings(report))
-        if report.change.as_ref().is_some_and(|change| change.value.as_deref() == Some("fast")
+        if report.change.as_ref().is_some_and(|change| moved(change) == [(MODE, None, Some("fast"))]
             && !change.applied)));
     let made = agreed(&machine.ctx, MODE, Some("fast")).await;
     assert!(made.is_ok());
     let cleared = crate::settings::run::settings(
         &machine.ctx,
         &crate::app::Settling::Clear {
-            setting: MODE.to_owned(),
+            settings: vec![MODE.to_owned()],
             agreement: None,
         },
     )
     .await;
     assert!(matches!(cleared, Ok(crate::app::Outcome::Settings(report))
-        if report.change.as_ref().is_some_and(|change| change.value.is_none() && !change.applied)));
+        if report.change.as_ref().is_some_and(|change| moved(change) == [(MODE, Some("fast"), None)]
+            && !change.applied)));
 }
 
 #[cfg(unix)]
@@ -524,7 +551,7 @@ async fn a_change_over_a_document_whose_mount_source_is_a_link_is_refused_naming
     let machine = machine("linked", running(&[]));
     let mut register =
         crate::app::plugins::read(&machine.ctx).unwrap_or_else(|_| Register::empty());
-    let mut comics = installed();
+    let mut comics = installed(PLUGIN);
     for placed in &mut comics.services {
         placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
             from: "Caddyfile".to_owned(),
@@ -577,7 +604,7 @@ async fn a_name_nothing_reads_or_another_command_takes_is_refused_naming_it() {
         .remedies
         .iter()
         .any(|remedy| remedy.detail.as_deref()
-            == Some("lemonfiber settings set gluetun:countries <value>"))));
+            == Some("lemonfiber settings set gluetun:countries=<value>"))));
 }
 
 #[tokio::test]

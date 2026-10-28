@@ -24,7 +24,7 @@
       "name": "value",
       "type": {
         "default": null,
-        "description": "What to change the key or the setting to, written as exactly itself.",
+        "description": "What to change the key to, written as exactly itself.",
         "type": [
           "string",
           "null"

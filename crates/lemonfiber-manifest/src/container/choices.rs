@@ -73,6 +73,34 @@ pub fn defaulted(env: &BTreeMap<String, Value>, setting: &str) -> Option<String>
     })
 }
 
+/// The values `setting` accepts in a service whose environment is `env`, as `held` says
+/// what each other setting holds: every value its choices list whose needs are met, and
+/// nothing where no reference in `env` declares its choices.
+#[must_use]
+pub fn offered(
+    env: &BTreeMap<String, Value>,
+    setting: &str,
+    held: &dyn Fn(&str) -> Option<String>,
+) -> Option<Vec<String>> {
+    let one_of = env.values().find_map(|value| match value {
+        Value::Setting(read) if read.setting == setting => read.one_of.as_deref(),
+        _ => None,
+    })?;
+    Some(open(one_of, held))
+}
+
+/// The values `one_of` lists whose needs are met, as `held` says what each other setting
+/// holds.
+#[must_use]
+pub fn open(one_of: &[Choice], held: &dyn Fn(&str) -> Option<String>) -> Vec<String> {
+    one_of
+        .iter()
+        .filter(|choice| choice.needs().is_none_or(|needs| met(needs, held)))
+        .flat_map(Choice::values)
+        .map(Constant::text)
+        .collect()
+}
+
 /// One service's settings and secrets, as the rules for choices read them.
 #[derive(Debug, Clone, Copy)]
 pub struct Reading<'a> {

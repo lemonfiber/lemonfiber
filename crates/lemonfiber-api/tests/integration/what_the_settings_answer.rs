@@ -106,12 +106,12 @@ const ASKED: [(&str, &str, &str); 3] = [
     (
         "POST",
         "/api/actions/settings-set",
-        r#"{"setting":"gluetun:countries","value":"Netherlands"}"#,
+        r#"{"values":{"gluetun:countries":"Netherlands"}}"#,
     ),
     (
         "POST",
         "/api/actions/settings-clear",
-        r#"{"setting":"gluetun:countries"}"#,
+        r#"{"settings":["gluetun:countries"]}"#,
     ),
 ];
 
@@ -165,18 +165,24 @@ async fn nobody_but_the_operator_reads_or_changes_the_settings() {
 }
 
 #[test]
-fn a_change_carries_its_setting_value_and_offer_into_the_command() {
+fn a_change_carries_its_settings_values_and_offer_into_the_command() {
     let given = Arguments {
-        setting: Some("gluetun:countries".to_owned()),
-        value: Some(String::new()),
+        values: [
+            ("gluetun:countries".to_owned(), String::new()),
+            ("gluetun:vpn-type".to_owned(), "openvpn".to_owned()),
+        ]
+        .into(),
         offer: Some("1a2b3c4d".to_owned()),
         ..Arguments::default()
     };
     assert_eq!(
         named("settings-set", given.clone()),
         Ok(Command::Settings(Settling::Set {
-            setting: "gluetun:countries".to_owned(),
-            value: String::new(),
+            values: [
+                ("gluetun:countries".to_owned(), String::new()),
+                ("gluetun:vpn-type".to_owned(), "openvpn".to_owned()),
+            ]
+            .into(),
             agreement: Some("1a2b3c4d".to_owned()),
         }))
     );
@@ -184,46 +190,39 @@ fn a_change_carries_its_setting_value_and_offer_into_the_command() {
         named(
             "settings-clear",
             Arguments {
-                value: None,
+                settings: vec![
+                    "gluetun:countries".to_owned(),
+                    "gluetun:vpn-type".to_owned()
+                ],
                 offer: Some("  ".to_owned()),
-                ..given
+                ..Arguments::default()
             }
         ),
         Ok(Command::Settings(Settling::Clear {
-            setting: "gluetun:countries".to_owned(),
+            settings: vec![
+                "gluetun:countries".to_owned(),
+                "gluetun:vpn-type".to_owned()
+            ],
             agreement: None,
         }))
     );
 }
 
 #[test]
-fn a_change_naming_no_setting_or_no_value_is_refused_by_what_it_lacks() {
+fn a_change_naming_no_setting_is_refused_by_what_it_lacks() {
     let missing = |action: &str, argument: &str| {
         Err(Refused::Missing {
             action: action.to_owned(),
             argument: argument.to_owned(),
         })
     };
-    let blank = Arguments {
-        setting: Some(" ".to_owned()),
-        value: Some("x".to_owned()),
-        ..Arguments::default()
-    };
     assert_eq!(
-        named("settings-set", blank),
-        missing("settings-set", "setting")
+        named("settings-set", Arguments::default()),
+        missing("settings-set", "values")
     );
     assert_eq!(
         named("settings-clear", Arguments::default()),
-        missing("settings-clear", "setting")
-    );
-    let valueless = Arguments {
-        setting: Some("gluetun:countries".to_owned()),
-        ..Arguments::default()
-    };
-    assert_eq!(
-        named("settings-set", valueless),
-        missing("settings-set", "value")
+        missing("settings-clear", "settings")
     );
 }
 
@@ -273,8 +272,7 @@ async fn each_write_refuses_a_name_the_other_takes_naming_the_command_that_does(
         (
             "settings-set",
             Arguments {
-                setting: Some("LEMONFIBER_QUIET_HOURS".to_owned()),
-                value: Some("22-07".to_owned()),
+                values: [("LEMONFIBER_QUIET_HOURS".to_owned(), "22-07".to_owned())].into(),
                 ..Arguments::default()
             },
             "LEMONFIBER_QUIET_HOURS",

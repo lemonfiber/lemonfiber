@@ -116,8 +116,7 @@ fn the_stack_is_filed_once_into_the_stores_and_journalled_by_fingerprint() {
     );
     assert!(crate::settings::store::recorded(
         &env.with_file_name(SETTINGS),
-        "lan-host",
-        Some("kept")
+        &[("lan-host", Some("kept"))].into()
     )
     .is_ok());
 

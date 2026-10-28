@@ -1,10 +1,13 @@
+use std::collections::BTreeMap;
+
 use crate::app::plugins::writing;
 use crate::app::Ctx;
 use crate::config::paths::SETTINGS;
+use crate::device_keys::run::apps_changed;
 use crate::error::codes::setting::{ALREADY_HOLDS, SETTINGS_MOVED};
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::journal::{Change, Kind};
-use crate::model::{SettingChange, SettingsReport};
+use crate::model::{SettingChange, SettingMove, SettingsReport};
 
 use super::readers::{self, Readers};
 use super::recorded::Recorded;
@@ -23,8 +26,7 @@ const OFFERED: [&str; 4] = [
 ];
 
 pub(super) struct Asked<'a> {
-    pub(super) setting: &'a str,
-    pub(super) value: Option<&'a str>,
+    pub(super) changing: BTreeMap<&'a str, Option<&'a str>>,
     pub(super) agreement: Option<&'a str>,
 }
 
@@ -36,22 +38,45 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     let register = crate::app::plugins::read(ctx)?;
     let installed = register.installed();
     let readers = readers::readers(&manifest, installed);
-    named(ctx, asked.setting, &readers)?;
-    if let Some(value) = asked.value {
-        fences::valued(asked.setting, value)?;
+    for (setting, value) in &asked.changing {
+        named(ctx, setting, &readers)?;
+        if let Some(value) = value {
+            fences::valued(setting, value)?;
+        }
     }
-    let was = Recorded::of(ctx).value(asked.setting).map(str::to_owned);
-    if was.as_deref() == asked.value {
-        return Err(Box::new(already(asked.setting, asked.value)));
+    let recorded = Recorded::of(ctx);
+    let held = |name: &str| recorded.value(name).map(str::to_owned);
+    let changing: BTreeMap<&str, Option<&str>> = asked
+        .changing
+        .iter()
+        .filter(|(setting, value)| recorded.value(setting) != **value)
+        .map(|(setting, value)| (*setting, *value))
+        .collect();
+    if changing.is_empty() {
+        return Err(Box::new(already(&asked.changing)));
     }
+    let outside = super::choosing::outside(&manifest, installed, &changing, &held);
+    if !outside.is_empty() {
+        return Err(Box::new(super::choosing::refused(&outside)));
+    }
+    let settings: Vec<SettingMove> = changing
+        .iter()
+        .map(|(setting, value)| SettingMove {
+            setting: (*setting).to_owned(),
+            was: held(setting),
+            value: value.map(str::to_owned),
+            consequence: consequence(ctx, setting, *value),
+        })
+        .collect();
     let regenerates = readers::services(
-        readers
-            .settings
-            .get(asked.setting)
-            .map(Vec::as_slice)
-            .unwrap_or_default(),
+        &changing
+            .keys()
+            .filter_map(|setting| readers.settings.get(*setting))
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>(),
     );
-    let after = Resolved::of(ctx, Some(&manifest), installed).changed(asked.setting, asked.value);
+    let after = Resolved::of(ctx, Some(&manifest), installed).changed(&changing);
     let overwrites = writing::regenerated(
         ctx,
         &manifest,
@@ -60,14 +85,11 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
         &after,
     )?;
     let restarts = restarting::running(ctx, &regenerates).await;
-    let standing = offer(asked, was.as_deref(), &regenerates, &restarts);
+    let standing = offer(&settings, &regenerates, &restarts);
     let mut change = SettingChange {
-        setting: asked.setting.to_owned(),
-        was: was.clone(),
-        value: asked.value.map(str::to_owned),
+        settings,
         regenerates,
         restarts,
-        consequence: consequence(ctx, asked),
         applied: false,
         agreement: standing.clone(),
         unrestarted: None,
@@ -82,7 +104,7 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     };
     let moved = crate::agreement::differs(answered, &standing, &OFFERED);
     if !moved.is_empty() {
-        return Err(Box::new(offer_moved(asked.setting, &moved, &standing)));
+        return Err(Box::new(offer_moved(&changing, &moved, &standing)));
     }
     if ctx.dry_run {
         return Ok(super::listing::report(
@@ -92,39 +114,59 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
             Some(change),
         ));
     }
-    let (Some(env), Some(paths)) = (
-        ctx.settings.env_file.as_deref(),
-        crate::app::targets::layout(ctx),
-    ) else {
-        return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
-    };
-    writing::unmoved(&overwrites, REFUSING)?;
-    let stamp = ctx.stamp();
-    let mut changes = vec![journalled(asked, was.as_deref(), &stamp)];
-    changes.extend(
-        overwrites
-            .iter()
-            .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
-    );
-    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
-        .map_err(|failure| Box::new(failure.problem()))?;
-    super::store::recorded(&env.with_file_name(SETTINGS), asked.setting, asked.value)
-        .map_err(|failure| Box::new(failure.problem()))?;
-    writing::overwritten(ctx, &overwrites, REFUSING)?;
-    if asked.setting == super::own::DEVICE_KEY_APPS {
-        crate::device_keys::run::apps_changed(ctx, was.as_deref(), asked.value).await?;
-    }
-    if asked.setting == super::own::DASHBOARD_SEARCH {
-        let _ = crate::seed::run::reshow(ctx).await;
-    }
-    change.applied = true;
-    change.unrestarted = restarting::restarted(ctx, &change.restarts).await;
+    written(ctx, &mut change, &changing, &overwrites).await?;
     Ok(super::listing::report(
         ctx,
         &manifest,
         installed,
         Some(change),
     ))
+}
+
+/// Write `change`: journalled, recorded, the entries it regenerates overwritten, and what
+/// reads it restarted.
+async fn written(
+    ctx: &Ctx,
+    change: &mut SettingChange,
+    changing: &BTreeMap<&str, Option<&str>>,
+    overwrites: &[writing::Overwrite],
+) -> Result<(), Box<Problem>> {
+    let (Some(env), Some(paths)) = (
+        ctx.settings.env_file.as_deref(),
+        crate::app::targets::layout(ctx),
+    ) else {
+        return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
+    };
+    writing::unmoved(overwrites, REFUSING)?;
+    let stamp = ctx.stamp();
+    let mut journal: Vec<Change> = change
+        .settings
+        .iter()
+        .map(|one| journalled(one, &stamp))
+        .collect();
+    journal.extend(
+        overwrites
+            .iter()
+            .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
+    );
+    crate::app::recover::journalled(&paths.journal(), &journal, ctx.seams.random.as_ref())
+        .map_err(|failure| Box::new(failure.problem()))?;
+    super::store::recorded(&env.with_file_name(SETTINGS), changing)
+        .map_err(|failure| Box::new(failure.problem()))?;
+    writing::overwritten(ctx, overwrites, REFUSING)?;
+    let apps = change
+        .settings
+        .iter()
+        .find(|one| one.setting == super::own::DEVICE_KEY_APPS);
+    if let Some(apps) = apps {
+        apps_changed(ctx, apps.was.as_deref(), apps.value.as_deref()).await?;
+    }
+    if changing.contains_key(super::own::DASHBOARD_SEARCH) {
+        let _ = crate::seed::run::reshow(ctx).await;
+    }
+    change.applied = true;
+    change.unrestarted = restarting::restarted(ctx, &change.restarts).await;
+    Ok(())
 }
 
 fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>> {
@@ -137,22 +179,22 @@ fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>
     fences::settings_takes(setting, readers.settings.contains_key(setting))
 }
 
-fn journalled(asked: &Asked<'_>, was: Option<&str>, stamp: &str) -> Change {
+fn journalled(one: &SettingMove, stamp: &str) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
-        target: asked.setting.to_owned(),
+        target: one.setting.clone(),
         kind: Kind::Setting {
-            name: asked.setting.to_owned(),
-            previous: was.map(str::to_owned),
-            current: asked.value.map(str::to_owned),
+            name: one.setting.clone(),
+            previous: one.was.clone(),
+            current: one.value.clone(),
             filed: None,
         },
     }
 }
 
-fn consequence(ctx: &Ctx, asked: &Asked<'_>) -> Option<String> {
-    let key = legacy::setting_key(asked.setting)?;
+fn consequence(ctx: &Ctx, setting: &str, value: Option<&str>) -> Option<String> {
+    let key = legacy::setting_key(setting)?;
     let held = ctx
         .settings
         .env_file
@@ -163,29 +205,40 @@ fn consequence(ctx: &Ctx, asked: &Asked<'_>) -> Option<String> {
                 .map(|file| legacy::overlaid(env, file))
         })
         .unwrap_or_default();
-    crate::app::configuring::consequence(ctx, &held, key, asked.value.unwrap_or_default())
+    crate::app::configuring::consequence(ctx, &held, key, value.unwrap_or_default())
 }
 
-fn offer(
-    asked: &Asked<'_>,
-    was: Option<&str>,
-    regenerates: &[String],
-    restarts: &[String],
-) -> String {
+fn offer(moves: &[SettingMove], regenerates: &[String], restarts: &[String]) -> String {
+    let asked: Vec<&str> = moves
+        .iter()
+        .flat_map(|one| {
+            [
+                one.setting.as_str(),
+                one.value.as_deref().unwrap_or_default(),
+            ]
+        })
+        .collect();
+    let was: Vec<&str> = moves
+        .iter()
+        .map(|one| one.was.as_deref().unwrap_or_default())
+        .collect();
     let regenerates: Vec<&str> = regenerates.iter().map(String::as_str).collect();
     let restarts: Vec<&str> = restarts.iter().map(String::as_str).collect();
-    crate::agreement::parted(&[
-        &[asked.setting, asked.value.unwrap_or_default()],
-        &[was.unwrap_or_default()],
-        &regenerates,
-        &restarts,
-    ])
+    crate::agreement::parted(&[&asked, &was, &regenerates, &restarts])
 }
 
-fn already(setting: &str, value: Option<&str>) -> Problem {
-    let summary = match value {
-        Some(_) => format!("{setting} already holds that"),
-        None => format!("{setting} holds no value of yours to take away"),
+/// The names of `changing`'s settings, as one phrase.
+fn listed(changing: &BTreeMap<&str, Option<&str>>) -> String {
+    changing.keys().copied().collect::<Vec<_>>().join(" and ")
+}
+
+fn already(asked: &BTreeMap<&str, Option<&str>>) -> Problem {
+    let settings = listed(asked);
+    let holds = if asked.len() > 1 { "hold" } else { "holds" };
+    let summary = if asked.values().any(Option::is_some) {
+        format!("{settings} already {holds} that")
+    } else {
+        format!("{settings} {holds} no value of yours to take away")
     };
     Problem::new(
         ALREADY_HOLDS,
@@ -196,7 +249,8 @@ fn already(setting: &str, value: Option<&str>) -> Problem {
     .in_state(State::Guided)
 }
 
-fn offer_moved(setting: &str, moved: &[&str], standing: &str) -> Problem {
+fn offer_moved(changing: &BTreeMap<&str, Option<&str>>, moved: &[&str], standing: &str) -> Problem {
+    let setting = listed(changing);
     Problem::new(
         SETTINGS_MOVED,
         format!("That change was agreed to against a different reading of {setting}"),

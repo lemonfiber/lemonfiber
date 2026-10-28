@@ -1,4 +1,5 @@
 mod changing;
+mod choosing;
 pub(crate) mod fences;
 pub(crate) mod files;
 pub(crate) mod filing;
@@ -29,12 +30,13 @@ use crate::plugin::Installed;
 pub(crate) const OPERATION: &str = "settings";
 
 /// Every refusal a change to a setting answers with before it is weighed.
-pub const REFUSALS: [crate::error::Code; 5] = [
+pub const REFUSALS: [crate::error::Code; 6] = [
     crate::error::codes::setting::NO_SUCH_SETTING,
     crate::error::codes::setting::A_SECRET,
     crate::error::codes::setting::TAKEN_ELSEWHERE,
     crate::error::codes::setting::UNWRITABLE_VALUE,
     crate::error::codes::setting::ALREADY_HOLDS,
+    crate::error::codes::setting::OUTSIDE_ITS_CHOICES,
 ];
 
 pub(crate) fn named(namespace: &str, id: &str) -> String {

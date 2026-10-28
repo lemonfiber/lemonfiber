@@ -28,7 +28,10 @@ use plugins::{
 };
 
 mod settling;
-use settling::{carries_key, carries_setting, carries_value, give_key, give_setting, give_value};
+use settling::{
+    carries_key, carries_settings, carries_value, carries_values, give_key, give_settings,
+    give_value, give_values,
+};
 
 mod viewing;
 
@@ -660,14 +663,15 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 56] = [
+pub(super) const SWEEPS: [Sweep; 57] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
     ("service", give_service, carries_service),
     ("key", give_key, carries_key),
     ("value", give_value, carries_value),
-    ("setting", give_setting, carries_setting),
+    ("values", give_values, carries_values),
+    ("settings", give_settings, carries_settings),
     ("preset", give_preset, carries_preset),
     ("media_type", give_media_type, carries_media_type),
     ("archive", give_archive, carries_archive),

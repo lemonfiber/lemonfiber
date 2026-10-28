@@ -133,7 +133,7 @@ pub(super) fn unproved(why: &Unattested) -> Problem {
                  in {SETTING}. Nothing was registered."
             ),
             Remedy::new("If it is a build you made, add its identity").with_detail(format!(
-                "{PRODUCT} settings set {SETTING} <identities, comma-separated>"
+                "{PRODUCT} settings set {SETTING}=<identities, comma-separated>"
             )),
         ),
     }

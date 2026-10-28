@@ -3,8 +3,8 @@
 use lemonfiber_core::credential::Inventory;
 use lemonfiber_core::glossary::Term;
 use lemonfiber_core::model::{
-    FrontDoorReport, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingRead,
-    SettingsReport, SubstitutionReport, UpdateReport, WalkthroughReport, WiringReport,
+    FrontDoorReport, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove,
+    SettingRead, SettingsReport, SubstitutionReport, UpdateReport, WalkthroughReport, WiringReport,
     WizardReport,
 };
 use lemonfiber_core::stack::closure::Plan;
@@ -250,12 +250,14 @@ pub(super) fn a_settings_report() -> SettingsReport {
             held: true,
         }],
         change: Some(SettingChange {
-            setting: "gluetun:countries".to_owned(),
-            was: Some("Netherlands".to_owned()),
-            value: Some("Belgium".to_owned()),
+            settings: vec![SettingMove {
+                setting: "gluetun:countries".to_owned(),
+                was: Some("Netherlands".to_owned()),
+                value: Some("Belgium".to_owned()),
+                consequence: None,
+            }],
             regenerates: vec!["gluetun".to_owned()],
             restarts: vec!["gluetun".to_owned()],
-            consequence: None,
             applied: true,
             agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f-3a4b5c6d".to_owned(),
             unrestarted: Some("the container engine would not recreate them".to_owned()),

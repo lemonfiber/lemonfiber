@@ -19,10 +19,13 @@ pub use takers::{
     TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION,
     TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING,
     TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING,
+    TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
+
+use std::collections::BTreeMap;
 
 use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
@@ -63,11 +66,14 @@ pub struct Arguments {
     pub unrated: Option<String>,
     /// The configuration key to change.
     pub key: Option<String>,
-    /// What to change the key or the setting to, written as exactly itself.
+    /// What to change the key to, written as exactly itself.
     pub value: Option<String>,
-    /// The setting to change or put back to its default, by the name the settings read
-    /// lists it under.
-    pub setting: Option<String>,
+    /// Each setting to change, by the name the settings read lists it under, with the
+    /// value it is to hold, written as exactly itself.
+    pub values: BTreeMap<String, String>,
+    /// The settings to put back to their defaults, by the names the settings read lists
+    /// them under.
+    pub settings: Vec<String>,
     /// The credential a grant to a third-party plugin is of, by the setting the
     /// credentials read lists it under.
     pub credential: Option<String>,
@@ -229,7 +235,8 @@ impl Arguments {
             unrated: Some("allow".to_owned()),
             key: Some("DATA_ROOT".to_owned()),
             value: Some("/srv".to_owned()),
-            setting: Some("vpn:countries".to_owned()),
+            values: [("vpn:countries".to_owned(), "Belgium".to_owned())].into(),
+            settings: vec!["vpn:countries".to_owned()],
             credential: Some("API_KEY".to_owned()),
             preset: Some("balanced".to_owned()),
             media_type: Some("tv".to_owned()),

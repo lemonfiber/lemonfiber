@@ -749,6 +749,11 @@
     "status": 400,
     "description": "Raised where the setting already holds what the change asks for."
   },
+  "SETTING-7": {
+    "name": "OUTSIDE_ITS_CHOICES",
+    "status": 400,
+    "description": "Raised where a change would leave a setting holding a value outside its choices."
+  },
   "SETUP-1": {
     "name": "NOT_REVIEWED",
     "status": 400,

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use lemonfiber_manifest::Manifest;
@@ -11,7 +12,7 @@ use crate::wiring::Fillers;
 
 pub(crate) struct Resolved {
     recorded: Recorded,
-    changing: Option<(String, Option<String>)>,
+    changing: BTreeMap<String, Option<String>>,
     files: Option<PathBuf>,
     fillers: Option<Fillers>,
     nfs: Option<crate::config::storage::Export>,
@@ -44,7 +45,7 @@ impl Resolved {
                 .and_then(|group| group.trim().parse().ok()),
             moved: crate::app::beside::moved(recorded.env()),
             recorded,
-            changing: None,
+            changing: BTreeMap::new(),
             name: ctx.settings.project.clone(),
             pass: crate::app::project::pinned(ctx),
             files: files_of(ctx),
@@ -62,17 +63,20 @@ impl Resolved {
         }
     }
 
-    pub(crate) fn changed(self, name: &str, value: Option<&str>) -> Self {
+    pub(crate) fn changed(self, changing: &BTreeMap<&str, Option<&str>>) -> Self {
         Self {
-            changing: Some((name.to_owned(), value.map(str::to_owned))),
+            changing: changing
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), value.map(str::to_owned)))
+                .collect(),
             ..self
         }
     }
 
     pub(crate) fn setting(&self, name: &str) -> Option<String> {
-        match &self.changing {
-            Some((changing, value)) if changing == name => value.clone(),
-            _ => self.recorded.value(name).map(str::to_owned),
+        match self.changing.get(name) {
+            Some(value) => value.clone(),
+            None => self.recorded.value(name).map(str::to_owned),
         }
     }
 

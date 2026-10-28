@@ -116,8 +116,11 @@ async fn a_search_address_that_is_not_one_fails_naming_the_setting() {
     let settings = scratch.path().join(crate::config::paths::SETTINGS);
     let _ = crate::settings::store::recorded(
         &settings,
-        crate::settings::own::DASHBOARD_SEARCH,
-        Some("duckduckgo.com"),
+        &[(
+            crate::settings::own::DASHBOARD_SEARCH,
+            Some("duckduckgo.com"),
+        )]
+        .into(),
     );
 
     let state = seeded(&ctx, scratch.path()).await;

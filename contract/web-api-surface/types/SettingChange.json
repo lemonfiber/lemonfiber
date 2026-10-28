@@ -12,12 +12,6 @@
       ],
       "required": true
     },
-    "consequence": {
-      "type": [
-        "null|string"
-      ],
-      "required": false
-    },
     "regenerates": {
       "type": [
         "array[string]"
@@ -30,25 +24,13 @@
       ],
       "required": true
     },
-    "setting": {
+    "settings": {
       "type": [
-        "string"
+        "array[ref:SettingMove]"
       ],
       "required": true
     },
     "unrestarted": {
-      "type": [
-        "null|string"
-      ],
-      "required": false
-    },
-    "value": {
-      "type": [
-        "null|string"
-      ],
-      "required": false
-    },
-    "was": {
       "type": [
         "null|string"
       ],

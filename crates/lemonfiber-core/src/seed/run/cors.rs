@@ -58,7 +58,7 @@ pub(super) async fn seed_cors(
                 server.name()
             ),
             "Give this machine an address the household reaches, with lemonfiber settings set \
-             lan-host <address>, then run seed again."
+             lan-host=<address>, then run seed again."
                 .to_owned(),
         );
         return Some(wiring);

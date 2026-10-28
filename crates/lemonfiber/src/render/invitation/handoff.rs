@@ -59,8 +59,8 @@ fn remedied(remedy: HandoffRemedy, report: &Handoff) -> String {
             format!("`{PRODUCT} status` says whether it is running, and `{PRODUCT} up` starts it.")
         }
         (HandoffRemedy::RecordAddress, _) => format!(
-            "Record the address the household uses with `{PRODUCT} settings set {HOUSEHOLD_HOST_SETTING} \
-             <address>`."
+            "Record the address the household uses with \
+             `{PRODUCT} settings set {HOUSEHOLD_HOST_SETTING}=<address>`."
         ),
     }
 }

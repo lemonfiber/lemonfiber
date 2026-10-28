@@ -508,6 +508,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETTING-4` | `UNWRITABLE_VALUE` | error | 5 | 400 | 0.18.0 | Raised where a value cannot be written as the setting asked for. |
 | `SETTING-5` | `SETTINGS_MOVED` | error | 1 | 400 | 0.18.0 | Raised when a change answers an offer read against settings that have since moved. |
 | `SETTING-6` | `ALREADY_HOLDS` | advisory | 1 | 400 | 0.18.0 | Raised where the setting already holds what the change asks for. |
+| `SETTING-7` | `OUTSIDE_ITS_CHOICES` | error | 5 | 400 | 0.18.0 | Raised where a change would leave a setting holding a value outside its choices. |
 
 ## `SETUP` — the first run
 
