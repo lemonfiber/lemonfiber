@@ -108,3 +108,26 @@ fn what_cannot_be_read_or_written_is_said() {
     let _ = std::fs::create_dir_all(config.join(PREVIOUS));
     assert!(withdrawn(&Disk, &config).is_err());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_replacement_that_cannot_be_written_or_taken_away_is_said() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let config = Scratch::new("internal-replacing-unwritten");
+    let Ok(new) = staged(&Disk, &config, "jellyfin") else {
+        unreachable!("a replacement is staged");
+    };
+    let _ = std::fs::write(config.join(super::super::INTERNAL), new.pkcs12());
+    let directory = config.join("lemonfiber");
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500));
+
+    let unpromoted = promoted(&Disk, &config);
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
+    let _ = std::fs::remove_file(config.join(NEXT));
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500));
+    let unstaged = staged(&Disk, &config, "jellyfin");
+
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
+    assert!(unpromoted.is_err_and(|unkept| unkept.to_string().contains(NEXT)));
+    assert!(unstaged.is_err_and(|unkept| unkept.to_string().contains(NEXT)));
+}

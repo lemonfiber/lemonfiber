@@ -209,8 +209,11 @@ pub(super) async fn advanced(
         Err(detail) => return failed(detail),
     };
     let state = match &standing.next {
-        Some(next) => serving(ctx, stack, (server, &asked), config, next).await,
-        None => served_again(ctx, (server, &asked), config).await,
+        Some(next) => {
+            let replacing = (standing.current.as_ref(), next);
+            serving(ctx, stack, (server, &asked), config, replacing).await
+        }
+        None => served_again(ctx, (server, &asked), standing.current.as_ref()).await,
     };
     match state {
         Ok(State::Wired | State::AlreadyWired) => {}
@@ -240,7 +243,7 @@ async fn reached(
 ) -> Result<(), String> {
     let current = internal::kept(ctx.seams.confined.as_ref(), config)
         .map_err(|unkept| unkept.to_string())?
-        .ok_or_else(|| format!("{} keeps no certificate in force", server.name()))?;
+        .ok_or_else(|| unkept(server))?;
     let mut unreached: Vec<String> = unheld(ctx, stack, server, &current.fingerprint)
         .await
         .into_iter()
@@ -270,12 +273,15 @@ async fn presents((path, client): &Asked, pin: &str) -> bool {
 async fn served_again(
     ctx: &Ctx,
     (server, (path, client)): (&MediaServer, &Asked),
-    config: &Path,
+    current: Option<&internal::Internal>,
 ) -> Result<State, String> {
-    let current = internal::kept(ctx.seams.confined.as_ref(), config)
-        .map_err(|unkept| unkept.to_string())?
-        .ok_or_else(|| format!("{} keeps no certificate in force", server.name()))?;
+    let current = current.ok_or_else(|| unkept(server))?;
     Ok(served(ctx, server, client.as_ref(), (path, &current.fingerprint)).await)
+}
+
+/// Why a replacement cannot go on where `server` keeps no certificate in force.
+fn unkept(server: &MediaServer) -> String {
+    format!("{} keeps no certificate in force", server.name())
 }
 
 /// Where the media server's container holds its certificate, and its adapter asked over
@@ -308,7 +314,7 @@ async fn serving(
     stack: Stack<'_>,
     (server, (path, client)): (&MediaServer, &Asked),
     config: &Path,
-    next: &internal::Internal,
+    (previous, next): (Option<&internal::Internal>, &internal::Internal),
 ) -> Result<State, String> {
     let unheld = unheld(ctx, stack, server, &next.fingerprint).await;
     if !unheld.is_empty() {
@@ -319,12 +325,10 @@ async fn serving(
             server.name()
         ));
     }
-    let previous =
-        internal::kept(ctx.seams.confined.as_ref(), config).map_err(|unkept| unkept.to_string())?;
     journalled(
         ctx,
         &server.served.id,
-        previous.map(|kept| kept.fingerprint),
+        previous.map(|kept| kept.fingerprint.clone()),
         &next.fingerprint,
     )?;
     internal::promoted(ctx.seams.confined.as_ref(), config).map_err(|unkept| unkept.to_string())?;
