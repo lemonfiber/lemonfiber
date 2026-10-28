@@ -474,6 +474,7 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
             path: at.clone(),
             check: false,
             adapter: None,
+            built: None,
         },
         false,
         &answering(404, "{}"),
@@ -504,6 +505,7 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
             path: at.clone(),
             check: false,
             adapter: None,
+            built: None,
         },
         false,
         &answering(404, "{}"),
@@ -518,6 +520,7 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
             path: source("record-unmade", &running()),
             check: false,
             adapter: None,
+            built: None,
         },
         false,
     )
@@ -530,6 +533,7 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
             path: PathBuf::from("/lemonfiber/no/such/plugin"),
             check: false,
             adapter: None,
+            built: None,
         },
         false,
     )
@@ -545,6 +549,7 @@ fn a_check_holds_what_it_takes_and_starts_the_adapter_it_names() {
             path: PathBuf::from("."),
             check,
             adapter: adapter.map(str::to_owned),
+            built: None,
         })
     };
     assert_eq!(asked(false, None), Retaking::default());
@@ -552,22 +557,42 @@ fn a_check_holds_what_it_takes_and_starts_the_adapter_it_names() {
         asked(true, None),
         Retaking {
             check: true,
-            adapter: None
+            adapter: None,
+            built: None
         }
     );
     assert_eq!(
         asked(true, Some("plugin-sonarr:pr")),
         Retaking {
             check: true,
-            adapter: Some("plugin-sonarr:pr".to_owned())
+            adapter: Some("plugin-sonarr:pr".to_owned()),
+            built: None
         }
     );
     assert_eq!(
         asked(false, Some("plugin-seerr:pr")),
         Retaking {
             check: false,
-            adapter: Some("plugin-seerr:pr".to_owned())
+            adapter: Some("plugin-seerr:pr".to_owned()),
+            built: None
         }
     );
     assert_eq!(taking(&Authoring::Capabilities), Retaking::default());
+}
+
+#[test]
+fn a_record_starts_the_plugins_own_service_from_the_image_built_names() {
+    assert_eq!(
+        taking(&Authoring::Record {
+            path: PathBuf::from("."),
+            check: true,
+            adapter: None,
+            built: Some("first-party-live-built".to_owned()),
+        }),
+        Retaking {
+            check: true,
+            adapter: None,
+            built: Some("first-party-live-built".to_owned()),
+        }
+    );
 }

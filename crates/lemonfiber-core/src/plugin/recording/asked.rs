@@ -140,6 +140,7 @@ pub(super) async fn taken(
             health: service.health.as_ref(),
             fronting,
             secrets: &manifest.secrets,
+            built: recorder.taking.built_for(&manifest.plugin.id, placed),
         };
         let took = match recorded(root, recorder, ask, &mine).await {
             Ok((written, cases)) => {
@@ -210,6 +211,8 @@ struct Service<'a> {
     fronting: Option<Fronting<'a>>,
     /// The secrets the plugin declares.
     secrets: &'a [Secret],
+    /// The image it is started from in place of its pin, where one is named for it.
+    built: Option<&'a str>,
 }
 
 /// One service's request recordings and the conformance cases of the adapter fronting
@@ -259,12 +262,13 @@ async fn recorded(
                 service.health,
                 mine,
                 service.secrets,
+                service.built,
             )
             .await?,
             Vec::new(),
         ),
     };
-    let pinned = format!("{}@{}", placed.image, placed.digest);
+    let pinned = crate::plugin::program::pinned(placed);
     let stood_in = stood_in::named(placed, service.secrets);
     let took = mine
         .iter()

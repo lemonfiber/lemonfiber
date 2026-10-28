@@ -37,7 +37,7 @@ impl Key {
     ) -> Self {
         let mode = user_of(placed);
         Self {
-            image: format!("{}@{}", placed.image, placed.digest),
+            image: crate::plugin::program::pinned(placed),
             args: proof.run.args.clone(),
             posture: placed.fields.posture,
             user: format!("{mode:?} {}:{}", operator.ids.0, operator.ids.1),

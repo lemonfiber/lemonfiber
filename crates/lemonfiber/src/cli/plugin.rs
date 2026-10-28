@@ -330,5 +330,14 @@ pub enum Authoring {
         /// request moving the adapter's pin to the published image holds them to that pin.
         #[arg(long, value_name = "IMAGE")]
         adapter: Option<String>,
+        /// Start the service whose id is the plugin's, and perform its runs, from this
+        /// image the engine holds, in place of its pin.
+        ///
+        /// The image the plugin's CI built from its own `Dockerfile`, where that service is
+        /// no adapter and none fronts it. A pull request that changes what the image does
+        /// writes its recordings this way, and the pull request moving the service's pin to
+        /// the published image holds them to that pin.
+        #[arg(long, value_name = "IMAGE")]
+        built: Option<String>,
     },
 }
