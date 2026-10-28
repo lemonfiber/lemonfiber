@@ -232,7 +232,7 @@ pub fn hosting(
 
 /// The profile the named service starts with: its own where the stack declares it, and
 /// the one its plugin's services sit in where a plugin brings it.
-fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<String> {
+pub(crate) fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<String> {
     manifest
         .services
         .iter()

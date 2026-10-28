@@ -167,6 +167,7 @@ pub async fn start_progress(
     sweep.taken_away(ctx).await;
     copies.made(ctx).await?;
     crate::screening::door::made_before_start(ctx, &manifest);
+    crate::seed::run::encrypting::made_before_start(ctx, &manifest);
     // Let go of what this start addresses, as the waited-on path does: a service that
     // falls over on the way up fell over, whoever stopped it last.
     super::halted::before(ctx, &action, &super::addressed(&action, &report.plan));

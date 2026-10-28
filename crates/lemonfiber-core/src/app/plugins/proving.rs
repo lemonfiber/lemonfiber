@@ -188,15 +188,7 @@ pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
         return;
     }
     let (service, profile) = PROXY;
-    let plan = Plan {
-        forms: Vec::new(),
-        profiles: std::iter::once(profile.to_owned()).collect(),
-        services: vec![service.to_owned()],
-        dropped: Vec::new(),
-        filtered: Vec::new(),
-        footprint: crate::stack::closure::Footprint::default(),
-        running: crate::stack::closure::Running::Unasked,
-    };
+    let plan = Plan::one(service, profile);
     let restart = Action::Restart(vec![service.to_owned()]);
     let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);
     let _ = ctx.seams.runner.run(&command).await;

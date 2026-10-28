@@ -94,18 +94,36 @@ pub(super) async fn seed_decline_key(
             },
         ));
     };
-    let held = decline
-        .held()
-        .await
-        .ok()
-        .flatten()
-        .and_then(|held| named_by(&filed, &held.key));
-    let state = match held {
-        Some(key) => kept(ctx, client.as_ref(), &filed, &key).await,
+    let pins = super::encrypting::pins(server);
+    let held = decline.held().await.ok().flatten();
+    let pinned = held.as_ref().is_some_and(|held| held.pins == pins);
+    let state = match held.and_then(|held| named_by(&filed, &held.key)) {
+        Some(key) if pinned => kept(ctx, client.as_ref(), &filed, &key).await,
+        Some(_) if ctx.dry_run => State::WouldWire {
+            yours: None,
+            ours: Some(pins.join(", ")),
+        },
+        Some(key) => repinned(client.as_ref(), &filed, decline.as_ref(), &key, &pins).await,
         None if ctx.dry_run => return Some(would_mint(server)),
-        None => minted(client.as_ref(), &filed, decline.as_ref()).await,
+        None => minted(client.as_ref(), &filed, decline.as_ref(), &pins).await,
     };
     Some(settled(server, state))
+}
+
+/// Hand the decline service the key it holds again with `pins`, the certificates the media
+/// server's internal TLS port presents now, then revoke whatever else is filed beside it.
+async fn repinned(
+    client: &dyn AppKeys,
+    filed: &[String],
+    decline: &dyn Declining,
+    key: &str,
+    pins: &[String],
+) -> State {
+    if let Err(failure) = decline.hold(key, pins).await {
+        return crate::seed::unreached(&failure);
+    }
+    let others: Vec<&String> = filed.iter().filter(|one| *one != key).collect();
+    super::minted::revoking(client, others).await
 }
 
 /// The key filed under the service's name whose SHA-256 is `hash`, where one is.
@@ -136,12 +154,17 @@ async fn kept(ctx: &Ctx, client: &dyn AppKeys, filed: &[String], key: &str) -> S
 ///
 /// A key the service would not take is revoked again at once: one nothing holds is not
 /// left on the server for the next run to find.
-async fn minted(client: &dyn AppKeys, filed: &[String], decline: &dyn Declining) -> State {
+async fn minted(
+    client: &dyn AppKeys,
+    filed: &[String],
+    decline: &dyn Declining,
+    pins: &[String],
+) -> State {
     let key = match super::minted::mint(client, DECLINE_APP).await {
         Ok(key) => key,
         Err(state) => return state,
     };
-    if let Err(failure) = decline.hold(&key, &[]).await {
+    if let Err(failure) = decline.hold(&key, pins).await {
         let _ = client.revoke(&key).await;
         return State::Failed {
             detail: format!(

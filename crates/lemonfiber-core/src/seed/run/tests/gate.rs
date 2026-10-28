@@ -55,10 +55,21 @@ fn minted_for(ctx: &Ctx, curator: &str, key: &str) {
         .for_each(|moved| moved.minted(ctx, key));
 }
 
+/// The internal TLS port the media server declares.
+const INTERNAL_TLS: u16 = 8920;
+
+/// What the media server declares: a guard's terms, and its internal TLS port.
+fn declared() -> crate::ports::service::Declared {
+    let mut declared = lemonfiber_fixtures::declaring::enforceable();
+    declared.ports.internal_tls = Some(INTERNAL_TLS);
+    declared
+}
+
 /// A media server filing `filed` under the gate's name and minting `minted`, taking a mint
 /// where `mints` and a revocation where `revokes`.
 fn serving(filed: &[&str], minted: &str, mints: bool, revokes: bool) -> Arc<Fake> {
     Fake::by_path(vec![
+        (media::serve("declared"), media::answered(&declared())),
         (media::serve("filed_as"), media::answered(&filed)),
         (
             media::serve("mint"),
@@ -167,7 +178,7 @@ fn holding(curators: &[(&str, &str)], key: &str) -> Upstreams {
 /// Where the gate reaches the media server: at the id its plugin's server keeps on the
 /// stack's network, on the port it listens on there.
 fn media_server_svc_network_url() -> String {
-    "http://jellyfin:8096".to_owned()
+    format!("https://jellyfin:{INTERNAL_TLS}")
 }
 
 /// Where the gate reads its routes, under `project`.
@@ -713,3 +724,5 @@ async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
 }
 
 mod refusing;
+
+mod pinning;

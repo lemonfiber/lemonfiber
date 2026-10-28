@@ -449,6 +449,7 @@ fn a_service(
         published: Some(8000),
         contract: None,
         confined_to: None,
+        config_at: None,
         media_types: vec!["tv".to_owned()],
         provides: Vec::new(),
         contracts: Vec::new(),

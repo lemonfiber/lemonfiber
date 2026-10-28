@@ -169,6 +169,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
                 .map(std::path::Path::to_path_buf)
                 .unwrap_or_default()
         }),
+        config_at: None,
         media_types: Vec::new(),
         provides: vec!["media.serve".to_owned()],
         contracts: vec!["media.serve@1".to_owned()],

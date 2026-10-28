@@ -28,6 +28,7 @@ mod crossing;
 mod proxies;
 // The decline service's own media-server key, minted for it alone.
 mod decline;
+pub(crate) mod encrypting;
 mod enveloping;
 mod fulfilment;
 // The request gate's routes, and the key it holds for the media server.
@@ -411,6 +412,7 @@ async fn seed_media_server(
     // After the identity's first half, because that is what records the administrator
     // credential this is written with.
     wirings.extend(cors::seed_cors(ctx, services, fillers, server).await);
+    wirings.extend(encrypting::seed_internal_tls(ctx, server).await);
 
     // The decline service's key, minted in the server the decline service names.
     wirings.extend(decline::seed_decline_key(ctx, services, fillers, project).await);

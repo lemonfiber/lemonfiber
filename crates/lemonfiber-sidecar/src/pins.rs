@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::Unreadable;
 
 /// The file the decline service is handed its pins in.
-pub(crate) const FILE: &str = "jellyfin.pins";
+pub(crate) const FILE: &str = "media-server.pins";
 
 /// How many hexadecimal digits a SHA-256 is written in.
 const DIGITS: usize = 64;

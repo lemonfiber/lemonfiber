@@ -188,6 +188,21 @@ pub struct Dropped {
 }
 
 impl Plan {
+    /// The one service `service`, in its profile `profile`, and nothing else: what acting on
+    /// a single service of a stack already up is planned as.
+    #[must_use]
+    pub fn one(service: &str, profile: &str) -> Self {
+        Self {
+            forms: Vec::new(),
+            profiles: std::iter::once(profile.to_owned()).collect(),
+            services: vec![service.to_owned()],
+            dropped: Vec::new(),
+            filtered: Vec::new(),
+            footprint: Footprint::default(),
+            running: Running::Unasked,
+        }
+    }
+
     /// Whether anything is left to run once narrowing is done.
     #[must_use]
     pub fn is_empty(&self) -> bool {
