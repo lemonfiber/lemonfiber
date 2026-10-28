@@ -1,5 +1,5 @@
 use lemonfiber_core::model::{
-    Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingRead, SettingsReport,
+    Choosable, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingRead, SettingsReport,
 };
 
 use super::Lines;
@@ -28,6 +28,7 @@ fn listed(report: &SettingsReport) -> Lines {
     for secret in &report.secrets {
         lines.extend(secret_lines(secret));
     }
+    lines.extend(super::waiting::waiting(&report.waiting));
     lines.spaced("Change one with lemonfiber settings set <setting>=<value>; a secret is replaced with lemonfiber credentials --rotate.");
     lines
 }
@@ -47,7 +48,15 @@ fn setting_lines(setting: &SettingRead) -> Lines {
         lines.put("    reads     nothing in the stack; the core reads it");
     }
     for reader in &setting.readers {
-        lines.put(format!("    reads     {}", read_as(reader)));
+        lines.put(format!(
+            "    reads     {}{}",
+            read_as(reader),
+            written_where(reader)
+        ));
+    }
+    if let Some(choices) = &setting.choices {
+        let listed: Vec<String> = choices.iter().map(choosable).collect();
+        lines.put(format!("    choices   {}", listed.join(", ")));
     }
     if let Some(key) = &setting.environment {
         lines.put(format!("    held      in the environment file as {key}"));
@@ -78,6 +87,49 @@ fn secret_lines(secret: &SecretRead) -> Lines {
         lines.put(format!("    reads     {}", read_as(reader)));
     }
     lines
+}
+
+/// Where a reference is written only beside other settings' values: what it needs, and
+/// whether that holds now.
+fn written_where(reader: &Reader) -> String {
+    if reader.needs.is_empty() {
+        return String::new();
+    }
+    format!(
+        ", written where {}{}",
+        needing(&reader.needs),
+        if reader.met {
+            ""
+        } else {
+            ", which is not so now"
+        }
+    )
+}
+
+/// One value a setting accepts, with what it needs where it is a choice only beside other
+/// settings' values.
+fn choosable(choice: &Choosable) -> String {
+    if choice.needs.is_empty() {
+        return choice.value.clone();
+    }
+    format!(
+        "{} (where {}{})",
+        choice.value,
+        needing(&choice.needs),
+        if choice.open { "" } else { "; not now" }
+    )
+}
+
+/// What `needs` asks of the other settings, as a clause.
+fn needing(needs: &std::collections::BTreeMap<String, Vec<String>>) -> String {
+    needs
+        .iter()
+        .map(|(setting, values)| match values.as_slice() {
+            [one] => format!("{setting} is {one}"),
+            _ => format!("{setting} is one of {}", values.join(", ")),
+        })
+        .collect::<Vec<_>>()
+        .join(" and ")
 }
 
 fn whose(whose: &Owner) -> String {

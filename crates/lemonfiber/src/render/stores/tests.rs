@@ -1,5 +1,6 @@
 use lemonfiber_core::model::{
-    Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove, SettingRead, SettingsReport,
+    Choosable, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove, SettingRead,
+    SettingsReport,
 };
 
 fn reader(service: &str, variable: &str, default: Option<&str>) -> Reader {
@@ -7,6 +8,8 @@ fn reader(service: &str, variable: &str, default: Option<&str>) -> Reader {
         service: service.to_owned(),
         variable: variable.to_owned(),
         default: default.map(str::to_owned),
+        met: true,
+        needs: std::collections::BTreeMap::new(),
     }
 }
 
@@ -21,6 +24,7 @@ fn listing() -> SettingsReport {
                 readers: vec![reader("gluetun", "SERVER_COUNTRIES", Some("Netherlands"))],
                 value: Some("Belgium".to_owned()),
                 environment: Some("VPN_COUNTRIES".to_owned()),
+                choices: None,
             },
             SettingRead {
                 name: "gluetun:provider".to_owned(),
@@ -30,6 +34,7 @@ fn listing() -> SettingsReport {
                 readers: vec![reader("gluetun", "VPN_SERVICE_PROVIDER", Some(""))],
                 value: None,
                 environment: None,
+                choices: None,
             },
             SettingRead {
                 name: "LEMONFIBER_DEVICE_KEY_APPS".to_owned(),
@@ -37,6 +42,7 @@ fn listing() -> SettingsReport {
                 readers: Vec::new(),
                 value: None,
                 environment: None,
+                choices: None,
             },
         ],
         secrets: vec![SecretRead {
@@ -51,6 +57,7 @@ fn listing() -> SettingsReport {
         change: None,
         rehearsed: false,
         unvetted: None,
+        waiting: Vec::new(),
     }
 }
 
@@ -287,4 +294,71 @@ fn a_change_names_the_operators_overlay_as_unvetted_where_there_is_one() {
     })
     .text();
     assert!(!listed.contains("Unvetted"), "{listed}");
+}
+
+#[test]
+fn a_setting_with_choices_lists_each_and_a_reference_says_what_it_is_written_beside() {
+    let mut report = listing();
+    let first = Reader {
+        needs: [("gluetun:vpn-type".to_owned(), vec!["openvpn".to_owned()])].into(),
+        met: false,
+        ..reader("gluetun", "OPENVPN_PROTOCOL", Some("udp"))
+    };
+    let two = Reader {
+        needs: [(
+            "gluetun:vpn-type".to_owned(),
+            vec!["openvpn".to_owned(), "custom".to_owned()],
+        )]
+        .into(),
+        met: true,
+        ..reader("gluetun", "PORT", Some("0"))
+    };
+    report.settings = vec![SettingRead {
+        name: "gluetun:provider".to_owned(),
+        whose: Owner::Namespace {
+            namespace: "gluetun".to_owned(),
+        },
+        readers: vec![first, two],
+        value: None,
+        environment: None,
+        choices: Some(vec![
+            Choosable {
+                value: "mullvad".to_owned(),
+                needs: std::collections::BTreeMap::new(),
+                open: true,
+            },
+            Choosable {
+                value: "pia".to_owned(),
+                needs: [("gluetun:vpn-type".to_owned(), vec!["openvpn".to_owned()])].into(),
+                open: false,
+            },
+            Choosable {
+                value: "proton".to_owned(),
+                needs: [("gluetun:vpn-type".to_owned(), vec!["wireguard".to_owned()])].into(),
+                open: true,
+            },
+        ]),
+    }];
+    let text = super::settings(&report).text();
+    assert!(
+        text.contains(
+            "    reads     gluetun as OPENVPN_PROTOCOL, udp by default, written where \
+             gluetun:vpn-type is openvpn, which is not so now\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "    reads     gluetun as PORT, 0 by default, written where gluetun:vpn-type is one \
+             of openvpn, custom\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "    choices   mullvad, pia (where gluetun:vpn-type is openvpn; not now), proton \
+             (where gluetun:vpn-type is wireguard)"
+        ),
+        "{text}"
+    );
 }

@@ -17,11 +17,15 @@ pub(super) fn report(
     installed: &[Installed],
     change: Option<SettingChange>,
 ) -> SettingsReport {
-    let readers = readers::readers(manifest, installed);
+    let recorded = Recorded::of(ctx);
+    let readers = readers::readers(manifest, installed, &|name| {
+        recorded.value(name).map(str::to_owned)
+    });
     let resolved = Resolved::of(ctx, Some(manifest), installed);
     SettingsReport {
-        settings: settings(&Recorded::of(ctx), &readers),
+        settings: settings(&recorded, &readers),
         secrets: secrets(ctx, &readers, Some(manifest), installed, &resolved),
+        waiting: super::run::waiting(ctx, manifest, installed),
         unvetted: change.as_ref().and(crate::overlay::unvetted(ctx)),
         change,
         rehearsed: ctx.dry_run,
@@ -39,6 +43,7 @@ fn settings(recorded: &Recorded, readers: &Readers) -> Vec<SettingRead> {
             readers: readers.settings.get(name).cloned().unwrap_or_default(),
             value: recorded.value(name).map(str::to_owned),
             environment: legacy::setting_key(name).map(str::to_owned),
+            choices: readers.choices.get(name).cloned(),
         })
         .collect()
 }

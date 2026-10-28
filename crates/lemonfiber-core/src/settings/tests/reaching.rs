@@ -162,7 +162,7 @@ async fn a_granted_secret_is_listed_as_granted_held_where_it_may_cross_and_withh
     let manifest = machine.ctx.stack.checked_manifest(machine.ctx.today()).ok();
     let readers = manifest
         .as_ref()
-        .map(|manifest| crate::settings::readers::readers(manifest, &installed))
+        .map(|manifest| crate::settings::readers::readers(manifest, &installed, &|_| None))
         .unwrap_or_default();
     let listed = |resolved: &Resolved| {
         super::super::listing::secrets(&machine.ctx, &readers, None, &installed, resolved)
@@ -212,6 +212,8 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
             service: "gluetun".to_owned(),
             variable: "WIREGUARD_PRIVATE_KEY".to_owned(),
             default: None,
+            met: true,
+            needs: std::collections::BTreeMap::new(),
         }],
     );
     let resolved = Resolved::of(&machine.ctx, None, &[]);
@@ -232,7 +234,7 @@ async fn an_assembled_parts_crossing_key_is_listed_as_granted() {
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
     let readers = manifest
         .as_ref()
-        .map(|manifest| crate::settings::readers::readers(manifest, &[]))
+        .map(|manifest| crate::settings::readers::readers(manifest, &[], &|_| None))
         .unwrap_or_default();
     let resolved = Resolved::of(&machine.ctx, manifest.as_ref(), &[]);
 

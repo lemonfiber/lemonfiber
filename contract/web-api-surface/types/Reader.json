@@ -6,6 +6,18 @@
       ],
       "required": false
     },
+    "met": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "needs": {
+      "type": [
+        "object{array[string]}"
+      ],
+      "required": true
+    },
     "service": {
       "type": [
         "string"

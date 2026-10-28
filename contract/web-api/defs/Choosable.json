@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One value a setting accepts.",
+  "type": "object",
+  "properties": {
+    "needs": {
+      "description": "The values of other settings under which it is a choice: each setting with the\nvalues it has to hold one of, and none where it always is.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "open": {
+      "description": "Whether it is a choice now.",
+      "type": "boolean"
+    },
+    "value": {
+      "description": "The value.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "value",
+    "needs",
+    "open"
+  ]
+}

@@ -220,6 +220,8 @@ pub(super) fn a_settings_report() -> SettingsReport {
         service: service.to_owned(),
         variable: variable.to_owned(),
         default: default.map(str::to_owned),
+        met: true,
+        needs: std::collections::BTreeMap::new(),
     };
     SettingsReport {
         settings: vec![
@@ -231,6 +233,7 @@ pub(super) fn a_settings_report() -> SettingsReport {
                 readers: vec![reader("gluetun", "SERVER_COUNTRIES", Some("Netherlands"))],
                 value: Some("Belgium".to_owned()),
                 environment: Some("VPN_COUNTRIES".to_owned()),
+                choices: None,
             },
             SettingRead {
                 name: "LEMONFIBER_DEVICE_KEY_APPS".to_owned(),
@@ -238,6 +241,7 @@ pub(super) fn a_settings_report() -> SettingsReport {
                 readers: Vec::new(),
                 value: None,
                 environment: None,
+                choices: None,
             },
         ],
         secrets: vec![SecretRead {
@@ -266,6 +270,7 @@ pub(super) fn a_settings_report() -> SettingsReport {
         }),
         rehearsed: false,
         unvetted: None,
+        waiting: Vec::new(),
     }
 }
 

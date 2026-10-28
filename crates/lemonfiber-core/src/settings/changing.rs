@@ -38,15 +38,15 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
         .map_err(|err| Box::new(err.problem()))?;
     let register = crate::app::plugins::read(ctx)?;
     let installed = register.installed();
-    let readers = readers::readers(&manifest, installed);
+    let recorded = Recorded::of(ctx);
+    let held = |name: &str| recorded.value(name).map(str::to_owned);
+    let readers = readers::readers(&manifest, installed, &held);
     for (setting, value) in &asked.changing {
         named(ctx, setting, &readers)?;
         if let Some(value) = value {
             fences::valued(setting, value)?;
         }
     }
-    let recorded = Recorded::of(ctx);
-    let held = |name: &str| recorded.value(name).map(str::to_owned);
     let changing: BTreeMap<&str, Option<&str>> = asked
         .changing
         .iter()
