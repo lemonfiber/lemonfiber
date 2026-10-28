@@ -194,10 +194,10 @@ fn needs_are_met_where_every_setting_holds_a_listed_value_the_default_where_none
     let defaulted = |setting: &str| super::defaulted(&env, setting);
     assert_eq!(defaulted("gluetun:vpn-type").as_deref(), Some("wireguard"));
     assert_eq!(defaulted("gluetun:nothing"), None);
-    assert!(super::met(&key.needs, defaulted));
-    assert!(!super::met(&key.needs, |setting: &str| {
+    assert!(super::met(&key.needs, &defaulted));
+    assert!(!super::met(&key.needs, &|setting: &str| {
         (setting == "gluetun:vpn-type").then(|| "openvpn".to_owned())
     }));
-    assert!(!super::met(&key.needs, |_: &str| None));
-    assert!(super::met(&super::Needs::new(), |_: &str| None));
+    assert!(!super::met(&key.needs, &|_: &str| None));
+    assert!(super::met(&super::Needs::new(), &|_: &str| None));
 }

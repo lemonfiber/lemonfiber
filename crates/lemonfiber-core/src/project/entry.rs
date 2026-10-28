@@ -403,7 +403,7 @@ fn valued(unit: &Unit<'_>, value: &Value, values: &Values<'_>) -> Option<String>
                 (values.setting)(unit.namespace, named)
                     .or_else(|| choices::defaulted(unit.env, named))
             };
-            choices::met(&setting.needs, held).then(|| {
+            choices::met(&setting.needs, &held).then(|| {
                 (values.setting)(unit.namespace, &setting.setting)
                     .unwrap_or_else(|| setting.default.text())
             })

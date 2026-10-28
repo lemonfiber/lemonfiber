@@ -57,7 +57,7 @@ impl Choice {
 /// Whether `needs` is met: every setting it names holds one of the values it lists, as
 /// `held` says what each holds.
 #[must_use]
-pub fn met(needs: &Needs, held: impl Fn(&str) -> Option<String>) -> bool {
+pub fn met(needs: &Needs, held: &dyn Fn(&str) -> Option<String>) -> bool {
     needs.iter().all(|(setting, values)| {
         held(setting).is_some_and(|value| values.iter().any(|one| one.text() == value))
     })

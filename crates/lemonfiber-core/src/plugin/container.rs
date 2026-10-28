@@ -181,7 +181,7 @@ pub(crate) fn needed(
         .iter()
         .find(|secret| secret.id == id)
         .is_none_or(|secret| {
-            choices::met(&secret.needs, |setting| {
+            choices::met(&secret.needs, &|setting| {
                 (reading.setting)(&installed.plugin, setting)
                     .or_else(|| choices::defaulted(&placed.fields.env, setting))
             })
