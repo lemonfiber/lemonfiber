@@ -23,7 +23,7 @@ pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
             .filter(|value| !value.is_empty())
             .map(str::to_owned)
     };
-    held(key).or_else(|| held(&earlier_credential(ctx, key)?))
+    held(key).or_else(|| earlier_credential(ctx, key).and_then(|earlier| held(&earlier)))
 }
 
 /// The name an earlier release recorded the credential the stack now keeps as `key`
