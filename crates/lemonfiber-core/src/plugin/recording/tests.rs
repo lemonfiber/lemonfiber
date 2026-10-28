@@ -373,9 +373,14 @@ fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
         let (Some(placed), Ok(copy)) = (placed, copy) else {
             unreachable!("the fixture places a service and a copy is made");
         };
-        assert!(super::served::certified(&placed, &copy).is_ok());
-        let held = crate::certificate::kept(copy.path()).is_ok_and(|kept| kept.is_some() == holds);
-        assert!(held, "{provides}");
+        let certified = super::served::certified(&placed, &copy);
+        let kept = crate::certificate::kept(copy.path()).ok().flatten();
+        assert_eq!(kept.is_some(), holds, "{provides}");
+        assert_eq!(
+            certified,
+            Ok(kept.map(|kept| kept.fingerprint)),
+            "the fingerprint it answers is the one the run made"
+        );
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt as _;

@@ -131,7 +131,8 @@ impl Prepared {
         )
         .map_err(refused("starting files"))?;
         let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
-        super::super::served::certified(upstream, &copy).map_err(refused("certificate"))?;
+        let fingerprint =
+            super::super::served::certified(upstream, &copy).map_err(refused("certificate"))?;
         super::super::served::mountable(upstream, &copy)
             .map_err(refused(super::super::served::MOUNTS))?;
         let apart = (adapter.placed.service != upstream.service)
@@ -160,6 +161,7 @@ impl Prepared {
             .chain(copy.made().map(str::to_owned))
             .chain(apart.iter().flat_map(Throwaway::made).map(str::to_owned))
             .chain(stand_ins.made.iter().cloned())
+            .chain(fingerprint)
             .collect();
         let mut secrets = written(&copy, apart.as_ref());
         for (secret, value) in stand_ins.held() {
