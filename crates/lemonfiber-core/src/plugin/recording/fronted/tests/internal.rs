@@ -142,4 +142,19 @@ fn only_an_adapter_speaking_media_serve_has_its_upstream_handed_one() {
         handed,
         Ok(kept.map(|pin| ("/config/lemonfiber/internal.p12".to_owned(), pin)))
     );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let locked = crate::plugin::program::Throwaway::of(
+            None,
+            &lemonfiber_fixtures::ports::Chance::cycling(),
+        );
+        let Ok(locked) = locked else {
+            unreachable!("a copy is made");
+        };
+        let _ = std::fs::set_permissions(locked.path(), std::fs::Permissions::from_mode(0o500));
+        let refused = super::super::super::served::internal(upstream, &serving, &locked);
+        let _ = std::fs::set_permissions(locked.path(), std::fs::Permissions::from_mode(0o700));
+        assert!(refused.is_err(), "{refused:?}");
+    }
 }

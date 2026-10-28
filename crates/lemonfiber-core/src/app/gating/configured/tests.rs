@@ -119,6 +119,47 @@ async fn a_route_to_a_curator_of_music_is_refused_and_nothing_written() {
     assert!(!path(scratch.path(), File::Tokens).exists());
 }
 
+/// The media server's route keeps the certificates its internal TLS port may present
+/// across admit and admitted, and a pin that is not a SHA-256 is refused with nothing
+/// written.
+#[tokio::test]
+async fn the_media_servers_pins_are_kept_and_an_odd_one_refused() {
+    let scratch = Scratch::new("gate-configured-pins");
+    let gate = gate(&scratch);
+    let pinned = vec![Gated {
+        target: Target::MediaServer {
+            pins: vec!["ab".repeat(32)],
+        },
+        path: "jellyfin".to_owned(),
+        address: "https://jellyfin:8920".to_owned(),
+        majors: vec![10],
+        credential: "the-gates-key".to_owned(),
+        tokens: Vec::new(),
+    }];
+
+    assert!(gate.admit(&pinned).await.is_ok());
+    assert_eq!(
+        gate.admitted()
+            .await
+            .ok()
+            .and_then(|admitted| admitted.first().map(|one| one.target.clone())),
+        Some(Target::MediaServer {
+            pins: vec!["ab".repeat(32)]
+        })
+    );
+
+    let odd = Scratch::new("gate-configured-pins-odd");
+    let gate = self::gate(&odd);
+    let mut unpinned = pinned;
+    for route in &mut unpinned {
+        route.target = Target::MediaServer {
+            pins: vec!["not-a-pin".to_owned()],
+        };
+    }
+    assert!(gate.admit(&unpinned).await.is_err());
+    assert!(!path(odd.path(), File::Upstreams).exists());
+}
+
 /// A film curator's route is the gate's film kind, and is answered as the curator of
 /// films it is.
 #[tokio::test]

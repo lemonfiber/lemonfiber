@@ -191,3 +191,44 @@ async fn without_an_administrator_or_a_media_server_nothing_is_asked() {
     assert_eq!(seed_internal_tls(&ctx, bundled.as_ref()).await, None);
     assert!(handed(&http).is_empty());
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_restart_that_cannot_be_run_or_placed_is_said_and_nothing_is_made_without_a_stack() {
+    let unrun = Arc::new(Recording::answering(Err(
+        crate::ports::process::Failure::NotFound {
+            program: "docker".to_owned(),
+        },
+    )));
+    let (ctx, _) = machine("encrypting-unrun", serving(Answer::reply(205, "")), unrun);
+    let wiring = seed_internal_tls(&ctx, server(&ctx).as_ref()).await;
+    assert!(matches!(
+        wiring.map(|one| one.state),
+        Some(State::Failed { detail }) if detail.contains("docker")
+    ),);
+
+    let (mut ctx, _) = machine(
+        "encrypting-unplaced",
+        serving(Answer::reply(205, "")),
+        ran(0),
+    );
+    let found = server(&ctx);
+    ctx.settings.stack_dir = None;
+    let Some(found) = found else {
+        unreachable!("the moved media server is hosted");
+    };
+    let unplaced = super::restarted(&ctx, &found).await;
+    assert!(
+        unplaced
+            .as_ref()
+            .is_err_and(|why| why.contains("is not a service of the stack written to disk")),
+        "{unplaced:?}"
+    );
+
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let Some(manifest) = manifest else {
+        unreachable!("the stack reads");
+    };
+    made_before_start(&ctx, &manifest);
+    assert!(server(&ctx)
+        .is_some_and(|server| server.served.confined_to.is_none() && pins(&server).is_empty()));
+}

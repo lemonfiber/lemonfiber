@@ -173,3 +173,12 @@ fn a_certificate_that_cannot_be_kept_where_it_is_asked_says_so() {
     assert!(matches!(unread, Err(Unkept::Unreadable(_))), "{unread:?}");
     assert!(!format!("{:?}", made_for("jellyfin")).contains("pkcs12:"));
 }
+
+#[test]
+fn a_name_a_certificate_cannot_be_made_out_to_is_refused_naming_it() {
+    let refused = made_for("jellyfín");
+    assert!(
+        matches!(&refused, Err(Unkept::Unmade(why)) if why.contains("jellyfín")),
+        "{refused:?}"
+    );
+}

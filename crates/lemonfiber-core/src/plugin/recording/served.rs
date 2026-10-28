@@ -155,8 +155,7 @@ pub(super) fn internal(
         return Ok(None);
     }
     let made = crate::certificate::internal::made_for(&upstream.service)
-        .map_err(|unkept| unkept.to_string())?;
-    crate::certificate::internal::written(copy.path(), &made)
+        .and_then(|made| crate::certificate::internal::written(copy.path(), &made).map(|()| made))
         .map_err(|unkept| unkept.to_string())?;
     let inside = Path::new(crate::project::entry::configuration(&upstream.config_path))
         .join(crate::certificate::internal::INTERNAL);

@@ -244,3 +244,21 @@ async fn an_address_is_served_until_the_process_ends_and_one_that_cannot_be_boun
     served.abort();
     assert!(serve(kit(), "not an address").await.is_err());
 }
+
+#[tokio::test]
+async fn what_is_in_force_once_the_upstream_restarts_is_answered_205_with_nothing_to_say() {
+    let restarting = lemonfiber_contract::Served::new("media.serve", 1, |_, _| {
+        Box::pin(async { Ok(lemonfiber_contract::wire::Answer::Reset) })
+    });
+    let (status, sort, body) = asked(
+        Kit::new(KEY, about()).serving(restarting),
+        "POST",
+        "/lemonfiber/media.serve/v1/serve_tls",
+        Some(KEY),
+    )
+    .await;
+    assert_eq!(
+        (status, sort.as_str(), body.as_str()),
+        (StatusCode::RESET_CONTENT, "", "")
+    );
+}

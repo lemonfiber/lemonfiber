@@ -586,3 +586,32 @@ async fn a_key_held_with_other_pins_is_handed_again_with_the_certificate_kept() 
 
     assert_eq!(seed(&ctx).await, Some(State::AlreadyWired));
 }
+
+/// A key that cannot be handed again with the certificate's pin is reported, never called
+/// done, and nothing filed beside it is revoked.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_key_that_cannot_be_handed_again_with_its_pin_is_reported() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let http = serving(&["kept", "stray"], "fresh", true);
+    let (ctx, at) = decline_ctx("decline-key-unrepinned", true, Some("kept"), http.clone());
+    let made =
+        crate::certificate::internal::kept_or_made(&at.join("config").join("jellyfin"), "jellyfin");
+    assert!(made.is_ok(), "{made:?}");
+    let directory = key_file(&at)
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500));
+    let state = super::super::decline::seed_decline_key(
+        &ctx,
+        &stack(true),
+        &super::moved_at(stack(true), &at),
+        Some(&at),
+    )
+    .await
+    .map(|one| one.state);
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
+    assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
+    assert!(!http.asked_for(media::serve("revoke")));
+}

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use p12_keystore::{Certificate, KeyStore, KeyStoreEntry, PrivateKey, PrivateKeyChain};
 
-use super::{fingerprint, unmade, Unkept};
+use super::{fingerprint, Unkept};
 
 /// Where the certificate is kept beneath the media server's configuration directory.
 pub const INTERNAL: &str = "lemonfiber/internal.p12";
@@ -60,34 +60,34 @@ pub fn path(config: &Path) -> PathBuf {
 ///
 /// [`Unkept::Unmade`] where the certificate or its PKCS#12 could not be made.
 pub fn made_for(service: &str) -> Result<Internal, Unkept> {
-    let mut params =
-        rcgen::CertificateParams::new(vec![service.to_owned()]).map_err(|why| unmade(&why))?;
+    sealed(service).ok_or_else(|| {
+        Unkept::Unmade(format!(
+            "a certificate made out to {service:?} could not be made or written as {INTERNAL}"
+        ))
+    })
+}
+
+/// The certificate made out to `service` and its PKCS#12, or nothing where either could
+/// not be made.
+fn sealed(service: &str) -> Option<Internal> {
+    let mut params = rcgen::CertificateParams::new(vec![service.to_owned()]).ok()?;
     params
         .distinguished_name
         .push(rcgen::DnType::CommonName, service);
-    let signing = rcgen::KeyPair::generate().map_err(|why| unmade(&why))?;
-    let certificate = params
-        .self_signed(&signing)
-        .map_err(|why| unmade(&why))?
-        .der()
-        .to_vec();
-    let key = signing.serialize_der();
+    let signing = rcgen::KeyPair::generate().ok()?;
+    let certificate = params.self_signed(&signing).ok()?.der().to_vec();
     let chain = PrivateKeyChain::new(
         ring::digest::digest(&ring::digest::SHA256, &certificate)
             .as_ref()
             .to_vec(),
-        PrivateKey::from_der(&key).map_err(|why| unwritten(&why))?,
-        [Certificate::from_der(&certificate).map_err(|why| unwritten(&why))?],
+        PrivateKey::from_der(&signing.serialize_der()).ok()?,
+        [Certificate::from_der(&certificate).ok()?],
     );
     let mut store = KeyStore::new();
     store.add_entry(ALIAS, KeyStoreEntry::PrivateKeyChain(chain));
-    let pkcs12 = store
-        .writer(PASSWORD)
-        .write()
-        .map_err(|why| unwritten(&why))?;
-    Ok(Internal {
+    Some(Internal {
         fingerprint: fingerprint(&certificate),
-        pkcs12,
+        pkcs12: store.writer(PASSWORD).write().ok()?,
     })
 }
 
@@ -150,11 +150,6 @@ pub fn kept_or_made(config: &Path, service: &str) -> Result<Internal, Unkept> {
     let made = made_for(service)?;
     written(config, &made)?;
     Ok(made)
-}
-
-/// Why a PKCS#12 could not be made, as it is reported.
-fn unwritten(why: &p12_keystore::error::Error) -> Unkept {
-    Unkept::Unmade(format!("{INTERNAL} could not be made: {why}"))
 }
 
 #[cfg(test)]

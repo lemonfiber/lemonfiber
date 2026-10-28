@@ -109,16 +109,19 @@ async fn served(ctx: &Ctx, server: &MediaServer, client: &dyn serve::Fills, path
 /// Start the media server's own service again, so it serves what it was told to.
 async fn restarted(ctx: &Ctx, server: &MediaServer) -> Result<(), String> {
     let id = server.id();
-    let manifest = ctx
+    let (profile, stack) = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|why| why.to_string())?;
-    let register = crate::app::plugins::read(ctx).map_err(|why| why.summary)?;
-    let profile = crate::project::profile_of(&manifest, register.installed(), id)
-        .ok_or_else(|| format!("{id} sits in no profile of the stack"))?;
-    let stack =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
-            .ok_or_else(|| "the stack has not been written to disk".to_owned())?;
+        .ok()
+        .zip(crate::app::plugins::read(ctx).ok())
+        .and_then(|(manifest, register)| {
+            crate::project::profile_of(&manifest, register.installed(), id)
+        })
+        .zip(crate::app::targets::project_directory(
+            &ctx.stack,
+            ctx.settings.stack_dir.as_deref(),
+        ))
+        .ok_or_else(|| format!("{id} is not a service of the stack written to disk"))?;
     let command = build(
         &Plan::one(id, &profile),
         &ctx.settings,

@@ -205,6 +205,14 @@ fn linked_household(
         (requests::intake("media_server_link"), vec![link]),
         (media::serve("filed_as"), vec![keys]),
         (media::serve("revoke"), vec![revoked]),
+        (
+            media::serve("declared"),
+            vec![media::answered(&{
+                let mut declared = lemonfiber_fixtures::declaring::enforceable();
+                declared.ports.internal_tls = Some(8920);
+                declared
+            })],
+        ),
     ])
 }
 
