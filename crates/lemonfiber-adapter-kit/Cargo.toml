@@ -17,9 +17,11 @@ async-trait = { workspace = true }
 axum = { workspace = true }
 form_urlencoded = { workspace = true }
 reqwest = { workspace = true }
+rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["net"] }
+webpki-roots = { workspace = true }
 
 [dev-dependencies]
 lemonfiber-adapters = { workspace = true }

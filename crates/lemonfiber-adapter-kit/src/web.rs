@@ -1,11 +1,13 @@
 //! Speaking HTTP to an upstream, for real: a [`Request`] turned into a `reqwest` call and
 //! what comes back turned into a [`Response`], bounded in time and in size.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_error::withheld::REDACTED;
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
+use rustls::{ClientConfig, RootCertStore};
 
 /// How long reaching the upstream may take.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -45,13 +47,33 @@ impl Web {
 
     /// A client, carrying cookies from one call to the next where `sessions` says so.
     fn built(sessions: bool) -> Result<Self, reqwest::Error> {
-        reqwest::Client::builder()
+        with_tls(reqwest::Client::builder(), bundled_tls().ok())
             .redirect(reqwest::redirect::Policy::none())
             .cookie_store(sessions)
             .connect_timeout(CONNECT_TIMEOUT)
             .timeout(REQUEST_TIMEOUT)
             .build()
             .map(|client| Self { client })
+    }
+}
+
+/// TLS over ring, trusting the roots bundled into the build, so an adapter reads no
+/// certificate store of the machine it runs on.
+fn bundled_tls() -> Result<ClientConfig, rustls::Error> {
+    let roots: RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
+    Ok(
+        ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_safe_default_protocol_versions()?
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    )
+}
+
+/// `builder` holding `tls`, or, where there is none, one reqwest refuses to build.
+fn with_tls(builder: reqwest::ClientBuilder, tls: Option<ClientConfig>) -> reqwest::ClientBuilder {
+    match tls {
+        Some(tls) => builder.tls_backend_preconfigured(tls),
+        None => builder.tls_backend_preconfigured(()),
     }
 }
 

@@ -135,16 +135,10 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         ),
         ("reqwest", &["lemonfiber-adapters/src/http.rs"]),
         ("sysinfo", &["lemonfiber-adapters/src/filesystem.rs"]),
-        // The HTTP adapter names it too: it is reqwest's TLS backend, and the
-        // reason a static Linux build carries no system TLS. Both are its homes.
-        (
-            "rustls",
-            &[
-                "lemonfiber-adapters/src/nntp.rs",
-                "lemonfiber-adapters/src/http.rs",
-            ],
-        ),
-        ("webpki_roots", &["lemonfiber-adapters/src/nntp.rs"]),
+        // The TLS the HTTP and NNTP adapters both wrap a connection in, and the
+        // reason a static Linux build carries no system TLS.
+        ("rustls", &["lemonfiber-adapters/src/tls.rs"]),
+        ("webpki_roots", &["lemonfiber-adapters/src/tls.rs"]),
         // Not an adapter — YAML is a format, and reading or writing one is pure.
         // Confined for the same reason the rest are: the operator's overlay is read in
         // one file and every generated document is written in another, and the day

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::{tls_config, unreachable, Dialer};
+use super::{unreachable, Dialer};
 use lemonfiber_ports::nntp::{Endpoint, Nntp};
 
 /// The behaviour of this adapter is proven from the core's `tests/integration/nntp.rs`,
@@ -101,13 +101,6 @@ async fn a_secure_dial_against_something_that_is_not_tls_does_not_complete() {
     };
     assert!(Dialer::new().converse(&secure, &[]).await.is_err());
     let _ = tokio::time::timeout(Duration::from_secs(3), server).await;
-}
-
-#[test]
-fn the_bundled_roots_build_a_configuration() {
-    // The trust anchors a static binary carries rather than reading from a
-    // system store, so a release with no system TLS still verifies a provider.
-    assert!(tls_config().is_ok());
 }
 
 #[test]
