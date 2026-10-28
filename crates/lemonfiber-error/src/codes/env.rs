@@ -58,4 +58,17 @@ codes! {
         remedy: "Bring both to the same Docker release, or carry on with the older set. It is \
             ordinary where the two machines were updated at different times.",
     }
+    /// Raised when the stack's engine is `OrbStack` with its network bridge on.
+    NETWORKS_MIRRORED = "ENV-6" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "OrbStack mirrors every container network into the Mac while its network bridge \
+            is on. The stack gives every link between two services a network of its own, and \
+            with that many networks mirrored each container start can take tens of seconds. \
+            lemonfiber reaches every service through a published port, never through a \
+            container's address, so nothing of the stack needs the bridge.",
+        remedy: "Turn the network bridge off with orb config set network_bridge false, then \
+            restart OrbStack.",
+    }
 }
