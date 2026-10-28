@@ -29,7 +29,9 @@ pub(crate) async fn restarted(ctx: &Ctx, services: &[String]) -> Option<String> 
         Ok(invocation) => invocation,
         Err(problem) => return Some(problem.summary),
     };
-    crate::app::engine::halted::before(ctx, &action, &invocation.addressed);
+    if let Err(refused) = crate::app::engine::before(ctx, &action, &invocation.addressed) {
+        return Some(refused.summary);
+    }
     let said = match ctx.seams.runner.run(&invocation.command).await {
         Ok(output) if output.succeeded() => None,
         Ok(refused) => Some(format!(

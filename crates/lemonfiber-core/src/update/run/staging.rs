@@ -270,7 +270,7 @@ async fn fetched(ctx: &Ctx, taking: &[Step]) {
 /// on the versions it was already running.
 async fn whole(ctx: &Ctx, action: &Action) -> Result<Vec<crate::model::StackEdit>, Box<Problem>> {
     let invocation = engine::invocation(ctx, &[], action)?;
-    engine::halted::before(ctx, action, &invocation.addressed);
+    engine::before(ctx, action, &invocation.addressed)?;
     ctx.seams
         .runner
         .run(&invocation.command)
@@ -335,7 +335,9 @@ async fn staged(ctx: &Ctx, manifest: &Manifest, taking: &[Step]) -> (Vec<Applied
 /// Move one service onto its pin, and find out whether it came back.
 async fn one(ctx: &Ctx, manifest: &Manifest, step: &Step) -> (Ending, Option<String>) {
     let service = std::slice::from_ref(&step.change.service);
-    engine::halted::before(ctx, &Action::Start(service.to_vec()), service);
+    if let Err(refused) = engine::before(ctx, &Action::Start(service.to_vec()), service) {
+        return (Ending::NotFetched, Some(refused.summary));
+    }
     match ctx.seams.runner.run(&step.argv).await {
         Err(failure) => (Ending::NotFetched, Some(failure.to_string())),
         Ok(output) if !output.succeeded() => (Ending::NotFetched, Some(refusal(&output))),

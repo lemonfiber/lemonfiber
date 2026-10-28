@@ -395,6 +395,8 @@ mod invitation_refusals;
 mod inviting;
 mod kinds;
 mod lifecycle;
+#[cfg(unix)]
+mod linking;
 mod logs;
 mod routing;
 mod settling;

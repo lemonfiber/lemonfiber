@@ -146,6 +146,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     if ctx.dry_run {
         return Ok(report);
     }
+    super::before(ctx, &Action::Up, &report.plan.services)?;
 
     if let Some(stopping) = stopping {
         let output = ctx
@@ -163,7 +164,6 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
 
     sweep.taken_away(ctx).await;
     copies.made(ctx).await?;
-    halted::before(ctx, &Action::Up, &report.plan.services);
     let started = ctx
         .seams
         .runner

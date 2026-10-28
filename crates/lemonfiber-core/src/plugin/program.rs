@@ -19,7 +19,9 @@ use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
 use crate::ports::program::{Configuration, Ended, Program, Run, Unran};
 use crate::project::entry::{configuration, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY};
 
-pub(crate) use throwaway::{digest as starting_digest, held as shipped, keep, Starting, Throwaway};
+pub(crate) use throwaway::{
+    digest as starting_digest, held as shipped, keep, unlinked, Starting, Throwaway,
+};
 
 /// The most of a run's standard output that is read.
 pub(crate) const READ_AT_MOST: usize = 64 * 1024;

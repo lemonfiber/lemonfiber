@@ -265,6 +265,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `LIFE-8` | `NO_ENGINE_IN_HERE` | error | 1 | 500 | 0.17.0 | Raised when lemonfiber runs in a container that cannot reach the engine. |
 | `LIFE-9` | `NOT_ON_THIS_ENGINE` | error | 1 | 500 | 0.17.0 | Raised when the engine lemonfiber reaches from a container does not know that container. |
 | `LIFE-10` | `RESTART_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where a restart names an offer that is not the one a fresh look at the stack builds. |
+| `LIFE-11` | `MOUNT_LINKED` | error | 1 | 409 | 0.18.0 | Raised when a start finds a service's mount source reached through a link. |
 
 ## `MIGRATE` — taking over a setup already here
 

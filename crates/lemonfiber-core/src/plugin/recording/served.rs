@@ -91,11 +91,9 @@ pub(super) async fn answers(
             .collect(),
         ..settled
     };
-    let served = recorder
-        .serving
-        .serve(&serve)
+    let served = started(recorder.serving, &serve, None)
         .await
-        .map_err(|unran| failing("container")(unran.to_string()))?;
+        .map_err(failing("container"))?;
     let seeded: Vec<String> = copy
         .made()
         .map(str::to_owned)
@@ -122,6 +120,21 @@ pub(super) async fn answers(
     };
     recorder.serving.removed(&served).await;
     finished
+}
+
+/// The container for `serve` started, on its own network or on the one `beside` is on,
+/// where nothing it is handed is reached through a link; why not otherwise.
+pub(in crate::plugin) async fn started(
+    serving: &dyn crate::ports::serving::Serving,
+    serve: &Serve,
+    beside: Option<&Served>,
+) -> Result<Served, String> {
+    crate::plugin::program::unlinked(serve.binds.iter().map(|bound| bound.source.as_path()))?;
+    match beside {
+        None => serving.serve(serve).await,
+        Some(served) => serving.beside(served, serve).await,
+    }
+    .map_err(|unran| unran.to_string())
 }
 
 /// A throwaway certificate and its key written into `copy` as the core writes them for a

@@ -126,6 +126,7 @@ async fn restarted(ctx: &Ctx, server: &MediaServer) -> Result<(), String> {
             ctx.settings.stack_dir.as_deref(),
         ))
         .ok_or_else(|| format!("{id} is not a service of the stack written to disk"))?;
+    crate::app::project::unlinked(ctx).map_err(|refused| refused.summary)?;
     let command = build(
         &Plan::one(id, &profile),
         &ctx.settings,

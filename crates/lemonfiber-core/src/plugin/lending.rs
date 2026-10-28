@@ -86,12 +86,7 @@ pub(crate) async fn lent(ctx: &Ctx, borrowing: &Borrowing<'_>) -> Result<Lent, S
         reaching: borrowing.reaching.clone(),
         ..super::recording::settled_as(adapter, &held, None, &operator)
     };
-    let served = ctx
-        .seams
-        .serving
-        .serve(&serve)
-        .await
-        .map_err(|unran| unran.to_string())?;
+    let served = super::recording::started(ctx.seams.serving.as_ref(), &serve, None).await?;
     match ready(ctx, adapter, &served).await {
         Ok(base) => Ok(Lent {
             served,

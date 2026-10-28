@@ -52,7 +52,7 @@ pub(crate) fn load(ctx: &Ctx) -> Halted {
 /// Every action that brings a container back or takes it away lets go: a start, a
 /// restart, and a removal alike. Only a stop is written down, and the actions that run
 /// nothing leave the record alone.
-pub(crate) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) {
+pub(super) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) {
     if matches!(action, Action::Stop(_) | Action::Pull(_) | Action::Config) {
         return;
     }

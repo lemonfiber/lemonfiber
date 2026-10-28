@@ -243,3 +243,27 @@ async fn a_restart_that_cannot_be_run_or_placed_is_said_and_nothing_is_made_with
         |server| server.served.confined_to.is_none() && pins(&ctx, &server).is_empty()
     ));
 }
+
+#[cfg(unix)]
+#[tokio::test(start_paused = true)]
+async fn a_server_over_a_linked_directory_is_not_started_again() {
+    let runner = ran(0);
+    let (ctx, project) = machine(
+        "encrypting-linked",
+        serving(Answer::reply(205, "")),
+        runner.clone(),
+    );
+    let _ = std::fs::write(
+        project.join(crate::project::FILE),
+        "services:\n  navidrome:\n    volumes:\n      - ./config/navidrome:/config\n",
+    );
+    lemonfiber_fixtures::scratch::linked_away(&project, "navidrome");
+
+    let wiring = seed_internal_tls(&ctx, server(&ctx).as_ref()).await;
+
+    assert!(matches!(
+        wiring.map(|one| one.state),
+        Some(State::Failed { detail }) if detail.contains("reached through a link")
+    ));
+    assert!(!runner.ran("restart"));
+}

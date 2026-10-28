@@ -19,7 +19,7 @@ mod unasked;
 mod written;
 
 pub(super) use fronted::handed_over;
-pub(super) use served::{healthy_at, mountable, settled_as};
+pub(super) use served::{healthy_at, mountable, settled_as, started};
 
 use std::path::Path;
 use std::sync::Arc;

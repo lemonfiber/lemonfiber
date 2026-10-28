@@ -761,3 +761,16 @@ async fn changing_the_dashboards_search_address_applies_the_dashboard_again() {
     let widgets = std::fs::read_to_string(homepage.join("widgets.yaml")).unwrap_or_default();
     assert!(widgets.contains(search), "{widgets}");
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_change_over_a_linked_directory_recreates_nothing_and_says_why() {
+    let machine = machine("linked", running(&["komga"]));
+    lemonfiber_fixtures::scratch::linked_away(&machine.document.with_file_name(""), "komga-worker");
+
+    let made = change(agreed(&machine.ctx, MODE, Some("fast")).await);
+
+    let said = made.and_then(|one| one.unrestarted).unwrap_or_default();
+    assert!(said.contains("reached through a link"), "{said}");
+    assert!(upped(&machine.runner).is_empty());
+}

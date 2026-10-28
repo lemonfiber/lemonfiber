@@ -672,3 +672,21 @@ async fn a_proof_whose_path_is_not_a_route_on_its_service_is_never_put() {
         );
     }
 }
+
+/// A plugin whose project mounts a directory reached through a link is not started, and
+/// the install is put back, saying why underneath.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_plugin_over_a_linked_directory_is_not_started_and_is_put_back() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("proving-linked", runner.clone(), answering(200));
+    lemonfiber_fixtures::scratch::linked_away(
+        &crate::app::project::directory(&ctx).unwrap_or_default(),
+        "navidrome",
+    );
+
+    let refused = beneath(installing(&ctx, &source("proving-linked", PROVING)).await);
+
+    assert_eq!(refused.1, "LIFE-11", "{refused:?}");
+    assert!(!runner.ran("up"), "{:?}", runner.seen());
+}

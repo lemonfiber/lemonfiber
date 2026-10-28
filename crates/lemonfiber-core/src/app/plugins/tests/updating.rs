@@ -667,3 +667,37 @@ async fn an_update_to_a_version_whose_one_service_guards_the_egress_is_refused()
     );
     assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
 }
+
+/// A new version over a directory reached through a link is not started, and neither is
+/// the old one put back over it.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_update_over_a_linked_directory_starts_neither_version() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("update-linked", runner.clone(), answering(200));
+    assert_eq!(
+        counted(installing(&ctx, &source("update-linked", PROVING)).await),
+        Some(1)
+    );
+    let before = runner.seen().len();
+    lemonfiber_fixtures::scratch::linked_away(
+        &crate::app::project::directory(&ctx).unwrap_or_default(),
+        "navidrome",
+    );
+
+    let done = update(updating(&ctx, &source("update-linked-next", &next())).await);
+
+    assert!(done
+        .as_ref()
+        .and_then(|one| one.restored.as_ref())
+        .is_some_and(|restored| !restored.running));
+    assert!(
+        !runner
+            .seen()
+            .iter()
+            .skip(before)
+            .any(|argv| argv.iter().any(|word| word == "up")),
+        "{:?}",
+        runner.seen()
+    );
+}

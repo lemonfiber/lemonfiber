@@ -181,3 +181,42 @@ async fn a_refusal_that_went_to_the_other_stream_is_still_the_operators_only_acc
         .unwrap_or_default();
     assert_eq!(said, "the compose file names no such service");
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_service_over_a_linked_directory_is_not_started_and_says_why() {
+    let machine = Machine::coming(Coming::Answering);
+    let archive = Kept::writing(true);
+    let mut context = ctx(&machine, behind(&[("sonarr", CURATOR_BEHIND)]), &archive);
+    let project: &'static std::path::Path = Box::leak(
+        lemonfiber_fixtures::scratch::Scratch::new("update-linked")
+            .kept()
+            .join("stack")
+            .into_boxed_path(),
+    );
+    lemonfiber_fixtures::stack::directory_into(project);
+    context.stack = lemonfiber_core::stack::Source::External(project);
+    lemonfiber_fixtures::scratch::linked_away(project, "navidrome");
+
+    let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
+
+    let read = report.map(|report| {
+        (
+            came_to(&report.applied, "sonarr"),
+            report
+                .applied
+                .first()
+                .and_then(|one| one.detail.clone())
+                .unwrap_or_default(),
+        )
+    });
+    assert!(
+        matches!(
+            &read,
+            Some((Some((Ending::NotFetched, Reversal::Rollback)), said))
+                if said.contains("reached through a link")
+        ),
+        "{read:?}"
+    );
+    assert!(machine.started().is_empty());
+}

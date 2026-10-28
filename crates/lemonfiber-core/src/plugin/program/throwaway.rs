@@ -233,7 +233,7 @@ impl Throwaway {
         }
         let at = self.copy.join(relative);
         let parent = at.parent().unwrap_or(&self.copy);
-        if linkless(&self.copy, parent)? == Reached::Absent {
+        if linkless(&self.copy, parent, &STARTING)? == Reached::Absent {
             return Ok(None);
         }
         match std::fs::symlink_metadata(&at) {
@@ -353,7 +353,7 @@ pub(crate) fn held(starting: Option<Starting<'_>>) -> Result<Vec<(String, Vec<u8
         return Ok(found);
     };
     let top = starting.at();
-    if linkless(starting.root, &top)? == Reached::Absent {
+    if linkless(starting.root, &top, &STARTING)? == Reached::Absent {
         return Ok(found);
     }
     let mut weight = 0_u64;
@@ -396,17 +396,33 @@ fn listed(dir: &Path) -> std::io::Result<Vec<(PathBuf, std::fs::Metadata)>> {
     })
 }
 
+/// Refuse where a directory a container is handed does not lie where throwaway copies are
+/// made, or is reached from there through a link.
+pub(crate) fn unlinked<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Result<(), String> {
+    let temp = std::env::temp_dir();
+    sources.into_iter().try_for_each(|source| {
+        if !source.starts_with(&temp) {
+            return Err(format!(
+                "{} does not lie where lemonfiber makes its throwaway copies, so no container \
+                 was started",
+                source.display()
+            ));
+        }
+        linkless(&temp, source, &MOUNTED).map(drop)
+    })
+}
+
 /// Whether the directory `top` is there, every step to it from `root` a directory of its
-/// own; refused where one is a link or anything else.
-fn linkless(root: &Path, top: &Path) -> Result<Reached, String> {
+/// own; refused in `refusals`' words where one is a link or anything else.
+fn linkless(root: &Path, top: &Path, refusals: &Refusals) -> Result<Reached, String> {
     let mut here = root.to_path_buf();
     for step in top.strip_prefix(root).unwrap_or(top).components() {
         here.push(step);
         match std::fs::symlink_metadata(&here) {
             Ok(kind) if kind.is_dir() => {}
-            Ok(_) => return Err(unkind(&here.display().to_string())),
+            Ok(_) => return Err((refusals.unkind)(&here.display().to_string())),
             Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(Reached::Absent),
-            Err(why) => return Err(unread(&here, &why)),
+            Err(why) => return Err((refusals.unread)(&here, &why)),
         }
     }
     Ok(Reached::There)
@@ -416,6 +432,37 @@ fn linkless(root: &Path, top: &Path) -> Result<Reached, String> {
 fn unkind(named: &str) -> String {
     format!("{named} is a link or a device, and no starting file may be either")
 }
+
+/// The refusal of a container handed a directory reached through something that is not a
+/// directory.
+fn unmounted(named: &str) -> String {
+    format!("{named} is a link or a device, so no container was started")
+}
+
+/// The refusal of a container handed a directory that could not be looked at.
+fn unlooked(at: &Path, why: &std::io::Error) -> String {
+    format!(
+        "{} could not be looked at, so no container was started: {why}",
+        at.display()
+    )
+}
+
+/// What a walk from a root says where a step is not a directory or cannot be looked at.
+struct Refusals {
+    /// Where a step is a link or anything else but a directory.
+    unkind: fn(&str) -> String,
+    /// Where a step cannot be looked at.
+    unread: fn(&Path, &std::io::Error) -> String,
+}
+
+/// A walk through the starting files.
+const STARTING: Refusals = Refusals { unkind, unread };
+
+/// A walk to a directory a container is handed.
+const MOUNTED: Refusals = Refusals {
+    unkind: unmounted,
+    unread: unlooked,
+};
 
 /// One file, opened through no link at its name and never waited on, held by the handle
 /// that was opened to being a file, the one its name resolves to beneath `top`, and

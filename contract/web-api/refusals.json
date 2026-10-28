@@ -264,6 +264,11 @@
     "status": 400,
     "description": "Raised where a restart names an offer that is not the one a fresh look at the stack builds."
   },
+  "LIFE-11": {
+    "name": "MOUNT_LINKED",
+    "status": 409,
+    "description": "Raised when a start finds a service's mount source reached through a link."
+  },
   "LIFE-3": {
     "name": "ALREADY_WORKING",
     "status": 409,

@@ -67,6 +67,21 @@ pub(crate) async fn verified(ctx: &Ctx) -> Result<(), Box<Problem>> {
     underneath::verified(ctx).await
 }
 
+/// What every action does just before it runs: a start or a restart refused where a
+/// directory the project mounts is reached through a link, then what the action brings
+/// back or takes away let go of.
+///
+/// # Errors
+///
+/// The refusal of a start or a restart over a directory reached through a link.
+pub(crate) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) -> Result<(), Box<Problem>> {
+    if matches!(action, Action::Up | Action::Start(_) | Action::Restart(_)) {
+        super::project::unlinked(ctx)?;
+    }
+    halted::before(ctx, action, addressed);
+    Ok(())
+}
+
 /// What resolving the forms into a runnable Compose command produced.
 ///
 /// Named fields rather than a tuple because callers want different parts of it: a
@@ -404,7 +419,7 @@ async fn worked(
     // stopped once it has: a start that falls over must read as the failure it is,
     // and a stop the operator asked for must not.
     let addressed = addressed(action, &report.plan);
-    halted::before(ctx, action, &addressed);
+    before(ctx, action, &addressed)?;
     let output = if matches!(action, Action::Pull(_)) {
         pulled(ctx, &command).await
     } else {
