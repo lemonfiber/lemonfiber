@@ -331,6 +331,9 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             Ok(Step::BeyondReach(format!("the device key {name}")))
         }
         Action::Leave { path } => Ok(Step::BeyondReach(format!("the overlay {path}"))),
+        Action::Unreplaced { service } => Ok(Step::BeyondReach(format!(
+            "the internal certificate of {service}"
+        ))),
         Action::Resettle {
             name,
             value,

@@ -20,6 +20,9 @@ pub enum Asking {
     Rotate {
         /// Which one, by the name the inventory gives it.
         credential: String,
+        /// The offer being answered, where the replacement is one that takes an offer:
+        /// nothing for its reading.
+        agreement: Option<String>,
     },
     /// End one grant of another service's credential to a third-party plugin, read first
     /// and carried out on the offer that reading named.
@@ -39,4 +42,9 @@ pub enum Asking {
         /// want it printed. Without this the warning is printed and the value is not.
         confirmed: bool,
     },
+}
+
+impl Asking {
+    /// The name the media server's internal certificate is replaced by on every surface.
+    pub const INTERNAL_CERTIFICATE: &str = "internal-certificate";
 }

@@ -25,6 +25,7 @@
         "const:\"revoke\"",
         "const:\"revoke-device\"",
         "const:\"rewind\"",
+        "const:\"unreplaced\"",
         "const:\"withdraw\""
       ],
       "required": true
@@ -125,6 +126,12 @@
       ],
       "required": true
     },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "to": {
       "type": [
         "string"
@@ -174,6 +181,7 @@
     "\"revoke\"",
     "\"revoke-device\"",
     "\"rewind\"",
+    "\"unreplaced\"",
     "\"withdraw\""
   ]
 }

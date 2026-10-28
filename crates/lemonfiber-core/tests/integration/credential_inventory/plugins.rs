@@ -74,6 +74,7 @@ async fn rotating_a_plugins_secret_replaces_nothing_and_says_why() {
         &ctx,
         Asking::Rotate {
             credential: "comics api_key".to_owned(),
+            agreement: None,
         },
     )
     .await;
@@ -198,6 +199,7 @@ async fn a_minted_plugin_secret_is_lemonfibers_and_rotating_it_holds_a_new_one()
         &ctx,
         Asking::Rotate {
             credential: "comics api_key".to_owned(),
+            agreement: None,
         },
     )
     .await

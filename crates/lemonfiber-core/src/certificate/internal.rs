@@ -29,6 +29,8 @@ pub struct Internal {
     pkcs12: Vec<u8>,
     /// SHA-256 over the certificate's DER encoding, lower-case hex.
     pub fingerprint: String,
+    /// Every name the certificate is made out to.
+    names: Vec<String>,
 }
 
 impl std::fmt::Debug for Internal {
@@ -45,6 +47,12 @@ impl Internal {
     #[must_use]
     pub fn pkcs12(&self) -> &[u8] {
         &self.pkcs12
+    }
+
+    /// Whether the certificate is made out to `service`.
+    #[must_use]
+    pub fn made_out_to(&self, service: &str) -> bool {
+        self.names.iter().any(|name| name == service)
     }
 }
 
@@ -89,6 +97,7 @@ fn sealed(service: &str) -> Option<Internal> {
     Some(Internal {
         fingerprint: fingerprint(&certificate),
         pkcs12: store.writer(PASSWORD).write().ok()?,
+        names: vec![service.to_owned()],
     })
 }
 
@@ -109,7 +118,28 @@ pub fn read(bytes: &[u8]) -> Result<Internal, Unkept> {
     Ok(Internal {
         fingerprint: fingerprint(certificate.as_der()),
         pkcs12: bytes.to_vec(),
+        names: named(certificate.as_der()),
     })
+}
+
+/// Every DNS name the certificate `der` is made out to.
+fn named(der: &[u8]) -> Vec<String> {
+    use x509_parser::prelude::{FromDer as _, GeneralName, X509Certificate};
+    let Ok((_, certificate)) = X509Certificate::from_der(der) else {
+        return Vec::new();
+    };
+    let Ok(Some(extension)) = certificate.subject_alternative_name() else {
+        return Vec::new();
+    };
+    extension
+        .value
+        .general_names
+        .iter()
+        .filter_map(|name| match name {
+            GeneralName::DNSName(dns) => Some((*dns).to_owned()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The certificate kept beneath `config`, read through no link, or nothing where none has
@@ -122,11 +152,15 @@ pub fn read(bytes: &[u8]) -> Result<Internal, Unkept> {
 ///
 /// [`Unkept::Unreadable`] where what is kept is not one, or is reached through a link.
 pub fn kept(confined: &dyn Confined, config: &Path) -> Result<Option<Internal>, Unkept> {
+    kept_at(confined, config, INTERNAL)
+}
+
+/// The certificate kept at `at` beneath `config`, read through no link, or nothing where
+/// none is.
+fn kept_at(confined: &dyn Confined, config: &Path, at: &str) -> Result<Option<Internal>, Unkept> {
     confined
-        .bytes(&path(config), config)
-        .map_err(|fault| {
-            Unkept::Unreadable(format!("{INTERNAL} could not be read: {}", fault.message))
-        })?
+        .bytes(&config.join(at), config)
+        .map_err(|fault| Unkept::Unreadable(format!("{at} could not be read: {}", fault.message)))?
         .map(|bytes| read(&bytes))
         .transpose()
 }
@@ -167,6 +201,9 @@ pub fn kept_or_made(
     written(confined, config, &made)?;
     Ok(made)
 }
+
+mod replacing;
+pub use replacing::{promoted, replacing, staged, withdrawn, Replacing, NEXT, PREVIOUS};
 
 #[cfg(test)]
 mod tests;

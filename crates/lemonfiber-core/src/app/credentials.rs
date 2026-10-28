@@ -14,6 +14,7 @@
 //! secrets in this stack belong to services, so a manifest that could not be read
 //! would leave those reading as none at all — which is a claim, not a gap.
 
+pub(crate) mod certifying;
 mod declining;
 mod gating;
 mod minting;
@@ -93,11 +94,14 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
                 .granting(after.installed())
                 .revoking(revoked));
         }
-        Asking::Rotate { credential } => {
+        Asking::Rotate {
+            credential,
+            agreement,
+        } => {
             replacing(
                 ctx,
                 held,
-                &credential,
+                (&credential, agreement.as_deref()),
                 Reaching {
                     services: &manifest.services,
                     fillers: &fillers,
@@ -105,7 +109,7 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
                     installed,
                 },
             )
-            .await
+            .await?
         }
     };
     Ok(inventory.granting(installed))
@@ -121,15 +125,19 @@ async fn showing(ctx: &Ctx, held: Vec<Held>, credential: &str, confirmed: bool) 
 }
 
 /// The inventory as it stands after a rotation, and what became of that rotation.
+///
+/// # Errors
+///
+/// Where the offer a replacement that takes one answers has moved.
 async fn replacing(
     ctx: &Ctx,
     held: Vec<Held>,
-    credential: &str,
+    (credential, agreement): (&str, Option<&str>),
     reaching: Reaching<'_>,
-) -> Inventory {
+) -> Result<Inventory, Box<Problem>> {
     let Some(found) = named(&held, credential) else {
         let known = named_ones(&held);
-        return Inventory::of(held).after(unknown(credential, &known));
+        return Ok(Inventory::of(held).after(unknown(credential, &known)));
     };
     let Reaching {
         services,
@@ -137,7 +145,16 @@ async fn replacing(
         project,
         installed,
     } = reaching;
-    let mut rotated = rotating::rotate(ctx, found, services, fillers, project).await;
+    let mut rotated = if found.setting == certifying::SETTING {
+        let stack = crate::seed::run::replacing::Stack {
+            services,
+            fillers,
+            project,
+        };
+        certifying::rotate(ctx, found, stack, agreement).await?
+    } else {
+        rotating::rotate(ctx, found, services, fillers, project).await
+    };
     if matches!(rotated.settled, Settled::Replaced { .. }) {
         rotated
             .consumers
@@ -146,7 +163,7 @@ async fn replacing(
     // Read again, because a landed replacement has changed what the answer is and an
     // inventory taken before it would report the state the rotation just left behind.
     let after = reading::taken(ctx, services, fillers, project, installed).await;
-    Inventory::of(after).after(rotated)
+    Ok(Inventory::of(after).after(rotated))
 }
 
 /// The stack a replacement reaches into: its services, who fills each of its asks,

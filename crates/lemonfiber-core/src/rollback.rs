@@ -252,6 +252,7 @@ pub fn standing(
             written,
             ..
         } => bounded(path, owner, *written, reads),
+        Kind::Certified { service, .. } => withdrawn_for_good(service),
         Kind::Overlaid { path, .. } => Standing::refused(
             &format!(
                 "the overlay {path} is the operator's own file, and lemonfiber does not write it"
@@ -291,6 +292,18 @@ pub fn standing(
         | Kind::Secret { .. }
         | Kind::Granted { .. } => Standing::whole(),
     }
+}
+
+/// Why a replacement of `service`'s internal certificate is not put back: the one it
+/// replaced is withdrawn from every holder, so only a further replacement moves it.
+fn withdrawn_for_good(service: &str) -> Standing {
+    Standing::refused(
+        &format!(
+            "the internal certificate of {service} was replaced, and the one it replaced is \
+             withdrawn from every holder"
+        ),
+        Some("replace it again: lemonfiber credentials --rotate internal-certificate"),
+    )
 }
 
 fn resettled(

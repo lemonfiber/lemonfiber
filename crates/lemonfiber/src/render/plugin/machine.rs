@@ -379,6 +379,9 @@ fn undone(undo: &Undo) -> String {
             format!("ended {plugin}'s grant of {}", grant.credential)
         }
         Action::Leave { path } => format!("left the overlay {path} as it is"),
+        Action::Unreplaced { service } => {
+            format!("left the internal certificate of {service} as it is")
+        }
     }
 }
 

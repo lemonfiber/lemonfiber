@@ -731,6 +731,12 @@ fn a_key_is_left_standing_and_named() {
             },
             "the overlay /cfg/overlay.yml",
         ),
+        (
+            Action::Unreplaced {
+                service: "jellyfin".to_owned(),
+            },
+            "the internal certificate of jellyfin",
+        ),
     ] {
         let carried = super::carrying_out(
             &lemonfiber_adapters::Disk,

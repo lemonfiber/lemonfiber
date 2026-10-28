@@ -42,7 +42,8 @@ fn ran(status: i32) -> Arc<Recording> {
     })))
 }
 
-/// A media server answering `serve_tls` with `answer`, and its declaration.
+/// A media server answering `serve_tls` with `answer`, saying it is ready, and its
+/// declaration.
 fn serving(answer: Answer) -> Arc<Fake> {
     Fake::by_path(vec![
         (media::serve("serve_tls"), answer),
@@ -50,6 +51,7 @@ fn serving(answer: Answer) -> Arc<Fake> {
             media::serve("declared"),
             media::answered(&lemonfiber_fixtures::declaring::enforceable()),
         ),
+        ("/lemonfiber/adapter/v1/ready", Answer::reply(200, "true")),
     ])
 }
 
@@ -70,7 +72,7 @@ async fn the_certificate_is_made_before_the_stack_starts_and_is_what_holders_are
     };
     assert_eq!(
         pins(&ctx, &server),
-        Vec::<String>::new(),
+        Ok(Vec::<String>::new()),
         "none is made yet"
     );
 
@@ -87,7 +89,7 @@ async fn the_certificate_is_made_before_the_stack_starts_and_is_what_holders_are
     assert!(kept.is_some(), "{}", config.display());
     assert_eq!(
         pins(&ctx, &server),
-        kept.map(|kept| vec![kept.fingerprint]).unwrap_or_default()
+        Ok(kept.map(|kept| vec![kept.fingerprint]).unwrap_or_default())
     );
 
     let again = internal::kept(&lemonfiber_adapters::Disk, &config)
@@ -115,7 +117,7 @@ async fn a_server_serving_it_already_is_left_running() {
         vec![serde_json::json!("/config/lemonfiber/internal.p12")]
     );
     let kept = server(&ctx)
-        .map(|server| pins(&ctx, &server))
+        .and_then(|server| pins(&ctx, &server).ok())
         .unwrap_or_default();
     assert_eq!(kept.len(), 1, "the certificate is made where none is kept");
     assert_eq!(
@@ -129,6 +131,46 @@ async fn a_server_serving_it_already_is_left_running() {
         "it is handed the SHA-256 of the certificate it serves"
     );
     assert!(!runner.ran("restart"));
+}
+
+#[test]
+fn a_certificate_not_made_out_to_the_media_server_is_replaced_before_the_stack_starts() {
+    let (ctx, _) = machine("encrypting-misnamed", serving(media::taken()), ran(0));
+    let found = server(&ctx);
+    let config = found
+        .as_ref()
+        .and_then(|server| server.served.confined_to.clone())
+        .unwrap_or_default();
+    let Ok(misnamed) = internal::made_for("emby") else {
+        unreachable!("a certificate is made");
+    };
+    assert_eq!(
+        internal::written(&lemonfiber_adapters::Disk, &config, &misnamed),
+        Ok(())
+    );
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let Some(manifest) = manifest else {
+        unreachable!("the stack reads");
+    };
+
+    made_before_start(&ctx, &manifest);
+
+    let kept = internal::replacing(&lemonfiber_adapters::Disk, &config).unwrap_or_default();
+    assert_eq!(
+        kept.current,
+        Some(misnamed.clone()),
+        "the one in force stays"
+    );
+    assert!(
+        kept.next.is_some_and(|next| next.made_out_to("jellyfin")),
+        "a replacement made out to the media server waits for every holder"
+    );
+    let handed = found.map(|server| pins(&ctx, &server));
+    assert!(handed.is_some_and(|handed| handed.is_ok_and(|handed| handed.len() == 2)));
+
+    let _ = std::fs::write(config.join(internal::NEXT), "not a certificate");
+    let unread = server(&ctx).map(|server| pins(&ctx, &server));
+    assert!(unread.is_some_and(|pins| pins.is_err_and(|why| why.contains("keeps what it holds"))));
 }
 
 #[tokio::test(start_paused = true)]
@@ -176,7 +218,10 @@ async fn a_server_serving_it_only_once_it_restarts_is_started_again_and_waited_f
     assert!(restarted
         .first()
         .is_some_and(|argv| argv.last().map(String::as_str) == Some("jellyfin")));
-    assert!(http.asked_for(media::serve("declared")));
+    assert!(
+        http.asked_for("/lemonfiber/adapter/v1/ready"),
+        "nothing else is asked of it until it says it is ready"
+    );
 
     let failing = ran(1);
     let (ctx, _) = machine(
@@ -282,9 +327,10 @@ async fn a_restart_that_cannot_be_run_or_placed_is_said_and_nothing_is_made_with
         unreachable!("the stack reads");
     };
     made_before_start(&ctx, &manifest);
-    assert!(server(&ctx).is_some_and(
-        |server| server.served.confined_to.is_none() && pins(&ctx, &server).is_empty()
-    ));
+    assert!(
+        server(&ctx).is_some_and(|server| server.served.confined_to.is_none()
+            && pins(&ctx, &server).is_ok_and(|pins| pins.is_empty()))
+    );
 }
 
 #[cfg(unix)]

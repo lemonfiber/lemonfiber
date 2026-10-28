@@ -1,8 +1,9 @@
 //! The acts on what extends the stack: installing, updating, removing and proving a plugin,
-//! running one of its demand recipes, ending a grant of a credential to one, and choosing
-//! which service fills a capability.
+//! running one of its demand recipes, ending a grant of a credential to one, replacing the
+//! certificate the media server presents to every holder of a media server credential, and
+//! choosing which service fills a capability.
 //!
-//! Apart from the table that names them for the reason the quality choice is: seven rows
+//! Apart from the table that names them for the reason the quality choice is: eight rows
 //! reading fields no other row reads, where a missing subject is the only thing any of
 //! them can refuse. Whether a source holds a plugin, whether the plugin named is
 //! installed, whether a service can fill a capability and whether the offer still
@@ -20,13 +21,14 @@ use lemonfiber_core::plugin::Source;
 use super::{filled, Arguments, Refused};
 
 /// Every act on what extends the stack.
-const ABOUT: [&str; 7] = [
+const ABOUT: [&str; 8] = [
     "plugin-install",
     "plugin-update",
     "plugin-remove",
     "plugin-prove",
     "plugin-run",
     "credentials-revoke",
+    "internal-certificate-replace",
     "wiring-fill",
 ];
 
@@ -60,6 +62,12 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         argument: argument.to_owned(),
     };
     let agreement = filled(offer);
+    if action == "internal-certificate-replace" {
+        return Ok(Command::Credentials(Asking::Rotate {
+            credential: Asking::INTERNAL_CERTIFICATE.to_owned(),
+            agreement,
+        }));
+    }
     if action == "credentials-revoke" {
         return Ok(Command::Credentials(Asking::Revoke {
             plugin: filled(plugin).ok_or_else(|| needs("plugin"))?,

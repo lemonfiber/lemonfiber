@@ -66,6 +66,10 @@ impl Confined for Disk {
     fn bytes(&self, path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault> {
         replacing::bytes(path, within)
     }
+
+    fn removed(&self, path: &Path, within: &Path) -> Result<(), Fault> {
+        replacing::removed(path, within)
+    }
 }
 
 /// What an opened handle turned out to be, against the name it was opened by.

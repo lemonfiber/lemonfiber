@@ -588,6 +588,15 @@ async fn a_key_held_with_other_pins_is_handed_again_with_the_certificate_kept() 
     assert!(!minted_on(&http));
 
     assert_eq!(seed(&ctx).await, Some(State::AlreadyWired));
+
+    let _ = std::fs::write(
+        at.join("config")
+            .join("jellyfin")
+            .join(crate::certificate::internal::NEXT),
+        "not a certificate",
+    );
+    assert!(matches!(seed(&ctx).await, Some(State::Failed { .. })));
+    assert_eq!(pins(), Some(format!("{}\n", made.fingerprint)));
 }
 
 /// A key that cannot be handed again with the certificate's pin is reported, never called
@@ -620,4 +629,79 @@ async fn a_key_that_cannot_be_handed_again_with_its_pin_is_reported() {
     let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
     assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
     assert!(!http.asked_for(media::serve("revoke")));
+}
+
+/// The decline service as the one holder of a media server credential: a replacement the
+/// media server does not yet present keeps it holding both pins, and the next seed that
+/// finds it presented withdraws the old one and hands the new one alone.
+#[tokio::test(start_paused = true)]
+async fn a_replacement_reaches_the_decline_service_before_the_old_pin_is_withdrawn() {
+    let ready = (
+        "/lemonfiber/adapter/v1/ready",
+        vec![lemonfiber_fixtures::http::Answer::reply(200, "true")],
+    );
+    let http = Fake::by_path_in_turn(vec![
+        (media::serve("filed_as"), vec![media::answered(&["kept"])]),
+        (media::serve("revoke"), vec![media::taken()]),
+        (
+            media::serve("serve_tls"),
+            vec![
+                media::taken(),
+                lemonfiber_fixtures::http::Answer::reply(205, ""),
+                media::taken(),
+            ],
+        ),
+        ready,
+    ]);
+    let (mut ctx, at) = decline_ctx("decline-replaced", true, Some("kept"), http.clone());
+    ctx.settings.stack_dir = Some(at.join("stack"));
+    let config = at.join("config").join("jellyfin");
+    let Ok(old) =
+        crate::certificate::internal::kept_or_made(&lemonfiber_adapters::Disk, &config, "jellyfin")
+    else {
+        unreachable!("the internal certificate is made");
+    };
+    let services = stack(true);
+    let fillers = super::moved_at(stack(true), &at);
+    let Some(server) = crate::app::targets::MediaServer::of(&fillers) else {
+        unreachable!("the moved media server fills the identity source");
+    };
+    let at_stack = crate::seed::run::replacing::Stack {
+        services: &services,
+        fillers: &fillers,
+        project: Some(&at),
+    };
+    let pins = || {
+        std::fs::read_to_string(crate::app::invite::declining::path(
+            &at,
+            lemonfiber_sidecar::decline::File::Pins,
+        ))
+        .unwrap_or_default()
+    };
+
+    let first = crate::seed::run::replacing::replaced(&ctx, at_stack, &server).await;
+
+    let kept = crate::certificate::internal::replacing(&lemonfiber_adapters::Disk, &config)
+        .unwrap_or_default();
+    let Some(new) = kept.current.clone() else {
+        unreachable!("the replacement is in place: {first:?}");
+    };
+    assert_eq!(kept.previous, Some(old.clone()), "{first:?}");
+    assert!(pins().contains(&old.fingerprint) && pins().contains(&new.fingerprint));
+
+    let second = crate::seed::run::replacing::advanced(&ctx, at_stack, Some(&server)).await;
+
+    let kept = crate::certificate::internal::replacing(&lemonfiber_adapters::Disk, &config)
+        .unwrap_or_default();
+    assert_eq!((kept.next, kept.previous), (None, None), "{second:?}");
+    assert_eq!(pins(), format!("{}\n", new.fingerprint));
+    let mut rehearsing = ctx.clone();
+    rehearsing.dry_run = true;
+    let _ = crate::certificate::internal::staged(&lemonfiber_adapters::Disk, &config, "jellyfin");
+    let rehearsed =
+        crate::seed::run::replacing::advanced(&rehearsing, at_stack, Some(&server)).await;
+    assert!(rehearsed.iter().any(|one| matches!(
+        &one.state,
+        State::WouldWire { ours: Some(ours), .. } if ours.contains("the decline service is handed")
+    )));
 }

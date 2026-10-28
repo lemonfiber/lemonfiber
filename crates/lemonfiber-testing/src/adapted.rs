@@ -454,6 +454,10 @@ impl Confined for Keyed {
     ) -> Result<Option<Vec<u8>>, Fault> {
         self.inner.bytes(path, within)
     }
+
+    fn removed(&self, path: &std::path::Path, within: &std::path::Path) -> Result<(), Fault> {
+        self.inner.removed(path, within)
+    }
 }
 
 /// Whether the engine's account `reporting` lists `adapter` healthy and published on

@@ -394,3 +394,20 @@ fn a_rehearsed_revoke_of_a_grant_nothing_reads_restarts_nothing_and_writes_nothi
     assert!(!ended.contains("Restarted"), "{ended}");
     assert!(!ended.contains("did not restart"), "{ended}");
 }
+
+#[test]
+fn a_rehearsed_replacement_that_takes_an_offer_says_how_to_answer_it() {
+    let text = drawn(
+        Inventory::of(Vec::new()).after(
+            Rotation::would(
+                "Media server internal certificate",
+                "the decline service is handed the new certificate's SHA-256",
+                "/stack/config/jellyfin/lemonfiber/internal.p12",
+                Vec::new(),
+            )
+            .offering("1a2b3c4d"),
+        ),
+    );
+    assert!(text.contains("answering this offer by name:"), "{text}");
+    assert!(text.contains("  --offer 1a2b3c4d"), "{text}");
+}

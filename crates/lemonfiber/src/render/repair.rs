@@ -152,6 +152,9 @@ fn restoring(action: &Action) -> String {
             format!("{plugin}'s grant of {} ended, as it was", grant.credential)
         }
         Action::Leave { path } => format!("the overlay {path} left as it is"),
+        Action::Unreplaced { service } => {
+            format!("the internal certificate of {service} left as it is")
+        }
     }
 }
 

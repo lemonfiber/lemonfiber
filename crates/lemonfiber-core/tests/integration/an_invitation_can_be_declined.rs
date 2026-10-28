@@ -468,6 +468,7 @@ async fn the_decline_key_is_listed_shown_and_replaced() {
     };
     let rotated = match asked(lemonfiber_core::app::Asking::Rotate {
         credential: "Media server decline key".to_owned(),
+        agreement: None,
     })
     .await
     {

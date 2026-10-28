@@ -72,6 +72,7 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
     };
     let rotated = match asked(lemonfiber_core::app::Asking::Rotate {
         credential: "Jellyfin request-gate key".to_owned(),
+        agreement: None,
     })
     .await
     {

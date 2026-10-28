@@ -101,6 +101,7 @@ fn reading_a_credential_is_not_read_the_way_rotating_one_is() {
     assert!(
         asked(&Command::Credentials(Asking::Rotate {
             credential: "qbittorrent".to_owned(),
+            agreement: None,
         }))
         .rehearsal
             == Rehearsal::Reports
@@ -431,6 +432,7 @@ fn taught_to_report() -> Vec<Command> {
         Command::Undo { run: None },
         Command::Credentials(Asking::Rotate {
             credential: "qbittorrent".to_owned(),
+            agreement: None,
         }),
         Command::Setup(SetupAction::Apply),
         Command::Backup { service: None },

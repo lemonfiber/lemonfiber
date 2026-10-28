@@ -184,11 +184,15 @@ async fn with_the_media_server(
         ));
         return wirings;
     };
+    let pins = match super::encrypting::pins(ctx, server) {
+        Ok(pins) => pins,
+        Err(detail) => return vec![settled(State::Failed { detail })],
+    };
     let routed = &Routed {
         server,
         pairing,
         internal,
-        pins: super::encrypting::pins(ctx, server),
+        pins,
     };
     let (gate, admitted) = match asked(ctx, fillers, project).await {
         Ok(asked) => asked,

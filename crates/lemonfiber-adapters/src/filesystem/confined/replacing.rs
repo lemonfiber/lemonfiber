@@ -99,6 +99,22 @@ pub(super) fn bytes(path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault
     }
 }
 
+/// Take away the file `path`, through the handle of the directory it is in.
+#[cfg(unix)]
+pub(super) fn removed(path: &Path, within: &Path) -> Result<(), Fault> {
+    use rustix::fs::{unlinkat, AtFlags};
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(unremoved(path, "it names no file"));
+    };
+    let Some(here) = walked(parent, within, Readable::Shared, false)? else {
+        return Ok(());
+    };
+    match unlinkat(&here, name, AtFlags::empty()) {
+        Ok(()) | Err(rustix::io::Errno::NOENT) => Ok(()),
+        Err(error) => Err(unremoved(path, &error.to_string())),
+    }
+}
+
 /// The directory `path` beneath `within`, held open, each step reached through no link
 /// and made first where `making` says so; nothing where a step is not there and is not to
 /// be made.
@@ -230,6 +246,19 @@ fn worded(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
+/// Take away the file `path`, every step looked at first.
+#[cfg(windows)]
+pub(super) fn removed(path: &Path, within: &Path) -> Result<(), Fault> {
+    use lemonfiber_ports::filesystem::Lying;
+    match super::lies(path, within) {
+        Lying::Absent => Ok(()),
+        Lying::Escaped => Err(unremoved(path, "a link stands on the way")),
+        Lying::Plain => {
+            std::fs::remove_file(path).map_err(|error| unremoved(path, &error.to_string()))
+        }
+    }
+}
+
 /// The name a file is written under beside `name` before it is renamed over it.
 fn staging(name: &std::ffi::OsStr) -> std::ffi::OsString {
     let mut staging = std::ffi::OsString::from(".");
@@ -251,6 +280,11 @@ fn unmade(path: &Path, within: &Path, why: &str) -> Fault {
 /// The refusal of writing `path`.
 fn unwritten(path: &Path, why: &str) -> Fault {
     Fault::new(format!("{} was not written: {why}", path.display()))
+}
+
+/// The refusal of taking `path` away.
+fn unremoved(path: &Path, why: &str) -> Fault {
+    Fault::new(format!("{} was not taken away: {why}", path.display()))
 }
 
 /// The refusal of reading `path`.

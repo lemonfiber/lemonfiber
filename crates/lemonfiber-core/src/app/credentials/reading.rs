@@ -42,6 +42,14 @@ pub(crate) async fn taken(
     taken.extend(super::declining::held(ctx, services, project).await);
     taken.extend(super::gating::held(ctx, services, fillers, project).await);
     taken.extend(super::tokening::held(ctx, services, fillers, project).await);
+    taken.extend(super::certifying::held(
+        ctx,
+        crate::seed::run::replacing::Stack {
+            services,
+            fillers,
+            project,
+        },
+    ));
     let secrets = crate::settings::secrets_at(ctx);
     let kept = secrets
         .as_deref()

@@ -165,6 +165,7 @@ pub fn described(change: &Change) -> String {
             format!("{plugin}'s grant of {}", grant.credential)
         }
         Kind::Overlaid { path, .. } => format!("the overlay {path}"),
+        Kind::Certified { service, .. } => format!("the internal certificate of {service}"),
     }
 }
 

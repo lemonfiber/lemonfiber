@@ -539,3 +539,18 @@ fn the_overlay_is_said_to_be_left_as_it_is() {
         "{said}"
     );
 }
+
+#[test]
+fn a_replaced_certificate_is_said_to_be_left_as_it_is() {
+    let undos = vec![Undo {
+        target: "jellyfin".to_owned(),
+        action: Action::Unreplaced {
+            service: "jellyfin".to_owned(),
+        },
+    }];
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+    assert!(
+        said.contains("the internal certificate of jellyfin left as it is"),
+        "{said}"
+    );
+}

@@ -12,6 +12,7 @@ async fn rotating(ctx: &Ctx) -> Option<Rotation> {
         ctx,
         crate::app::command::Asking::Rotate {
             credential: CREDENTIAL.to_owned(),
+            agreement: None,
         },
     )
     .await

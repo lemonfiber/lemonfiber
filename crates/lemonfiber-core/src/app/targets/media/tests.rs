@@ -311,6 +311,7 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
         assert!(server.identifying(&ctx).await.is_none());
         assert!(server.identifying(&ctx).await.is_none());
         assert!(server.administering(&ctx).await.is_none());
+        assert!(!server.ready(&ctx).await);
     }
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
