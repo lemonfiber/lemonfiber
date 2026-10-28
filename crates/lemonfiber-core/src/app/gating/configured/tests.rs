@@ -29,7 +29,7 @@ fn routes() -> Vec<Gated> {
             tokens: vec![TokenHash::of("tv-token").as_str().to_owned()],
         },
         Gated {
-            target: Target::MediaServer,
+            target: Target::MediaServer { pins: Vec::new() },
             path: "jellyfin".to_owned(),
             address: "http://jellyfin:8096".to_owned(),
             majors: vec![10],

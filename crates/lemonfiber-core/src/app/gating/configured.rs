@@ -141,14 +141,16 @@ fn kind(target: &Target) -> Result<Kind, Failure> {
                 service: SERVICE.to_owned(),
                 detail: format!("it reaches no curator filing {media_type}"),
             }),
-        Target::MediaServer => Ok(Kind::Jellyfin),
+        Target::MediaServer { .. } => Ok(Kind::Jellyfin),
     }
 }
 
 /// What a route of `kind` reaches.
 fn target(kind: Kind) -> Target {
-    super::fetching(kind).map_or(Target::MediaServer, |fetching| Target::Curator {
-        media_type: fetching.media_type().to_owned(),
+    super::fetching(kind).map_or(Target::MediaServer { pins: Vec::new() }, |fetching| {
+        Target::Curator {
+            media_type: fetching.media_type().to_owned(),
+        }
     })
 }
 

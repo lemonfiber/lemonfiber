@@ -80,7 +80,7 @@ pub(crate) fn fetched(target: &crate::ports::service::Target) -> Option<media::K
         crate::ports::service::Target::Curator { media_type } => {
             media::Kind::for_media_type(media_type)
         }
-        crate::ports::service::Target::MediaServer => None,
+        crate::ports::service::Target::MediaServer { .. } => None,
     }
 }
 

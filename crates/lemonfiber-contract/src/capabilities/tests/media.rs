@@ -5,10 +5,10 @@ use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    Addressee, Answers, AppKeys, BytePath, Dated, Declared, Declaring, EpisodeDetail, Failure,
-    Fronted, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath,
-    Locations, Medium, Naming, Picture, Playback, Ports, Presentation, Question, Screening,
-    SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
+    Addressee, Answers, AppKeys, Applied, BytePath, Dated, Declared, Declaring, Encrypting,
+    EpisodeDetail, Failure, Fronted, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress,
+    Library, LivePath, Locations, Medium, Naming, Picture, Playback, Ports, Presentation, Question,
+    Screening, SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -226,6 +226,7 @@ pub(super) fn declared() -> Declared {
         ports: Ports {
             upstream: 8000,
             encrypted: Some(8443),
+            internal_tls: Some(8920),
         },
     }
 }
@@ -237,8 +238,23 @@ impl Declaring for Upstream {
     }
 }
 
+/// Where the script's upstream reads a certificate only once it restarts.
+const READ_AT_START: &str = "/config/lemonfiber/internal.p12";
+
+#[async_trait]
+impl Encrypting for Upstream {
+    async fn serve_tls(&self, path: &str) -> Result<Applied, Failure> {
+        self.tell(format!("serve_tls {path}"));
+        Ok(if path == READ_AT_START {
+            Applied::OnRestart
+        } else {
+            Applied::Now
+        })
+    }
+}
+
 /// Every operation of the capability, once, each answer written down.
-async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring>(
+async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring + Encrypting>(
     server: &M,
 ) -> Vec<String> {
     let how_far = HowFar {
@@ -275,6 +291,8 @@ async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring>
         format!("{:?}", server.answers_to("gate-key").await),
         format!("{:?}", server.revoke("gate-key").await),
         format!("{:?}", server.declared().await),
+        format!("{:?}", server.serve_tls(READ_AT_START).await),
+        format!("{:?}", server.serve_tls("/config/tls.p12").await),
     ]
 }
 
@@ -292,7 +310,9 @@ async fn a_media_server_answers_and_is_told_through_its_contract_as_it_is_in_pro
             "allow",
             "restart",
             "answers",
-            "revoke"
+            "revoke",
+            "serve_tls",
+            "serve_tls"
         ]
     );
 }

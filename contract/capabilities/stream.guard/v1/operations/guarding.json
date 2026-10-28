@@ -346,6 +346,16 @@
                         "null"
                       ]
                     },
+                    "internal_tls": {
+                      "description": "The internal TLS port it serves with the certificate the core makes for it, where\nevery service the core hands a media server credential reaches it; none where it\nfills no `identity.source`.",
+                      "format": "uint16",
+                      "maximum": 65535,
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
                     "upstream": {
                       "description": "Its own.",
                       "format": "uint16",

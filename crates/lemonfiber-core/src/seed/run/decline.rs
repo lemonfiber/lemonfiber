@@ -99,7 +99,7 @@ pub(super) async fn seed_decline_key(
         .await
         .ok()
         .flatten()
-        .and_then(|hash| named_by(&filed, &hash));
+        .and_then(|held| named_by(&filed, &held.key));
     let state = match held {
         Some(key) => kept(ctx, client.as_ref(), &filed, &key).await,
         None if ctx.dry_run => return Some(would_mint(server)),
@@ -141,7 +141,7 @@ async fn minted(client: &dyn AppKeys, filed: &[String], decline: &dyn Declining)
         Ok(key) => key,
         Err(state) => return state,
     };
-    if let Err(failure) = decline.hold(&key).await {
+    if let Err(failure) = decline.hold(&key, &[]).await {
         let _ = client.revoke(&key).await;
         return State::Failed {
             detail: format!(

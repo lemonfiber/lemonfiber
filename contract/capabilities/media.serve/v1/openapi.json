@@ -142,6 +142,9 @@
     "/lemonfiber/media.serve/v1/series_held": {
       "$ref": "operations/series_held.json"
     },
+    "/lemonfiber/media.serve/v1/serve_tls": {
+      "$ref": "operations/serve_tls.json"
+    },
     "/lemonfiber/media.serve/v1/sign_out": {
       "$ref": "operations/sign_out.json"
     },

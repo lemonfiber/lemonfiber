@@ -1,6 +1,6 @@
-use lemonfiber_ports::service::Failure;
+use lemonfiber_ports::service::{Applied, Failure};
 
-use super::{answered, asked, Kind, Refusal};
+use super::{answered, asked, Answer, Kind, Refusal};
 
 /// Each way a port fails crosses as its own refusal and is read back as the same way.
 #[test]
@@ -69,7 +69,7 @@ fn a_body_that_is_not_the_request_is_refused_as_not_asked() {
 
 #[test]
 fn an_answer_is_its_json_and_a_failure_is_its_refusal() {
-    assert_eq!(answered(Ok(3_u8)).ok(), Some(b"3".to_vec()));
+    assert_eq!(answered(Ok(3_u8)).ok(), Some(Answer::Json(b"3".to_vec())));
     let failed: Result<u8, Failure> = Err(Failure::Unavailable {
         service: "upstream".to_owned(),
     });
@@ -104,5 +104,18 @@ fn an_answer_that_cannot_be_written_is_refused() {
     assert_eq!(
         answered(Ok(Unwritable)).err().map(|refusal| refusal.kind),
         Some(Kind::Refused)
+    );
+}
+
+#[test]
+fn applied_once_the_upstream_restarts_is_a_reset_and_at_once_is_said() {
+    assert_eq!(answered(Ok(Applied::OnRestart)), Ok(Answer::Reset));
+    assert_eq!(
+        answered(Ok(Applied::Now)),
+        Ok(Answer::Json(b"null".to_vec()))
+    );
+    assert_eq!(
+        answered(Ok("on-restart".to_owned())),
+        Ok(Answer::Json(b"\"on-restart\"".to_vec()))
     );
 }

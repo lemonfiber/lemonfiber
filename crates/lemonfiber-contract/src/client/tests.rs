@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
-use lemonfiber_ports::service::Failure;
+use lemonfiber_ports::service::{Applied, Failure};
 
 use super::{Contracted, Witness, DEADLINE, LARGEST};
 
@@ -73,6 +73,36 @@ async fn only_an_answer_with_nothing_to_say_may_be_empty() {
         Err(Failure::Refused { .. })
     ));
     assert_eq!((told.count(), told_empty.count()), (0, 1));
+}
+
+#[tokio::test]
+async fn a_reset_reads_as_applied_once_the_upstream_restarts_and_only_so() {
+    let (_, client, told) = adapter(Answer::reply(205, ""));
+    assert_eq!(
+        asked::<Applied>(&client).await.ok(),
+        Some(Applied::OnRestart)
+    );
+    let (_, client, told_now) = adapter(Answer::reply(204, ""));
+    assert_eq!(asked::<Applied>(&client).await.ok(), Some(Applied::Now));
+    let (_, client, told_unit) = adapter(Answer::reply(205, ""));
+    assert!(matches!(
+        asked::<()>(&client).await,
+        Err(Failure::Refused { .. })
+    ));
+    let (_, client, told_said) = adapter(Answer::reply(205, "null"));
+    assert!(matches!(
+        asked::<Applied>(&client).await,
+        Err(Failure::Refused { .. })
+    ));
+    assert_eq!(
+        (
+            told.count(),
+            told_now.count(),
+            told_unit.count(),
+            told_said.count()
+        ),
+        (0, 0, 1, 1)
+    );
 }
 
 #[tokio::test]

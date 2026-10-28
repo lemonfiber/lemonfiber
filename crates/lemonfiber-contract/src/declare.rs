@@ -130,7 +130,7 @@ macro_rules! contract {
                 adapter: &A,
                 operation: &str,
                 body: &[u8],
-            ) -> ::core::result::Result<::std::vec::Vec<u8>, $crate::Refusal>
+            ) -> ::core::result::Result<$crate::wire::Answer, $crate::Refusal>
             where
                 A: Send + Sync $( + $Trait )*,
             {

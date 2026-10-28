@@ -95,9 +95,30 @@
                       "type": "object"
                     },
                     {
-                      "const": "media-server",
-                      "description": "The media server.",
-                      "type": "string"
+                      "additionalProperties": false,
+                      "description": "The media server, reached at its internal TLS port.",
+                      "properties": {
+                        "media-server": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "pins": {
+                              "description": "The SHA-256 of each certificate that port may present, in lower-case\nhexadecimal: the only ones the gate accepts.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "pins"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "media-server"
+                      ],
+                      "type": "object"
                     }
                   ]
                 }

@@ -607,7 +607,7 @@ fn the_key_the_gate_holds_is_told_from_one_sharing_its_short_fingerprint() {
     );
     let admitted = [crate::ports::service::Admitted::of(
         &crate::ports::service::Gated {
-            target: crate::ports::service::Target::MediaServer,
+            target: crate::ports::service::Target::MediaServer { pins: Vec::new() },
             path: "jellyfin".to_owned(),
             address: "http://jellyfin:8096".to_owned(),
             majors: Vec::new(),

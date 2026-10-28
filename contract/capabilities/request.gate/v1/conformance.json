@@ -31,13 +31,19 @@
             ]
           },
           {
-            "address": "http://conformance-media-server",
+            "address": "https://conformance-media-server:8920",
             "credential": "{minted}",
             "majors": [
               10
             ],
             "path": "media-server",
-            "target": "media-server",
+            "target": {
+              "media-server": {
+                "pins": [
+                  "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                ]
+              }
+            },
             "tokens": [
               "0000000000000000000000000000000000000000000000000000000000000000"
             ]

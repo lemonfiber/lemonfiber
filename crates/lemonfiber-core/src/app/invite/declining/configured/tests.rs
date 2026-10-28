@@ -6,7 +6,7 @@ use lemonfiber_sidecar::decline::{File, Table, TokenHash};
 
 use super::Configured;
 use crate::app::invite::declining::path;
-use crate::ports::service::{Claimed, Declinable, Declining, Invitations};
+use crate::ports::service::{Claimed, Declinable, Declining, Invitations, KeyHeld};
 
 /// The stack's own decline service under a fresh project.
 fn decline(scratch: &Scratch) -> Configured {
@@ -21,14 +21,17 @@ async fn a_key_held_is_written_and_answered_by_its_hash() {
     let service = decline(&scratch);
 
     assert_eq!(service.held().await.ok(), Some(None));
-    assert!(service.hold("0123456789abcdef").await.is_ok());
+    assert!(service.hold("0123456789abcdef", &[]).await.is_ok());
     assert_eq!(
         std::fs::read_to_string(path(scratch.path(), File::Key)).ok(),
         Some("0123456789abcdef\n".to_owned())
     );
     assert_eq!(
         service.held().await.ok(),
-        Some(Some(TokenHash::of("0123456789abcdef").as_str().to_owned()))
+        Some(Some(KeyHeld {
+            key: TokenHash::of("0123456789abcdef").as_str().to_owned(),
+            pins: Vec::new(),
+        }))
     );
 }
 
@@ -38,7 +41,7 @@ async fn a_key_of_two_words_is_refused_and_nothing_written() {
     let scratch = Scratch::new("decline-configured-two-words");
     let service = decline(&scratch);
 
-    assert!(service.hold("two words").await.is_err());
+    assert!(service.hold("two words", &[]).await.is_err());
     assert!(!path(scratch.path(), File::Key).exists());
 }
 

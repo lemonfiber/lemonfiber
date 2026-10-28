@@ -16,8 +16,12 @@ pub enum Target {
         /// The media type it files.
         media_type: String,
     },
-    /// The media server.
-    MediaServer,
+    /// The media server, reached at its internal TLS port.
+    MediaServer {
+        /// The SHA-256 of each certificate that port may present, in lower-case
+        /// hexadecimal: the only ones the gate accepts.
+        pins: Vec<String>,
+    },
 }
 
 /// One route the gate admits, as it is applied.

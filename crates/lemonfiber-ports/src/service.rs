@@ -13,12 +13,14 @@ use lemonfiber_error::{Diagnose, Problem, Remedy, State};
 mod addressing;
 mod aggregators;
 mod applications;
+mod applying;
 mod asking;
 mod carrying;
 mod catalogue;
 mod clients;
 mod declaring;
 mod declining;
+mod encrypting;
 mod extracting;
 mod failure;
 mod fetching;
@@ -49,6 +51,7 @@ mod upkeep;
 pub use addressing::{Address, Addressing};
 pub use aggregators::{Aggregator, AggregatorAt, Aggregators, KnownAggregator, PullsIndexers};
 pub use applications::{AppSync, Application, ApplicationKind, RegisteredApplication};
+pub use applying::{Applied, Restart};
 pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
 pub use carrying::{Carried, Carrying, Record};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
@@ -61,7 +64,8 @@ pub use declaring::{
     joined, Addressee, Answers, BytePath, Declared, Declaring, Held, LivePath, Locations, Naming,
     Ports, Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, STREAM_NAME, TOKEN,
 };
-pub use declining::{Claimed, Declinable, Declining, Invitations};
+pub use declining::{Claimed, Declinable, Declining, Invitations, KeyHeld};
+pub use encrypting::Encrypting;
 pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};

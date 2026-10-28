@@ -6,12 +6,14 @@
 //! session; whether
 //! the library holds something yet; how each series it holds is filed, and reading one
 //! item afresh; standing behind the front door, with the keys it holds for the stack's
-//! own services; and what a guard in front of it enforces.
+//! own services; what a guard in front of it enforces; and the certificate its internal
+//! TLS port presents.
 
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    AppKeys, Dated, Declared, Declaring, Fronted, HowFar, Image, Item, ItemDetail, ItemProgress,
-    Library, Picture, Playback, Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
+    AppKeys, Applied, Dated, Declared, Declaring, Encrypting, Fronted, HowFar, Image, Item,
+    ItemDetail, ItemProgress, Library, Picture, Playback, Screening, SeriesHeld, Upkeep,
+    PICTURE_MOST, SERIES_MOST,
 };
 
 use super::{NOWHERE, PROXY};
@@ -143,6 +145,10 @@ crate::contract! {
         impl Declaring {
             /// What a guard in front of it enforces, and where it serves each item.
             fn declared() -> Declared where asks = Asked {};
+        }
+        impl Encrypting {
+            /// Serve the internal TLS port with the PKCS#12 at this path inside the upstream's container.
+            fn serve_tls(str path: &str) -> Applied where asks = Asked { path: Placeholder::Certificate.written() };
         }
     }
 }

@@ -17,6 +17,11 @@ use lemonfiber_ports::service::Failure;
 
 use crate::wire::{self, Refusal};
 
+/// What an answer of [`wire::RESET`] reads as: applied, in force once the upstream
+/// restarts, which an operation answering anything but
+/// [`Applied`](lemonfiber_ports::service::Applied) does not read.
+const ON_RESTART: &str = "\"on-restart\"";
+
 /// What an adapter's own account of itself is named in what is witnessed about it.
 const ABOUT: &str = "about";
 
@@ -200,6 +205,7 @@ impl Contracted {
         match fetched.status {
             200 => Ok(body),
             204 if body.is_empty() => Ok("null"),
+            wire::RESET if body.is_empty() => Ok(ON_RESTART),
             401 => Err(Failure::Unauthorised {
                 service: self.service.clone(),
             }),

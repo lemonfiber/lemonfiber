@@ -266,10 +266,15 @@ impl Http for Served {
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
         Ok(match served {
-            Ok(body) => Response {
+            Ok(wire::Answer::Json(body)) => Response {
                 status: 200,
                 headers: Vec::new(),
                 body: String::from_utf8(body).unwrap_or_default(),
+            },
+            Ok(wire::Answer::Reset) => Response {
+                status: wire::RESET,
+                headers: Vec::new(),
+                body: String::new(),
             },
             Err(refusal) => Response {
                 status: refusal.kind.status(),

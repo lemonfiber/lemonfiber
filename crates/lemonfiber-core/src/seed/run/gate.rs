@@ -211,7 +211,7 @@ async fn with_the_media_server(
 pub(crate) fn held(admitted: &[Admitted], filed: &[String]) -> Option<String> {
     let presented = admitted
         .iter()
-        .find(|route| route.target == Target::MediaServer)?;
+        .find(|route| matches!(route.target, Target::MediaServer { .. }))?;
     filed
         .iter()
         .find(|key| crate::ports::digest::sha256(key) == presented.credential)
@@ -374,7 +374,7 @@ struct Routed<'a> {
 /// presenting `key`.
 fn to_media(routed: &Routed<'_>, key: &str) -> Gated {
     Gated {
-        target: Target::MediaServer,
+        target: Target::MediaServer { pins: Vec::new() },
         path: routed.server.id().to_owned(),
         address: routed.pairing.at.url(),
         majors: routed.pairing.majors.clone(),

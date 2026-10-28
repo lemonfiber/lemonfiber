@@ -79,6 +79,7 @@ pub fn enforceable() -> Declared {
         ports: Ports {
             upstream: 8080,
             encrypted: None,
+            internal_tls: None,
         },
     }
 }

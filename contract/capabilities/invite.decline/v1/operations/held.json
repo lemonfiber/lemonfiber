@@ -20,12 +20,40 @@
         "content": {
           "application/json": {
             "schema": {
+              "$defs": {
+                "KeyHeld": {
+                  "additionalProperties": false,
+                  "description": "The key a decline service holds and the certificates it accepts, each by its SHA-256 in\nlower-case hexadecimal.",
+                  "properties": {
+                    "key": {
+                      "description": "The SHA-256 of the key's bytes.",
+                      "type": "string"
+                    },
+                    "pins": {
+                      "description": "The SHA-256 of each certificate the media server's internal TLS port may present.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "pins"
+                  ],
+                  "type": "object"
+                }
+              },
               "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "title": "Nullable_string",
-              "type": [
-                "string",
-                "null"
-              ]
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/KeyHeld"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nullable_KeyHeld"
             }
           }
         },

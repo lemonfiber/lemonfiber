@@ -9,7 +9,7 @@ use lemonfiber_sidecar::decline::{Claimed as Telling, File, Invitation, Key, Tab
 
 use super::{path, SERVICE};
 use crate::ports::filesystem::FileSystem;
-use crate::ports::service::{Claimed, Declining, Failure, Invitations};
+use crate::ports::service::{Claimed, Declining, Failure, Invitations, KeyHeld};
 
 /// The stack's own decline service, beneath the project its configuration is mounted from.
 pub(crate) struct Configured {
@@ -41,7 +41,7 @@ impl Configured {
 
 #[async_trait]
 impl Declining for Configured {
-    async fn hold(&self, key: &str) -> Result<(), Failure> {
+    async fn hold(&self, key: &str, _pins: &[String]) -> Result<(), Failure> {
         let key = Key::read(key).map_err(|unreadable| Failure::Refused {
             service: SERVICE.to_owned(),
             detail: unreadable.to_string(),
@@ -49,7 +49,7 @@ impl Declining for Configured {
         self.written(File::Key, &key.written())
     }
 
-    async fn held(&self) -> Result<Option<String>, Failure> {
+    async fn held(&self) -> Result<Option<KeyHeld>, Failure> {
         let at = path(&self.project, File::Key);
         Ok(crate::app::targets::read_owned(
             self.files.as_ref(),
@@ -58,7 +58,10 @@ impl Declining for Configured {
         )
         .await
         .and_then(|text| Key::read(&text).ok())
-        .map(|key| key.fingerprint()))
+        .map(|key| KeyHeld {
+            key: key.fingerprint(),
+            pins: Vec::new(),
+        }))
     }
 
     async fn apply_invitations(&self, invitations: &Invitations) -> Result<(), Failure> {

@@ -270,6 +270,7 @@ impl Asking<'_> {
             held: self.held,
             answers: BTreeMap::new(),
             made,
+            certificate: None,
         };
         let mut asked = Vec::new();
         for (spoken, capability) in &contracts {
