@@ -7,14 +7,14 @@ use std::sync::Arc;
 
 use rustls::{ClientConfig, RootCertStore};
 
-/// A client configuration over ring and the bundled roots, or why it could not be built,
-/// which with the bundled provider it always can.
-pub(crate) fn bundled() -> Result<ClientConfig, String> {
+/// A client configuration over ring and the bundled roots, or nothing where it could not
+/// be built, which with the bundled provider it always can.
+pub(crate) fn bundled() -> Option<ClientConfig> {
     let roots: RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
-    Ok(
+    Some(
         ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
             .with_safe_default_protocol_versions()
-            .map_err(|error| format!("the TLS backend could not be initialised: {error}"))?
+            .ok()?
             .with_root_certificates(roots)
             .with_no_client_auth(),
     )

@@ -166,7 +166,7 @@ impl Web {
 /// Every client this adapter sends with, before anything one request asks of it, or
 /// nothing where its TLS could not be set up.
 fn builder(cookies: &Arc<PerOrigin>) -> Option<reqwest::ClientBuilder> {
-    let tls = crate::tls::bundled().ok()?;
+    let tls = crate::tls::bundled()?;
     #[expect(
         clippy::disallowed_methods,
         reason = "the one builder this adapter makes, which every client takes its TLS from"

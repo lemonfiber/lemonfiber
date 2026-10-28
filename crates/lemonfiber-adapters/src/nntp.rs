@@ -107,7 +107,12 @@ impl Dialer {
         // Built per dial rather than held: a configuration that could not be built
         // would be an impossible state to carry around, and the one place that
         // cares is here, where it becomes an ordinary unreachable-provider report.
-        let config = crate::tls::bundled().map_err(|reason| unreachable(&endpoint.host, reason))?;
+        let config = crate::tls::bundled().ok_or_else(|| {
+            unreachable(
+                &endpoint.host,
+                "the TLS backend could not be initialised".to_owned(),
+            )
+        })?;
         TlsConnector::from(Arc::new(config))
             .connect(name, tcp)
             .await
