@@ -67,6 +67,7 @@ fn a_placeholder_is_written_as_it_is_read_back() {
     for placeholder in [
         Placeholder::Minted,
         Placeholder::Certificate,
+        Placeholder::Pinned,
         Placeholder::Upstream("password".to_owned()),
         Placeholder::MintedUpstream("password".to_owned()),
         Placeholder::answer("identity.source", 1, "invite", "/id"),
@@ -80,6 +81,7 @@ fn a_placeholder_is_written_as_it_is_read_back() {
     }
     assert_eq!(Placeholder::Minted.written(), "{minted}");
     assert_eq!(Placeholder::Certificate.written(), "{certificate}");
+    assert_eq!(Placeholder::Pinned.written(), "{certificate:sha256}");
     assert_eq!(
         Placeholder::answer("identity.source", 1, "invite", "/id").written(),
         "{identity.source@1/invite-answers#/id}"

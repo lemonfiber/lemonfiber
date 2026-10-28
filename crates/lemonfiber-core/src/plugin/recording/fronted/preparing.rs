@@ -29,9 +29,9 @@ pub(super) struct Prepared {
     /// Each variable of the upstream's environment that names a secret or a setting
     /// declaring a stand-in, as `NAME=value`.
     pub(super) env: Vec<String>,
-    /// Where the upstream's container holds the throwaway internal certificate, where the
-    /// adapter speaks the contract that hands it one.
-    pub(super) certificate: Option<String>,
+    /// Where the upstream's container holds the throwaway internal certificate, and its
+    /// SHA-256, where the adapter speaks the contract that hands it one.
+    pub(super) certificate: Option<(String, String)>,
 }
 
 /// Each secret either copy's files name, with the value written for it.
@@ -196,7 +196,7 @@ impl Prepared {
             key,
             made,
             env,
-            certificate: internal.map(|(inside, _)| inside),
+            certificate: internal,
         })
     }
 }

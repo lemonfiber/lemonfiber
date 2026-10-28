@@ -293,7 +293,8 @@
     },
     {
       "asked": {
-        "path": "{certificate}"
+        "path": "{certificate}",
+        "pin": "{certificate:sha256}"
       },
       "case": "serve_tls-answers",
       "expect": {

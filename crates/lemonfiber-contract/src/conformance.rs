@@ -25,6 +25,9 @@ const MINTED: &str = "minted";
 /// The placeholder for where the upstream's container holds the internal certificate.
 const CERTIFICATE: &str = "certificate";
 
+/// The placeholder for the SHA-256 of the internal certificate written for the case.
+const PINNED: &str = "certificate:sha256";
+
 /// What a placeholder naming a field of `upstream.json` begins with.
 const UPSTREAM: &str = "upstream:";
 
@@ -44,6 +47,9 @@ pub enum Placeholder {
     /// The path, inside the container of the upstream the adapter fronts, of the PKCS#12
     /// holding the internal certificate, written for the case with an empty password.
     Certificate,
+    /// The SHA-256 of the certificate [`Placeholder::Certificate`] holds, in lower-case
+    /// hexadecimal.
+    Pinned,
     /// The string at a JSON pointer in the answer to an earlier case.
     Answered {
         /// The case, as `<capability>@<major>/<case>`.
@@ -69,6 +75,7 @@ impl Placeholder {
         let inner = match self {
             Self::Minted => MINTED.to_owned(),
             Self::Certificate => CERTIFICATE.to_owned(),
+            Self::Pinned => PINNED.to_owned(),
             Self::Upstream(field) => format!("{UPSTREAM}{field}"),
             Self::MintedUpstream(field) => format!("{MINTED}:{UPSTREAM}{field}"),
             Self::Answered { case, pointer } => format!("{case}{POINTER}{pointer}"),
@@ -88,6 +95,9 @@ impl Placeholder {
         }
         if inner == CERTIFICATE {
             return Some(Self::Certificate);
+        }
+        if inner == PINNED {
+            return Some(Self::Pinned);
         }
         if let Some(field) = inner
             .strip_prefix(MINTED)

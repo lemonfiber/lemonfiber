@@ -11,10 +11,12 @@ const MINTED: &str = "0707070707070707070707070707070707070707070707070707070707
 
 const CERTIFICATE: &str = "/config/lemonfiber/internal.p12";
 
+const PIN: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
 struct Filler {
     random: FixedRandom,
     held: Throwaway,
-    certificate: Option<String>,
+    certificate: Option<(String, String)>,
 }
 
 impl Filler {
@@ -22,7 +24,7 @@ impl Filler {
         Some(Self {
             random: FixedRandom(random.map(|byte| vec![byte; 32])),
             held: Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()).ok()?,
-            certificate: random.map(|_| CERTIFICATE.to_owned()),
+            certificate: random.map(|_| (CERTIFICATE.to_owned(), PIN.to_owned())),
         })
     }
 
@@ -72,6 +74,7 @@ fn every_placeholder_is_filled_wherever_it_stands_and_only_credentials_are_kept_
         "key": "{minted}",
         "plain": "conformance-member",
         "path": "{certificate}",
+        "pin": "{certificate:sha256}",
     });
     assert_eq!(
         filler.filled(Some("{\"username\": \"admin\"}"), &asks),
@@ -82,6 +85,7 @@ fn every_placeholder_is_filled_wherever_it_stands_and_only_credentials_are_kept_
                 "key": MINTED,
                 "plain": "conformance-member",
                 "path": CERTIFICATE,
+                "pin": PIN,
             })),
             2
         )
@@ -123,6 +127,10 @@ fn a_placeholder_with_nothing_to_fill_it_names_itself_and_why() {
     assert_eq!(
         why(None, "{certificate}"),
         "{certificate} cannot be filled: no internal certificate was written for the upstream"
+    );
+    assert_eq!(
+        why(None, "{certificate:sha256}"),
+        "{certificate:sha256} cannot be filled: no internal certificate was written for the upstream"
     );
     assert_eq!(
         why(None, "{minted}"),

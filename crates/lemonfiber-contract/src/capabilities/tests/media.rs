@@ -238,13 +238,16 @@ impl Declaring for Upstream {
     }
 }
 
+/// The SHA-256 the script's certificate is handed with.
+const PIN: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
 /// Where the script's upstream reads a certificate only once it restarts.
 const READ_AT_START: &str = "/config/lemonfiber/internal.p12";
 
 #[async_trait]
 impl Encrypting for Upstream {
-    async fn serve_tls(&self, path: &str) -> Result<Applied, Failure> {
-        self.tell(format!("serve_tls {path}"));
+    async fn serve_tls(&self, path: &str, pin: &str) -> Result<Applied, Failure> {
+        self.tell(format!("serve_tls {path} {pin}"));
         Ok(if path == READ_AT_START {
             Applied::OnRestart
         } else {
@@ -291,8 +294,8 @@ async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring 
         format!("{:?}", server.answers_to("gate-key").await),
         format!("{:?}", server.revoke("gate-key").await),
         format!("{:?}", server.declared().await),
-        format!("{:?}", server.serve_tls(READ_AT_START).await),
-        format!("{:?}", server.serve_tls("/config/tls.p12").await),
+        format!("{:?}", server.serve_tls(READ_AT_START, PIN).await),
+        format!("{:?}", server.serve_tls("/config/tls.p12", PIN).await),
     ]
 }
 

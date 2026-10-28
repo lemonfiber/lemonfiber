@@ -114,7 +114,50 @@ async fn a_server_serving_it_already_is_left_running() {
         handed(&http),
         vec![serde_json::json!("/config/lemonfiber/internal.p12")]
     );
+    let kept = server(&ctx)
+        .map(|server| pins(&ctx, &server))
+        .unwrap_or_default();
+    assert_eq!(kept.len(), 1, "the certificate is made where none is kept");
+    assert_eq!(
+        media::served(&http.requests(), "serve_tls")
+            .into_iter()
+            .filter_map(|asked| asked.get("pin").cloned())
+            .collect::<Vec<_>>(),
+        kept.into_iter()
+            .map(serde_json::Value::from)
+            .collect::<Vec<_>>(),
+        "it is handed the SHA-256 of the certificate it serves"
+    );
     assert!(!runner.ran("restart"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_certificate_that_cannot_be_kept_is_said_and_nothing_is_served() {
+    let http = serving(media::taken());
+    let (ctx, _) = machine("encrypting-unkept", http.clone(), ran(0));
+    let found = server(&ctx);
+    let config = found
+        .as_ref()
+        .and_then(|server| server.served.confined_to.clone())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(config.join("lemonfiber"));
+    let _ = std::fs::write(internal::path(&config), "not a certificate");
+    let wiring = seed_internal_tls(&ctx, found.as_ref()).await;
+    assert!(matches!(
+        wiring.map(|one| one.state),
+        Some(State::Failed { detail }) if detail.contains("does not read")
+    ));
+
+    let unconfined = found.map(|mut server| {
+        server.served.confined_to = None;
+        server
+    });
+    let wiring = seed_internal_tls(&ctx, unconfined.as_ref()).await;
+    assert!(matches!(
+        wiring.map(|one| one.state),
+        Some(State::Failed { detail }) if detail.contains("no configuration directory")
+    ));
+    assert!(handed(&http).is_empty());
 }
 
 #[tokio::test(start_paused = true)]

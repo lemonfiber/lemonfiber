@@ -34,8 +34,8 @@ pub(super) struct Filling<'a> {
     /// Every credential the run has made so far.
     pub(super) made: Vec<String>,
     /// Where the upstream's container holds the internal certificate written for the run,
-    /// where one was written.
-    pub(super) certificate: Option<String>,
+    /// and its SHA-256, where one was written.
+    pub(super) certificate: Option<(String, String)>,
 }
 
 impl Filling<'_> {
@@ -71,6 +71,14 @@ impl Filling<'_> {
         })
     }
 
+    /// Where the upstream's container holds the internal certificate written for the run,
+    /// and its SHA-256; why not where none was written.
+    fn internal(&self) -> Result<&(String, String), String> {
+        self.certificate
+            .as_ref()
+            .ok_or_else(|| "no internal certificate was written for the upstream".to_owned())
+    }
+
     /// What `placeholder` is filled with, kept among what the run made where it is a
     /// credential minted for the case or read from an answer.
     fn placeholder(
@@ -80,10 +88,8 @@ impl Filling<'_> {
     ) -> Result<String, String> {
         match placeholder {
             Placeholder::Minted => self.minted(),
-            Placeholder::Certificate => self
-                .certificate
-                .clone()
-                .ok_or_else(|| "no internal certificate was written for the upstream".to_owned()),
+            Placeholder::Certificate => self.internal().map(|(inside, _)| inside.clone()),
+            Placeholder::Pinned => self.internal().map(|(_, pin)| pin.clone()),
             Placeholder::MintedUpstream(field) => {
                 let fresh = self.minted()?;
                 minted.push((field.clone(), fresh.clone()));
