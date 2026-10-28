@@ -8,7 +8,7 @@ use lemonfiber_ports::program::{Configuration, Run, Unran};
 
 use lemonfiber_ports::program::LEFT_BEHIND;
 
-use super::{body, left_behind, read, status, uncreated, PROOF_LABEL};
+use super::{body, left_behind, read, status, uncreated, unstarted, PROOF_LABEL, STARTED_WITHIN};
 
 fn run() -> Run {
     Run {
@@ -201,4 +201,25 @@ fn only_a_proofs_container_older_than_any_run_is_taken_for_one_left_behind() {
         left_behind(&listed, SystemTime::UNIX_EPOCH - Duration::from_secs(1)),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn a_start_the_engine_did_not_finish_in_time_is_said_as_one_and_not_as_a_refusal() {
+    assert_eq!(
+        unstarted(bollard::errors::Error::RequestTimeoutError),
+        Unran::Unstarted {
+            seconds: STARTED_WITHIN.as_secs()
+        }
+    );
+    assert_eq!(
+        Unran::Unstarted { seconds: 120 }.to_string(),
+        "the container engine did not start the container within 120 seconds"
+    );
+    assert!(matches!(
+        unstarted(bollard::errors::Error::DockerResponseServerError {
+            status_code: 500,
+            message: "no such network".to_owned(),
+        }),
+        Unran::Refused { reason } if reason.contains("no such network")
+    ));
 }

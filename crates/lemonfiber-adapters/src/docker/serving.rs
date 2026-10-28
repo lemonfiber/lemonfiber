@@ -20,7 +20,7 @@ use tokio_stream::StreamExt as _;
 use lemonfiber_ports::program::{Unran, LEFT_BEHIND};
 use lemonfiber_ports::serving::{Serve, Served, Standing};
 
-use super::program::{refused, uncreated, PROOF_LABEL};
+use super::program::{launched, refused, uncreated, PROOF_LABEL};
 use super::Daemon;
 
 /// What every network this starts is named beginning with, before the moment it was made.
@@ -87,12 +87,12 @@ async fn started(
         .await
         .map_err(|error| uncreated(&error, &serve.image))?
         .id;
-    let inspected = match docker.start_container(&container, None).await {
+    let inspected = match launched(docker, &container).await {
         Ok(()) => docker
             .inspect_container(&container, None)
             .await
             .map_err(|error| refused(&error)),
-        Err(error) => Err(refused(&error)),
+        Err(unstarted) => Err(unstarted),
     };
     match inspected {
         Ok(inspected) => Ok(Served {

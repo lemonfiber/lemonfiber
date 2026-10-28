@@ -2,7 +2,7 @@
 //! API: created, attached, started, read, waited on and removed.
 
 use std::collections::HashMap;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use bollard::container::LogOutput;
 use bollard::models::{
@@ -117,18 +117,16 @@ async fn watched(docker: &Docker, id: &str, run: &Run) -> Result<Ran, Unran> {
         .stream(true)
         .logs(false)
         .build();
-    let attached = docker
+    let watching = docker.clone().with_timeout(run.within + STARTED_WITHIN);
+    let attached = watching
         .attach_container(id, Some(attaching))
         .await
         .map_err(|error| refused(&error))?;
-    docker
-        .start_container(id, None)
-        .await
-        .map_err(|error| refused(&error))?;
+    launched(docker, id).await?;
     let mut stdout = Vec::new();
     let ending = tokio::time::timeout(run.within, async {
         read(attached.output, &mut stdout, run.read_at_most).await;
-        exited(docker, id).await
+        exited(&watching, id).await
     })
     .await;
     match ending {
@@ -177,6 +175,32 @@ pub(super) fn status(
         Ok(answer) => Ok(answer.status_code),
         Err(bollard::errors::Error::DockerContainerWaitError { code, .. }) => Ok(code),
         Err(other) => Err(refused(&other)),
+    }
+}
+
+/// How long the engine is given to start a container, apart from the limit on any other
+/// request: a start waits on the engine setting up the container's network and mounts,
+/// which some engines take most of a minute over.
+pub(super) const STARTED_WITHIN: Duration = Duration::from_secs(120);
+
+/// Start the container `id`, given [`STARTED_WITHIN`] rather than a request's limit.
+pub(super) async fn launched(docker: &Docker, id: &str) -> Result<(), Unran> {
+    docker
+        .clone()
+        .with_timeout(STARTED_WITHIN)
+        .start_container(id, None)
+        .await
+        .map_err(unstarted)
+}
+
+/// Why a start failed: a start the engine did not finish within [`STARTED_WITHIN`], or
+/// the engine's own refusal.
+pub(super) fn unstarted(error: bollard::errors::Error) -> Unran {
+    match error {
+        bollard::errors::Error::RequestTimeoutError => Unran::Unstarted {
+            seconds: STARTED_WITHIN.as_secs(),
+        },
+        other => refused(&other),
     }
 }
 

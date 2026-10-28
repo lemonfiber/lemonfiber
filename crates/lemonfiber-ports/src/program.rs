@@ -93,6 +93,12 @@ pub enum Unran {
         /// The engine's own words.
         reason: String,
     },
+    /// The engine did not start the container within the time a start is given.
+    #[error("the container engine did not start the container within {seconds} seconds")]
+    Unstarted {
+        /// How long it was given, in seconds.
+        seconds: u64,
+    },
 }
 
 /// Runs an image's own program once.
