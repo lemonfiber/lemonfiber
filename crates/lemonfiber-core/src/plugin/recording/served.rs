@@ -5,8 +5,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use lemonfiber_contract::capabilities::FOLDER;
+use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::container::{Secret, STREAM_GUARD};
 use lemonfiber_plugin::{Health, HealthKind};
+
 use tokio::time::Instant;
 
 use super::addressed::Addressed;
@@ -19,6 +21,7 @@ use crate::plugin::installed::Placed;
 use crate::plugin::program::{contained, Contained, Operator, Starting, Throwaway};
 use crate::plugin::recorded::Answer;
 use crate::ports::http::{Http, Method, Request};
+use crate::ports::service::Failure;
 use crate::ports::serving::{Bound, Serve, Served, Standing};
 
 /// How often a service still coming up is looked at again.
@@ -368,19 +371,74 @@ pub(in crate::plugin) async fn healthy(
     health: Option<&Health>,
     served: &Served,
 ) -> Result<(), String> {
-    healthy_at(serving, http, health, served, served.port).await
+    let port = served.port;
+    until(
+        serving,
+        served,
+        allowed(health),
+        &HEALTH_PASSES,
+        |standing| async move { Ok(passes(http, health, port, standing).await) },
+    )
+    .await
 }
 
-/// Wait until `served`'s health passes at `port` on the loopback interface, or say why it
-/// will not.
-pub(in crate::plugin) async fn healthy_at(
+/// Wait until the adapter `served`, asked as `adapter`, says its upstream answers, or say
+/// why it did not within its `health`'s limit.
+pub(in crate::plugin) async fn answering(
     serving: &dyn crate::ports::serving::Serving,
-    http: &dyn Http,
-    health: Option<&Health>,
+    adapter: &Contracted,
     served: &Served,
-    port: Option<u16>,
+    health: Option<&Health>,
 ) -> Result<(), String> {
-    let within = allowed(health);
+    until(
+        serving,
+        served,
+        allowed(health),
+        &UPSTREAM_ANSWERS,
+        |_| async {
+            match adapter.ready().await {
+                Ok(ready) => Ok(ready),
+                Err(Failure::Unavailable { .. }) => Ok(false),
+                Err(failure) => Err(failure.to_string()),
+            }
+        },
+    )
+    .await
+}
+
+/// What a wait is for, as said where it ends without it.
+struct Awaited {
+    /// The moment waited for, as said where the service exited before it.
+    passed: &'static str,
+    /// The moment waited for, as said where it did not come in time.
+    unpassed: &'static str,
+}
+
+/// A service's health passing.
+const HEALTH_PASSES: Awaited = Awaited {
+    passed: "its health passed",
+    unpassed: "its health did not pass",
+};
+
+/// An adapter saying its upstream answers.
+const UPSTREAM_ANSWERS: Awaited = Awaited {
+    passed: "it said its upstream answers",
+    unpassed: "it did not say its upstream answers",
+};
+
+/// Wait until `now` holds of `served` as it stands, or say why it will not: it exited, it
+/// did not hold within `within`, or `now` refused.
+async fn until<F, Holds>(
+    serving: &dyn crate::ports::serving::Serving,
+    served: &Served,
+    within: Duration,
+    awaited: &Awaited,
+    now: F,
+) -> Result<(), String>
+where
+    F: Fn(Standing) -> Holds,
+    Holds: std::future::Future<Output = Result<bool, String>>,
+{
     let until = Instant::now() + within;
     loop {
         let standing = serving
@@ -388,14 +446,15 @@ pub(in crate::plugin) async fn healthy_at(
             .await
             .map_err(|unran| unran.to_string())?;
         if let Standing::Exited(code) = standing {
-            return Err(format!("it exited {code} before its health passed"));
+            return Err(format!("it exited {code} before {}", awaited.passed));
         }
-        if passes(http, health, port, standing).await {
+        if now(standing).await? {
             return Ok(());
         }
         if Instant::now() >= until {
             return Err(format!(
-                "its health did not pass within {} seconds",
+                "{} within {} seconds",
+                awaited.unpassed,
                 within.as_secs()
             ));
         }

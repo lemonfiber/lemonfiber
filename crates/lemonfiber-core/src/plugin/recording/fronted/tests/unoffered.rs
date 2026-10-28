@@ -32,7 +32,7 @@ fn serving() -> Arc<Fake> {
         ("/health", vec![Answer::reply(200, "ok")]),
         (
             "/lemonfiber/adapter/v1/ready",
-            vec![Answer::reply(200, "{}")],
+            vec![Answer::reply(200, "true")],
         ),
         (
             "/System/Info/Public",

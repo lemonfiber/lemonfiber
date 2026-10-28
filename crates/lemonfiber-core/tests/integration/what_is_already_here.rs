@@ -226,7 +226,7 @@ fn stacks(theirs: &[Carried], ours: &[Carried], takes: Answer) -> Vec<Route> {
         (
             ready_path_of_any_adapter(),
             None,
-            vec![Answer::reply(200, "{}")],
+            vec![Answer::reply(200, "true")],
         ),
         (
             lent("records"),

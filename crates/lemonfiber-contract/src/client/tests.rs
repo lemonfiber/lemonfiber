@@ -266,6 +266,39 @@ async fn an_adapter_is_asked_what_it_is_by_a_keyed_get() {
 }
 
 #[tokio::test]
+async fn an_adapter_is_asked_whether_its_upstream_answers_by_a_keyed_get() {
+    let (fake, client, told) = adapter(Answer::reply(200, "false"));
+    assert_eq!(client.ready().await.ok(), Some(false));
+    let request = fake.request();
+    assert_eq!(
+        request
+            .as_ref()
+            .map(|request| (request.method, request.url.as_str())),
+        Some((
+            Method::Get,
+            "http://adapter:8080/lemonfiber/adapter/v1/ready"
+        ))
+    );
+    assert!(request.is_some_and(|request| request
+        .headers
+        .contains(&("Authorization".to_owned(), "Bearer k3y".to_owned()))));
+    assert_eq!(told.count(), 0);
+
+    let (_, client, _) = adapter(Answer::reply(200, "true"));
+    assert_eq!(client.ready().await.ok(), Some(true));
+
+    let (_, client, told) = adapter(Answer::reply(200, "{}"));
+    assert!(matches!(client.ready().await, Err(Failure::Refused { .. })));
+    assert_eq!(told.count(), 1);
+
+    let (_, client, _) = adapter(Answer::reply(401, ""));
+    assert!(matches!(
+        client.ready().await,
+        Err(Failure::Unauthorised { .. })
+    ));
+}
+
+#[tokio::test]
 async fn a_call_without_the_key_carries_none_and_answers_its_status() {
     let (fake, client, told) = adapter(Answer::reply(401, ""));
     let serve = crate::capabilities::media::serve::capability();

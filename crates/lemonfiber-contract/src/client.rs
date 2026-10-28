@@ -25,6 +25,9 @@ const ON_RESTART: &str = "\"on-restart\"";
 /// What an adapter's own account of itself is named in what is witnessed about it.
 const ABOUT: &str = "about";
 
+/// What an adapter's word on its upstream is named in what is witnessed about it.
+const READY: &str = "ready";
+
 /// The most an answer may carry, in bytes, where its operation declares no more.
 pub const LARGEST: usize = 1024 * 1024;
 
@@ -133,13 +136,16 @@ impl Contracted {
     ///
     /// As [`Self::call`].
     pub async fn about(&self) -> Result<crate::adapter::About, Failure> {
-        let path = crate::adapter::about_path();
-        let fetched = self
-            .exchange(Method::Get, &path, None, LARGEST, true)
-            .await?;
-        let answer = self.answer(ABOUT, &fetched)?;
-        serde_json::from_str(answer)
-            .map_err(|why| self.outside(ABOUT, &format!("the answer did not read: {why}")))
+        self.own(&crate::adapter::about_path(), ABOUT).await
+    }
+
+    /// Whether the adapter says its upstream answers.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::call`].
+    pub async fn ready(&self) -> Result<bool, Failure> {
+        self.own(&crate::adapter::ready_path(), READY).await
     }
 
     /// The status the adapter answers `operation` with when it is asked without the key.
@@ -153,6 +159,20 @@ impl Contracted {
         self.exchange(Method::Post, &operation.path(), asked, LARGEST, false)
             .await
             .map(|fetched| fetched.status)
+    }
+
+    /// What the adapter answers a keyed `GET` of `path`, its own `name`d route, read as `R`.
+    async fn own<R: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        name: &str,
+    ) -> Result<R, Failure> {
+        let fetched = self
+            .exchange(Method::Get, path, None, LARGEST, true)
+            .await?;
+        let answer = self.answer(name, &fetched)?;
+        serde_json::from_str(answer)
+            .map_err(|why| self.outside(name, &format!("the answer did not read: {why}")))
     }
 
     /// Send what was asked, written, and wait for the adapter's response.

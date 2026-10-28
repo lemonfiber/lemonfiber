@@ -62,9 +62,9 @@ async fn a_lent_adapter_is_pointed_at_their_service_with_their_key_alone_and_tak
     let serves = Arc::new(Serves::on(PUBLISHED));
     let ready = Fake::by_path(vec![(
         "/lemonfiber/adapter/v1/ready",
-        Answer::reply(200, "{}"),
+        Answer::reply(200, "true"),
     )]);
-    let ctx = lending("lent", &serves, ready);
+    let ctx = lending("lent", &serves, Arc::clone(&ready));
     let (installed, adapter) = sonarr();
 
     let lent = lent(&ctx, &borrowing(&installed, &adapter)).await;
@@ -85,7 +85,11 @@ async fn a_lent_adapter_is_pointed_at_their_service_with_their_key_alone_and_tak
     )
     .unwrap_or_default();
     assert_eq!(upstream, serde_json::json!({ "api_key": "their-key" }));
-    assert!(held.join(KEY_FILE).exists());
+    let key = std::fs::read_to_string(held.join(KEY_FILE)).unwrap_or_default();
+    assert!(!key.is_empty());
+    assert!(ready.requests().iter().any(|request| request
+        .headers
+        .contains(&("Authorization".to_owned(), format!("Bearer {key}")))));
     assert_eq!(lent.adapter.service(), TELEVISION.adapter);
     assert!(serves.removed().is_empty());
 
@@ -109,6 +113,45 @@ async fn an_adapter_that_never_comes_ready_is_taken_away_and_said_why() {
             .is_some_and(|why| why.contains("exited 1")),
         "{:?}",
         lent.err()
+    );
+    assert_eq!(serves.removed().len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_adapter_is_lent_only_once_it_answers_and_says_its_upstream_does() {
+    let serves = Arc::new(Serves::on(PUBLISHED));
+    let ready = Fake::by_path_in_turn(vec![(
+        "/lemonfiber/adapter/v1/ready",
+        vec![
+            Answer::Silent,
+            Answer::reply(200, "false"),
+            Answer::reply(200, "true"),
+        ],
+    )]);
+    let ctx = lending("settling", &serves, Arc::clone(&ready));
+    let (installed, adapter) = sonarr();
+
+    let lent = lent(&ctx, &borrowing(&installed, &adapter)).await;
+
+    assert!(lent.is_ok(), "{:?}", lent.err());
+    assert_eq!(ready.requests().len(), 3);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_adapter_whose_upstream_never_answers_is_taken_away_and_said_why() {
+    let serves = Arc::new(Serves::on(PUBLISHED));
+    let unready = Fake::by_path(vec![(
+        "/lemonfiber/adapter/v1/ready",
+        Answer::reply(200, "false"),
+    )]);
+    let ctx = lending("unready", &serves, unready);
+    let (installed, adapter) = sonarr();
+
+    let lent = lent(&ctx, &borrowing(&installed, &adapter)).await;
+
+    assert_eq!(
+        lent.err().as_deref(),
+        Some("it did not say its upstream answers within 60 seconds")
     );
     assert_eq!(serves.removed().len(), 1);
 }

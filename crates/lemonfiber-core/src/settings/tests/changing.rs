@@ -82,11 +82,13 @@ fn installed(plugin: &str) -> Installed {
         .unwrap_or_else(|| crate::test_support::an_installed("comics", Vec::new()))
 }
 
+#[track_caller]
 pub(super) fn machine(name: &str, engine: Reporting) -> Machine {
     holding(name, engine, PLUGIN)
 }
 
 /// A machine with the plugin `plugin` describes installed, its project written.
+#[track_caller]
 pub(super) fn holding(name: &str, engine: Reporting, plugin: &str) -> Machine {
     let env = env_without_password(&format!("changing-{name}"));
     let stack = env.with_file_name("data").join("stack");
@@ -765,7 +767,7 @@ async fn changing_the_dashboards_search_address_applies_the_dashboard_again() {
 #[cfg(unix)]
 #[tokio::test]
 async fn a_change_over_a_linked_directory_recreates_nothing_and_says_why() {
-    let machine = machine("linked", running(&["komga"]));
+    let machine = machine("linked-mount", running(&["komga"]));
     lemonfiber_fixtures::scratch::linked_away(&machine.document.with_file_name(""), "komga-worker");
 
     let made = change(agreed(&machine.ctx, MODE, Some("fast")).await);

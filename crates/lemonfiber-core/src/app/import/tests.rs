@@ -70,7 +70,7 @@ fn importing(name: &str, serves: &Arc<Serves>) -> crate::app::Ctx {
         ))))
         .with_http(Fake::by_path(vec![(
             "/lemonfiber/adapter/v1/ready",
-            Answer::reply(200, "{}"),
+            Answer::reply(200, "true"),
         )]));
     ctx.seams.serving = Arc::clone(serves) as Arc<dyn lemonfiber_ports::serving::Serving>;
     let ctx = TELEVISION.reaching(ctx);
