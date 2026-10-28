@@ -54,6 +54,25 @@ impl Choice {
     }
 }
 
+/// Whether `needs` is met: every setting it names holds one of the values it lists, as
+/// `held` says what each holds.
+#[must_use]
+pub fn met(needs: &Needs, held: impl Fn(&str) -> Option<String>) -> bool {
+    needs.iter().all(|(setting, values)| {
+        held(setting).is_some_and(|value| values.iter().any(|one| one.text() == value))
+    })
+}
+
+/// What `setting` holds in a service whose environment is `env` while the operator has
+/// recorded no value: the default of its first reference to it, where it reads it.
+#[must_use]
+pub fn defaulted(env: &BTreeMap<String, Value>, setting: &str) -> Option<String> {
+    env.values().find_map(|value| match value {
+        Value::Setting(read) if read.setting == setting => Some(read.default.text()),
+        _ => None,
+    })
+}
+
 /// One service's settings and secrets, as the rules for choices read them.
 #[derive(Debug, Clone, Copy)]
 pub struct Reading<'a> {

@@ -24,6 +24,7 @@ fn keeping(plugin: &str, setting: &str, was: &str, secret: Option<&str>) -> supe
             minted: false,
             serves: None,
             was: Some(key.to_owned()),
+            needs: lemonfiber_manifest::container::choices::Needs::new(),
         })
         .into_iter()
         .collect();

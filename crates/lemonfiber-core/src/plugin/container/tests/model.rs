@@ -435,6 +435,7 @@ fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
                 why: "reads the curator".to_owned(),
                 minted: false,
                 was: None,
+                needs: lemonfiber_manifest::container::choices::Needs::new(),
             }],
             ..crate::plugin::Declaration::default()
         },
@@ -479,6 +480,7 @@ fn a_crossing_secret_whose_holder_nothing_here_names_is_withheld_and_an_own_one_
                     why: "reads it".to_owned(),
                     minted: false,
                     was: None,
+                    needs: lemonfiber_manifest::container::choices::Needs::new(),
                 }],
                 ..crate::plugin::Declaration::default()
             },

@@ -105,6 +105,7 @@ pub fn generated(
         .map(|service| stack_unit(service, reading))
         .chain(installed.iter().flat_map(|one| {
             let secrets = plugin::Reading {
+                setting: reading.setting,
                 secrets_file: reading.secrets_file,
                 ..plugin::Reading::bare()
             };
