@@ -40,7 +40,7 @@ async fn a_service_presenting_a_pinned_certificate_is_reached_and_any_other_is_r
     let Some(pinned) = pinned else {
         unreachable!("a pinned client is built");
     };
-    let answer = pinned.get(&served.base).send().await;
+    let answer = pinned.get(served.base.as_url().clone()).send().await;
     let body = match answer {
         Ok(answer) => answer.text().await.ok(),
         Err(_) => None,
@@ -50,7 +50,11 @@ async fn a_service_presenting_a_pinned_certificate_is_reached_and_any_other_is_r
     let other = client(&["0".repeat(64)], None);
     assert!(other.is_some());
     if let Some(other) = other {
-        assert!(other.get(&served.base).send().await.is_err());
+        assert!(other
+            .get(served.base.as_url().clone())
+            .send()
+            .await
+            .is_err());
     }
     assert!(client(&[], Some(WITHIN)).is_none());
 }
@@ -65,13 +69,16 @@ async fn a_redirect_is_answered_rather_than_followed_and_plain_http_is_refused()
     let Some(pinned) = pinned else {
         unreachable!("a pinned client is built");
     };
+    let Some(elsewhere) = served.base.joined("/elsewhere") else {
+        unreachable!("a path joins beneath the fake");
+    };
     let status = pinned
-        .get(format!("{}/elsewhere", served.base))
+        .get(elsewhere.as_url().clone())
         .send()
         .await
         .map(|answer| answer.status());
     assert_eq!(status.ok(), Some(StatusCode::FOUND));
-    let plain = served.base.replacen("https://", "http://", 1);
+    let plain = served.base.to_string().replacen("https://", "http://", 1);
     assert!(pinned.get(plain).send().await.is_err());
 }
 
@@ -84,7 +91,4 @@ async fn a_handshake_presents_a_pin_only_where_the_certificate_is_that_one() {
     assert!(presents(&served.base, &served.pin, WITHIN).await);
     assert!(!presents(&served.base, &"0".repeat(64), WITHIN).await);
     assert!(!presents(&served.base, "", WITHIN).await);
-    let plain = served.base.replacen("https://", "http://", 1);
-    assert!(!presents(&plain, &served.pin, WITHIN).await);
-    assert!(!presents("not an address", &served.pin, WITHIN).await);
 }
