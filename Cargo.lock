@@ -1553,6 +1553,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemonfiber-pinned"
+version = "0.17.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "hyper",
+ "hyper-util",
+ "rcgen",
+ "reqwest",
+ "ring",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
+]
+
+[[package]]
 name = "lemonfiber-plugin"
 version = "0.17.0"
 dependencies = [

@@ -1,0 +1,38 @@
+[package]
+name = "lemonfiber-pinned"
+description = "A client that reaches a service only over TLS presenting a certificate whose SHA-256 it was handed."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+publish = false
+
+[features]
+# A TLS server on loopback presenting a certificate made for one test, for every crate
+# that reaches a pinned service to test against.
+test-support = ["dep:axum", "dep:hyper", "dep:hyper-util", "dep:rcgen", "dep:tokio", "dep:tokio-rustls"]
+
+[dependencies]
+futures-util = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-manual-roots"] }
+ring = { workspace = true }
+rustls = { workspace = true, features = ["std", "tls12"] }
+axum = { workspace = true, optional = true }
+hyper = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true }
+rcgen = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["net", "rt"] }
+tokio-rustls = { workspace = true, optional = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+rcgen = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt", "rt-multi-thread"] }
+tokio-rustls = { workspace = true }
+
+[lints]
+workspace = true
