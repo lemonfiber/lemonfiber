@@ -66,7 +66,7 @@ include_dir = "0.7"
 libc = "0.2"
 # Making a directory beneath another through the directory's own handle, so a link put
 # on the way between one step and the next is refused rather than followed.
-rustix = { version = "1", default-features = false, features = ["std", "fs"] }
+rustix = { version = "1", default-features = false, features = ["std", "fs", "process"] }
 # rustls, not the platform's TLS: it keeps the musl static release target free of
 # an OpenSSL build dependency. json for decoding service API responses.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }
@@ -129,6 +129,10 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 # which rustls already builds on. Without its `pem` feature, which brings a base64 of
 # another line: the PEM is written and read with the base64 above.
 rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring"] }
+# The PKCS#12 the media server serves its internal TLS port from. Without its default
+# `pbes1` feature, which brings the RC2 and DES schemes: what is written is PBES2 with
+# AES-256 and an HMAC-SHA256 MAC, which every supported media server line reads.
+p12-keystore = { version = "=0.4.1", default-features = false }
 # Verifying the signature a registry offers beside an image, with the library rustls
 # already builds on.
 ring = "0.17"

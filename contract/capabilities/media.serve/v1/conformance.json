@@ -290,6 +290,18 @@
       "keyed": true,
       "live": false,
       "operation": "declared"
+    },
+    {
+      "asked": {
+        "path": "{certificate}"
+      },
+      "case": "serve_tls-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "serve_tls"
     }
   ],
   "major": 1

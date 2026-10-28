@@ -16,7 +16,7 @@ use super::moving::{change, missing, shown};
 use crate::error::{Diagnose, Problem};
 use crate::journal::Kind;
 use crate::plugin::Installed;
-use crate::ports::filesystem::Lying;
+use crate::ports::filesystem::{Lying, Readable};
 use crate::project::entry::{mounts, MOUNT_TREE};
 use crate::stack::Failure;
 
@@ -47,15 +47,18 @@ pub(crate) fn made(
             .collect();
         crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
             .map_err(|failure| Box::new(failure.problem()))?;
-        std::fs::create_dir_all(&source).map_err(|why| {
-            Box::new(
-                Failure::NotWritten {
-                    path: source.clone(),
-                    reason: why.to_string(),
-                }
-                .problem(),
-            )
-        })?;
+        ctx.seams
+            .confined
+            .made(&source, &directory, Readable::Shared)
+            .map_err(|fault| {
+                Box::new(
+                    Failure::NotWritten {
+                        path: source.clone(),
+                        reason: fault.message,
+                    }
+                    .problem(),
+                )
+            })?;
     }
     Ok(())
 }

@@ -224,7 +224,11 @@ impl Http for Certifying {
             .asked()
             .first()
             .and_then(|served| served.binds.iter().find(|bound| bound.target == "/config"))
-            .and_then(|bound| crate::certificate::kept(&bound.source).ok().flatten())
+            .and_then(|bound| {
+                crate::certificate::kept(&lemonfiber_adapters::Disk, &bound.source)
+                    .ok()
+                    .flatten()
+            })
             .map(|kept| kept.fingerprint)
             .unwrap_or_default();
         Ok(Response {

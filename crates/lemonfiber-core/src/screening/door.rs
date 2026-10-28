@@ -81,8 +81,11 @@ pub fn directory(project: &Path) -> PathBuf {
 /// # Errors
 ///
 /// [`Unkept`] where what is kept cannot be read, or a new one cannot be made.
-pub fn ensured(project: &Path) -> Result<Kept, Unkept> {
-    certificate::kept_or_made(&directory(project))
+pub fn ensured(
+    confined: &dyn crate::ports::filesystem::Confined,
+    project: &Path,
+) -> Result<Kept, Unkept> {
+    certificate::kept_or_made(confined, &directory(project))
 }
 
 /// Make the door's certificate before the stack starts, where the stack runs a door.
@@ -98,7 +101,7 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     if let (true, Some(project)) = (runs_a_door, project) {
-        let _ = ensured(&project);
+        let _ = ensured(ctx.seams.confined.as_ref(), &project);
     }
 }
 
@@ -112,7 +115,7 @@ pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
     let at = crate::app::invite::household_address(ctx, GUARDED).await;
     let (base, fingerprint) = match at_the_door(
         at.map(|address| address.url),
-        certificate::kept(&directory(&project)),
+        certificate::kept(ctx.seams.confined.as_ref(), &directory(&project)),
     ) {
         Ok(door) => door,
         Err(why) => return Door::Unknown(why),

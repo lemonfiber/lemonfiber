@@ -72,7 +72,8 @@ pub(super) async fn answers(
         recorder.random,
     )
     .map_err(failing("starting files"))?;
-    let fingerprint = certified(placed, &copy).map_err(failing("certificate"))?;
+    let fingerprint =
+        certified(placed, &copy, recorder.confined).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;
     mountable(placed, &copy).map_err(failing(MOUNTS))?;
     let mut stand_ins = StandIns::of(secrets, recorder.random).map_err(failing(STAND_INS))?;
@@ -90,11 +91,9 @@ pub(super) async fn answers(
             .collect(),
         ..settled
     };
-    let served = recorder
-        .serving
-        .serve(&serve)
+    let served = started(recorder.serving, &serve, None)
         .await
-        .map_err(|unran| failing("container")(unran.to_string()))?;
+        .map_err(failing("container"))?;
     let seeded: Vec<String> = copy
         .made()
         .map(str::to_owned)
@@ -123,19 +122,66 @@ pub(super) async fn answers(
     finished
 }
 
+/// The container for `serve` started, on its own network or on the one `beside` is on,
+/// where nothing it is handed is reached through a link; why not otherwise.
+pub(in crate::plugin) async fn started(
+    serving: &dyn crate::ports::serving::Serving,
+    serve: &Serve,
+    beside: Option<&Served>,
+) -> Result<Served, String> {
+    crate::plugin::program::unlinked(serve.binds.iter().map(|bound| bound.source.as_path()))?;
+    match beside {
+        None => serving.serve(serve).await,
+        Some(served) => serving.beside(served, serve).await,
+    }
+    .map_err(|unran| unran.to_string())
+}
+
 /// A throwaway certificate and its key written into `copy` as the core writes them for a
 /// filler of a capability it hands a certificate, and readable by whoever that filler runs
 /// as, where `placed` provides one, with the fingerprint the certificate is answered by,
 /// which the run made; nothing otherwise.
-pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<Option<String>, String> {
+pub(super) fn certified(
+    placed: &Placed,
+    copy: &Throwaway,
+    confined: &dyn crate::ports::filesystem::Confined,
+) -> Result<Option<String>, String> {
     if !placed.provides.iter().any(|name| name == STREAM_GUARD) {
         return Ok(None);
     }
-    let kept = crate::certificate::replaced(copy.path()).map_err(|unkept| unkept.to_string())?;
+    let kept =
+        crate::certificate::replaced(confined, copy.path()).map_err(|unkept| unkept.to_string())?;
     crate::certificate::FILES
         .iter()
         .try_for_each(|named| copy.readable(named))?;
     Ok(Some(kept.fingerprint))
+}
+
+/// A throwaway internal certificate made out to `upstream` and written into its `copy` as
+/// the core writes it for the media server, where `adapter` speaks `media.serve`, the
+/// contract that hands its upstream that certificate: where the upstream's container holds
+/// it, and the fingerprint it is answered by, which the run made. Nothing otherwise.
+pub(super) fn internal(
+    upstream: &Placed,
+    adapter: &Placed,
+    copy: &Throwaway,
+    confined: &dyn crate::ports::filesystem::Confined,
+) -> Result<Option<(String, String)>, String> {
+    let spoken = lemonfiber_contract::spoken(
+        lemonfiber_contract::capabilities::media::serve::CAPABILITY,
+        lemonfiber_contract::capabilities::media::serve::MAJOR,
+    );
+    if !adapter.speaks.contains(&spoken) {
+        return Ok(None);
+    }
+    let made = crate::certificate::internal::made_for(&upstream.service)
+        .and_then(|made| {
+            crate::certificate::internal::written(confined, copy.path(), &made).map(|()| made)
+        })
+        .map_err(|unkept| unkept.to_string())?;
+    let inside = Path::new(crate::project::entry::configuration(&upstream.config_path))
+        .join(crate::certificate::internal::INTERNAL);
+    Ok(Some((inside.display().to_string(), made.fingerprint)))
 }
 
 /// An empty library beside `copy` holding the folder the conformance cases file into,

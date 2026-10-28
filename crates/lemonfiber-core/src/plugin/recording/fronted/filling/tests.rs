@@ -9,9 +9,12 @@ use crate::plugin::program::Throwaway;
 
 const MINTED: &str = "0707070707070707070707070707070707070707070707070707070707070707";
 
+const CERTIFICATE: &str = "/config/lemonfiber/internal.p12";
+
 struct Filler {
     random: FixedRandom,
     held: Throwaway,
+    certificate: Option<String>,
 }
 
 impl Filler {
@@ -19,6 +22,7 @@ impl Filler {
         Some(Self {
             random: FixedRandom(random.map(|byte| vec![byte; 32])),
             held: Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()).ok()?,
+            certificate: random.map(|_| CERTIFICATE.to_owned()),
         })
     }
 
@@ -43,6 +47,7 @@ impl Filler {
             .into_iter()
             .collect(),
             made: Vec::new(),
+            certificate: self.certificate.clone(),
         }
     }
 
@@ -66,6 +71,7 @@ fn every_placeholder_is_filled_wherever_it_stands_and_only_credentials_are_kept_
         "signed": ["{identity.source@1/whoever-answers#/token}", 12, null],
         "key": "{minted}",
         "plain": "conformance-member",
+        "path": "{certificate}",
     });
     assert_eq!(
         filler.filled(Some("{\"username\": \"admin\"}"), &asks),
@@ -75,6 +81,7 @@ fn every_placeholder_is_filled_wherever_it_stands_and_only_credentials_are_kept_
                 "signed": ["t0k3n", 12, null],
                 "key": MINTED,
                 "plain": "conformance-member",
+                "path": CERTIFICATE,
             })),
             2
         )
@@ -112,6 +119,10 @@ fn a_placeholder_with_nothing_to_fill_it_names_itself_and_why() {
     assert_eq!(
         why(None, "{identity.source@1/household-answers#/0/id}"),
         "{identity.source@1/household-answers#/0/id} cannot be filled: identity.source@1/household-answers answered no string at \"/0/id\""
+    );
+    assert_eq!(
+        why(None, "{certificate}"),
+        "{certificate} cannot be filled: no internal certificate was written for the upstream"
     );
     assert_eq!(
         why(None, "{minted}"),

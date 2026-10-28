@@ -276,3 +276,32 @@ async fn a_variable_another_plugin_was_kept_under_refuses_the_install() {
     );
     assert_eq!(read(&proxy), before, "nothing of it was written");
 }
+
+/// A proxy whose project mounts a directory reached through a link is not told to read
+/// its file again: a restart is a start.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_removal_over_a_linked_directory_restarts_no_proxy() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("fronting-linked", runner.clone(), answering(200));
+    let _ = fronted(&ctx);
+    let _ = installing(&ctx, &source("fronting-linked", PROVING)).await;
+    let before = runner.seen().len();
+    lemonfiber_fixtures::scratch::linked_away(
+        &crate::app::project::directory(&ctx).unwrap_or_default(),
+        "navidrome",
+    );
+
+    let gone = removal(removing(&ctx, "komga").await);
+
+    assert_eq!(gone.map(|one| one.removed), Some(true));
+    assert!(
+        !runner
+            .seen()
+            .iter()
+            .skip(before)
+            .any(|argv| argv.iter().any(|word| word == "restart")),
+        "{:?}",
+        runner.seen()
+    );
+}

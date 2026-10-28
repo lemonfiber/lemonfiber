@@ -133,6 +133,18 @@ fn sweep(root: &Path, now: SystemTime) {
     }
 }
 
+/// The directory `service` mounts from beneath the project at `project` made a link to a
+/// directory beside the project, as a container that planted one would leave it.
+#[cfg(unix)]
+pub fn linked_away(project: &Path, service: &str) {
+    let outside = project.with_file_name("outside");
+    let at = project.join("config").join(service);
+    let _ = std::fs::create_dir_all(&outside);
+    let _ = std::fs::create_dir_all(project.join("config"));
+    let _ = std::fs::remove_dir_all(&at);
+    let _ = std::os::unix::fs::symlink(&outside, &at);
+}
+
 impl Drop for Scratch {
     fn drop(&mut self) {
         if !self.root.as_os_str().is_empty() {

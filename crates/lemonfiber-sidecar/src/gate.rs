@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::shape::written;
-use crate::{TokenHash, Unreadable};
+use crate::{Pins, TokenHash, Unreadable};
 
 /// The port the gate listens on, reached only across its own networks and never
 /// published.
@@ -104,6 +104,10 @@ pub struct Upstream {
     /// gate knows itself.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub majors: Vec<u32>,
+    /// On the media server's route, the SHA-256 of each certificate its internal TLS
+    /// port may present, the only ones the gate accepts there. None on the \*arr routes.
+    #[serde(default, skip_serializing_if = "Pins::is_empty")]
+    pub pins: Pins,
 }
 
 /// Every route the gate answers, as the core writes them.

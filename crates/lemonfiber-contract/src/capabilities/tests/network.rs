@@ -48,15 +48,16 @@ impl Tunnelling for Unreached {
 
 #[tokio::test]
 async fn an_egress_guard_is_served_its_answers_its_failures_and_nothing_else() {
-    let refused =
-        |served: Result<Vec<u8>, crate::wire::Refusal>| served.err().map(|refusal| refusal.kind);
+    let refused = |served: Result<crate::wire::Answer, crate::wire::Refusal>| {
+        served.err().map(|refusal| refusal.kind)
+    };
     assert_eq!(
         refused(egress::dispatch(&Unreached, "up", b"{}").await),
         Some(crate::wire::Kind::Unavailable)
     );
     assert_eq!(
         egress::dispatch(&Unreached, "forwarded", b"{}").await.ok(),
-        Some(b"null".to_vec())
+        Some(crate::wire::Answer::Json(b"null".to_vec()))
     );
     assert_eq!(
         refused(egress::dispatch(&Unreached, "forwarded", b"not a request").await),

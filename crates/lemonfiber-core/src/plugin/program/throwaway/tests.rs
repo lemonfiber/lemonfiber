@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{digest, keep, swept, Starting, Throwaway, MOST_BYTES, MOST_FILES};
+use super::{digest, keep, swept, unlinked, Starting, Throwaway, MOST_BYTES, MOST_FILES};
 
 const SERVICE: &str = "recyclarr";
 
@@ -538,4 +538,38 @@ fn a_copy_naming_a_secret_is_refused_where_the_machine_supplies_no_random_bytes(
     assert!(refused
         .as_ref()
         .is_err_and(|why| why.contains("which nothing holds")));
+}
+
+#[test]
+fn a_directory_a_container_is_handed_is_reached_through_no_link() {
+    let scratch = Scratch::new("handed");
+    let plain = scratch.path().join("plain");
+    let _ = std::fs::create_dir_all(&plain);
+    assert_eq!(
+        unlinked([plain.as_path(), &scratch.path().join("absent")]),
+        Ok(())
+    );
+
+    let outside = unlinked([Path::new("/")]).err().unwrap_or_default();
+    assert!(outside.contains("does not lie where"), "{outside}");
+
+    let long = scratch.path().join("x".repeat(300));
+    let unlooked = unlinked([long.as_path()]).err().unwrap_or_default();
+    assert!(unlooked.contains("could not be looked at"), "{unlooked}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_on_the_way_to_a_directory_a_container_is_handed_starts_nothing() {
+    let scratch = Scratch::new("handed-linked");
+    let aside = scratch.path().join("aside");
+    let _ = std::fs::create_dir_all(aside.join("inside"));
+    let _ = std::os::unix::fs::symlink(&aside, scratch.path().join("linked"));
+    let said = unlinked([scratch.path().join("linked").join("inside").as_path()])
+        .err()
+        .unwrap_or_default();
+    assert!(
+        said.contains("is a link or a device, so no container"),
+        "{said}"
+    );
 }

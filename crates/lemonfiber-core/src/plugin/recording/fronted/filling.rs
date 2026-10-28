@@ -33,6 +33,9 @@ pub(super) struct Filling<'a> {
     pub(super) answers: BTreeMap<String, Value>,
     /// Every credential the run has made so far.
     pub(super) made: Vec<String>,
+    /// Where the upstream's container holds the internal certificate written for the run,
+    /// where one was written.
+    pub(super) certificate: Option<String>,
 }
 
 impl Filling<'_> {
@@ -77,6 +80,10 @@ impl Filling<'_> {
     ) -> Result<String, String> {
         match placeholder {
             Placeholder::Minted => self.minted(),
+            Placeholder::Certificate => self
+                .certificate
+                .clone()
+                .ok_or_else(|| "no internal certificate was written for the upstream".to_owned()),
             Placeholder::MintedUpstream(field) => {
                 let fresh = self.minted()?;
                 minted.push((field.clone(), fresh.clone()));

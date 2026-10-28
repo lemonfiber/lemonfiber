@@ -427,6 +427,33 @@ impl Confined for Keyed {
     ) -> Result<(), Fault> {
         self.inner.moved(from, to, within)
     }
+
+    fn made(
+        &self,
+        path: &std::path::Path,
+        within: &std::path::Path,
+        readable: Readable,
+    ) -> Result<(), Fault> {
+        self.inner.made(path, within, readable)
+    }
+
+    fn replaced(
+        &self,
+        path: &std::path::Path,
+        within: &std::path::Path,
+        contents: &[u8],
+        readable: Readable,
+    ) -> Result<(), Fault> {
+        self.inner.replaced(path, within, contents, readable)
+    }
+
+    fn bytes(
+        &self,
+        path: &std::path::Path,
+        within: &std::path::Path,
+    ) -> Result<Option<Vec<u8>>, Fault> {
+        self.inner.bytes(path, within)
+    }
 }
 
 /// Whether the engine's account `reporting` lists `adapter` healthy and published on

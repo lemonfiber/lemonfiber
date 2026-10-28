@@ -161,7 +161,7 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
     let served = served::last(directory)
         .filter(|served| served.encrypted && served.network)
         .ok_or_else(|| Box::new(not_served()))?;
-    let held = crate::certificate::kept(directory)
+    let held = crate::certificate::kept(ctx.seams.confined.as_ref(), directory)
         .map_err(|why| Box::new(no_certificate(&why.to_string())))?
         .ok_or_else(|| Box::new(no_certificate("none has been made")))?;
     let reached = reached(ctx, served.port)
@@ -262,7 +262,7 @@ pub async fn reaching(ctx: &Ctx) -> Reaching {
             ..Reaching::default()
         };
     };
-    let pin = crate::certificate::kept_or_made(directory)
+    let pin = crate::certificate::kept_or_made(ctx.seams.confined.as_ref(), directory)
         .ok()
         .map(|kept| kept.fingerprint);
     let address = match served::last(directory).filter(|served| served.encrypted && served.network)
@@ -310,9 +310,12 @@ async fn reached(ctx: &Ctx, port: u16) -> Option<crate::door::Address> {
 pub fn replacing(ctx: &Ctx, confirm: bool) -> Result<Replacement, Box<Problem>> {
     let directory = kept_in(ctx)?;
     let held = if confirm {
-        Some(crate::certificate::replaced(directory))
+        Some(crate::certificate::replaced(
+            ctx.seams.confined.as_ref(),
+            directory,
+        ))
     } else {
-        crate::certificate::kept(directory).transpose()
+        crate::certificate::kept(ctx.seams.confined.as_ref(), directory).transpose()
     }
     .transpose()
     .map_err(|why| Box::new(no_certificate(&why.to_string())))?;

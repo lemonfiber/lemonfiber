@@ -105,11 +105,13 @@ fn a_door_nothing_is_known_about_locates_nothing_and_says_why() {
 fn the_door_is_https_on_its_own_port_only_with_an_address_and_a_certificate() {
     let dir = Scratch::named("door-made").kept();
     let _ = std::fs::remove_dir_all(&dir);
-    let kept = ensured(&dir).ok();
+    let kept = ensured(&lemonfiber_adapters::Disk, &dir).ok();
     let fingerprint = kept.as_ref().map(|kept| kept.fingerprint.clone());
     assert!(directory(&dir).join("certificate.pem").exists());
     assert_eq!(
-        ensured(&dir).ok().map(|again| again.fingerprint),
+        ensured(&lemonfiber_adapters::Disk, &dir)
+            .ok()
+            .map(|again| again.fingerprint),
         fingerprint,
         "a second start made the door a new certificate"
     );
@@ -208,7 +210,9 @@ async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
 async fn a_standing_door_locates_where_the_server_behind_it_declared() {
     const HOUSEHOLD_HOST: &str = "192.168.1.20";
     let project = Scratch::new("door-standing");
-    let fingerprint = ensured(project.path()).map(|kept| kept.fingerprint).ok();
+    let fingerprint = ensured(&lemonfiber_adapters::Disk, project.path())
+        .map(|kept| kept.fingerprint)
+        .ok();
     let standing_at = |household_host: Option<&str>| {
         crate::test_support::a_context()
             .over(crate::stack::Source::Embedded(&STACKLET))

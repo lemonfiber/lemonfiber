@@ -66,6 +66,7 @@ async fn every_operation_reads_an_answer_as_the_client_does() {
 fn a_placeholder_is_written_as_it_is_read_back() {
     for placeholder in [
         Placeholder::Minted,
+        Placeholder::Certificate,
         Placeholder::Upstream("password".to_owned()),
         Placeholder::MintedUpstream("password".to_owned()),
         Placeholder::answer("identity.source", 1, "invite", "/id"),
@@ -78,6 +79,7 @@ fn a_placeholder_is_written_as_it_is_read_back() {
         assert_eq!(String::from(placeholder.clone()), placeholder.written());
     }
     assert_eq!(Placeholder::Minted.written(), "{minted}");
+    assert_eq!(Placeholder::Certificate.written(), "{certificate}");
     assert_eq!(
         Placeholder::answer("identity.source", 1, "invite", "/id").written(),
         "{identity.source@1/invite-answers#/id}"

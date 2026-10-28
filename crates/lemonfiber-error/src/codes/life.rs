@@ -116,4 +116,17 @@ codes! {
             rehearsed — so nothing was restarted.",
         remedy: "Rehearse the restart again, and answer the offer it gives now.",
     }
+    /// Raised when a start finds a service's mount source reached through a link.
+    MOUNT_LINKED = "LIFE-11" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "A directory the stack mounts into a service is reached through a link \
+            beneath the project directory. The engine follows a link wherever it mounts, so the \
+            service would be handed whatever the link points at on the machine. A stack \
+            lemonfiber wrote has no link there, so nothing was started; the message names the \
+            service and the path.",
+        remedy: "Look at what put a link at the path named, take the link away, and start \
+            again.",
+    }
 }

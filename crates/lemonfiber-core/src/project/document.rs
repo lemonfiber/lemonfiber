@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use super::entry::{literal, Entry, LIBRARY_VOLUME};
+use super::entry::{literal, Entry, CONFIGURATION_TREE, LIBRARY_VOLUME, MOUNT_TREE};
 use crate::config::storage::Export;
 use crate::topology::{Network, Topology};
 
@@ -53,6 +53,37 @@ pub(crate) fn sliced(text: &str, names: &[&str]) -> String {
     let mut sliced = serde_norway::Mapping::new();
     sliced.insert("services".into(), services.into());
     yaml(&sliced)
+}
+
+/// Each directory a service of the document `text` mounts from the configuration or mount
+/// tree beneath the project directory, by the service it is mounted into, as the engine
+/// is handed it.
+pub(crate) fn sources(text: &str) -> Vec<(String, String)> {
+    let document: serde_norway::Value = serde_norway::from_str(text).unwrap_or_default();
+    document
+        .get("services")
+        .and_then(serde_norway::Value::as_mapping)
+        .into_iter()
+        .flatten()
+        .flat_map(|(name, entry)| {
+            let service = name.as_str().unwrap_or_default().to_owned();
+            entry
+                .get("volumes")
+                .and_then(serde_norway::Value::as_sequence)
+                .into_iter()
+                .flatten()
+                .filter_map(|volume| volume.as_str()?.split(':').next())
+                .filter(|source| {
+                    [CONFIGURATION_TREE, MOUNT_TREE].iter().any(|tree| {
+                        source
+                            .strip_prefix("./")
+                            .and_then(|beneath| beneath.strip_prefix(tree))
+                            .is_some_and(|rest| rest.starts_with('/'))
+                    })
+                })
+                .map(move |source| (service.clone(), source.replace("$$", "$")))
+        })
+        .collect()
 }
 
 /// The options every NFS library volume is mounted with, after the server's address:

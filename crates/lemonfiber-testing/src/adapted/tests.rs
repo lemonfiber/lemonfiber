@@ -189,6 +189,20 @@ fn a_keyed_disk_holds_the_adapters_key_and_reads_every_other_file_as_the_disk_do
         keyed.read(&seeded, &directory),
         Beneath::Read("seeded".to_owned())
     );
+
+    let replaced = directory.join("replaced").join("other.bin");
+    assert_eq!(
+        keyed.made(&directory.join("replaced"), &directory, Readable::Owner),
+        Ok(())
+    );
+    assert_eq!(
+        keyed.replaced(&replaced, &directory, b"whole", Readable::Owner),
+        Ok(())
+    );
+    assert_eq!(
+        keyed.bytes(&replaced, &directory),
+        Ok(Some(b"whole".to_vec()))
+    );
 }
 
 #[test]

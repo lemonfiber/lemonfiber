@@ -179,6 +179,7 @@ pub(crate) fn declared() -> Declared {
         ports: Ports {
             upstream: PORT,
             encrypted: Some(GUARDED),
+            internal_tls: None,
         },
     }
 }

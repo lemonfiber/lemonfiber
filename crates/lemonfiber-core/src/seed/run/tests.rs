@@ -335,6 +335,7 @@ fn admitting(routes: &[(&str, lemonfiber_sidecar::gate::Kind, &str)]) -> String 
                     address: format!("http://{route}:80"),
                     credential: lemonfiber_sidecar::gate::Credential::new(*credential),
                     majors: Vec::new(),
+                    pins: lemonfiber_sidecar::Pins::default(),
                 },
             )
             .collect(),

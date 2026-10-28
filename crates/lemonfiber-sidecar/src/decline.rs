@@ -1,11 +1,14 @@
 //! What the core and the decline service hand each other.
 //!
-//! Four files, in the service's configuration directory:
+//! Five files, in the service's configuration directory:
 //!
 //! - [`File::Table`], the invitations it may act on, written by the core at each
 //!   invitation and mounted read-only. A token is held only as its hash.
 //! - [`File::Key`], the one Jellyfin API key minted for it, written by the core
 //!   owner-only and mounted read-only.
+//! - [`File::Pins`], the SHA-256 of each certificate the media server's internal TLS
+//!   port may present, the only ones the service accepts there, written by the core
+//!   beside the key.
 //! - [`File::Refusals`], what it declined, written by the service and read back by
 //!   the core, which reports each as the invitation's standing.
 //! - [`File::Lapses`], what it took back when an invitation's window closed,
@@ -15,8 +18,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::shape::written;
-pub use crate::TokenHash;
 use crate::Unreadable;
+pub use crate::{Pins, TokenHash};
 
 /// The files in the decline service's configuration directory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +28,8 @@ pub enum File {
     Table,
     /// The Jellyfin API key minted for it alone.
     Key,
+    /// The certificates the media server's internal TLS port may present, as [`Pins`].
+    Pins,
     /// What it declined.
     Refusals,
     /// What it took back when an invitation's window closed.
@@ -38,6 +43,7 @@ impl File {
         match self {
             Self::Table => "invitations.json",
             Self::Key => "jellyfin.key",
+            Self::Pins => crate::pins::FILE,
             Self::Refusals => "refusals.json",
             Self::Lapses => "lapses.json",
         }

@@ -54,6 +54,7 @@
             },
             "ports": {
               "encrypted": null,
+              "internal_tls": null,
               "upstream": 80
             },
             "question": {

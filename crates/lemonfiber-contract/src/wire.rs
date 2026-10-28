@@ -6,7 +6,9 @@
 //! ([`Failure`]), plus two that only a contract can: a call nobody declared, and one whose
 //! body did not read.
 
-use lemonfiber_ports::service::Failure;
+use std::any::Any;
+
+use lemonfiber_ports::service::{Applied, Failure};
 use serde::{Deserialize, Serialize};
 
 pub use lemonfiber_ports::http::{JSON, PROBLEM};
@@ -115,14 +117,32 @@ pub fn asked<A: serde::de::DeserializeOwned>(body: &[u8]) -> Result<A, Refusal> 
     serde_json::from_slice(body).map_err(|why| Refusal::new(Kind::NotAsked, why.to_string()))
 }
 
-/// What a port answered, as the body an adapter sends back.
+/// The status an adapter answers an operation with that applied what it was asked and is
+/// in force only once the upstream restarts.
+pub const RESET: u16 = 205;
+
+/// What an adapter answers a call it served with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Answer {
+    /// This JSON, at `200`.
+    Json(Vec<u8>),
+    /// Applied, and in force once the upstream restarts: [`RESET`], with nothing to say.
+    Reset,
+}
+
+/// What a port answered, as what an adapter sends back.
 ///
 /// # Errors
 ///
 /// The refusal a failure crosses as.
-pub fn answered<R: Serialize>(answer: Result<R, Failure>) -> Result<Vec<u8>, Refusal> {
+pub fn answered<R: Serialize + 'static>(answer: Result<R, Failure>) -> Result<Answer, Refusal> {
     let answer = answer.map_err(|failure| Refusal::from(&failure))?;
-    serde_json::to_vec(&answer).map_err(|why| Refusal::new(Kind::Refused, why.to_string()))
+    if (&answer as &dyn Any).downcast_ref::<Applied>() == Some(&Applied::OnRestart) {
+        return Ok(Answer::Reset);
+    }
+    serde_json::to_vec(&answer)
+        .map(Answer::Json)
+        .map_err(|why| Refusal::new(Kind::Refused, why.to_string()))
 }
 
 #[cfg(test)]

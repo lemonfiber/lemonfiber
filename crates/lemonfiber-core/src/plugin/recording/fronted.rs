@@ -20,7 +20,7 @@ use serde_json::Value;
 use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
-use super::served::{allowed, healthy, healthy_at, LOG_LINES, POLL};
+use super::served::{allowed, healthy, healthy_at, started, LOG_LINES, POLL};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
@@ -112,14 +112,12 @@ pub(super) async fn answers(
         .map_err(failing)?;
     let (serve, apart) = serves(recorder, upstream, adapter, &prepared, reaching);
     let alone = apart.is_none();
-    let served = recorder
-        .serving
-        .serve(&serve)
+    let served = started(recorder.serving, &serve, None)
         .await
-        .map_err(|unran| failing(Faulted::new("container", unran.to_string(), Vec::new())))?;
+        .map_err(|why| failing(Faulted::new("container", why, Vec::new())))?;
     let beside = match &apart {
         None => Ok(served.clone()),
-        Some(started) => recorder.serving.beside(&served, started).await,
+        Some(apart) => started(recorder.serving, apart, Some(&served)).await,
     };
     let outcome = match &beside {
         Ok(fronting) => {
@@ -134,13 +132,14 @@ pub(super) async fn answers(
                 key: &prepared.key,
                 made: &prepared.made,
                 envelope: envelope.as_ref(),
+                certificate: prepared.certificate.as_deref(),
             }
             .asked(items)
             .await
         }
-        Err(unran) => Err(Faulted::new(
+        Err(why) => Err(Faulted::new(
             "adapter's container",
-            unran.to_string(),
+            why.clone(),
             prepared.made.clone(),
         )),
     };
@@ -215,6 +214,7 @@ struct Asking<'a> {
     key: &'a str,
     made: &'a [String],
     envelope: Option<&'a lemonfiber_ports::service::Declared>,
+    certificate: Option<&'a str>,
 }
 
 impl Asking<'_> {
@@ -270,6 +270,7 @@ impl Asking<'_> {
             held: self.held,
             answers: BTreeMap::new(),
             made,
+            certificate: self.certificate.map(str::to_owned),
         };
         let mut asked = Vec::new();
         for (spoken, capability) in &contracts {

@@ -73,6 +73,7 @@ fn declared() -> Declared {
         ports: Ports {
             upstream: UPSTREAM_PORT,
             encrypted: None,
+            internal_tls: None,
         },
     }
 }

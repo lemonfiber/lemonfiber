@@ -23,7 +23,7 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::Router;
 use lemonfiber_contract::adapter::{about_path, ready_path, About, KEY_FILE, UPSTREAM_FILE};
-use lemonfiber_contract::wire::{JSON, PROBLEM};
+use lemonfiber_contract::wire::{Answer, JSON, PROBLEM};
 use lemonfiber_contract::{Refusal, Served};
 use tokio::net::TcpListener;
 
@@ -187,7 +187,8 @@ async fn operation(
         return refused(&Refusal::unknown_operation(&operation));
     };
     match served.dispatch(&operation, body.to_vec()).await {
-        Ok(answer) => answered(StatusCode::OK, Some(JSON), answer),
+        Ok(Answer::Json(answer)) => answered(StatusCode::OK, Some(JSON), answer),
+        Ok(Answer::Reset) => answered(StatusCode::RESET_CONTENT, None, Vec::new()),
         Err(refusal) => refused(&refusal),
     }
 }

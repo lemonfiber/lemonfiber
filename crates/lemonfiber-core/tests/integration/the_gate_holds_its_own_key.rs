@@ -21,6 +21,7 @@ fn routes(key: &str) -> String {
         address: "http://jellyfin:8096".to_owned(),
         credential: Credential::new(key),
         majors: vec![10],
+        pins: lemonfiber_sidecar::Pins::default(),
     }])
     .written()
 }

@@ -6,7 +6,7 @@ use lemonfiber_sidecar::decline::{File, Table, TokenHash};
 
 use super::Configured;
 use crate::app::invite::declining::path;
-use crate::ports::service::{Claimed, Declinable, Declining, Invitations};
+use crate::ports::service::{Claimed, Declinable, Declining, Invitations, KeyHeld};
 
 /// The stack's own decline service under a fresh project.
 fn decline(scratch: &Scratch) -> Configured {
@@ -21,15 +21,46 @@ async fn a_key_held_is_written_and_answered_by_its_hash() {
     let service = decline(&scratch);
 
     assert_eq!(service.held().await.ok(), Some(None));
-    assert!(service.hold("0123456789abcdef").await.is_ok());
+    assert!(service.hold("0123456789abcdef", &[]).await.is_ok());
     assert_eq!(
         std::fs::read_to_string(path(scratch.path(), File::Key)).ok(),
         Some("0123456789abcdef\n".to_owned())
     );
     assert_eq!(
         service.held().await.ok(),
-        Some(Some(TokenHash::of("0123456789abcdef").as_str().to_owned()))
+        Some(Some(KeyHeld {
+            key: TokenHash::of("0123456789abcdef").as_str().to_owned(),
+            pins: Vec::new(),
+        }))
     );
+}
+
+/// The certificates the media server may present are written beside the key, and answered
+/// back with it; a pin that is not a SHA-256 is refused and nothing is written.
+#[tokio::test]
+async fn the_pins_are_written_beside_the_key_and_answered_back() {
+    let scratch = Scratch::new("decline-configured-pins");
+    let service = decline(&scratch);
+    let pins = vec!["ab".repeat(32), "cd".repeat(32)];
+
+    assert!(service.hold("0123456789abcdef", &pins).await.is_ok());
+    assert_eq!(
+        std::fs::read_to_string(path(scratch.path(), File::Pins)).ok(),
+        Some(format!("{}\n{}\n", "ab".repeat(32), "cd".repeat(32)))
+    );
+    assert_eq!(
+        service.held().await.ok().flatten().map(|held| held.pins),
+        Some(pins)
+    );
+
+    let refused = Scratch::new("decline-configured-pins-refused");
+    let service = decline(&refused);
+    assert!(service
+        .hold("0123456789abcdef", &["not-a-pin".to_owned()])
+        .await
+        .is_err());
+    assert!(!path(refused.path(), File::Key).exists());
+    assert!(!path(refused.path(), File::Pins).exists());
 }
 
 /// A key of more than one word is refused and nothing is written.
@@ -38,7 +69,7 @@ async fn a_key_of_two_words_is_refused_and_nothing_written() {
     let scratch = Scratch::new("decline-configured-two-words");
     let service = decline(&scratch);
 
-    assert!(service.hold("two words").await.is_err());
+    assert!(service.hold("two words", &[]).await.is_err());
     assert!(!path(scratch.path(), File::Key).exists());
 }
 

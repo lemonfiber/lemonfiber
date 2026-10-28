@@ -20,7 +20,9 @@ use lemonfiber_ports::service::{
     Requesting, Requests, Searching, Target, Telling, Wish,
 };
 
-use super::{curator_address, CURATOR, CURATOR_PORT, FOLDER, NAMED, PROFILE, TOKEN_HASH};
+use super::{
+    curator_address, CERTIFICATE_PIN, CURATOR, CURATOR_PORT, FOLDER, NAMED, PROFILE, TOKEN_HASH,
+};
 use crate::conformance::Placeholder;
 
 /// The media server account the conformance cases link, find and ask for, in the shape a
@@ -289,7 +291,7 @@ crate::contract! {
 }
 
 /// Where the conformance cases' gate reaches the media server.
-const MEDIA_SERVER_AT: &str = "http://conformance-media-server";
+const MEDIA_SERVER_AT: &str = "https://conformance-media-server:8920";
 
 /// The path segment the conformance cases' gate answers the media server's route under.
 const MEDIA_SERVER_PATH: &str = "media-server";
@@ -324,7 +326,7 @@ crate::contract! {
                         Vec::new(),
                     ),
                     gated(
-                        Target::MediaServer,
+                        Target::MediaServer { pins: vec![CERTIFICATE_PIN.to_owned()] },
                         MEDIA_SERVER_PATH,
                         MEDIA_SERVER_AT.to_owned(),
                         vec![MEDIA_SERVER_MAJOR],

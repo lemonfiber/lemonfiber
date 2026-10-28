@@ -63,6 +63,7 @@ async fn ran(
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
             taking: &crate::plugin::Retaking::default(),
+            confined: &lemonfiber_adapters::Disk,
         },
     )
     .await
@@ -331,6 +332,7 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
         transport: &silent,
         random: &chance,
         taking: &crate::plugin::Retaking::default(),
+        confined: &lemonfiber_adapters::Disk,
     };
     let mut took = Vec::new();
     for running in runs {
@@ -373,8 +375,10 @@ fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
         let (Some(placed), Ok(copy)) = (placed, copy) else {
             unreachable!("the fixture places a service and a copy is made");
         };
-        let certified = super::served::certified(&placed, &copy);
-        let kept = crate::certificate::kept(copy.path()).ok().flatten();
+        let certified = super::served::certified(&placed, &copy, &lemonfiber_adapters::Disk);
+        let kept = crate::certificate::kept(&lemonfiber_adapters::Disk, copy.path())
+            .ok()
+            .flatten();
         assert_eq!(kept.is_some(), holds, "{provides}");
         assert_eq!(
             certified,
@@ -421,7 +425,7 @@ fn a_certificate_that_cannot_be_written_stops_the_guard_before_it_starts() {
         unreachable!("the fixture places a service and a copy is made");
     };
     let _ = std::fs::set_permissions(copy.path(), std::fs::Permissions::from_mode(0o500));
-    let certified = super::served::certified(&placed, &copy);
+    let certified = super::served::certified(&placed, &copy, &lemonfiber_adapters::Disk);
     let _ = std::fs::set_permissions(copy.path(), std::fs::Permissions::from_mode(0o700));
     assert!(certified.is_err());
 }

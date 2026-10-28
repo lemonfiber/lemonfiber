@@ -12,10 +12,18 @@
               "key": {
                 "description": "The port's `key`.",
                 "type": "string"
+              },
+              "pins": {
+                "description": "The port's `pins`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               }
             },
             "required": [
-              "key"
+              "key",
+              "pins"
             ],
             "title": "Asked",
             "type": "object"

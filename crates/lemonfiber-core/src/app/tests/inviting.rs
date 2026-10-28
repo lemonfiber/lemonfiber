@@ -555,7 +555,7 @@ async fn an_offer_on_a_machine_served_encrypted_carries_a_join_link() {
     let env = recorded_admin("offers-joinable");
     let companion =
         lemonfiber_fixtures::scratch::Scratch::named("offers-joinable-companion").kept();
-    let _ = crate::certificate::kept_or_made(&companion);
+    let _ = crate::certificate::kept_or_made(&lemonfiber_adapters::Disk, &companion);
     let _ = crate::companion::served::record(
         &companion,
         crate::companion::served::Served {

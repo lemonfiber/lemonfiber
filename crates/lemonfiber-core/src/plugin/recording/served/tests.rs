@@ -290,3 +290,39 @@ async fn a_container_that_exits_fails_at_once_naming_its_status() {
     );
     assert!(started.elapsed() < std::time::Duration::from_secs(1));
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn no_container_is_started_with_a_directory_reached_through_a_link() {
+    let Ok(copy) = Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()) else {
+        return;
+    };
+    let Some(sonarr) = placed(SERVED) else {
+        return;
+    };
+    let serve = settled(&sonarr, &copy, None);
+    let aside = copy.path().with_file_name("aside");
+    let _ = std::fs::rename(copy.path(), &aside);
+    let _ = std::os::unix::fs::symlink(&aside, copy.path());
+    let serving = Serves::on(49153);
+    let running = Served {
+        container: "upstream".to_owned(),
+        network: "recording".to_owned(),
+        hostname: "upstream".to_owned(),
+        addresses: Vec::new(),
+        machine: Vec::new(),
+        port: None,
+        contract: None,
+    };
+
+    let alone = super::started(&serving, &serve, None).await;
+    let beside = super::started(&serving, &serve, Some(&running)).await;
+
+    for refused in [alone, beside] {
+        assert!(
+            refused.as_ref().is_err_and(|why| why.contains("is a link")),
+            "{refused:?}"
+        );
+    }
+    assert!(serving.asked().is_empty());
+}

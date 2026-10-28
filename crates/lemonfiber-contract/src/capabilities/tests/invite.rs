@@ -2,19 +2,22 @@
 //! process and through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Claimed, Declinable, Declining, Failure, Invitations};
+use lemonfiber_ports::service::{Claimed, Declinable, Declining, Failure, Invitations, KeyHeld};
 
 use super::{crosses_alike, decline, Upstream};
 
 #[async_trait]
 impl Declining for Upstream {
-    async fn hold(&self, key: &str) -> Result<(), Failure> {
-        self.tell(format!("hold {key}"));
+    async fn hold(&self, key: &str, pins: &[String]) -> Result<(), Failure> {
+        self.tell(format!("hold {key} {pins:?}"));
         Ok(())
     }
-    async fn held(&self) -> Result<Option<String>, Failure> {
+    async fn held(&self) -> Result<Option<KeyHeld>, Failure> {
         self.tell("held".to_owned());
-        Ok(Some(lemonfiber_ports::fingerprint("decline-key")))
+        Ok(Some(KeyHeld {
+            key: lemonfiber_ports::fingerprint("decline-key"),
+            pins: vec!["ab".repeat(32), "cd".repeat(32)],
+        }))
     }
     async fn apply_invitations(&self, invitations: &Invitations) -> Result<(), Failure> {
         self.tell(format!("apply_invitations {invitations:?}"));
@@ -44,7 +47,10 @@ async fn script<D: Declining>(decline: &D) -> Vec<String> {
         ],
     };
     vec![
-        format!("{:?}", decline.hold("decline-key").await),
+        format!(
+            "{:?}",
+            decline.hold("decline-key", &["ab".repeat(32)]).await
+        ),
         format!("{:?}", decline.held().await),
         format!("{:?}", decline.apply_invitations(&invitations).await),
     ]

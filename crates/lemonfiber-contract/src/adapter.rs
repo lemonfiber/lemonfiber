@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::wire::Answer;
 use crate::Refusal;
 
 /// The file in an adapter's configuration directory the core writes the plugin's key to.
@@ -75,7 +76,7 @@ pub struct Release {
 }
 
 /// What a served call comes to.
-pub type Answering = Pin<Box<dyn Future<Output = Result<Vec<u8>, Refusal>> + Send>>;
+pub type Answering = Pin<Box<dyn Future<Output = Result<Answer, Refusal>> + Send>>;
 
 /// Serving one call: the operation and what it was asked with.
 type Dispatching = dyn Fn(String, Vec<u8>) -> Answering + Send + Sync;
@@ -126,7 +127,7 @@ impl Served {
     /// # Errors
     ///
     /// The refusal the operation answered with.
-    pub async fn dispatch(&self, operation: &str, body: Vec<u8>) -> Result<Vec<u8>, Refusal> {
+    pub async fn dispatch(&self, operation: &str, body: Vec<u8>) -> Result<Answer, Refusal> {
         (self.dispatching)(operation.to_owned(), body).await
     }
 }

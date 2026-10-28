@@ -156,6 +156,7 @@ async fn read_through(
             transport: &shared,
             random: &FixedRandom(random.map(|byte| vec![byte; 32])),
             taking: &crate::plugin::Retaking::default(),
+            confined: &lemonfiber_adapters::Disk,
         },
     )
     .await
@@ -691,6 +692,7 @@ mod alone;
 mod checking;
 mod claiming;
 mod identity;
+mod internal;
 mod sharing;
 mod standing_in;
 mod unoffered;

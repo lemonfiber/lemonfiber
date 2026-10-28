@@ -4,6 +4,7 @@
 //! merged over it and nothing else.
 
 mod copying;
+mod linking;
 mod mounting;
 mod moving;
 mod passing;
@@ -31,6 +32,7 @@ use crate::topology::Topology;
 use crate::wiring::Chosen;
 
 pub(crate) use copying::{pending as copies, Copies};
+pub(crate) use linking::unlinked;
 pub(crate) use moving::{beneath as moved_beneath, moved};
 pub(crate) use passing::readied as pass_readied;
 pub(crate) use retiring::{retired, still_there};

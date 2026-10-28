@@ -43,8 +43,7 @@ pub(super) async fn seed_gate_routes(
     let routed = server.and_then(|server| server.gated().map(|gated| (server, gated)));
     match routed {
         Some((server, (_, pairing))) if gating::may_hold(fillers, server.filler.holder()) => {
-            let gated = Routed { server, pairing };
-            with_the_media_server(ctx, services, fillers, &gated, project).await
+            with_the_media_server(ctx, services, fillers, (server, pairing), project).await
         }
         Some((server, _)) => {
             let mut wirings = curators_alone(ctx, services, fillers, project).await;
@@ -131,10 +130,9 @@ async fn with_the_media_server(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    routed: &Routed<'_>,
+    (server, pairing): (&MediaServer, &Pairing),
     project: Option<&Path>,
 ) -> Vec<Wiring> {
-    let server = routed.server;
     let gating = gating::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up; a rehearsal before the first run finds none recorded yet.
@@ -166,6 +164,31 @@ async fn with_the_media_server(
     let filed = match filed {
         Ok(filed) => filed,
         Err(failure) => return vec![settled(crate::seed::unreached(&failure))],
+    };
+    let Some(internal) = client
+        .declared()
+        .await
+        .ok()
+        .and_then(|declared| declared.ports.internal_tls)
+    else {
+        let mut wirings = curators_alone(ctx, services, fillers, project).await;
+        wirings.push(Wiring::settled(
+            format!("{} routed through the request gate", server.name()),
+            State::Unmatched {
+                reason: format!(
+                    "{} declares no internal encrypted port, the one port the gate may reach \
+                     it at",
+                    server.name()
+                ),
+            },
+        ));
+        return wirings;
+    };
+    let routed = &Routed {
+        server,
+        pairing,
+        internal,
+        pins: super::encrypting::pins(ctx, server),
     };
     let (gate, admitted) = match asked(ctx, fillers, project).await {
         Ok(asked) => asked,
@@ -211,7 +234,7 @@ async fn with_the_media_server(
 pub(crate) fn held(admitted: &[Admitted], filed: &[String]) -> Option<String> {
     let presented = admitted
         .iter()
-        .find(|route| route.target == Target::MediaServer)?;
+        .find(|route| matches!(route.target, Target::MediaServer { .. }))?;
     filed
         .iter()
         .find(|key| crate::ports::digest::sha256(key) == presented.credential)
@@ -363,20 +386,26 @@ fn routing(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> (Vec<Gated>, Vec<Wiri
     (routes, unrouted)
 }
 
-/// The media server as the gate routes to it: where the API it speaks is answered.
+/// The media server as the gate routes to it: where the API it speaks is answered, the
+/// internal TLS port it is reached at and the certificates that port may present.
 struct Routed<'a> {
     server: &'a MediaServer,
     pairing: &'a Pairing,
+    internal: u16,
+    pins: Vec<String>,
 }
 
 /// The route to the media server, named by its id, reaching the API other services sign
-/// the household in through it in, forwarding to the majors of it the stack supports and
+/// the household in through it in at its internal TLS port, accepting only the
+/// certificates it may present, forwarding to the majors of it the stack supports and
 /// presenting `key`.
 fn to_media(routed: &Routed<'_>, key: &str) -> Gated {
     Gated {
-        target: Target::MediaServer,
+        target: Target::MediaServer {
+            pins: routed.pins.clone(),
+        },
         path: routed.server.id().to_owned(),
-        address: routed.pairing.at.url(),
+        address: routed.pairing.at.encrypted_at(routed.internal),
         majors: routed.pairing.majors.clone(),
         credential: key.to_owned(),
         tokens: Vec::new(),

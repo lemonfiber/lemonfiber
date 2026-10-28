@@ -82,6 +82,8 @@ pub struct Operation {
     /// For an operation bound to a kind of media, what its case for each media type posts
     /// instead, by media type; none for every other operation.
     pub filed: Vec<(&'static str, serde_json::Value)>,
+    /// Whether it may answer that what it applied is in force once the upstream restarts.
+    pub restarts: bool,
     /// How its answer is read.
     reads: Reading,
 }
@@ -104,6 +106,8 @@ impl Operation {
             secret: &[],
             asks: serde_json::Value::Null,
             filed: Vec::new(),
+            restarts: std::any::TypeId::of::<R>()
+                == std::any::TypeId::of::<lemonfiber_ports::service::Applied>(),
             reads: read_as::<R>,
         }
     }

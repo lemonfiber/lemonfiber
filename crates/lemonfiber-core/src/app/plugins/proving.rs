@@ -69,11 +69,19 @@ pub(crate) async fn started(
         .iter()
         .map(|placed| placed.service.clone())
         .collect();
-    crate::app::engine::halted::before(ctx, &Action::Start(services.clone()), &services);
-    let command = invocation(ctx, installed, stack, &Action::Start(services));
-    let answered = match ctx.seams.runner.run(&command).await {
-        Ok(output) if output.succeeded() => return Ok(()),
-        other => other,
+    let start = Action::Start(services.clone());
+    let answered = match crate::app::engine::before(ctx, &start, &services) {
+        Ok(()) => match ctx
+            .seams
+            .runner
+            .run(&invocation(ctx, installed, stack, &start))
+            .await
+        {
+            Ok(output) if output.succeeded() => return Ok(()),
+            Ok(refused) => Ok(refused),
+            Err(why) => Err(crate::error::Diagnose::problem(&why)),
+        },
+        Err(refused) => Err(*refused),
     };
     // Put back before the sentence about it is written. A failure here is the same
     // failure a proof that did not hold is — the install got no further — so it goes
@@ -85,7 +93,7 @@ pub(crate) async fn started(
         // The engine's own account underneath the install's, rather than in place of
         // it: what an operator has to act on is that nothing is installed, and *docker
         // is not on this machine* is why rather than what.
-        Err(why) => problem.caused_by(crate::error::Diagnose::problem(&why)),
+        Err(cause) => problem.caused_by(cause),
     }))
 }
 
@@ -103,9 +111,16 @@ pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
         .iter()
         .map(|placed| placed.service.clone())
         .collect();
-    crate::app::engine::halted::before(ctx, &Action::Start(services.clone()), &services);
-    let command = invocation(ctx, installed, stack, &Action::Start(services));
-    match ctx.seams.runner.run(&command).await {
+    let start = Action::Start(services.clone());
+    if let Err(refused) = crate::app::engine::before(ctx, &start, &services) {
+        return Some(refused.summary);
+    }
+    match ctx
+        .seams
+        .runner
+        .run(&invocation(ctx, installed, stack, &start))
+        .await
+    {
         Ok(output) if output.succeeded() => None,
         Ok(refused) => Some(format!(
             "the container engine refused to start it: {}",
@@ -188,15 +203,10 @@ pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
         return;
     }
     let (service, profile) = PROXY;
-    let plan = Plan {
-        forms: Vec::new(),
-        profiles: std::iter::once(profile.to_owned()).collect(),
-        services: vec![service.to_owned()],
-        dropped: Vec::new(),
-        filtered: Vec::new(),
-        footprint: crate::stack::closure::Footprint::default(),
-        running: crate::stack::closure::Running::Unasked,
-    };
+    let plan = Plan::one(service, profile);
+    if crate::app::project::unlinked(ctx).is_err() {
+        return;
+    }
     let restart = Action::Restart(vec![service.to_owned()]);
     let command = build(&plan, &ctx.settings, stack, &restart, ctx.environment);
     let _ = ctx.seams.runner.run(&command).await;

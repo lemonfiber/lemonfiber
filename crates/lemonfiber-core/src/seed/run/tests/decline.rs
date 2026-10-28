@@ -539,3 +539,85 @@ async fn a_replaced_key_the_server_will_not_revoke_is_said() {
     assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
     assert_eq!(held(&at).as_deref(), Some("fresh"));
 }
+
+/// A key the service holds with pins that are not the certificate kept for the media
+/// server's internal TLS port is handed to it again with that certificate's pin, which
+/// a rehearsal only says, and once it holds them both it is left alone.
+#[tokio::test]
+async fn a_key_held_with_other_pins_is_handed_again_with_the_certificate_kept() {
+    let http = serving(&["kept"], "fresh", true);
+    let (ctx, at) = decline_ctx("decline-key-repinned", true, Some("kept"), http.clone());
+    let made = crate::certificate::internal::kept_or_made(
+        &lemonfiber_adapters::Disk,
+        &at.join("config").join("jellyfin"),
+        "jellyfin",
+    );
+    let Ok(made) = made else {
+        unreachable!("the internal certificate is made: {made:?}");
+    };
+    let fillers = super::moved_at(stack(true), &at);
+    let seed = |ctx: &Ctx| {
+        let ctx = ctx.clone();
+        let fillers = fillers.clone();
+        let at = at.clone();
+        async move {
+            super::super::decline::seed_decline_key(&ctx, &stack(true), &fillers, Some(&at))
+                .await
+                .map(|one| one.state)
+        }
+    };
+    let pins = || {
+        std::fs::read_to_string(crate::app::invite::declining::path(
+            &at,
+            lemonfiber_sidecar::decline::File::Pins,
+        ))
+        .ok()
+    };
+
+    let mut rehearsing = ctx.clone();
+    rehearsing.dry_run = true;
+    assert!(matches!(
+        seed(&rehearsing).await,
+        Some(State::WouldWire { ours: Some(ours), .. }) if ours == made.fingerprint
+    ));
+    assert_eq!(pins(), None, "a rehearsal hands nothing");
+
+    assert_eq!(seed(&ctx).await, Some(State::Wired));
+    assert_eq!(pins(), Some(format!("{}\n", made.fingerprint)));
+    assert_eq!(held(&at).as_deref(), Some("kept"));
+    assert!(!minted_on(&http));
+
+    assert_eq!(seed(&ctx).await, Some(State::AlreadyWired));
+}
+
+/// A key that cannot be handed again with the certificate's pin is reported, never called
+/// done, and nothing filed beside it is revoked.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_key_that_cannot_be_handed_again_with_its_pin_is_reported() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let http = serving(&["kept", "stray"], "fresh", true);
+    let (ctx, at) = decline_ctx("decline-key-unrepinned", true, Some("kept"), http.clone());
+    let made = crate::certificate::internal::kept_or_made(
+        &lemonfiber_adapters::Disk,
+        &at.join("config").join("jellyfin"),
+        "jellyfin",
+    );
+    assert!(made.is_ok(), "{made:?}");
+    let directory = key_file(&at)
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500));
+    let state = super::super::decline::seed_decline_key(
+        &ctx,
+        &stack(true),
+        &super::moved_at(stack(true), &at),
+        Some(&at),
+    )
+    .await
+    .map(|one| one.state);
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
+    assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
+    assert!(!http.asked_for(media::serve("revoke")));
+}

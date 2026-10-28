@@ -42,6 +42,12 @@ impl Address {
     pub fn url(&self) -> String {
         format!("http://{}:{}", self.host, self.port)
     }
+
+    /// Where a service beside it reaches it over HTTPS, at its encrypted port `port`.
+    #[must_use]
+    pub fn encrypted_at(&self, port: u16) -> String {
+        format!("https://{}:{port}", self.host)
+    }
 }
 
 /// One service on this machine, the stack's or a plugin's, as whatever reaches it needs
@@ -68,6 +74,9 @@ pub struct Filler {
     /// Every service's, the stack's own included: whatever runs in a container can write
     /// the directory mounted into it, whoever published the image.
     pub confined_to: Option<std::path::PathBuf>,
+    /// Where its configuration directory is mounted inside its container, where its
+    /// manifest says: a plugin's service's, and none for the stack's own.
+    pub config_at: Option<String>,
     /// The media it files, which decides which of an asker's connections it comes to.
     pub media_types: Vec<String>,
     /// Every capability it says it provides.
@@ -425,6 +434,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         contract: None,
         confined_to: project
             .map(|project| crate::app::targets::service_config_dir(project, &service.id)),
+        config_at: None,
         media_types: service.media_types.clone(),
         provides: service.provides.clone(),
         contracts: Vec::new(),
@@ -460,6 +470,7 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
         contract: placed.contract_port(),
         confined_to: project
             .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
+        config_at: Some(crate::project::entry::configuration(&placed.config_path).to_owned()),
         media_types: placed.media_types.clone(),
         provides: placed.provides.clone(),
         contracts: placed.speaks.clone(),

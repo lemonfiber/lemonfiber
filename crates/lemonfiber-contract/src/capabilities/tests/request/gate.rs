@@ -37,9 +37,11 @@ async fn script<G: Gating>(gate: &G) -> Vec<String> {
     let routes = vec![
         curator("movies"),
         Gated {
-            target: Target::MediaServer,
+            target: Target::MediaServer {
+                pins: vec!["ab".repeat(32)],
+            },
             path: "media".to_owned(),
-            address: "http://media:8096".to_owned(),
+            address: "https://media:8920".to_owned(),
             majors: vec![10, 12],
             credential: "media-key".to_owned(),
             tokens: vec!["ef".repeat(32)],
@@ -69,7 +71,9 @@ fn the_routes_a_gate_is_asked_to_admit_reach_a_curator_and_the_media_server() {
             Target::Curator {
                 media_type: "tv".to_owned()
             },
-            Target::MediaServer
+            Target::MediaServer {
+                pins: vec![crate::capabilities::CERTIFICATE_PIN.to_owned()]
+            }
         ]
     );
 }

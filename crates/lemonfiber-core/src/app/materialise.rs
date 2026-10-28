@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use crate::app::targets::held_beneath;
 use crate::materialised::{checksum, decide, diff, Decision, Materialised, Seen};
 use crate::model::StackEdit;
-use crate::ports::filesystem::Confined;
+use crate::ports::filesystem::{Confined, Readable};
 use crate::quality::Selection;
 use crate::stack::{Failure, Source};
 
@@ -452,7 +452,11 @@ fn write_file(
     (target, within): (&Path, &Path),
     content: &[u8],
 ) -> std::io::Result<()> {
-    target.parent().map_or(Ok(()), std::fs::create_dir_all)?;
+    target.parent().map_or(Ok(()), |parent| {
+        confined
+            .made(parent, within, Readable::Shared)
+            .map_err(|fault| std::io::Error::other(fault.message))
+    })?;
     crate::within::write_unlinked(confined, target, within, content)
 }
 

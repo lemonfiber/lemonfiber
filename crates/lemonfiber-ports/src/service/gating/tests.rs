@@ -27,7 +27,7 @@ fn a_route_is_answered_with_its_credential_by_its_sha_256_and_never_its_value() 
 }
 
 #[test]
-fn a_route_names_a_curator_by_the_media_type_it_files_and_the_media_server_by_nothing() {
+fn a_route_names_a_curator_by_the_media_type_it_files_and_the_media_server_by_its_pins() {
     let curator = serde_json::to_value(Target::Curator {
         media_type: "music".to_owned(),
     })
@@ -39,15 +39,18 @@ fn a_route_names_a_curator_by_the_media_type_it_files_and_the_media_server_by_no
         Some("music")
     );
     assert_eq!(
-        serde_json::to_value(Target::MediaServer).unwrap_or_default(),
-        "media-server"
+        serde_json::to_value(Target::MediaServer {
+            pins: vec!["ab".repeat(32)],
+        })
+        .unwrap_or_default(),
+        serde_json::json!({ "media-server": { "pins": ["ab".repeat(32)] } })
     );
 }
 
 #[test]
 fn a_route_written_for_a_reader_withholds_its_credential() {
     let gated = Gated {
-        target: Target::MediaServer,
+        target: Target::MediaServer { pins: Vec::new() },
         path: "media".to_owned(),
         address: "http://media:80".to_owned(),
         majors: vec![10],

@@ -166,3 +166,24 @@ fn an_operation_publishes_where_its_answer_holds_a_credential() {
         ]
     );
 }
+
+/// Only an operation answering when what it applied is in force publishes that it may
+/// answer that it is in force once the upstream restarts.
+#[test]
+fn only_an_operation_saying_when_it_is_in_force_publishes_a_reset() {
+    let mut resetting = Vec::new();
+    for capability in crate::capabilities::all() {
+        for operation in &capability.operations {
+            if path_item(operation)
+                .pointer(&format!("/post/responses/{}", crate::wire::RESET))
+                .is_some()
+            {
+                resetting.push((
+                    crate::spoken(capability.name, capability.major),
+                    operation.name,
+                ));
+            }
+        }
+    }
+    assert_eq!(resetting, vec![("media.serve@1".to_owned(), "serve_tls")]);
+}

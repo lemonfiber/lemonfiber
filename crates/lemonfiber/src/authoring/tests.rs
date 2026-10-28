@@ -95,6 +95,7 @@ async fn published(
             transport: &silent,
             random: &lemonfiber_fixtures::support::FixedRandom(None),
             taking: &Retaking::default(),
+            confined: &lemonfiber_adapters::Disk,
         },
     )
     .await

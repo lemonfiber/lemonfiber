@@ -224,6 +224,10 @@ pub struct Ports {
     pub upstream: u16,
     /// Its own encrypted one, where a household client expects one.
     pub encrypted: Option<u16>,
+    /// The internal TLS port it serves with the certificate the core makes for it, where
+    /// every service the core hands a media server credential reaches it; none where it
+    /// fills no `identity.source`.
+    pub internal_tls: Option<u16>,
 }
 
 /// Everything a guard in front of a media server enforces, as the media server's filler

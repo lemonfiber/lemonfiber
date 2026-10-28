@@ -39,6 +39,7 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
             address: "http://sonarr:8989".to_owned(),
             credential: Credential::new("sonarrs"),
             majors: Vec::new(),
+            pins: lemonfiber_sidecar::Pins::default(),
         }])
         .written(),
     );

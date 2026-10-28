@@ -137,6 +137,7 @@ fn routes() -> Upstreams {
             address: "http://sonarr:8989".to_owned(),
             credential: Credential::new(CURATOR_KEY),
             majors: Vec::new(),
+            pins: lemonfiber_sidecar::Pins::default(),
         },
         Upstream {
             route: "jellyfin".to_owned(),
@@ -144,6 +145,7 @@ fn routes() -> Upstreams {
             address: "http://jellyfin:8096".to_owned(),
             credential: Credential::new("gates"),
             majors: vec![10],
+            pins: lemonfiber_sidecar::Pins::default(),
         },
     ])
 }

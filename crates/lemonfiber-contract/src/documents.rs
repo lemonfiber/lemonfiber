@@ -140,6 +140,16 @@ pub fn path_item(operation: &crate::Operation) -> Value {
             }
         }
     });
+    if let (true, Some(responses)) = (
+        operation.restarts,
+        item.pointer_mut("/post/responses")
+            .and_then(Value::as_object_mut),
+    ) {
+        responses.insert(
+            wire::RESET.to_string(),
+            json!({ "description": "Applied, and in force once the upstream restarts." }),
+        );
+    }
     if let (false, Some(post)) = (
         operation.secret.is_empty(),
         item.get_mut("post").and_then(Value::as_object_mut),

@@ -123,15 +123,15 @@ use self_update::standing as stands;
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, WATCH};
 
-/// Every refusal a run working on the stack answers with before it acts, which a client
-/// names by its code: another run holding it, a registry refusing it, a project the
-/// operator edited that the run would write again, and a data location the project
-/// cannot be written from.
-pub const REFUSALS: [Code; 4] = [
+/// Every refusal a run on the stack answers with before it acts, named by its code: another
+/// run holding it, a registry refusing it, a project the operator edited, a data location
+/// the project cannot be written from, and a mount source reached through a link.
+pub const REFUSALS: [Code; 5] = [
     ALREADY_WORKING,
     REGISTRY_REFUSED,
     crate::error::codes::stack::PROJECT_EDITED,
     crate::error::codes::storage::ROOT_REFUSED,
+    crate::error::codes::life::MOUNT_LINKED,
 ];
 
 /// Ask the engine to act on a set of services, which five commands do identically.

@@ -1,5 +1,6 @@
 //! The service a household member declines an invitation at: the one media server key it
-//! switches an invitation off with, and the invitations it may act on.
+//! switches an invitation off with, the certificates the media server may present to it,
+//! and the invitations it may act on.
 
 use async_trait::async_trait;
 
@@ -51,23 +52,37 @@ pub struct Invitations {
     pub invitations: Vec<Declinable>,
 }
 
+/// The key a decline service holds and the certificates it accepts, each by its SHA-256 in
+/// lower-case hexadecimal.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct KeyHeld {
+    /// The SHA-256 of the key's bytes.
+    pub key: String,
+    /// The SHA-256 of each certificate the media server's internal TLS port may present.
+    pub pins: Vec<String>,
+}
+
 /// A decline service, told the key it acts with and the invitations it may act on.
 #[async_trait]
 pub trait Declining: Send + Sync {
-    /// Switch an invitation off with `key` from now on, in place of the key it holds.
+    /// Switch an invitation off with `key` from now on, in place of the key it holds,
+    /// reaching the media server only at its internal TLS port and accepting only a
+    /// certificate whose SHA-256, in lower-case hexadecimal, is one of `pins`.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] where it is unreachable or refuses.
-    async fn hold(&self, key: &str) -> Result<(), Failure>;
+    async fn hold(&self, key: &str, pins: &[String]) -> Result<(), Failure>;
 
-    /// The key it holds, by the SHA-256 of its bytes in lower-case hexadecimal, or nothing
-    /// where it holds none.
+    /// The key it holds and the certificates it accepts, or nothing where it holds no key.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] where it is unreachable or answers unreadably.
-    async fn held(&self) -> Result<Option<String>, Failure>;
+    async fn held(&self) -> Result<Option<KeyHeld>, Failure>;
 
     /// Act on `invitations` alone from now on.
     ///

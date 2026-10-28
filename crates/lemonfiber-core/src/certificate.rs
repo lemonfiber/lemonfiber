@@ -20,6 +20,10 @@ use std::path::Path;
 
 use base64::Engine as _;
 
+use crate::ports::filesystem::{Confined, Readable};
+
+pub mod internal;
+
 /// The certificate, as it is written down.
 const CERTIFICATE: &str = "certificate.pem";
 
@@ -140,10 +144,20 @@ pub fn fingerprint(der: &[u8]) -> String {
 /// what it should be. Neither is made again over it: a certificate replaced because it
 /// could not be read is every paired phone refusing this machine for a reason nobody
 /// was told.
-pub fn kept(directory: &Path) -> Result<Option<Kept>, Unkept> {
-    let certificate = std::fs::read_to_string(directory.join(CERTIFICATE)).ok();
-    let key = std::fs::read_to_string(directory.join(KEY)).ok();
-    match (certificate, key) {
+pub fn kept(confined: &dyn Confined, directory: &Path) -> Result<Option<Kept>, Unkept> {
+    let read = |name: &str| -> Result<Option<String>, Unkept> {
+        confined
+            .bytes(&directory.join(name), directory)
+            .map_err(|fault| {
+                Unkept::Unreadable(format!("{name} could not be read: {}", fault.message))
+            })?
+            .map(|bytes| {
+                String::from_utf8(bytes)
+                    .map_err(|_| Unkept::Unreadable(format!("{name} is not text")))
+            })
+            .transpose()
+    };
+    match (read(CERTIFICATE)?, read(KEY)?) {
         (None, None) => Ok(None),
         (Some(certificate), Some(key)) => Kept::read(&certificate, &key).map(Some),
         _ => Err(Unkept::Unreadable(format!(
@@ -158,10 +172,10 @@ pub fn kept(directory: &Path) -> Result<Option<Kept>, Unkept> {
 /// # Errors
 ///
 /// [`Unkept`] where what is kept cannot be read, or a new one cannot be made.
-pub fn kept_or_made(directory: &Path) -> Result<Kept, Unkept> {
-    match kept(directory)? {
+pub fn kept_or_made(confined: &dyn Confined, directory: &Path) -> Result<Kept, Unkept> {
+    match kept(confined, directory)? {
         Some(held) => Ok(held),
-        None => made(directory),
+        None => made(confined, directory),
     }
 }
 
@@ -173,8 +187,8 @@ pub fn kept_or_made(directory: &Path) -> Result<Kept, Unkept> {
 /// # Errors
 ///
 /// [`Unkept::Unmade`] where a certificate could not be made or written down.
-pub fn replaced(directory: &Path) -> Result<Kept, Unkept> {
-    made(directory)
+pub fn replaced(confined: &dyn Confined, directory: &Path) -> Result<Kept, Unkept> {
+    made(confined, directory)
 }
 
 /// Make a certificate and write it and its key down.
@@ -182,7 +196,7 @@ pub fn replaced(directory: &Path) -> Result<Kept, Unkept> {
 /// The key first, so a stop between the two leaves a key with no certificate — which is
 /// refused as half of a pair when it is next read — rather than a certificate somebody
 /// could pin whose key is gone.
-fn made(directory: &Path) -> Result<Kept, Unkept> {
+fn made(confined: &dyn Confined, directory: &Path) -> Result<Kept, Unkept> {
     let generated = rcgen::generate_simple_self_signed(vec![NAMED.to_owned()]);
     let made = generated.as_ref().map_err(unmade)?;
     let (certificate, key) = (
@@ -190,8 +204,16 @@ fn made(directory: &Path) -> Result<Kept, Unkept> {
         pem(PRIVATE_KEY, &made.signing_key.serialize_der()),
     );
     for (name, text) in FILES.into_iter().zip([&key, &certificate]) {
-        crate::config::store::write(&directory.join(name), text)
-            .map_err(|why| Unkept::Unmade(format!("{name} could not be written: {why}")))?;
+        confined
+            .replaced(
+                &directory.join(name),
+                directory,
+                text.as_bytes(),
+                Readable::Owner,
+            )
+            .map_err(|why| {
+                Unkept::Unmade(format!("{name} could not be written: {}", why.message))
+            })?;
     }
     Kept::read(&certificate, &key)
 }

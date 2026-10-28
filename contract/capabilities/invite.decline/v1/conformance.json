@@ -15,7 +15,10 @@
     },
     {
       "asked": {
-        "key": "{minted}"
+        "key": "{minted}",
+        "pins": [
+          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ]
       },
       "case": "hold-answers",
       "expect": {

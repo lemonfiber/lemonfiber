@@ -37,7 +37,7 @@ fn machine(directory: Option<PathBuf>, name: Option<&str>, recorded: Option<&str
 /// A directory the surface was served from encrypted, on the network, on `port`.
 fn served_from(named: &str, port: u16) -> PathBuf {
     let at = Scratch::new(named).kept();
-    let _ = certificate::kept_or_made(&at);
+    let _ = certificate::kept_or_made(&lemonfiber_adapters::Disk, &at);
     let _ = served::record(
         &at,
         served::Served {
@@ -61,7 +61,7 @@ async fn refused(ctx: &Ctx) -> Option<crate::error::Code> {
 async fn material_names_where_the_stack_is_and_the_certificate_it_presents() {
     let at = served_from("companion-paired", 8443);
     let pairing = paired(&machine(Some(at.clone()), Some("den"), None)).await;
-    let fingerprint = certificate::kept(&at)
+    let fingerprint = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
         .map(|held| held.fingerprint);
@@ -132,7 +132,7 @@ async fn the_identifier_survives_a_reissue_a_new_address_and_a_new_certificate()
 
     let moved = paired(&machine(Some(at.clone()), None, Some("192.168.1.9"))).await;
 
-    let _ = certificate::replaced(&at);
+    let _ = certificate::replaced(&lemonfiber_adapters::Disk, &at);
     let recertified = paired(&machine(Some(at.clone()), Some("den"), None)).await;
 
     let stack = |made: &Result<super::Pairing, _>| {
@@ -227,7 +227,7 @@ async fn what_pairing_rests_on_is_refused_by_name_when_missing() {
 fn replacing_is_said_before_it_is_done() {
     let at = served_from("companion-replacing", 8443);
     let ctx = machine(Some(at.clone()), Some("den"), None);
-    let before = certificate::kept(&at)
+    let before = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
         .map(|held| held.fingerprint);
@@ -241,7 +241,7 @@ fn replacing_is_said_before_it_is_done() {
     );
 
     let done = replacing(&ctx, true);
-    let after = certificate::kept(&at)
+    let after = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
         .map(|held| held.fingerprint);
@@ -305,7 +305,7 @@ async fn both_halves_are_reached_through_the_one_command() {
     let paired = dispatch(Command::Companion(Asked::Pair), &ctx).await;
     assert!(matches!(paired, Ok(Outcome::Pairing(_))), "{paired:?}");
 
-    let before = certificate::kept(&at)
+    let before = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
         .map(|held| held.fingerprint);
@@ -319,7 +319,7 @@ async fn both_halves_are_reached_through_the_one_command() {
         "{rehearsed:?}"
     );
     assert_eq!(
-        certificate::kept(&at)
+        certificate::kept(&lemonfiber_adapters::Disk, &at)
             .ok()
             .flatten()
             .map(|held| held.fingerprint),
@@ -413,7 +413,7 @@ fn a_refusal_of_pairing_names_no_command() {
 async fn reaching_a_served_machine_names_its_address_and_pin() {
     let at = served_from("companion-reaching", 8443);
     let reaching = super::reaching(&machine(Some(at.clone()), Some("den"), None)).await;
-    let pin = certificate::kept(&at)
+    let pin = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
         .map(|held| held.fingerprint);

@@ -19,10 +19,14 @@ fn a_fingerprint_is_the_digest_of_the_whole_certificate_in_lower_case_hex() {
 #[test]
 fn a_certificate_is_made_once_and_kept() {
     let at = Scratch::new("companion-certificate-kept");
-    assert_eq!(kept(&at), Ok(None), "nothing is made by looking");
+    assert_eq!(
+        kept(&lemonfiber_adapters::Disk, &at),
+        Ok(None),
+        "nothing is made by looking"
+    );
 
-    let made = kept_or_made(&at);
-    let again = kept_or_made(&at);
+    let made = kept_or_made(&lemonfiber_adapters::Disk, &at);
+    let again = kept_or_made(&lemonfiber_adapters::Disk, &at);
     assert!(made.is_ok(), "{made:?}");
     assert_eq!(made, again, "the second run presents what the first made");
     assert!(
@@ -41,12 +45,12 @@ fn a_certificate_is_made_once_and_kept() {
 #[test]
 fn a_replaced_certificate_is_a_different_one() {
     let at = Scratch::new("companion-certificate-replaced");
-    let first = kept_or_made(&at).map(|held| held.fingerprint);
-    let second = replaced(&at).map(|held| held.fingerprint);
+    let first = kept_or_made(&lemonfiber_adapters::Disk, &at).map(|held| held.fingerprint);
+    let second = replaced(&lemonfiber_adapters::Disk, &at).map(|held| held.fingerprint);
     assert!(first.is_ok() && second.is_ok());
     assert_ne!(first, second);
     assert_eq!(
-        kept(&at).map(|held| held.map(|held| held.fingerprint)),
+        kept(&lemonfiber_adapters::Disk, &at).map(|held| held.map(|held| held.fingerprint)),
         second.map(Some),
         "and it is the one kept from then on"
     );
@@ -57,16 +61,27 @@ fn a_replaced_certificate_is_a_different_one() {
 #[test]
 fn what_cannot_be_read_is_refused_rather_than_made_again() {
     let at = Scratch::new("companion-certificate-unreadable");
-    let _ = kept_or_made(&at);
+    let _ = kept_or_made(&lemonfiber_adapters::Disk, &at);
     let _ = std::fs::remove_file(at.join(CERTIFICATE));
-    assert!(matches!(kept_or_made(&at), Err(Unkept::Unreadable(why)) if why.contains("only one")));
+    assert!(
+        matches!(kept_or_made(&lemonfiber_adapters::Disk, &at), Err(Unkept::Unreadable(why)) if why.contains("only one"))
+    );
 
     let _ = std::fs::write(at.join(CERTIFICATE), "not a certificate");
-    assert!(matches!(kept(&at), Err(Unkept::Unreadable(why)) if why.contains("not a certificate")));
+    assert!(
+        matches!(kept(&lemonfiber_adapters::Disk, &at), Err(Unkept::Unreadable(why)) if why.contains("not a certificate"))
+    );
 
-    let _ = replaced(&at);
+    let _ = replaced(&lemonfiber_adapters::Disk, &at);
     let _ = std::fs::write(at.join(KEY), "not a key");
-    assert!(matches!(kept(&at), Err(Unkept::Unreadable(why)) if why.contains("not a private key")));
+    assert!(
+        matches!(kept(&lemonfiber_adapters::Disk, &at), Err(Unkept::Unreadable(why)) if why.contains("not a private key"))
+    );
+
+    let _ = std::fs::write(at.join(KEY), [0xff, 0xfe]);
+    assert!(
+        matches!(kept(&lemonfiber_adapters::Disk, &at), Err(Unkept::Unreadable(why)) if why.contains("is not text"))
+    );
 }
 
 /// A directory that cannot be written to makes nothing, and says which file.
@@ -76,7 +91,7 @@ fn a_certificate_that_cannot_be_written_down_is_not_made() {
     let blocked = at.join("blocked");
     let _ = std::fs::write(&blocked, "a file where the directory would go");
     assert!(
-        matches!(replaced(&blocked), Err(Unkept::Unmade(why)) if why.contains(KEY)),
+        matches!(replaced(&lemonfiber_adapters::Disk, &blocked), Err(Unkept::Unmade(why)) if why.contains(KEY)),
         "the key is written first"
     );
 }
@@ -115,4 +130,33 @@ fn a_block_written_reads_back_as_what_it_holds() {
     assert!(written.ends_with("\n-----END CERTIFICATE-----\n"));
     assert!(written.lines().all(|line| line.len() <= 64), "{written}");
     assert_eq!(der(&written, "CERTIFICATE"), Some(held));
+}
+
+/// A container that can write the directory the door's certificate is kept in cannot
+/// point the core's read of it anywhere else.
+#[cfg(unix)]
+#[test]
+fn a_link_planted_where_the_certificate_or_its_key_is_kept_is_never_followed() {
+    use std::os::unix::fs::symlink;
+    let scratch = Scratch::new("certificate-linked");
+    let at = scratch.join("door");
+    let _ = std::fs::create_dir_all(&at);
+    let elsewhere = scratch.join("elsewhere");
+    let disk = &lemonfiber_adapters::Disk;
+    let _ = kept_or_made(disk, &elsewhere);
+
+    for name in [KEY, CERTIFICATE] {
+        let _ = std::fs::remove_file(at.join(KEY));
+        let _ = std::fs::remove_file(at.join(CERTIFICATE));
+        let _ = kept_or_made(disk, &at);
+        let _ = std::fs::remove_file(at.join(name));
+        let _ = symlink(elsewhere.join(name), at.join(name));
+        assert!(
+            matches!(kept(disk, &at), Err(Unkept::Unreadable(why)) if why.contains(name)),
+            "{name}"
+        );
+    }
+    assert!(replaced(disk, &at).is_ok());
+    assert!(std::fs::symlink_metadata(at.join(KEY)).is_ok_and(|meta| meta.is_file()));
+    assert!(kept(disk, &at).is_ok_and(|kept| kept.is_some()));
 }

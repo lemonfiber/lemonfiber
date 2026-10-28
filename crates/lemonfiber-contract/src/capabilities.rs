@@ -58,6 +58,10 @@ const NOWHERE: &str = "00000000000000000000000000000000";
 /// hashes to.
 const TOKEN_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
+/// A SHA-256, in lower-case hexadecimal, that no certificate the conformance cases meet
+/// hashes to.
+const CERTIFICATE_PIN: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
 /// The loopback address, the one proxy the conformance cases trust to name the client.
 const PROXY: &str = "127.0.0.1";
 
