@@ -131,7 +131,8 @@ B = { setting = "gluetun:vpn-type", default = "", recorded_with = "openvpn" }
 fn needs_name_only_another_setting_the_service_reads_and_only_its_values() {
     let env = env(r#"
 A = { setting = "gluetun:vpn-type", default = "wireguard", one_of = ["wireguard", "openvpn"] }
-B = { setting = "gluetun:provider", default = "mullvad", needs = { "gluetun:provider" = ["mullvad"], "gluetun:elsewhere" = ["x"], "gluetun:vpn-type" = ["ipsec", "openvpn"] } }
+B = { setting = "gluetun:provider", default = "mullvad", needs = { "gluetun:provider" = ["mullvad"], "gluetun:elsewhere" = ["x"], "gluetun:vpn-type" = ["ipsec", "openvpn"], "gluetun:region" = ["anywhere"] } }
+C = { setting = "gluetun:region", default = "europe" }
 "#);
     let stray = secret(
         r#"

@@ -139,3 +139,40 @@ fn a_minted_key_crosses_by_its_secret_name_only_to_a_plugin_granted_it() {
         Some(Holding::Store(A_MINTED_KEY.to_owned()))
     );
 }
+
+#[test]
+fn a_plugin_secret_is_filed_only_where_the_setting_it_needs_holds_what_it_lists() {
+    let ctx = machine("needing");
+    let mut placed = crate::test_support::a_placed("guard", &[], None);
+    placed.fields.env = toml::from_str(
+        r#"
+VPN_TYPE = { setting = "guard:vpn-type", default = "wireguard", one_of = ["wireguard", "openvpn"] }
+OPENVPN_USER = { secret = "openvpn-user" }
+"#,
+    )
+    .unwrap_or_default();
+    let mut installed = crate::test_support::an_installed("guard", vec![placed]);
+    installed.declared.secrets = vec![crate::plugin::Secret {
+        id: "openvpn-user".to_owned(),
+        of: "guard".to_owned(),
+        why: "Signs in to the provider over OpenVPN.".to_owned(),
+        minted: false,
+        serves: None,
+        was: None,
+        needs: toml::from_str(r#""guard:vpn-type" = ["openvpn"]"#).unwrap_or_default(),
+    }];
+    let installed = [installed];
+    let named = |resolved: &crate::settings::Resolved| -> Vec<String> {
+        crate::settings::files::every_file(None, &installed, resolved)
+            .into_iter()
+            .flat_map(|(_, _, variables)| variables)
+            .map(|variable| variable.name)
+            .collect()
+    };
+    let resolved = crate::settings::Resolved::of(&ctx, None, &installed);
+    assert!(named(&resolved).is_empty());
+    assert_eq!(
+        named(&resolved.changed("guard:vpn-type", Some("openvpn"))),
+        ["OPENVPN_USER"]
+    );
+}
