@@ -265,5 +265,49 @@ fn a_client_is_built_over_the_bundled_tls() {
 
 #[test]
 fn a_client_without_tls_is_refused_rather_than_built_over_another() {
-    assert!(with_tls(reqwest::Client::builder(), None).build().is_err());
+    assert!(with_tls(None).build().is_err());
+}
+
+/// The fake's own address, an app answering `200` at its root, and the client's answer to it.
+async fn asked_over_tls(client: reqwest::Client) -> Option<Result<u16, reqwest::Error>> {
+    let app = axum::Router::new().route("/", axum::routing::get(|| async { "ok" }));
+    let served = lemonfiber_pinned::fake::tls(app)?;
+    let answer = client.get(served.base.as_url().clone()).send().await;
+    Some(answer.map(|answer| answer.status().as_u16()))
+}
+
+#[tokio::test]
+async fn a_client_over_the_kit_tls_completes_a_handshake_with_a_root_it_trusts() {
+    let app = axum::Router::new().route("/", axum::routing::get(|| async { "ok" }));
+    let served = lemonfiber_pinned::fake::tls(app);
+    let config = served.as_ref().and_then(|served| {
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(served.certificate.clone()).ok()?;
+        rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .ok()
+        .map(|config| config.with_root_certificates(roots).with_no_client_auth())
+    });
+    let client = with_tls(config).build().ok();
+    let answered = match (served, client) {
+        (Some(served), Some(client)) => client
+            .get(served.base.as_url().clone())
+            .send()
+            .await
+            .ok()
+            .map(|answer| answer.status().as_u16()),
+        _ => None,
+    };
+    assert_eq!(answered, Some(200));
+}
+
+#[tokio::test]
+async fn a_client_from_client_builder_refuses_a_certificate_no_bundled_root_signs() {
+    let refused = match client_builder().build() {
+        Ok(client) => asked_over_tls(client).await,
+        Err(_) => None,
+    };
+    assert!(refused.is_some_and(|answer| answer.is_err_and(|error| error.is_connect())));
 }

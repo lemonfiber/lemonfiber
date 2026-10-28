@@ -1583,6 +1583,7 @@ dependencies = [
  "lemonfiber-contract",
  "lemonfiber-error",
  "lemonfiber-fixtures",
+ "lemonfiber-pinned",
  "lemonfiber-ports",
  "reqwest",
  "rustls",

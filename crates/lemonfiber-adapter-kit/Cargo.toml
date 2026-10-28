@@ -26,6 +26,7 @@ webpki-roots = { workspace = true }
 [dev-dependencies]
 lemonfiber-adapters = { workspace = true }
 lemonfiber-fixtures = { workspace = true }
+lemonfiber-pinned = { workspace = true, features = ["test-support"] }
 tokio = { workspace = true, features = ["io-util", "macros", "rt"] }
 tower = { workspace = true, features = ["util"] }
 

@@ -1,0 +1,7 @@
+# A client reqwest builds itself has no TLS to build with and panics for want of a
+# crypto provider, so every client here starts from the HTTP adapter's own builder.
+disallowed-methods = [
+  { path = "reqwest::Client::new", reason = "build it from `http::builder`, which hands it `tls::bundled`" },
+  { path = "reqwest::Client::builder", reason = "build it from `http::builder`, which hands it `tls::bundled`" },
+  { path = "reqwest::ClientBuilder::new", reason = "build it from `http::builder`, which hands it `tls::bundled`" },
+]

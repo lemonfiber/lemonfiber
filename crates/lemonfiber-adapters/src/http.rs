@@ -167,8 +167,13 @@ impl Web {
 /// nothing where its TLS could not be set up.
 fn builder(cookies: &Arc<PerOrigin>) -> Option<reqwest::ClientBuilder> {
     let tls = crate::tls::bundled().ok()?;
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one builder this adapter makes, which every client takes its TLS from"
+    )]
+    let builder = reqwest::Client::builder();
     Some(
-        reqwest::Client::builder()
+        builder
             .tls_backend_preconfigured(tls)
             .cookie_provider(Arc::clone(cookies))
             .redirect(no_redirect())

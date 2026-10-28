@@ -61,7 +61,7 @@ impl Web {
 /// make. reqwest builds no client over TLS it was not handed, so every client an adapter
 /// builds starts here.
 pub fn client_builder() -> reqwest::ClientBuilder {
-    with_tls(reqwest::Client::builder(), bundled_tls().ok())
+    with_tls(bundled_tls().ok())
 }
 
 /// TLS over ring, trusting the roots bundled into the build, so an adapter reads no
@@ -76,8 +76,13 @@ fn bundled_tls() -> Result<ClientConfig, rustls::Error> {
     )
 }
 
-/// `builder` holding `tls`, or, where there is none, one reqwest refuses to build.
-fn with_tls(builder: reqwest::ClientBuilder, tls: Option<ClientConfig>) -> reqwest::ClientBuilder {
+/// A builder holding `tls`, or, where there is none, one reqwest refuses to build.
+fn with_tls(tls: Option<ClientConfig>) -> reqwest::ClientBuilder {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one builder this crate makes, which every client takes its TLS from"
+    )]
+    let builder = reqwest::Client::builder();
     match tls {
         Some(tls) => builder.tls_backend_preconfigured(tls),
         None => builder.tls_backend_preconfigured(()),
