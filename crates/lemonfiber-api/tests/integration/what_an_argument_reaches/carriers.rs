@@ -220,9 +220,9 @@ fn carries_offer(command: &Command) -> bool {
         Command::Remove { agreement, .. }
         | Command::Reset { agreement }
         | Command::Wiring(Linking::Fill(Filling { agreement, .. }))
-        | Command::Credentials(Asking::Revoke { agreement, .. }) => {
-            agreement.as_deref() == Some(OFFER)
-        }
+        | Command::Credentials(
+            Asking::Revoke { agreement, .. } | Asking::Rotate { agreement, .. },
+        ) => agreement.as_deref() == Some(OFFER),
         // And standing in place of a setup, where the offer's own name is the only yes:
         // dropped, nothing could be stopped; kept silently, what stopped is something
         // nobody read the list of.

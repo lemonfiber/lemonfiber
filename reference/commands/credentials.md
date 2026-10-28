@@ -35,6 +35,9 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --offer <OFFER>
+          The offer a reading of a replacement named, which is the yes to it. Replacing the media server's internal certificate is read first and answered with its offer
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
