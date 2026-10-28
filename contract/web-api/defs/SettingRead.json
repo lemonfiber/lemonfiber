@@ -3,6 +3,16 @@
   "description": "One setting.",
   "type": "object",
   "properties": {
+    "choices": {
+      "description": "Every value it accepts, where its manifest declares them.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "Choosable.json"
+      }
+    },
     "environment": {
       "description": "The environment file's key it is held under, where it is held there.",
       "type": [

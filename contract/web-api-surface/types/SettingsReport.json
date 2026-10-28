@@ -29,6 +29,12 @@
         "anyOf(null,ref:Unvetted)"
       ],
       "required": false
+    },
+    "waiting": {
+      "type": [
+        "array[ref:Waiting]"
+      ],
+      "required": true
     }
   },
   "variants": []

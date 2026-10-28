@@ -77,6 +77,7 @@ fn every_outcome() -> Vec<Outcome> {
         change: None,
         rehearsed: false,
         unvetted: None,
+        waiting: Vec::new(),
     }));
     every
 }

@@ -1,5 +1,11 @@
 {
   "fields": {
+    "choices": {
+      "type": [
+        "array|null[ref:Choosable]"
+      ],
+      "required": false
+    },
     "environment": {
       "type": [
         "null|string"

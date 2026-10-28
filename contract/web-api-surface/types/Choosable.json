@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "needs": {
+      "type": [
+        "object{array[string]}"
+      ],
+      "required": true
+    },
+    "open": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

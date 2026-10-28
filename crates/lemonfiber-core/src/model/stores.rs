@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 /// Every setting and secret the stack's services read, and what changing a setting came to.
@@ -9,6 +11,9 @@ pub struct SettingsReport {
     pub secrets: Vec<SecretRead>,
     /// The change asked for, where one was.
     pub change: Option<SettingChange>,
+    /// The services held back until the operator gives what they need to start, each
+    /// with what it waits for, as status names them.
+    pub waiting: Vec<Waiting>,
     /// Whether this was a rehearsal.
     pub rehearsed: bool,
     /// The operator's overlay and every service it changes, where there is one: merged
@@ -30,6 +35,8 @@ pub struct SettingRead {
     pub value: Option<String>,
     /// The environment file's key it is held under, where it is held there.
     pub environment: Option<String>,
+    /// Every value it accepts, where its manifest declares them.
+    pub choices: Option<Vec<Choosable>>,
 }
 
 /// One secret, without its value.
@@ -83,6 +90,23 @@ pub struct Reader {
     pub variable: String,
     /// What the service's manifest declares while no value is recorded.
     pub default: Option<String>,
+    /// The values of other settings under which the variable is written: each setting
+    /// with the values it has to hold one of.
+    pub needs: BTreeMap<String, Vec<String>>,
+    /// Whether those settings hold what it needs now.
+    pub met: bool,
+}
+
+/// One value a setting accepts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Choosable {
+    /// The value.
+    pub value: String,
+    /// The values of other settings under which it is a choice: each setting with the
+    /// values it has to hold one of, and none where it always is.
+    pub needs: BTreeMap<String, Vec<String>>,
+    /// Whether it is a choice now.
+    pub open: bool,
 }
 
 /// A change to one or more settings, made in one act.

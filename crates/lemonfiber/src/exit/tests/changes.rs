@@ -715,6 +715,7 @@ fn a_setting_changed_and_left_unrestarted_is_a_failure() {
             }),
             rehearsed: false,
             unvetted: None,
+            waiting: Vec::new(),
         })
     };
     assert_eq!(

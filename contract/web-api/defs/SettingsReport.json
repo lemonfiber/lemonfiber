@@ -42,11 +42,19 @@
           "type": "null"
         }
       ]
+    },
+    "waiting": {
+      "description": "The services held back until the operator gives what they need to start, each\nwith what it waits for, as status names them.",
+      "type": "array",
+      "items": {
+        "$ref": "Waiting.json"
+      }
     }
   },
   "required": [
     "settings",
     "secrets",
+    "waiting",
     "rehearsed"
   ]
 }

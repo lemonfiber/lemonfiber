@@ -35,6 +35,7 @@ PROVIDER = { setting = "guard:provider", default = "mullvad", one_of = [
 FORWARDING = { setting = "guard:forwarding", default = "off", one_of = [
     { values = ["off", "on"], needs = { "guard:vpn-type" = ["openvpn"] } },
 ] }
+PORT = { setting = "guard:port", default = "0", needs = { "guard:vpn-type" = ["openvpn", "custom"] } }
 "#;
 
 fn guard(name: &str) -> Machine {
@@ -191,4 +192,53 @@ async fn only_the_settings_that_move_are_changed_and_none_moving_changes_nothing
     )
     .await;
     assert_eq!(code(&cleared), Some("SETTING-1"), "{}", said(&cleared));
+}
+
+#[tokio::test]
+async fn the_settings_read_carries_each_choice_with_its_needs_and_each_reference_with_its_own() {
+    let machine = guard("read");
+    let read = |name: &str| {
+        crate::settings::run::listing(&machine.ctx)
+            .ok()
+            .and_then(|report| report.settings.into_iter().find(|one| one.name == name))
+    };
+    let provider = |open: bool| {
+        Some(vec![
+            crate::model::Choosable {
+                value: "mullvad".to_owned(),
+                needs: std::collections::BTreeMap::new(),
+                open: true,
+            },
+            crate::model::Choosable {
+                value: "pia".to_owned(),
+                needs: [(TYPE.to_owned(), vec!["openvpn".to_owned()])].into(),
+                open,
+            },
+        ])
+    };
+    assert_eq!(read(PROVIDER).and_then(|one| one.choices), provider(false));
+    let port = |met: bool| {
+        Some(vec![(
+            [(
+                TYPE.to_owned(),
+                vec!["openvpn".to_owned(), "custom".to_owned()],
+            )]
+            .into(),
+            met,
+        )])
+    };
+    let needing = |name: &str| {
+        read(name).map(|one| {
+            one.readers
+                .into_iter()
+                .map(|reader| (reader.needs, reader.met))
+                .collect::<Vec<_>>()
+        })
+    };
+    assert_eq!(needing("guard:port"), port(false));
+    assert_eq!(read("guard:port").and_then(|one| one.choices), None);
+
+    assert!(agreed(&machine, &[(TYPE, Some("openvpn"))]).await.is_ok());
+    assert_eq!(read(PROVIDER).and_then(|one| one.choices), provider(true));
+    assert_eq!(needing("guard:port"), port(true));
 }

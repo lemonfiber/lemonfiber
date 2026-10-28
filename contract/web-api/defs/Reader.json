@@ -10,6 +10,20 @@
         "null"
       ]
     },
+    "met": {
+      "description": "Whether those settings hold what it needs now.",
+      "type": "boolean"
+    },
+    "needs": {
+      "description": "The values of other settings under which the variable is written: each setting\nwith the values it has to hold one of.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
     "service": {
       "description": "The service.",
       "type": "string"
@@ -21,6 +35,8 @@
   },
   "required": [
     "service",
-    "variable"
+    "variable",
+    "needs",
+    "met"
   ]
 }
