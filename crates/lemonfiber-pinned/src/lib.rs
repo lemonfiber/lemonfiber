@@ -136,12 +136,22 @@ pub fn client(pins: &[String], within: Option<Duration>) -> Option<reqwest::Clie
 /// certificate whose SHA-256 is `pin`, the server given `within` to answer.
 ///
 /// Any answer the server makes over that handshake counts, whatever its status: the
-/// question is what it presents, not what it serves.
+/// question is what it presents, not what it serves. An address not reached over HTTPS
+/// presents nothing, and nothing is sent to it.
 pub async fn presents(base: &str, pin: &str, within: Duration) -> bool {
-    let asked = client(&[pin.to_owned()], Some(within)).map(|client| client.head(base).send());
+    let asked = https(base)
+        .zip(client(&[pin.to_owned()], Some(within)))
+        .map(|(base, client)| client.head(base).send());
     futures_util::future::OptionFuture::from(asked)
         .await
         .is_some_and(|answered| answered.is_ok())
+}
+
+/// `text` as an address, where it is one reached over HTTPS.
+fn https(text: &str) -> Option<reqwest::Url> {
+    reqwest::Url::parse(text)
+        .ok()
+        .filter(|url| url.scheme() == "https")
 }
 
 #[cfg(test)]

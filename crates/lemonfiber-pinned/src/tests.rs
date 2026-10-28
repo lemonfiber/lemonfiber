@@ -84,4 +84,7 @@ async fn a_handshake_presents_a_pin_only_where_the_certificate_is_that_one() {
     assert!(presents(&served.base, &served.pin, WITHIN).await);
     assert!(!presents(&served.base, &"0".repeat(64), WITHIN).await);
     assert!(!presents(&served.base, "", WITHIN).await);
+    let plain = served.base.replacen("https://", "http://", 1);
+    assert!(!presents(&plain, &served.pin, WITHIN).await);
+    assert!(!presents("not an address", &served.pin, WITHIN).await);
 }
