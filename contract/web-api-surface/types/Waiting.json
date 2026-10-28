@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "wants": {
+      "type": [
+        "array[ref:Wanted]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

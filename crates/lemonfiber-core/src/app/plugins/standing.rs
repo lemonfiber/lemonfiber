@@ -47,6 +47,23 @@ pub(crate) struct Standing {
 /// Read against the stack as it stands and the plugins already installed, so the answer
 /// is about this machine: an ask a plugin installed earlier has already contested is
 /// not this install's doing, and is not laid at its door.
+/// The services held back once `would` is installed beside `others`, each with what it
+/// waits for.
+pub(crate) fn waiting(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    others: &[Installed],
+    would: &Installed,
+) -> Vec<crate::model::Waiting> {
+    let installed: Vec<Installed> = others
+        .iter()
+        .filter(|one| one.plugin != would.plugin)
+        .chain(std::iter::once(would))
+        .cloned()
+        .collect();
+    crate::settings::run::waiting(ctx, manifest, &installed)
+}
+
 pub(crate) fn standing(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,

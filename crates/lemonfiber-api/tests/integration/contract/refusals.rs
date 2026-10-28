@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use axum::http::StatusCode;
 use lemonfiber_api::contract::Contract;
 use lemonfiber_core::agreement::MOVED;
-use lemonfiber_core::error::codes::{self, plugin, quota};
+use lemonfiber_core::error::codes::{self, plugin, quota, setting};
 use lemonfiber_core::error::Code;
 
 /// A generator names a value per refusal after the name it is declared under, so two
@@ -45,13 +45,14 @@ fn a_claim_that_collects_nothing_is_listed_as_unauthorised() {
 /// answered with: an arrangement for closing requests is made at a shell, and a check a
 /// plugin contributed, a proof that runs a plugin's image or asks its service, and a move
 /// in place on offer are each said inside a diagnosis rather than refusing one.
-const ANSWERED_ELSEWHERE: [Code; 6] = [
+const ANSWERED_ELSEWHERE: [Code; 7] = [
     quota::NOTHING_AGREED,
     quota::TOO_SOON,
     plugin::CONTRIBUTED_FAILED,
     plugin::PROOF_RUN_FAILED,
     plugin::PROOF_ASKED_FAILED,
     plugin::MOVE_OFFERED,
+    setting::HELD_BACK,
 ];
 
 /// A code at a status of the client's own making is one a client branches on, so each

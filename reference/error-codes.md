@@ -509,6 +509,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETTING-5` | `SETTINGS_MOVED` | error | 1 | 400 | 0.18.0 | Raised when a change answers an offer read against settings that have since moved. |
 | `SETTING-6` | `ALREADY_HOLDS` | advisory | 1 | 400 | 0.18.0 | Raised where the setting already holds what the change asks for. |
 | `SETTING-7` | `OUTSIDE_ITS_CHOICES` | error | 5 | 400 | 0.18.0 | Raised where a change would leave a setting holding a value outside its choices. |
+| `SETTING-8` | `HELD_BACK` | warning | 1 | 409 | 0.18.0 | Raised where a service is held back until the operator gives what it needs to start. |
 
 ## `SETUP` — the first run
 

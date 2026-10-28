@@ -86,6 +86,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         taking: Vec::new(),
         granting: Vec::new(),
         sharing: Vec::new(),
+        waiting: Vec::new(),
     }
 }
 

@@ -52,6 +52,7 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "services.request-gate-record",
     "services.seasons",
     "services.seasons.",
+    "services.waiting",
     "storage.hardlinks",
     "storage.mode",
     "storage.permissions",

@@ -94,12 +94,17 @@ pub struct SettingChange {
     pub regenerates: Vec<String>,
     /// Every running service the change restarts.
     pub restarts: Vec<String>,
+    /// Every service held back that the change starts, having given the last thing it
+    /// waited for.
+    pub starts: Vec<String>,
     /// Whether it was written.
     pub applied: bool,
     /// What this reading names itself, part by part.
     pub agreement: String,
     /// Why the services it restarts were not restarted, where they were not.
     pub unrestarted: Option<String>,
+    /// The services held back once the change is made, each with what it waits for.
+    pub waiting: Vec<Waiting>,
 }
 
 /// One setting a change moves.
@@ -113,4 +118,71 @@ pub struct SettingMove {
     pub value: Option<String>,
     /// What moving it costs, where it costs anything.
     pub consequence: Option<String>,
+}
+
+/// A service held back until the operator gives what it needs to start.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Waiting {
+    /// The service.
+    pub service: String,
+    /// Everything it waits for.
+    pub wants: Vec<Wanted>,
+}
+
+/// One thing a service waits for, never with its value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum Wanted {
+    /// A setting only the operator holds, or one holding a value outside its choices.
+    Setting {
+        /// The setting.
+        setting: String,
+        /// The values it accepts, where it declares choices.
+        choices: Option<Vec<String>>,
+    },
+    /// A secret nobody has entered.
+    Secret {
+        /// The secret, by its name in the secret store.
+        secret: String,
+    },
+    /// The service it runs through, which is held back itself.
+    Service {
+        /// That service.
+        service: String,
+    },
+}
+
+impl Wanted {
+    /// What it is, as a sentence names it, never with a value.
+    #[must_use]
+    pub fn said(&self) -> String {
+        match self {
+            Self::Setting {
+                setting,
+                choices: Some(choices),
+            } if choices.is_empty() => format!(
+                "the setting {setting}, which has no choice until the settings it depends on \
+                 change"
+            ),
+            Self::Setting {
+                setting,
+                choices: Some(choices),
+            } => format!("the setting {setting}, one of {}", choices.join(", ")),
+            Self::Setting {
+                setting,
+                choices: None,
+            } => format!("the setting {setting}"),
+            Self::Secret { secret } => format!("the secret {secret}"),
+            Self::Service { service } => format!("{service}, which it runs through"),
+        }
+    }
+}
+
+impl Waiting {
+    /// The service and everything it waits for, as one sentence names them.
+    #[must_use]
+    pub fn said(&self) -> String {
+        let wants: Vec<String> = self.wants.iter().map(Wanted::said).collect();
+        format!("{} waits for {}", self.service, wants.join("; "))
+    }
 }

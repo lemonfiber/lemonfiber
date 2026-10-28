@@ -30,11 +30,23 @@
       ],
       "required": true
     },
+    "starts": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
     "unrestarted": {
       "type": [
         "null|string"
       ],
       "required": false
+    },
+    "waiting": {
+      "type": [
+        "array[ref:Waiting]"
+      ],
+      "required": true
     }
   },
   "variants": []

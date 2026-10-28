@@ -17,6 +17,7 @@ mod granting;
 mod own;
 mod reaching;
 mod stacked;
+mod waiting;
 
 fn secrets_in(scratch: &Scratch) -> PathBuf {
     scratch.path().join("config").join("secrets.json")

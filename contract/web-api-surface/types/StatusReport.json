@@ -41,6 +41,12 @@
         "array[ref:Undeclared]"
       ],
       "required": true
+    },
+    "waiting": {
+      "type": [
+        "array[ref:Waiting]"
+      ],
+      "required": true
     }
   },
   "variants": []

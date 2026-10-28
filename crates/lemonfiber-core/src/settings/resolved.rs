@@ -20,6 +20,7 @@ pub(crate) struct Resolved {
     moved: Vec<crate::model::MovedReport>,
     name: String,
     pass: Option<String>,
+    secrets: Option<super::Secrets>,
 }
 
 impl Resolved {
@@ -49,6 +50,7 @@ impl Resolved {
             name: ctx.settings.project.clone(),
             pass: crate::app::project::pinned(ctx),
             files: files_of(ctx),
+            secrets: super::secrets_at(ctx).and_then(|at| super::Secrets::at(&at).ok()),
             nfs: ctx.settings.nfs.clone(),
             fillers: manifest.map(|manifest| {
                 Fillers::trusting(
@@ -148,6 +150,11 @@ impl Resolved {
             name: &self.name,
             operator: &operator,
             pass: self.pass.as_deref(),
+            held: &|name| {
+                self.secrets
+                    .as_ref()
+                    .is_some_and(|kept| kept.value(name).is_some())
+            },
         })
     }
 }

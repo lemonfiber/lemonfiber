@@ -378,6 +378,9 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         ctx.settings.env_file.clone(),
     )
     .beside(crate::app::project::directory(ctx));
+    let waiting = crate::doctor::waiting::WaitingCheck::new(Arc::new(
+        crate::settings::run::HeldBack::of(ctx, manifest),
+    ));
     let mut checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(bridging),
@@ -398,6 +401,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(gate),
         Box::new(decline),
         Box::new(moves),
+        Box::new(waiting),
         Box::new(permissions),
         Box::new(overlay),
     ];

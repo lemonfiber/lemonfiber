@@ -67,6 +67,8 @@ fn change(value: Option<&str>, applied: bool) -> SettingChange {
         applied,
         agreement: "1a2b3c4d-5e6f7a8b".to_owned(),
         unrestarted: None,
+        waiting: Vec::new(),
+        starts: Vec::new(),
     }
 }
 
@@ -116,6 +118,7 @@ fn a_change_unanswered_names_what_it_regenerates_and_the_offer_to_answer() {
 fn a_clear_made_says_the_default_is_written_again_and_what_was_not_restarted() {
     let mut made = change(None, true);
     made.restarts = vec!["gluetun".to_owned()];
+    made.starts = vec!["torrents".to_owned()];
     made.unrestarted = Some("the engine is not running".to_owned());
     for one in &mut made.settings {
         one.consequence =
@@ -131,6 +134,7 @@ fn a_clear_made_says_the_default_is_written_again_and_what_was_not_restarted() {
          \x20 was          Netherlands\n\
          \x20 regenerates  gluetun\n\
          \x20 restarts     gluetun\n\
+         \x20 starts       torrents\n\
          \n\
          changing this affects which provider carries the torrents\n\
          \n\

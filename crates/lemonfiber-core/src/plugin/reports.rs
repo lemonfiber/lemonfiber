@@ -88,6 +88,8 @@ pub struct Install {
     pub granting: Vec<super::Granting>,
     /// Every adapter that writes the files of the service it fronts.
     pub sharing: Vec<super::Sharing>,
+    /// The services held back once the install is made, each with what it waits for.
+    pub waiting: Vec<crate::model::Waiting>,
 }
 
 /// A capability that would have nothing filling it.

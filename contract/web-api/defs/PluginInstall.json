@@ -103,6 +103,13 @@
         }
       ]
     },
+    "waiting": {
+      "description": "The services held back once the install is made, each with what it waits for.",
+      "type": "array",
+      "items": {
+        "$ref": "Waiting.json"
+      }
+    },
     "would": {
       "description": "What the install settled, said whether or not it was written down.",
       "$ref": "PluginInstalled.json"
@@ -119,6 +126,7 @@
     "recipes_ran",
     "taking",
     "granting",
-    "sharing"
+    "sharing",
+    "waiting"
   ]
 }

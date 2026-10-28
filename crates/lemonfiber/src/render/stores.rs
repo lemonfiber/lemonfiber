@@ -144,6 +144,9 @@ fn changed(change: &SettingChange, rehearsed: bool) -> Lines {
         "  restarts     {}",
         listed_or(&change.restarts, unread)
     ));
+    if !change.starts.is_empty() {
+        lines.put(format!("  starts       {}", change.starts.join(", ")));
+    }
     for consequence in change
         .settings
         .iter()
@@ -151,6 +154,7 @@ fn changed(change: &SettingChange, rehearsed: bool) -> Lines {
     {
         lines.spaced(consequence.clone());
     }
+    lines.extend(super::waiting::waiting(&change.waiting));
     if let Some(why) = &change.unrestarted {
         lines.spaced(format!(
             "The change is made, and what reads it was not restarted: {why}"

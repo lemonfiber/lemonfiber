@@ -75,4 +75,16 @@ codes! {
         remedy: "Give one of the choices the message names, moving the settings it depends \
             on in the same act where they have to change too.",
     }
+    /// Raised where a service is held back until the operator gives what it needs to start.
+    HELD_BACK = "SETTING-8" {
+        severity: Warning,
+        status: 409,
+        since: "0.18.0",
+        meaning: "A service is held back until the operator gives what it needs to start: a \
+            setting only the operator holds, a secret nobody has entered, or a setting holding \
+            a value outside its choices. The rest of the stack runs, and so does nothing that \
+            runs through the service; the message names each service and what it waits for.",
+        remedy: "Give each setting the message names with lemonfiber settings set; the act that \
+            gives the last thing a service waits for starts it.",
+    }
 }

@@ -45,6 +45,7 @@ pub mod seasons;
 pub mod storage;
 pub mod telling;
 pub mod vpn;
+pub mod waiting;
 pub mod wiring;
 
 use std::time::Duration;

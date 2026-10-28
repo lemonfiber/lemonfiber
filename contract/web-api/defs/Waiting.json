@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A service held back until the operator gives what it needs to start.",
+  "type": "object",
+  "properties": {
+    "service": {
+      "description": "The service.",
+      "type": "string"
+    },
+    "wants": {
+      "description": "Everything it waits for.",
+      "type": "array",
+      "items": {
+        "$ref": "Wanted.json"
+      }
+    }
+  },
+  "required": [
+    "service",
+    "wants"
+  ]
+}

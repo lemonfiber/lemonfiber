@@ -60,6 +60,7 @@ fn reading(mut installed: Installed, id: &str, of: &str) -> Installed {
         was: None,
         serves: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),
+        needed_to_start: false,
     });
     installed
 }

@@ -402,6 +402,7 @@ fn a_status_report_leads_with_the_condition() {
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Unhealthy, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        waiting: Vec::new(),
     };
     let text = status(&report).text();
     assert!(text.starts_with("running, and something needs attention"));
@@ -477,6 +478,7 @@ fn a_container_the_stack_never_declared_is_shown_with_an_unknown_description() {
         }],
         services: vec![service("sonarr", State::Absent, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        waiting: Vec::new(),
     };
     let text = status(&report).text();
 
@@ -511,6 +513,7 @@ fn a_stranger_that_failed_is_worded_without_an_exit_code_to_quote() {
         }],
         services: vec![service("sonarr", State::Absent, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        waiting: Vec::new(),
     };
     let text = status(&report).text();
 
@@ -534,6 +537,7 @@ fn a_stack_with_nothing_strange_running_says_nothing_about_strangers() {
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Absent, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        waiting: Vec::new(),
     };
 
     assert!(!status(&report).text().contains("does not declare"));
@@ -655,6 +659,7 @@ fn a_status_report_names_the_running_forms_and_what_they_left_out() {
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Healthy, None)],
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
+        waiting: Vec::new(),
     };
     let text = status(&report).text();
     assert!(text.contains("running for: tv, movies"), "{text}");

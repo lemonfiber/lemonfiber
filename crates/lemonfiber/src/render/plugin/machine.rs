@@ -71,6 +71,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(answering::sharing(&install.sharing, acted));
         lines.extend(answering::granting(&install.would, acted));
         lines.extend(container(&install.would));
+        lines.extend(crate::render::waiting::waiting(&install.waiting));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
         }

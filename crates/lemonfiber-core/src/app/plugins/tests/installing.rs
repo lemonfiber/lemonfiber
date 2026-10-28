@@ -70,6 +70,27 @@ async fn a_rehearsed_install_says_everything_the_real_one_would_and_writes_nothi
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
+#[tokio::test]
+async fn a_rehearsed_install_names_each_service_that_would_wait_and_for_what() {
+    let ctx = rehearsing("waiting");
+    let manifest = format!(
+        "{MANIFEST}\n[service.env]\nKOMGA_TOKEN = {{ setting = \"komga:token\", default = \"\", \
+         recorded_with = \"0000\" }}\n"
+    );
+    let install =
+        report(installing(&ctx, &source("waiting", &manifest)).await).and_then(|one| one.install);
+    assert_eq!(
+        install.map(|one| one.waiting),
+        Some(vec![crate::model::Waiting {
+            service: "komga".to_owned(),
+            wants: vec![crate::model::Wanted::Setting {
+                setting: "komga:token".to_owned(),
+                choices: None,
+            }],
+        }])
+    );
+}
+
 /// And the listing beside it counts what is installed rather than what would
 /// be. A rehearsal that said *one plugin is installed* in the same breath as
 /// *nothing was written* is a rehearsal an operator has to choose between two

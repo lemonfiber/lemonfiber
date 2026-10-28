@@ -194,6 +194,7 @@ pub(super) async fn install(
         install: Some(Box::new(Install {
             granting: crate::plugin::granting(&would),
             sharing: crate::plugin::sharing(&would),
+            waiting: standing::waiting(ctx, &stack_manifest, standing.installed(), &would),
             would,
             recorded,
             changes,

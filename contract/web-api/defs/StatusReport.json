@@ -45,12 +45,20 @@
       "items": {
         "$ref": "Undeclared.json"
       }
+    },
+    "waiting": {
+      "description": "The services held back until the operator gives what they need to start, each\nwith what it waits for and never a value.\n\nBeside the services, as what was filtered is: one that is not there is listed\nhere and nowhere else, because it is waiting rather than failing to start.",
+      "type": "array",
+      "items": {
+        "$ref": "Waiting.json"
+      }
     }
   },
   "required": [
     "forms",
     "active_forms",
     "filtered",
+    "waiting",
     "condition",
     "services",
     "undeclared",
