@@ -188,7 +188,7 @@ async fn with_the_media_server(
         server,
         pairing,
         internal,
-        pins: super::encrypting::pins(server),
+        pins: super::encrypting::pins(ctx, server),
     };
     let (gate, admitted) = match asked(ctx, fillers, project).await {
         Ok(asked) => asked,

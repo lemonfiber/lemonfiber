@@ -43,7 +43,7 @@ fn ana() -> Member {
 /// record of offers in another, minting from `random`.
 fn served_machine(named: &str, random: Option<Vec<u8>>) -> (Ctx, PathBuf) {
     let companion = Scratch::new(&format!("{named}-companion")).kept();
-    let _ = crate::certificate::kept_or_made(&companion);
+    let _ = crate::certificate::kept_or_made(&lemonfiber_adapters::Disk, &companion);
     let _ = served::record(
         &companion,
         served::Served {
@@ -148,7 +148,11 @@ async fn an_offer_on_a_machine_served_encrypted_is_handed_a_link_that_claims_it(
         .settings
         .companion
         .as_deref()
-        .and_then(|at| crate::certificate::kept(at).ok().flatten())
+        .and_then(|at| {
+            crate::certificate::kept(&lemonfiber_adapters::Disk, at)
+                .ok()
+                .flatten()
+        })
         .map(|held| held.fingerprint)
         .unwrap_or_default();
     assert_eq!(

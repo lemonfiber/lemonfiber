@@ -156,6 +156,7 @@ async fn read_through(
             transport: &shared,
             random: &FixedRandom(random.map(|byte| vec![byte; 32])),
             taking: &crate::plugin::Retaking::default(),
+            confined: &lemonfiber_adapters::Disk,
         },
     )
     .await

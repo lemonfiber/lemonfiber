@@ -68,7 +68,11 @@ async fn the_certificate_is_made_before_the_stack_starts_and_is_what_holders_are
     let Some(server) = server else {
         unreachable!("the moved media server is hosted");
     };
-    assert_eq!(pins(&server), Vec::<String>::new(), "none is made yet");
+    assert_eq!(
+        pins(&ctx, &server),
+        Vec::<String>::new(),
+        "none is made yet"
+    );
 
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
     let Some(manifest) = manifest else {
@@ -77,17 +81,23 @@ async fn the_certificate_is_made_before_the_stack_starts_and_is_what_holders_are
     made_before_start(&ctx, &manifest);
     let config = server.served.confined_to.clone().unwrap_or_default();
     assert!(config.starts_with(&project), "{}", config.display());
-    let kept = internal::kept(&config).ok().flatten();
+    let kept = internal::kept(&lemonfiber_adapters::Disk, &config)
+        .ok()
+        .flatten();
     assert!(kept.is_some(), "{}", config.display());
     assert_eq!(
-        pins(&server),
+        pins(&ctx, &server),
         kept.map(|kept| vec![kept.fingerprint]).unwrap_or_default()
     );
 
-    let again = internal::kept(&config).ok().flatten();
+    let again = internal::kept(&lemonfiber_adapters::Disk, &config)
+        .ok()
+        .flatten();
     made_before_start(&ctx, &manifest);
     assert_eq!(
-        internal::kept(&config).ok().flatten(),
+        internal::kept(&lemonfiber_adapters::Disk, &config)
+            .ok()
+            .flatten(),
         again,
         "it is made once"
     );
@@ -229,6 +239,7 @@ async fn a_restart_that_cannot_be_run_or_placed_is_said_and_nothing_is_made_with
         unreachable!("the stack reads");
     };
     made_before_start(&ctx, &manifest);
-    assert!(server(&ctx)
-        .is_some_and(|server| server.served.confined_to.is_none() && pins(&server).is_empty()));
+    assert!(server(&ctx).is_some_and(
+        |server| server.served.confined_to.is_none() && pins(&ctx, &server).is_empty()
+    ));
 }

@@ -19,7 +19,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installed;
-use crate::ports::filesystem::Lying;
+use crate::ports::filesystem::{Lying, Readable};
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
@@ -74,7 +74,7 @@ pub(crate) fn carry_out(
                 if ctx.seams.confined.lies(&write.path, beneath) == Lying::Escaped {
                     return Err(Box::new(unwritable(&write.path, LINKED)));
                 }
-                made_whole(ctx, plugin, stamp, &journal, &write.path, None)?;
+                made_whole(ctx, plugin, stamp, &journal, (&write.path, beneath), None)?;
                 continue;
             }
             crate::plugin::Lands::Document { previous, text } => {
@@ -96,7 +96,7 @@ pub(crate) fn carry_out(
                 continue;
             }
             crate::plugin::Lands::Key => {
-                keyed(ctx, plugin, stamp, &journal, &write.path)?;
+                keyed(ctx, plugin, stamp, &journal, (&write.path, &stack))?;
                 continue;
             }
             crate::plugin::Lands::Secrets(variables) => {
@@ -107,7 +107,7 @@ pub(crate) fn carry_out(
                     plugin,
                     stamp,
                     &journal,
-                    &write.path,
+                    (&write.path, crate::within::directory_of(&write.path)),
                     Some(text.as_bytes()),
                 )?;
                 continue;
@@ -171,29 +171,23 @@ pub(crate) fn unlinked(ctx: &Ctx, installed: &Installed, stack: &Path) -> Result
         .map_or(Ok(()), |source| Err(Box::new(unwritable(&source, LINKED))))
 }
 
-/// Make one directory, or write one whole file holding `content`, journalling
-/// every path it brings into being first.
+/// Make one directory, or write one whole file holding `content`, beneath `within`
+/// through no link, journalling every path it brings into being first.
 fn made_whole(
     ctx: &Ctx,
     plugin: &str,
     stamp: &str,
     journal: &Path,
-    path: &Path,
+    (path, within): (&Path, &Path),
     content: Option<&[u8]>,
 ) -> Result<(), Box<Problem>> {
     recorded_making(ctx, (plugin, stamp, journal), path, content.is_none())?;
-
+    let confined = ctx.seams.confined.as_ref();
     match content {
-        None => std::fs::create_dir_all(path)
-            .map_err(|why| Box::new(unwritable(path, &why.to_string()))),
-        // The writer brings the directory into being on its way to the file, so there
-        // is no second answer here to where a document's directory comes from. Its
-        // failure is reported as this install's own: the writer is shared with the
-        // settings file and says *your settings could not be saved*, which about a
-        // plugin's file names the wrong file and offers the wrong remedy.
-        Some(content) => crate::config::store::write_bytes(path, content)
-            .map_err(|failure| Box::new(unwritable(path, &failure.to_string()))),
+        None => confined.made(path, within, Readable::Shared),
+        Some(content) => confined.replaced(path, within, content, Readable::Private),
     }
+    .map_err(|fault| Box::new(unwritable(path, &fault.message)))
 }
 
 /// Journal every path writing `path` brings into being, parent first.
@@ -222,9 +216,9 @@ fn keyed(
     plugin: &str,
     stamp: &str,
     journal: &Path,
-    path: &Path,
+    (path, within): (&Path, &Path),
 ) -> Result<(), Box<Problem>> {
-    if path.is_file() {
+    if ctx.seams.confined.lies(path, within) == Lying::Plain {
         return Ok(());
     }
     let key = crate::keys::Secret::mint(ctx.seams.random.as_ref())
@@ -234,7 +228,7 @@ fn keyed(
         plugin,
         stamp,
         journal,
-        path,
+        (path, within),
         Some(key.as_str().as_bytes()),
     )
 }

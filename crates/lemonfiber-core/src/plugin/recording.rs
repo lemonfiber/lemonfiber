@@ -65,6 +65,8 @@ pub struct Recorder<'a> {
     pub random: &'a dyn Random,
     /// Whether what is taken is written or held to what is there.
     pub taking: &'a Retaking,
+    /// Writes into the throwaway copies a service's container is handed, through no link.
+    pub confined: &'a dyn crate::ports::filesystem::Confined,
 }
 
 /// What taking one recording came to.

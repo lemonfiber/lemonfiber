@@ -15,8 +15,11 @@ async fn the_media_servers_route_is_pinned_to_the_certificate_kept_for_it() {
         Some("held"),
         http.clone(),
     );
-    let made =
-        crate::certificate::internal::kept_or_made(&at.join("config").join("jellyfin"), "jellyfin");
+    let made = crate::certificate::internal::kept_or_made(
+        &lemonfiber_adapters::Disk,
+        &at.join("config").join("jellyfin"),
+        "jellyfin",
+    );
     let Ok(made) = made else {
         unreachable!("the internal certificate is made: {made:?}");
     };

@@ -65,7 +65,7 @@ include_dir = "0.7"
 libc = "0.2"
 # Making a directory beneath another through the directory's own handle, so a link put
 # on the way between one step and the next is refused rather than followed.
-rustix = { version = "1", default-features = false, features = ["std", "fs"] }
+rustix = { version = "1", default-features = false, features = ["std", "fs", "process"] }
 # rustls, not the platform's TLS: it keeps the musl static release target free of
 # an OpenSSL build dependency. json for decoding service API responses.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }

@@ -45,7 +45,7 @@ impl Http for Serving {
                     .find(|bound| bound.target == "/config")
             })
             .and_then(|bound| {
-                crate::certificate::internal::kept(&bound.source)
+                crate::certificate::internal::kept(&lemonfiber_adapters::Disk, &bound.source)
                     .ok()
                     .flatten()
             });
@@ -127,14 +127,27 @@ fn only_an_adapter_speaking_media_serve_has_its_upstream_handed_one() {
         unreachable!("the fixture places an upstream and its adapter");
     };
     assert_eq!(
-        super::super::super::served::internal(upstream, subtitling, &copy),
+        super::super::super::served::internal(
+            upstream,
+            subtitling,
+            &copy,
+            &lemonfiber_adapters::Disk
+        ),
         Ok(None)
     );
-    assert_eq!(crate::certificate::internal::kept(copy.path()), Ok(None));
+    assert_eq!(
+        crate::certificate::internal::kept(&lemonfiber_adapters::Disk, copy.path()),
+        Ok(None)
+    );
     let mut serving = subtitling.clone();
     serving.speaks = vec!["media.serve@1".to_owned()];
-    let handed = super::super::super::served::internal(upstream, &serving, &copy);
-    let kept = crate::certificate::internal::kept(copy.path())
+    let handed = super::super::super::served::internal(
+        upstream,
+        &serving,
+        &copy,
+        &lemonfiber_adapters::Disk,
+    );
+    let kept = crate::certificate::internal::kept(&lemonfiber_adapters::Disk, copy.path())
         .ok()
         .flatten()
         .map(|kept| kept.fingerprint);
@@ -153,7 +166,12 @@ fn only_an_adapter_speaking_media_serve_has_its_upstream_handed_one() {
             unreachable!("a copy is made");
         };
         let _ = std::fs::set_permissions(locked.path(), std::fs::Permissions::from_mode(0o500));
-        let refused = super::super::super::served::internal(upstream, &serving, &locked);
+        let refused = super::super::super::served::internal(
+            upstream,
+            &serving,
+            &locked,
+            &lemonfiber_adapters::Disk,
+        );
         let _ = std::fs::set_permissions(locked.path(), std::fs::Permissions::from_mode(0o700));
         assert!(refused.is_err(), "{refused:?}");
     }

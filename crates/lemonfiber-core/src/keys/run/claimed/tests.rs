@@ -29,7 +29,7 @@ impl Machine {
     fn new(named: &str, served_on_the_network: bool) -> Self {
         let companion = Scratch::new(&format!("claim-{named}-companion")).kept();
         if served_on_the_network {
-            let _ = crate::certificate::kept_or_made(&companion);
+            let _ = crate::certificate::kept_or_made(&lemonfiber_adapters::Disk, &companion);
             let _ = served::record(
                 &companion,
                 served::Served {

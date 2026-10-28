@@ -72,7 +72,8 @@ pub(super) async fn answers(
         recorder.random,
     )
     .map_err(failing("starting files"))?;
-    let fingerprint = certified(placed, &copy).map_err(failing("certificate"))?;
+    let fingerprint =
+        certified(placed, &copy, recorder.confined).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;
     mountable(placed, &copy).map_err(failing(MOUNTS))?;
     let mut stand_ins = StandIns::of(secrets, recorder.random).map_err(failing(STAND_INS))?;
@@ -127,11 +128,16 @@ pub(super) async fn answers(
 /// filler of a capability it hands a certificate, and readable by whoever that filler runs
 /// as, where `placed` provides one, with the fingerprint the certificate is answered by,
 /// which the run made; nothing otherwise.
-pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<Option<String>, String> {
+pub(super) fn certified(
+    placed: &Placed,
+    copy: &Throwaway,
+    confined: &dyn crate::ports::filesystem::Confined,
+) -> Result<Option<String>, String> {
     if !placed.provides.iter().any(|name| name == STREAM_GUARD) {
         return Ok(None);
     }
-    let kept = crate::certificate::replaced(copy.path()).map_err(|unkept| unkept.to_string())?;
+    let kept =
+        crate::certificate::replaced(confined, copy.path()).map_err(|unkept| unkept.to_string())?;
     crate::certificate::FILES
         .iter()
         .try_for_each(|named| copy.readable(named))?;
@@ -146,6 +152,7 @@ pub(super) fn internal(
     upstream: &Placed,
     adapter: &Placed,
     copy: &Throwaway,
+    confined: &dyn crate::ports::filesystem::Confined,
 ) -> Result<Option<(String, String)>, String> {
     let spoken = lemonfiber_contract::spoken(
         lemonfiber_contract::capabilities::media::serve::CAPABILITY,
@@ -155,7 +162,9 @@ pub(super) fn internal(
         return Ok(None);
     }
     let made = crate::certificate::internal::made_for(&upstream.service)
-        .and_then(|made| crate::certificate::internal::written(copy.path(), &made).map(|()| made))
+        .and_then(|made| {
+            crate::certificate::internal::written(confined, copy.path(), &made).map(|()| made)
+        })
         .map_err(|unkept| unkept.to_string())?;
     let inside = Path::new(crate::project::entry::configuration(&upstream.config_path))
         .join(crate::certificate::internal::INTERNAL);

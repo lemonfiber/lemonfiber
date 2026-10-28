@@ -29,18 +29,22 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
         return;
     };
     if let Some(config) = server.served.confined_to.as_deref() {
-        let _ = internal::kept_or_made(config, &server.served.id);
+        let _ = internal::kept_or_made(ctx.seams.confined.as_ref(), config, &server.served.id);
     }
 }
 
 /// The pins every holder of a credential of `server` is handed: the certificate kept for
 /// its internal TLS port. None where none is kept, which reaches nothing.
-pub(crate) fn pins(server: &MediaServer) -> Vec<String> {
+pub(crate) fn pins(ctx: &Ctx, server: &MediaServer) -> Vec<String> {
     server
         .served
         .confined_to
         .as_deref()
-        .and_then(|config| internal::kept(config).ok().flatten())
+        .and_then(|config| {
+            internal::kept(ctx.seams.confined.as_ref(), config)
+                .ok()
+                .flatten()
+        })
         .map(|kept| vec![kept.fingerprint])
         .unwrap_or_default()
 }

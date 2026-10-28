@@ -134,12 +134,13 @@ impl Prepared {
         )
         .map_err(refused("starting files"))?;
         let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
-        let fingerprint =
-            super::super::served::certified(upstream, &copy).map_err(refused("certificate"))?;
+        let fingerprint = super::super::served::certified(upstream, &copy, recorder.confined)
+            .map_err(refused("certificate"))?;
         super::super::served::mountable(upstream, &copy)
             .map_err(refused(super::super::served::MOUNTS))?;
-        let internal = super::super::served::internal(upstream, adapter.placed, &copy)
-            .map_err(refused("internal certificate"))?;
+        let internal =
+            super::super::served::internal(upstream, adapter.placed, &copy, recorder.confined)
+                .map_err(refused("internal certificate"))?;
         let apart = (adapter.placed.service != upstream.service)
             .then(|| {
                 Throwaway::of(

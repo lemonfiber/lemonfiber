@@ -89,3 +89,33 @@ fn a_secrets_file_that_cannot_be_written_is_refused_naming_it() {
         "named"
     );
 }
+
+/// An adapter's container can write its own configuration directory, so a link it plants
+/// on the way to where its key is written leads the write nowhere outside.
+#[cfg(unix)]
+#[test]
+fn a_key_whose_directory_is_a_planted_link_is_refused_and_nothing_lands_outside() {
+    let (ctx, _) = machine("keyed-linked");
+    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
+    let outside = stack.with_file_name("outside");
+    let _ = std::fs::create_dir_all(stack.join("config"));
+    let _ = std::fs::create_dir_all(&outside);
+    let _ = std::os::unix::fs::symlink(&outside, stack.join("config").join("adapter"));
+    let key = stack.join("config").join("adapter").join("api.key");
+
+    let refused = carry_out(
+        &ctx,
+        "tools",
+        "stamp",
+        &[Write {
+            path: key,
+            lands: Lands::Key,
+        }],
+    );
+
+    assert!(refused.is_err());
+    assert_eq!(
+        std::fs::read_dir(&outside).map(Iterator::count).ok(),
+        Some(0)
+    );
+}

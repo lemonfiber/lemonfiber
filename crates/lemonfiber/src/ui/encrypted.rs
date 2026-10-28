@@ -53,7 +53,7 @@ pub(crate) fn encrypting(
             "there is no configuration directory to keep one in",
         ))
     })?;
-    let kept = certificate::kept_or_made(directory)
+    let kept = certificate::kept_or_made(ctx.seams.confined.as_ref(), directory)
         .map_err(|why| Box::new(uncertified(&why.to_string())))?;
     let (certificate, key) = kept.presented();
     let config = rustls::ServerConfig::builder_with_provider(Arc::new(

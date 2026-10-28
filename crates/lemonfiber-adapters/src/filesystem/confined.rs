@@ -48,6 +48,24 @@ impl Confined for Disk {
     fn moved(&self, from: &Path, to: &Path, within: &Path) -> Result<(), Fault> {
         moving::moved(from, to, within)
     }
+
+    fn made(&self, path: &Path, within: &Path, readable: Readable) -> Result<(), Fault> {
+        replacing::made(path, within, readable)
+    }
+
+    fn replaced(
+        &self,
+        path: &Path,
+        within: &Path,
+        contents: &[u8],
+        readable: Readable,
+    ) -> Result<(), Fault> {
+        replacing::replaced(path, within, contents, readable)
+    }
+
+    fn bytes(&self, path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault> {
+        replacing::bytes(path, within)
+    }
 }
 
 /// What an opened handle turned out to be, against the name it was opened by.
@@ -134,7 +152,7 @@ fn created(path: &Path, within: &Path, readable: Readable) -> Result<std::fs::Fi
     let flags =
         OFlags::RDWR | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
     let made_as = match readable {
-        Readable::Owner => Mode::RUSR | Mode::WUSR,
+        Readable::Owner | Readable::Private => Mode::RUSR | Mode::WUSR,
         Readable::Shared => Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::ROTH,
     };
     openat(&here, name, flags, made_as)
@@ -162,7 +180,7 @@ fn created(path: &Path, within: &Path, _readable: Readable) -> Result<std::fs::F
 #[cfg(unix)]
 const fn mode(readable: Readable) -> u32 {
     match readable {
-        Readable::Owner => 0o600,
+        Readable::Owner | Readable::Private => 0o600,
         Readable::Shared => 0o644,
     }
 }
@@ -403,6 +421,7 @@ fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
 }
 
 mod moving;
+mod replacing;
 mod unpacking;
 
 pub(crate) use unpacking::{unpacked, UNPACKED_AT_MOST};

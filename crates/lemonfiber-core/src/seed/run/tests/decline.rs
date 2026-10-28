@@ -547,8 +547,11 @@ async fn a_replaced_key_the_server_will_not_revoke_is_said() {
 async fn a_key_held_with_other_pins_is_handed_again_with_the_certificate_kept() {
     let http = serving(&["kept"], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-repinned", true, Some("kept"), http.clone());
-    let made =
-        crate::certificate::internal::kept_or_made(&at.join("config").join("jellyfin"), "jellyfin");
+    let made = crate::certificate::internal::kept_or_made(
+        &lemonfiber_adapters::Disk,
+        &at.join("config").join("jellyfin"),
+        "jellyfin",
+    );
     let Ok(made) = made else {
         unreachable!("the internal certificate is made: {made:?}");
     };
@@ -595,8 +598,11 @@ async fn a_key_that_cannot_be_handed_again_with_its_pin_is_reported() {
     use std::os::unix::fs::PermissionsExt as _;
     let http = serving(&["kept", "stray"], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-unrepinned", true, Some("kept"), http.clone());
-    let made =
-        crate::certificate::internal::kept_or_made(&at.join("config").join("jellyfin"), "jellyfin");
+    let made = crate::certificate::internal::kept_or_made(
+        &lemonfiber_adapters::Disk,
+        &at.join("config").join("jellyfin"),
+        "jellyfin",
+    );
     assert!(made.is_ok(), "{made:?}");
     let directory = key_file(&at)
         .parent()

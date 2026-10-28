@@ -30,7 +30,11 @@ fn a_run_not_asked_to_encrypt_presents_nothing() {
         encrypting(&keeping(Some(at.clone())), false, None),
         Ok(None)
     ));
-    assert_eq!(certificate::kept(&at), Ok(None), "and nothing is made");
+    assert_eq!(
+        certificate::kept(&lemonfiber_adapters::Disk, &at),
+        Ok(None),
+        "and nothing is made"
+    );
 }
 
 /// Asked for, the certificate is made once and presented with the fingerprint a phone
@@ -49,7 +53,7 @@ fn a_run_asked_to_encrypt_presents_the_certificate_it_keeps() {
     assert!(first.is_some());
     assert_eq!(first, second);
     assert_eq!(
-        certificate::kept(&at)
+        certificate::kept(&lemonfiber_adapters::Disk, &at)
             .ok()
             .flatten()
             .map(|held| held.fingerprint),
@@ -75,9 +79,9 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
         Some(NO_CERTIFICATE)
     );
 
-    let _ = certificate::replaced(&at);
+    let _ = certificate::replaced(&lemonfiber_adapters::Disk, &at);
     let other = Scratch::new("encrypting-another-key").kept();
-    let _ = certificate::replaced(&other);
+    let _ = certificate::replaced(&lemonfiber_adapters::Disk, &other);
     let _ = std::fs::copy(other.join("key.pem"), at.join("key.pem"));
     assert_eq!(
         code(&keeping(Some(at)), Some(8443)),
@@ -90,7 +94,7 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
 /// pairing needs.
 fn served_as_den(named: &str, port: u16) -> Ctx {
     let at = Scratch::new(named).kept();
-    let _ = certificate::kept_or_made(&at);
+    let _ = certificate::kept_or_made(&lemonfiber_adapters::Disk, &at);
     let _ = served::record(
         &at,
         served::Served {

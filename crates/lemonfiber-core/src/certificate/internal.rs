@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use p12_keystore::{Certificate, KeyStore, KeyStoreEntry, PrivateKey, PrivateKeyChain};
 
 use super::{fingerprint, Unkept};
+use crate::ports::filesystem::{Confined, Readable};
 
 /// Where the certificate is kept beneath the media server's configuration directory.
 pub const INTERNAL: &str = "lemonfiber/internal.p12";
@@ -111,30 +112,41 @@ pub fn read(bytes: &[u8]) -> Result<Internal, Unkept> {
     })
 }
 
-/// The certificate kept beneath `config`, or nothing where none has been made.
+/// The certificate kept beneath `config`, read through no link, or nothing where none has
+/// been made.
+///
+/// The configuration directory is the media server's own to write, so a link planted at
+/// any step to the certificate is refused rather than followed.
 ///
 /// # Errors
 ///
-/// [`Unkept::Unreadable`] where what is kept is not one.
-pub fn kept(config: &Path) -> Result<Option<Internal>, Unkept> {
-    match std::fs::read(path(config)) {
-        Ok(bytes) => read(&bytes).map(Some),
-        Err(why) if why.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(why) => Err(Unkept::Unreadable(format!(
-            "{INTERNAL} could not be read: {why}"
-        ))),
-    }
+/// [`Unkept::Unreadable`] where what is kept is not one, or is reached through a link.
+pub fn kept(confined: &dyn Confined, config: &Path) -> Result<Option<Internal>, Unkept> {
+    confined
+        .bytes(&path(config), config)
+        .map_err(|fault| {
+            Unkept::Unreadable(format!("{INTERNAL} could not be read: {}", fault.message))
+        })?
+        .map(|bytes| read(&bytes))
+        .transpose()
 }
 
 /// `made` written beneath `config`, readable by its owner alone, in place of whatever was
-/// kept there.
+/// kept there: into a directory of the operator's own reached through no link, beside the
+/// old one and renamed over it.
 ///
 /// # Errors
 ///
 /// [`Unkept::Unmade`] where it could not be written.
-pub fn written(config: &Path, made: &Internal) -> Result<(), Unkept> {
-    crate::config::store::write_bytes(&path(config), &made.pkcs12)
-        .map_err(|why| Unkept::Unmade(format!("{INTERNAL} could not be written: {why}")))
+pub fn written(confined: &dyn Confined, config: &Path, made: &Internal) -> Result<(), Unkept> {
+    confined
+        .replaced(&path(config), config, &made.pkcs12, Readable::Owner)
+        .map_err(|fault| {
+            Unkept::Unmade(format!(
+                "{INTERNAL} could not be written: {}",
+                fault.message
+            ))
+        })
 }
 
 /// The certificate kept beneath `config`, made out to `service` and written first where
@@ -143,12 +155,16 @@ pub fn written(config: &Path, made: &Internal) -> Result<(), Unkept> {
 /// # Errors
 ///
 /// [`Unkept`] where what is kept cannot be read, or a new one cannot be made or written.
-pub fn kept_or_made(config: &Path, service: &str) -> Result<Internal, Unkept> {
-    if let Some(held) = kept(config)? {
+pub fn kept_or_made(
+    confined: &dyn Confined,
+    config: &Path,
+    service: &str,
+) -> Result<Internal, Unkept> {
+    if let Some(held) = kept(confined, config)? {
         return Ok(held);
     }
     let made = made_for(service)?;
-    written(config, &made)?;
+    written(confined, config, &made)?;
     Ok(made)
 }
 

@@ -94,7 +94,7 @@ pub(super) async fn seed_decline_key(
             },
         ));
     };
-    let pins = super::encrypting::pins(server);
+    let pins = super::encrypting::pins(ctx, server);
     let held = decline.held().await.ok().flatten();
     let pinned = held.as_ref().is_some_and(|held| held.pins == pins);
     let state = match held.and_then(|held| named_by(&filed, &held.key)) {
