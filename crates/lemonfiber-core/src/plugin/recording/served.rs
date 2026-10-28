@@ -40,6 +40,13 @@ const LIBRARY: &str = "/data";
 /// The library a service takes, beside its starting files.
 const DATA: &str = "data";
 
+/// What the step that makes a service's further mounts is called where it fails.
+pub(super) const MOUNTS: &str = "mounts";
+
+/// What each further mount a service is given is named beside its starting files, before
+/// its place among them.
+const MOUNTED: &str = "mount-";
+
 /// What one served service answered each of its requests, scrubbed.
 pub(super) async fn answers(
     recorder: Recorder<'_>,
@@ -67,6 +74,7 @@ pub(super) async fn answers(
     .map_err(failing("starting files"))?;
     certified(placed, &copy).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;
+    mountable(placed, &copy).map_err(failing(MOUNTS))?;
     let mut stand_ins = StandIns::of(secrets, recorder.random).map_err(failing(STAND_INS))?;
     let stood = stand_ins
         .settings(placed, recorder.random)
@@ -141,6 +149,31 @@ pub(super) fn library(placed: &Placed, copy: &Throwaway) -> Result<Option<PathBu
     Ok(Some(data))
 }
 
+/// Each further mount install gives `placed`, as the directory beside `copy` it is served
+/// from and where it lands.
+fn mounted(placed: &Placed, copy: &Throwaway) -> Vec<Bound> {
+    crate::project::entry::mounts(&placed.fields.mount, placed.takes_data)
+        .enumerate()
+        .map(|(at, mount)| Bound {
+            source: copy.beside(&mount_named(at)),
+            target: mount.to.clone(),
+            read_only: mount.ro,
+        })
+        .collect()
+}
+
+/// An empty directory beside `copy` for each further mount install gives `placed`, open to
+/// whoever the service is.
+pub(in crate::plugin) fn mountable(placed: &Placed, copy: &Throwaway) -> Result<(), String> {
+    (0..crate::project::entry::mounts(&placed.fields.mount, placed.takes_data).count())
+        .try_for_each(|at| copy.emptied(&mount_named(at)).map(drop))
+}
+
+/// What the directory the further mount at `at` is served from is named beside the copy.
+fn mount_named(at: usize) -> PathBuf {
+    PathBuf::from(format!("{MOUNTED}{at}"))
+}
+
 /// The container a service's recordings are taken from: as lemonfiber runs it, with
 /// throwaway starting files and library and its one port on the loopback interface.
 pub(super) fn settled(placed: &Placed, copy: &Throwaway, data: Option<&Path>) -> Serve {
@@ -169,11 +202,14 @@ pub(in crate::plugin) fn settled_as(
     let mut binds = vec![Bound {
         source: copy.path().to_path_buf(),
         target: crate::project::entry::configuration(&placed.config_path).to_owned(),
+        read_only: placed.fields.config_ro,
     }];
     binds.extend(data.map(|data| Bound {
         source: data.to_path_buf(),
         target: LIBRARY.to_owned(),
+        read_only: false,
     }));
+    binds.extend(mounted(placed, copy));
     Serve {
         reaching: Vec::new(),
         image: format!("{}@{}", placed.image, placed.digest),

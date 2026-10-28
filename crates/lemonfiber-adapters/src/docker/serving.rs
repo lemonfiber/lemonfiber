@@ -244,7 +244,7 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
                         typ: Some(MountType::BIND),
                         source: Some(bound.source.display().to_string()),
                         target: Some(bound.target.clone()),
-                        read_only: Some(false),
+                        read_only: Some(bound.read_only),
                         ..Mount::default()
                     })
                     .collect(),

@@ -39,3 +39,37 @@ async fn an_adapter_sharing_its_upstreams_configuration_is_recorded_with_its_ups
         .iter()
         .all(|one| one.binds.iter().all(|bound| bound.target != "/upstream")));
 }
+
+#[tokio::test]
+async fn an_adapter_and_its_upstream_are_each_recorded_with_their_further_mounts() {
+    let mounting = FRONTED
+        .replace(
+            "replaces    = \"jellyfin\"\n",
+            "replaces    = \"jellyfin\"\n\n[[service.mount]]\nfrom = \"cache\"\nto   = \"/cache\"\n",
+        )
+        .replace(
+            "provides    = [\"subtitles.fetch\"]\n",
+            "provides    = [\"subtitles.fetch\"]\n\n[[service.mount]]\nfrom = \"state\"\nto   = \"/state\"\n",
+        );
+    let at = source("fronted-mounting", &mounting);
+    let serving = engine();
+    let read = recorded(&at, &serving, &answering(), Some(7)).await;
+    assert_eq!(failed_at(&read), Vec::new());
+    let served = serving.asked();
+    let mounted = |at: usize, target: &str| {
+        served
+            .get(at)
+            .and_then(|one| one.binds.iter().find(|bound| bound.target == target))
+            .map(|bound| (bound.source.clone(), bound.read_only))
+    };
+    let cache = mounted(0, "/cache");
+    let state = mounted(1, "/state");
+    assert!(cache.as_ref().is_some_and(|(_, ro)| !ro), "{served:?}");
+    assert!(state.as_ref().is_some_and(|(_, ro)| !ro), "{served:?}");
+    assert_ne!(
+        cache.map(|(source, _)| source),
+        state.map(|(source, _)| source)
+    );
+    assert_eq!(mounted(0, "/state"), None);
+    assert_eq!(mounted(1, "/cache"), None);
+}

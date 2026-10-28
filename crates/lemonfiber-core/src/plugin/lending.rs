@@ -75,6 +75,7 @@ pub(crate) async fn lent(ctx: &Ctx, borrowing: &Borrowing<'_>) -> Result<Lent, S
     let key = crate::secret::generate(ctx.seams.random.as_ref())
         .ok_or_else(|| crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned())?;
     held.hold(KEY_FILE, &key)?;
+    super::recording::mountable(adapter, &held)?;
     super::recording::handed_over(&held, &borrowing.credentials)?;
     let mut operator = Operator::of(ctx);
     if let Some((uid, gid)) = held.owner() {

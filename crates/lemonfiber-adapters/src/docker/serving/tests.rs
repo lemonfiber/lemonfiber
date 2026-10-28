@@ -28,10 +28,12 @@ fn serve() -> Serve {
             Bound {
                 source: PathBuf::from("/tmp/copy/config"),
                 target: "/config".to_owned(),
+                read_only: true,
             },
             Bound {
                 source: PathBuf::from("/tmp/copy/data"),
                 target: "/data".to_owned(),
+                read_only: false,
             },
         ],
         tmpfs: vec!["/run".to_owned()],
@@ -115,6 +117,13 @@ fn a_served_container_is_on_its_own_network_with_its_port_on_loopback_alone() {
             ),
             (Some(MountType::BIND), Some("/tmp/copy/data"), Some("/data")),
         ]
+    );
+    assert_eq!(
+        mounts
+            .iter()
+            .map(|mount| mount.read_only)
+            .collect::<Vec<_>>(),
+        vec![Some(true), Some(false)]
     );
     assert_eq!(host.devices, None);
     assert_eq!(host.binds, None);
