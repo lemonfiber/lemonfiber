@@ -178,8 +178,8 @@ async fn plain_compose_in_the_project_directory_resolves_what_lemonfiber_started
     assert_eq!(plain, ours);
     assert!(ours.contains("name: lemonfiber"), "{ours}");
     assert!(
-        ours.contains("jellyfin:") && ours.contains("gluetun:"),
-        "{ours}"
+        ours.contains("jellyfin:") && !ours.contains("gluetun:"),
+        "the guard waits for the VPN key it is given: {ours}"
     );
     let written =
         std::fs::read_to_string(project.join(lemonfiber_core::project::FILE)).unwrap_or_default();

@@ -4,11 +4,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.111.216/29
-  ask__calibre-web-automated__proxy.front__caddy:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.160.240/29
   ask__decline__identity.source__jellyfin:
     internal: true
     ipam:
