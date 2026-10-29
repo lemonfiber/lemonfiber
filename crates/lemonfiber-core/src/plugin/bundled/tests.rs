@@ -8,7 +8,7 @@ use crate::plugin::Verdict;
 const STACK: &str = lemonfiber_bundled::STACK;
 
 /// A service of a part the bundle assembles, which the stack runs as its own.
-const ASSEMBLED: &str = "calibre-web-automated";
+const ASSEMBLED: &str = "flaresolverr";
 
 /// A service of a part the bundle installs, kept in the stack until it moves.
 const KEPT: &str = "jellyfin";
@@ -22,13 +22,13 @@ capability = "media.serve"
 id = "guarded"
 request = { method = "GET", path = "/Items" }
 expect = { status = 401 }
-fixture = "recordings/calibre-web-automated/guarded.json"
+fixture = "recordings/flaresolverr/guarded.json"
 
 [[probe]]
 id = "catalogue"
 request = { method = "GET", path = "/Items" }
 expect = { status = 200, json_has_keys = ["Items"] }
-fixture = "recordings/calibre-web-automated/catalogue.json"
+fixture = "recordings/flaresolverr/catalogue.json"
 "#;
 
 /// The shipped stack, with [`ASSEMBLED`] alone providing and claiming `media.serve` as
@@ -62,7 +62,7 @@ fn pinned(manifest: &Manifest) -> String {
 /// A stack directory holding the recordings named, each answering `status` with `body`.
 fn recorded(tag: &str, from: &str, answers: &[(&str, u16, &str)]) -> PathBuf {
     let root = lemonfiber_fixtures::scratch::Scratch::named(tag).kept();
-    let under = root.join("recordings/calibre-web-automated");
+    let under = root.join("recordings/flaresolverr");
     let _ = std::fs::create_dir_all(&under);
     for (name, status, body) in answers {
         let recording = format!(
@@ -204,8 +204,7 @@ fn an_assembled_service_providing_with_no_claim_refuses_the_stack() {
     assert_eq!(
         said(&report),
         vec![
-            "refused: calibre-web-automated provides media.serve, and no claim demonstrates it"
-                .to_owned(),
+            "refused: flaresolverr provides media.serve, and no claim demonstrates it".to_owned(),
             "1 refused, 0 refuted, 0 unproven, 0 demonstrated".to_owned(),
         ]
     );
@@ -240,7 +239,7 @@ fn the_report_says_each_answer_worst_first_with_a_count() {
     );
     assert!(
         lines.get(2).is_some_and(
-            |line| line.starts_with("refuted: calibre-web-automated media.serve probe guarded")
+            |line| line.starts_with("refuted: flaresolverr media.serve probe guarded")
         ),
         "{lines:?}"
     );
@@ -251,9 +250,9 @@ fn the_report_says_each_answer_worst_first_with_a_count() {
                 == "refused: sonarr provides library.manage, and no claim demonstrates it"),
         "{lines:?}"
     );
-    assert!(lines.iter().any(
-        |line| line.starts_with("unproven: calibre-web-automated media.serve probe catalogue")
-    ));
+    assert!(lines
+        .iter()
+        .any(|line| line.starts_with("unproven: flaresolverr media.serve probe catalogue")));
     assert_eq!(
         lines.last().map(String::as_str),
         Some("2 refused, 1 refuted, 1 unproven, 0 demonstrated")
@@ -277,7 +276,7 @@ fn a_probe_the_recording_answers_is_said_as_demonstrated() {
 
     assert!(lines
         .iter()
-        .any(|line| line == "demonstrated: calibre-web-automated media.serve probe guarded"));
+        .any(|line| line == "demonstrated: flaresolverr media.serve probe guarded"));
     assert_eq!(
         lines.last().map(String::as_str),
         Some("0 refused, 0 refuted, 0 unproven, 2 demonstrated")
@@ -306,7 +305,7 @@ expect = { status = 200"#,
     );
     let root = recorded("bundled-runs", &pinned(&manifest), &[]);
     let _ = std::fs::write(
-        root.join("recordings/calibre-web-automated/guarded.json"),
+        root.join("recordings/flaresolverr/guarded.json"),
         format!(
             r#"{{"recorded_from":"{}","note":"its release","run":{{"args":["--version"]}},"result":{{"exit":0,"stdout_starts_with":"10.11.11\n"}}}}"#,
             pinned(&manifest)

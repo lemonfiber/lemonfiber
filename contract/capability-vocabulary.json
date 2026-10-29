@@ -206,7 +206,7 @@
       "name": "media.serve",
       "summary": "Serves the filed library to a player, with its own catalogue of what it holds.",
       "contract": "Holds a catalogue of what is in the library and serves it to a player over HTTP. The catalogue is not readable without a credential — a library server that answers an anonymous caller is publishing the household's collection to every device on the network.",
-      "declared_by": ["calibre-web-automated", "audiobookshelf", "jellyfin", "navidrome"],
+      "declared_by": ["audiobookshelf", "calibre-web-automated", "jellyfin", "navidrome"],
       "probes": [
         {
           "id": "guarded",

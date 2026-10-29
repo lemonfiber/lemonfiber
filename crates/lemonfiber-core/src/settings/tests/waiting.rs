@@ -65,12 +65,21 @@ fn waits(recorded: &[(&str, &str)], held: &[&str]) -> Vec<Waiting> {
         unreachable!("the stack reads");
     };
     let recorded: BTreeMap<&str, &str> = recorded.iter().copied().collect();
-    waiting(
+    guarded(waiting(
         &manifest,
         &guard(),
         &|name| recorded.get(name).map(|value| (*value).to_owned()),
         &|name| held.contains(&name),
-    )
+    ))
+}
+
+/// What of `waiting` is the guard plugin's tunnel, leaving what the stack's own services
+/// wait for to the tests of the stack.
+fn guarded(waiting: Vec<Waiting>) -> Vec<Waiting> {
+    waiting
+        .into_iter()
+        .filter(|one| one.service == "tunnel")
+        .collect()
 }
 
 fn tunnel(wants: Vec<Wanted>) -> Vec<Waiting> {
@@ -182,7 +191,7 @@ async fn status_names_each_service_held_back_beside_the_services_and_not_among_t
         unreachable!("the status reads");
     };
     assert_eq!(
-        report.waiting,
+        guarded(report.waiting),
         tunnel(vec![
             Wanted::Setting {
                 setting: "guard:account".to_owned(),
@@ -215,7 +224,7 @@ async fn a_settings_change_names_what_waits_once_it_is_made() {
         .await,
     );
     assert_eq!(
-        change.map(|one| one.waiting),
+        change.map(|one| guarded(one.waiting)),
         Some(tunnel(vec![Wanted::Secret {
             secret: "guard:openvpn-user".to_owned(),
         }]))
@@ -260,7 +269,7 @@ async fn a_service_held_back_is_written_apart_and_started_by_the_act_giving_its_
         made.as_ref().map(|one| one.starts.clone()),
         Some(vec!["tunnel".to_owned()])
     );
-    assert_eq!(made.map(|one| one.waiting), Some(Vec::new()));
+    assert_eq!(made.map(|one| guarded(one.waiting)), Some(Vec::new()));
     assert_ne!(profile(&machine).as_deref(), Some(crate::project::WAITING));
     assert!(machine
         .runner

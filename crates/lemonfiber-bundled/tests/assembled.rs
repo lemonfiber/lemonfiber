@@ -15,8 +15,15 @@ const PLUGIN_ONLY: [&str; 3] = ["replaces", "native", "env"];
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's own services declare none of them.
-const FROM_SECRETS: [(&str, &str, &str); 6] = [
+const FROM_SECRETS: [(&str, &str, &str); 9] = [
     ("gluetun", "WIREGUARD_PRIVATE_KEY", "wireguard-key"),
+    (
+        "gluetun",
+        "WIREGUARD_PRESHARED_KEY",
+        "wireguard-preshared-key",
+    ),
+    ("gluetun", "OPENVPN_USER", "openvpn-user"),
+    ("gluetun", "OPENVPN_PASSWORD", "openvpn-password"),
     ("recyclarr", "RADARR_API_KEY", "movies-key"),
     ("recyclarr", "SONARR_API_KEY", "tv-key"),
     ("unpackerr", "UN_LIDARR_0_API_KEY", "music-key"),
