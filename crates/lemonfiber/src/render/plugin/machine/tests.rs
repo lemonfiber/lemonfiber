@@ -87,6 +87,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         granting: Vec::new(),
         sharing: Vec::new(),
         waiting: Vec::new(),
+        secured: None,
     }
 }
 
@@ -209,6 +210,35 @@ fn an_adapter_writing_its_upstreams_files_is_said_to() {
             .contains("files of another service"),
         "nothing is said where nothing is shared"
     );
+}
+
+/// What asking the egress guard to hold its control credential came to is said on an
+/// install and an update alike.
+#[test]
+fn a_guard_restarted_to_take_up_its_control_credential_is_said_to_have_been() {
+    let said = "gluetun restarted to take up the control credential it was handed";
+    let installing = {
+        let mut report = moving(true, None, None);
+        report.update = None;
+        report.install = Some(Box::new(Install {
+            secured: Some(said.to_owned()),
+            ..install(self::recorded("komga", None), true)
+        }));
+        installs(&report).text()
+    };
+    let updating = {
+        let mut report = moving(true, None, None);
+        if let Some(update) = report.update.as_mut() {
+            update.install.secured = Some(said.to_owned());
+        }
+        installs(&report).text()
+    };
+    for text in [installing, updating] {
+        assert!(text.contains(said), "{text}");
+    }
+    assert!(!installs(&moving(true, None, None))
+        .text()
+        .contains("control credential"));
 }
 
 mod installed;

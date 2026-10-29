@@ -185,6 +185,7 @@ async fn a_rehearsal_says_whom_it_would_hand_and_hands_nobody() {
             wirings.first().map(|wiring| &wiring.state),
             Some(crate::seed::State::WouldWire { ours: Some(ours), .. })
                 if ours.contains("tv in /data/downloads/complete/tv")
+                    && ours.ends_with("may restart to take it up")
         ),
         "{wirings:?}"
     );

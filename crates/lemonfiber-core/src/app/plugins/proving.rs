@@ -212,7 +212,17 @@ pub(crate) async fn refronted(ctx: &Ctx, stack: &Path, routed: bool) {
     let _ = ctx.seams.runner.run(&command).await;
 }
 
-/// Ask every proof of the service it names, now that there is one to ask.
+/// What a rehearsal of installing `installed` says of asking the egress guard among its
+/// services to hold its control credential; nothing on a run that acts.
+pub(crate) fn rehearsed(ctx: &Ctx, installed: &Installed, acting: bool) -> Option<String> {
+    (!acting)
+        .then(|| crate::seed::run::would_restart(ctx, installed))
+        .flatten()
+}
+
+/// Ask every proof of the service it names, now that there is one to ask, once an egress
+/// guard among its services is asked to hold its control credential: what that came to,
+/// where it was more than held at once.
 ///
 /// The stated list and the manifest's own proofs are one list read twice — the first
 /// is built one entry per declared proof, in the manifest's order — so they walk
@@ -229,8 +239,12 @@ pub(crate) async fn asked(
     stack: &Path,
     source: &Path,
     stated: &mut [Proving],
-) {
+) -> Option<String> {
     let deadline = ctx.seams.clock.now() + ctx.patience;
+    let secured = crate::seed::run::securing_installed(ctx, installed, deadline)
+        .await
+        .as_ref()
+        .map(crate::seed::run::Secured::said);
     let _ = crate::seed::run::guarding_installed(ctx, installed, deadline).await;
     // Where each of this plugin's services answers, read through the one answer every
     // caller that asks a plugin's service reads: a second way of composing an address
@@ -269,6 +283,7 @@ pub(crate) async fn asked(
     for (placed, stated) in speaking.zip(stated.iter_mut().skip(manifest.proofs.len())) {
         stated.came_to = Some(spoken(ctx, stack, installed, placed, deadline).await);
     }
+    secured
 }
 
 /// What asking an adapter what it speaks came to: whether it speaks exactly the

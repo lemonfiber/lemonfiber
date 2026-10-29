@@ -166,10 +166,10 @@ async fn hold(ctx: &Ctx, restarting: &Restarting, profiled: &Profiled) -> State 
         return State::AlreadyWired;
     }
     if ctx.dry_run {
-        return State::WouldWire {
-            yours: applied.map(|preset| preset.label().to_owned()),
-            ours: Some(profiled.preset.label().to_owned()),
-        };
+        return restarting.would(
+            applied.map(|preset| preset.label().to_owned()),
+            profiled.preset.label(),
+        );
     }
     restarting.taken_up(ctx, syncer.apply(profiled).await).await
 }

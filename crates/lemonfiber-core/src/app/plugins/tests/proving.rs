@@ -690,3 +690,17 @@ async fn a_plugin_over_a_linked_directory_is_not_started_and_is_put_back() {
     assert_eq!(refused.1, "LIFE-11", "{refused:?}");
     assert!(!runner.ran("up"), "{:?}", runner.seen());
 }
+
+#[tokio::test]
+async fn only_a_rehearsal_says_an_installed_guard_may_restart() {
+    use crate::test_support::egress::{answering, guard, machine, ran};
+    let ctx = machine(
+        "proving-rehearsed",
+        answering(lemonfiber_fixtures::http::Answer::reply(205, "")),
+        ran(),
+        true,
+    );
+
+    assert!(super::super::proving::rehearsed(&ctx, &guard(), false).is_some());
+    assert_eq!(super::super::proving::rehearsed(&ctx, &guard(), true), None);
+}

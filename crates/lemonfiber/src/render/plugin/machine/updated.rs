@@ -43,6 +43,7 @@ pub(super) fn updated(one: &Update) -> Lines {
         acted,
     ));
     lines.extend(super::verified(one.install.verified.as_ref()));
+    lines.extend(super::secured(one.install.secured.as_deref()));
     lines.extend(super::overriding(
         &one.install.overrides,
         one.install.recorded,

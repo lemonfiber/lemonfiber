@@ -261,6 +261,7 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         stack_edits: Vec::new(),
         port_conflicts: Vec::new(),
         forwarding: None,
+        secured: None,
         switched: None,
         held: None,
         offer: None,

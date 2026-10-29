@@ -60,6 +60,12 @@
       ],
       "required": false
     },
+    "secured": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "sharing": {
       "type": [
         "array[ref:PluginSharing]"

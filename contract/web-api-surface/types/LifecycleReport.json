@@ -66,6 +66,12 @@
       ],
       "required": true
     },
+    "secured": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "services": {
       "type": [
         "array[ref:Service]"

@@ -134,6 +134,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         stack_edits,
         port_conflicts,
         forwarding: None,
+        secured: None,
         switched: Some(switched),
         held: None,
         offer: None,

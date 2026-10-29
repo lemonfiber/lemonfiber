@@ -90,6 +90,7 @@ pub(crate) async fn update(
     if !acting {
         account.went_back =
             super::super::putting_back::everything(&ctx.clone().rehearsing(), &at, &whose).await?;
+        account.install.secured = proving::rehearsed(ctx, &would, acting);
         return Ok(answering(held.installed().to_vec(), account, offer));
     }
 
@@ -253,6 +254,7 @@ fn started(
             granting: crate::plugin::granting(would),
             sharing: crate::plugin::sharing(would),
             waiting: Vec::new(),
+            secured: None,
         },
         stopped: None,
         restored: None,
@@ -321,7 +323,7 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
     if let Some(why) = proving::up(ctx, coming.would, coming.stack).await {
         return Came::Stopped(why);
     }
-    proving::asked(
+    install.secured = proving::asked(
         ctx,
         coming.manifest,
         coming.would,

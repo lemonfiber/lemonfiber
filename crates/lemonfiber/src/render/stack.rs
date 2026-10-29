@@ -273,6 +273,9 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
         lines.spaced(describe(condition));
         lines.extend(show(&report.services));
     }
+    for said in report.secured.iter().chain(&report.forwarding) {
+        lines.spaced(said.clone());
+    }
 
     // Stack files the operator edited, kept as they set them rather than overwritten
     // on this run. Named with the change an upgrade would make, so the operator can

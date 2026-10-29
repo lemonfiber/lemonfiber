@@ -87,6 +87,25 @@ fn a_start_that_leaves_the_pass_service_out_says_why() {
     );
 }
 
+/// What asking the egress guard to hold its control credential and passing the forwarded
+/// port came to is said after what the services came to.
+#[test]
+fn a_start_says_what_the_guard_and_the_forwarded_port_came_to() {
+    let report = LifecycleReport {
+        status: Some(0),
+        secured: Some(
+            "gluetun restarted to take up the control credential it was handed".to_owned(),
+        ),
+        forwarding: Some("qbittorrent now takes peers on 51413".to_owned()),
+        ..a_lifecycle("up", a_plan("media", Vec::new()))
+    };
+    let text = lifecycle(&report).text();
+    assert!(
+        text.contains("gluetun restarted to take up the control credential it was handed\n\nqbittorrent now takes peers on 51413"),
+        "{text}"
+    );
+}
+
 /// Told before the bind fails, and told as a fact rather than a refusal.
 #[test]
 fn a_port_something_else_holds_is_named_on_both_sides_before_the_start() {

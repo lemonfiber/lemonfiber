@@ -208,6 +208,13 @@ pub(crate) async fn settled_into(
     let settled = settle(ctx, manifest, &profiles).await?;
     report.condition = Some(condition(&settled));
     report.services = settled;
+    let project =
+        super::super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = super::super::targets::host_fillers(ctx, manifest, project.as_deref());
+    report.secured = crate::seed::run::secured(ctx, &fillers)
+        .await
+        .as_ref()
+        .map(crate::seed::run::Secured::said);
     report.forwarding = super::super::forwarding::after_start(ctx, manifest).await;
     Ok(())
 }
