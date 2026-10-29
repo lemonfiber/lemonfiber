@@ -286,7 +286,8 @@ pub fn standing(
         | Kind::Setting { .. }
         | Kind::Secret { .. }
         | Kind::Granted { .. }
-        | Kind::Ran { .. } => Standing::whole(),
+        | Kind::Ran { .. }
+        | Kind::Restarted { .. } => Standing::whole(),
     }
 }
 

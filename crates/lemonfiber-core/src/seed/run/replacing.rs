@@ -216,7 +216,7 @@ pub(super) async fn advanced(
         None => served_again(ctx, (server, &asked), standing.current.as_ref()).await,
     };
     match state {
-        Ok(State::Wired | State::AlreadyWired) => {}
+        Ok(State::Wired | State::Restarted { .. } | State::AlreadyWired) => {}
         Ok(state) => return settled(state),
         Err(detail) => return failed(detail),
     }

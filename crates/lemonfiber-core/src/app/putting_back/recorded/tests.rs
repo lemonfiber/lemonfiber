@@ -139,3 +139,13 @@ fn a_part_started_again_is_recorded_as_the_run_the_other_way() {
     };
     assert_eq!(inverted(&ran(false)), Some(ran(true)));
 }
+
+#[test]
+fn a_restart_put_back_records_nothing() {
+    assert_eq!(
+        inverted(&Kind::Restarted {
+            service: "recyclarr".to_owned(),
+        }),
+        None
+    );
+}

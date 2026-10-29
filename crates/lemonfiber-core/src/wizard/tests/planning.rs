@@ -704,6 +704,12 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the stop or start of prowlarr"
     );
+    assert_eq!(
+        described(&change(Kind::Restarted {
+            service: "recyclarr".to_owned(),
+        })),
+        "the restart of recyclarr"
+    );
 }
 
 #[test]

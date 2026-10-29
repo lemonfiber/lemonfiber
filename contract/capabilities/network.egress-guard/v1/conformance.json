@@ -32,6 +32,16 @@
       "keyed": true,
       "live": false,
       "operation": "forwarded"
+    },
+    {
+      "asked": {},
+      "case": "secure-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "secure"
     }
   ],
   "major": 1

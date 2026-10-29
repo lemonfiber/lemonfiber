@@ -146,6 +146,7 @@ impl Change {
             } => Action::regrant(plugin, grant, !given),
             Kind::Overlaid { path, .. } => Action::Leave { path: path.clone() },
             Kind::Ran { service, running } => Action::run(service, !running),
+            Kind::Restarted { service } => Action::run(service, true),
             Kind::Certified { service, .. } => Action::unreplaced(service),
         }
     }

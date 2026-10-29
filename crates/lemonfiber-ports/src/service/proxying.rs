@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Applied, Failure};
 
 /// One household name the proxy answers, and the service it forwards to.
 #[derive(
@@ -51,12 +51,13 @@ pub struct Routing {
 /// A proxy, told its routing table and asked to read it.
 #[async_trait]
 pub trait Proxying: Send + Sync {
-    /// Serve `table` in place of the table it serves now.
+    /// Serve `table` in place of the table it serves now, saying whether it serves it at
+    /// once or once it restarts.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] where it is unreachable or refuses the table.
-    async fn apply(&self, table: &Routing) -> Result<(), Failure>;
+    async fn apply(&self, table: &Routing) -> Result<Applied, Failure>;
 
     /// The table it serves now.
     ///
@@ -65,10 +66,10 @@ pub trait Proxying: Send + Sync {
     /// Returns [`Failure`] where it is unreachable or answers unreadably.
     async fn routing(&self) -> Result<Routing, Failure>;
 
-    /// Read the table applied, so it answers by it.
+    /// Read the table applied, so it answers by it, at once or once it restarts.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] where it is unreachable or cannot read the table.
-    async fn reload(&self) -> Result<(), Failure>;
+    async fn reload(&self) -> Result<Applied, Failure>;
 }

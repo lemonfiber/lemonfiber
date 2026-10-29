@@ -208,7 +208,12 @@ async fn a_server_serving_it_only_once_it_restarts_is_started_again_and_waited_f
     let runner = ran(0);
     let (ctx, _) = machine("encrypting-restart", http.clone(), runner.clone());
     let wiring = seed_internal_tls(&ctx, server(&ctx).as_ref()).await;
-    assert_eq!(wiring.map(|one| one.state), Some(State::Wired));
+    assert_eq!(
+        wiring.map(|one| one.state),
+        Some(State::Restarted {
+            service: "jellyfin".to_owned()
+        })
+    );
     let restarted: Vec<Vec<String>> = runner
         .seen()
         .into_iter()

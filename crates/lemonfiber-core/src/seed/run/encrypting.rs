@@ -11,8 +11,6 @@ use lemonfiber_contract::capabilities::media::serve;
 
 use crate::ports::service::Applied;
 use crate::seed::{State, Wiring};
-use crate::stack::closure::Plan;
-use crate::stack::compose::{build, Action};
 
 /// What the report calls this connection.
 pub(super) fn connection(server: &MediaServer) -> String {
@@ -117,6 +115,11 @@ fn in_force(ctx: &Ctx, server: &MediaServer) -> Result<String, String> {
         .map_err(|unkept| unkept.to_string())
 }
 
+/// The media server's own service started again, journalled first.
+async fn restarted(ctx: &Ctx, server: &MediaServer) -> Result<(), String> {
+    super::restarting::restart(ctx, server.id()).await
+}
+
 /// What telling `client` to serve the certificate at `path` with the SHA-256 `pin` comes to,
 /// asking the media server nothing else until it says it is ready again where it had to
 /// start again.
@@ -133,7 +136,9 @@ pub(super) async fn served(
                 let _ = crate::patience::RESTART
                     .until(|| server.ready(ctx), |ready| *ready)
                     .await;
-                State::Wired
+                State::Restarted {
+                    service: server.id().to_owned(),
+                }
             }
             Err(why) => State::Failed {
                 detail: format!(
@@ -144,43 +149,6 @@ pub(super) async fn served(
             },
         },
         Err(failure) => super::super::report::unreached(&failure),
-    }
-}
-
-/// Start the media server's own service again, so it serves what it was told to.
-async fn restarted(ctx: &Ctx, server: &MediaServer) -> Result<(), String> {
-    let id = server.id();
-    let (profile, stack) = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .ok()
-        .zip(crate::app::plugins::read(ctx).ok())
-        .and_then(|(manifest, register)| {
-            crate::project::profile_of(&manifest, register.installed(), id)
-        })
-        .zip(crate::app::targets::project_directory(
-            &ctx.stack,
-            ctx.settings.stack_dir.as_deref(),
-        ))
-        .ok_or_else(|| format!("{id} is not a service of the stack written to disk"))?;
-    crate::app::project::unlinked(ctx).map_err(|refused| refused.summary)?;
-    let command = build(
-        &Plan::one(id, &profile),
-        &ctx.settings,
-        &stack,
-        &Action::Restart(vec![id.to_owned()]),
-        ctx.environment,
-    );
-    let ran = ctx
-        .seams
-        .runner
-        .run(&command)
-        .await
-        .map_err(|failure| failure.to_string())?;
-    if ran.succeeded() {
-        Ok(())
-    } else {
-        Err(crate::text::plain(ran.stderr.trim()))
     }
 }
 

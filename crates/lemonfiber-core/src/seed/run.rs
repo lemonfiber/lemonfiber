@@ -51,6 +51,7 @@ pub(crate) mod tokens;
 use fulfilment::{fulfilling, seed_fulfilment_targets};
 pub(crate) mod identity;
 mod reset;
+mod restarting;
 mod withholding;
 
 use applications::{seed_applications, skipped};

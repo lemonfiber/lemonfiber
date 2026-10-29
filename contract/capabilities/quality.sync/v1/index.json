@@ -7,7 +7,7 @@
     },
     {
       "path": "quality.sync/v1/operations/apply.json",
-      "sha256": "e4f4efa462ffa266a467607b1293203e32161fc05e82445921222cceceb68f14"
+      "sha256": "639c6dcafc5fe83b06d471d967e93dd7dcb64925079902b9bd0a8152126142ba"
     },
     {
       "path": "quality.sync/v1/operations/applied.json",

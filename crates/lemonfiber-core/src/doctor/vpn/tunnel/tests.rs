@@ -63,3 +63,11 @@ async fn a_guard_never_asked_to_forward_forwards_none() {
     );
     assert_eq!(unasked.forwarded().await.ok(), Some(None));
 }
+
+#[tokio::test]
+async fn the_stacks_own_guard_holds_its_control_server_already() {
+    assert_eq!(
+        guard(a_guard_forwarding(None)).secure().await.ok(),
+        Some(crate::ports::service::Applied::Now)
+    );
+}

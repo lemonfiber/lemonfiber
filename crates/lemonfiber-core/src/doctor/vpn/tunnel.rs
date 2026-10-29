@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::ports::docker::{Engine, Health, Lifecycle};
-use crate::ports::service::{Failure, Tunnelling};
+use crate::ports::service::{Applied, Failure, Tunnelling};
 
 use super::port_forward::Grant;
 use super::probe::{find, read_grant};
@@ -50,6 +50,10 @@ impl Tunnelling for Gluetun {
 
     async fn forwarded(&self) -> Result<Option<u16>, Failure> {
         forwarded(self).await
+    }
+
+    async fn secure(&self) -> Result<Applied, Failure> {
+        Ok(Applied::Now)
     }
 }
 

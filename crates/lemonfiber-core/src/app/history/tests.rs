@@ -359,3 +359,13 @@ fn a_part_started_or_stopped_reads_as_its_service() {
     assert_eq!(did(&ran(true)), "started prowlarr");
     assert_eq!(did(&ran(false)), "stopped prowlarr");
 }
+
+#[test]
+fn a_restart_reads_as_its_service() {
+    assert_eq!(
+        did(&crate::journal::Kind::Restarted {
+            service: "recyclarr".to_owned(),
+        }),
+        "restarted recyclarr"
+    );
+}

@@ -14,6 +14,12 @@ use serde::Serialize;
 pub enum State {
     /// Written and read back.
     Wired,
+    /// Written, and in force once `service` started again, as the adapter that took it
+    /// answered.
+    Restarted {
+        /// The service started again.
+        service: String,
+    },
     /// Present and correct; nothing was done.
     AlreadyWired,
     /// Present but operator-changed; preserved.

@@ -232,3 +232,16 @@ fn a_pass_with_work_left_names_the_command_and_explains_no_seeding() {
     .text();
     assert!(!told.contains("seed —"), "{told}");
 }
+
+#[test]
+fn a_connection_taken_up_by_a_restart_says_what_restarted() {
+    let report = seed_report(vec![wiring(
+        "a",
+        SeedState::Restarted {
+            service: "recyclarr".to_owned(),
+        },
+    )]);
+    assert!(seeding(&report)
+        .text()
+        .contains("wired, recyclarr restarted to take it up"));
+}

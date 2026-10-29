@@ -2,7 +2,7 @@
 //! process and through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Failure, Tunnelling};
+use lemonfiber_ports::service::{Applied, Failure, Tunnelling};
 
 use super::{crosses_alike, egress, Upstream};
 
@@ -16,6 +16,10 @@ impl Tunnelling for Upstream {
         self.tell("forwarded".to_owned());
         Ok(Some(51413))
     }
+    async fn secure(&self) -> Result<Applied, Failure> {
+        self.tell("secure".to_owned());
+        Ok(Applied::OnRestart)
+    }
 }
 
 /// Every operation of the capability, each answer written down.
@@ -23,12 +27,13 @@ async fn script<T: Tunnelling>(guard: &T) -> Vec<String> {
     vec![
         format!("{:?}", guard.up().await),
         format!("{:?}", guard.forwarded().await),
+        format!("{:?}", guard.secure().await),
     ]
 }
 
 #[tokio::test]
 async fn an_egress_guard_answers_through_its_contract_as_it_does_in_process() {
-    crosses_alike!(script, egress::Adapter, ["up", "forwarded"]);
+    crosses_alike!(script, egress::Adapter, ["up", "forwarded", "secure"]);
 }
 
 /// An egress guard that cannot be reached.
@@ -44,6 +49,9 @@ impl Tunnelling for Unreached {
     async fn forwarded(&self) -> Result<Option<u16>, Failure> {
         Ok(None)
     }
+    async fn secure(&self) -> Result<Applied, Failure> {
+        Ok(Applied::OnRestart)
+    }
 }
 
 #[tokio::test]
@@ -58,6 +66,10 @@ async fn an_egress_guard_is_served_its_answers_its_failures_and_nothing_else() {
     assert_eq!(
         egress::dispatch(&Unreached, "forwarded", b"{}").await.ok(),
         Some(crate::wire::Answer::Json(b"null".to_vec()))
+    );
+    assert_eq!(
+        egress::dispatch(&Unreached, "secure", b"{}").await.ok(),
+        Some(crate::wire::Answer::Reset)
     );
     assert_eq!(
         refused(egress::dispatch(&Unreached, "forwarded", b"not a request").await),
