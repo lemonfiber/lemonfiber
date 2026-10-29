@@ -389,6 +389,7 @@ async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCod
         random: &lemonfiber_adapters::Os,
         taking: &taking,
         confined: &lemonfiber_adapters::Disk,
+        runner: &lemonfiber_adapters::Local,
     };
     let answered = authoring::published(read, json, &asking, recorder).await;
     if let Some(fault) = answered.fault {

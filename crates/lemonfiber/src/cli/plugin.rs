@@ -313,6 +313,13 @@ pub enum Authoring {
     /// keeps the note already written in it, and a conformance recording no case asks is
     /// removed. A run's recording that the run does not reproduce byte for byte is refused
     /// and left as it was, and exits non-zero. No image is pulled.
+    ///
+    /// Where the plugin ships `posture/prepare`, it is run on this machine from the
+    /// plugin's directory, with the copy of the starting files of the service whose id is
+    /// the plugin's as its one argument, before each container of that service starts, and
+    /// within 30 seconds; whatever the recording writes into the copy itself takes the
+    /// place of what it left. A script that fails stops that service, naming it. No other
+    /// command runs a program a plugin ships.
     Record {
         /// The plugin's source: its directory, or the `plugin.toml` inside it.
         path: PathBuf,

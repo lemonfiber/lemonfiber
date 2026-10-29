@@ -275,6 +275,8 @@ Take every recording the manifest names again, from its pins, and write each.
 
 A run is run as an install runs it: a new container from the pinned image, with no network, under the service's posture, user and memory limit, with a throwaway copy of its starting files, bounded in time and in what is read. A request is asked of one fresh container of its service after its first run, and each conformance case of an adapter of the plugin asked of that adapter in front of it. Each recording keeps the note already written in it, and a conformance recording no case asks is removed. A run's recording that the run does not reproduce byte for byte is refused and left as it was, and exits non-zero. No image is pulled.
 
+Where the plugin ships `posture/prepare`, it is run on this machine from the plugin's directory, with the copy of the starting files of the service whose id is the plugin's as its one argument, before each container of that service starts, and within 30 seconds; whatever the recording writes into the copy itself takes the place of what it left. A script that fails stops that service, naming it. No other command runs a program a plugin ships.
+
 Usage: lemonfiber plugin record [OPTIONS] <PATH>
 
 Arguments:

@@ -11,6 +11,7 @@ use lemonfiber_contract::adapter::KEY_FILE;
 
 use super::super::stood_in::{StandIns, STAND_INS};
 use super::{refused, Faulted, Fronting, Placed, Recorder, Starting, Throwaway};
+use crate::plugin::program::{Preparing, PREPARE};
 use crate::ports::random::Random;
 
 /// What both containers are given before either starts.
@@ -114,12 +115,13 @@ impl Prepared {
     }
 
     /// Both copies and the adapter's key, or why one could not be made.
-    pub(super) fn of(
+    pub(super) async fn of(
         recorder: Recorder<'_>,
         root: &Path,
         upstream: &Placed,
         adapter: Fronting<'_>,
         declared: &[Secret],
+        preparing: Option<Preparing<'_>>,
     ) -> Result<Self, Faulted> {
         let mut stand_ins = StandIns::of(declared, recorder.random).map_err(refused(STAND_INS))?;
         let stood = stand_ins
@@ -133,6 +135,9 @@ impl Prepared {
             recorder.random,
         )
         .map_err(refused("starting files"))?;
+        if let Some(preparing) = preparing {
+            preparing.prepared(&copy).await.map_err(refused(PREPARE))?;
+        }
         let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
         let fingerprint = super::super::served::certified(upstream, &copy, recorder.confined)
             .map_err(refused("certificate"))?;

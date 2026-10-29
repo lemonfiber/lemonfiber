@@ -132,6 +132,7 @@ pub(super) async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>) -> O
             random: &FixedRandom(Some(vec![7; 32])),
             taking: &crate::plugin::Retaking::default(),
             confined: &lemonfiber_adapters::Disk,
+            runner: &lemonfiber_fixtures::ports::Idle,
         },
     )
     .await

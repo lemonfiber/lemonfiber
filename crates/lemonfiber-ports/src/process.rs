@@ -5,6 +5,8 @@
 //! Construction of the argument vector is pure and lives elsewhere; this port
 //! only executes what it is handed.
 
+use std::path::Path;
+
 use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -113,6 +115,21 @@ pub trait Runner: Send + Sync {
     /// As [`Self::run`].
     async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
         let _ = env;
+        self.run(argv).await
+    }
+
+    /// Run `argv` from the directory `dir`, and wait for it to finish.
+    ///
+    /// For a program that reads the files it was shipped beside. The default runs `argv`
+    /// as [`Self::run`] does, from wherever this process is, which is the whole of what a
+    /// stand-in that starts no process can do; the implementation that starts a real one
+    /// overrides it to start the program in `dir`.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::run`].
+    async fn run_from(&self, argv: &[String], dir: &Path) -> Result<Output, Failure> {
+        let _ = dir;
         self.run(argv).await
     }
 

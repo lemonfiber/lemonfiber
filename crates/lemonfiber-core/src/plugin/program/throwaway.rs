@@ -22,7 +22,7 @@ static COUNTED: AtomicU64 = AtomicU64::new(0);
 
 /// Whether a directory is there, reached from a root through no link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Reached {
+pub(super) enum Reached {
     /// It is there, every step to it a directory of its own.
     There,
     /// A step to it is not there.
@@ -414,7 +414,7 @@ pub(crate) fn unlinked<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Resul
 
 /// Whether the directory `top` is there, every step to it from `root` a directory of its
 /// own; refused in `refusals`' words where one is a link or anything else.
-fn linkless(root: &Path, top: &Path, refusals: &Refusals) -> Result<Reached, String> {
+pub(super) fn linkless(root: &Path, top: &Path, refusals: &Refusals) -> Result<Reached, String> {
     let mut here = root.to_path_buf();
     for step in top.strip_prefix(root).unwrap_or(top).components() {
         here.push(step);
@@ -448,11 +448,11 @@ fn unlooked(at: &Path, why: &std::io::Error) -> String {
 }
 
 /// What a walk from a root says where a step is not a directory or cannot be looked at.
-struct Refusals {
+pub(super) struct Refusals {
     /// Where a step is a link or anything else but a directory.
-    unkind: fn(&str) -> String,
+    pub(super) unkind: fn(&str) -> String,
     /// Where a step cannot be looked at.
-    unread: fn(&Path, &std::io::Error) -> String,
+    pub(super) unread: fn(&Path, &std::io::Error) -> String,
 }
 
 /// A walk through the starting files.

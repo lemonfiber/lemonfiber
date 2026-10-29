@@ -1,5 +1,6 @@
 //! Running programs on this machine.
 
+use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -29,11 +30,15 @@ pub struct Local;
 #[async_trait]
 impl Runner for Local {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        ran(argv, &[]).await
+        ran(argv, &[], None).await
     }
 
     async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
-        ran(argv, env).await
+        ran(argv, env, None).await
+    }
+
+    async fn run_from(&self, argv: &[String], dir: &Path) -> Result<Output, Failure> {
+        ran(argv, &[], Some(dir)).await
     }
 
     async fn stream(
@@ -44,15 +49,19 @@ impl Runner for Local {
     }
 }
 
-/// Spawn the program with these variables set and wait for it, or say why it could
-/// not be spawned.
+/// Spawn the program with these variables set, in `dir` where one is given, and wait
+/// for it, or say why it could not be spawned.
 ///
 /// The child is killed if this is dropped before it ends — work ended part-way
 /// takes the program it was running with it rather than leaving it to finish on
 /// its own — and when it outlasts [`RUN_WITHIN`]. Either way what it had written is
 /// kept, and a program stopped this way has no exit status, which is what every
 /// caller already reads as a run that did not succeed.
-async fn ran(argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
+async fn ran(
+    argv: &[String],
+    env: &[(String, String)],
+    dir: Option<&Path>,
+) -> Result<Output, Failure> {
     let Some((program, arguments)) = argv.split_first() else {
         return Err(Failure::Unusable {
             program: String::new(),
@@ -60,7 +69,11 @@ async fn ran(argv: &[String], env: &[(String, String)]) -> Result<Output, Failur
         });
     };
 
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    if let Some(dir) = dir {
+        command.current_dir(dir);
+    }
+    let mut child = command
         .args(arguments)
         .envs(env.iter().map(|(name, value)| (name, value)))
         .stdin(Stdio::null())

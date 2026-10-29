@@ -35,6 +35,7 @@ async fn built(at: &Path, program: &dyn Program, serving: &Serves) -> Option<Rec
                 ..Retaking::default()
             },
             confined: &lemonfiber_adapters::Disk,
+            runner: &lemonfiber_fixtures::ports::Idle,
         },
     )
     .await

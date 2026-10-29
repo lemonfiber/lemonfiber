@@ -29,8 +29,10 @@ use serde::Serialize;
 
 use super::claimed::{sourced, Unreadable};
 use super::installed::{Installed, Placed};
+use super::program::Preparing;
 use crate::doctor::BUNDLED_CHECKS;
 use crate::ports::http::Http;
+use crate::ports::process::Runner;
 use crate::ports::program::Program;
 use crate::ports::random::Random;
 use crate::ports::serving::Serving;
@@ -76,6 +78,22 @@ pub struct Recorder<'a> {
     pub taking: &'a Retaking,
     /// Writes into the throwaway copies a service's container is handed, through no link.
     pub confined: &'a dyn crate::ports::filesystem::Confined,
+    /// Runs the plugin's `posture/prepare` on this machine.
+    pub runner: &'a dyn Runner,
+}
+
+impl<'a> Recorder<'a> {
+    /// What runs the `posture/prepare` of the plugin whose source is at `root` with a copy
+    /// of the starting files of `placed`, where it is the service whose id is `plugin`.
+    fn preparing<'b>(&self, root: &'b Path, plugin: &str, placed: &Placed) -> Option<Preparing<'b>>
+    where
+        'a: 'b,
+    {
+        (placed.service == plugin).then_some(Preparing {
+            runner: self.runner,
+            root,
+        })
+    }
 }
 
 /// What taking one recording came to.

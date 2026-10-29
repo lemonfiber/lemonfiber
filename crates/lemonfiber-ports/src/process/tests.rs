@@ -57,23 +57,24 @@ fn every_failure_says_which_program_it_meant() {
     }
 }
 
+/// A stand-in that starts no process, answering each run with the words it was asked.
+struct Echo;
+
+#[async_trait::async_trait]
+impl super::Runner for Echo {
+    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        Ok(Output {
+            status: Some(0),
+            stdout: argv.join(" "),
+            stderr: String::new(),
+        })
+    }
+}
+
 /// A stand-in that starts no process answers a run with variables as it answers any
 /// run.
 #[tokio::test]
 async fn a_run_with_variables_is_a_run_where_nothing_overrides_it() {
-    struct Echo;
-
-    #[async_trait::async_trait]
-    impl super::Runner for Echo {
-        async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-            Ok(Output {
-                status: Some(0),
-                stdout: argv.join(" "),
-                stderr: String::new(),
-            })
-        }
-    }
-
     let ran = super::Runner::run_with(
         &Echo,
         &["git".to_owned(), "status".to_owned()],
@@ -82,4 +83,18 @@ async fn a_run_with_variables_is_a_run_where_nothing_overrides_it() {
     .await
     .map(|output| output.stdout);
     assert_eq!(ran.ok().as_deref(), Some("git status"));
+}
+
+/// A stand-in that starts no process answers a run from a directory as it answers any
+/// run.
+#[tokio::test]
+async fn a_run_from_a_directory_is_a_run_where_nothing_overrides_it() {
+    let ran = super::Runner::run_from(
+        &Echo,
+        &["posture/prepare".to_owned(), "/tmp/copy".to_owned()],
+        std::path::Path::new("/plugin"),
+    )
+    .await
+    .map(|output| output.stdout);
+    assert_eq!(ran.ok().as_deref(), Some("posture/prepare /tmp/copy"));
 }

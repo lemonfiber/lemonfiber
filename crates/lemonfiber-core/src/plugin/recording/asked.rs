@@ -16,6 +16,7 @@ use super::written::{landing, written};
 use super::{Failed, Recorder, Taken, Took};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::{Installed, Placed};
+use crate::plugin::program::Preparing;
 use crate::plugin::recorded::{Answer, Asked, Of};
 use crate::ports::http::{Http, Response};
 
@@ -141,6 +142,7 @@ pub(super) async fn taken(
             fronting,
             secrets: &manifest.secrets,
             built: recorder.taking.built_for(&manifest.plugin.id, placed),
+            preparing: recorder.preparing(root, &manifest.plugin.id, placed),
         };
         let took = match recorded(root, recorder, ask, &mine).await {
             Ok((written, cases)) => {
@@ -202,17 +204,20 @@ const fn unrecorded(item: &Item<'_>) -> &'static str {
 
 /// One service whose recordings are taken together.
 #[derive(Clone, Copy)]
-struct Service<'a> {
+pub(super) struct Service<'a> {
     /// How installing it places it.
-    placed: &'a Placed,
+    pub(super) placed: &'a Placed,
     /// The health its manifest declares.
-    health: Option<&'a lemonfiber_plugin::Health>,
+    pub(super) health: Option<&'a lemonfiber_plugin::Health>,
     /// The adapter of the plugin that fronts it, where one does.
-    fronting: Option<Fronting<'a>>,
+    pub(super) fronting: Option<Fronting<'a>>,
     /// The secrets the plugin declares.
-    secrets: &'a [Secret],
+    pub(super) secrets: &'a [Secret],
     /// The image it is started from in place of its pin, where one is named for it.
-    built: Option<&'a str>,
+    pub(super) built: Option<&'a str>,
+    /// What runs the plugin's `posture/prepare` with its starting files before it starts,
+    /// where it is the service whose id is the plugin's.
+    pub(super) preparing: Option<Preparing<'a>>,
 }
 
 /// One service's request recordings and the conformance cases of the adapter fronting
@@ -242,31 +247,8 @@ async fn recorded(
         })?;
     }
     let (answered, cases) = match service.fronting {
-        Some(fronting) => {
-            fronted::answers(
-                recorder,
-                root,
-                placed,
-                service.health,
-                fronting,
-                mine,
-                service.secrets,
-            )
-            .await?
-        }
-        None => (
-            answers(
-                recorder,
-                root,
-                placed,
-                service.health,
-                mine,
-                service.secrets,
-                service.built,
-            )
-            .await?,
-            Vec::new(),
-        ),
+        Some(fronting) => fronted::answers(recorder, root, &service, fronting, mine).await?,
+        None => (answers(recorder, root, &service, mine).await?, Vec::new()),
     };
     let pinned = crate::plugin::program::pinned(placed);
     let stood_in = stood_in::named(placed, service.secrets);

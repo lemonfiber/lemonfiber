@@ -13,12 +13,11 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
-use lemonfiber_manifest::container::Secret;
 use lemonfiber_plugin::Health;
 use serde_json::Value;
 
 use super::addressed::Addressed;
-use super::asked::{answered, kept, Item};
+use super::asked::{answered, kept, Item, Service};
 use super::scrubbed::Scrub;
 use super::served::{allowed, answering, healthy, started, LOG_LINES, POLL};
 use super::{Failed, Recorder};
@@ -90,19 +89,26 @@ pub(super) struct Fronting<'a> {
 pub(super) async fn answers(
     recorder: Recorder<'_>,
     root: &Path,
-    upstream: &Placed,
-    health: Option<&Health>,
+    service: &Service<'_>,
     adapter: Fronting<'_>,
     items: &[&Item<'_>],
-    secrets: &[Secret],
 ) -> Result<(Vec<Answer>, Vec<Case>), Failed> {
+    let Service {
+        placed: upstream,
+        health,
+        secrets,
+        preparing,
+        ..
+    } = *service;
     let failing = |fault: Faulted| Failed {
         service: upstream.service.clone(),
         step: fault.step,
         why: crate::text::plain(&fault.why),
         log: Vec::new(),
     };
-    let prepared = Prepared::of(recorder, root, upstream, adapter, secrets).map_err(failing)?;
+    let prepared = Prepared::of(recorder, root, upstream, adapter, secrets, preparing)
+        .await
+        .map_err(failing)?;
     let envelope = enveloping::guards(adapter.placed)
         .then(enveloping::declared)
         .transpose()

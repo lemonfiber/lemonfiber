@@ -6,19 +6,19 @@ use std::time::Duration;
 
 use lemonfiber_contract::capabilities::FOLDER;
 use lemonfiber_contract::Contracted;
-use lemonfiber_manifest::container::{Secret, STREAM_GUARD};
+use lemonfiber_manifest::container::STREAM_GUARD;
 use lemonfiber_plugin::{Health, HealthKind};
 
 use tokio::time::Instant;
 
 use super::addressed::Addressed;
-use super::asked::{answered, Item};
+use super::asked::{answered, Item, Service};
 use super::scrubbed::Scrub;
 use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::Placed;
-use crate::plugin::program::{contained, Contained, Operator, Starting, Throwaway};
+use crate::plugin::program::{contained, Contained, Operator, Starting, Throwaway, PREPARE};
 use crate::plugin::recorded::Answer;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::Failure;
@@ -54,12 +54,17 @@ const MOUNTED: &str = "mount-";
 pub(super) async fn answers(
     recorder: Recorder<'_>,
     root: &Path,
-    placed: &Placed,
-    health: Option<&Health>,
+    service: &Service<'_>,
     items: &[&Item<'_>],
-    secrets: &[Secret],
-    built: Option<&str>,
 ) -> Result<Vec<Answer>, Failed> {
+    let Service {
+        placed,
+        health,
+        secrets,
+        built,
+        preparing,
+        ..
+    } = *service;
     let failing = |step: &'static str| {
         move |why: String| Failed {
             service: placed.service.clone(),
@@ -76,6 +81,9 @@ pub(super) async fn answers(
         recorder.random,
     )
     .map_err(failing("starting files"))?;
+    if let Some(preparing) = preparing {
+        preparing.prepared(&copy).await.map_err(failing(PREPARE))?;
+    }
     let fingerprint =
         certified(placed, &copy, recorder.confined).map_err(failing("certificate"))?;
     let data = library(placed, &copy).map_err(failing("data"))?;

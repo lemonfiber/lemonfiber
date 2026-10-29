@@ -12,6 +12,7 @@ use crate::ports::program::{Program, Unran};
 
 pub(super) mod asking;
 mod building;
+mod preparing;
 mod standing_in;
 
 const PINNED: &str = "ghcr.io/recyclarr/recyclarr@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9";
@@ -65,6 +66,7 @@ async fn ran(
             random: &lemonfiber_fixtures::support::FixedRandom(None),
             taking: &crate::plugin::Retaking::default(),
             confined: &lemonfiber_adapters::Disk,
+            runner: &lemonfiber_fixtures::ports::Idle,
         },
     )
     .await
@@ -334,6 +336,7 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
         random: &chance,
         taking: &crate::plugin::Retaking::default(),
         confined: &lemonfiber_adapters::Disk,
+        runner: &lemonfiber_fixtures::ports::Idle,
     };
     let mut took = Vec::new();
     for running in runs {

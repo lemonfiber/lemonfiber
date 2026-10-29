@@ -181,6 +181,22 @@ async fn a_run_with_variables_sets_each_of_them() {
     assert_eq!(ran.ok().as_deref(), Some("set"));
 }
 
+/// A run from a directory starts the program there.
+#[tokio::test]
+async fn a_run_from_a_directory_starts_there() {
+    let dir = std::env::temp_dir().canonicalize().ok();
+    let ran = match &dir {
+        Some(dir) => Local
+            .run_from(&argv(&["pwd", "-P"]), dir)
+            .await
+            .ok()
+            .map(|output| std::path::PathBuf::from(output.stdout.trim_end())),
+        None => None,
+    };
+    assert!(ran.is_some());
+    assert_eq!(ran, dir);
+}
+
 /// A run given up on takes its child with it, rather than leaving it running.
 #[tokio::test]
 async fn a_run_given_up_on_ends_its_child() {

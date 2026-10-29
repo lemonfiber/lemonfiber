@@ -1,6 +1,7 @@
 //! A proof that runs the image's own program: the container it runs in, settled from the
 //! record of the service it proves, and what the run came to.
 
+mod prepared;
 mod throwaway;
 
 use std::path::Path;
@@ -19,6 +20,7 @@ use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
 use crate::ports::program::{Configuration, Ended, Program, Run, Unran};
 use crate::project::entry::{configuration, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY};
 
+pub(crate) use prepared::{Preparing, PREPARE};
 pub(crate) use throwaway::{
     digest as starting_digest, held as shipped, keep, unlinked, Starting, Throwaway,
 };
@@ -215,6 +217,7 @@ pub(crate) async fn performed(
             run,
             operator,
             starting,
+            preparing: None,
         },
         random,
     )
@@ -229,6 +232,9 @@ pub(crate) struct Asking<'a> {
     pub(crate) operator: &'a Operator,
     /// Where its starting files are copied from, where it has any.
     pub(crate) starting: Option<Starting<'a>>,
+    /// What runs the plugin's `posture/prepare` with the copy before the run, where a
+    /// recording runs it.
+    pub(crate) preparing: Option<Preparing<'a>>,
 }
 
 /// Run a run for the service `placed` records, from `image`, with a throwaway copy of
@@ -244,11 +250,17 @@ pub(crate) async fn performed_from(
         run,
         operator,
         starting,
+        preparing,
     } = asking;
     let copy = match throwaway::Throwaway::of(starting, random) {
         Ok(copy) => copy,
         Err(why) => return Came::Unproven(why),
     };
+    if let Some(preparing) = preparing {
+        if let Err(why) = preparing.prepared(&copy).await {
+            return Came::Unproven(why);
+        }
+    }
     let asked = settled(placed, image, run, operator, Some(copy.path()));
     match program.run(&asked).await {
         Ok(ran) => match ran.ended {
