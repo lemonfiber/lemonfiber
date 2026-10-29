@@ -8,6 +8,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::ports::random::Random;
 use crate::project::entry::CONFIGURATION_TREE;
 
+mod modes;
+
+use modes::{opened, owner_only};
+
 /// The most starting files one service may ship.
 pub(crate) const MOST_FILES: usize = 64;
 
@@ -319,39 +323,9 @@ fn unmade(at: &Path, why: &std::io::Error) -> String {
     )
 }
 
-/// A file created new, never through a link, readable and writable by its owner alone.
-#[cfg(unix)]
-fn owner_only() -> std::fs::OpenOptions {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    let mut options = std::fs::File::options();
-    options.write(true).create_new(true).mode(0o600);
-    options
-}
-
-/// A file created new, where the platform keeps no mode.
-#[cfg(not(unix))]
-fn owner_only() -> std::fs::OpenOptions {
-    let mut options = std::fs::File::options();
-    options.write(true).create_new(true);
-    options
-}
-
-/// `at` given `mode`, where the platform keeps one.
-#[cfg(unix)]
-fn opened(at: &Path, mode: u32) -> std::io::Result<()> {
-    use std::os::unix::fs::PermissionsExt as _;
-    std::fs::set_permissions(at, std::fs::Permissions::from_mode(mode))
-}
-
 /// `at` given `mode`, or why it could not be, as a copy that could not be made says it.
 fn reopened(at: &Path, mode: u32) -> Result<(), String> {
     opened(at, mode).map_err(|why| unmade(at, &why))
-}
-
-/// Nothing, where the platform keeps no mode.
-#[cfg(not(unix))]
-fn opened(_at: &Path, _mode: u32) -> std::io::Result<()> {
-    Ok(())
 }
 
 /// Every file of a service's starting files, with its path beneath their directory,
