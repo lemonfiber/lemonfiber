@@ -352,6 +352,14 @@
             {"type": "null"}
           ]
         },
+        "certificate": {
+          "description": "The certificate lemonfiber makes for it before it first starts.",
+          "anyOf": [
+            {"$ref": "#/$defs/ServiceCertificate"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
         "claim": {
           "description": "The evidence for what [`Self::provides`] names: one claim per capability, each\nbinding the capability's probes to requests on this service and to recordings.\n\nKept as the tables the stack wrote rather than read here. A claim is the plugin\ncontract's shape and that contract's reader is what holds it, so a bundled\nservice and a plugin standing in for it meet one set of binding rules; a second\nreader here would be a second answer to what a claim may say, and this crate\ncannot reach the first, which reads this one.",
           "type": "array",
@@ -521,6 +529,21 @@
       },
       "additionalProperties": false,
       "required": ["id", "name", "profile", "image", "tag", "criticality", "license", "upstream", "last_release", "describes", "without_it"]
+    },
+    "ServiceCertificate": {
+      "description": "The certificate lemonfiber makes for a service before it first starts.",
+      "type": "object",
+      "properties": {
+        "certificate": {"description": "Where the certificate is written, relative to the configuration directory.", "type": "string"},
+        "key": {"description": "Where its private key is written, relative to the configuration directory.", "type": "string"},
+        "names": {
+          "description": "The host names it is made out to.",
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false,
+      "required": ["key", "certificate", "names"]
     },
     "ServiceConstant": {
       "description": "A value written exactly as declared.",

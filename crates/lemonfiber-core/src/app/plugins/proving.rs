@@ -465,9 +465,12 @@ pub(super) async fn running(
     let came = crate::plugin::program::performed(
         ctx.seams.program.as_ref(),
         placed,
-        run,
-        &crate::plugin::program::Operator::of(ctx),
-        Some(starting),
+        crate::plugin::program::Asking {
+            run,
+            operator: &crate::plugin::program::Operator::of(ctx),
+            starting: Some(starting),
+            confined: ctx.seams.confined.as_ref(),
+        },
         ctx.seams.random.as_ref(),
     )
     .await;

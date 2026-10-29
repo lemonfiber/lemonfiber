@@ -303,3 +303,39 @@ fn the_shapes_a_manifest_declares_are_read_beside_it_and_a_key_is_the_default() 
     assert_eq!(shape_of(&read, "never-declared"), Minted::Key);
     assert!(shapes(Path::new("/lemonfiber/no/such/plugin")).is_empty());
 }
+
+#[test]
+fn a_starting_file_where_a_declared_certificate_is_written_is_refused() {
+    let declaring = crate::plugin::program::tests::RUNNING.replace(
+        "user_mode     = \"uid\"\n",
+        "user_mode     = \"uid\"\ncertificate   = { key = \"tls/key.pem\", certificate = \"tls/certificate.pem\", names = [\"qualitysync\"] }\n",
+    );
+    let manifest = lemonfiber_plugin::Manifest::from_toml(&declaring);
+    assert!(manifest.is_ok(), "{manifest:?}");
+    let shipped = |service: &str, path: &str| Shipped {
+        service: service.to_owned(),
+        path: path.to_owned(),
+        bytes: b"x".to_vec(),
+    };
+    let said = manifest
+        .map(|manifest| {
+            super::covered(
+                &manifest,
+                &[
+                    shipped("qualitysync", "tls/key.pem"),
+                    shipped("qualitysync", "recyclarr.yml"),
+                    shipped("other", "tls/certificate.pem"),
+                ],
+            )
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        said.iter()
+            .map(|one| (one.location.as_str(), one.message.as_str()))
+            .collect::<Vec<_>>(),
+        vec![(
+            "service qualitysync.certificate",
+            "tls/key.pem is a starting file, where lemonfiber writes the certificate it declares"
+        )]
+    );
+}

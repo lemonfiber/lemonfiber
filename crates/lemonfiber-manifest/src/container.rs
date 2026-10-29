@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::validate::{GATEWAY_GRANT, TUNNEL_DEVICE};
 
+mod certified;
 pub mod choices;
 pub mod earlier;
 mod paths;
@@ -15,6 +16,7 @@ mod record;
 mod values;
 mod words;
 
+pub use certified::{Certificate, MOST_NAMES};
 use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside};
 pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
@@ -262,6 +264,8 @@ pub struct Container<'a> {
     pub network: Option<&'a Network>,
     /// Its privileged shape.
     pub shape: Option<Shape>,
+    /// The certificate lemonfiber makes for it, where it declares one.
+    pub certificate: Option<&'a Certificate>,
     /// The capabilities it provides.
     pub provides: &'a [String],
     /// Whether it speaks a capability contract.
@@ -362,6 +366,14 @@ impl Container<'_> {
                 ));
             }
             self.landed(at, path, &mut targets, found);
+        }
+        if let Some(certificate) = self.certificate {
+            found.extend(
+                certificate
+                    .broken(self.provides)
+                    .into_iter()
+                    .map(|wrong| (self.at("certificate"), wrong)),
+            );
         }
         for path in self.rebuilt {
             if !is_source(path) {

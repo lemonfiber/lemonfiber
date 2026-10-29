@@ -12,7 +12,9 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Reported, Verdict};
 use crate::error::codes::plugin::PROOF_RUN_FAILED;
 use crate::error::{Problem, Remedy, State};
-use crate::plugin::program::{limit, performed, starting_digest, verdict, Operator, Starting};
+use crate::plugin::program::{
+    limit, performed, starting_digest, verdict, Asking, Operator, Starting,
+};
 use crate::plugin::{Installed, Placed, RunProof};
 use crate::ports::program::Program;
 
@@ -40,6 +42,8 @@ pub(crate) struct Running {
     pub(crate) now: String,
     /// Where the values minted for a run's throwaway starting files come from.
     pub(crate) random: Arc<dyn crate::ports::random::Random>,
+    /// Writes the certificate a service serves with into a run's throwaway copy.
+    pub(crate) confined: Arc<dyn crate::ports::filesystem::Confined>,
 }
 
 /// A check for every run proof `installed` declares.
@@ -165,9 +169,12 @@ impl Proved {
         let came = performed(
             self.running.program.as_ref(),
             &self.placed,
-            &self.proof.run,
-            &self.running.operator,
-            starting,
+            Asking {
+                run: &self.proof.run,
+                operator: &self.running.operator,
+                starting,
+                confined: self.running.confined.as_ref(),
+            },
             self.running.random.as_ref(),
         )
         .await;

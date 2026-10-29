@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use lemonfiber_contract::capabilities::FOLDER;
 use lemonfiber_contract::Contracted;
-use lemonfiber_manifest::container::{Secret, STREAM_GUARD};
+use lemonfiber_manifest::container::Secret;
 use lemonfiber_plugin::{Health, HealthKind};
 
 use tokio::time::Instant;
@@ -18,7 +18,7 @@ use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::Placed;
-use crate::plugin::program::{contained, Contained, Operator, Starting, Throwaway};
+use crate::plugin::program::{certified, contained, Contained, Operator, Starting, Throwaway};
 use crate::plugin::recorded::Answer;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::Failure;
@@ -140,26 +140,6 @@ pub(in crate::plugin) async fn started(
         Some(served) => serving.beside(served, serve).await,
     }
     .map_err(|unran| unran.to_string())
-}
-
-/// A throwaway certificate and its key written into `copy` as the core writes them for a
-/// filler of a capability it hands a certificate, and readable by whoever that filler runs
-/// as, where `placed` provides one, with the fingerprint the certificate is answered by,
-/// which the run made; nothing otherwise.
-pub(super) fn certified(
-    placed: &Placed,
-    copy: &Throwaway,
-    confined: &dyn crate::ports::filesystem::Confined,
-) -> Result<Option<String>, String> {
-    if !placed.provides.iter().any(|name| name == STREAM_GUARD) {
-        return Ok(None);
-    }
-    let kept =
-        crate::certificate::replaced(confined, copy.path()).map_err(|unkept| unkept.to_string())?;
-    crate::certificate::FILES
-        .iter()
-        .try_for_each(|named| copy.readable(named))?;
-    Ok(Some(kept.fingerprint))
 }
 
 /// A throwaway internal certificate made out to `upstream` and written into its `copy` as

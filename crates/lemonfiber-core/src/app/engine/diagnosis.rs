@@ -69,6 +69,7 @@ fn running(ctx: &Ctx, stack: &Stack) -> Vec<Box<dyn Check>> {
         kept: crate::app::targets::beside_env(ctx, crate::config::paths::RUN_VERDICTS),
         now: ctx.stamp(),
         random: Arc::clone(&ctx.seams.random),
+        confined: Arc::clone(&ctx.seams.confined),
     };
     stack
         .installed

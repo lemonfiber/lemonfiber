@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "certificate": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "key": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "names": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

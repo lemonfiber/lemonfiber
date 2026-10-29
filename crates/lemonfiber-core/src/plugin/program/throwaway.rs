@@ -185,10 +185,16 @@ impl Throwaway {
             .map_err(|why| unmade(&at, &why))
     }
 
-    /// The file `named` directly beneath the copy made readable by whoever the service runs
-    /// as, which the copy's owner-only directory keeps from anybody else on the machine.
+    /// The file `named` beneath the copy, and each directory between, made readable by
+    /// whoever the service runs as, which the copy's owner-only directory keeps from anybody
+    /// else on the machine.
     pub(crate) fn readable(&self, named: &str) -> Result<(), String> {
         let at = self.copy.join(named);
+        let mut between = at.parent();
+        while let Some(directory) = between.filter(|directory| *directory != self.copy) {
+            opened(directory, 0o755).map_err(|why| unmade(directory, &why))?;
+            between = directory.parent();
+        }
         opened(&at, 0o644).map_err(|why| unmade(&at, &why))
     }
 

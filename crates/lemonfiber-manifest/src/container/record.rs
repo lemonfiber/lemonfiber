@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Mount, Network, Posture, Publish, UserMode, Value};
+use super::{Certificate, Mount, Network, Posture, Publish, UserMode, Value};
 
 /// The container fields an install record keeps for a service, beyond those every
 /// record already holds.
@@ -45,6 +45,9 @@ pub struct Fields {
     /// The network it runs inside.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
+    /// The certificate lemonfiber makes for it, where it declares one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate: Option<Certificate>,
 }
 
 impl Fields {

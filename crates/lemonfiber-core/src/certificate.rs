@@ -20,8 +20,11 @@ use std::path::Path;
 
 use base64::Engine as _;
 
+use lemonfiber_manifest::container::Certificate;
+
 use crate::ports::filesystem::{Confined, Readable};
 
+pub mod declared;
 pub mod internal;
 
 /// The certificate, as it is written down.
@@ -29,9 +32,6 @@ const CERTIFICATE: &str = "certificate.pem";
 
 /// The private key it was made with, readable by its owner alone.
 const KEY: &str = "key.pem";
-
-/// Every file a certificate and its key are written down in.
-pub(crate) const FILES: [&str; 2] = [KEY, CERTIFICATE];
 
 /// The label a PEM block holding a certificate carries.
 const CERTIFIED: &str = "CERTIFICATE";
@@ -76,13 +76,15 @@ impl Kept {
         (self.certificate.clone(), self.key.clone())
     }
 
-    /// A certificate and key as they were written down, or why they are not one.
-    fn read(certificate: &str, key: &str) -> Result<Self, Unkept> {
-        let certificate = der(certificate, CERTIFIED)
-            .ok_or_else(|| Unkept::Unreadable(format!("{CERTIFICATE} is not a certificate")))?;
+    /// A certificate and key as they were written down where `laid` says, or why they are
+    /// not one.
+    fn read(certificate: &str, key: &str, laid: &Certificate) -> Result<Self, Unkept> {
+        let certificate = der(certificate, CERTIFIED).ok_or_else(|| {
+            Unkept::Unreadable(format!("{} is not a certificate", laid.certificate))
+        })?;
         let key = der(key, PRIVATE_KEY)
             .and_then(|bytes| rcgen::KeyPair::try_from(bytes).ok())
-            .ok_or_else(|| Unkept::Unreadable(format!("{KEY} is not a private key")))?
+            .ok_or_else(|| Unkept::Unreadable(format!("{} is not a private key", laid.key)))?
             .serialize_der();
         Ok(Self {
             fingerprint: fingerprint(&certificate),
@@ -130,6 +132,16 @@ pub enum Unkept {
     Unmade(String),
 }
 
+/// Where this machine's own certificates and their keys are written in their directory,
+/// and the one name each is made out to.
+pub(crate) fn own() -> Certificate {
+    Certificate {
+        key: KEY.to_owned(),
+        certificate: CERTIFICATE.to_owned(),
+        names: vec![NAMED.to_owned()],
+    }
+}
+
 /// What a phone pins for a certificate: SHA-256 over its DER encoding, lower-case hex.
 #[must_use]
 pub fn fingerprint(der: &[u8]) -> String {
@@ -145,6 +157,16 @@ pub fn fingerprint(der: &[u8]) -> String {
 /// could not be read is every paired phone refusing this machine for a reason nobody
 /// was told.
 pub fn kept(confined: &dyn Confined, directory: &Path) -> Result<Option<Kept>, Unkept> {
+    kept_as(confined, directory, &own())
+}
+
+/// The certificate kept in `directory` where `laid` says, or nothing where none has been
+/// made; refused as [`kept`] refuses.
+fn kept_as(
+    confined: &dyn Confined,
+    directory: &Path,
+    laid: &Certificate,
+) -> Result<Option<Kept>, Unkept> {
     let read = |name: &str| -> Result<Option<String>, Unkept> {
         confined
             .bytes(&directory.join(name), directory)
@@ -157,12 +179,13 @@ pub fn kept(confined: &dyn Confined, directory: &Path) -> Result<Option<Kept>, U
             })
             .transpose()
     };
-    match (read(CERTIFICATE)?, read(KEY)?) {
+    match (read(&laid.certificate)?, read(&laid.key)?) {
         (None, None) => Ok(None),
-        (Some(certificate), Some(key)) => Kept::read(&certificate, &key).map(Some),
+        (Some(certificate), Some(key)) => Kept::read(&certificate, &key, laid).map(Some),
         _ => Err(Unkept::Unreadable(format!(
-            "only one of {CERTIFICATE} and {KEY} is there, and a certificate is presented with \
-             the key it was made with"
+            "only one of {} and {} is there, and a certificate is presented with the key it \
+             was made with",
+            laid.certificate, laid.key
         ))),
     }
 }
@@ -175,7 +198,7 @@ pub fn kept(confined: &dyn Confined, directory: &Path) -> Result<Option<Kept>, U
 pub fn kept_or_made(confined: &dyn Confined, directory: &Path) -> Result<Kept, Unkept> {
     match kept(confined, directory)? {
         Some(held) => Ok(held),
-        None => made(confined, directory),
+        None => made(confined, directory, &own(), Readable::Owner),
     }
 }
 
@@ -188,34 +211,35 @@ pub fn kept_or_made(confined: &dyn Confined, directory: &Path) -> Result<Kept, U
 ///
 /// [`Unkept::Unmade`] where a certificate could not be made or written down.
 pub fn replaced(confined: &dyn Confined, directory: &Path) -> Result<Kept, Unkept> {
-    made(confined, directory)
+    made(confined, directory, &own(), Readable::Owner)
 }
 
-/// Make a certificate and write it and its key down.
+/// Make a certificate out to the names `laid` gives and write it and its key down beneath
+/// `directory` where it says, each readable as `readable` says.
 ///
 /// The key first, so a stop between the two leaves a key with no certificate — which is
 /// refused as half of a pair when it is next read — rather than a certificate somebody
 /// could pin whose key is gone.
-fn made(confined: &dyn Confined, directory: &Path) -> Result<Kept, Unkept> {
-    let generated = rcgen::generate_simple_self_signed(vec![NAMED.to_owned()]);
+fn made(
+    confined: &dyn Confined,
+    directory: &Path,
+    laid: &Certificate,
+    readable: Readable,
+) -> Result<Kept, Unkept> {
+    let generated = rcgen::generate_simple_self_signed(laid.names.clone());
     let made = generated.as_ref().map_err(unmade)?;
     let (certificate, key) = (
         pem(CERTIFIED, made.cert.der()),
         pem(PRIVATE_KEY, &made.signing_key.serialize_der()),
     );
-    for (name, text) in FILES.into_iter().zip([&key, &certificate]) {
+    for (name, text) in [(&laid.key, &key), (&laid.certificate, &certificate)] {
         confined
-            .replaced(
-                &directory.join(name),
-                directory,
-                text.as_bytes(),
-                Readable::Owner,
-            )
+            .replaced(&directory.join(name), directory, text.as_bytes(), readable)
             .map_err(|why| {
                 Unkept::Unmade(format!("{name} could not be written: {}", why.message))
             })?;
     }
-    Kept::read(&certificate, &key)
+    Kept::read(&certificate, &key, laid)
 }
 
 /// Why a certificate could not be made, as it is reported.

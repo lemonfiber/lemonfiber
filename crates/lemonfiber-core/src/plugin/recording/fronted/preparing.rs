@@ -134,7 +134,7 @@ impl Prepared {
         )
         .map_err(refused("starting files"))?;
         let data = super::super::served::library(upstream, &copy).map_err(refused("data"))?;
-        let fingerprint = super::super::served::certified(upstream, &copy, recorder.confined)
+        let fingerprint = crate::plugin::program::certified(upstream, &copy, recorder.confined)
             .map_err(refused("certificate"))?;
         super::super::served::mountable(upstream, &copy)
             .map_err(refused(super::super::served::MOUNTS))?;

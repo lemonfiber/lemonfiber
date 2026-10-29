@@ -563,6 +563,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `STACK-11` | `PROJECT_EDITED` | error | 1 | 409 | 0.18.0 | Raised when a change would write over a generated project the operator has edited. |
 | `STACK-12` | `VOLUME_NOT_COPIED` | error | 1 | 500 | 0.18.0 | Raised when a service's state kept in a volume could not be copied into its mount tree before the service first starts from there. |
 | `STACK-13` | `RESET_MOVED` | error | 1 | 400 | 0.18.0 | Raised where the offer a reset answers is not the one a reading of it makes now. |
+| `STACK-14` | `CERTIFICATE_NOT_MADE` | error | 1 | 500 | 0.18.0 | Raised where the certificate a service declares could not be made or read before it starts. |
 
 ## `STORAGE` — the data location
 

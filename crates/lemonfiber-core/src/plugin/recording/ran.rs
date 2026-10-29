@@ -81,6 +81,7 @@ pub(super) async fn taken(
                     run: running.run,
                     operator: &Operator::recording(),
                     starting: Some(starting),
+                    confined: recorder.confined,
                 },
                 recorder.random,
             )

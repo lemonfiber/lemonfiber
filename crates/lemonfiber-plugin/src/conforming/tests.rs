@@ -443,6 +443,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
     const PERMITTED: &[&str] = &[
         "asks_for",
         "bind",
+        "certificate",
         "config_path",
         "config_ro",
         "contract",

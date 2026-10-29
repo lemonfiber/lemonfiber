@@ -53,6 +53,9 @@ macro_rules! container_fields {
             /// The one privileged shape lemonfiber writes for it, from a closed set.
             #[serde(default)]
             pub shape: ::std::option::Option<$crate::container::Shape>,
+            /// The certificate lemonfiber makes for it before it first starts.
+            #[serde(default)]
+            pub certificate: ::std::option::Option<$crate::container::Certificate>,
         }
     };
 }

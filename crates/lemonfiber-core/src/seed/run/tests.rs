@@ -62,6 +62,7 @@ pub(super) fn manifest_service(id: &str, port: Option<u16>) -> lemonfiber_manife
         posture: lemonfiber_manifest::container::Posture::Standard,
         network: None,
         shape: None,
+        certificate: None,
         asks_for: None,
         reaches: None,
         listens: port,

@@ -553,6 +553,14 @@
             {"type": "null"}
           ]
         },
+        "certificate": {
+          "description": "The certificate lemonfiber makes for it before it first starts.",
+          "anyOf": [
+            {"$ref": "#/$defs/ServiceCertificate"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
         "config_path": {
           "description": "Where inside the container its one configuration directory is mounted,\n`/config` where absent.",
           "type": ["string", "null"],
@@ -900,6 +908,21 @@
       "oneOf": [
         {"description": "A password: every character class a password rule asks for.", "type": "string", "const": "password"}
       ]
+    },
+    "ServiceCertificate": {
+      "description": "The certificate lemonfiber makes for a service before it first starts.",
+      "type": "object",
+      "properties": {
+        "certificate": {"description": "Where the certificate is written, relative to the configuration directory.", "type": "string"},
+        "key": {"description": "Where its private key is written, relative to the configuration directory.", "type": "string"},
+        "names": {
+          "description": "The host names it is made out to.",
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false,
+      "required": ["key", "certificate", "names"]
     },
     "ServiceConstant": {
       "description": "A value written exactly as declared.",
