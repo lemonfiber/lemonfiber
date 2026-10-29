@@ -21,11 +21,13 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use url::Url;
 
-use crate::ports::http::Request;
-use crate::ports::resolve::Resolver;
+use lemonfiber_ports::http::Request;
+use lemonfiber_ports::resolve::Resolver;
+
 use crate::schemes::{PLAIN, SECURE};
 
 mod classes;
+pub mod schemes;
 
 pub use classes::internal;
 

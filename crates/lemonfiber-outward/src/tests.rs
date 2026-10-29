@@ -5,7 +5,7 @@ use std::net::IpAddr;
 use lemonfiber_fixtures::ports::Resolving;
 
 use super::{checked, host_of, internal, literal, outward, Inward};
-use crate::ports::http::{Method, Request};
+use lemonfiber_ports::http::{Method, Request};
 
 /// The address written, read as one.
 fn ip(written: &str) -> IpAddr {

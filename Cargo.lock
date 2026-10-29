@@ -1701,6 +1701,7 @@ dependencies = [
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
+ "lemonfiber-outward",
  "lemonfiber-plugin",
  "lemonfiber-ports",
  "lemonfiber-sidecar",
@@ -1752,6 +1753,16 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "lemonfiber-outward"
+version = "0.17.0"
+dependencies = [
+ "lemonfiber-fixtures",
+ "lemonfiber-ports",
+ "tokio",
+ "url",
 ]
 
 [[package]]

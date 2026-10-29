@@ -15,6 +15,7 @@ lemonfiber-bundled = { workspace = true }
 lemonfiber-bundle = { workspace = true }
 lemonfiber-error = { workspace = true }
 lemonfiber-manifest = { workspace = true }
+lemonfiber-outward = { workspace = true }
 # The plugin manifest types, the capability vocabulary and the extension points —
 # the three things this crate generates a published artefact from. One way only:
 # nothing there reaches back here, which is what lets it be read with no stack.

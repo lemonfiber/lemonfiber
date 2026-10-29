@@ -1,0 +1,21 @@
+[package]
+name = "lemonfiber-outward"
+description = "Whether a host stands for somewhere out on the internet, and nowhere closer: the check every call made on the strength of a name somebody else wrote is held to."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+publish = false
+
+[dependencies]
+lemonfiber-ports = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+lemonfiber-fixtures = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true
