@@ -94,6 +94,47 @@ async fn nothing_listening_is_unreachable() {
     assert_eq!(reached, Some(true));
 }
 
+async fn answering_after(wait: std::time::Duration) -> Option<String> {
+    let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
+    let address = listener.local_addr().ok()?;
+    tokio::spawn(async move {
+        while let Ok((mut stream, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                let mut asked = [0_u8; 4096];
+                let _ = stream.read(&mut asked).await;
+                tokio::time::sleep(wait).await;
+                let _ = stream
+                    .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+                    .await;
+                let _ = stream.shutdown().await;
+            });
+        }
+    });
+    Some(format!("http://{address}/"))
+}
+
+#[tokio::test]
+async fn a_waiting_client_reads_an_answer_within_its_wait_and_none_after_it() {
+    let url = answering_after(std::time::Duration::from_millis(300)).await;
+    let (patient, hasty) = match (
+        url,
+        Web::waiting(std::time::Duration::from_secs(5)),
+        Web::waiting(std::time::Duration::from_millis(50)),
+    ) {
+        (Some(url), Ok(patient), Ok(hasty)) => (
+            patient
+                .send(&asking(url.clone()))
+                .await
+                .ok()
+                .map(|read| read.status),
+            hasty.send(&asking(url)).await.is_err(),
+        ),
+        _ => (None, false),
+    };
+    assert_eq!(patient, Some(200));
+    assert!(hasty);
+}
+
 const BODY: &str = r#"{"Name":"admin"}"#;
 
 #[tokio::test]

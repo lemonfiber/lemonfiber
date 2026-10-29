@@ -32,7 +32,18 @@ impl Web {
     ///
     /// The error building the client.
     pub fn new() -> Result<Self, reqwest::Error> {
-        Self::built(false)
+        Self::built(false, REQUEST_TIMEOUT)
+    }
+
+    /// A client carrying no cookie from one call to the next that waits up to `within`
+    /// for a call's answer, for an upstream whose operation takes longer than a call
+    /// usually may.
+    ///
+    /// # Errors
+    ///
+    /// The error building the client.
+    pub fn waiting(within: Duration) -> Result<Self, reqwest::Error> {
+        Self::built(false, within)
     }
 
     /// A client that carries the session cookie an upstream sets on a sign-in to the
@@ -42,16 +53,17 @@ impl Web {
     ///
     /// The error building the client.
     pub fn keeping_sessions() -> Result<Self, reqwest::Error> {
-        Self::built(true)
+        Self::built(true, REQUEST_TIMEOUT)
     }
 
-    /// A client, carrying cookies from one call to the next where `sessions` says so.
-    fn built(sessions: bool) -> Result<Self, reqwest::Error> {
+    /// A client, carrying cookies from one call to the next where `sessions` says so,
+    /// that waits up to `within` for a call's answer.
+    fn built(sessions: bool, within: Duration) -> Result<Self, reqwest::Error> {
         client_builder()
             .redirect(reqwest::redirect::Policy::none())
             .cookie_store(sessions)
             .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT)
+            .timeout(within)
             .build()
             .map(|client| Self { client })
     }
