@@ -12,7 +12,7 @@ async fn a_tunnelled_torrent_run_is_not_warned() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -25,7 +25,10 @@ async fn a_tunnelled_torrent_run_is_not_warned() {
         0,
         "nothing is exposed, so there is nothing to warn about"
     );
-    assert_eq!(wizard.answers().vpn, Some(Vpn::Carrying));
+    assert_eq!(
+        wizard.answers().vpn,
+        Some(Vpn::Carrying(Guarded::default()))
+    );
 }
 
 /// The requirement itself: torrents without a VPN are warned about, the
@@ -40,7 +43,7 @@ async fn torrents_without_a_vpn_are_warned_and_confirmed_and_never_refused() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -78,7 +81,7 @@ async fn declining_the_exposure_asks_again_rather_than_stopping() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -87,7 +90,10 @@ async fn declining_the_exposure_asks_again_rather_than_stopping() {
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
     assert_eq!(prompt.warned_unprotected.get(), 1);
-    assert_eq!(wizard.answers().vpn, Some(Vpn::Carrying));
+    assert_eq!(
+        wizard.answers().vpn,
+        Some(Vpn::Carrying(Guarded::default()))
+    );
 }
 
 /// A Usenet-only run never meets the question: nothing about it is exposed to
@@ -107,7 +113,7 @@ async fn a_usenet_only_run_is_never_asked_about_a_vpn() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -129,7 +135,7 @@ async fn the_prerequisites_are_shown_derived_from_the_chosen_protocols() {
     assert!(matches!(
         run(
             &mut wizard,
-            &prompt,
+            (&prompt, None),
             &ProbeFs::links(),
             &proving(),
             &applying(&paths, "t")
@@ -153,7 +159,7 @@ async fn a_confirmed_run_gathers_the_answers_and_applies_them() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -194,7 +200,7 @@ async fn a_run_the_operator_does_not_confirm_applies_nothing() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -216,7 +222,7 @@ async fn where_the_container_user_does_not_apply_it_is_not_asked() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -242,7 +248,7 @@ async fn gathering_saves_progress_so_a_quit_run_can_resume() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -303,7 +309,7 @@ fn resume_carries_an_interrupted_apply_forward_from_its_answers() {
     let mut wizard = Wizard::new(Environment::LinuxNative);
     for answer in [
         Answer::Protocols(Protocols::both()),
-        Answer::Vpn(Vpn::Carrying),
+        Answer::Vpn(Vpn::Carrying(Guarded::default())),
         Answer::DataLocation(dir.join("data-root")),
         Answer::Credentials(None),
         Answer::Provider(None),
@@ -335,7 +341,7 @@ async fn a_wizard_past_gathering_is_refused_rather_than_re_applied() {
     let mut wizard = Wizard::new(Environment::LinuxNative);
     for answer in [
         Answer::Protocols(Protocols::both()),
-        Answer::Vpn(Vpn::Carrying),
+        Answer::Vpn(Vpn::Carrying(Guarded::default())),
         Answer::DataLocation(dir.join("data-root")),
         Answer::Credentials(None),
         Answer::Provider(None),
@@ -355,7 +361,7 @@ async fn a_wizard_past_gathering_is_refused_rather_than_re_applied() {
 
     let refused = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),

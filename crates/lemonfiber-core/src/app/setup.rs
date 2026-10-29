@@ -10,9 +10,12 @@
 //! a surface to show their progress.
 
 mod answering;
+mod guarding;
 mod proving;
 
 pub use answering::{setup, SetupAction};
+pub(crate) use guarding::checking;
+pub use guarding::{Asking, Guard};
 use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_vpn};
 
 use std::path::{Path, PathBuf};
@@ -22,7 +25,8 @@ use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
 use crate::error::codes::setup::{
-    ALREADY_SET_UP, ALREADY_UNDERWAY, DOES_NOT_APPLY, NOTHING_TO_RECOVER, NOT_REVIEWED,
+    ALREADY_SET_UP, ALREADY_UNDERWAY, DOES_NOT_APPLY, GUARD_UNANSWERED, NOTHING_TO_RECOVER,
+    NOT_REVIEWED,
 };
 use crate::error::{Code, Diagnose as _, Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
@@ -30,16 +34,18 @@ use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::validate::{Validation, Validator};
 use crate::wizard::{
     described, Answer, Choice, Library, Phase, Plan, Progress, Recovery, Rejected, Resolution,
-    Step, Wizard,
+    Step, Vpn, Wizard,
 };
 
 /// Every refusal answering, applying or recovering setup answers with, which a client
 /// names by its code.
-pub const REFUSALS: [Code; 4] = [
+pub const REFUSALS: [Code; 6] = [
     DOES_NOT_APPLY,
     ALREADY_SET_UP,
     NOT_REVIEWED,
     NOTHING_TO_RECOVER,
+    GUARD_UNANSWERED,
+    crate::error::codes::setting::OUTSIDE_ITS_CHOICES,
 ];
 
 /// How the operator is asked the questions the wizard cannot answer itself.
@@ -56,6 +62,10 @@ pub trait Prompt {
     /// Whether a VPN will carry the torrent traffic. Asked only where torrents
     /// were chosen, and after the checklist has said what one is for.
     fn vpn(&self) -> bool;
+    /// One question of the egress guard a VPN carries the torrents through, as
+    /// [`Guard::asked`] puts it: one of the values offered, a setting's value, or a
+    /// secret read without echo and never printed back; nothing to leave it unanswered.
+    fn guard(&self, asking: &Asking<'_>) -> Option<String>;
     /// Torrents were chosen and nothing will carry them: state what that exposes
     /// and ask whether to go on anyway (`true`) or reconsider (`false`). Going on
     /// is always available — this warns, it never refuses.
@@ -174,7 +184,7 @@ pub enum Outcome {
 /// confirmed answers fails — the marker left for recovery in that case.
 pub async fn run(
     wizard: &mut Wizard,
-    prompt: &dyn Prompt,
+    (prompt, guard): (&dyn Prompt, Option<&Guard>),
     filesystem: &dyn FileSystem,
     validator: &dyn Validator,
     applying: &Applying<'_>,
@@ -186,9 +196,17 @@ pub async fn run(
     if wizard.phase() != Phase::InProgress {
         return Err(Box::new(already_underway()));
     }
-    gather(wizard, prompt, filesystem, validator, applying.paths)
-        .await
-        .map_err(|rejected| Box::new(does_not_apply(rejected)))?;
+    if guarded(wizard, guard).is_err() {
+        save(wizard, applying.paths);
+    }
+    gather(
+        wizard,
+        (prompt, guard),
+        filesystem,
+        validator,
+        applying.paths,
+    )
+    .await?;
 
     if !prompt.confirm(&wizard.plan()) {
         return Ok(Outcome::Abandoned);
@@ -202,6 +220,41 @@ pub async fn run(
     apply::apply(wizard, applying)?;
     clear_progress(applying.paths);
     Ok(Outcome::Applied)
+}
+
+/// The service filling `network.egress-guard` in the stack `ctx` sets up, where one does:
+/// what setup's VPN step asks of it.
+#[must_use]
+pub fn guard(ctx: &crate::app::Ctx) -> Option<Guard> {
+    let manifest = ctx.stack.manifest().ok()?;
+    let register = crate::app::plugins::read(ctx).unwrap_or_default();
+    let installed = register.installed();
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = crate::wiring::Fillers::of(
+        &manifest,
+        installed,
+        &crate::app::targets::chosen_fillers(ctx),
+        project.as_deref(),
+    );
+    let (filler, _) = fillers.filling(lemonfiber_manifest::container::EGRESS_GUARD)?;
+    Guard::of(&manifest, installed, &filler.id)
+}
+
+/// Take back a VPN answer that no longer gives `guard` what it needs, so its step is
+/// asked again; why, where it was taken back.
+///
+/// # Errors
+///
+/// The refusal [`Guard::taken`] gives the answer recorded, with the answer taken back
+/// and the walk standing on the VPN step.
+pub(crate) fn guarded(wizard: &mut Wizard, guard: Option<&Guard>) -> Result<(), Box<Problem>> {
+    let Some(Vpn::Carrying(given)) = &wizard.answers().vpn else {
+        return Ok(());
+    };
+    checking(guard, given)
+        .map(drop)
+        .inspect_err(|_| wizard.reask_vpn())
 }
 
 /// The setup progress saved at `path`, or nothing where none is there or it does
@@ -346,11 +399,11 @@ enum How {
 
 async fn gather(
     wizard: &mut Wizard,
-    prompt: &dyn Prompt,
+    (prompt, guard): (&dyn Prompt, Option<&Guard>),
     filesystem: &dyn FileSystem,
     validator: &dyn Validator,
     paths: &Paths,
-) -> Result<(), Rejected> {
+) -> Result<(), Box<Problem>> {
     // Each question is paired with how to ask it, so the walk is one loop: ask,
     // record, and save before moving on, so quitting mid-setup resumes at the
     // question reached rather than restarting. One loop keeps the recording a
@@ -392,7 +445,7 @@ async fn gather(
         }
         let answer = match how {
             How::Sync(ask) => ask(prompt),
-            How::Vpn => resolve_vpn(prompt),
+            How::Vpn => resolve_vpn(prompt, guard),
             How::Location => Answer::DataLocation(resolve_location(prompt, filesystem).await),
             How::Credential => resolve_credentials(prompt, validator).await,
             How::Provider => resolve_provider(prompt, validator).await,
@@ -407,7 +460,12 @@ async fn gather(
             prompt.prerequisites(&prerequisites(*protocols));
         }
 
-        wizard.answer(answer)?;
+        if let Answer::Vpn(Vpn::Carrying(given)) = &answer {
+            checking(guard, given)?;
+        }
+        wizard
+            .answer(answer)
+            .map_err(|rejected| Box::new(does_not_apply(rejected)))?;
         save(wizard, paths);
     }
     Ok(())

@@ -11,6 +11,13 @@
       "description": "The step the operator is on.",
       "$ref": "WizardStep.json"
     },
+    "guard": {
+      "description": "What the VPN step asks of the egress guard where one carries the torrents, in the\norder it asks it: empty where nothing fills the guard or it asks nothing.",
+      "type": "array",
+      "items": {
+        "$ref": "GuardQuestion.json"
+      }
+    },
     "offered": {
       "description": "Whether this machine has setup left to do. False once configuration\nexists and nothing is part-way through, which is when a surface directs\nthe operator to reconfiguration instead of asking the first question again.",
       "type": "boolean"
@@ -69,6 +76,7 @@
     "ready_for_review",
     "plan",
     "written",
-    "rehearsed"
+    "rehearsed",
+    "guard"
   ]
 }

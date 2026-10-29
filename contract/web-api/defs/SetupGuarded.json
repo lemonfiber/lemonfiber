@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The egress guard's settings and secrets, as setup's VPN step was answered with them.",
+  "type": "object",
+  "properties": {
+    "secrets": {
+      "description": "Each of its secrets given, by the name the secret store holds it under, with its\nvalue.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "settings": {
+      "description": "Each of its settings given, by name, with its value.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    }
+  },
+  "additionalProperties": false
+}

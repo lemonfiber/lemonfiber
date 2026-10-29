@@ -94,6 +94,8 @@ pub(crate) fn raw() -> RawSetup {
         library: None,
         service_user: None,
         vpn: None,
+        vpn_settings: Vec::new(),
+        vpn_secrets: Vec::new(),
         household: None,
         notifications: None,
         autostart: None,

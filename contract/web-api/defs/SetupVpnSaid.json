@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Either answer, in a word.",
+  "oneOf": [
+    {
+      "description": "A VPN carries it, with nothing given for the egress guard.",
+      "type": "string",
+      "const": "carrying"
+    },
+    {
+      "description": "Nothing does, and the operator confirmed they understood that.",
+      "type": "string",
+      "const": "absent"
+    }
+  ]
+}

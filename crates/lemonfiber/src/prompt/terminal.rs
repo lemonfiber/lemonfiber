@@ -9,7 +9,9 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 use lemonfiber_core::alert::Appetite;
-use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
+use lemonfiber_core::app::setup::{
+    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
+};
 use lemonfiber_core::autostart::DECLINE_CONSEQUENCE;
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
@@ -327,6 +329,36 @@ impl Prompt for Terminal {
         // why torrents want one, so yes is the answer that follows from what they
         // were told. Nothing is assumed from the default — a no is asked about.
         self.yes_no("\nWill a VPN carry your torrent traffic?", true)
+    }
+
+    fn guard(&self, asking: &Asking<'_>) -> Option<String> {
+        let typed = match asking {
+            Asking::Choice {
+                setting,
+                offered,
+                default,
+            } => {
+                say!("\n{setting}:");
+                for (at, value) in offered.iter().enumerate() {
+                    say!("  {}) {value}", at + 1);
+                }
+                let typed = self.answers.ask(&format!(
+                    "Choose [{}]:",
+                    default.as_deref().unwrap_or_default()
+                ));
+                typed
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|at| offered.get(at.checked_sub(1)?).cloned())
+                    .unwrap_or(typed)
+            }
+            Asking::Value { setting } => self.answers.ask(&format!("\n{setting}:")),
+            Asking::Secret { secret, why } => {
+                say!("\n{why}.");
+                self.answers.secret(&format!("{secret}:"))
+            }
+        };
+        (!typed.is_empty()).then_some(typed)
     }
 
     fn unprotected(&self) -> bool {

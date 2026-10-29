@@ -1,5 +1,5 @@
 mod changing;
-mod choosing;
+pub(crate) mod choosing;
 pub(crate) mod fences;
 pub(crate) mod files;
 pub(crate) mod filing;
@@ -16,7 +16,7 @@ pub(crate) mod run;
 mod secrets;
 pub(crate) mod store;
 pub(crate) mod undoing;
-mod waiting;
+pub(crate) mod waiting;
 
 pub(crate) use files::{text, written};
 pub(crate) use resolved::{holding, Resolved, OPERATOR_KEYS};

@@ -17,7 +17,7 @@ use crate::storage::{self, Linked};
 use crate::validate::{pasted, Credential, Validation, Validator};
 use crate::wizard::{Answer, Indexer, Provider, Vpn};
 
-use super::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
+use super::{CredentialChoice, Guard, Prompt, ProviderEntry, StorageWarning};
 
 /// Ask whether a VPN carries the torrents, and where none does, make sure the
 /// operator chose that knowingly.
@@ -32,10 +32,15 @@ use super::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
 /// loop cannot wedge, and an operator who genuinely wants an unprotected run gets
 /// one. Warned and recorded, so a later diagnosis reads it as a decision rather
 /// than an oversight.
-pub(crate) fn resolve_vpn(prompt: &dyn Prompt) -> Answer {
+///
+/// Where one does, `guard` is asked what it needs to carry it, question by question.
+pub(crate) fn resolve_vpn(prompt: &dyn Prompt, guard: Option<&Guard>) -> Answer {
     loop {
         if prompt.vpn() {
-            return Answer::Vpn(Vpn::Carrying);
+            let given = guard
+                .map(|guard| guard.asked(&mut |asking| prompt.guard(asking)))
+                .unwrap_or_default();
+            return Answer::Vpn(Vpn::Carrying(given));
         }
         if prompt.unprotected() {
             return Answer::Vpn(Vpn::Absent);

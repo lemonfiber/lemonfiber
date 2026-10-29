@@ -12,13 +12,13 @@ use crate::plugin::Installed;
 
 /// One setting a change would leave outside its choices.
 #[derive(Debug)]
-pub(super) struct Outside {
+pub(crate) struct Outside {
     /// The setting.
-    setting: String,
+    pub(crate) setting: String,
     /// The value it would hold.
-    value: String,
+    pub(crate) value: String,
     /// The values it would accept.
-    choices: Vec<String>,
+    pub(crate) choices: Vec<String>,
 }
 
 /// Every setting `changing` would leave holding a value outside its choices, where
@@ -96,7 +96,7 @@ fn environments<'a>(
 
 /// The refusal naming each setting `outside` lists, the value it would hold and the
 /// choices it has.
-pub(super) fn refused(outside: &[Outside]) -> Problem {
+pub(crate) fn refused(outside: &[Outside]) -> Problem {
     let named: Vec<String> = outside
         .iter()
         .map(|one| {

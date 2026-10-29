@@ -3,8 +3,8 @@ use crate::test_support::a_fresh_write;
 use std::path::PathBuf;
 
 use super::{
-    described, offer_setup, Answer, Choice, Library, Phase, Progress, Recovery, Resolution, Status,
-    Step, Vpn, Wizard,
+    described, offer_setup, Answer, Choice, Guarded, Library, Phase, Progress, Recovery,
+    Resolution, Status, Step, Vpn, Wizard,
 };
 use crate::config::env::EnvFile;
 use crate::config::Protocols;
@@ -28,7 +28,9 @@ fn answer_all(wizard: &mut Wizard) {
     wizard
         .answer(Answer::Protocols(Protocols::both()))
         .unwrap_or(());
-    wizard.answer(Answer::Vpn(Vpn::Carrying)).unwrap_or(());
+    wizard
+        .answer(Answer::Vpn(Vpn::Carrying(Guarded::default())))
+        .unwrap_or(());
     wizard
         .answer(Answer::DataLocation(PathBuf::from("/srv/media")))
         .unwrap_or(());
@@ -57,3 +59,5 @@ fn setting<'a>(plan: &'a super::Plan, key: &str) -> Option<&'a str> {
 
 mod planning;
 mod walking;
+
+mod answering;

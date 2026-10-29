@@ -16,7 +16,7 @@ async fn an_answer_that_does_not_apply_here_stops_the_run() {
 
     let stopped = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &ProbeFs::links(),
         &proving(),
         &applying(&paths, "t"),
@@ -50,7 +50,7 @@ async fn a_location_that_cannot_hardlink_is_put_to_the_operator_who_may_use_it()
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &cannot_link(FsKind::ExFat),
         &proving(),
         &applying(&paths, "t"),
@@ -81,7 +81,7 @@ async fn a_copy_only_location_names_no_reason_where_its_type_explains_nothing() 
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &cannot_link(FsKind::Linking("ext4".to_owned())),
         &proving(),
         &applying(&paths, "t"),
@@ -118,7 +118,7 @@ async fn a_location_that_cannot_link_can_be_swapped_for_one_that_can() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &filesystem,
         &proving(),
         &applying(&paths, "t"),
@@ -154,7 +154,7 @@ async fn a_location_that_does_not_exist_yet_is_tested_through_its_parent() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &filesystem,
         &proving(),
         &applying(&paths, "t"),
@@ -186,7 +186,7 @@ async fn a_location_that_cannot_be_written_is_reported_untestable() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &filesystem,
         &proving(),
         &applying(&paths, "t"),
@@ -220,7 +220,7 @@ async fn a_location_with_no_reachable_parent_cannot_be_tested() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &filesystem,
         &proving(),
         &applying(&paths, "t"),
@@ -264,7 +264,7 @@ async fn a_link_that_cannot_be_confirmed_is_reported_untestable() {
 
     let outcome = run(
         &mut wizard,
-        &prompt,
+        (&prompt, None),
         &filesystem,
         &proving(),
         &applying(&paths, "t"),

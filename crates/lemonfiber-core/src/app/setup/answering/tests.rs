@@ -19,7 +19,7 @@ use crate::stack::Source;
 use crate::test_support::a_context;
 use crate::validate::{Credential, Validation, Validator};
 use crate::wizard::{
-    Answer, Choice, Indexer, Library, Phase, Progress, Provider, Step, Vpn, Wizard,
+    Answer, Choice, Guarded, Indexer, Library, Phase, Progress, Provider, Step, Vpn, Wizard,
 };
 
 /// A scratch layout unique to this process and case, cleared first.
@@ -102,7 +102,7 @@ fn planned(report: Option<&WizardReport>, key: &str) -> Option<String> {
 fn all_of_them(root: &Path) -> [Answer; 9] {
     [
         Answer::Protocols(Protocols::both()),
-        Answer::Vpn(Vpn::Carrying),
+        Answer::Vpn(Vpn::Carrying(Guarded::default())),
         Answer::DataLocation(root.to_path_buf()),
         Answer::Credentials(None),
         Answer::Provider(None),

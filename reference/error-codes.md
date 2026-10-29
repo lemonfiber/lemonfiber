@@ -532,6 +532,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETUP-13` | `NOT_REWOUND` | error | 1 | 500 | 0.17.0 | Raised when a file a reversal would write back to what it held cannot be. |
 | `SETUP-14` | `UNKEPT` | warning | 1 | 500 | 0.18.0 | Raised when a reversal meets a secret whose earlier value lemonfiber kept no copy of. |
 | `SETUP-15` | `NOT_MOVED_BACK` | error | 1 | 500 | 0.18.0 | Raised when a service's state lemonfiber moved could not be moved back. |
+| `SETUP-16` | `GUARD_UNANSWERED` | error | 1 | 400 | 0.18.0 | Raised when a VPN answer leaves the egress guard without what it needs to start. |
 
 ## `SPACE` — the disk, and letting a download go
 

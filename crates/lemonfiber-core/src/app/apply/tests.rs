@@ -11,7 +11,7 @@ use crate::config::{store, Protocols};
 use crate::journal::{Change, Kind};
 use crate::platform::Environment;
 use crate::stack::Source;
-use crate::wizard::{Answer, Library, Phase, Vpn, Wizard};
+use crate::wizard::{Answer, Guarded, Library, Phase, Vpn, Wizard};
 
 /// What an apply writes with, over a real directory and a real machine's
 /// randomness — the key the journal's credentials are sealed under is made from
@@ -23,6 +23,7 @@ fn applying<'a>(paths: &'a Paths, source: Source, stamp: &'a str) -> Applying<'a
         stamp,
         random: &A_MACHINE,
         confined: &lemonfiber_adapters::Disk,
+        guard: None,
     }
 }
 
@@ -88,7 +89,9 @@ fn answering_autostart(data_root: &Path, on_boot: bool) -> Wizard {
     wizard
         .answer(Answer::Protocols(Protocols::both()))
         .unwrap_or(());
-    wizard.answer(Answer::Vpn(Vpn::Carrying)).unwrap_or(());
+    wizard
+        .answer(Answer::Vpn(Vpn::Carrying(Guarded::default())))
+        .unwrap_or(());
     wizard
         .answer(Answer::DataLocation(data_root.to_path_buf()))
         .unwrap_or(());

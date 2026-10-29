@@ -15,6 +15,7 @@ fn part_way() -> WizardReport {
         plan: Vec::new(),
         written: Vec::new(),
         proof: None,
+        guard: Vec::new(),
     }
 }
 

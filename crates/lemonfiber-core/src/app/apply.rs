@@ -19,22 +19,26 @@
 //! making each write atomic — a temporary file renamed over the target — is a
 //! hardening the shared writer will grow, and is called out where it bites.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::alert::{Appetite, Wants};
 use crate::app::reconfiguring::SETTINGS;
+use crate::app::setup::Guard;
 use crate::autostart::Returning;
 use crate::baseline::Baseline;
-use crate::config::paths::Paths;
+use crate::config::paths::{Paths, SECRETS};
 use crate::config::store::{self, is_secret};
+use crate::credential::fingerprint;
 use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::journal::{Change, Journal, Kind, Seal};
 use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
 use crate::quality::{Preset, Selection};
+use crate::settings::Keeping;
 use crate::stack::{self, Source};
-use crate::wizard::{Phase, Plan, Wizard};
+use crate::wizard::{Guarded, Phase, Plan, Vpn, Wizard};
 
 /// Everything an apply writes *with*, as against the answers it writes.
 ///
@@ -56,6 +60,9 @@ pub struct Applying<'a> {
     pub random: &'a dyn Random,
     /// How the stack's files are written into directories containers can write.
     pub confined: &'a dyn Confined,
+    /// The service filling `network.egress-guard`, which the VPN answer is held to and
+    /// whose settings and secrets alone it writes; nothing where none does.
+    pub guard: Option<&'a Guard>,
 }
 
 /// Write a reviewed setup to disk, driving the lifecycle and recording each
@@ -80,13 +87,17 @@ pub struct Applying<'a> {
 /// stack could not be materialised — leaving the marker at `applying` and the
 /// journal holding what had been written, which the next run recovers from.
 pub fn apply(wizard: &mut Wizard, applying: &Applying) -> Result<(), Box<Problem>> {
+    let taken = match &wizard.answers().vpn {
+        Some(Vpn::Carrying(given)) => crate::app::setup::checking(applying.guard, given)?,
+        _ => Guarded::default(),
+    };
     if !wizard.transition(Phase::Applying) {
         return Err(Box::new(not_reviewed()));
     }
     // Every failure is boxed as one problem on the way out, because a `Problem` is
     // large beside the `()` this returns on success — so the writes themselves stay
     // a plain sequence, each stopping the rest.
-    write(wizard, applying).map_err(|fault| Box::new(fault.problem()))
+    write(wizard, applying, &taken).map_err(|fault| Box::new(fault.problem()))
 }
 
 /// A failure part-way through applying, named finely enough to remedy: a file the
@@ -130,7 +141,7 @@ impl Fault {
 /// Ordered for recovery: the applying marker is persisted first, each change is
 /// journalled before it is written, and the applied marker is persisted last — so
 /// a stop at any point leaves the marker and journal a later run reads.
-fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
+fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<(), Fault> {
     let (paths, stamp, random) = (applying.paths, applying.stamp, applying.random);
     let (progress, env_file, journal) = (paths.setup_progress(), paths.env_file(), paths.journal());
     let seal = Seal::minted(&journal, random);
@@ -217,6 +228,7 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
         store::write(&journal, &lines(&log, &seal, random)).map_err(Fault::Store)?;
         store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
+    guarded(taken, applying, &mut log, &seal).map_err(Fault::Store)?;
 
     // What lemonfiber wrote, recorded as the expected state a later change compares
     // against. Without it, the first change made to a setting cannot tell an
@@ -265,6 +277,74 @@ fn write(wizard: &mut Wizard, applying: &Applying) -> Result<(), Fault> {
     // resume, which keeps the writes, rather than trusting a half-written stack.
     wizard.transition(Phase::Applied);
     store::write(&progress, &rendered(wizard)).map_err(Fault::Store)
+}
+
+/// What the egress guard took of the VPN answer, written where every setting and secret
+/// of a service is kept: each journalled before it is written, a secret by the
+/// fingerprints of what it replaces and of itself.
+fn guarded(
+    taken: &Guarded,
+    applying: &Applying,
+    log: &mut Journal,
+    seal: &Seal,
+) -> Result<(), store::Failure> {
+    if taken == &Guarded::default() {
+        return Ok(());
+    }
+    let (settings, secrets) = (&taken.settings, &taken.secrets);
+    let (env, journal) = (applying.paths.env_file(), applying.paths.journal());
+    let (settings_at, secrets_at) = (
+        env.with_file_name(crate::config::paths::SETTINGS),
+        env.with_file_name(SECRETS),
+    );
+    let held = crate::settings::Settings::at(&settings_at)?;
+    let kept = crate::settings::Secrets::at(&secrets_at)?;
+    let changed = |target: &str, kind: Kind| Change {
+        at: applying.stamp.to_owned(),
+        operation: crate::wizard::APPLY.to_owned(),
+        target: target.to_owned(),
+        kind,
+    };
+    for (name, value) in settings {
+        log.record(changed(
+            name,
+            Kind::Setting {
+                name: name.clone(),
+                previous: held.value(name).map(str::to_owned),
+                current: Some(value.clone()),
+                filed: None,
+            },
+        ));
+    }
+    for (name, value) in secrets {
+        log.record(changed(
+            name,
+            Kind::Secret {
+                name: name.clone(),
+                from: crate::settings::Source::Operator.as_str().to_owned(),
+                previous: kept.fingerprint(name),
+                current: Some(fingerprint(value)),
+                filed: None,
+            },
+        ));
+    }
+    store::write(&journal, &lines(log, seal, applying.random))?;
+    let changing: BTreeMap<&str, Option<&str>> = settings
+        .iter()
+        .map(|(name, value)| (name.as_str(), Some(value.as_str())))
+        .collect();
+    crate::settings::store::recorded(&settings_at, &changing)?;
+    let at = applying.stamp.parse().unwrap_or_default();
+    let keeping: Vec<Keeping<'_>> = secrets
+        .iter()
+        .map(|(name, value)| Keeping {
+            name,
+            value,
+            from: crate::settings::Source::Operator,
+            at,
+        })
+        .collect();
+    crate::settings::kept(&secrets_at, &keeping, &|_| Ok(()))
 }
 
 /// Record the settings this apply wrote, as what lemonfiber last put in the file.

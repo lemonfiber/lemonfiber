@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "guard": {
+      "type": [
+        "array[ref:GuardQuestion]"
+      ],
+      "required": true
+    },
     "offered": {
       "type": [
         "boolean"

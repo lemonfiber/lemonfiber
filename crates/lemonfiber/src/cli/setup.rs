@@ -58,6 +58,14 @@ pub struct RawSetup {
     /// this is absent, the run proceeds unprotected and records that it did.
     #[arg(long, value_name = "BOOL")]
     pub vpn: Option<bool>,
+    /// One of the VPN's settings the egress guard asks for, as `NAME=VALUE`. Repeat it
+    /// for each.
+    #[arg(long = "vpn-setting", value_name = "NAME=VALUE")]
+    pub vpn_settings: Vec<String>,
+    /// One of the VPN's secrets the egress guard asks for, as `NAME=VALUE`, by the name
+    /// the secret store holds it under. Repeat it for each.
+    #[arg(long = "vpn-secret", value_name = "NAME=VALUE")]
+    pub vpn_secrets: Vec<String>,
     /// Whether others in the home will use it.
     #[arg(long, value_name = "BOOL")]
     pub household: Option<bool>,

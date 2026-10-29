@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One question the VPN step asks of the service filling `network.egress-guard`.\n\nAsked in order. A choice offers only the values whose needs the answers before it\nmeet, and a value or a secret is asked only where its own needs are met.",
+  "oneOf": [
+    {
+      "description": "One of a setting's values.",
+      "type": "object",
+      "properties": {
+        "asks": {
+          "type": "string",
+          "const": "choice"
+        },
+        "choices": {
+          "description": "Every value it accepts, each with what it is a choice under.",
+          "type": "array",
+          "items": {
+            "$ref": "Choosable.json"
+          }
+        },
+        "default": {
+          "description": "What it holds where it is left unanswered.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "setting": {
+          "description": "The setting.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asks",
+        "setting",
+        "choices"
+      ]
+    },
+    {
+      "description": "A setting's value, which only the operator holds.",
+      "type": "object",
+      "properties": {
+        "asks": {
+          "type": "string",
+          "const": "value"
+        },
+        "needs": {
+          "description": "The values of other settings under which it is asked.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "setting": {
+          "description": "The setting.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asks",
+        "setting",
+        "needs"
+      ]
+    },
+    {
+      "description": "A secret, entered without being shown.",
+      "type": "object",
+      "properties": {
+        "asks": {
+          "type": "string",
+          "const": "secret"
+        },
+        "needs": {
+          "description": "The values of settings under which it is asked.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "secret": {
+          "description": "The name the secret store holds it under.",
+          "type": "string"
+        },
+        "why": {
+          "description": "What holding it is for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asks",
+        "secret",
+        "why",
+        "needs"
+      ]
+    }
+  ]
+}

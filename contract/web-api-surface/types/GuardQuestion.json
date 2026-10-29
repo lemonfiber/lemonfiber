@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "asks": {
+      "type": [
+        "const:\"choice\"",
+        "const:\"secret\"",
+        "const:\"value\""
+      ],
+      "required": true
+    },
+    "choices": {
+      "type": [
+        "array[ref:Choosable]"
+      ],
+      "required": true
+    },
+    "default": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "needs": {
+      "type": [
+        "object{array[string]}"
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"choice\"",
+    "\"secret\"",
+    "\"value\""
+  ]
+}

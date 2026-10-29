@@ -77,6 +77,12 @@ Options:
 
           [possible values: true, false]
 
+      --vpn-setting <NAME=VALUE>
+          One of the VPN's settings the egress guard asks for, as `NAME=VALUE`. Repeat it for each
+
+      --vpn-secret <NAME=VALUE>
+          One of the VPN's secrets the egress guard asks for, as `NAME=VALUE`, by the name the secret store holds it under. Repeat it for each
+
       --household <BOOL>
           Whether others in the home will use it
 

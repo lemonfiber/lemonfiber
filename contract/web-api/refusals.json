@@ -769,6 +769,11 @@
     "status": 400,
     "description": "Raised when apply is asked for before the answers have been reviewed."
   },
+  "SETUP-16": {
+    "name": "GUARD_UNANSWERED",
+    "status": 400,
+    "description": "Raised when a VPN answer leaves the egress guard without what it needs to start."
+  },
   "SETUP-5": {
     "name": "DOES_NOT_APPLY",
     "status": 400,

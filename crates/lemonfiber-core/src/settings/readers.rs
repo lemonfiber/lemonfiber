@@ -58,7 +58,10 @@ impl Readers {
 }
 
 /// Every value `one_of` lists, each with what it needs and whether `held` meets it.
-fn choosable(one_of: &[Choice], held: &dyn Fn(&str) -> Option<String>) -> Vec<Choosable> {
+pub(crate) fn choosable(
+    one_of: &[Choice],
+    held: &dyn Fn(&str) -> Option<String>,
+) -> Vec<Choosable> {
     one_of
         .iter()
         .flat_map(|choice| {
@@ -72,7 +75,7 @@ fn choosable(one_of: &[Choice], held: &dyn Fn(&str) -> Option<String>) -> Vec<Ch
 }
 
 /// `needs`, each value as the text a variable holds.
-fn texts(needs: &choices::Needs) -> BTreeMap<String, Vec<String>> {
+pub(crate) fn texts(needs: &choices::Needs) -> BTreeMap<String, Vec<String>> {
     needs
         .iter()
         .map(|(setting, values)| (setting.clone(), values.iter().map(Constant::text).collect()))

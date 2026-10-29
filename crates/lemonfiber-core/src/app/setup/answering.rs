@@ -29,7 +29,7 @@ use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::model::{SettingReport, WizardReport};
 use crate::validate::{Credential, Validation, Validator};
 use crate::wizard::{
-    offer_setup, Answer, Choice, Indexer, Phase, Progress, Provider, Status, Wizard,
+    offer_setup, Answer, Choice, Indexer, Phase, Progress, Provider, Status, Vpn, Wizard,
 };
 
 /// What a setup request asks of the wizard.
@@ -84,11 +84,15 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
         || Wizard::new(ctx.environment),
         |progress| Wizard::resume(ctx.environment, progress),
     );
+    let guard = super::guard(ctx);
 
     let mut proof = None;
     match action {
         SetupAction::Where => {}
         SetupAction::Answer(answer) => {
+            if let Answer::Vpn(Vpn::Carrying(given)) = &answer {
+                super::checking(guard.as_ref(), given)?;
+            }
             let (answer, came_to) = proven(ctx.validator.as_ref(), answer).await;
             proof = came_to;
             wizard
@@ -111,10 +115,17 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
         // and stops at it, so what it answers with is the reviewed plan — every
         // setting apply would write, with the credentials among them withheld — and
         // not one file of it is on disk.
-        SetupAction::Apply if ctx.dry_run => super::would_apply(&mut wizard)?,
         SetupAction::Apply => {
-            let stamp = ctx.stamp();
-            super::resume(&mut wizard, &applying(ctx, &paths, &stamp))?;
+            if let Err(problem) = super::guarded(&mut wizard, guard.as_ref()) {
+                kept(ctx, &wizard, &paths);
+                return Err(problem);
+            }
+            if ctx.dry_run {
+                super::would_apply(&mut wizard)?;
+            } else {
+                let stamp = ctx.stamp();
+                super::resume(&mut wizard, &applying(ctx, &paths, &stamp, guard.as_ref()))?;
+            }
         }
         // Refused where nothing is part-way through: the three ways out are about a
         // half-written apply, and offering them for a run that has not begun one
@@ -131,7 +142,8 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
             }
             if !ctx.dry_run {
                 let stamp = ctx.stamp();
-                super::recovered(&mut wizard, &applying(ctx, &paths, &stamp), choice)?;
+                let applying = applying(ctx, &paths, &stamp, guard.as_ref());
+                super::recovered(&mut wizard, &applying, choice)?;
                 // Starting over forgot the answers, so the walk is back at its
                 // beginning — and a report still reading them off the wizard in hand
                 // would describe a run that no longer exists anywhere.
@@ -142,7 +154,7 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
         }
     }
 
-    Ok(reported(&wizard, &paths, proof))
+    Ok(reported(&wizard, &paths, proof, guard.as_ref()))
 }
 
 /// Keep what has been answered so far, unless this run is only saying what it would do.
@@ -166,13 +178,19 @@ fn kept(ctx: &Ctx, wizard: &Wizard, paths: &Paths) {
 ///
 /// The stamp is taken by the caller and lent in. A bundle that stamped itself would
 /// have a value of its own to keep alive, and this is handed to one call and dropped.
-fn applying<'a>(ctx: &'a Ctx, paths: &'a Paths, stamp: &'a str) -> Applying<'a> {
+fn applying<'a>(
+    ctx: &'a Ctx,
+    paths: &'a Paths,
+    stamp: &'a str,
+    guard: Option<&'a super::Guard>,
+) -> Applying<'a> {
     Applying {
         paths,
         source: ctx.stack,
         stamp,
         random: ctx.seams.random.as_ref(),
         confined: ctx.seams.confined.as_ref(),
+        guard,
     }
 }
 
@@ -191,7 +209,12 @@ fn open(saved: Option<&Progress>, paths: &Paths) -> bool {
 /// The progress is read back rather than taken from the wizard in hand, because a
 /// finished apply removes it — so what this reports is what the next run will
 /// find, which is the thing a surface is deciding on.
-fn reported(wizard: &Wizard, paths: &Paths, proof: Option<Validation>) -> WizardReport {
+fn reported(
+    wizard: &Wizard,
+    paths: &Paths,
+    proof: Option<Validation>,
+    guard: Option<&super::Guard>,
+) -> WizardReport {
     let saved = super::progress_at(&paths.setup_progress());
     WizardReport {
         rehearsed: crate::model::Ran::ForReal,
@@ -221,11 +244,31 @@ fn reported(wizard: &Wizard, paths: &Paths, proof: Option<Validation>) -> Wizard
             // The operator's, and said so before the write rather than after: a plan
             // is what their own answers came to, so the origin they will read back
             // off the listing afterwards is the one they are shown here.
-            .map(|(key, value)| {
-                SettingReport::of(store::showing(key, value), crate::origin::Origin::Operator)
-            })
+            .map(|(key, value)| store::showing(key, value))
+            .chain(guarded(wizard))
+            .map(|shown| SettingReport::of(shown, crate::origin::Origin::Operator))
             .collect(),
+        guard: guard.map(super::Guard::questions).unwrap_or_default(),
     }
+}
+
+/// What a VPN answer gives the egress guard, as the plan shows it: each setting by its
+/// value and each secret withheld.
+fn guarded(wizard: &Wizard) -> Vec<store::Shown> {
+    let Some(Vpn::Carrying(given)) = &wizard.answers().vpn else {
+        return Vec::new();
+    };
+    let settings = given.settings.iter().map(|(name, value)| store::Shown {
+        key: name.clone(),
+        value: value.clone(),
+        secret: false,
+    });
+    let secrets = given.secrets.keys().map(|name| store::Shown {
+        key: name.clone(),
+        value: store::REDACTED.to_owned(),
+        secret: true,
+    });
+    settings.chain(secrets).collect()
 }
 
 /// The answer as this path may record it, and what proving it came to.

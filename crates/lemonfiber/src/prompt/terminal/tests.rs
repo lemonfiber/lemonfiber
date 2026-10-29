@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
+use lemonfiber_core::app::setup::{
+    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
+};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::prerequisites;
@@ -371,4 +373,45 @@ fn the_review_shows_every_setting_and_never_a_secret_in_the_clear() {
     let empty = Wizard::new(Environment::MacOs).plan();
     assert!(answered(&[""]).confirm(&empty));
     assert!(!answered(&["n"]).confirm(&empty));
+}
+
+#[test]
+fn the_guards_questions_take_a_number_a_value_a_default_or_a_hidden_secret() {
+    let choice = || Asking::Choice {
+        setting: "guard:vpn-type",
+        offered: vec!["wireguard".to_owned(), "openvpn".to_owned()],
+        default: Some("wireguard".to_owned()),
+    };
+
+    assert_eq!(
+        answered(&["2"]).guard(&choice()),
+        Some("openvpn".to_owned())
+    );
+    assert_eq!(
+        answered(&["openvpn"]).guard(&choice()),
+        Some("openvpn".to_owned())
+    );
+    assert_eq!(answered(&["9"]).guard(&choice()), Some("9".to_owned()));
+    assert_eq!(answered(&[""]).guard(&choice()), None);
+    assert_eq!(
+        answered(&[""]).guard(&Asking::Choice {
+            setting: "guard:provider",
+            offered: Vec::new(),
+            default: None,
+        }),
+        None
+    );
+    assert_eq!(
+        answered(&["account-7"]).guard(&Asking::Value {
+            setting: "guard:account"
+        }),
+        Some("account-7".to_owned())
+    );
+    assert_eq!(
+        answered(&["a-key"]).guard(&Asking::Secret {
+            secret: "guard:wireguard-key",
+            why: "Dials the tunnel",
+        }),
+        Some("a-key".to_owned())
+    );
 }

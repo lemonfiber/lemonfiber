@@ -3,6 +3,8 @@
 //! The vocabulary of the conversation: one type per question, so an answer that does
 //! not make sense cannot be represented rather than being caught later.
 
+use std::collections::BTreeMap;
+
 use super::{PathBuf, Protocols};
 use crate::alert::Appetite;
 use serde::{Deserialize, Serialize};
@@ -76,14 +78,82 @@ pub struct Indexer {
 /// operator has to make knowingly — and one a later run must not quietly re-ask,
 /// nor a diagnosis mistake for an oversight. Recording the acceptance is what
 /// makes it theirs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[schemars(rename = "SetupVpn")]
-#[serde(rename_all = "kebab-case")]
+///
+/// Read from what a progress file written before the egress guard's questions holds
+/// too: the bare `"carrying"` reads as carrying with nothing given.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case", from = "Given")]
+#[schemars(with = "Given", rename = "SetupVpn")]
 pub enum Vpn {
-    /// A VPN carries it.
+    /// A VPN carries it, through the egress guard set up with what was given.
+    Carrying(Guarded),
+    /// Nothing does, and the operator confirmed they understood that.
+    Absent,
+}
+
+/// The egress guard's settings and secrets, as setup's VPN step was answered with them.
+#[derive(Clone, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "SetupGuarded")]
+pub struct Guarded {
+    /// Each of its settings given, by name, with its value.
+    #[serde(default)]
+    pub settings: BTreeMap<String, String>,
+    /// Each of its secrets given, by the name the secret store holds it under, with its
+    /// value.
+    #[serde(default)]
+    pub secrets: BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for Guarded {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Guarded")
+            .field("settings", &self.settings)
+            .field("secrets", &self.secrets.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
+/// A VPN answer as it is read: carrying with the guard's settings and secrets, or either
+/// word alone.
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(untagged)]
+#[schemars(rename = "SetupVpnGiven")]
+enum Given {
+    /// Carrying, with what was given.
+    Given(Carried),
+    /// Carrying with nothing given, or nothing carrying it.
+    Said(Said),
+}
+
+/// Carrying, with what was given.
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[schemars(rename = "SetupVpnCarrying")]
+enum Carried {
+    /// A VPN carries it, through the egress guard set up with what was given.
+    Carrying(Guarded),
+}
+
+/// Either answer, in a word.
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "SetupVpnSaid")]
+enum Said {
+    /// A VPN carries it, with nothing given for the egress guard.
     Carrying,
     /// Nothing does, and the operator confirmed they understood that.
     Absent,
+}
+
+impl From<Given> for Vpn {
+    fn from(given: Given) -> Self {
+        match given {
+            Given::Given(Carried::Carrying(guarded)) => Self::Carrying(guarded),
+            Given::Said(Said::Carrying) => Self::Carrying(Guarded::default()),
+            Given::Said(Said::Absent) => Self::Absent,
+        }
+    }
 }
 
 /// Where the credentials step stands: not yet reached, reached and left empty, or
