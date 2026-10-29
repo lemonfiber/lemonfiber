@@ -300,7 +300,7 @@ async fn a_rehearsal_shows_the_edit_and_the_real_run_puts_the_preset_back_over_i
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-reapply");
     let fillers = a_sync(&project, &first_party("syncer"), true);
     let selection = crate::quality::Selection::everywhere(crate::quality::Preset::default_preset());
-    let edit = crate::ports::service::Edited {
+    let edit = crate::model::StackEdit {
         path: "recyclarr.yml".to_owned(),
         diff: "-  min: 0\n+  min: 25\n".to_owned(),
     };

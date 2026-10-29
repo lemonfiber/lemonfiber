@@ -106,3 +106,24 @@ async fn a_configuration_the_operator_declared_their_own_is_never_put_back() {
     assert_eq!(reapplied(&ctx, &selection(), None).await.ok(), Some(None));
     assert!(http.requests().is_empty());
 }
+
+#[tokio::test]
+async fn a_key_the_sync_left_in_its_edit_reaches_neither_the_report_nor_the_journal() {
+    let leaking = r#"{"path":"recyclarr.yml","diff":"-  note: the-key-held\n+  note: balanced\n"}"#;
+    let http = Fake::by_path(vec![("/edited", Answer::reply(200, leaking))]);
+    let ctx = machine("reapplying-leaking", http, true);
+    minted_for_every_part(&ctx, "the-key-held");
+
+    let report = super::super::quality(&ctx, crate::app::QualityAction::Reapply).await;
+
+    let said = report
+        .map(|report| serde_json::to_string(&report).unwrap_or_default())
+        .unwrap_or_default();
+    assert!(said.contains("note: (set, not shown)"), "{said}");
+    assert!(!said.contains("the-key-held"), "{said}");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .and_then(|at| std::fs::read_to_string(at).ok())
+        .unwrap_or_default();
+    assert!(!journal.contains("the-key-held"));
+}

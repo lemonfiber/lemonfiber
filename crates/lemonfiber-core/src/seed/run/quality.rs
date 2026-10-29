@@ -8,12 +8,15 @@
 
 use lemonfiber_contract::capabilities::quality::sync;
 
+mod masked;
+
 use super::connecting::{pairings, Cleared, Connection};
 use super::restarting::Restarting;
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
+use crate::model::StackEdit;
 use crate::ports::media::Kind;
-use crate::ports::service::{Applied, Edited, Profiled, Syncing};
+use crate::ports::service::{Applied, Profiled, Syncing};
 use crate::quality::Selection;
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Filler, Fillers};
@@ -56,13 +59,14 @@ async fn syncer(ctx: &Ctx, fillers: &Fillers, asker: Cleared<'_>) -> Option<Rest
 
 /// What putting every curator's profiles back over a hand edit came to, through each
 /// quality sync speaking `quality.sync`: the edit replaced, or on a rehearsal the edit it
-/// would replace, or why it was not; nothing where no sync speaks it.
+/// would replace, masked here whatever the sync masked, or why it was not; nothing where
+/// no sync speaks it.
 pub(crate) async fn reapplied(
     ctx: &Ctx,
     fillers: &Fillers,
     selection: &Selection,
-) -> Option<Result<Option<Edited>, String>> {
-    let mut asked: Option<Option<Edited>> = None;
+) -> Option<Result<Option<StackEdit>, String>> {
+    let mut asked: Option<Option<StackEdit>> = None;
     for holding in holding(fillers) {
         let Some(syncer) = syncer(ctx, fillers, holding.asker).await else {
             continue;
@@ -83,12 +87,14 @@ async fn put_back(
     syncer: &Restarting,
     curators: &[(&Filler, Kind, &Address)],
     selection: &Selection,
-) -> Result<Option<Edited>, String> {
+) -> Result<Option<StackEdit>, String> {
     let adapter = sync::Adapter(syncer.adapter().clone());
+    let mut held = masked::held(ctx);
     let (mut replaced, mut restart) = (None, false);
     for (curator, which, at) in curators {
         let api_key = super::keys::minted_key(ctx, curator)
             .ok_or_else(|| format!("lemonfiber holds no key for {}", curator.name))?;
+        held.push(api_key.clone());
         let profiled = profiled(*which, at, api_key, selection);
         let edit = if ctx.dry_run {
             adapter.edited(&profiled).await
@@ -98,7 +104,9 @@ async fn put_back(
                 reapplied.replaced
             })
         }
-        .map_err(|failure| failure.to_string())?;
+        .map_err(|failure| masked::said(&failure.to_string(), &held))?
+        .map(|edit| masked::masked(edit, &held))
+        .transpose()?;
         replaced = replaced.or(edit);
     }
     if restart {

@@ -9,7 +9,6 @@ use crate::app::Ctx;
 use crate::error::codes::qual::UNREAPPLIED;
 use crate::error::{Diagnose as _, Problem, Remedy, State};
 use crate::model::StackEdit;
-use crate::ports::service::Edited;
 use crate::quality::Selection;
 
 /// Whether the quality sync's configuration holds a hand edit that putting `selection`
@@ -42,7 +41,7 @@ pub(super) async fn reapplied(
         return Ok(None);
     }
     match asked(ctx, selection).await {
-        Some(Ok(edit)) => Ok(edit.map(|Edited { path, diff }| StackEdit { path, diff })),
+        Some(Ok(edit)) => Ok(edit),
         Some(Err(why)) => Err(unreapplied(&why)),
         None => reapply_preset(
             ctx.seams.confined.as_ref(),
@@ -59,7 +58,7 @@ pub(super) async fn reapplied(
 
 /// What every quality sync speaking `quality.sync` answered, or nothing where none does or
 /// the stack cannot be read.
-async fn asked(ctx: &Ctx, selection: &Selection) -> Option<Result<Option<Edited>, String>> {
+async fn asked(ctx: &Ctx, selection: &Selection) -> Option<Result<Option<StackEdit>, String>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());

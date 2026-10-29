@@ -26,15 +26,22 @@ pub struct Profiled {
 
 /// A hand edit to a quality sync's configuration: the file, and the diff of what is on
 /// disk against what putting the profiles back writes, every credential value masked.
-#[derive(
-    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Edited {
     /// The configuration file, as the upstream's configuration directory names it.
     pub path: String,
     /// What is on disk against what is written in its place, masked.
     pub diff: String,
+}
+
+impl std::fmt::Debug for Edited {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Edited")
+            .field("path", &self.path)
+            .field("diff", &format_args!("{} bytes", self.diff.len()))
+            .finish()
+    }
 }
 
 /// What putting the profiles back over a hand edit came to.
