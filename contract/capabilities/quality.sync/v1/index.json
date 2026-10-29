@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "quality.sync/v1/openapi.json",
-      "sha256": "97386808f4e8bacaaafb3fef40c34bfff4cc14ea81c7edf6db26ff693d6aa057"
+      "sha256": "0338282f3d38cee64841de690c9db05ff155ee7421b3dfda47c622925cdfc124"
     },
     {
       "path": "quality.sync/v1/operations/apply.json",
@@ -14,8 +14,16 @@
       "sha256": "4a5c709caa7c1302914b0825e8854d5ae46f68e5517a5d2731a803b239d50283"
     },
     {
+      "path": "quality.sync/v1/operations/edited.json",
+      "sha256": "ba93e8e2da48f16939bb6c79b54094b41c67327139d76d027475e74cdf340c5b"
+    },
+    {
+      "path": "quality.sync/v1/operations/reapply.json",
+      "sha256": "ba4dd50fe80822dea055be82ffe1f7fb99f140af9cbdacfb3e4d00f55867f2a6"
+    },
+    {
       "path": "quality.sync/v1/conformance.json",
-      "sha256": "c87530207952cabb26cb79c611c0cb3d98dabf16f72bbdc19df8805ead24fa1f"
+      "sha256": "bc0066b36c93f8af825de6051c95529cbb5cd2f15a9914ac3b897861d623645a"
     }
   ],
   "major": 1

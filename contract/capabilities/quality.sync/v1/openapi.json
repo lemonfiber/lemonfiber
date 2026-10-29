@@ -90,6 +90,12 @@
     },
     "/lemonfiber/quality.sync/v1/apply": {
       "$ref": "operations/apply.json"
+    },
+    "/lemonfiber/quality.sync/v1/edited": {
+      "$ref": "operations/edited.json"
+    },
+    "/lemonfiber/quality.sync/v1/reapply": {
+      "$ref": "operations/reapply.json"
     }
   }
 }

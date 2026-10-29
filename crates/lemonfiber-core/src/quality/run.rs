@@ -47,21 +47,19 @@ pub const CHANGES: &str = "A quality choice shapes what is fetched from now on. 
 /// is the write, not an account of one. A reapply re-asserts the recorded preset
 /// over a quality sync config the operator hand-edited, the explicit consent an
 /// ordinary run withholds.
-pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport, Box<Problem>> {
+pub(crate) async fn quality(
+    ctx: &Ctx,
+    action: QualityAction,
+) -> Result<QualityReport, Box<Problem>> {
     let mut selection = load_selection(ctx)?;
     let chose = matches!(action, QualityAction::Set { .. });
     let playback = playback(ctx);
     let record = materialised_record(ctx);
-    let into = ctx.settings.stack_dir.as_deref();
 
     let (disposition, customised, overwritten) = match action {
         QualityAction::Show => (
             Disposition::Shown,
-            crate::app::materialise::quality_sync_customised(
-                ctx.seams.confined.as_ref(),
-                into,
-                record.as_deref(),
-            ),
+            reapplying::customised(ctx, &selection, record.as_deref()).await,
             None,
         ),
         QualityAction::Set {
@@ -87,25 +85,12 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             };
             (
                 disposition,
-                crate::app::materialise::quality_sync_customised(
-                    ctx.seams.confined.as_ref(),
-                    into,
-                    record.as_deref(),
-                ),
+                reapplying::customised(ctx, &selection, record.as_deref()).await,
                 None,
             )
         }
         QualityAction::Reapply => {
-            let overwritten = crate::app::materialise::reapply_preset(
-                ctx.seams.confined.as_ref(),
-                ctx.stack,
-                into,
-                record.as_deref(),
-                &selection,
-                &ctx.settings.unmanaged,
-                ctx.dry_run,
-            )
-            .map_err(|failure| Box::new(failure.problem()))?;
+            let overwritten = reapplying::reapplied(ctx, &selection, record.as_deref()).await?;
             let disposition = if ctx.dry_run {
                 Disposition::WouldReapply
             } else {
@@ -292,6 +277,8 @@ fn choice(scope: &str, preset: Preset, playback: Playback) -> PresetChoice {
         needs_transcoding_here: warn_before_confirming(preset, playback).is_some(),
     }
 }
+
+mod reapplying;
 
 #[cfg(test)]
 mod tests;

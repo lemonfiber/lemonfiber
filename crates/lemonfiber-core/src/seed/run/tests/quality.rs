@@ -1,6 +1,7 @@
 //! Holding each curator's quality profiles through a quality sync speaking its contract.
 
 use super::*;
+use crate::test_support::syncing::the_sync;
 
 /// What a sync answers for a curator it has applied nothing to.
 const NOTHING_APPLIED: &str = "null";
@@ -13,23 +14,6 @@ const APPLY: &str = "/lemonfiber/quality.sync/v1/apply";
 
 /// The sync as a replaced key's copies name it.
 const THE_SYNC: &str = "sync the stand-in";
-
-/// A plugin `syncer` whose service `sync` speaks `quality.sync` where `speaking` and
-/// asks every curator.
-fn the_sync(speaking: bool) -> crate::plugin::Installed {
-    let mut installed = crate::test_support::contracted("syncer", "sync", "quality.sync");
-    for placed in &mut installed.services {
-        placed.asks = vec![crate::plugin::Asking {
-            native: None,
-            capability: "library.curate".to_owned(),
-            each: true,
-        }];
-        if !speaking {
-            placed.speaks.clear();
-        }
-    }
-    installed
-}
 
 /// [`the_sync`] beside a curator of each kind of video and one of music, each moved into
 /// its plugin, trusting `trusted` beside the bundle's plugins.
@@ -284,4 +268,109 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
         "{not_reprofiled:?}"
     );
     assert!(applied_bodies(&unread).is_empty());
+}
+
+/// Where a sync is asked what putting a preset back would replace.
+const EDITED: &str = "/lemonfiber/quality.sync/v1/edited";
+
+/// Where a sync is told to put a preset back over a hand edit.
+const REAPPLY: &str = "/lemonfiber/quality.sync/v1/reapply";
+
+/// A hand edit, as the sync answers it.
+const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"-  min: 0\n+  min: 25\n"}"#;
+
+/// A sync answering `edited` with [`AN_EDIT`] and `reapply` with `reapplied`.
+fn reapplying(reapplied: &'static str) -> Arc<Fake> {
+    Fake::by_path(vec![
+        (EDITED, Answer::reply(200, AN_EDIT)),
+        (REAPPLY, Answer::reply(200, reapplied)),
+    ])
+}
+
+/// How many times `http` was asked at `path`.
+fn asked_at(http: &Fake, path: &str) -> usize {
+    http.requests()
+        .iter()
+        .filter(|one| one.url.ends_with(path))
+        .count()
+}
+
+#[tokio::test]
+async fn a_rehearsal_shows_the_edit_and_the_real_run_puts_the_preset_back_over_it() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-reapply");
+    let fillers = a_sync(&project, &first_party("syncer"), true);
+    let selection = crate::quality::Selection::everywhere(crate::quality::Preset::default_preset());
+    let edit = crate::ports::service::Edited {
+        path: "recyclarr.yml".to_owned(),
+        diff: "-  min: 0\n+  min: 25\n".to_owned(),
+    };
+    let http = reapplying(format!(r#"{{"replaced":{AN_EDIT},"applied":null}}"#).leak());
+    let mut ctx = contracted_ctx(&project, "sync", true, http.clone());
+    ctx.dry_run = true;
+
+    let shown = super::super::quality::reapplied(&ctx, &fillers, &selection).await;
+
+    assert_eq!(shown, Some(Ok(Some(edit.clone()))));
+    assert_eq!(
+        (asked_at(&http, "/edited"), asked_at(&http, "/reapply")),
+        (2, 0)
+    );
+
+    ctx.dry_run = false;
+    let put_back = super::super::quality::reapplied(&ctx, &fillers, &selection).await;
+
+    assert_eq!(put_back, Some(Ok(Some(edit))));
+    assert_eq!(asked_at(&http, "/reapply"), 2);
+}
+
+#[tokio::test]
+async fn a_sync_taking_it_up_only_once_it_restarts_is_restarted_or_said_not_to_have_been() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-reapply-restart");
+    let fillers = a_sync(&project, &first_party("syncer"), true);
+    let selection = crate::quality::Selection::everywhere(crate::quality::Preset::default_preset());
+    let http = reapplying(r#"{"replaced":null,"applied":"on-restart"}"#);
+    let ctx = contracted_ctx(&project, "sync", true, http.clone());
+
+    let put_back = super::super::quality::reapplied(&ctx, &fillers, &selection).await;
+
+    assert!(
+        matches!(&put_back, Some(Err(why)) if why.starts_with("sync takes it up only once it starts again")),
+        "{put_back:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_sync_that_refuses_or_a_curator_with_no_key_is_said_and_one_not_speaking_is_not_asked() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-reapply-refused");
+    let selection = crate::quality::Selection::everywhere(crate::quality::Preset::default_preset());
+    let refusing = contracted_ctx(
+        &project,
+        "sync",
+        true,
+        Fake::by_path(vec![(REAPPLY, Answer::reply(500, ""))]),
+    );
+    let speaking = a_sync(&project, &first_party("syncer"), true);
+
+    let refused = super::super::quality::reapplied(&refusing, &speaking, &selection).await;
+    let elsewhere = lemonfiber_fixtures::scratch::Scratch::new("quality-reapply-unkeyed");
+    let forgotten = forgetting_minted(contracted_ctx(&elsewhere, "sync", true, reapplying("null")));
+    let unkeyed = super::super::quality::reapplied(
+        &forgotten,
+        &a_sync(&elsewhere, &first_party("syncer"), true),
+        &selection,
+    )
+    .await;
+    let unspoken = super::super::quality::reapplied(
+        &contracted_ctx(&project, "sync", true, reapplying("null")),
+        &a_sync(&project, &first_party("syncer"), false),
+        &selection,
+    )
+    .await;
+
+    assert!(matches!(refused, Some(Err(_))), "{refused:?}");
+    assert!(
+        matches!(&unkeyed, Some(Err(why)) if why == "lemonfiber holds no key for Sonarr"),
+        "{unkeyed:?}"
+    );
+    assert_eq!(unspoken, None);
 }

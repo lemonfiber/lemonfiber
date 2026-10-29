@@ -25,7 +25,7 @@ use crate::stack::{Failure, Source};
 /// slashes on every platform by the stack embedding, the same separator the
 /// materialised record keys already use. It would need revisiting only if the
 /// stack ever came from a real filesystem walk on a back-slash OS.
-const QUALITY_SYNC_CONFIG: &str = "config/recyclarr/recyclarr.yml";
+pub(crate) const QUALITY_SYNC_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 
 /// Write the stack under `into`, preserving any file the operator has edited, and
 /// return where it lives and which files were left as they set them.

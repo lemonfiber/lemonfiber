@@ -68,7 +68,7 @@ pub(crate) use curating::curators;
 pub(crate) use enveloping::guarding_installed;
 pub(crate) use gate::reroute;
 use identity::seed_request_identity;
-pub(crate) use quality::reprofile;
+pub(crate) use quality::{reapplied, reprofile};
 pub(crate) use reset::reset_connections;
 pub(crate) use securing::{secured, secured_by, securing_installed, would_restart, Secured};
 pub(crate) use showing::reshow;

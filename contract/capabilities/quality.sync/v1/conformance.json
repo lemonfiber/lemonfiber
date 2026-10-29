@@ -42,6 +42,42 @@
       "keyed": true,
       "live": false,
       "operation": "applied"
+    },
+    {
+      "asked": {
+        "profiled": {
+          "api_key": "{minted}",
+          "host": "conformance-curator",
+          "port": 58989,
+          "preset": "balanced",
+          "which": "tv"
+        }
+      },
+      "case": "edited-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "edited"
+    },
+    {
+      "asked": {
+        "profiled": {
+          "api_key": "{minted}",
+          "host": "conformance-curator",
+          "port": 58989,
+          "preset": "balanced",
+          "which": "tv"
+        }
+      },
+      "case": "reapply-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "reapply"
     }
   ],
   "major": 1

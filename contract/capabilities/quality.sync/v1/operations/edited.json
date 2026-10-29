@@ -1,0 +1,177 @@
+{
+  "post": {
+    "operationId": "edited",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "Preset": {
+                "description": "How good the operator wants their media to look, and how much disk they will\nspend on it — chosen without ever learning what a custom format is.",
+                "oneOf": [
+                  {
+                    "const": "space-saving",
+                    "description": "Good enough on a laptop or tablet: 720p–1080p, smaller encodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "balanced",
+                    "description": "Looks right on a TV, at sensible file sizes: 1080p, good encodes. The one\nchosen when the operator expresses no preference.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "high-quality",
+                    "description": "The best 1080p available, with size a secondary concern: 1080p, high-bitrate.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "maximum",
+                    "description": "4K where it exists, with HDR preserved: 2160p, very large files.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "Profiled": {
+                "additionalProperties": false,
+                "description": "One curator, and the preset its profiles are held to.",
+                "properties": {
+                  "api_key": {
+                    "description": "The curator's own key.",
+                    "type": "string"
+                  },
+                  "host": {
+                    "description": "The host the sync reaches the curator on.",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "The port the curator listens on.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "preset": {
+                    "$ref": "#/$defs/Preset",
+                    "description": "The preset its profiles are held to."
+                  },
+                  "which": {
+                    "$ref": "#/$defs/Kind",
+                    "description": "What the curator files."
+                  }
+                },
+                "required": [
+                  "which",
+                  "host",
+                  "port",
+                  "api_key",
+                  "preset"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "profiled": {
+                "$ref": "#/$defs/Profiled",
+                "description": "The port's `profiled`."
+              }
+            },
+            "required": [
+              "profiled"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Edited": {
+                  "additionalProperties": false,
+                  "description": "A hand edit to a quality sync's configuration: the file, and the diff of what is on\ndisk against what putting the profiles back writes, every credential value masked.",
+                  "properties": {
+                    "diff": {
+                      "description": "What is on disk against what is written in its place, masked.",
+                      "type": "string"
+                    },
+                    "path": {
+                      "description": "The configuration file, as the upstream's configuration directory names it.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "diff"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Edited"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nullable_Edited"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576
+  }
+}

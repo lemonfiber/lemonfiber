@@ -153,8 +153,8 @@
         1
       ],
       "openapi": "quality.sync/v1/openapi.json",
-      "operations": 2,
-      "sha256": "a8966ef6df3e756adfe65ee098b686e767019d33bef56e422ae2e8554b5dc392"
+      "operations": 4,
+      "sha256": "4afdc31fc037d178868c6375975e6794887875e8ee4f5f48d566b11635a68b54"
     },
     {
       "capability": "dashboard.show",
