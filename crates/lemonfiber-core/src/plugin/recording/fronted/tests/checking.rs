@@ -19,6 +19,7 @@ async fn checked(at: &Path, serving: &Serves, http: &Arc<Fake>, adapter: Option<
     let taking = Retaking {
         check: true,
         adapter: adapter.map(str::to_owned),
+        built: None,
     };
     let read = record(
         at,
@@ -168,6 +169,7 @@ async fn writing_from_the_adapter_it_names_writes_what_that_adapter_answered() {
     let taking = Retaking {
         check: false,
         adapter: Some(BUILT.to_owned()),
+        built: None,
     };
     let read = record(
         &at,

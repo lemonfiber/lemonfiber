@@ -156,6 +156,7 @@ pub(crate) fn contained(placed: &Placed, operator: &Operator) -> Contained {
 /// The container a run of `run` is made in, for the service `placed` records.
 pub(crate) fn settled(
     placed: &Placed,
+    image: &str,
     run: &lemonfiber_plugin::Run,
     operator: &Operator,
     configured: Option<&Path>,
@@ -172,7 +173,7 @@ pub(crate) fn settled(
         devices: _,
     } = contained(placed, operator);
     Run {
-        image: format!("{}@{}", placed.image, placed.digest),
+        image: image.to_owned(),
         args: run.args.clone(),
         env,
         user,
@@ -191,8 +192,13 @@ pub(crate) fn settled(
     }
 }
 
-/// Run `run` for the service `placed` records, with a throwaway copy of its starting
-/// files, and say what it came to.
+/// The image `placed` pins, by its digest.
+pub(crate) fn pinned(placed: &Placed) -> String {
+    format!("{}@{}", placed.image, placed.digest)
+}
+
+/// Run `run` for the service `placed` records, from the image it pins, with a throwaway
+/// copy of its starting files, and say what it came to.
 pub(crate) async fn performed(
     program: &dyn Program,
     placed: &Placed,
@@ -201,11 +207,49 @@ pub(crate) async fn performed(
     starting: Option<Starting<'_>>,
     random: &dyn crate::ports::random::Random,
 ) -> Came {
+    performed_from(
+        program,
+        placed,
+        &pinned(placed),
+        Asking {
+            run,
+            operator,
+            starting,
+        },
+        random,
+    )
+    .await
+}
+
+/// What a run is asked as: the run, who it runs as, and the starting files it is given.
+pub(crate) struct Asking<'a> {
+    /// The run.
+    pub(crate) run: &'a lemonfiber_plugin::Run,
+    /// Who it runs as.
+    pub(crate) operator: &'a Operator,
+    /// Where its starting files are copied from, where it has any.
+    pub(crate) starting: Option<Starting<'a>>,
+}
+
+/// Run a run for the service `placed` records, from `image`, with a throwaway copy of
+/// its starting files, and say what it came to.
+pub(crate) async fn performed_from(
+    program: &dyn Program,
+    placed: &Placed,
+    image: &str,
+    asking: Asking<'_>,
+    random: &dyn crate::ports::random::Random,
+) -> Came {
+    let Asking {
+        run,
+        operator,
+        starting,
+    } = asking;
     let copy = match throwaway::Throwaway::of(starting, random) {
         Ok(copy) => copy,
         Err(why) => return Came::Unproven(why),
     };
-    let asked = settled(placed, run, operator, Some(copy.path()));
+    let asked = settled(placed, image, run, operator, Some(copy.path()));
     match program.run(&asked).await {
         Ok(ran) => match ran.ended {
             Ended::Exited(exit) => Came::Ended(RunResult {

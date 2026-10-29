@@ -58,6 +58,7 @@ pub(super) async fn answers(
     health: Option<&Health>,
     items: &[&Item<'_>],
     secrets: &[Secret],
+    built: Option<&str>,
 ) -> Result<Vec<Answer>, Failed> {
     let failing = |step: &'static str| {
         move |why: String| Failed {
@@ -85,6 +86,7 @@ pub(super) async fn answers(
         .map_err(failing(STAND_INS))?;
     let settled = settled(placed, &copy, data.as_deref());
     let serve = Serve {
+        image: built.map_or_else(|| settled.image.clone(), str::to_owned),
         env: settled
             .env
             .iter()
@@ -264,7 +266,7 @@ pub(in crate::plugin) fn settled_as(
     binds.extend(mounted(placed, copy));
     Serve {
         reaching: Vec::new(),
-        image: format!("{}@{}", placed.image, placed.digest),
+        image: crate::plugin::program::pinned(placed),
         env,
         command: Vec::new(),
         user,

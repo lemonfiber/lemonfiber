@@ -43,12 +43,21 @@ pub struct Retaking {
     pub check: bool,
     /// An image the engine holds, each adapter started from in place of its pin.
     pub adapter: Option<String>,
+    /// An image the engine holds, the service whose id is the plugin's started, and each
+    /// of its runs performed, from in place of its pin.
+    pub built: Option<String>,
 }
 
 impl Retaking {
     /// The image each adapter is started from in place of its pin, where one is named.
     fn adapter(&self) -> Option<&str> {
         self.adapter.as_deref()
+    }
+
+    /// The image `placed` is started from in place of its pin, where it is the service
+    /// whose id is `plugin`'s and an image is named for it.
+    fn built_for(&self, plugin: &str, placed: &Placed) -> Option<&str> {
+        self.built.as_deref().filter(|_| placed.service == plugin)
     }
 }
 
@@ -151,8 +160,10 @@ pub async fn record(path: &Path, recorder: Recorder<'_>) -> Result<Recorded, Unr
     let (root, manifest) = sourced(path)?;
     let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     let mut recordings = Vec::new();
-    let mut failed = Vec::new();
-    if refusals.is_empty() {
+    let mut failed: Vec<Failed> = unbuildable(&manifest, recorder.taking)
+        .into_iter()
+        .collect();
+    if refusals.is_empty() && failed.is_empty() {
         for running in ran::runs(&manifest) {
             recordings.push(ran::taken(&manifest, running, &root, recorder).await);
         }
@@ -175,6 +186,34 @@ pub async fn record(path: &Path, recorder: Recorder<'_>) -> Result<Recorded, Unr
         recordings,
         failed,
         holds,
+    })
+}
+
+/// Why the image `--built` names cannot stand in for the service whose id is the plugin's,
+/// where it cannot: no such service is declared, it is an adapter, or an adapter fronts it,
+/// whose recordings `--adapter` takes.
+fn unbuildable(manifest: &Manifest, taking: &Retaking) -> Option<Failed> {
+    taking.built.as_ref()?;
+    let plugin = manifest.plugin.id.as_str();
+    let service = manifest
+        .services
+        .iter()
+        .find(|service| service.id == plugin);
+    let why = match service {
+        None => "no service of this plugin has the plugin's id, so there is none for it to stand in for",
+        Some(service) if !service.speaks.is_empty() || service.fronts.is_some() => {
+            "the service with the plugin's id is an adapter, whose image --adapter names"
+        }
+        Some(service) if manifest.services.iter().any(|one| one.fronts.as_deref() == Some(service.id.as_str())) => {
+            "an adapter fronts the service with the plugin's id, so its recordings are taken with --adapter"
+        }
+        Some(_) => return None,
+    };
+    Some(Failed {
+        service: plugin.to_owned(),
+        step: "--built".to_owned(),
+        why: why.to_owned(),
+        log: Vec::new(),
     })
 }
 

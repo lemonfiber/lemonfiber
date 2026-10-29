@@ -6,7 +6,7 @@ use lemonfiber_plugin::{Manifest, Run};
 
 use super::written::{before, written};
 use super::{placed, Recorder, Retaking, Taken, Took};
-use crate::plugin::program::{performed, recorded, Came, Operator, Starting};
+use crate::plugin::program::{performed_from, pinned, recorded, Asking, Came, Operator, Starting};
 use crate::plugin::recorded::{Of, Recording, RunAsked, RunResult};
 
 /// One run a manifest names a recording for.
@@ -68,17 +68,24 @@ pub(super) async fn taken(
                 root,
                 service: &placed.service,
             };
-            let came = performed(
+            let pin = pinned(&placed);
+            let image = recorder
+                .taking
+                .built_for(&manifest.plugin.id, &placed)
+                .unwrap_or(&pin);
+            let came = performed_from(
                 recorder.program,
                 &placed,
-                running.run,
-                &Operator::recording(),
-                Some(starting),
+                image,
+                Asking {
+                    run: running.run,
+                    operator: &Operator::recording(),
+                    starting: Some(starting),
+                },
                 recorder.random,
             )
             .await;
-            let pinned = format!("{}@{}", placed.image, placed.digest);
-            kept(root, fixture, &pinned, running.run, &came, recorder.taking)
+            kept(root, fixture, &pin, running.run, &came, recorder.taking)
         }
         _ => Took::Unrecorded {
             why: "names no fixture, or no one service of this plugin, so there is nowhere to \

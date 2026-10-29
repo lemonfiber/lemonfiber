@@ -58,6 +58,7 @@ fn a_check_names_a_recording_no_case_asked_and_leaves_it() {
         &Retaking {
             check: true,
             adapter: None,
+            built: None,
         },
     );
 
@@ -140,6 +141,7 @@ fn a_folder_that_cannot_be_read_is_passed_over() {
         &Retaking {
             check: true,
             adapter: None,
+            built: None,
         },
     );
     let _ = std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755));

@@ -7,7 +7,9 @@ use lemonfiber_plugin::{Expect, Manifest};
 use super::super::installed::{Installed, Placed};
 use super::super::recorded::RunResult;
 use super::super::Verdict;
-use super::{contained, limit, performed, recorded, settled, verdict, Came, Operator, Starting};
+use super::{
+    contained, limit, performed, pinned, recorded, settled, verdict, Came, Operator, Starting,
+};
 use crate::ports::program::{Configuration, Unran};
 
 /// A plugin whose one service has no port, proved by running its own program.
@@ -58,7 +60,7 @@ pub(crate) fn declaring_a_password() -> String {
            minted = \"password\"\nwhy    = \"Its administrator's password\"\n"
 }
 
-fn placed(text: &str) -> Option<Placed> {
+pub(in crate::plugin) fn placed(text: &str) -> Option<Placed> {
     let manifest = Manifest::from_toml(text);
     assert!(manifest.is_ok(), "the fixture reads: {manifest:?}");
     manifest
@@ -95,6 +97,7 @@ fn a_confined_run_has_no_network_capability_or_writable_root_and_only_the_consta
     let asked = placed(RUNNING).map(|placed| {
         settled(
             &placed,
+            &pinned(&placed),
             &run_of(&["--version"], Some(45)),
             &operator(),
             Some(copy),
@@ -141,9 +144,15 @@ fn a_confined_run_has_no_network_capability_or_writable_root_and_only_the_consta
 #[test]
 fn a_standard_run_is_given_back_six_capabilities_and_a_writable_root() {
     let text = RUNNING.replace("posture       = \"confined\"\n", "");
-    let Some(asked) =
-        placed(&text).map(|placed| settled(&placed, &run_of(&["-v"], None), &operator(), None))
-    else {
+    let Some(asked) = placed(&text).map(|placed| {
+        settled(
+            &placed,
+            &pinned(&placed),
+            &run_of(&["-v"], None),
+            &operator(),
+            None,
+        )
+    }) else {
         return;
     };
     assert_eq!(
@@ -195,8 +204,15 @@ fn a_render_shape_passes_no_device_the_host_is_not_asked_about() {
 #[test]
 fn who_a_run_is_follows_the_services_user_mode() {
     let as_env = RUNNING.replace("user_mode     = \"uid\"", "user_mode     = \"puid-env\"");
-    let env =
-        placed(&as_env).map(|placed| settled(&placed, &run_of(&["-v"], None), &operator(), None));
+    let env = placed(&as_env).map(|placed| {
+        settled(
+            &placed,
+            &pinned(&placed),
+            &run_of(&["-v"], None),
+            &operator(),
+            None,
+        )
+    });
     assert_eq!(env.as_ref().and_then(|asked| asked.user.clone()), None);
     assert!(env.is_some_and(|asked| {
         asked
@@ -204,8 +220,15 @@ fn who_a_run_is_follows_the_services_user_mode() {
             .ends_with(&["PUID=501".to_owned(), "PGID=20".to_owned()])
     }));
     let as_image = RUNNING.replace("user_mode     = \"uid\"\n", "user_mode     = \"image\"\n");
-    let image =
-        placed(&as_image).map(|placed| settled(&placed, &run_of(&["-v"], None), &operator(), None));
+    let image = placed(&as_image).map(|placed| {
+        settled(
+            &placed,
+            &pinned(&placed),
+            &run_of(&["-v"], None),
+            &operator(),
+            None,
+        )
+    });
     assert!(image.is_some_and(
         |asked| asked.user.is_none() && !asked.env.iter().any(|one| one.starts_with("PUID"))
     ));

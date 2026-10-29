@@ -526,4 +526,4 @@ fn unfinished(state: crate::seed::State) -> String {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

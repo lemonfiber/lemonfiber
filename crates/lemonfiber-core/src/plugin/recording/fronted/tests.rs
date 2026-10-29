@@ -13,7 +13,7 @@ use crate::ports::http::{Http, Request};
 use crate::ports::program::Unran;
 use crate::ports::serving::Served;
 
-const FRONTED: &str = r#"
+pub(in crate::plugin::recording) const FRONTED: &str = r#"
 schema_version = 1
 
 [plugin]
