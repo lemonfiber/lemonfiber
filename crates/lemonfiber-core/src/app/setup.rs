@@ -39,13 +39,12 @@ use crate::wizard::{
 
 /// Every refusal answering, applying or recovering setup answers with, which a client
 /// names by its code.
-pub const REFUSALS: [Code; 6] = [
+pub const REFUSALS: [Code; 5] = [
     DOES_NOT_APPLY,
     ALREADY_SET_UP,
     NOT_REVIEWED,
     NOTHING_TO_RECOVER,
     GUARD_UNANSWERED,
-    crate::error::codes::setting::OUTSIDE_ITS_CHOICES,
 ];
 
 /// How the operator is asked the questions the wizard cannot answer itself.
