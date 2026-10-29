@@ -1,0 +1,22 @@
+{
+  "capability": "owner.claim",
+  "files": [
+    {
+      "path": "owner.claim/v1/openapi.json",
+      "sha256": "d579c0d523bbed74bf0d294547ba9bd91aed832975a09eaa0a0c6e8aabb6ecf8"
+    },
+    {
+      "path": "owner.claim/v1/operations/owner.json",
+      "sha256": "3d4c84f37d8df663f5052c515f663e716756c9a4b13e418b9ef0e912b05f4d09"
+    },
+    {
+      "path": "owner.claim/v1/operations/claim.json",
+      "sha256": "9d9169780a9b908e23f3092c96291e299b22f2d7dfec536a89b7ae786445203b"
+    },
+    {
+      "path": "owner.claim/v1/conformance.json",
+      "sha256": "e5a00b8068cda61163518739bba75db6ff768fb39ff29f0630f93f7d821032cf"
+    }
+  ],
+  "major": 1
+}

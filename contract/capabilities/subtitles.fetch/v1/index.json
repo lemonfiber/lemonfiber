@@ -1,0 +1,22 @@
+{
+  "capability": "subtitles.fetch",
+  "files": [
+    {
+      "path": "subtitles.fetch/v1/openapi.json",
+      "sha256": "fe3effdbcac8957e1591af5cc050f6a0483ca1f237579ff7f9f1b8be1e7117df"
+    },
+    {
+      "path": "subtitles.fetch/v1/operations/watching.json",
+      "sha256": "1ae69ebc974a32680a6dd9b259954c9f72d3f560677809d49bd8e5d86ce4c4b3"
+    },
+    {
+      "path": "subtitles.fetch/v1/operations/watch.json",
+      "sha256": "b249b80494489e2ccdf7009d3acc86d093bc566f818eff519f22a92ab8e8cf4c"
+    },
+    {
+      "path": "subtitles.fetch/v1/conformance.json",
+      "sha256": "32366d84655be6af598fbf1826fde81681457cf71c59f39cfc310ac202d1bfb8"
+    }
+  ],
+  "major": 1
+}

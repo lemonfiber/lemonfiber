@@ -1,5 +1,5 @@
-//! The published documents: an `OpenAPI` document and a conformance list per capability,
-//! and an index of them all.
+//! The published documents: an `OpenAPI` document, a conformance list and an index of its
+//! files per capability, and an index of every capability.
 //!
 //! Generated from [`crate::capabilities::all`], never written by hand, and compared with
 //! the committed `contract/capabilities/` by a test, so a type that moves and a document
@@ -19,26 +19,40 @@ const KEY: &str = "key";
 #[must_use]
 pub fn files() -> Vec<(String, String)> {
     let capabilities = crate::capabilities::all();
-    let mut files: Vec<(String, String)> = capabilities
-        .iter()
-        .flat_map(|capability| {
-            let mut documents = vec![(located(capability, OPENAPI), openapi(capability))];
-            documents.extend(capability.operations.iter().map(|operation| {
-                (
-                    located(capability, &format!("{OPERATIONS}/{}.json", operation.name)),
-                    path_item(operation),
-                )
-            }));
-            documents.push((located(capability, CONFORMANCE), conformance(capability)));
-            documents
-                .into_iter()
-                .map(|(path, document)| (path, written(&document)))
-        })
-        .collect();
-    let listed = index(&capabilities, &files);
-    files.push(("index.json".to_owned(), written(&listed)));
+    let mut files = Vec::new();
+    let mut listed = Vec::new();
+    for capability in &capabilities {
+        let documents = documents(capability);
+        let own = written(&index(capability, &documents));
+        listed.push(entry(capability, &own));
+        files.extend(documents);
+        files.push((located(capability, INDEX), own));
+    }
+    files.push((
+        INDEX.to_owned(),
+        written(&json!({ "capabilities": listed })),
+    ));
     files
 }
+
+/// One capability's documents, each as a path under [`DIRECTORY`] and its contents.
+fn documents(capability: &Capability) -> Vec<(String, String)> {
+    let mut documents = vec![(located(capability, OPENAPI), openapi(capability))];
+    documents.extend(capability.operations.iter().map(|operation| {
+        (
+            located(capability, &format!("{OPERATIONS}/{}.json", operation.name)),
+            path_item(operation),
+        )
+    }));
+    documents.push((located(capability, CONFORMANCE), conformance(capability)));
+    documents
+        .into_iter()
+        .map(|(path, document)| (path, written(&document)))
+        .collect()
+}
+
+/// The name of the index of every capability, and of each capability's own.
+const INDEX: &str = "index.json";
 
 /// The name of a capability's `OpenAPI` document.
 const OPENAPI: &str = "openapi.json";
@@ -119,7 +133,8 @@ pub fn path_item(operation: &crate::Operation) -> Value {
     let mut item = json!({
         "post": {
             "operationId": operation.name,
-            "x-lemonfiber-largest": operation.largest,
+            "x-lemonfiber-largest": operation.bounds.largest,
+            "x-lemonfiber-deadline": operation.bounds.deadline.as_secs(),
             "security": [{ KEY: [] }],
             "requestBody": {
                 "required": true,
@@ -191,31 +206,33 @@ pub fn conformance(capability: &Capability) -> Value {
     })
 }
 
-/// Every capability, the major this build speaks, and every file of its documents with
-/// its digest.
+/// One capability's index: every file of its documents with its digest.
 #[must_use]
-pub fn index(capabilities: &[Capability], files: &[(String, String)]) -> Value {
-    let listed: Vec<Value> = capabilities
+pub fn index(capability: &Capability, documents: &[(String, String)]) -> Value {
+    let files: Vec<Value> = documents
         .iter()
-        .map(|capability| {
-            let within = located(capability, "");
-            let documents: Vec<Value> = files
-                .iter()
-                .filter(|(path, _)| path.starts_with(&within))
-                .map(|(path, text)| json!({ "path": path, "sha256": digest(text) }))
-                .collect();
-            json!({
-                "capability": capability.name,
-                "majors": [capability.major],
-                "operations": capability.operations.len(),
-                "facet": crate::capabilities::is_facet(capability.name),
-                "openapi": located(capability, OPENAPI),
-                "conformance": located(capability, CONFORMANCE),
-                "files": documents
-            })
-        })
+        .map(|(path, text)| json!({ "path": path, "sha256": digest(text) }))
         .collect();
-    json!({ "capabilities": listed })
+    json!({
+        "capability": capability.name,
+        "major": capability.major,
+        "files": files
+    })
+}
+
+/// One capability as the index of every capability lists it: the major this build
+/// speaks, where its documents are, and its own index, `own`, with its digest.
+fn entry(capability: &Capability, own: &str) -> Value {
+    json!({
+        "capability": capability.name,
+        "majors": [capability.major],
+        "operations": capability.operations.len(),
+        "facet": crate::capabilities::is_facet(capability.name),
+        "openapi": located(capability, OPENAPI),
+        "conformance": located(capability, CONFORMANCE),
+        "index": located(capability, INDEX),
+        "sha256": digest(own)
+    })
 }
 
 #[cfg(test)]

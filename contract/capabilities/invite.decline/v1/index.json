@@ -1,0 +1,26 @@
+{
+  "capability": "invite.decline",
+  "files": [
+    {
+      "path": "invite.decline/v1/openapi.json",
+      "sha256": "31f6181e61577e34f691a03bc43fe4fb8863b853500d27c570cb87bd0650ff0a"
+    },
+    {
+      "path": "invite.decline/v1/operations/hold.json",
+      "sha256": "4e565958c64d5a84222dccc72c5577076072ce134cea1183e90374facfb88bc7"
+    },
+    {
+      "path": "invite.decline/v1/operations/held.json",
+      "sha256": "4fc8aeee5a5ebe07695a48fd7256ac519ee7caa2888c9dcad86677003fbc73fc"
+    },
+    {
+      "path": "invite.decline/v1/operations/apply_invitations.json",
+      "sha256": "f60f1294c1f427d6018bc3c5c2843792337e297d4383b5d88dd48edef735121f"
+    },
+    {
+      "path": "invite.decline/v1/conformance.json",
+      "sha256": "569146162babad33ccdd891865b9f8e3e602bd258bcb322171c7209a32a4a180"
+    }
+  ],
+  "major": 1
+}

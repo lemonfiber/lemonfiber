@@ -1,0 +1,22 @@
+{
+  "capability": "indexer.proxy",
+  "files": [
+    {
+      "path": "indexer.proxy/v1/openapi.json",
+      "sha256": "78b0f7c937898a8390eecf92709070b57a4ce233f6893fc86a5a7f54a30d2f67"
+    },
+    {
+      "path": "indexer.proxy/v1/operations/solve.json",
+      "sha256": "e53ee14b623e7cbdf206c9cc1afddb59c9244a5ca8e5f91bc98dd660e09116a2"
+    },
+    {
+      "path": "indexer.proxy/v1/operations/answers.json",
+      "sha256": "a979da1be45b7ca18228e5dd154569b473285d3f598111f00fa444ba6d52a38d"
+    },
+    {
+      "path": "indexer.proxy/v1/conformance.json",
+      "sha256": "fdd16f30dde707bc5fd2e12fed266eb9226892728bfe2b583bdb30eadda950e7"
+    }
+  ],
+  "major": 1
+}

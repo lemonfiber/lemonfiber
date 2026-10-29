@@ -1,0 +1,22 @@
+{
+  "capability": "request.gate",
+  "files": [
+    {
+      "path": "request.gate/v1/openapi.json",
+      "sha256": "ef58fefc9d945212fe186be98f8bcdf3766f51f09c831077d7cb94693356783c"
+    },
+    {
+      "path": "request.gate/v1/operations/admit.json",
+      "sha256": "fa838a9a832bd3e43f0b6bc63ae84d8c33da6db61d3a75ff222c93562703305e"
+    },
+    {
+      "path": "request.gate/v1/operations/admitted.json",
+      "sha256": "64ec38d6243ead0e6f69cae5ad1f285d3c996c58e033bdf1de5678e0f013c322"
+    },
+    {
+      "path": "request.gate/v1/conformance.json",
+      "sha256": "27d7969812e530b7ae7b8a9cc36fe4db6e02818148e02e7aa4b1f240cb9a0890"
+    }
+  ],
+  "major": 1
+}

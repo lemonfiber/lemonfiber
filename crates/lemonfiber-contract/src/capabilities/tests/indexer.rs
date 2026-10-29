@@ -1,15 +1,17 @@
-//! `indexer.search` and `indexer.pull` across their contracts: one script run against an indexer in process and
-//! through the contract, which must answer alike and be told alike.
+//! `indexer.search`, `indexer.pull` and `indexer.proxy` across their contracts: one script
+//! run against each in process and through the contract, which must answer alike and be
+//! told alike.
 
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use lemonfiber_ports::service::{
-    Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, Failure,
+    Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, Cookie, Failure,
     IndexerUse, Indexers, KnownAggregator, Limits, Protocol, PullsIndexers, RegisteredApplication,
+    Solved, Solving,
 };
 
-use super::{crosses_alike, pull, search, Upstream, SERVICE};
+use super::{crosses_alike, pull, search, solver, Upstream, SERVICE};
 
 #[async_trait]
 impl AppSync for Upstream {
@@ -151,4 +153,39 @@ async fn pulled<P: PullsIndexers>(curator: &P) -> Vec<String> {
 #[tokio::test]
 async fn a_curator_that_pulls_answers_and_is_told_through_its_contract_as_it_is_in_process() {
     crosses_alike!(pulled, pull::Adapter, ["pull"]);
+}
+
+#[async_trait]
+impl Solving for Upstream {
+    async fn solve(&self, url: &str) -> Result<Solved, Failure> {
+        self.tell(format!("solve {url}"));
+        Ok(Solved {
+            status: 200,
+            url: url.to_owned(),
+            user_agent: "Mozilla/5.0".to_owned(),
+            cookies: vec![Cookie {
+                name: "clearance".to_owned(),
+                value: "cleared".to_owned(),
+                domain: "indexer.example".to_owned(),
+            }],
+            page: "<html></html>".to_owned(),
+        })
+    }
+    async fn answers(&self) -> Result<bool, Failure> {
+        self.tell("answers".to_owned());
+        Ok(true)
+    }
+}
+
+/// Every operation of `indexer.proxy`, once, each answer written down.
+async fn solved<S: Solving>(solver: &S) -> Vec<String> {
+    vec![
+        format!("{:?}", solver.solve("https://indexer.example/").await),
+        format!("{:?}", solver.answers().await),
+    ]
+}
+
+#[tokio::test]
+async fn a_challenge_solver_answers_and_is_told_through_its_contract_as_it_is_in_process() {
+    crosses_alike!(solved, solver::Adapter, ["solve", "answers"]);
 }

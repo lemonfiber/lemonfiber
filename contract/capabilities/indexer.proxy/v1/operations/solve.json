@@ -1,0 +1,133 @@
+{
+  "post": {
+    "operationId": "solve",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "url": {
+                "description": "The port's `url`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Cookie": {
+                  "additionalProperties": false,
+                  "description": "A cookie a site set while a page was fetched.",
+                  "properties": {
+                    "domain": {
+                      "description": "The domain it is sent to.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "Its name.",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Its value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value",
+                    "domain"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "A page fetched past its challenge.",
+              "properties": {
+                "cookies": {
+                  "description": "The cookies the site set.",
+                  "items": {
+                    "$ref": "#/$defs/Cookie"
+                  },
+                  "type": "array"
+                },
+                "page": {
+                  "description": "The page.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "The status the page answered with.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "url": {
+                  "description": "The address the page ended at, after every redirect.",
+                  "type": "string"
+                },
+                "user_agent": {
+                  "description": "The browser it was fetched as.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "url",
+                "user_agent",
+                "cookies",
+                "page"
+              ],
+              "title": "Solved",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 60,
+    "x-lemonfiber-largest": 8388608
+  }
+}

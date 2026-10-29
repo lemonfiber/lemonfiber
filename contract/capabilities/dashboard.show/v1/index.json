@@ -1,0 +1,22 @@
+{
+  "capability": "dashboard.show",
+  "files": [
+    {
+      "path": "dashboard.show/v1/openapi.json",
+      "sha256": "0311e4e025182fb4f634e2738b873ccbb1bb2ae8c02b6a04fb23d7496144bb65"
+    },
+    {
+      "path": "dashboard.show/v1/operations/apply.json",
+      "sha256": "58d7b7296f2fc2cbff5d9071d1ca85dfe2501f4332f0807af34332cc10e0a4fa"
+    },
+    {
+      "path": "dashboard.show/v1/operations/panels.json",
+      "sha256": "1355409dfbf62807dc715f62639dec2f0402c9c21a9a80385d7b655264d2a84b"
+    },
+    {
+      "path": "dashboard.show/v1/conformance.json",
+      "sha256": "eaeb6ac8255c57cc3d256113b4f5d3e06bbe697d1b59875ca620410e06f78d31"
+    }
+  ],
+  "major": 1
+}

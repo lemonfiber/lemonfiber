@@ -1,0 +1,26 @@
+{
+  "capability": "proxy.front",
+  "files": [
+    {
+      "path": "proxy.front/v1/openapi.json",
+      "sha256": "ebb6717810d427756bd7c3f225667d02ca44570ea66b422404d731db6c158928"
+    },
+    {
+      "path": "proxy.front/v1/operations/apply.json",
+      "sha256": "6f5c7a41d83118396483b0f1e6a8305c228cbb813cf473fc86e126a715798b41"
+    },
+    {
+      "path": "proxy.front/v1/operations/routing.json",
+      "sha256": "f204a3dd70c947df5753fab898d7af5cd34d3635035d5b3e42f96a4431d269f8"
+    },
+    {
+      "path": "proxy.front/v1/operations/reload.json",
+      "sha256": "20663cd78b7a8b28b6e47135fe6bd2f1484f51e06f5a166e8271e54313e46dc3"
+    },
+    {
+      "path": "proxy.front/v1/conformance.json",
+      "sha256": "55eddca781df5bfd908b886956347eb7fa4a0ea1c08c9dea3e01aa6ae7c9509c"
+    }
+  ],
+  "major": 1
+}

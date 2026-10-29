@@ -1,0 +1,58 @@
+{
+  "capability": "download.usenet",
+  "files": [
+    {
+      "path": "download.usenet/v1/openapi.json",
+      "sha256": "c4caac8a260f15aa1b89c5bf322e3018d149a6cf453159c65b7afde45fbd99e4"
+    },
+    {
+      "path": "download.usenet/v1/operations/transfers.json",
+      "sha256": "fe378f45f08ea3570f2644621d610845c3d754d379dd0fb21c3a68a25b3bfdd5"
+    },
+    {
+      "path": "download.usenet/v1/operations/pulling.json",
+      "sha256": "33671e51a2b56e52370b0373bb2f1ac5cab7b13985b079531624dc68c4a0a6bf"
+    },
+    {
+      "path": "download.usenet/v1/operations/stop.json",
+      "sha256": "0997abf0b8e879e8ccaf626cce954fc9b697a86c62899f97ba30e583c39d756e"
+    },
+    {
+      "path": "download.usenet/v1/operations/resume.json",
+      "sha256": "e2a75406f321fa0f690e318d8261685f4a96f702e92594fb8087091b74fa4f9a"
+    },
+    {
+      "path": "download.usenet/v1/operations/throttled.json",
+      "sha256": "43ed764516db5ab6f1a0f9be2044a063592d389071ecd413def43325d1c9b0b5"
+    },
+    {
+      "path": "download.usenet/v1/operations/restrain.json",
+      "sha256": "88a0c155752ab34a20d82e361c827a39b31ad2ed9ba0f0063a224ffd6dc928d7"
+    },
+    {
+      "path": "download.usenet/v1/operations/moving.json",
+      "sha256": "624d33bbc706f2fa61f4cddd9f3e1073cc02781381efab52181c79d22d9db60f"
+    },
+    {
+      "path": "download.usenet/v1/operations/moved.json",
+      "sha256": "80d2ca10b94f85e2cea074416da034e35efc7e0d5f0b2d6fbd0b0cfe10e49ed8"
+    },
+    {
+      "path": "download.usenet/v1/operations/filed.json",
+      "sha256": "24ab47a7feb227ab6f6fb6e67c6a1fcce4ebfff194a3be17491511844f56cf53"
+    },
+    {
+      "path": "download.usenet/v1/operations/file_under.json",
+      "sha256": "531bd40d09050285f0d6673f8567a86c17e03ea9771d152d3b85a5b82308b7d7"
+    },
+    {
+      "path": "download.usenet/v1/operations/accounts.json",
+      "sha256": "fb363aa6f4c9a73e869bb26b286b723e555de27fcb7bfff45cd1f3c241ccfa8a"
+    },
+    {
+      "path": "download.usenet/v1/conformance.json",
+      "sha256": "5382595cadd9fa30008cda1f636c74d050070f510eeaf437e4b0983d555ee035"
+    }
+  ],
+  "major": 1
+}

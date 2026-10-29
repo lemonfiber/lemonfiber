@@ -15,7 +15,9 @@
 //! After its return type every operation says what its conformance case posts, as
 //! `where asks = Asked { … }`: a value of the request it crosses as, any string of which
 //! may be a [`crate::conformance::Placeholder`]. One whose answer may be larger than
-//! [`crate::client::LARGEST`] says so first, as `where largest = BYTES, asks = …`, and one
+//! [`crate::client::LARGEST`] says so first, as `where largest = BYTES, asks = …`, one
+//! whose answer may take longer than [`crate::client::DEADLINE`] says so next, as
+//! `where deadline = DURATION, asks = …`, and one
 //! whose answer holds a credential the upstream issues names each place as a JSON pointer
 //! before `asks`, as `where secret = &["/token"], asks = …`.
 //!
@@ -41,7 +43,7 @@ macro_rules! contract {
                 impl $Trait:path {
                     $(
                         $(#[$op_meta:meta])*
-                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? $(secret = $secret:expr,)? asks = $asks:expr;
+                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? $(deadline = $deadline:expr,)? $(secret = $secret:expr,)? asks = $asks:expr;
                     )*
                 }
             )*
@@ -111,7 +113,10 @@ macro_rules! contract {
                                     CAPABILITY,
                                     MAJOR,
                                     stringify!($op),
-                                    $crate::contract!(@largest $($largest)?),
+                                    $crate::Bounds {
+                                        largest: $crate::contract!(@largest $($largest)?),
+                                        deadline: $crate::contract!(@deadline $($deadline)?),
+                                    },
                                     &asked,
                                 )
                                 .await
@@ -177,6 +182,7 @@ macro_rules! contract {
                                 stringify!($op),
                             )
                             .within($crate::contract!(@largest $($largest)?))
+                            .awaited($crate::contract!(@deadline $($deadline)?))
                             .holding($crate::contract!(@secret $($secret)?))
                             .asking(&$op::asks()),
                         )*)*
@@ -188,6 +194,8 @@ macro_rules! contract {
 
     (@largest) => { $crate::client::LARGEST };
     (@largest $largest:expr) => { $largest };
+    (@deadline) => { $crate::client::DEADLINE };
+    (@deadline $deadline:expr) => { $deadline };
 
     (@secret) => { &[] };
     (@secret $secret:expr) => { $secret };

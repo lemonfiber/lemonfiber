@@ -1,0 +1,26 @@
+{
+  "capability": "stream.guard",
+  "files": [
+    {
+      "path": "stream.guard/v1/openapi.json",
+      "sha256": "48aaab62cb8d12e4a16d1e6c5ece0e6bd1ac8a149961b7fcdceeee73781eaf28"
+    },
+    {
+      "path": "stream.guard/v1/operations/guard.json",
+      "sha256": "ed1dc28d1e7bee9420421671c8429450e2fa59bd65a0485ab62a52fd0156a005"
+    },
+    {
+      "path": "stream.guard/v1/operations/guarding.json",
+      "sha256": "0b0b3b530070e8a233abd71ac24707016d3dbd86071cc7347efc1d6457b0d7c0"
+    },
+    {
+      "path": "stream.guard/v1/operations/certificate.json",
+      "sha256": "049514b3ba317f424835a76d4a639f6be54630199434e4391152b31f9c7cccbf"
+    },
+    {
+      "path": "stream.guard/v1/conformance.json",
+      "sha256": "60dc892570c84efb9d7dc6b6f5ebeba134e599a751028cf9c88c2173a4067f8a"
+    }
+  ],
+  "major": 1
+}

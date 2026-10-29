@@ -33,7 +33,8 @@ fn every_party_answers_on_a_port_of_its_own_at_a_host_the_cases_name() {
             "download client",
             "identity source",
             "curator",
-            "aggregator"
+            "aggregator",
+            "site"
         ]
     );
     assert_eq!(ports.len(), all.len());
