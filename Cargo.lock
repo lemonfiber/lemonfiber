@@ -1586,6 +1586,7 @@ dependencies = [
  "lemonfiber-pinned",
  "lemonfiber-ports",
  "reqwest",
+ "rustix",
  "rustls",
  "serde",
  "serde_json",
