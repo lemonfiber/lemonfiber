@@ -203,10 +203,11 @@ async fn a_file_hardlinked_in_from_elsewhere_is_never_read_and_a_write_replaces_
 #[tokio::test(flavor = "multi_thread")]
 async fn a_pipe_at_the_name_is_refused_without_blocking() {
     let directories = Directories::new("pipe");
-    let made = std::process::Command::new("mkfifo")
-        .arg(directories.shared.join("caddy.json"))
-        .status();
-    assert!(made.is_ok_and(|status| status.success()));
+    let at = directories.shared.join("caddy.json");
+    let made =
+        tokio::task::spawn_blocking(move || std::process::Command::new("mkfifo").arg(at).status())
+            .await;
+    assert!(made.is_ok_and(|made| made.is_ok_and(|status| status.success())));
 
     assert_eq!(
         Shared::at(&directories.shared)
