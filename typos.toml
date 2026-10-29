@@ -41,3 +41,5 @@ extend-exclude = ["assets/web", "assets/plugins", "crates/lemonfiber-core/tests/
 # A crate name, not a misspelling of "flat". Found the moment the checker could
 # read `.docs/` for the first time, which is the point of letting it.
 flate2 = "flate2"
+# The POSIX open flag for writing only, as rustix names it.
+WRONLY = "WRONLY"
