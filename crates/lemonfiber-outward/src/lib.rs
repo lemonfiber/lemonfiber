@@ -16,6 +16,9 @@
 //! ([`literal`]), because a resolver or a URL parser handed `127.1` or `0x7f000001`
 //! reads it as an address too, and a spelling this did not recognise would pass as a
 //! name.
+//!
+//! [`resolve::Lookup`] is the operating system's resolver, for a caller with nothing
+//! standing in for it.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -27,6 +30,7 @@ use lemonfiber_ports::resolve::Resolver;
 use crate::schemes::{PLAIN, SECURE};
 
 mod classes;
+pub mod resolve;
 pub mod schemes;
 
 pub use classes::internal;

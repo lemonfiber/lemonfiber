@@ -35,7 +35,7 @@ pub mod occupancy;
 pub mod process;
 pub mod random;
 pub mod registry;
-pub mod resolve;
+pub use lemonfiber_outward::resolve;
 pub mod retrying;
 pub mod time;
 mod tls;

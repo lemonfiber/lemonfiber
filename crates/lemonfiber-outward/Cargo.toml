@@ -11,6 +11,8 @@ publish = false
 
 [dependencies]
 lemonfiber-ports = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
 url = { workspace = true }
 
 [dev-dependencies]

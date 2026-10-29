@@ -19,6 +19,7 @@ publish = false
 # which is what keeps a container runtime, an HTTP client and a TLS stack out of a crate
 # that must not be able to reach the network at all.
 lemonfiber-ports = { workspace = true }
+lemonfiber-outward = { workspace = true }
 lemonfiber-error = { workspace = true }
 async-trait = { workspace = true }
 bollard = { workspace = true }

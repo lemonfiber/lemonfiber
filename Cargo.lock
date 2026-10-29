@@ -1606,6 +1606,7 @@ dependencies = [
  "getrandom 0.4.3",
  "lemonfiber-error",
  "lemonfiber-fixtures",
+ "lemonfiber-outward",
  "lemonfiber-ports",
  "libc",
  "reqwest",
@@ -1759,6 +1760,7 @@ dependencies = [
 name = "lemonfiber-outward"
 version = "0.17.0"
 dependencies = [
+ "async-trait",
  "lemonfiber-fixtures",
  "lemonfiber-ports",
  "tokio",
