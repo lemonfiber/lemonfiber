@@ -202,10 +202,10 @@ fn unbuildable(manifest: &Manifest, taking: &Retaking) -> Option<Failed> {
     let why = match service {
         None => "no service of this plugin has the plugin's id, so there is none for it to stand in for",
         Some(service) if !service.speaks.is_empty() || service.fronts.is_some() => {
-            "the service with the plugin's id is an adapter, whose image `--adapter` names"
+            "the service with the plugin's id is an adapter, whose image --adapter names"
         }
         Some(service) if manifest.services.iter().any(|one| one.fronts.as_deref() == Some(service.id.as_str())) => {
-            "an adapter fronts the service with the plugin's id, so its recordings are taken with `--adapter`"
+            "an adapter fronts the service with the plugin's id, so its recordings are taken with --adapter"
         }
         Some(_) => return None,
     };
