@@ -622,6 +622,41 @@ fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
     assert_eq!(configuration(&project), configuration(&standing));
 }
 
+/// A link by name joins the first-party service moved in place of the service it names,
+/// and no other service filling what that one fills.
+#[test]
+fn a_link_by_name_joins_the_part_moved_in_place_and_no_other_filler() {
+    let mut moved = a_placed("sonarr", &["library.curate"], Some(8989));
+    moved.replaces = Some("sonarr".to_owned());
+    let stranger = an_installed(
+        "my-curator",
+        vec![a_placed("my-curator", &["library.curate"], Some(18989))],
+    );
+    let project = project(
+        &carried(),
+        &[
+            crate::test_support::pinned_as(an_installed("sonarr", vec![moved])),
+            stranger,
+        ],
+    );
+
+    let joined = |id: &str| sequence(&entry(&project, id), "networks");
+
+    assert!(
+        joined("sonarr").contains(&"link__unpackerr__sonarr".to_owned()),
+        "{:?}",
+        joined("sonarr")
+    );
+    assert!(joined("unpackerr").contains(&"link__unpackerr__sonarr".to_owned()));
+    assert!(
+        !joined("my-curator")
+            .iter()
+            .any(|network| network.starts_with("link__")),
+        "{:?}",
+        joined("my-curator")
+    );
+}
+
 /// Every service of a plugin the bundle installs is written into the stack profile its
 /// bundle entry names, so the forms holding that profile start and stop it,
 /// and a third-party plugin's into a profile of its own.
