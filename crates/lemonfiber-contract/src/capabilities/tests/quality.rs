@@ -4,15 +4,15 @@
 use async_trait::async_trait;
 use lemonfiber_ports::media::preset::Preset;
 use lemonfiber_ports::media::Kind;
-use lemonfiber_ports::service::{Failure, Profiled, Syncing};
+use lemonfiber_ports::service::{Applied, Failure, Profiled, Syncing};
 
 use super::{crosses_alike, sync, Upstream};
 
 #[async_trait]
 impl Syncing for Upstream {
-    async fn apply(&self, profiled: &Profiled) -> Result<(), Failure> {
+    async fn apply(&self, profiled: &Profiled) -> Result<Applied, Failure> {
         self.tell(format!("apply {profiled:?}"));
-        Ok(())
+        Ok(Applied::OnRestart)
     }
     async fn applied(&self, which: Kind) -> Result<Option<Preset>, Failure> {
         self.tell(format!("applied {which:?}"));

@@ -3,7 +3,7 @@
 
 use lemonfiber_ports::media::preset::Preset;
 use lemonfiber_ports::media::Kind;
-use lemonfiber_ports::service::{Profiled, Syncing};
+use lemonfiber_ports::service::{Applied, Profiled, Syncing};
 
 use super::{CURATOR, CURATOR_PORT};
 use crate::conformance::Placeholder;
@@ -13,7 +13,7 @@ crate::contract! {
     pub mod sync = "quality.sync" @ 1 {
         impl Syncing {
             /// Hold one curator's profiles to a preset.
-            fn apply(refer profiled: &Profiled as Profiled) -> () where asks = Asked {
+            fn apply(refer profiled: &Profiled as Profiled) -> Applied where asks = Asked {
                 profiled: Profiled {
                     which: Kind::Tv,
                     host: CURATOR.to_owned(),

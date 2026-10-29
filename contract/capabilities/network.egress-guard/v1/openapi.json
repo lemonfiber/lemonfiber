@@ -88,6 +88,9 @@
     "/lemonfiber/network.egress-guard/v1/forwarded": {
       "$ref": "operations/forwarded.json"
     },
+    "/lemonfiber/network.egress-guard/v1/secure": {
+      "$ref": "operations/secure.json"
+    },
     "/lemonfiber/network.egress-guard/v1/up": {
       "$ref": "operations/up.json"
     }

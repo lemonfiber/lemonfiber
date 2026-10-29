@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Applied, Failure};
 
 /// An egress guard, asked about its tunnel.
 #[async_trait]
@@ -21,4 +21,12 @@ pub trait Tunnelling: Send + Sync {
     ///
     /// Returns [`Failure`] where it is unreachable or cannot tell.
     async fn forwarded(&self) -> Result<Option<u16>, Failure>;
+
+    /// Hold its control server to the credential its adapter was handed, at once or once
+    /// it restarts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where it is unreachable or refuses.
+    async fn secure(&self) -> Result<Applied, Failure>;
 }

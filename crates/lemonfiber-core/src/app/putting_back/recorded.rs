@@ -120,6 +120,7 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::KeyRevoked { .. }
         | Kind::DeviceKeyRevoked { .. }
         | Kind::Overlaid { .. }
+        | Kind::Restarted { .. }
         | Kind::Certified { .. } => None,
     }
 }

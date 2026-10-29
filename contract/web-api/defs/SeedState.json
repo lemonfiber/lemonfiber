@@ -16,6 +16,24 @@
       ]
     },
     {
+      "description": "Written, and in force once `service` started again, as the adapter that took it\nanswered.",
+      "type": "object",
+      "properties": {
+        "service": {
+          "description": "The service started again.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "restarted"
+        }
+      },
+      "required": [
+        "state",
+        "service"
+      ]
+    },
+    {
       "description": "Present and correct; nothing was done.",
       "type": "object",
       "properties": {

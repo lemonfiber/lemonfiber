@@ -262,5 +262,16 @@ fn only_an_operation_saying_when_it_is_in_force_publishes_a_reset() {
             }
         }
     }
-    assert_eq!(resetting, vec![("media.serve@1".to_owned(), "serve_tls")]);
+    let spoken = |capability: &str| crate::spoken(capability, 1);
+    assert_eq!(
+        resetting,
+        vec![
+            (spoken("network.egress-guard"), "secure"),
+            (spoken("media.serve"), "serve_tls"),
+            (spoken("proxy.front"), "apply"),
+            (spoken("proxy.front"), "reload"),
+            (spoken("quality.sync"), "apply"),
+            (spoken("archive.extract"), "watch"),
+        ]
+    );
 }

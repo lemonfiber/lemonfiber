@@ -18,6 +18,7 @@ use lemonfiber_contract::capabilities::archive::extract;
 
 use super::connecting::{pairings, Cleared, Connection};
 use super::filing::{completed, Completed};
+use super::restarting::Restarting;
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::ports::service::{Curated, Extracting};
@@ -68,15 +69,9 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
     let mut wirings = Vec::new();
     for holding in holding(fillers) {
         let connection = format!("{} watching every curator", holding.asker.name);
-        let extractor = match spoken(
-            ctx,
-            holding.asker.answering(),
-            extract::CAPABILITY,
-            extract::MAJOR,
-        )
-        .await
-        {
-            Spoken::Over(adapter) => extract::Adapter(adapter),
+        let answering = holding.asker.answering();
+        let extractor = match spoken(ctx, answering, extract::CAPABILITY, extract::MAJOR).await {
+            Spoken::Over(adapter) => Restarting::of(fillers, answering, adapter),
             Spoken::Unanswered | Spoken::Not => continue,
         };
         let mut curated = Vec::new();
@@ -99,7 +94,7 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
         }
         wirings.push(Wiring::settled(
             connection,
-            watched(&extractor, &curated, ctx.dry_run).await,
+            watched(ctx, &extractor, &curated).await,
         ));
     }
     wirings
@@ -109,8 +104,8 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
 ///
 /// Every curator together or none, because what it is handed replaces what it watches: a
 /// curator left out of one call is a curator it stops watching.
-async fn watched(extractor: &dyn Extracting, curated: &[Curated], rehearsing: bool) -> State {
-    if rehearsing {
+async fn watched(ctx: &Ctx, extractor: &Restarting, curated: &[Curated]) -> State {
+    if ctx.dry_run {
         return State::WouldWire {
             yours: None,
             ours: Some(
@@ -122,8 +117,6 @@ async fn watched(extractor: &dyn Extracting, curated: &[Curated], rehearsing: bo
             ),
         };
     }
-    match extractor.watch(curated).await {
-        Ok(()) => State::Wired,
-        Err(failure) => crate::seed::unreached(&failure),
-    }
+    let watching = extract::Adapter(extractor.adapter().clone());
+    extractor.taken_up(ctx, watching.watch(curated).await).await
 }

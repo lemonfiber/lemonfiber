@@ -2,15 +2,15 @@
 //! and through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Curated, Extracting, Extraction, Failure};
+use lemonfiber_ports::service::{Applied, Curated, Extracting, Extraction, Failure};
 
 use super::{crosses_alike, extract, json, Upstream};
 
 #[async_trait]
 impl Extracting for Upstream {
-    async fn watch(&self, curators: &[Curated]) -> Result<(), Failure> {
+    async fn watch(&self, curators: &[Curated]) -> Result<Applied, Failure> {
         self.tell(format!("watch {}", json(&curators)));
-        Ok(())
+        Ok(Applied::OnRestart)
     }
     async fn working(&self) -> Result<Vec<Extraction>, Failure> {
         self.tell("working".to_owned());

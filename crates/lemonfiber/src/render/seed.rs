@@ -22,6 +22,9 @@ fn connection(wiring: &lemonfiber_core::seed::Wiring) -> Lines {
     let connection = &wiring.connection;
     match &wiring.state {
         SeedState::Wired => lines.put(format!("  ✓ {connection}   wired")),
+        SeedState::Restarted { service } => {
+            lines.put(format!("  ✓ {connection}   wired, {service} restarted to take it up"));
+        }
         SeedState::AlreadyWired => lines.put(format!("  ✓ {connection}   already wired")),
         SeedState::Drifted => lines.put(format!("  · {connection}   left as you set it")),
         SeedState::Adopted => lines.put(format!("  ✓ {connection}   yours, adopted")),

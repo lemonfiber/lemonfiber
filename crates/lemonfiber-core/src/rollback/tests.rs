@@ -642,3 +642,19 @@ fn a_part_stopped_by_a_choice_goes_back_whole() {
         Reversal::Whole
     );
 }
+
+#[test]
+fn a_restart_goes_back_whole() {
+    let restarted = Change {
+        at: "1".to_owned(),
+        operation: "seed".to_owned(),
+        target: "recyclarr".to_owned(),
+        kind: Kind::Restarted {
+            service: "recyclarr".to_owned(),
+        },
+    };
+    assert_eq!(
+        standing(&restarted, &[], &holding(&[]), &unread).reversal,
+        Reversal::Whole
+    );
+}

@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "network.egress-guard/v1/openapi.json",
-      "sha256": "25afdc153a6492850b5379022a6b499172a1286ddde6e720df102bba059dae02"
+      "sha256": "cdf9e8de59cf3600cc10e3ffc2f03c8f9d3b83979ebbd092d933f9de73f62d83"
     },
     {
       "path": "network.egress-guard/v1/operations/up.json",
@@ -14,8 +14,12 @@
       "sha256": "920b2045ab196559077c3193513eddea757dd6f93364ed6801042f93b9b6875e"
     },
     {
+      "path": "network.egress-guard/v1/operations/secure.json",
+      "sha256": "89c5600fa4248ee59465a7ac4f381801d9078c79c3c96c5357cf2be5206be2fe"
+    },
+    {
       "path": "network.egress-guard/v1/conformance.json",
-      "sha256": "13110f29d75021cb57a637c495eb98659dbcadb1f2862da8791d3da3c4c79d49"
+      "sha256": "30b198b17384d1594dd79f21be26b91786e5e626d34cab0faede476e51c5a1fe"
     }
   ],
   "major": 1

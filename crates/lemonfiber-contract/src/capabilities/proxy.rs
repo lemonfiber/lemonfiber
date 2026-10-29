@@ -2,7 +2,7 @@
 //!
 //! It is handed its whole routing table, read back, and asked to read what it was handed.
 
-use lemonfiber_ports::service::{Proxying, Route, Routing, Tls};
+use lemonfiber_ports::service::{Applied, Proxying, Route, Routing, Tls};
 
 /// The household name the conformance cases route.
 const NAME: &str = "conformance.home.local";
@@ -18,7 +18,7 @@ crate::contract! {
     pub mod front = "proxy.front" @ 1 {
         impl Proxying {
             /// Serve a routing table in place of the one it serves.
-            fn apply(refer table: &Routing as Routing) -> () where asks = Asked {
+            fn apply(refer table: &Routing as Routing) -> Applied where asks = Asked {
                 table: Routing {
                     tls: Tls::Automatic,
                     routes: vec![Route {
@@ -31,7 +31,7 @@ crate::contract! {
             /// The table it serves.
             fn routing() -> Routing where asks = Asked {};
             /// Read the table applied.
-            fn reload() -> () where asks = Asked {};
+            fn reload() -> Applied where asks = Asked {};
         }
     }
 }

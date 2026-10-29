@@ -9,6 +9,7 @@
 use lemonfiber_contract::capabilities::quality::sync;
 
 use super::connecting::{pairings, Cleared, Connection};
+use super::restarting::Restarting;
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::ports::media::Kind;
@@ -43,11 +44,12 @@ fn holding(fillers: &Fillers) -> Vec<Holding<'_>> {
     found
 }
 
-/// The sync as the core asks it, over `quality.sync`. Nothing where it cannot be asked
-/// over it.
-async fn syncer(ctx: &Ctx, asker: Cleared<'_>) -> Option<Box<dyn Syncing>> {
-    match spoken(ctx, asker.answering(), sync::CAPABILITY, sync::MAJOR).await {
-        Spoken::Over(adapter) => Some(Box::new(sync::Adapter(adapter))),
+/// The sync as the core asks it, over `quality.sync`, with the upstream started again
+/// where it takes what it applied up only then. Nothing where it cannot be asked over it.
+async fn syncer(ctx: &Ctx, fillers: &Fillers, asker: Cleared<'_>) -> Option<Restarting> {
+    let answering = asker.answering();
+    match spoken(ctx, answering, sync::CAPABILITY, sync::MAJOR).await {
+        Spoken::Over(adapter) => Some(Restarting::of(fillers, answering, adapter)),
         Spoken::Unanswered | Spoken::Not => None,
     }
 }
@@ -64,7 +66,7 @@ fn for_quality(curator: &str) -> String {
 pub(super) async fn seed_quality(ctx: &Ctx, fillers: &Fillers) -> Vec<Wiring> {
     let mut wirings = Vec::new();
     for holding in holding(fillers) {
-        let Some(syncer) = syncer(ctx, holding.asker).await else {
+        let Some(syncer) = syncer(ctx, fillers, holding.asker).await else {
             continue;
         };
         let selection = crate::quality::run::load_selection(ctx);
@@ -89,7 +91,7 @@ pub(super) async fn seed_quality(ctx: &Ctx, fillers: &Fillers) -> Vec<Wiring> {
             let profiled = profiled(*which, at, api_key, selection);
             wirings.push(Wiring::settled(
                 connection,
-                hold(syncer.as_ref(), &profiled, ctx.dry_run).await,
+                hold(ctx, &syncer, &profiled).await,
             ));
         }
     }
@@ -115,20 +117,19 @@ pub(crate) async fn reprofile(
         else {
             continue;
         };
-        let Some(syncer) = syncer(ctx, holding.asker).await else {
+        let Some(syncer) = syncer(ctx, fillers, holding.asker).await else {
             continue;
         };
         let Some(api_key) = super::keys::minted_key(ctx, curator) else {
             continue;
         };
         let state = match crate::quality::run::load_selection(ctx) {
-            Ok(selection) => match syncer
-                .apply(&profiled(*which, at, api_key, &selection))
-                .await
-            {
-                Ok(()) => State::Wired,
-                Err(failure) => crate::seed::unreached(&failure),
-            },
+            Ok(selection) => {
+                let applied = sync::Adapter(syncer.adapter().clone())
+                    .apply(&profiled(*which, at, api_key, &selection))
+                    .await;
+                syncer.taken_up(ctx, applied).await
+            }
             Err(problem) => State::Failed {
                 detail: problem.summary,
             },
@@ -155,7 +156,8 @@ fn profiled(which: Kind, at: &Address, api_key: String, selection: &Selection) -
 /// Read first, so a sync already holding the preset is not written again to report a
 /// change to nothing. A replaced key reaches it through [`reprofile`], which the key's
 /// replacement runs.
-async fn hold(syncer: &dyn Syncing, profiled: &Profiled, rehearsing: bool) -> State {
+async fn hold(ctx: &Ctx, restarting: &Restarting, profiled: &Profiled) -> State {
+    let syncer = sync::Adapter(restarting.adapter().clone());
     let applied = match syncer.applied(profiled.which).await {
         Ok(applied) => applied,
         Err(failure) => return crate::seed::unreached(&failure),
@@ -163,14 +165,11 @@ async fn hold(syncer: &dyn Syncing, profiled: &Profiled, rehearsing: bool) -> St
     if applied == Some(profiled.preset) {
         return State::AlreadyWired;
     }
-    if rehearsing {
+    if ctx.dry_run {
         return State::WouldWire {
             yours: applied.map(|preset| preset.label().to_owned()),
             ours: Some(profiled.preset.label().to_owned()),
         };
     }
-    if let Err(failure) = syncer.apply(profiled).await {
-        return crate::seed::unreached(&failure);
-    }
-    State::Wired
+    restarting.taken_up(ctx, syncer.apply(profiled).await).await
 }

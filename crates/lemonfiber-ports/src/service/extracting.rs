@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Applied, Failure};
 
 /// One curator the extractor watches the download folder of, and hands back to.
 #[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -45,12 +45,13 @@ pub struct Extraction {
 /// An extractor, told whose downloads to watch.
 #[async_trait]
 pub trait Extracting: Send + Sync {
-    /// Watch `curators` in place of every curator it watches now.
+    /// Watch `curators` in place of every curator it watches now, at once or once it
+    /// restarts.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] where it is unreachable or refuses.
-    async fn watch(&self, curators: &[Curated]) -> Result<(), Failure>;
+    async fn watch(&self, curators: &[Curated]) -> Result<Applied, Failure>;
 
     /// What it is extracting now.
     ///

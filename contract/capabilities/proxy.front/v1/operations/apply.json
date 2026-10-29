@@ -118,9 +118,29 @@
         "content": {
           "application/json": {
             "schema": {
+              "$defs": {
+                "Restart": {
+                  "description": "What an operation applied that is in force only once the upstream restarts says.",
+                  "oneOf": [
+                    {
+                      "const": "on-restart",
+                      "description": "In force once the upstream restarts.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
               "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "title": "null",
-              "type": "null"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Restart"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When what an operation applied is in force.\n\nIt crosses as `null` where it is in force at once, and as `\"on-restart\"` where it is in\nforce once the upstream restarts, which an adapter answers as `205`.",
+              "title": "Applied"
             }
           }
         },
@@ -128,6 +148,9 @@
       },
       "204": {
         "description": "Answered, with nothing to say."
+      },
+      "205": {
+        "description": "Applied, and in force once the upstream restarts."
       },
       "400": {
         "$ref": "../openapi.json#/components/responses/Refused"

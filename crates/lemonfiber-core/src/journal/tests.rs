@@ -660,3 +660,22 @@ fn undoing_a_part_stopped_starts_it_and_one_started_stops_it() {
         );
     }
 }
+
+#[test]
+fn undoing_a_restart_leaves_the_service_running() {
+    let restarted = Change {
+        at: "1".to_owned(),
+        operation: "seed".to_owned(),
+        target: "recyclarr".to_owned(),
+        kind: Kind::Restarted {
+            service: "recyclarr".to_owned(),
+        },
+    };
+    assert_eq!(
+        restarted.undo().action,
+        Action::Run {
+            service: "recyclarr".to_owned(),
+            running: true,
+        }
+    );
+}

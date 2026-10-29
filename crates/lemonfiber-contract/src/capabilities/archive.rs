@@ -5,7 +5,7 @@
 //! extracting now. Nothing here hands an extraction back: the extractor does.
 
 use lemonfiber_ports::media::Kind;
-use lemonfiber_ports::service::{Curated, Extracting, Extraction};
+use lemonfiber_ports::service::{Applied, Curated, Extracting, Extraction};
 
 use super::{curator_address, FOLDER};
 use crate::conformance::Placeholder;
@@ -15,7 +15,7 @@ crate::contract! {
     pub mod extract = "archive.extract" @ 1 {
         impl Extracting {
             /// Watch every curator's download folder in place of the ones it watches.
-            fn watch(slice curators: &[Curated] as Curated) -> () where asks = Asked {
+            fn watch(slice curators: &[Curated] as Curated) -> Applied where asks = Asked {
                 curators: vec![Curated {
                     media_type: Kind::Tv.media_type().to_owned(),
                     address: curator_address(),

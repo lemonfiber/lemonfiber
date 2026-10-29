@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Applied, Failure};
 use crate::media::preset::Preset;
 use crate::media::Kind;
 
@@ -27,12 +27,13 @@ pub struct Profiled {
 /// A quality sync, told the preset each curator's profiles are held to.
 #[async_trait]
 pub trait Syncing: Send + Sync {
-    /// Hold the curator of `profiled.which` to `profiled.preset`.
+    /// Hold the curator of `profiled.which` to `profiled.preset`, at once or once it
+    /// restarts.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] where it is unreachable or refuses.
-    async fn apply(&self, profiled: &Profiled) -> Result<(), Failure>;
+    async fn apply(&self, profiled: &Profiled) -> Result<Applied, Failure>;
 
     /// The preset it last applied to the curator of `which`, or none.
     ///

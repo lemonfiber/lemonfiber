@@ -295,6 +295,11 @@ pub enum Kind {
         /// The fingerprint of what it holds now, or nothing where it was taken away.
         current: Option<String>,
     },
+    /// A service was started again so it takes up what its adapter applied.
+    Restarted {
+        /// The service.
+        service: String,
+    },
     /// A service was started or stopped: a part a choice of filler took out of its form,
     /// or brought back to it.
     Ran {

@@ -33,8 +33,8 @@
         1
       ],
       "openapi": "network.egress-guard/v1/openapi.json",
-      "operations": 2,
-      "sha256": "1bca3797526305eb39b7a7a281f7de99ee7f559d92c6cf7e1c4bd847ab0e60ac"
+      "operations": 3,
+      "sha256": "99482adaf3cdc64f155715ffde2e6bffd699daed90280d97d8fa190855f6d673"
     },
     {
       "capability": "library.curate",
@@ -142,7 +142,7 @@
       ],
       "openapi": "proxy.front/v1/openapi.json",
       "operations": 3,
-      "sha256": "11f7ca2f8745793d413d347d3adef396e8eca81b49ce44decc7e9e85588aafef"
+      "sha256": "e216955f2c7ce180bf5a994bed9d0c461fe3ad7b409d7ecc3f2692f3de0a5714"
     },
     {
       "capability": "quality.sync",
@@ -154,7 +154,7 @@
       ],
       "openapi": "quality.sync/v1/openapi.json",
       "operations": 2,
-      "sha256": "8b8e7fedbccf9eac1d2be1f9a93ae00295aedce730600973b17a36bd1950eeab"
+      "sha256": "a8966ef6df3e756adfe65ee098b686e767019d33bef56e422ae2e8554b5dc392"
     },
     {
       "capability": "dashboard.show",
@@ -178,7 +178,7 @@
       ],
       "openapi": "archive.extract/v1/openapi.json",
       "operations": 2,
-      "sha256": "892be095d2974d81f623d8bd4b42891ecaff4f10bb0a1d5cbbbec4c3cc6375b6"
+      "sha256": "e2102f58993036eb38341f8bfc60bd70e5a5ef634fde074f8bd6c09b24863bb9"
     },
     {
       "capability": "stream.guard",

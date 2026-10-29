@@ -19,6 +19,12 @@
       ],
       "required": true
     },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "state": {
       "type": [
         "const:\"adopted\"",
@@ -28,6 +34,7 @@
         "const:\"failed\"",
         "const:\"observed\"",
         "const:\"refused\"",
+        "const:\"restarted\"",
         "const:\"skipped\"",
         "const:\"stale\"",
         "const:\"unmanaged\"",
@@ -53,6 +60,7 @@
     "\"failed\"",
     "\"observed\"",
     "\"refused\"",
+    "\"restarted\"",
     "\"skipped\"",
     "\"stale\"",
     "\"unmanaged\"",

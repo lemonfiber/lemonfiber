@@ -2,15 +2,15 @@
 //! through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Failure, Proxying, Route, Routing, Tls};
+use lemonfiber_ports::service::{Applied, Failure, Proxying, Route, Routing, Tls};
 
 use super::{crosses_alike, front, Upstream};
 
 #[async_trait]
 impl Proxying for Upstream {
-    async fn apply(&self, table: &Routing) -> Result<(), Failure> {
+    async fn apply(&self, table: &Routing) -> Result<Applied, Failure> {
         self.tell(format!("apply {table:?}"));
-        Ok(())
+        Ok(Applied::OnRestart)
     }
     async fn routing(&self) -> Result<Routing, Failure> {
         self.tell("routing".to_owned());
@@ -26,9 +26,9 @@ impl Proxying for Upstream {
             }],
         })
     }
-    async fn reload(&self) -> Result<(), Failure> {
+    async fn reload(&self) -> Result<Applied, Failure> {
         self.tell("reload".to_owned());
-        Ok(())
+        Ok(Applied::Now)
     }
 }
 

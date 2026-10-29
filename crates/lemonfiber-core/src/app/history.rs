@@ -179,6 +179,7 @@ fn did(kind: &Kind) -> String {
             running: true,
         } => format!("started {service}"),
         Kind::Ran { service, .. } => format!("stopped {service}"),
+        Kind::Restarted { service } => format!("restarted {service}"),
     }
 }
 
