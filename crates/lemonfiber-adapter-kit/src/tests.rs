@@ -9,7 +9,7 @@ use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
 use tower::ServiceExt as _;
 
-use super::{key_in, serve, serving, upstream_in, Kit, UPSTREAM_MOST};
+use super::{key_in, same_secret, serve, serving, upstream_in, Kit, UPSTREAM_MOST};
 
 const KEY: &str = "the-plugins-key";
 
@@ -261,4 +261,13 @@ async fn what_is_in_force_once_the_upstream_restarts_is_answered_205_with_nothin
         (status, sort.as_str(), body.as_str()),
         (StatusCode::RESET_CONTENT, "", "")
     );
+}
+
+#[test]
+fn a_secret_is_the_same_only_byte_for_byte_and_never_when_empty() {
+    assert!(same_secret("abcdef", "abcdef"));
+    assert!(!same_secret("abcdef", "abcdeg"));
+    assert!(!same_secret("abcdef", "abcde"));
+    assert!(!same_secret("abcdef", ""));
+    assert!(!same_secret("", ""));
 }
