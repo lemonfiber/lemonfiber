@@ -255,7 +255,7 @@ jobs:
       # What this repository carries, declared here so it can be read without a
       # SonarCloud login. A ceiling rather than an allowance: it may not rise past
       # what stands against `main`, and at zero the gate refuses the first issue.
-      allowed-open: 2
+      allowed-open: 0
       # Whether a scan ran. Where the change reached no code none did, and the gate
       # waits for no summary while still holding the open count to `allowed-open`.
       code: ${{ needs.scope.result != 'success' || needs.scope.outputs.code == 'true' }}
