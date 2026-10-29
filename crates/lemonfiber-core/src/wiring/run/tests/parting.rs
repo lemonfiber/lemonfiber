@@ -125,3 +125,20 @@ async fn a_part_the_reversal_may_not_start_is_left_named() {
     assert!(back.is_some_and(|back| back.left.iter().any(|left| left.target == "prowlarr")));
     assert!(!handed(&runner, "up", "prowlarr"));
 }
+
+#[tokio::test]
+async fn a_part_no_engine_could_be_run_for_is_named_with_why() {
+    let (mut ctx, _) = ctx("no-engine");
+    ctx.seams.runner = Arc::new(Recording::answering(Err(
+        crate::ports::process::Failure::NotFound {
+            program: "docker".to_owned(),
+        },
+    )));
+
+    let report = agreed(&ctx, fill("indexer.search", "nzbhydra2")).await.ok();
+
+    assert!(report.is_some_and(|report| report
+        .unran
+        .iter()
+        .any(|one| one.service == "prowlarr" && one.because == "docker was not found")));
+}
