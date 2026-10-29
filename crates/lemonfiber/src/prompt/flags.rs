@@ -4,15 +4,18 @@
 //! vocabulary a person has to be told when they get it wrong. Kept together so
 //! the words and the message that names them cannot drift apart.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use lemonfiber::cli::RawSetup;
 use lemonfiber_core::alert::Appetite;
-use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
+use lemonfiber_core::app::setup::{
+    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
+};
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Library, Plan, Step, Wizard};
+use lemonfiber_core::wizard::{Guarded, Library, Plan, Step, Wizard};
 
 /// Read `--protocols` into a protocol choice, or name what was expected.
 pub(super) fn parse_protocols(value: &str) -> Result<Protocols, String> {
@@ -60,6 +63,19 @@ pub(super) fn parse_appetite(value: &str) -> Result<Appetite, String> {
     }
 }
 
+/// Read each `NAME=VALUE` given as `flag`, or name the flag where one is not, saying what
+/// was given only where `shown`.
+fn pairs(given: Vec<String>, flag: &str, shown: bool) -> Result<BTreeMap<String, String>, String> {
+    given
+        .into_iter()
+        .map(|pair| match pair.split_once('=') {
+            Some((name, value)) if !name.is_empty() => Ok((name.to_owned(), value.to_owned())),
+            _ if shown => Err(format!("{flag} must be NAME=VALUE, not `{pair}`")),
+            _ => Err(format!("{flag} must be NAME=VALUE")),
+        })
+        .collect()
+}
+
 /// Read a `UID:GID` pair, or nothing where it is blank or malformed.
 pub(super) fn parse_ids(answer: &str) -> Option<(u32, u32)> {
     let (uid, gid) = answer.split_once(':')?;
@@ -82,6 +98,7 @@ pub struct SetupFlags {
     service_user: Option<(u32, u32)>,
     library: Option<Library>,
     vpn: Option<bool>,
+    guarded: Guarded,
     household: Option<bool>,
     notifications: Option<Appetite>,
     autostart: Option<bool>,
@@ -101,6 +118,10 @@ impl SetupFlags {
             service_user: None,
             library: None,
             vpn: None,
+            guarded: Guarded {
+                settings: BTreeMap::new(),
+                secrets: BTreeMap::new(),
+            },
             household: None,
             notifications: None,
             autostart: None,
@@ -154,6 +175,10 @@ impl SetupFlags {
                 .transpose()?,
             library: raw.library.map(|value| parse_library(&value)).transpose()?,
             vpn: raw.vpn,
+            guarded: Guarded {
+                settings: pairs(raw.vpn_settings, "--vpn-setting", true)?,
+                secrets: pairs(raw.vpn_secrets, "--vpn-secret", false)?,
+            },
             household: raw.household,
             notifications: raw
                 .notifications
@@ -274,6 +299,15 @@ impl Prompt for Flags {
         // so a scripted torrent setup that never mentions a VPN reaches the
         // warning rather than passing silently as though one had been claimed.
         self.flags.vpn.unwrap_or(false)
+    }
+    fn guard(&self, asking: &Asking<'_>) -> Option<String> {
+        match asking {
+            Asking::Choice { setting, .. } | Asking::Value { setting } => {
+                self.flags.guarded.settings.get(*setting)
+            }
+            Asking::Secret { secret, .. } => self.flags.guarded.secrets.get(*secret),
+        }
+        .cloned()
     }
     fn unprotected(&self) -> bool {
         // Nobody is here to be warned, so there is nobody to confirm. The run

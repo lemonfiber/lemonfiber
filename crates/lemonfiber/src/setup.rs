@@ -334,16 +334,18 @@ async fn drive(
     };
 
     let at = stamp();
+    let guard = core_setup::guard(&ctx);
     let applying = Applying {
         paths,
         source: ctx.stack,
         stamp: &at,
         random: ctx.seams.random.as_ref(),
         confined: ctx.seams.confined.as_ref(),
+        guard: guard.as_ref(),
     };
     match core_setup::run(
         &mut wizard,
-        prompt.as_ref(),
+        (prompt.as_ref(), guard.as_ref()),
         ctx.seams.filesystem.as_ref(),
         validator.as_ref(),
         &applying,

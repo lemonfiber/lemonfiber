@@ -18,7 +18,7 @@ use crate::ports::filesystem::{
 use crate::prerequisites::PrerequisiteMap;
 use crate::stack::Source;
 use crate::validate::{Validation, Validator};
-use crate::wizard::{Answer, Library, Phase, Plan, Progress, Vpn, Wizard};
+use crate::wizard::{Answer, Guarded, Library, Phase, Plan, Progress, Vpn, Wizard};
 
 /// A validator that answers with scripted outcomes, so a run is driven with no
 /// network. Each call takes the next outcome, and the last is repeated once they
@@ -197,6 +197,11 @@ struct Scripted {
     /// Empty answers yes, so a test that scripts a "no" to the VPN question and
     /// nothing here gets the accepted-the-exposure path.
     unprotected: std::cell::RefCell<VecDeque<bool>>,
+    /// What the operator answers each of the egress guard's questions with, by the
+    /// setting or the secret it asks for; nothing leaves one unanswered.
+    guarding: std::collections::BTreeMap<String, String>,
+    /// Every question of the egress guard put to the operator, in order.
+    asked_of_the_guard: std::cell::RefCell<Vec<String>>,
     /// How many times the exposure was put to the operator — a warning that
     /// never appeared and one that appeared silently look the same otherwise.
     warned_unprotected: std::cell::Cell<usize>,
@@ -239,6 +244,8 @@ impl Scripted {
             shown_prerequisites: std::cell::RefCell::new(Vec::new()),
             vpn: std::cell::RefCell::new(VecDeque::new()),
             unprotected: std::cell::RefCell::new(VecDeque::new()),
+            guarding: std::collections::BTreeMap::new(),
+            asked_of_the_guard: std::cell::RefCell::new(Vec::new()),
             warned_unprotected: std::cell::Cell::new(0),
             locations: std::cell::RefCell::new(VecDeque::from([data_location])),
             accept: Accept::Elsewhere,
@@ -262,6 +269,17 @@ impl Prompt for Scripted {
     }
     fn vpn(&self) -> bool {
         self.vpn.borrow_mut().pop_front().unwrap_or(true)
+    }
+
+    fn guard(&self, asking: &super::Asking<'_>) -> Option<String> {
+        let name = match asking {
+            super::Asking::Choice { setting, .. } | super::Asking::Value { setting } => setting,
+            super::Asking::Secret { secret, .. } => secret,
+        };
+        self.asked_of_the_guard
+            .borrow_mut()
+            .push((*name).to_owned());
+        self.guarding.get(*name).cloned()
     }
 
     fn unprotected(&self) -> bool {
@@ -326,6 +344,7 @@ fn applying<'a>(paths: &'a Paths, stamp: &'a str) -> Applying<'a> {
         stamp,
         random: &A_MACHINE,
         confined: &lemonfiber_adapters::Disk,
+        guard: None,
     }
 }
 
@@ -358,5 +377,6 @@ fn entering(dir: &Path, on_failure: CredentialChoice) -> Scripted {
 }
 
 mod credentials;
+mod guarded;
 mod location;
 mod protocols;

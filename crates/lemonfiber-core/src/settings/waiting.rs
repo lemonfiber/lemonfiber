@@ -11,14 +11,72 @@ use crate::model::{Waiting, Wanted};
 use crate::plugin::Installed;
 use crate::topology::{Placed, Topology};
 
-/// One secret a service reads, as the rules for waiting read it.
-struct Read<'a> {
+/// One secret a service reads, as the rules for waiting and setup's questions read it.
+pub(crate) struct Read<'a> {
     /// Its name in the secret store.
-    name: String,
+    pub(crate) name: String,
+    /// What holding it is for.
+    pub(crate) why: &'a str,
     /// Whether only the operator holds it and the service needs it to start.
-    needed_to_start: bool,
+    pub(crate) needed_to_start: bool,
     /// The values of other settings under which it is asked for.
-    needs: &'a choices::Needs,
+    pub(crate) needs: &'a choices::Needs,
+}
+
+/// One service's settings and secrets, as the rules for waiting and setup's questions
+/// read them.
+pub(crate) struct Reading<'a> {
+    /// The service's id.
+    pub(crate) service: &'a str,
+    /// Its environment.
+    pub(crate) env: &'a BTreeMap<String, Value>,
+    /// Every secret it reads.
+    pub(crate) secrets: Vec<Read<'a>>,
+}
+
+/// Every service `manifest` and `installed` hold, each with its settings and secrets: the
+/// stack's own, then each installed plugin's.
+pub(crate) fn readings<'a>(manifest: &'a Manifest, installed: &'a [Installed]) -> Vec<Reading<'a>> {
+    let stack = manifest.services.iter().map(|service| {
+        let container = service.container();
+        let secrets = service
+            .secret
+            .iter()
+            .map(|secret| Read {
+                name: super::named(container.namespace, &secret.id),
+                why: &secret.why,
+                needed_to_start: secret.recorded_with.is_some(),
+                needs: &secret.needs,
+            })
+            .collect::<Vec<_>>();
+        Reading {
+            service: container.id,
+            env: container.env,
+            secrets,
+        }
+    });
+    let plugins = installed.iter().flat_map(|one| {
+        one.services.iter().map(move |placed| {
+            let secrets = one
+                .declared
+                .secrets
+                .iter()
+                .filter(|secret| reads(&placed.fields.env, &secret.id))
+                .map(|secret| Read {
+                    name: super::named(&one.plugin, &secret.id),
+                    why: &secret.why,
+                    needed_to_start: secret.needed_to_start,
+                    needs: &secret.needs,
+                })
+                .collect::<Vec<_>>();
+            Reading {
+                service: placed.service.as_str(),
+                env: &placed.fields.env,
+                secrets,
+            }
+        })
+    });
+    stack.chain(plugins).collect()
 }
 
 /// Every service `manifest` and `installed` hold that waits for something, each with
@@ -30,41 +88,12 @@ pub(crate) fn waiting(
     recorded: &dyn Fn(&str) -> Option<String>,
     held: &dyn Fn(&str) -> bool,
 ) -> Vec<Waiting> {
-    let stack = manifest.services.iter().map(|service| {
-        let container = service.container();
-        let secrets = service
-            .secret
-            .iter()
-            .map(|secret| Read {
-                name: super::named(container.namespace, &secret.id),
-                needed_to_start: secret.recorded_with.is_some(),
-                needs: &secret.needs,
-            })
-            .collect::<Vec<_>>();
-        (container.id, container.env, secrets)
-    });
-    let plugins = installed.iter().flat_map(|one| {
-        one.services.iter().map(move |placed| {
-            let secrets = one
-                .declared
-                .secrets
-                .iter()
-                .filter(|secret| reads(&placed.fields.env, &secret.id))
-                .map(|secret| Read {
-                    name: super::named(&one.plugin, &secret.id),
-                    needed_to_start: secret.needed_to_start,
-                    needs: &secret.needs,
-                })
-                .collect::<Vec<_>>();
-            (placed.service.as_str(), &placed.fields.env, secrets)
-        })
-    });
-    stack
-        .chain(plugins)
-        .filter_map(|(service, env, secrets)| {
-            let wants = wanted(env, &secrets, recorded, held);
+    readings(manifest, installed)
+        .into_iter()
+        .filter_map(|reading| {
+            let wants = wanted(reading.env, &reading.secrets, recorded, held);
             (!wants.is_empty()).then(|| Waiting {
-                service: service.to_owned(),
+                service: reading.service.to_owned(),
                 wants,
             })
         })

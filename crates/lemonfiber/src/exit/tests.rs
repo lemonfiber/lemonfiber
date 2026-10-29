@@ -47,6 +47,7 @@ fn a_wizard() -> WizardReport {
         plan: Vec::new(),
         written: Vec::new(),
         proof: None,
+        guard: Vec::new(),
     }
 }
 

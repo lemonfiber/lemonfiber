@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Carrying, with what was given.",
+  "oneOf": [
+    {
+      "description": "A VPN carries it, through the egress guard set up with what was given.",
+      "type": "object",
+      "properties": {
+        "carrying": {
+          "$ref": "SetupGuarded.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "carrying"
+      ]
+    }
+  ]
+}

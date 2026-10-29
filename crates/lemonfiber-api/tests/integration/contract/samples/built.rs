@@ -627,7 +627,39 @@ pub(super) fn a_setup_part_way() -> WizardReport {
         proof: Some(lemonfiber_core::validate::Validation::Valid {
             observed: "the indexer answered with its capabilities".to_owned(),
         }),
+        guard: a_guards_questions(),
     }
+}
+
+/// What the VPN step asks of a guard: a choice, a value and a secret.
+fn a_guards_questions() -> Vec<lemonfiber_core::model::GuardQuestion> {
+    use lemonfiber_core::model::{Choosable, GuardQuestion};
+    let needs = || {
+        std::collections::BTreeMap::from([(
+            "gluetun:vpn-type".to_owned(),
+            vec!["openvpn".to_owned()],
+        )])
+    };
+    vec![
+        GuardQuestion::Choice {
+            setting: "gluetun:vpn-type".to_owned(),
+            default: Some("wireguard".to_owned()),
+            choices: vec![Choosable {
+                value: "openvpn".to_owned(),
+                needs: std::collections::BTreeMap::new(),
+                open: true,
+            }],
+        },
+        GuardQuestion::Value {
+            setting: "gluetun:account".to_owned(),
+            needs: needs(),
+        },
+        GuardQuestion::Secret {
+            secret: "gluetun:openvpn-user".to_owned(),
+            why: "Signs in over OpenVPN".to_owned(),
+            needs: needs(),
+        },
+    ]
 }
 
 /// A walk that got all the way through, so the fields only an ending fills are

@@ -4,6 +4,8 @@
 //! separate files and are re-exported as one, so `crate::model::X` reads the same as it
 //! always did.
 
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 /// What versions are in play: the binary, the stack it operates, and what changed.
@@ -223,6 +225,43 @@ pub struct WizardReport {
     /// Said in a field of its own so that a rehearsal is never told from the real run by
     /// its wording alone.
     pub rehearsed: Ran,
+    /// What the VPN step asks of the egress guard where one carries the torrents, in the
+    /// order it asks it: empty where nothing fills the guard or it asks nothing.
+    pub guard: Vec<GuardQuestion>,
+}
+
+/// One question the VPN step asks of the service filling `network.egress-guard`.
+///
+/// Asked in order. A choice offers only the values whose needs the answers before it
+/// meet, and a value or a secret is asked only where its own needs are met.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(tag = "asks", rename_all = "kebab-case")]
+pub enum GuardQuestion {
+    /// One of a setting's values.
+    Choice {
+        /// The setting.
+        setting: String,
+        /// What it holds where it is left unanswered.
+        default: Option<String>,
+        /// Every value it accepts, each with what it is a choice under.
+        choices: Vec<crate::model::Choosable>,
+    },
+    /// A setting's value, which only the operator holds.
+    Value {
+        /// The setting.
+        setting: String,
+        /// The values of other settings under which it is asked.
+        needs: BTreeMap<String, Vec<String>>,
+    },
+    /// A secret, entered without being shown.
+    Secret {
+        /// The name the secret store holds it under.
+        secret: String,
+        /// What holding it is for.
+        why: String,
+        /// The values of settings under which it is asked.
+        needs: BTreeMap<String, Vec<String>>,
+    },
 }
 
 /// Whether a walk through setup was carried out or rehearsed, written as the bare

@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{CredentialChoice, Prompt, ProviderEntry, StorageWarning};
+use lemonfiber_core::app::setup::{
+    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
+};
 use lemonfiber_core::config::Protocols;
 
 use lemonfiber_core::prerequisites::prerequisites;
@@ -305,4 +307,56 @@ fn each_notification_appetite_can_be_named_on_the_command_line() {
         refused.contains("problems, completions or everything"),
         "{refused}"
     );
+}
+
+#[test]
+fn the_guards_questions_are_answered_from_the_vpn_flags_alone() {
+    let flags = SetupFlags::parse(RawSetup {
+        vpn_settings: vec!["guard:vpn-type=openvpn".to_owned()],
+        vpn_secrets: vec!["guard:openvpn-user=someone".to_owned()],
+        ..raw()
+    });
+    let Ok(flags) = flags else {
+        unreachable!("the flags parse");
+    };
+    let prompt = Flags::new(flags, PathBuf::from("/srv"));
+
+    let asked = |asking: &Asking<'_>| prompt.guard(asking);
+
+    assert_eq!(
+        asked(&Asking::Choice {
+            setting: "guard:vpn-type",
+            offered: Vec::new(),
+            default: None,
+        }),
+        Some("openvpn".to_owned())
+    );
+    assert_eq!(
+        asked(&Asking::Value {
+            setting: "guard:account"
+        }),
+        None
+    );
+    assert_eq!(
+        asked(&Asking::Secret {
+            secret: "guard:openvpn-user",
+            why: "Signs in",
+        }),
+        Some("someone".to_owned())
+    );
+}
+
+#[test]
+fn a_vpn_flag_that_is_not_name_equals_value_is_refused_without_saying_a_secret() {
+    let setting = SetupFlags::parse(RawSetup {
+        vpn_settings: vec!["guard:vpn-type".to_owned()],
+        ..raw()
+    });
+    let secret = SetupFlags::parse(RawSetup {
+        vpn_secrets: vec!["=a-key-nobody-reads".to_owned()],
+        ..raw()
+    });
+
+    assert!(setting.is_err_and(|why| why.contains("guard:vpn-type")));
+    assert!(secret.is_err_and(|why| why.contains("--vpn-secret") && !why.contains("a-key")));
 }

@@ -153,10 +153,11 @@ impl Step {
     /// credentials its own steps carry, and naming them from here is what keeps that
     /// list from drifting from the questions setup actually asks.
     ///
-    /// The tunnel names none. Its step asks *whether* a VPN carries the torrents and
-    /// records that; which provider carries them is set afterwards, so listing it here
-    /// would name a setting no answer of this step ever writes. What a torrent run has
-    /// to go and obtain is a prerequisite rather than a credential, and is said as one.
+    /// The tunnel names none here. What its step writes are the egress guard's own
+    /// settings and secrets, named by the manifest of whatever fills the guard rather
+    /// than by this build, so no list of keys fixed here could hold them. What a torrent
+    /// run has to go and obtain is a prerequisite rather than a credential, and is said
+    /// as one.
     #[must_use]
     pub const fn settings(self) -> &'static [&'static str] {
         match self {

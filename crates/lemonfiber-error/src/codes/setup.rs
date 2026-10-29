@@ -150,4 +150,14 @@ codes! {
             and the message names both places.",
         remedy: "Run the reversal again once both places can be written.",
     }
+    /// Raised when a VPN answer leaves the egress guard without what it needs to start.
+    GUARD_UNANSWERED = "SETUP-16" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "The VPN answer leaves out a setting or a secret the egress guard needs to \
+            start, or gives one it does not ask for under the answers given. Nothing was \
+            recorded, and the VPN step is asked again.",
+        remedy: "Answer the VPN step again with every setting and secret it names.",
+    }
 }

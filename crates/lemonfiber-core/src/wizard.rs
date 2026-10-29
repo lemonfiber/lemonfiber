@@ -30,7 +30,7 @@ mod recovery;
 mod steps;
 
 pub use answers::{
-    Answer, Answers, Credentials, Indexer, Library, Provider, Rejected, Usenet, Vpn,
+    Answer, Answers, Credentials, Guarded, Indexer, Library, Provider, Rejected, Usenet, Vpn,
 };
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
 pub use recovery::{described, Choice, Recovery, Resolution, Status};
@@ -95,6 +95,12 @@ impl Wizard {
                 self.progress.at = rehomed;
             }
         }
+    }
+
+    /// Take back the VPN answer and stand on its step again, to be asked afresh.
+    pub(crate) fn reask_vpn(&mut self) {
+        self.progress.answers.vpn = None;
+        self.progress.at = Step::Vpn;
     }
 
     /// The resumable state, to be serialised and written by a surface.
