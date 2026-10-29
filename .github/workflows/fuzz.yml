@@ -85,6 +85,8 @@ jobs:
               | .github/workflows/fuzz.yml | rust-toolchain.toml | Cargo.lock)
               fuzzed=true
               ;;
+            *)
+              ;;
             esac
           done <<< "${changed}"
           echo "fuzzed=${fuzzed}" >> "$GITHUB_OUTPUT"

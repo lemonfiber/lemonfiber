@@ -90,6 +90,8 @@ jobs:
               echo "::error::The reason must be one line of plain text, with no '-->' in it."
               exit 1
               ;;
+            *)
+              ;;
           esac
 
           id=$(gh api "repos/${REPO}/releases/tags/v${VERSION}" --jq '.id // empty')
