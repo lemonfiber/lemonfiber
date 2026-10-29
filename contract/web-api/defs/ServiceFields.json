@@ -3,6 +3,17 @@
   "description": "The container fields an install record keeps for a service, beyond those every\nrecord already holds.",
   "type": "object",
   "properties": {
+    "certificate": {
+      "description": "The certificate lemonfiber makes for it, where it declares one.",
+      "anyOf": [
+        {
+          "$ref": "ServiceCertificate.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "config_ro": {
       "description": "Whether its configuration directory is read-only.",
       "type": "boolean"

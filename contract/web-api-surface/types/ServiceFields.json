@@ -1,5 +1,11 @@
 {
   "fields": {
+    "certificate": {
+      "type": [
+        "anyOf(null,ref:ServiceCertificate)"
+      ],
+      "required": false
+    },
     "config_ro": {
       "type": [
         "boolean"

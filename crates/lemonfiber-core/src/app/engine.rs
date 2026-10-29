@@ -415,6 +415,7 @@ async fn worked(
     if starts(action) {
         crate::screening::door::made_before_start(ctx, &manifest);
         crate::seed::run::encrypting::made_before_start(ctx, &manifest);
+        crate::certificate::declared::made_before_start(ctx, &manifest)?;
     }
 
     // Let go of what is about to start before it runs, and write down what a stop

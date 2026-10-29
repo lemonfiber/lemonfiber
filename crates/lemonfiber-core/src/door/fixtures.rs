@@ -39,6 +39,7 @@ pub(crate) fn service(id: &str, bind: Option<Bind>) -> Service {
         posture: lemonfiber_manifest::container::Posture::Standard,
         network: None,
         shape: None,
+        certificate: None,
         asks_for: None,
         reaches: None,
         listens: None,

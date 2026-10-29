@@ -65,6 +65,7 @@ fn service(id: &str, name: &str, port: u16) -> lemonfiber_manifest::Service {
         posture: lemonfiber_manifest::container::Posture::Standard,
         network: None,
         shape: None,
+        certificate: None,
         asks_for: None,
         reaches: None,
         listens: None,

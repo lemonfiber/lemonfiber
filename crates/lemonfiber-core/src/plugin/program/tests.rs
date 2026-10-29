@@ -8,7 +8,8 @@ use super::super::installed::{Installed, Placed};
 use super::super::recorded::RunResult;
 use super::super::Verdict;
 use super::{
-    contained, limit, performed, pinned, recorded, settled, verdict, Came, Operator, Starting,
+    contained, limit, performed, pinned, recorded, settled, verdict, Asking, Came, Operator,
+    Starting, Throwaway,
 };
 use crate::ports::program::{Configuration, Unran};
 
@@ -254,12 +255,15 @@ async fn a_run_that_said_what_it_declares_passes_and_its_copy_is_gone() {
     let came = performed(
         program.as_ref(),
         &placed,
-        &run_of(&["--version"], None),
-        &operator(),
-        Some(Starting {
-            root: &source,
-            service: "qualitysync",
-        }),
+        Asking {
+            run: &run_of(&["--version"], None),
+            operator: &operator(),
+            starting: Some(Starting {
+                root: &source,
+                service: "qualitysync",
+            }),
+            confined: &lemonfiber_adapters::Disk,
+        },
         &lemonfiber_fixtures::ports::Chance::cycling(),
     )
     .await;
@@ -280,9 +284,12 @@ async fn a_run_that_overran_fails_naming_its_limit() {
     let came = performed(
         program.as_ref(),
         &placed,
-        &run_of(&["sync"], Some(5)),
-        &operator(),
-        None,
+        Asking {
+            run: &run_of(&["sync"], Some(5)),
+            operator: &operator(),
+            starting: None,
+            confined: &lemonfiber_adapters::Disk,
+        },
         &lemonfiber_fixtures::ports::Chance::cycling(),
     )
     .await;
@@ -325,9 +332,12 @@ async fn a_run_the_engine_could_not_make_is_unproven_naming_why() {
         let came = performed(
             Proving::answering(Err(unran)).as_ref(),
             &placed,
-            &run_of(&["-v"], None),
-            &operator(),
-            None,
+            Asking {
+                run: &run_of(&["-v"], None),
+                operator: &operator(),
+                starting: None,
+                confined: &lemonfiber_adapters::Disk,
+            },
             &lemonfiber_fixtures::ports::Chance::cycling(),
         )
         .await;
@@ -352,12 +362,15 @@ async fn a_run_whose_starting_files_are_refused_is_unproven_and_never_made() {
     let came = performed(
         program.as_ref(),
         &placed,
-        &run_of(&["-v"], None),
-        &operator(),
-        Some(Starting {
-            root: &source,
-            service: "qualitysync",
-        }),
+        Asking {
+            run: &run_of(&["-v"], None),
+            operator: &operator(),
+            starting: Some(Starting {
+                root: &source,
+                service: "qualitysync",
+            }),
+            confined: &lemonfiber_adapters::Disk,
+        },
         &lemonfiber_fixtures::ports::Chance::cycling(),
     )
     .await;
@@ -433,4 +446,69 @@ fn the_operator_is_what_this_machines_settings_write_each_falling_back_as_the_en
         })
         .build();
     assert_eq!(Operator::of(&blank), Operator::recording());
+}
+
+/// [`RUNNING`] with its service declaring the certificate it serves with.
+const DECLARING: &str = "user_mode     = \"uid\"\ncertificate   = { key = \"tls/key.pem\", certificate = \"tls/certificate.pem\", names = [\"qualitysync\"] }\n";
+
+#[test]
+fn a_declared_certificate_is_written_into_the_copy_readable_by_the_service() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let Some(placed) = placed(&RUNNING.replace("user_mode     = \"uid\"\n", DECLARING)) else {
+        unreachable!("the fixture places a service");
+    };
+    let Ok(copy) = Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling()) else {
+        unreachable!("a throwaway copy is made");
+    };
+    let certified = super::certified(&placed, &copy, &lemonfiber_adapters::Disk);
+    let kept = placed.fields.certificate.as_ref().and_then(|laid| {
+        crate::certificate::declared::kept_or_made(&lemonfiber_adapters::Disk, copy.path(), laid)
+            .ok()
+    });
+    assert!(kept.is_some());
+    assert_eq!(certified.ok().flatten(), kept.map(|kept| kept.fingerprint));
+    let mode = |named: &str| {
+        std::fs::metadata(copy.path().join(named))
+            .ok()
+            .map(|file| file.permissions().mode() & 0o777)
+    };
+    assert_eq!(
+        (
+            mode("tls"),
+            mode("tls/key.pem"),
+            mode("tls/certificate.pem")
+        ),
+        (Some(0o755), Some(0o644), Some(0o644))
+    );
+}
+
+#[tokio::test]
+async fn a_run_whose_certificate_cannot_be_written_is_unproven_and_never_run() {
+    let source = Scratch::new("program-uncertified");
+    let _ = std::fs::create_dir_all(source.join("config/qualitysync/tls/key.pem"));
+    let _ = std::fs::write(source.join("config/qualitysync/tls/key.pem/inside"), "x");
+    let program = Proving::exiting(0, "v8.7.3 (Branch.master)\n");
+    let Some(placed) = placed(&RUNNING.replace("user_mode     = \"uid\"\n", DECLARING)) else {
+        unreachable!("the fixture places a service");
+    };
+    let came = performed(
+        program.as_ref(),
+        &placed,
+        Asking {
+            run: &run_of(&["--version"], None),
+            operator: &operator(),
+            starting: Some(Starting {
+                root: &source,
+                service: "qualitysync",
+            }),
+            confined: &lemonfiber_adapters::Disk,
+        },
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+    )
+    .await;
+    assert!(
+        matches!(&came, Came::Unproven(why) if why.contains("tls/key.pem could not be written")),
+        "{came:?}"
+    );
+    assert!(program.asked().is_empty());
 }

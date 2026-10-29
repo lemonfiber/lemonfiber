@@ -44,6 +44,7 @@ fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
         mem_limit_mib: None,
         network: None,
         shape: None,
+        certificate: None,
         provides: &[],
         speaks: false,
     }
@@ -679,4 +680,23 @@ fn what_a_service_rebuilds_lies_beneath_its_configuration_directory() {
         .iter()
         .all(|one| one.ends_with("is not a relative path beneath its configuration directory")));
     assert!(!found.iter().any(|one| one.contains("rebuilt cache:")));
+}
+
+#[test]
+fn a_certificate_is_held_to_its_rules_under_the_field_it_is_declared_in() {
+    let none = NONE;
+    let certificate = super::Certificate {
+        key: "../key.pem".to_owned(),
+        certificate: "certificate.pem".to_owned(),
+        names: vec!["jellyfin".to_owned()],
+    };
+    let mut serving = plain(&none);
+    serving.certificate = Some(&certificate);
+    assert_eq!(
+        serving.broken(),
+        vec![(
+            "service jellyfin.certificate".to_owned(),
+            "../key.pem is not a relative path beneath its configuration directory".to_owned()
+        )]
+    );
 }

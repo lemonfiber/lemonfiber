@@ -138,4 +138,18 @@ codes! {
             message names what moved.",
         remedy: "Read what a reset would revert again, and answer the name it prints.",
     }
+    /// Raised where the certificate a service declares could not be made or read before it
+    /// starts.
+    CERTIFICATE_NOT_MADE = "STACK-14" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "A service declares a certificate lemonfiber makes for it before it starts, \
+            and that certificate could not be made, or what is kept in its place is not a \
+            certificate and its key, or only one of the two is there. Starting the service \
+            would start it without the certificate it serves with, so nothing was started.",
+        remedy: "The message names the service and the file. Where only one of the two is \
+            there, or either is not what it should be, move both aside and start again, and \
+            lemonfiber makes a new pair.",
+    }
 }

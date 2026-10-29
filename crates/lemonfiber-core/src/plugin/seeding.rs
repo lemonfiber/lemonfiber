@@ -103,6 +103,29 @@ pub fn refused(manifest: &Manifest, shipped: &[Shipped]) -> Vec<Violation> {
             lemonfiber_plugin::seeding::refused(manifest, &file.service, &file.path, &file.bytes)
         })
         .chain(crowded(shipped))
+        .chain(covered(manifest, shipped))
+        .collect()
+}
+
+/// Each starting file shipped where its service's declared certificate or key is written.
+fn covered(manifest: &Manifest, shipped: &[Shipped]) -> Vec<Violation> {
+    shipped
+        .iter()
+        .filter(|file| {
+            manifest
+                .services
+                .iter()
+                .filter(|service| service.id == file.service)
+                .filter_map(|service| service.certificate.as_ref())
+                .any(|laid| file.path == laid.key || file.path == laid.certificate)
+        })
+        .map(|file| Violation {
+            location: format!("service {}.certificate", file.service),
+            message: format!(
+                "{} is a starting file, where lemonfiber writes the certificate it declares",
+                file.path
+            ),
+        })
         .collect()
 }
 

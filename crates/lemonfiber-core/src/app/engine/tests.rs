@@ -29,6 +29,10 @@ fn both_ways_of_starting_make_the_doors_certificate_first() {
             source.contains("encrypting::made_before_start(ctx, &manifest)"),
             "{path} starts services without making the media server's internal certificate"
         );
+        assert!(
+            source.contains("declared::made_before_start(ctx, &manifest)?"),
+            "{path} starts services without making the certificates they declare"
+        );
     }
 }
 

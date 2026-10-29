@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The certificate lemonfiber makes for a service before it first starts.",
+  "type": "object",
+  "properties": {
+    "certificate": {
+      "description": "Where the certificate is written, relative to the configuration directory.",
+      "type": "string"
+    },
+    "key": {
+      "description": "Where its private key is written, relative to the configuration directory.",
+      "type": "string"
+    },
+    "names": {
+      "description": "The host names it is made out to.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "key",
+    "certificate",
+    "names"
+  ]
+}

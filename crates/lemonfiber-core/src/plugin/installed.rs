@@ -155,6 +155,7 @@ impl Placed {
                 posture: service.posture,
                 mem_limit_mib: service.mem_limit_mib,
                 network: service.network.clone(),
+                certificate: service.certificate.clone(),
             },
             service: service.id.clone(),
             image: service.image.clone(),

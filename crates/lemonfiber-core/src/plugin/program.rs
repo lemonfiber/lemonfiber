@@ -202,23 +202,10 @@ pub(crate) fn pinned(placed: &Placed) -> String {
 pub(crate) async fn performed(
     program: &dyn Program,
     placed: &Placed,
-    run: &lemonfiber_plugin::Run,
-    operator: &Operator,
-    starting: Option<Starting<'_>>,
+    asking: Asking<'_>,
     random: &dyn crate::ports::random::Random,
 ) -> Came {
-    performed_from(
-        program,
-        placed,
-        &pinned(placed),
-        Asking {
-            run,
-            operator,
-            starting,
-        },
-        random,
-    )
-    .await
+    performed_from(program, placed, &pinned(placed), asking, random).await
 }
 
 /// What a run is asked as: the run, who it runs as, and the starting files it is given.
@@ -229,6 +216,8 @@ pub(crate) struct Asking<'a> {
     pub(crate) operator: &'a Operator,
     /// Where its starting files are copied from, where it has any.
     pub(crate) starting: Option<Starting<'a>>,
+    /// Writes the certificate the service serves with into the copy, through no link.
+    pub(crate) confined: &'a dyn crate::ports::filesystem::Confined,
 }
 
 /// Run a run for the service `placed` records, from `image`, with a throwaway copy of
@@ -244,11 +233,15 @@ pub(crate) async fn performed_from(
         run,
         operator,
         starting,
+        confined,
     } = asking;
     let copy = match throwaway::Throwaway::of(starting, random) {
         Ok(copy) => copy,
         Err(why) => return Came::Unproven(why),
     };
+    if let Err(why) = laid(placed.fields.certificate.clone(), &copy, confined) {
+        return Came::Unproven(why);
+    }
     let asked = settled(placed, image, run, operator, Some(copy.path()));
     match program.run(&asked).await {
         Ok(ran) => match ran.ended {
@@ -260,6 +253,44 @@ pub(crate) async fn performed_from(
         },
         Err(unran) => Came::Unproven(unproven(&unran)),
     }
+}
+
+/// A throwaway certificate and its key written into `copy` where and as the core writes the
+/// one the service `placed` records serves with, readable by whoever it runs as, with the
+/// fingerprint the certificate is answered by, which the run made; nothing where it serves
+/// with none.
+pub(crate) fn certified(
+    placed: &Placed,
+    copy: &Throwaway,
+    confined: &dyn crate::ports::filesystem::Confined,
+) -> Result<Option<String>, String> {
+    laid(
+        crate::certificate::declared::served_with(
+            &placed.provides,
+            placed.fields.certificate.as_ref(),
+        ),
+        copy,
+        confined,
+    )
+}
+
+/// A throwaway certificate and its key written into `copy` where `laid` says, readable by
+/// whoever the service runs as, with the fingerprint the certificate is answered by;
+/// nothing where `laid` is nothing.
+fn laid(
+    laid: Option<lemonfiber_manifest::container::Certificate>,
+    copy: &Throwaway,
+    confined: &dyn crate::ports::filesystem::Confined,
+) -> Result<Option<String>, String> {
+    let Some(laid) = laid else {
+        return Ok(None);
+    };
+    let kept = crate::certificate::declared::throwaway(confined, copy.path(), &laid)
+        .map_err(|unkept| unkept.to_string())?;
+    [&laid.key, &laid.certificate]
+        .into_iter()
+        .try_for_each(|named| copy.readable(named))?;
+    Ok(Some(kept.fingerprint))
 }
 
 /// Why a run that could not be made leaves its proof unproven.
