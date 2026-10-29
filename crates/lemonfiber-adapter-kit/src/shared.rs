@@ -6,15 +6,19 @@
 //! every step after it works on that handle: a stale staging name is unlinked, which
 //! removes a link and never follows it; the staging file is created new, refusing to
 //! follow one; its mode is set and it is flushed through its own handle; and it is
-//! renamed over the target, which replaces a link rather than writing through it. A read
-//! opens the file the same way, refuses anything but a plain file, and is bounded.
+//! renamed over the target, which replaces a link rather than writing through it; no
+//! file is ever opened in place to be written. A read refuses anything but a plain file
+//! with one name before opening it, opens it without following a link and without
+//! blocking, refuses it again through the handle before reading a byte, and is bounded.
+//! A name is a [`SharedName`], one path component, built only by validating it.
 
 use std::io::{Read as _, Write as _};
 use std::os::fd::OwnedFd;
 use std::path::{Path, PathBuf};
 
 use rustix::fs::{
-    fchmod, fstat, fsync, openat, renameat, unlinkat, AtFlags, FileType, Mode, OFlags, CWD,
+    fchmod, fstat, fsync, openat, renameat, statat, unlinkat, AtFlags, FileType, Mode, OFlags,
+    Stat, CWD,
 };
 use rustix::io::Errno;
 
@@ -26,16 +30,20 @@ pub const LARGEST: u64 = 4 * 1024 * 1024;
 /// read.
 const KEPT: u32 = 0o644;
 
+/// The longest file name, in bytes, one path component holds.
+const LONGEST_NAME: usize = 255;
+
 /// What a staging file is named beside its target: hidden, and never a target's name.
 const STAGING: &str = ".writing";
 
 /// Why a shared file was not written or read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Unshared {
-    /// The name is not one plain file name in the directory.
+    /// The name is not one path component.
     Named(String),
     /// The directory, or the file named, is a link or not what was asked for: a
-    /// directory that is not one, or a file that is not a plain file.
+    /// directory that is not one, a file that is not a plain file, or a file that has
+    /// another name too.
     Linked(String),
     /// The file is larger than [`LARGEST`].
     Large(String),
@@ -55,6 +63,40 @@ impl std::fmt::Display for Unshared {
 }
 
 impl std::error::Error for Unshared {}
+
+/// One file name in the shared directory: exactly one path component, and never a
+/// staging name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedName(String);
+
+impl SharedName {
+    /// `name`, where it is one path component: not empty and no longer than a file
+    /// name is, not `.` or `..`, with no `/` and no NUL, and not ending as a staging
+    /// name does.
+    ///
+    /// # Errors
+    ///
+    /// [`Unshared::Named`] for anything else.
+    pub fn new(name: &str) -> Result<Self, Unshared> {
+        let one = !name.is_empty()
+            && name.len() <= LONGEST_NAME
+            && name != "."
+            && name != ".."
+            && !name.contains(['/', '\0'])
+            && !name.ends_with(STAGING);
+        if one {
+            Ok(Self(name.to_owned()))
+        } else {
+            Err(Unshared::Named(name.to_owned()))
+        }
+    }
+
+    /// The name as written.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// The configuration directory an adapter shares with its upstream.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,50 +119,39 @@ impl Shared {
     ///
     /// # Errors
     ///
-    /// [`Unshared`] where the name is not one plain file name, the directory is a link,
-    /// or a step fails; nothing outside the directory is written.
-    pub async fn write(&self, name: &str, contents: Vec<u8>, mode: u32) -> Result<(), Unshared> {
+    /// [`Unshared`] where the directory is a link or a step fails; nothing outside the
+    /// directory is written.
+    pub async fn write(
+        &self,
+        name: &SharedName,
+        contents: Vec<u8>,
+        mode: u32,
+    ) -> Result<(), Unshared> {
         let directory = self.directory.clone();
-        let owned = name.to_owned();
-        tokio::task::spawn_blocking(move || written(&directory, &owned, &contents, mode))
+        let owned = name.clone();
+        tokio::task::spawn_blocking(move || written(&directory, owned.as_str(), &contents, mode))
             .await
-            .map_err(failed(name))?
+            .map_err(failed(name.as_str()))?
     }
 
     /// What the file `name` holds, or none where nothing is there, following no link.
     ///
     /// # Errors
     ///
-    /// [`Unshared`] where the name is not one plain file name, the directory or the file
-    /// is a link or not a plain file, the file is larger than [`LARGEST`], or a step
-    /// fails.
-    pub async fn read(&self, name: &str) -> Result<Option<Vec<u8>>, Unshared> {
+    /// [`Unshared`] where the directory or the file is a link, the file is not a plain
+    /// file with one name, it is larger than [`LARGEST`], or a step fails.
+    pub async fn read(&self, name: &SharedName) -> Result<Option<Vec<u8>>, Unshared> {
         let directory = self.directory.clone();
-        let owned = name.to_owned();
-        tokio::task::spawn_blocking(move || read(&directory, &owned))
+        let owned = name.clone();
+        tokio::task::spawn_blocking(move || read(&directory, owned.as_str()))
             .await
-            .map_err(failed(name))?
+            .map_err(failed(name.as_str()))?
     }
 }
 
 /// What a step that failed on the file `name` is reported as.
 fn failed<E: std::fmt::Display>(name: &str) -> impl FnOnce(E) -> Unshared + '_ {
     move |why| Unshared::Failed(name.to_owned(), why.to_string())
-}
-
-/// `name`, where it is one plain file name: no separator, not `.` or `..`, and never a
-/// staging name.
-fn plain(name: &str) -> Result<&str, Unshared> {
-    let one = !name.is_empty()
-        && name != "."
-        && name != ".."
-        && !name.contains(['/', '\0'])
-        && !name.ends_with(STAGING);
-    if one {
-        Ok(name)
-    } else {
-        Err(Unshared::Named(name.to_owned()))
-    }
 }
 
 /// The directory at `path`, opened once and refused where it is a link.
@@ -140,7 +171,6 @@ fn opened(path: &Path) -> Result<OwnedFd, Unshared> {
 
 /// Write `contents` to `name` in the directory at `path`, through its handle alone.
 fn written(path: &Path, name: &str, contents: &[u8], mode: u32) -> Result<(), Unshared> {
-    let name = plain(name)?;
     let directory = opened(path)?;
     let staging = format!(".{name}{STAGING}");
     match unlinkat(&directory, staging.as_str(), AtFlags::empty()) {
@@ -170,31 +200,42 @@ fn written(path: &Path, name: &str, contents: &[u8], mode: u32) -> Result<(), Un
 
 /// Write `contents` into the file `name` just created, set its mode and flush it.
 fn filled(created: OwnedFd, name: &str, contents: &[u8], mode: Mode) -> Result<(), Unshared> {
+    alone(&fstat(&created).map_err(failed(name))?, name)?;
     fchmod(&created, mode).map_err(failed(name))?;
     let mut file = std::fs::File::from(created);
     file.write_all(contents).map_err(failed(name))?;
     fsync(&file).map_err(failed(name))
 }
 
-/// What `name` in the directory at `path` holds, through its handle alone.
+/// Refuse the file `name` described by `held` unless it is a plain file with no other
+/// name, so neither a link, a device, a pipe nor a file hardlinked in from elsewhere is
+/// read or written.
+fn alone(held: &Stat, name: &str) -> Result<(), Unshared> {
+    if FileType::from_raw_mode(held.st_mode) == FileType::RegularFile && held.st_nlink == 1 {
+        Ok(())
+    } else {
+        Err(Unshared::Linked(name.to_owned()))
+    }
+}
+
+/// What `name` in the directory at `path` holds, through its handle alone: looked at
+/// without following a link and refused before it is opened unless it is a plain file
+/// with one name, then looked at again through the handle opened, and read bounded.
 fn read(path: &Path, name: &str) -> Result<Option<Vec<u8>>, Unshared> {
-    let name = plain(name)?;
     let directory = opened(path)?;
-    let file = match openat(
+    match statat(&directory, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(seen) => alone(&seen, name)?,
+        Err(Errno::NOENT) => return Ok(None),
+        Err(why) => return Err(failed(name)(why)),
+    }
+    let file = openat(
         &directory,
         name,
         OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
         Mode::empty(),
-    ) {
-        Ok(file) => file,
-        Err(Errno::NOENT) => return Ok(None),
-        Err(Errno::LOOP) => return Err(Unshared::Linked(name.to_owned())),
-        Err(why) => return Err(failed(name)(why)),
-    };
-    let held = fstat(&file).map_err(failed(name))?;
-    if FileType::from_raw_mode(held.st_mode) != FileType::RegularFile {
-        return Err(Unshared::Linked(name.to_owned()));
-    }
+    )
+    .map_err(failed(name))?;
+    alone(&fstat(&file).map_err(failed(name))?, name)?;
     let mut bytes = Vec::new();
     std::fs::File::from(file)
         .take(LARGEST + 1)
