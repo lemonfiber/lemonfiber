@@ -13,6 +13,21 @@ impl Action {
         }
     }
 
+    /// Start `service` where `running`, and stop it otherwise.
+    fn run(service: &str, running: bool) -> Self {
+        Self::Run {
+            service: service.to_owned(),
+            running,
+        }
+    }
+
+    /// Leave `service`'s internal certificate as it is.
+    fn unreplaced(service: &str) -> Self {
+        Self::Unreplaced {
+            service: service.to_owned(),
+        }
+    }
+
     /// Give `grant` to `plugin` again where `give`, and end it otherwise.
     fn regrant(plugin: &str, grant: &crate::plugin::Grant, give: bool) -> Self {
         Self::Regrant {
@@ -130,9 +145,8 @@ impl Change {
                 given,
             } => Action::regrant(plugin, grant, !given),
             Kind::Overlaid { path, .. } => Action::Leave { path: path.clone() },
-            Kind::Certified { service, .. } => Action::Unreplaced {
-                service: service.clone(),
-            },
+            Kind::Ran { service, running } => Action::run(service, !running),
+            Kind::Certified { service, .. } => Action::unreplaced(service),
         }
     }
 }

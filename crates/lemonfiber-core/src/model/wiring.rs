@@ -59,4 +59,17 @@ pub struct SubstitutionReport {
     /// over the project this choice would write, and held to nothing lemonfiber vets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unvetted: Option<crate::model::Unvetted>,
+    /// Each part the change was to stop or start and could not, with why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unran: Vec<Unran>,
+}
+
+/// A part a substitution was to stop or start and could not.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "SubstitutionUnran")]
+pub struct Unran {
+    /// The part's service.
+    pub service: String,
+    /// Why it was not.
+    pub because: String,
 }

@@ -737,6 +737,13 @@ fn a_key_is_left_standing_and_named() {
             },
             "the internal certificate of jellyfin",
         ),
+        (
+            Action::Run {
+                service: "prowlarr".to_owned(),
+                running: true,
+            },
+            "prowlarr",
+        ),
     ] {
         let carried = super::carrying_out(
             &lemonfiber_adapters::Disk,

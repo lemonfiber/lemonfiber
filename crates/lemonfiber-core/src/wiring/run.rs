@@ -28,15 +28,15 @@ use crate::model::{SubstitutionReport, WiringReport};
 /// # Errors
 ///
 /// Whatever the operation asked for returns.
-pub(crate) fn wiring(
+pub(crate) async fn wiring(
     ctx: &Ctx,
     asked: &crate::app::Linking,
 ) -> Result<crate::app::Outcome, Box<Problem>> {
     match asked {
         crate::app::Linking::Read => listing(ctx).map(crate::app::Outcome::Wiring),
-        crate::app::Linking::Fill(filling) => {
-            substituting(ctx, filling).map(crate::app::Outcome::Substitution)
-        }
+        crate::app::Linking::Fill(filling) => substituting(ctx, filling)
+            .await
+            .map(crate::app::Outcome::Substitution),
     }
 }
 
@@ -94,7 +94,7 @@ const OFFERED: [&str; 4] = [
 /// read, a service this stack does not have, one that cannot do the thing, a capability
 /// nothing asks for, one the named service already fills, an agreement naming a
 /// reading that has since moved, or a settings file that could not be written.
-fn substituting(
+async fn substituting(
     ctx: &Ctx,
     filling: &crate::app::Filling,
 ) -> Result<SubstitutionReport, Box<Problem>> {
@@ -121,15 +121,16 @@ fn substituting(
 
     let standing = offer(&substitution);
     let unvetted = crate::overlay::unvetted(ctx);
-    let reading = |applied| SubstitutionReport {
+    let reading = |applied, unran| SubstitutionReport {
         rehearsed: false,
         substitution: substitution.clone(),
         applied,
         agreement: standing.clone(),
         unvetted: unvetted.clone(),
+        unran,
     };
     let Some(answered) = filling.agreement.as_deref() else {
-        return Ok(reading(false));
+        return Ok(reading(false, Vec::new()));
     };
     let moved = crate::agreement::differs(answered, &standing, &OFFERED);
     if !moved.is_empty() {
@@ -147,16 +148,17 @@ fn substituting(
         &crate::settings::Resolved::of(ctx, Some(&manifest), installed.installed()),
     )?;
     if ctx.dry_run {
-        return Ok(reading(false));
+        return Ok(reading(false, Vec::new()));
     }
 
     // The record of the change goes down before the change does, so a run stopped
     // between the two leaves a journal entry for a setting that still holds its old
     // value — which unwinds to the value it already has. The other order leaves a
     // changed setting nothing can put back.
-    let (Some(path), Some(paths)) = (
+    let (Some(path), Some(paths), Some(stack)) = (
         ctx.settings.env_file.as_deref(),
         crate::app::targets::layout(ctx),
+        crate::app::project::directory(ctx),
     ) else {
         return Err(Box::new(nowhere_to_record()));
     };
@@ -166,11 +168,12 @@ fn substituting(
     let reasons = held.reasons_with(&filling.capability, reason);
     let before = held.reasons();
     let stamp = ctx.stamp();
-    let mut changes = vec![super::recorded(
+    let mut changes = super::parted(&substitution, &stamp);
+    changes.push(super::recorded(
         &substitution,
         held.setting().as_deref(),
         &stamp,
-    )];
+    ));
     let mut writes = vec![(super::FILLS_KEY, substitution.setting.as_str())];
     if reasons != before {
         changes.push(super::recorded_why(
@@ -201,7 +204,32 @@ fn substituting(
         .as_ref()
         .map_err(crate::app::plugins::diagnosed)?;
 
-    Ok(reading(true))
+    let unran = parts_ran(ctx, &stack, &substitution).await;
+    Ok(reading(true, unran))
+}
+
+/// Each part `substitution` stops or starts, run in the project in `stack`, answering
+/// each one that could not be.
+async fn parts_ran(
+    ctx: &Ctx,
+    stack: &std::path::Path,
+    substitution: &crate::wiring::Substitution,
+) -> Vec<crate::model::Unran> {
+    let mut unran = Vec::new();
+    let parts = substitution
+        .stops
+        .iter()
+        .map(|part| (part, false))
+        .chain(substitution.starts.iter().map(|part| (part, true)));
+    for (part, running) in parts {
+        if let Err(because) = crate::app::engine::ran(ctx, stack, part, running).await {
+            unran.push(crate::model::Unran {
+                service: part.clone(),
+                because,
+            });
+        }
+    }
+    unran
 }
 
 /// One setting written, or the settings file's own refusal.

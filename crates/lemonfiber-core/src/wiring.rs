@@ -33,10 +33,12 @@ mod fillers;
 mod handing;
 pub(crate) mod run;
 pub use run::listing;
+mod replacing;
 mod settling;
 
 pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
+pub use replacing::replaced;
 use settling::claimants;
 pub use settling::{address, asked_by, contested_by, filled, settle, settle_trusting, unfilled};
 
@@ -252,6 +254,11 @@ pub struct Substitution {
     /// which is a working stack becoming a broken one, on a change that reads as
     /// swapping like for like.
     pub leaves_unfilled: Vec<Unfilled>,
+    /// Each part the change takes out of its form, stopped with its configuration and
+    /// data kept where they are.
+    pub stops: Vec<String>,
+    /// Each part the change brings back to its form, started again.
+    pub starts: Vec<String>,
     /// The setting the change writes.
     pub setting: String,
     /// What the operator said about the choice, where they said anything.
@@ -327,7 +334,10 @@ pub fn substitute(
     }
 
     let setting = chosen.with(capability, service);
-    let after = settle(manifest, installed, &Chosen::read(Some(&setting)));
+    let choosing = Chosen::read(Some(&setting));
+    let after = settle(manifest, installed, &choosing);
+    let out = replaced(manifest, installed, chosen);
+    let left_out = replaced(manifest, installed, &choosing);
     let standing: BTreeSet<(String, String)> = unfilled(&before)
         .into_iter()
         .map(|one| (one.by, one.capability))
@@ -341,6 +351,16 @@ pub fn substitute(
         leaves_unfilled: unfilled(&after)
             .into_iter()
             .filter(|one| !standing.contains(&(one.by.clone(), one.capability.clone())))
+            .collect(),
+        stops: left_out
+            .iter()
+            .filter(|part| !out.contains(part))
+            .cloned()
+            .collect(),
+        starts: out
+            .iter()
+            .filter(|part| !left_out.contains(part))
+            .cloned()
             .collect(),
         setting,
         why: None,
@@ -400,6 +420,28 @@ pub fn recorded(
             current: substitution.setting.clone(),
         },
     }
+}
+
+/// The journal entries for each part a substitution stops or starts, put down before the
+/// choice's own so that putting the run back restores the choice first and the parts
+/// after it.
+#[must_use]
+pub fn parted(substitution: &Substitution, at: &str) -> Vec<crate::journal::Change> {
+    substitution
+        .stops
+        .iter()
+        .map(|part| (part, false))
+        .chain(substitution.starts.iter().map(|part| (part, true)))
+        .map(|(part, running)| crate::journal::Change {
+            at: at.to_owned(),
+            operation: OPERATION.to_owned(),
+            target: part.clone(),
+            kind: crate::journal::Kind::Ran {
+                service: part.clone(),
+                running,
+            },
+        })
+        .collect()
 }
 
 /// What the history calls a substitution.

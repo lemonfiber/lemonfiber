@@ -522,6 +522,18 @@ fn a_device_key_put_back_is_said_by_its_name() {
         }),
         "left the internal certificate of jellyfin as it is"
     );
+    for (running, said) in [
+        (true, "started prowlarr again"),
+        (false, "stopped prowlarr again"),
+    ] {
+        assert_eq!(
+            undone(Action::Run {
+                service: "prowlarr".to_owned(),
+                running,
+            }),
+            said
+        );
+    }
 }
 
 /// State moved back out of a mount tree, and a volume's copy kept, say what was done.

@@ -107,6 +107,10 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             grant: grant.clone(),
             given: !given,
         }),
+        Kind::Ran { service, running } => Some(Kind::Ran {
+            service: service.clone(),
+            running: !running,
+        }),
         Kind::Created { .. }
         | Kind::Made { .. }
         | Kind::Copied { .. }

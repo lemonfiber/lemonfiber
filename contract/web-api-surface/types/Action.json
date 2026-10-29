@@ -25,6 +25,7 @@
         "const:\"revoke\"",
         "const:\"revoke-device\"",
         "const:\"rewind\"",
+        "const:\"run\"",
         "const:\"unreplaced\"",
         "const:\"withdraw\""
       ],
@@ -126,6 +127,12 @@
       ],
       "required": true
     },
+    "running": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
     "service": {
       "type": [
         "string"
@@ -181,6 +188,7 @@
     "\"revoke\"",
     "\"revoke-device\"",
     "\"rewind\"",
+    "\"run\"",
     "\"unreplaced\"",
     "\"withdraw\""
   ]

@@ -24,6 +24,12 @@
       ],
       "required": true
     },
+    "unran": {
+      "type": [
+        "array[ref:SubstitutionUnran]"
+      ],
+      "required": false
+    },
     "unvetted": {
       "type": [
         "anyOf(null,ref:Unvetted)"

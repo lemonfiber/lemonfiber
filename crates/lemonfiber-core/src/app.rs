@@ -479,7 +479,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
         Command::Remove { name, agreement } => removed(ctx, name, agreement).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
-        Command::Wiring(asked) => wiring::wiring(ctx, &asked),
+        Command::Wiring(asked) => wiring::wiring(ctx, &asked).await,
         Command::Settings(asked) => crate::settings::run::settings(ctx, &asked).await,
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),

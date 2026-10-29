@@ -638,3 +638,25 @@ fn undoing_a_grant_gives_back_what_it_ended_and_ends_what_it_gave() {
     assert_eq!(granted(true).undo().action, regrant(false));
     assert_eq!(granted(false).undo().action, regrant(true));
 }
+
+#[test]
+fn undoing_a_part_stopped_starts_it_and_one_started_stops_it() {
+    let ran = |running: bool| Change {
+        at: "1".to_owned(),
+        operation: "substitute".to_owned(),
+        target: "prowlarr".to_owned(),
+        kind: Kind::Ran {
+            service: "prowlarr".to_owned(),
+            running,
+        },
+    };
+    for running in [false, true] {
+        assert_eq!(
+            ran(running).undo().action,
+            Action::Run {
+                service: "prowlarr".to_owned(),
+                running: !running,
+            }
+        );
+    }
+}

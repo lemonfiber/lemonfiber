@@ -130,3 +130,12 @@ fn putting_a_grant_back_is_recorded_as_the_grant_the_other_way() {
     assert_eq!(inverted(&granted(true)), Some(granted(false)));
     assert_eq!(inverted(&granted(false)), Some(granted(true)));
 }
+
+#[test]
+fn a_part_started_again_is_recorded_as_the_run_the_other_way() {
+    let ran = |running: bool| Kind::Ran {
+        service: "prowlarr".to_owned(),
+        running,
+    };
+    assert_eq!(inverted(&ran(false)), Some(ran(true)));
+}

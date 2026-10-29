@@ -793,4 +793,5 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
 }
 
 mod pass;
+mod replaced;
 mod sources;

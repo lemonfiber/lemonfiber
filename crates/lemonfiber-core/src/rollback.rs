@@ -253,12 +253,7 @@ pub fn standing(
             ..
         } => bounded(path, owner, *written, reads),
         Kind::Certified { service, .. } => withdrawn_for_good(service),
-        Kind::Overlaid { path, .. } => Standing::refused(
-            &format!(
-                "the overlay {path} is the operator's own file, and lemonfiber does not write it"
-            ),
-            Some("edit the overlay yourself if it should hold something else"),
-        ),
+        Kind::Overlaid { path, .. } => the_operators(path),
         // A key is revoked because something should stop holding it, and making it good
         // again would hand back exactly what the revoke took away.
         Kind::KeyRevoked { name, .. } => Standing::refused(
@@ -290,8 +285,17 @@ pub fn standing(
         | Kind::DeviceKeyRegistered { .. }
         | Kind::Setting { .. }
         | Kind::Secret { .. }
-        | Kind::Granted { .. } => Standing::whole(),
+        | Kind::Granted { .. }
+        | Kind::Ran { .. } => Standing::whole(),
     }
+}
+
+/// Why a change to the overlay at `path` is not put back: the file is the operator's.
+fn the_operators(path: &str) -> Standing {
+    Standing::refused(
+        &format!("the overlay {path} is the operator's own file, and lemonfiber does not write it"),
+        Some("edit the overlay yourself if it should hold something else"),
+    )
 }
 
 /// Why a replacement of `service`'s internal certificate is not put back: the one it

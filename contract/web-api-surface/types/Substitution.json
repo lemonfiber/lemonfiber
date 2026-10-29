@@ -30,6 +30,18 @@
       ],
       "required": true
     },
+    "starts": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "stops": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
     "was": {
       "type": [
         "null|string"

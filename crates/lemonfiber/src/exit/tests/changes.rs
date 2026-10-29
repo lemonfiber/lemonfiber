@@ -631,12 +631,15 @@ fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out()
         Outcome::Substitution(lemonfiber_core::model::SubstitutionReport {
             rehearsed: false,
             unvetted: None,
+            unran: Vec::new(),
             substitution: lemonfiber_core::wiring::Substitution {
                 capability: "indexer.search".to_owned(),
                 was: Some("prowlarr".to_owned()),
                 now: "nzbhydra2".to_owned(),
                 asked_by: vec!["bindery".to_owned()],
                 leaves_unfilled: Vec::new(),
+                stops: Vec::new(),
+                starts: Vec::new(),
                 setting: "indexer.search=nzbhydra2".to_owned(),
                 why: None,
             },

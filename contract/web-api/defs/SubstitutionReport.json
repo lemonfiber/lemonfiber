@@ -19,6 +19,13 @@
       "description": "The change itself, and what it would leave with nothing filling it.",
       "$ref": "Substitution.json"
     },
+    "unran": {
+      "description": "Each part the change was to stop or start and could not, with why.",
+      "type": "array",
+      "items": {
+        "$ref": "SubstitutionUnran.json"
+      }
+    },
     "unvetted": {
       "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this choice would write, and held to nothing lemonfiber vets.",
       "anyOf": [

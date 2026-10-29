@@ -155,6 +155,11 @@ fn restoring(action: &Action) -> String {
         Action::Unreplaced { service } => {
             format!("the internal certificate of {service} left as it is")
         }
+        Action::Run {
+            service,
+            running: true,
+        } => format!("{service} started again"),
+        Action::Run { service, .. } => format!("{service} stopped again"),
     }
 }
 
