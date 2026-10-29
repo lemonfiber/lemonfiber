@@ -206,6 +206,11 @@ pub fn parties(media_types: &[String]) -> Vec<Party> {
             host: AGGREGATOR,
             answering: aggregator_answering(),
         },
+        Party {
+            named: "site",
+            host: indexer::SITE_HOST,
+            answering: indexer::site_answering(),
+        },
     ]
 }
 
@@ -229,6 +234,7 @@ pub fn all() -> Vec<crate::Capability> {
         library::capability(),
         indexer::search::capability(),
         indexer::pull::capability(),
+        indexer::proxy::capability(),
         subtitles::fetch::capability(),
         request::intake::capability(),
         identity::source::capability(),

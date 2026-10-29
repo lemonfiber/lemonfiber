@@ -40,6 +40,7 @@ mod requests;
 mod screening;
 mod searching;
 mod showing;
+mod solving;
 pub mod stage;
 mod subtitles;
 mod syncing;
@@ -96,6 +97,7 @@ pub use screening::{
 };
 pub use searching::{Asked, Detail, Found, Page, Searching, Season, Wish};
 pub use showing::{Entry, EntryWidget, Group, PageWidget, Panels, Showing};
+pub use solving::{Cookie, Solved, Solving};
 pub use subtitles::{Subtitles, Watched, Watching};
 pub use syncing::{Profiled, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};

@@ -1,0 +1,22 @@
+{
+  "capability": "indexer.pull",
+  "files": [
+    {
+      "path": "indexer.pull/v1/openapi.json",
+      "sha256": "b8e03379f9b7e215b9b054035a93fa7dd8892309fb4c0f209447b2620ce23f24"
+    },
+    {
+      "path": "indexer.pull/v1/operations/aggregators.json",
+      "sha256": "b60dc4be690f57119ac6bbbca2a8a0ab22b1d0608d1e86eb5231da19e8f1066b"
+    },
+    {
+      "path": "indexer.pull/v1/operations/add_aggregator.json",
+      "sha256": "3a86d6e5318a71cd15bb19407e4f6c09b593b356384c065999ad8366d910690a"
+    },
+    {
+      "path": "indexer.pull/v1/conformance.json",
+      "sha256": "fb5c1bcf90441d7c3b3d8277afaec6cea10c7f7563517b273224d554258c9095"
+    }
+  ],
+  "major": 1
+}

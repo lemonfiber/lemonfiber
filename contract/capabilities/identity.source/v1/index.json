@@ -1,0 +1,90 @@
+{
+  "capability": "identity.source",
+  "files": [
+    {
+      "path": "identity.source/v1/openapi.json",
+      "sha256": "d75a0f1fca7cd8308971152fd1c0b75ed18583a62bda7daa934ec2e038a32ee0"
+    },
+    {
+      "path": "identity.source/v1/operations/startup_completed.json",
+      "sha256": "9c8887ef3599fce3b1ce40486f51dc3d965775c5c1531085d6bebb1eed7559a4"
+    },
+    {
+      "path": "identity.source/v1/operations/create_admin.json",
+      "sha256": "7acdcb6b34fedcb7a17e1127bcd691ae2a5edb4fe05a94b3b04420648a562f8a"
+    },
+    {
+      "path": "identity.source/v1/operations/replace_admin_password.json",
+      "sha256": "577df89a66162d191ebb0669f2fde046d03659fcd3fc42a8340f7c4631b8257b"
+    },
+    {
+      "path": "identity.source/v1/operations/household.json",
+      "sha256": "f1a4d888312c2fac4fdf50ba1739c790219f50915900b1c47857bbcb7cc2fcda"
+    },
+    {
+      "path": "identity.source/v1/operations/whoever.json",
+      "sha256": "5f1ac4523b51e1207d0e308e40e901f5cf6336b57c25edd25ce6161612ea13bc"
+    },
+    {
+      "path": "identity.source/v1/operations/standing.json",
+      "sha256": "3c0eaed8e06af0cae33bc097a066375ebfade21cabdf05097db2829526f1a901"
+    },
+    {
+      "path": "identity.source/v1/operations/invite.json",
+      "sha256": "f70f766b8f45741eaed4139e3faa99f6e23aaae5806c02efb2c9ae73ea4bdbd1"
+    },
+    {
+      "path": "identity.source/v1/operations/claim.json",
+      "sha256": "e88e67913462e0d780999cb681ebeb574847d7cb979b62fd2a3ef8d6db2d2606"
+    },
+    {
+      "path": "identity.source/v1/operations/unclaim.json",
+      "sha256": "6f66678acb8368a52327e5296e3b87d57f585f8d1a1b965bce21ddddd1ccc725"
+    },
+    {
+      "path": "identity.source/v1/operations/when_invited.json",
+      "sha256": "e1000b944564f96acb94a010d70e66089bb8da70d32d64bc971113461c6d213c"
+    },
+    {
+      "path": "identity.source/v1/operations/libraries.json",
+      "sha256": "ca982c80751887cb857ded617832d17340938cf4ff8eca0f2d0cfaefb1d41797"
+    },
+    {
+      "path": "identity.source/v1/operations/ratings.json",
+      "sha256": "07fbc7cc41bb22850e28af87c92463252d0b1e0a5107bbc964ffb591935de61e"
+    },
+    {
+      "path": "identity.source/v1/operations/country.json",
+      "sha256": "ba7abc9dfcb1ec3fb4c3d28db4251e71df3cac00339db8ff04633a249dbb8972"
+    },
+    {
+      "path": "identity.source/v1/operations/allow.json",
+      "sha256": "56d30b3c4490bb2e378201053a9452b23665dc465d1862ebd3d9aa6080e7689a"
+    },
+    {
+      "path": "identity.source/v1/operations/claimable.json",
+      "sha256": "24c67dae49c768976bb4b155e4d6c634be167e9833a7eaae0b4c58886c47a41e"
+    },
+    {
+      "path": "identity.source/v1/operations/suspend.json",
+      "sha256": "98e328e25a81de67d09813a57070330b8e5b89fcf4a8be6c51f4061c62247ef9"
+    },
+    {
+      "path": "identity.source/v1/operations/sessions.json",
+      "sha256": "b087fb892a090ef79438b6612879dd3cb64b74b47dd7805f31568d5572f9233e"
+    },
+    {
+      "path": "identity.source/v1/operations/signs_devices_in.json",
+      "sha256": "8dbbbf13144248fbfc58685734cc2b99ff51ebf6fa769ce3d8154b02bb13a179"
+    },
+    {
+      "path": "identity.source/v1/operations/withdraw.json",
+      "sha256": "868738f5227969bbe2e11b362a9a58ac9138fff7c8f08fd4344d7750bc7f484d"
+    },
+    {
+      "path": "identity.source/v1/conformance.json",
+      "sha256": "d8cd189b17d991e059ca03a3618a58f9bce010a69b83066038a1ec42e09a1d47"
+    }
+  ],
+  "major": 1
+}

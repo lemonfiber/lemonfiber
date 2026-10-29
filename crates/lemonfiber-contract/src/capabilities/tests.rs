@@ -17,7 +17,7 @@ use super::archive::extract;
 use super::dashboard::show;
 use super::download::{torrent, usenet};
 use super::identity::source;
-use super::indexer::{pull, search};
+use super::indexer::{proxy as solver, pull, search};
 use super::invite::decline;
 use super::library::curate;
 use super::media::serve;
@@ -251,6 +251,7 @@ impl Http for Served {
             curate::CAPABILITY => curate::dispatch(&*self.upstream, operation, body).await,
             search::CAPABILITY => search::dispatch(&*self.upstream, operation, body).await,
             pull::CAPABILITY => pull::dispatch(&*self.upstream, operation, body).await,
+            solver::CAPABILITY => solver::dispatch(&*self.upstream, operation, body).await,
             fetch::CAPABILITY => fetch::dispatch(&*self.upstream, operation, body).await,
             intake::CAPABILITY => intake::dispatch(&*self.upstream, operation, body).await,
             source::CAPABILITY => source::dispatch(&*self.upstream, operation, body).await,
@@ -396,7 +397,13 @@ async fn a_request_with_a_field_the_operation_does_not_take_is_not_asked() {
 #[tokio::test]
 async fn a_capability_nobody_serves_refuses_every_operation() {
     let asked: Result<(), Failure> = contracted(Served::default())
-        .call("nothing.served", 1, "anything", crate::client::LARGEST, &())
+        .call(
+            "nothing.served",
+            1,
+            "anything",
+            crate::Bounds::STANDARD,
+            &(),
+        )
         .await;
     assert!(matches!(asked, Err(Failure::Refused { .. })));
 }
@@ -428,6 +435,7 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             curate::CAPABILITY,
             search::CAPABILITY,
             pull::CAPABILITY,
+            solver::CAPABILITY,
             fetch::CAPABILITY,
             intake::CAPABILITY,
             source::CAPABILITY,

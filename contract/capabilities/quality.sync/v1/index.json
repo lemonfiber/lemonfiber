@@ -1,0 +1,22 @@
+{
+  "capability": "quality.sync",
+  "files": [
+    {
+      "path": "quality.sync/v1/openapi.json",
+      "sha256": "97386808f4e8bacaaafb3fef40c34bfff4cc14ea81c7edf6db26ff693d6aa057"
+    },
+    {
+      "path": "quality.sync/v1/operations/apply.json",
+      "sha256": "e4f4efa462ffa266a467607b1293203e32161fc05e82445921222cceceb68f14"
+    },
+    {
+      "path": "quality.sync/v1/operations/applied.json",
+      "sha256": "4a5c709caa7c1302914b0825e8854d5ae46f68e5517a5d2731a803b239d50283"
+    },
+    {
+      "path": "quality.sync/v1/conformance.json",
+      "sha256": "c87530207952cabb26cb79c611c0cb3d98dabf16f72bbdc19df8805ead24fa1f"
+    }
+  ],
+  "major": 1
+}

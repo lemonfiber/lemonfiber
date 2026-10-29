@@ -4,10 +4,10 @@
 //! key. What comes back is read only if it is one of the answers the contract declares: a
 //! success whose body decodes as the operation's answer, or a refusal whose body decodes
 //! as one. Anything else, a status nobody declared, a body past the operation's bound
-//! ([`LARGEST`] unless it declares more), an answer
-//! after [`DEADLINE`], a field the type does not have, is refused, never read, and told
-//! to the [`Witness`], so the plugin's standing records that it answered outside its
-//! contract.
+//! ([`LARGEST`] unless it declares more), an answer after its deadline ([`DEADLINE`]
+//! unless it declares longer), a field the type does not have, is refused, never read,
+//! and told to the [`Witness`], so the plugin's standing records that it answered outside
+//! its contract.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,8 +34,25 @@ pub const LARGEST: usize = 1024 * 1024;
 /// What a call made without the key carries: nothing an operation could read.
 const UNKEYED_ASKED: &str = "{}";
 
-/// How long an answer may take.
+/// How long an answer may take, where its operation declares no longer.
 pub const DEADLINE: Duration = Duration::from_secs(15);
+
+/// What one operation's answer is held to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds {
+    /// The most it may carry, in bytes.
+    pub largest: usize,
+    /// How long it may take.
+    pub deadline: Duration,
+}
+
+impl Bounds {
+    /// [`LARGEST`] and [`DEADLINE`].
+    pub const STANDARD: Self = Self {
+        largest: LARGEST,
+        deadline: DEADLINE,
+    };
+}
 
 /// Who is told when an adapter answers outside its contract.
 pub trait Witness: Send + Sync {
@@ -112,7 +129,7 @@ impl Contracted {
         capability: &str,
         major: u32,
         operation: &str,
-        largest: usize,
+        bounds: Bounds,
         asked: &A,
     ) -> Result<R, Failure>
     where
@@ -122,7 +139,7 @@ impl Contracted {
         let path = crate::path(capability, major, operation);
         let written = Some(serde_json::to_string(asked));
         let fetched = self
-            .exchange(Method::Post, &path, written, largest, true)
+            .exchange(Method::Post, &path, written, bounds, true)
             .await?;
         let answer = self.answer(operation, &fetched)?;
         serde_json::from_str(answer)
@@ -156,9 +173,15 @@ impl Contracted {
     /// time.
     pub async fn unkeyed(&self, operation: &crate::Operation) -> Result<u16, Failure> {
         let asked = Some(Ok(UNKEYED_ASKED.to_owned()));
-        self.exchange(Method::Post, &operation.path(), asked, LARGEST, false)
-            .await
-            .map(|fetched| fetched.status)
+        self.exchange(
+            Method::Post,
+            &operation.path(),
+            asked,
+            Bounds::STANDARD,
+            false,
+        )
+        .await
+        .map(|fetched| fetched.status)
     }
 
     /// What the adapter answers a keyed `GET` of `path`, its own `name`d route, read as `R`.
@@ -168,7 +191,7 @@ impl Contracted {
         name: &str,
     ) -> Result<R, Failure> {
         let fetched = self
-            .exchange(Method::Get, path, None, LARGEST, true)
+            .exchange(Method::Get, path, None, Bounds::STANDARD, true)
             .await?;
         let answer = self.answer(name, &fetched)?;
         serde_json::from_str(answer)
@@ -185,7 +208,7 @@ impl Contracted {
         method: Method,
         path: &str,
         written: Option<serde_json::Result<String>>,
-        largest: usize,
+        bounds: Bounds,
         keyed: bool,
     ) -> Result<Fetched, Failure> {
         let body = written
@@ -205,7 +228,8 @@ impl Contracted {
             body,
             pinned: None,
         };
-        let sent = tokio::time::timeout(DEADLINE, self.http.fetch(&request, largest)).await;
+        let sent =
+            tokio::time::timeout(bounds.deadline, self.http.fetch(&request, bounds.largest)).await;
         let Ok(Ok(fetched)) = sent else {
             return Err(Failure::Unavailable {
                 service: self.service.clone(),

@@ -27,7 +27,7 @@ use declare::contract;
 pub mod wire;
 
 pub use adapter::Served;
-pub use client::Contracted;
+pub use client::{Bounds, Contracted};
 pub use lemonfiber_ports::service::Failure;
 pub use wire::Refusal;
 
@@ -55,7 +55,7 @@ type Reading = for<'c> fn(
     &'static str,
     u32,
     &'static str,
-    usize,
+    Bounds,
 ) -> Pin<Box<dyn Future<Output = Result<(), Failure>> + Send + 'c>>;
 
 /// One operation of one capability's contract: what it is called, and the shapes of what
@@ -72,8 +72,8 @@ pub struct Operation {
     pub asked: schemars::Schema,
     /// The schema of what is answered.
     pub answered: schemars::Schema,
-    /// The most its answer may carry, in bytes.
-    pub largest: usize,
+    /// What its answer is held to.
+    pub bounds: Bounds,
     /// Each place its answer holds a credential the upstream issues, as a JSON pointer,
     /// `""` where the whole answer is one.
     pub secret: &'static [&'static str],
@@ -102,7 +102,7 @@ impl Operation {
             name,
             asked: schemars::schema_for!(A),
             answered: schemars::schema_for!(R),
-            largest: client::LARGEST,
+            bounds: Bounds::STANDARD,
             secret: &[],
             asks: serde_json::Value::Null,
             filed: Vec::new(),
@@ -126,13 +126,20 @@ impl Operation {
     ///
     /// As [`Contracted::call`].
     pub async fn judged(&self, client: &Contracted) -> Result<(), Failure> {
-        (self.reads)(client, self.capability, self.major, self.name, self.largest).await
+        (self.reads)(client, self.capability, self.major, self.name, self.bounds).await
     }
 
     /// The same operation, its answer bounded at `largest` bytes.
     #[must_use]
     pub const fn within(mut self, largest: usize) -> Self {
-        self.largest = largest;
+        self.bounds.largest = largest;
+        self
+    }
+
+    /// The same operation, its answer awaited for `deadline`.
+    #[must_use]
+    pub const fn awaited(mut self, deadline: std::time::Duration) -> Self {
+        self.bounds.deadline = deadline;
         self
     }
 
@@ -156,11 +163,11 @@ fn read_as<'c, R: serde::de::DeserializeOwned + Send + 'static>(
     capability: &'static str,
     major: u32,
     name: &'static str,
-    largest: usize,
+    bounds: Bounds,
 ) -> Pin<Box<dyn Future<Output = Result<(), Failure>> + Send + 'c>> {
     Box::pin(async move {
         client
-            .call::<(), R>(capability, major, name, largest, &())
+            .call::<(), R>(capability, major, name, bounds, &())
             .await
             .map(drop)
     })

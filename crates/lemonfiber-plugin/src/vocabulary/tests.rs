@@ -501,3 +501,14 @@ fn quality_sync_is_the_one_capability_whose_fillers_listen_on_nothing() {
         .collect();
     assert_eq!(quiet, vec!["quality.sync"]);
 }
+
+#[test]
+fn every_capability_in_the_vocabulary_has_a_contract_this_build_speaks() {
+    let named: BTreeSet<&str> = carried().iter().map(|capability| capability.name).collect();
+    let contracted: BTreeSet<&str> = lemonfiber_contract::capabilities::all()
+        .iter()
+        .map(|capability| capability.name)
+        .filter(|name| !lemonfiber_contract::capabilities::is_facet(name))
+        .collect();
+    assert_eq!(named, contracted);
+}

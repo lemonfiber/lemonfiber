@@ -5,7 +5,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 use lemonfiber_ports::service::{Applied, Failure};
 
-use super::{Contracted, Witness, DEADLINE, LARGEST};
+use super::{Bounds, Contracted, Witness, DEADLINE, LARGEST};
 
 /// Records what it was told.
 #[derive(Default)]
@@ -36,7 +36,7 @@ fn adapter(answer: Answer) -> (Arc<Fake>, Contracted, Arc<Told>) {
 
 async fn asked<R: serde::de::DeserializeOwned>(client: &Contracted) -> Result<R, Failure> {
     client
-        .call("download.torrent", 1, "moved", LARGEST, &"2026-10")
+        .call("download.torrent", 1, "moved", Bounds::STANDARD, &"2026-10")
         .await
 }
 
@@ -186,7 +186,13 @@ async fn a_request_that_cannot_be_written_is_refused_and_never_sent() {
     let unwritable = std::collections::BTreeMap::from([((1_u8, 2_u8), 3_u8)]);
     assert!(matches!(
         client
-            .call::<_, u32>("download.torrent", 1, "moved", LARGEST, &unwritable)
+            .call::<_, u32>(
+                "download.torrent",
+                1,
+                "moved",
+                Bounds::STANDARD,
+                &unwritable
+            )
             .await,
         Err(Failure::Refused { .. })
     ));
@@ -232,7 +238,16 @@ async fn an_answer_that_is_not_text_is_refused_and_witnessed() {
 async fn an_answer_is_read_up_to_the_bound_its_operation_declares() {
     let (_, client, told) = adapter(Answer::reply(200, format!("\"{}\"", "a".repeat(LARGEST))));
     let read: Result<String, Failure> = client
-        .call("media.serve", 1, "picture", LARGEST * 2, &())
+        .call(
+            "media.serve",
+            1,
+            "picture",
+            Bounds {
+                largest: LARGEST * 2,
+                deadline: DEADLINE,
+            },
+            &(),
+        )
         .await;
     assert_eq!(read.ok().map(|answer| answer.len()), Some(LARGEST));
     assert_eq!(told.count(), 0);
@@ -358,4 +373,38 @@ async fn an_answer_that_does_not_come_by_the_deadline_is_refused_as_absent() {
         "{answered:?}"
     );
     assert_eq!(started.elapsed(), DEADLINE);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_operation_declaring_a_longer_deadline_is_awaited_that_long() {
+    let client = Contracted::new(
+        Arc::new(Silent),
+        "http://adapter:8080/",
+        "solver-adapter",
+        "k3y",
+    );
+    let solve = crate::capabilities::indexer::proxy::capability();
+    let declared = solve
+        .operations
+        .iter()
+        .find(|operation| operation.name == "solve")
+        .map(|operation| operation.bounds);
+    let started = tokio::time::Instant::now();
+
+    let answered: Result<serde_json::Value, Failure> = client
+        .call(
+            "indexer.proxy",
+            1,
+            "solve",
+            declared.unwrap_or(Bounds::STANDARD),
+            &(),
+        )
+        .await;
+
+    assert!(matches!(answered, Err(Failure::Unavailable { .. })));
+    assert!(declared.is_some_and(|bounds| bounds.deadline > DEADLINE));
+    assert_eq!(
+        Some(started.elapsed()),
+        declared.map(|bounds| bounds.deadline)
+    );
 }

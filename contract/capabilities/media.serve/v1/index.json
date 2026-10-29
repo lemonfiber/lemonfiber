@@ -1,0 +1,110 @@
+{
+  "capability": "media.serve",
+  "files": [
+    {
+      "path": "media.serve/v1/openapi.json",
+      "sha256": "371814a5805635f6025e093c9950977507ea4a1cbf3c5b618d9ec0486bb36ce0"
+    },
+    {
+      "path": "media.serve/v1/operations/signed_in.json",
+      "sha256": "55af28ce9d637dc49f8e1997ed48e3c178d0cdfb173b0da806d023999db7c579"
+    },
+    {
+      "path": "media.serve/v1/operations/title.json",
+      "sha256": "ba8d57a9170e3a40eaee6167e40662bf4b57f06f83fc3a501869cf34de0e5902"
+    },
+    {
+      "path": "media.serve/v1/operations/part_way.json",
+      "sha256": "e41e0fc85b495c2920bd19b64f5f8e8338e453bced29cc2ed8d5e5ebb45f9f11"
+    },
+    {
+      "path": "media.serve/v1/operations/progressed.json",
+      "sha256": "2fd5e2455ab9797efd49336536ea383ad72edd564a7ffce1ace6980b14d845ea"
+    },
+    {
+      "path": "media.serve/v1/operations/sign_out.json",
+      "sha256": "16a8d7b1a2b59a38aea865e45d21fe11f23508cd4bda5bcb1f20103b21be7df6"
+    },
+    {
+      "path": "media.serve/v1/operations/picture.json",
+      "sha256": "a48897d1f2965a9cf3cfbcfca5ff40f45f5fe11e8d2ae3c51f34f60b4a67e7b0"
+    },
+    {
+      "path": "media.serve/v1/operations/holdings.json",
+      "sha256": "9cc4ae7d76c53a448279fc145bc8fe1716dbedae808aec3f2363f1aa8331ae41"
+    },
+    {
+      "path": "media.serve/v1/operations/playing.json",
+      "sha256": "2511b5e5abb177c5a8b29a8c0d85113d3c4219a7115420f0ede48e9a30b62ae6"
+    },
+    {
+      "path": "media.serve/v1/operations/has_item.json",
+      "sha256": "e55cbf77ddb6799f9322ae72ee72b39ee40c667c7d1eb683e259ef044a5844e2"
+    },
+    {
+      "path": "media.serve/v1/operations/rescan.json",
+      "sha256": "455d8137893fcbb9ae69e211c37c91875b104604bfbd59d4ba3f594688f97a96"
+    },
+    {
+      "path": "media.serve/v1/operations/series_held.json",
+      "sha256": "32c451ee91e92e73f70e1ac6bd3d736b04f323d30471e501c8babdde45ef41bb"
+    },
+    {
+      "path": "media.serve/v1/operations/refresh.json",
+      "sha256": "e36fcc6a26d605de835f2b301f220687aff825500ae1e249440c5f2388331b1a"
+    },
+    {
+      "path": "media.serve/v1/operations/filed_as.json",
+      "sha256": "a49cd34eadff60c53dde1d578efaab6431292df14cd8bedc8ec00a638e140aee"
+    },
+    {
+      "path": "media.serve/v1/operations/mint.json",
+      "sha256": "91226d73f4d5188366b984b984afcac4e745de8d6e32c33c0a920d0fe62ad624"
+    },
+    {
+      "path": "media.serve/v1/operations/dated.json",
+      "sha256": "555bf088ff0759bc317012e946c6b20cf2edba2edcd973f16871cb0012a26a3b"
+    },
+    {
+      "path": "media.serve/v1/operations/answers_to.json",
+      "sha256": "1d36266f57376c941ef3e2d872e17e665f96950e91f0451e74d721f232f56eb2"
+    },
+    {
+      "path": "media.serve/v1/operations/revoke.json",
+      "sha256": "aec6439be7de2adbc30cfabedcf6b348bbae47593d4cf9450e3c4236c5af9e37"
+    },
+    {
+      "path": "media.serve/v1/operations/known_proxies.json",
+      "sha256": "ed185d1c1984b593f29469773fcad3f1bb625a9f880996340318f1cab3b72297"
+    },
+    {
+      "path": "media.serve/v1/operations/trust_only.json",
+      "sha256": "092c94e15b5c6bd77cac80379c836d14c361d55aa23e52a148f2c2bfe3b97aa7"
+    },
+    {
+      "path": "media.serve/v1/operations/allowed_origins.json",
+      "sha256": "9dc21887c00a38b2c875fa01413c666a55cde4fc6ca4efd8016dee6e0cfe9fbe"
+    },
+    {
+      "path": "media.serve/v1/operations/allow_only.json",
+      "sha256": "80fae8b830dd8bcce31a49791537c78516819bef229c4f7031b8f920dd68684a"
+    },
+    {
+      "path": "media.serve/v1/operations/restart.json",
+      "sha256": "3708e8e3af7fb7bf25a92ed089fc333ba8aeedf5ca439c2afc1724b1e5cf1b71"
+    },
+    {
+      "path": "media.serve/v1/operations/declared.json",
+      "sha256": "a92fd668026c77978a3c6754e406a273b4af2468953068aeaacaad725a27d418"
+    },
+    {
+      "path": "media.serve/v1/operations/serve_tls.json",
+      "sha256": "7ebdd28ddef0401f4b9f633d702f47d9aefadbf113bb225bd9c1310b6b608c8c"
+    },
+    {
+      "path": "media.serve/v1/conformance.json",
+      "sha256": "7092df1c85a971af486f3cc37d03a70e28ba074cafaa5767c1752a2e78d8b438"
+    }
+  ],
+  "major": 1
+}

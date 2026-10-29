@@ -108,6 +108,60 @@ fn no_document_is_longer_than_the_line_cap() {
     }
 }
 
+#[test]
+fn the_index_holds_each_capabilitys_index_by_its_digest_and_that_every_file_of_it() {
+    let generated: std::collections::BTreeMap<String, String> = files().into_iter().collect();
+    let read = |path: &str| {
+        generated
+            .get(path)
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+            .unwrap_or_default()
+    };
+    let listed = read("index.json");
+    let entries = listed
+        .get("capabilities")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(entries.len(), crate::capabilities::all().len());
+    let mut held = vec!["index.json".to_owned()];
+    for entry in &entries {
+        let own = entry
+            .get("index")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        assert_eq!(
+            entry.get("sha256").and_then(serde_json::Value::as_str),
+            generated
+                .get(own)
+                .map(|text| super::digest(text))
+                .as_deref()
+        );
+        held.push(own.to_owned());
+        for file in read(own)
+            .get("files")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let path = file
+                .get("path")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            assert_eq!(
+                file.get("sha256").and_then(serde_json::Value::as_str),
+                generated
+                    .get(path)
+                    .map(|text| super::digest(text))
+                    .as_deref()
+            );
+            held.push(path.to_owned());
+        }
+    }
+    held.sort();
+    assert_eq!(held, generated.keys().cloned().collect::<Vec<_>>());
+}
+
 /// An operation's answer bound is published with it, and a picture's is larger than the
 /// default because it carries the picture's bytes.
 #[test]
@@ -128,6 +182,29 @@ fn an_operation_publishes_the_bound_its_answer_is_held_to() {
     assert!(largest("picture")
         .and_then(|bound| bound.as_u64())
         .is_some_and(|bound| bound > 2 * 1024 * 1024 * 4 / 3));
+}
+
+#[test]
+fn an_operation_publishes_how_long_its_answer_is_awaited() {
+    let deadline = |capability: crate::Capability, name: &str| {
+        capability
+            .operations
+            .iter()
+            .find(|operation| operation.name == name)
+            .and_then(|operation| {
+                path_item(operation)
+                    .get("post")
+                    .and_then(|post| post.get("x-lemonfiber-deadline"))
+                    .and_then(serde_json::Value::as_u64)
+            })
+    };
+    let solver = crate::capabilities::indexer::proxy::capability;
+    assert_eq!(
+        deadline(solver(), "answers"),
+        Some(crate::client::DEADLINE.as_secs())
+    );
+    assert!(deadline(solver(), "solve")
+        .is_some_and(|seconds| seconds > crate::client::DEADLINE.as_secs()));
 }
 
 /// Where an answer holds a credential the upstream issues is published with its operation,

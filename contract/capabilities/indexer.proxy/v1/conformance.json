@@ -1,0 +1,40 @@
+{
+  "capability": "indexer.proxy",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "solve"
+    },
+    {
+      "asked": {
+        "url": "http://conformance-site:58180/"
+      },
+      "case": "solve-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "solve"
+    },
+    {
+      "asked": {},
+      "case": "answers-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "answers"
+    }
+  ],
+  "major": 1
+}

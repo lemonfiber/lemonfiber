@@ -7,12 +7,15 @@
 //!
 //! `indexer.pull` beside it is a facet, asked of every curator that speaks it: where it
 //! pulls its indexers from, each aggregator named in its native API.
+//!
+//! `indexer.proxy` is the challenge solver an indexer fetches through: a page fetched
+//! past the challenge in front of it, and whether it answers.
 
 use std::time::{Duration, SystemTime};
 
 use lemonfiber_ports::service::{
     Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, IndexerUse,
-    Indexers, KnownAggregator, Protocol, PullsIndexers, RegisteredApplication,
+    Indexers, KnownAggregator, Protocol, PullsIndexers, RegisteredApplication, Solved, Solving,
 };
 
 use super::{AGGREGATOR, AGGREGATOR_PORT, AGGREGATOR_PROTOCOL, NAMED};
@@ -26,6 +29,35 @@ const AGGREGATOR_URL: &str = "http://conformance-aggregator";
 
 /// The moment the conformance cases ask about use at, in seconds after the epoch.
 const NOW: u64 = 1_767_225_600;
+
+/// The host the conformance cases name a site a challenge solver fetches from on.
+pub const SITE_HOST: &str = "conformance-site";
+
+/// The port the conformance cases name that site on, where the recorder's stand-in for it
+/// answers.
+const SITE_PORT: u16 = 58_180;
+
+/// The most a solved page may carry, in bytes.
+const PAGE_ANSWER: usize = 8 * crate::client::LARGEST;
+
+/// How long solving a challenge may take.
+const SOLVE_DEADLINE: Duration = Duration::from_secs(60);
+
+/// What answers as the site the conformance cases have a challenge solver fetch while it
+/// is recorded: one page, unchallenged.
+#[must_use]
+pub fn site_answering() -> lemonfiber_ports::serving::StandIn {
+    use lemonfiber_ports::serving::Said;
+    lemonfiber_ports::serving::StandIn {
+        port: SITE_PORT,
+        headers: Vec::new(),
+        answers: vec![Said::json(
+            "GET",
+            "/",
+            serde_json::json!({ "name": NAMED }).to_string(),
+        )],
+    }
+}
 
 /// The application this contract's `applications` case answered first.
 fn registered() -> RegisteredApplication {
@@ -98,6 +130,20 @@ crate::contract! {
                     key: Placeholder::Minted.written(),
                 },
             };
+        }
+    }
+}
+
+crate::contract! {
+    /// `indexer.proxy`: a challenge solver.
+    pub mod proxy = "indexer.proxy" @ 1 {
+        impl Solving {
+            /// The page at `url`, fetched past whatever challenge stands in front of it.
+            fn solve(str url: &str) -> Solved where largest = PAGE_ANSWER, deadline = SOLVE_DEADLINE, asks = Asked {
+                url: format!("http://{SITE_HOST}:{SITE_PORT}/"),
+            };
+            /// Whether it answers.
+            fn answers() -> bool where asks = Asked {};
         }
     }
 }

@@ -1,0 +1,42 @@
+{
+  "capability": "indexer.search",
+  "files": [
+    {
+      "path": "indexer.search/v1/openapi.json",
+      "sha256": "cc71b0d567aa2659194a8cf643f86a7c0a655c85e3163fab7a41e386e2a807a2"
+    },
+    {
+      "path": "indexer.search/v1/operations/register_application.json",
+      "sha256": "0ba1602262fd5430fa7cc0bf3ee2d5bdf71f51fae16d3f882944eb56534f8fde"
+    },
+    {
+      "path": "indexer.search/v1/operations/applications.json",
+      "sha256": "06572a9d87d7da71c07bc25bef9b2cc82050b5ab1d9763c12edf8481498d1fe0"
+    },
+    {
+      "path": "indexer.search/v1/operations/test_application.json",
+      "sha256": "afaa342e318363c6f0da865eab1515b2c16069cc0bf526296ddc41e599547a09"
+    },
+    {
+      "path": "indexer.search/v1/operations/rekey_application.json",
+      "sha256": "82147f669bf16bd794eb087df3eaf2cbb1021c110e569b4b20b4390cd29c6b1a"
+    },
+    {
+      "path": "indexer.search/v1/operations/indexers.json",
+      "sha256": "761788691f5a1a189cdcfacd4f52185a4a127f3ae3daab2373601170647fcc6f"
+    },
+    {
+      "path": "indexer.search/v1/operations/aggregators.json",
+      "sha256": "b60dc4be690f57119ac6bbbca2a8a0ab22b1d0608d1e86eb5231da19e8f1066b"
+    },
+    {
+      "path": "indexer.search/v1/operations/add_aggregator.json",
+      "sha256": "e85b0e63188a65013454e4cb108f7ae968ac8ad13234286356661e1eec035a2e"
+    },
+    {
+      "path": "indexer.search/v1/conformance.json",
+      "sha256": "f36390ba8b7bc711ca2c5f3e2ea22225e94a9c4f3ecf6a8604a4a8123ddfc618"
+    }
+  ],
+  "major": 1
+}

@@ -1,0 +1,22 @@
+{
+  "capability": "archive.extract",
+  "files": [
+    {
+      "path": "archive.extract/v1/openapi.json",
+      "sha256": "d154a59c60124dc70c5ab6823a87b0d31dc5e293d47c1b2136da5e1722056866"
+    },
+    {
+      "path": "archive.extract/v1/operations/watch.json",
+      "sha256": "f43cffd99c6867695128bd9fcb3d0d1e412eff65a50f0862e555ca18b0c3382f"
+    },
+    {
+      "path": "archive.extract/v1/operations/working.json",
+      "sha256": "e25a21804253878b22821b7d35476b70621eb5f2e63cfe633a1050043f91c1ca"
+    },
+    {
+      "path": "archive.extract/v1/conformance.json",
+      "sha256": "501b5cdce4a16790e1d6c8f53bf114c75a106048b7828aaec39b204132f1c5b5"
+    }
+  ],
+  "major": 1
+}
