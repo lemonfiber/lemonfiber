@@ -192,10 +192,10 @@ impl Throwaway {
         let at = self.copy.join(named);
         let mut between = at.parent();
         while let Some(directory) = between.filter(|directory| *directory != self.copy) {
-            opened(directory, 0o755).map_err(|why| unmade(directory, &why))?;
+            reopened(directory, 0o755)?;
             between = directory.parent();
         }
-        opened(&at, 0o644).map_err(|why| unmade(&at, &why))
+        reopened(&at, 0o644)
     }
 
     /// `text` held at `named` directly beneath the copy, readable by its owner alone,
@@ -341,6 +341,11 @@ fn owner_only() -> std::fs::OpenOptions {
 fn opened(at: &Path, mode: u32) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
     std::fs::set_permissions(at, std::fs::Permissions::from_mode(mode))
+}
+
+/// `at` given `mode`, or why it could not be, as a copy that could not be made says it.
+fn reopened(at: &Path, mode: u32) -> Result<(), String> {
+    opened(at, mode).map_err(|why| unmade(at, &why))
 }
 
 /// Nothing, where the platform keeps no mode.

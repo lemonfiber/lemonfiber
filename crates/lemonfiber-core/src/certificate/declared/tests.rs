@@ -188,7 +188,10 @@ fn a_start_whose_certificate_is_half_there_is_refused_naming_the_service() {
 
 #[test]
 fn nothing_is_made_where_no_stack_directory_is_known() {
-    let ctx = crate::test_support::a_context().build();
+    let mut ctx = crate::test_support::a_context()
+        .over(crate::test_support::embedded())
+        .build();
+    ctx.settings.stack_dir = None;
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         unreachable!("the stack reads");
     };
