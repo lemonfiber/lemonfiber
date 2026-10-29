@@ -183,7 +183,7 @@ fn written(path: &Path, name: &str, contents: &[u8], mode: u32) -> Result<(), Un
     let created = openat(
         &directory,
         staging.as_str(),
-        OFlags::RDWR | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
         permitted,
     )
     .map_err(failed(name))?;
