@@ -197,6 +197,7 @@ pub(crate) fn substituted(report: &SubstitutionReport) -> Lines {
         lines.put(format!("  because  {why}"));
     }
     lines.extend(cost(&made.leaves_unfilled, report.applied));
+    lines.extend(parts(report));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
     if !report.applied {
         lines.extend(answering(report));
@@ -224,6 +225,30 @@ fn answering(report: &SubstitutionReport) -> Lines {
         "  lemonfiber wiring fill {} {}{reason} --offer {}",
         made.capability, made.now, report.agreement
     ));
+    lines
+}
+
+/// Each part the change stops or starts, and each it could not.
+fn parts(report: &SubstitutionReport) -> Lines {
+    let made = &report.substitution;
+    let mut lines = Lines::default();
+    let (stops, starts) = if report.applied {
+        ("  stopped  ", "  started  ")
+    } else {
+        ("  stops    ", "  starts   ")
+    };
+    for part in &made.stops {
+        lines.put(format!("{stops}{part}, its configuration and data kept"));
+    }
+    for part in &made.starts {
+        lines.put(format!("{starts}{part}"));
+    }
+    if !report.unran.is_empty() {
+        lines.spaced("These did not stop or start, and the choice stands:");
+        for one in &report.unran {
+            lines.put(format!("  {} — {}", one.service, one.because));
+        }
+    }
     lines
 }
 

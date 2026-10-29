@@ -625,3 +625,20 @@ fn a_secret_is_judged_whole_and_left_to_the_store_to_check() {
         Reversal::Whole
     );
 }
+
+#[test]
+fn a_part_stopped_by_a_choice_goes_back_whole() {
+    let ran = Change {
+        at: "1".to_owned(),
+        operation: "substitute".to_owned(),
+        target: "prowlarr".to_owned(),
+        kind: Kind::Ran {
+            service: "prowlarr".to_owned(),
+            running: false,
+        },
+    };
+    assert_eq!(
+        standing(&ran, &[], &holding(&[]), &unread).reversal,
+        Reversal::Whole
+    );
+}

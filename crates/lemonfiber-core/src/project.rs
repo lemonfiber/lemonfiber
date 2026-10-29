@@ -34,6 +34,10 @@ pub const FILE: &str = "compose.generated.yml";
 /// written under: one no start activates, and no form or plugin can be named.
 pub const WAITING: &str = "lemonfiber.waiting";
 
+/// The profile a part a choice of filler replaced is written under, its configuration and
+/// data kept where they are: one no start activates, and no form or plugin can be named.
+pub const REPLACED: &str = "lemonfiber.replaced";
+
 /// What the project's values are read from beyond the manifest and the register.
 pub struct Reading<'a> {
     /// The operator's value for a setting of the named namespace, where one is recorded.
@@ -109,6 +113,7 @@ pub fn generated(
     .into_iter()
     .map(|held| held.service)
     .collect();
+    let replaced = crate::wiring::replaced(manifest, installed, chosen);
     let address =
         |service: &str, url: &UrlOf| address(manifest, installed, &inputs, &topology, service, url);
     let values = Values {
@@ -139,6 +144,7 @@ pub fn generated(
         ))
         .map(|unit| beside(unit, reading.moved))
         .map(|unit| waiting_for(unit, &waiting))
+        .map(|unit| replaced_by(unit, &replaced))
         .collect();
     let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for unit in &units {
@@ -250,6 +256,15 @@ pub(crate) fn profile_of(manifest: &Manifest, installed: &[Installed], id: &str)
 fn waiting_for<'a>(mut unit: Unit<'a>, waiting: &[String]) -> Unit<'a> {
     if waiting.iter().any(|held| held == unit.id) {
         WAITING.clone_into(&mut unit.profile);
+    }
+    unit
+}
+
+/// `unit`, written under [`REPLACED`] where it is one of the parts a choice of filler
+/// `replaced`.
+fn replaced_by<'a>(mut unit: Unit<'a>, replaced: &[String]) -> Unit<'a> {
+    if replaced.iter().any(|part| part == unit.id) {
+        REPLACED.clone_into(&mut unit.profile);
     }
     unit
 }

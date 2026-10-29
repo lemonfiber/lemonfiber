@@ -213,3 +213,33 @@ async fn an_overlay_change_the_journal_cannot_hold_starts_nothing() {
 }
 
 mod sweeping;
+
+#[test]
+fn a_part_a_choice_passed_over_is_not_among_what_starting_everything_starts() {
+    let dir = crate::app::fixtures::scratch("engine-replaced").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(
+        dir.join(".env"),
+        "LEMONFIBER_FILLS=indexer.search=nzbhydra2\n",
+    );
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(dir.join(".env")),
+            ..crate::config::Settings::default()
+        })
+        .build();
+
+    let services = super::resolved(&ctx, &[])
+        .map(|(_, plan)| plan.services)
+        .unwrap_or_default();
+
+    assert!(
+        !services.iter().any(|one| one == "prowlarr"),
+        "{services:?}"
+    );
+    assert!(
+        services.iter().any(|one| one == "nzbhydra2"),
+        "{services:?}"
+    );
+}

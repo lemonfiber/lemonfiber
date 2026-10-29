@@ -77,6 +77,13 @@ pub(crate) fn chosen_fillers(ctx: &Ctx) -> crate::wiring::Chosen {
         .because(recorded_secret(ctx, crate::wiring::FILLS_WHY_KEY).as_deref())
 }
 
+/// The parts the operator's choices of filler take out of their form, as
+/// [`crate::wiring::replaced`] answers over `manifest` and what is installed.
+pub(crate) fn replaced_parts(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<String> {
+    let installed = crate::app::plugins::read(ctx).unwrap_or_default();
+    crate::wiring::replaced(manifest, installed.installed(), &chosen_fillers(ctx))
+}
+
 /// The ordinal each service holds where two would share a credential's name, as the
 /// environment file records them.
 pub(crate) fn ordinals(ctx: &Ctx) -> crate::config::credentials::Ordinals {

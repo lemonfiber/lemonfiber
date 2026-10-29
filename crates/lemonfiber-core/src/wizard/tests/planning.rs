@@ -697,6 +697,13 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the internal certificate of jellyfin"
     );
+    assert_eq!(
+        described(&change(Kind::Ran {
+            service: "prowlarr".to_owned(),
+            running: false,
+        })),
+        "the stop or start of prowlarr"
+    );
 }
 
 #[test]

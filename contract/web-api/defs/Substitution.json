@@ -29,6 +29,20 @@
       "description": "The setting the change writes.",
       "type": "string"
     },
+    "starts": {
+      "description": "Each part the change brings back to its form, started again.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stops": {
+      "description": "Each part the change takes out of its form, stopped with its configuration and\ndata kept where they are.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "was": {
       "description": "What fills it now, where anything does.",
       "type": [
@@ -49,6 +63,8 @@
     "now",
     "asked_by",
     "leaves_unfilled",
+    "stops",
+    "starts",
     "setting"
   ]
 }

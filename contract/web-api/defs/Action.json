@@ -462,6 +462,29 @@
       ]
     },
     {
+      "description": "Start a service again, or stop it again.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "run"
+        },
+        "running": {
+          "description": "Whether it is left running.",
+          "type": "boolean"
+        },
+        "service": {
+          "description": "The service.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "service",
+        "running"
+      ]
+    },
+    {
       "description": "Leave the operator's overlay as it is.\n\nWorked out so the record of a change to it has a reversal to name, and never\ncarried out: lemonfiber does not write the operator's own file.",
       "type": "object",
       "properties": {

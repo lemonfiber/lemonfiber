@@ -38,11 +38,11 @@ fn fill(capability: &str, service: &str) -> Filling {
 }
 
 /// The choice read, and then answered with the name its reading printed.
-fn agreed(
+async fn agreed(
     ctx: &crate::app::Ctx,
     filling: Filling,
 ) -> Result<crate::model::SubstitutionReport, Box<crate::error::Problem>> {
-    let reading = substituting(ctx, &filling)?;
+    let reading = substituting(ctx, &filling).await?;
     substituting(
         ctx,
         &Filling {
@@ -50,6 +50,7 @@ fn agreed(
             ..filling
         },
     )
+    .await
 }
 
 /// What the settings file says the operator chose.
@@ -95,13 +96,13 @@ fn the_listing_answers_every_link_the_pinned_stack_declares() {
 
 /// A rehearsal works the whole thing out and writes nothing, which is the answer
 /// somebody wants before agreeing to it.
-#[test]
-fn a_rehearsed_substitution_answers_in_full_and_writes_nothing() {
+#[tokio::test]
+async fn a_rehearsed_substitution_answers_in_full_and_writes_nothing() {
     let (ctx, at) = ctx("rehearsed");
     let rehearsing = ctx.rehearsing();
     let filling = fill("indexer.search", "nzbhydra2");
 
-    let report = substituting(&rehearsing, &filling).ok();
+    let report = substituting(&rehearsing, &filling).await.ok();
 
     assert_eq!(report.as_ref().map(|report| report.applied), Some(false));
     assert_eq!(
@@ -120,12 +121,12 @@ fn a_rehearsed_substitution_answers_in_full_and_writes_nothing() {
 }
 
 /// A real run records the choice, and the next listing reads it back.
-#[test]
-fn a_substitution_is_recorded_and_read_back() {
+#[tokio::test]
+async fn a_substitution_is_recorded_and_read_back() {
     let (ctx, at) = ctx("recorded");
     let filling = fill("indexer.search", "nzbhydra2");
 
-    let report = agreed(&ctx, filling).ok();
+    let report = agreed(&ctx, filling).await.ok();
 
     assert_eq!(report.map(|report| report.applied), Some(true));
     assert_eq!(recorded(&at).as_deref(), Some("indexer.search=nzbhydra2"));
@@ -139,11 +140,11 @@ fn a_substitution_is_recorded_and_read_back() {
 
 /// Each refusal is its own mistake with its own next step, so each carries its
 /// own code rather than one that did not work.
-#[test]
-fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
+#[tokio::test]
+async fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
     let (ctx, _at) = ctx("refused");
-    let refused = |capability: &str, service: &str| {
-        let problem = substituting(&ctx, &fill(capability, service)).err();
+    let refused = async |capability: &str, service: &str| {
+        let problem = substituting(&ctx, &fill(capability, service)).await.err();
         // Listed, so a client reading the list before it meets one can name it.
         if let Some(problem) = &problem {
             assert!(
@@ -155,21 +156,30 @@ fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
         problem.map(|problem| problem.code)
     };
 
-    assert_eq!(refused("indexer.search", "sabnzbd"), Some(CANNOT_FILL));
-    assert_eq!(refused("request.intake", "seerr"), Some(NOTHING_ASKS));
-    assert_eq!(refused("identity.source", "jellyfin"), Some(ALREADY_FILLS));
     assert_eq!(
-        refused("indexer.search", "plex").map(lemonfiber_error::Code::as_str),
+        refused("indexer.search", "sabnzbd").await,
+        Some(CANNOT_FILL)
+    );
+    assert_eq!(refused("request.intake", "seerr").await, Some(NOTHING_ASKS));
+    assert_eq!(
+        refused("identity.source", "jellyfin").await,
+        Some(ALREADY_FILLS)
+    );
+    assert_eq!(
+        refused("indexer.search", "plex")
+            .await
+            .map(lemonfiber_error::Code::as_str),
         Some("WIRE-1")
     );
 }
 
 /// Which service fills a capability is a setting, so a run with nowhere to keep
 /// one cannot make the choice — and says so rather than reporting it made.
-#[test]
-fn a_run_with_nowhere_to_record_the_choice_refuses_rather_than_pretending() {
+#[tokio::test]
+async fn a_run_with_nowhere_to_record_the_choice_refuses_rather_than_pretending() {
     let ctx = crate::test_support::a_context().build();
     let refused = agreed(&ctx, fill("indexer.search", "nzbhydra2"))
+        .await
         .err()
         .map(|problem| (problem.code, problem.status()));
     assert_eq!(refused, Some((CHOICE_UNWRITABLE, 500)));
@@ -180,8 +190,8 @@ fn a_run_with_nowhere_to_record_the_choice_refuses_rather_than_pretending() {
 /// nothing would read as a stack that wires nothing, and a substitution worked
 /// out against nothing would be a choice recorded for a capability no wiring asks
 /// for.
-#[test]
-fn a_stack_that_cannot_be_read_refuses_both_the_listing_and_the_change() {
+#[tokio::test]
+async fn a_stack_that_cannot_be_read_refuses_both_the_listing_and_the_change() {
     let ctx = crate::test_support::a_context()
         .over(crate::test_support::nowhere())
         .build();
@@ -191,7 +201,9 @@ fn a_stack_that_cannot_be_read_refuses_both_the_listing_and_the_change() {
         "a stack nothing could read was listed"
     );
     assert!(
-        substituting(&ctx, &fill("indexer.search", "nzbhydra2"),).is_err(),
+        substituting(&ctx, &fill("indexer.search", "nzbhydra2"),)
+            .await
+            .is_err(),
         "a choice was worked out against a stack nothing could read"
     );
 }
@@ -203,8 +215,8 @@ fn a_stack_that_cannot_be_read_refuses_both_the_listing_and_the_change() {
 /// leaves an entry for a setting that still holds its old value — which unwinds to
 /// the value it already has. What must not happen is the opposite: the answer
 /// saying the choice was recorded when the file says otherwise.
-#[test]
-fn a_choice_the_settings_file_will_not_take_is_refused_rather_than_reported_made() {
+#[tokio::test]
+async fn a_choice_the_settings_file_will_not_take_is_refused_rather_than_reported_made() {
     let at = dir("unwritable");
     // A directory where the settings file goes: the path exists, so there is
     // somewhere to record the choice, and writing to it cannot succeed.
@@ -217,6 +229,7 @@ fn a_choice_the_settings_file_will_not_take_is_refused_rather_than_reported_made
     let ctx = crate::test_support::a_context().settings(settings).build();
 
     let answered = agreed(&ctx, fill("indexer.search", "nzbhydra2"))
+        .await
         .map(|report| report.applied)
         .map_err(|problem| problem.severity);
 
@@ -224,34 +237,35 @@ fn a_choice_the_settings_file_will_not_take_is_refused_rather_than_reported_made
 }
 
 /// The read and the verb arrive as one command and come back as two answers.
-#[test]
-fn the_read_and_the_verb_answer_as_the_two_outcomes_they_are() {
+#[tokio::test]
+async fn the_read_and_the_verb_answer_as_the_two_outcomes_they_are() {
     let (ctx, _at) = ctx("wiring");
     let rehearsing = ctx.rehearsing();
     assert!(matches!(
-        wiring(&rehearsing, &Linking::Read),
+        wiring(&rehearsing, &Linking::Read).await,
         Ok(Outcome::Wiring(_))
     ));
     assert!(matches!(
         wiring(
             &rehearsing,
             &Linking::Fill(fill("indexer.search", "nzbhydra2"))
-        ),
+        )
+        .await,
         Ok(Outcome::Substitution(_))
     ));
 }
 
 /// A choice whose record cannot be written is not made: the journal goes down first,
 /// and a journal that will not take the entry stops the change it would have recorded.
-#[test]
-fn a_choice_the_journal_will_not_take_is_not_made() {
+#[tokio::test]
+async fn a_choice_the_journal_will_not_take_is_not_made() {
     let (ctx, at) = ctx("unjournalled");
     assert!(
         std::fs::create_dir_all(at.join("config").join("journal.jsonl.writing").join("held"))
             .is_ok()
     );
 
-    let answered = agreed(&ctx, fill("indexer.search", "nzbhydra2"));
+    let answered = agreed(&ctx, fill("indexer.search", "nzbhydra2")).await;
 
     assert!(answered.is_err(), "a choice was made with no record of it");
     assert_eq!(recorded(&at), None, "and the settings file holds it anyway");
@@ -282,10 +296,12 @@ fn settled(
 
 /// Unanswered, a choice is the reading and nothing more: what it would come to and the
 /// name it goes by, with nothing written.
-#[test]
-fn an_unanswered_choice_is_its_reading_and_writes_nothing() {
+#[tokio::test]
+async fn an_unanswered_choice_is_its_reading_and_writes_nothing() {
     let (ctx, at) = ctx("unanswered");
-    let report = substituting(&ctx, &fill("indexer.search", "nzbhydra2")).ok();
+    let report = substituting(&ctx, &fill("indexer.search", "nzbhydra2"))
+        .await
+        .ok();
     assert_eq!(report.as_ref().map(|report| report.applied), Some(false));
     assert_eq!(
         report.map(|report| report.agreement.split('-').count()),
@@ -296,20 +312,24 @@ fn an_unanswered_choice_is_its_reading_and_writes_nothing() {
 }
 
 /// A rehearsal answering the offer checks it and still writes nothing.
-#[test]
-fn a_rehearsal_answering_the_offer_writes_nothing() {
+#[tokio::test]
+async fn a_rehearsal_answering_the_offer_writes_nothing() {
     let (ctx, at) = ctx("rehearsed-answer");
-    let report = agreed(&ctx.rehearsing(), fill("indexer.search", "nzbhydra2")).ok();
+    let report = agreed(&ctx.rehearsing(), fill("indexer.search", "nzbhydra2"))
+        .await
+        .ok();
     assert_eq!(report.map(|report| report.applied), Some(false));
     assert_eq!(recorded(&at), None);
 }
 
 /// An answer naming a reading that has since moved is refused, naming what moved, and
 /// changes nothing.
-#[test]
-fn an_answer_to_a_moved_reading_is_refused_naming_what_moved() {
+#[tokio::test]
+async fn an_answer_to_a_moved_reading_is_refused_naming_what_moved() {
     let (ctx, at) = ctx("moved");
-    let reading = substituting(&ctx, &fill("indexer.search", "nzbhydra2")).ok();
+    let reading = substituting(&ctx, &fill("indexer.search", "nzbhydra2"))
+        .await
+        .ok();
     let mut stale: Vec<String> = reading
         .map(|report| report.agreement.split('-').map(str::to_owned).collect())
         .unwrap_or_default();
@@ -323,6 +343,7 @@ fn an_answer_to_a_moved_reading_is_refused_naming_what_moved() {
             ..fill("indexer.search", "nzbhydra2")
         },
     )
+    .await
     .err();
     assert_eq!(
         refused.as_ref().map(|problem| problem.code),
@@ -339,8 +360,8 @@ fn an_answer_to_a_moved_reading_is_refused_naming_what_moved() {
 }
 
 /// A reason given is recorded with the choice and read back as the choice's own.
-#[test]
-fn a_reason_is_recorded_with_the_choice_and_read_back_beside_it() {
+#[tokio::test]
+async fn a_reason_is_recorded_with_the_choice_and_read_back_beside_it() {
     let (ctx, at) = ctx("reasoned");
     let said = "hydra searches the private trackers prowlarr cannot";
     let report = agreed(
@@ -350,6 +371,7 @@ fn a_reason_is_recorded_with_the_choice_and_read_back_beside_it() {
             ..fill("indexer.search", "nzbhydra2")
         },
     )
+    .await
     .ok();
     assert_eq!(
         report.map(|report| report.substitution.why),
@@ -369,17 +391,19 @@ fn a_reason_is_recorded_with_the_choice_and_read_back_beside_it() {
 
 /// A choice made with nothing said, over choices that had nothing said either, writes
 /// no reasons setting at all.
-#[test]
-fn a_choice_with_nothing_said_writes_no_reasons() {
+#[tokio::test]
+async fn a_choice_with_nothing_said_writes_no_reasons() {
     let (ctx, at) = ctx("unreasoned");
-    assert!(agreed(&ctx, fill("indexer.search", "nzbhydra2")).is_ok());
+    assert!(agreed(&ctx, fill("indexer.search", "nzbhydra2"))
+        .await
+        .is_ok());
     assert_eq!(held(&at, crate::wiring::FILLS_WHY_KEY), None);
 }
 
 /// A reason too long to read beside the choice, or running over more than one line,
 /// is refused before anything is read or written.
-#[test]
-fn a_reason_that_cannot_be_recorded_is_refused() {
+#[tokio::test]
+async fn a_reason_that_cannot_be_recorded_is_refused() {
     let (ctx, at) = ctx("unreasonable");
     for said in [
         "x".repeat(crate::wiring::REASON_MOST + 1),
@@ -393,6 +417,7 @@ fn a_reason_that_cannot_be_recorded_is_refused() {
                 ..fill("indexer.search", "nzbhydra2")
             },
         )
+        .await
         .err();
         assert_eq!(
             refused.as_ref().map(|problem| problem.code),
@@ -408,6 +433,7 @@ fn a_reason_that_cannot_be_recorded_is_refused() {
             ..fill("indexer.search", "nzbhydra2")
         },
     )
+    .await
     .is_ok());
     assert_eq!(recorded(&at), None);
 }
@@ -421,6 +447,8 @@ fn an_answer_carried_over_to_another_service_names_the_choice_itself() {
         now: "nzbhydra2".to_owned(),
         asked_by: vec!["bindery".to_owned()],
         leaves_unfilled: Vec::new(),
+        stops: Vec::new(),
+        starts: Vec::new(),
         setting: "indexer.search=nzbhydra2".to_owned(),
         why: None,
     };
@@ -436,11 +464,12 @@ fn an_answer_carried_over_to_another_service_names_the_choice_itself() {
 
 /// A record of what is installed that cannot be read refuses the choice, because a
 /// plugin's service may be the very claimant being chosen between.
-#[test]
-fn a_choice_over_a_record_that_will_not_read_is_refused() {
+#[tokio::test]
+async fn a_choice_over_a_record_that_will_not_read_is_refused() {
     let (ctx, at) = ctx("record-unread");
     assert!(std::fs::write(at.join("config").join("plugins.json"), "{ not json").is_ok());
     let refused = substituting(&ctx, &fill("indexer.search", "nzbhydra2"))
+        .await
         .err()
         .map(|problem| problem.code.as_str().to_owned());
     assert_eq!(refused.as_deref(), Some("PLUGIN-4"));
@@ -478,4 +507,5 @@ fn the_listing_carries_an_installed_plugins_ask_after_the_stacks_with_its_origin
     assert!(theirs > 0);
 }
 
+mod parting;
 mod regenerating;

@@ -196,6 +196,7 @@ pub(super) fn a_substitution() -> SubstitutionReport {
     SubstitutionReport {
         rehearsed: false,
         unvetted: None,
+        unran: Vec::new(),
         substitution: Substitution {
             capability: "indexer.search".to_owned(),
             was: Some("prowlarr".to_owned()),
@@ -206,6 +207,8 @@ pub(super) fn a_substitution() -> SubstitutionReport {
                 by: "bindery".to_owned(),
                 capability: "indexer.proxy".to_owned(),
             }],
+            stops: vec!["prowlarr".to_owned()],
+            starts: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),
             why: Some("hydra searches the trackers prowlarr cannot".to_owned()),
         },

@@ -30,6 +30,7 @@ use refused::{cannot_succeed, more_than_one, no_such_run, nowhere_to_look};
 
 mod recorded;
 use recorded::recording;
+mod running;
 
 /// What putting a run back came to.
 ///
@@ -114,16 +115,23 @@ pub async fn undo(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>
     }
 }
 
+/// Where the journal and the project are, or the refusal of a machine with neither.
+fn laid_out(ctx: &Ctx) -> Result<(crate::config::paths::Paths, std::path::PathBuf), Box<Problem>> {
+    super::targets::layout(ctx)
+        .zip(super::project::directory(ctx))
+        .ok_or_else(|| Box::new(nowhere_to_look()))
+}
+
 /// Put back the run stamped `at`.
 async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
-    let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
+    let (paths, stack) = laid_out(ctx)?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
     let operation = operation_at(changes, at)?;
     let run: Vec<&Change> = together(changes, &operation, at);
-    carried_out(ctx, &paths, changes, &run, at).await
+    carried_out(ctx, (&paths, &stack), changes, &run, at).await
 }
 
 /// Put back every change `whose` claims, called `at` in what is said about it.
@@ -145,13 +153,13 @@ pub(crate) async fn everything(
     at: &str,
     whose: &(dyn Fn(&Change) -> bool + Sync),
 ) -> Result<Reversal, Box<Problem>> {
-    let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
+    let (paths, stack) = laid_out(ctx)?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
     let run = crate::rollback::everything(changes, whose);
-    carried_out(ctx, &paths, changes, &run, at).await
+    carried_out(ctx, (&paths, &stack), changes, &run, at).await
 }
 
 /// Whether [`everything`] would go ahead, asked without touching anything.
@@ -190,7 +198,7 @@ pub(crate) fn admitted(
 /// sentence and never looked up by, which is what lets one path serve both.
 async fn carried_out(
     ctx: &Ctx,
-    paths: &crate::config::paths::Paths,
+    (paths, stack): (&crate::config::paths::Paths, &std::path::Path),
     changes: &[Change],
     run: &[&Change],
     at: &str,
@@ -223,7 +231,8 @@ async fn carried_out(
     let reached = super::recover::reconfigured(ctx, &undos, &manifest).await;
     // A key goes back through the keys themselves, where the clock and the narrator a
     // revoke is heard through are; everything else on this machine goes back on disk.
-    let (revoking, left): (Vec<Undo>, Vec<Undo>) = reached.left.iter().cloned().partition(|undo| {
+    let (running, left) = running::parted(&reached.left);
+    let (revoking, left): (Vec<Undo>, Vec<Undo>) = left.into_iter().partition(|undo| {
         crate::keys::run::revoked_by(undo).is_some()
             || crate::device_keys::run::revoked_by(undo).is_some()
     });
@@ -243,6 +252,7 @@ async fn carried_out(
         Vec::new(),
     )?;
     super::recover::reheld(ctx, &carried)?;
+    let (ran, unran) = running::ran(ctx, stack, &running).await;
 
     // The account rather than the instruction, which is the division `told` exists to
     // make: what a reversal is carried out *with* holds the values it puts back, and
@@ -255,6 +265,7 @@ async fn carried_out(
         .iter()
         .chain(revoking.iter())
         .chain(carried.done.iter())
+        .chain(ran.iter())
         .cloned()
         .map(told)
         .collect();
@@ -269,9 +280,11 @@ async fn carried_out(
     )
     .map_err(|failure| Box::new(super::recover::unrecorded("The reversal", &failure)))?;
 
+    let mut left = standing_after(&reached.unreached, &carried);
+    left.extend(unran);
     Ok(Reversal {
         reversed,
-        left: standing_after(&reached.unreached, &carried),
+        left,
         noted,
         rehearsed: false,
     })

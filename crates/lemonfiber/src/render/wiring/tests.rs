@@ -248,12 +248,15 @@ fn substituting(applied: bool, leaves: Vec<Unfilled>) -> SubstitutionReport {
     SubstitutionReport {
         rehearsed: false,
         unvetted: None,
+        unran: Vec::new(),
         substitution: Substitution {
             capability: "indexer.search".to_owned(),
             was: Some("prowlarr".to_owned()),
             now: "nzbhydra2".to_owned(),
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: leaves,
+            stops: Vec::new(),
+            starts: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),
             why: None,
         },
@@ -363,4 +366,34 @@ fn a_choice_under_an_overlay_names_it_as_unvetted() {
     assert!(!substituted(&substituting(false, Vec::new()))
         .text()
         .contains("Unvetted"));
+}
+
+#[test]
+fn a_reading_says_which_parts_it_stops_and_starts_and_a_change_which_did_not() {
+    let with_parts = |applied: bool| {
+        let mut report = substituting(applied, Vec::new());
+        report.substitution.stops = vec!["prowlarr".to_owned()];
+        report.substitution.starts = vec!["jackett".to_owned()];
+        report
+    };
+    let read = substituted(&with_parts(false)).text();
+    assert!(
+        read.contains("stops    prowlarr, its configuration and data kept"),
+        "{read}"
+    );
+    assert!(read.contains("starts   jackett"), "{read}");
+    assert!(!read.contains("did not stop or start"), "{read}");
+
+    let mut made = with_parts(true);
+    made.unran = vec![lemonfiber_core::model::Unran {
+        service: "prowlarr".to_owned(),
+        because: "the container engine refused: busy".to_owned(),
+    }];
+    let said = substituted(&made).text();
+    assert!(said.contains("stopped  prowlarr"), "{said}");
+    assert!(said.contains("started  jackett"), "{said}");
+    assert!(
+        said.contains("prowlarr — the container engine refused: busy"),
+        "{said}"
+    );
 }

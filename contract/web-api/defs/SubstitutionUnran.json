@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A part a substitution was to stop or start and could not.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why it was not.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The part's service.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "because"
+  ]
+}

@@ -300,6 +300,8 @@ fn a_substitution_names_the_capability_both_services_and_everything_that_asked()
             now: "nzbhydra2".to_owned(),
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: Vec::new(),
+            stops: vec!["prowlarr".to_owned()],
+            starts: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),
             why: None,
         }))
@@ -735,3 +737,5 @@ mod asking;
 mod installed;
 mod moved;
 mod native;
+
+mod replacing;

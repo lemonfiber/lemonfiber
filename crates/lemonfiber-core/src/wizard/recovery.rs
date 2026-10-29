@@ -166,6 +166,7 @@ pub fn described(change: &Change) -> String {
         }
         Kind::Overlaid { path, .. } => format!("the overlay {path}"),
         Kind::Certified { service, .. } => format!("the internal certificate of {service}"),
+        Kind::Ran { service, .. } => format!("the stop or start of {service}"),
     }
 }
 

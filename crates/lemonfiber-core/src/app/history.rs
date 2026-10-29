@@ -174,6 +174,11 @@ fn did(kind: &Kind) -> String {
         Kind::Certified { service, .. } => {
             format!("replaced the internal certificate of {service}")
         }
+        Kind::Ran {
+            service,
+            running: true,
+        } => format!("started {service}"),
+        Kind::Ran { service, .. } => format!("stopped {service}"),
     }
 }
 

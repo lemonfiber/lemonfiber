@@ -52,11 +52,17 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .map(|register| register.installed().to_vec())
         .unwrap_or_default();
     let waiting = crate::settings::run::waiting(ctx, &manifest, &installed);
+    let replaced = crate::wiring::replaced(
+        &manifest,
+        &installed,
+        &crate::app::targets::chosen_fillers(ctx),
+    );
     // A service an active form's closure left out, and that is not there, is reported
     // among what was filtered. Listing it again as absent would say it failed to start.
     let services: Vec<_> = everything
         .into_iter()
         .filter(|service| profiles.contains(&service.profile))
+        .filter(|service| !replaced.contains(&service.id))
         .filter(|service| {
             service.state != State::Absent
                 || !(filtered.iter().any(|out| out.id == service.id)

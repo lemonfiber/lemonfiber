@@ -19,7 +19,9 @@ pub(crate) mod halted;
 mod inflight;
 mod lock;
 mod offered;
+mod parting;
 pub(crate) use offered::{answering, restarted};
+pub(crate) use parting::ran;
 mod preview;
 pub(crate) use preview::preview;
 mod remote;
@@ -485,12 +487,14 @@ pub(super) fn resolved(
     // every operation that resolves a plan means the same thing by an empty list —
     // and `everything` is every declared profile rather than every form composed
     // together, which forms that refuse each other's company would refuse.
-    let plan = if forms.is_empty() {
+    let mut plan = if forms.is_empty() {
         everything(&manifest, ctx.settings.protocols)
     } else {
         resolve(&manifest, forms, ctx.settings.protocols)
     }
     .map_err(|err| Box::new(err.problem()))?;
+    let replaced = super::targets::replaced_parts(ctx, &manifest);
+    plan.services.retain(|service| !replaced.contains(service));
     Ok((manifest, plan))
 }
 

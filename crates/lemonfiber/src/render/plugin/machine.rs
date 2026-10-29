@@ -382,6 +382,11 @@ fn undone(undo: &Undo) -> String {
         Action::Unreplaced { service } => {
             format!("left the internal certificate of {service} as it is")
         }
+        Action::Run {
+            service,
+            running: true,
+        } => format!("started {service} again"),
+        Action::Run { service, .. } => format!("stopped {service} again"),
     }
 }
 

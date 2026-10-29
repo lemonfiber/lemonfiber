@@ -349,3 +349,13 @@ fn every_kind_of_change_reads_as_what_it_did() {
         ]
     );
 }
+
+#[test]
+fn a_part_started_or_stopped_reads_as_its_service() {
+    let ran = |running: bool| crate::journal::Kind::Ran {
+        service: "prowlarr".to_owned(),
+        running,
+    };
+    assert_eq!(did(&ran(true)), "started prowlarr");
+    assert_eq!(did(&ran(false)), "stopped prowlarr");
+}
