@@ -16,7 +16,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// The most of an answer read.
-const BODY_LIMIT: usize = 16 * 1024 * 1024;
+pub const BODY_LIMIT: usize = 16 * 1024 * 1024;
 
 /// An HTTP client that follows no redirect and reads no more than [`BODY_LIMIT`].
 #[derive(Debug, Clone)]

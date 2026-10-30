@@ -8,6 +8,7 @@
 pub mod credential;
 pub mod endpoint;
 pub mod settings;
+pub mod shared;
 pub mod web;
 
 use std::collections::BTreeMap;
