@@ -1,5 +1,5 @@
 use super::{
-    answering, declared, hostnames, named, proxied, publishing, publishing_in, services, STACK,
+    answering, declared, named, publishing, publishing_in, routed, routed_to, services, STACK,
 };
 
 /// The register found the stack, rather than finding nothing and passing.
@@ -40,18 +40,17 @@ fn a_stack_description_that_cannot_be_read_holds_nothing() {
     assert!(!declared(STACK).is_empty());
 }
 
-/// And the names it answers on, for the same reason.
+/// And the names the household reaches the bundle's parts at, for the same reason.
 #[test]
-fn the_register_holds_the_names_the_proxy_answers_on() {
-    let answered = hostnames();
+fn the_register_holds_the_names_the_household_reaches_the_bundle_at() {
+    let answered = routed().len();
     assert!(
-        answered.len() > 5,
-        "the shipped proxy configuration was not read, so a plugin could take any name it \
-             already answers on: {answered:?}"
+        answered >= 5,
+        "the bundle's parts were not read, so a plugin could take any name the household \
+             already reaches: {answered} names"
     );
-    assert!(answering("watch"), "the stanza in force is read");
-    assert!(answering("sonarr"), "and the one written out disabled");
-    assert!(!answering("comics"), "and nothing it does not name");
+    assert!(answering("watch"));
+    assert!(!answering("comics"), "and nothing the bundle does not name");
 }
 
 /// A name nothing declares is not held.
@@ -67,50 +66,13 @@ fn a_port_the_stack_publishes_names_the_service_holding_it() {
     assert_eq!(publishing(8096).map(|held| held.id.as_str()), Some("door"));
 }
 
-/// The reader takes a label from a stanza and nothing from anything else.
-///
-/// On text planted here rather than only on the shipped file, because the
-/// shipped file is one shape and the thing worth knowing is which shapes this
-/// takes and which it leaves — a reader that took the prose as well would
-/// reserve words nobody had written a stanza for.
 #[test]
-fn a_label_is_taken_from_a_stanza_and_from_nothing_else() {
-    let planted = "\
-watch.{$DOMAIN:home.local} {\n\
-\treverse_proxy jellyfin:8096\n\
-}\n\
-# sonarr.{$DOMAIN:home.local}      { reverse_proxy sonarr:8989 }\n\
-# Set DOMAIN in .env, and the {$DOMAIN placeholder is filled in.\n\
-watch.{$DOMAIN:home.local} {\n\
-}\n\
-UPPER.{$DOMAIN:home.local} {\n\
-}\n";
-    assert_eq!(
-        proxied(planted),
-        vec!["watch".to_owned(), "sonarr".to_owned()]
-    );
-}
-
-/// And a file with no stanza in it yields nothing, rather than a word.
-#[test]
-fn a_configuration_with_no_stanza_in_it_reserves_no_name() {
-    assert!(proxied("# nothing here\nreverse_proxy jellyfin:8096\n").is_empty());
-}
-
-#[test]
-fn each_proxied_name_is_routed_to_the_service_its_stanza_names() {
-    let routed = super::routes(
-        "watch.{$DOMAIN:home.local} {\n\treverse_proxy door:8096\n}\n\n# sonarr.{$DOMAIN:home.local}      { reverse_proxy sonarr:8989 }\nhome.{$DOMAIN} {\n}\n",
-    );
-    assert_eq!(
-        routed,
-        vec![
-            ("watch".to_owned(), "door".to_owned()),
-            ("sonarr".to_owned(), "sonarr".to_owned()),
-        ]
-    );
-    assert_eq!(super::routed_to("watch"), Some("door"));
-    assert_eq!(super::routed_to("nowhere"), None);
+fn each_name_is_routed_to_the_stack_service_its_part_stands_in_for() {
+    assert_eq!(routed_to("watch"), Some("door"));
+    assert_eq!(routed_to("requests"), Some("seerr"));
+    assert_eq!(routed_to("nowhere"), None);
+    assert_eq!(super::label_of("door"), Some("watch"));
+    assert_eq!(super::label_of("nowhere"), None);
 }
 
 /// A port a shipped service publishes as a further port is held as its first is.

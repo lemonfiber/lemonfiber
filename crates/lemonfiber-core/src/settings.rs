@@ -84,6 +84,17 @@ pub(crate) fn dashboard_search(ctx: &Ctx) -> Result<String, String> {
     own::refusal(own::DASHBOARD_SEARCH, value).map_or_else(|| Ok(value.to_owned()), Err)
 }
 
+/// The domain the household's names are under: the one recorded, or the default where
+/// none is.
+pub(crate) fn household_domain(ctx: &Ctx) -> String {
+    recorded::Recorded::of(ctx)
+        .value(own::DOMAIN)
+        .map(str::trim)
+        .filter(|domain| own::is_domain(domain))
+        .unwrap_or(own::DEFAULT_DOMAIN)
+        .to_owned()
+}
+
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {
     files::forgotten(ctx, plugin);
     let Some(env) = ctx.settings.env_file.as_deref() else {

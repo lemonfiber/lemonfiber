@@ -1,36 +1,5 @@
 name: lemonfiber
 services:
-  caddy:
-    image: ghcr.io/lemonfiber/caddy:main-22eef6b30f45@sha256:dd64ac74c6800d3445072406c3d2e982b530c9be5de747d05c68b50f87301b5a
-    profiles:
-    - proxy
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      DOMAIN: home.local
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:80:8080
-    - 0.0.0.0:443:8443
-    volumes:
-    - ./config/caddy:/etc/caddy:ro
-    - ./mounts/caddy/data:/data
-    - ./mounts/caddy/config:/config
-    networks:
-    - ask__homepage__proxy.front__caddy
-    - own__caddy
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   decline:
     image: ghcr.io/lemonfiber/decline:0.17.0@sha256:814d551113e93135259ac8e92586938bf88c3bb03bc8ce75b8e0d7e4d14a8147
     profiles:
@@ -311,6 +280,36 @@ services:
     - ask__recyclarr__library.curate__bindery
     - ask__request-gate__library.curate__bindery
     - own__bindery
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  caddy:
+    image: ghcr.io/lemonfiber/caddy:main-7e36d4e7166c@sha256:6fb83b5215f34ce6c48d81bc4b42f2ca973343b5a330c46463f470e189bbc147
+    profiles:
+    - proxy
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:80:8080
+    - 0.0.0.0:443:8443
+    volumes:
+    - ./config/caddy:/etc/caddy:ro
+    - ./mounts/caddy/data:/data
+    - ./mounts/caddy/config:/config
+    networks:
+    - ask__homepage__proxy.front__caddy
+    - own__caddy
     security_opt:
     - no-new-privileges:true
     cap_drop:

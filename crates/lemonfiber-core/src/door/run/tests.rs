@@ -598,13 +598,12 @@ fn over_a_plugin_door(
     proxying: bool,
     domain: Option<&str>,
 ) -> crate::model::FrontDoorReport {
-    let declared = [
-        watching(),
-        service("caddy", Some(lemonfiber_manifest::Bind::Lan)),
-    ];
+    let mut proxy = service("front", Some(lemonfiber_manifest::Bind::Lan));
+    proxy.provides = vec!["proxy.front".to_owned()];
+    let declared = [watching(), proxy];
     let mut surveyed = vec![up("door", crate::docker::State::Healthy)];
     if proxying {
-        surveyed.push(up("caddy", crate::docker::State::Running));
+        surveyed.push(up("front", crate::docker::State::Running));
     }
     let plugin = crate::door::fixtures::fronted("requests", Some("request.intake@1"), Some("ask"));
     let undeclared: Vec<crate::docker::Undeclared> = state

@@ -170,7 +170,6 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
                 Puts::Directory => "a directory ",
                 Puts::Document => "a document  ",
                 Puts::Key => "a key       ",
-                Puts::Region => "a region in ",
                 Puts::Secrets => "secrets file",
                 Puts::Starting => "a file      ",
                 Puts::Upstream => "credentials ",

@@ -1,20 +1,15 @@
-//! Writing a region into one of the stack's own files, and taking it back out.
+//! Writing one of the stack's own files whole, and taking a region back out of one.
 //!
-//! The write and its undo are the two halves of [`crate::journal::Kind::Region`], and
-//! both halves do one more thing than edit the file: they keep the record of what
-//! lemonfiber materialised true. That record is how the pass that writes the stack's
-//! files tells an operator's edit from lemonfiber's own. A region written without
-//! re-recording the file would read to that pass as the operator's edit, and the
-//! file would be preserved as theirs from then on, never updated again. So the
-//! checksum moves with the region, inside the same write, and only where the record
-//! was already holding the file as lemonfiber last wrote it. A file the operator had
-//! edited before the region went in is still theirs afterwards, and still reads that
-//! way.
+//! Both keep the record of what lemonfiber materialised true. That record is how the pass
+//! that writes the stack's files tells an operator's edit from lemonfiber's own, so a
+//! write that did not re-record the file would read to that pass as the operator's edit,
+//! and the file would be preserved as theirs from then on, never updated again. So the
+//! checksum moves with the text, inside the same write, and only where the record was
+//! already holding the file as lemonfiber last wrote it. A file the operator had edited
+//! before is still theirs afterwards, and still reads that way.
 //!
-//! Where the file is kept is the caller's business. The journal entry is written
-//! before the region is, by the caller, for the reason every write is journalled
-//! first: a run that dies between the two leaves a record of a region that may not be
-//! there, and taking out a region that is not there is nothing.
+//! Taking a region out is the undo of [`crate::journal::Kind::Region`], which an earlier
+//! release journalled when it wrote a plugin's region into one of the stack's files.
 
 use std::path::Path;
 
@@ -28,33 +23,6 @@ use crate::within::{directory_of, read_unlinked, write_unlinked};
 /// is the one the next pass over the stack reads.
 pub(crate) fn record_beside(env_file: &Path) -> std::path::PathBuf {
     env_file.with_file_name(crate::config::paths::MATERIALISED)
-}
-
-/// Write `owner`'s region holding `body` into the file at `path`.
-///
-/// The file has to be there already: a region is written into a file the stack has,
-/// never into one this brings into being. It is read the way it is written, never
-/// through a link, because the directory it is in is one a container can write to.
-///
-/// # Errors
-///
-/// Where the file is not there, is not a plain file, or cannot be read or written.
-pub(crate) fn put(
-    confined: &dyn Confined,
-    path: &Path,
-    key: &str,
-    owner: &str,
-    body: &str,
-    record: Option<&Path>,
-) -> Result<(), String> {
-    let Some(before) = read_unlinked(confined, path, directory_of(path))? else {
-        return Err(format!(
-            "{} is not there, and a region is only written into a file the stack already has",
-            path.display()
-        ));
-    };
-    let after = crate::region::put(&before, owner, body);
-    rewritten(confined, path, (key, &before), &after, record)
 }
 
 /// Write `text` as the whole of the file at `path`, where it holds anything else, and

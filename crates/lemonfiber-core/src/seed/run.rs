@@ -26,6 +26,8 @@ mod connecting;
 mod cors;
 mod crossing;
 mod proxies;
+// The household's routes through the proxy.
+mod fronting;
 // The decline service's own media-server key, minted for it alone.
 mod decline;
 pub(crate) mod encrypting;
@@ -66,6 +68,7 @@ pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, Held};
 pub(crate) use curating::curators;
 pub(crate) use enveloping::guarding_installed;
+pub(crate) use fronting::{refront, served};
 pub(crate) use gate::reroute;
 use identity::seed_request_identity;
 pub(crate) use quality::{reapplied, reprofile};
@@ -238,6 +241,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
     wirings.extend(quality::seed_quality(ctx, &fillers).await);
 
+    wirings.extend(fronting::seed_routes(ctx, &manifest.services, &installed, &fillers).await);
     wirings.extend(
         showing::seed_dashboard(
             ctx,

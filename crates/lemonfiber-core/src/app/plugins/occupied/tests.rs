@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use super::{answered, bound, named, occupied, run, unoccupied};
 use crate::plugin::{Placed, Reached};
+use crate::ports::service::Route;
 use crate::project::overlay::{Declared, Published};
 use crate::test_support::{a_context, a_placed, an_installed};
 
@@ -116,21 +117,25 @@ fn every_port_a_plugin_publishes_is_held_to_what_is_already_published() {
     );
 }
 
-/// A label a site in the live proxy configuration answers on is refused; the plugin's
-/// own region in that file is not somebody else's site.
+/// A name the proxy serves for another service is refused; one it serves for the
+/// plugin's own service, an earlier version's, is not somebody else's.
 #[test]
-fn a_label_the_live_proxy_answers_on_is_refused_and_its_own_region_is_not() {
+fn a_name_the_proxy_serves_for_another_service_is_refused_and_its_own_is_not() {
     let would = an_installed("tools", vec![reached("web", 25600, Some("files"))]);
-    let by_hand = "files.{$DOMAIN:home.local} {\n\treverse_proxy nas:80\n}\n";
-    let said = answered(&would, by_hand);
-    assert!(said.iter().any(|one| one.contains("files")), "{said:?}");
+    let route = |host: &str| Route {
+        name: "files.home.example".to_owned(),
+        host: host.to_owned(),
+        port: 80,
+    };
 
-    let own = crate::region::put(
-        "watch.{$DOMAIN:home.local} {\n}\n",
-        &crate::plugin::owner("tools"),
-        "files.{$DOMAIN:home.local} {\n\treverse_proxy web:25600\n}\n",
+    let said = answered(&would, &[route("nas")], "home.example");
+    assert!(
+        said.iter()
+            .any(|one| one.contains("files.home.example") && one.contains("nas")),
+        "{said:?}"
     );
-    assert!(answered(&would, &own).is_empty(), "{own}");
+    assert!(answered(&would, &[route("web")], "home.example").is_empty());
+    assert!(answered(&would, &[route("nas")], "elsewhere.example").is_empty());
 }
 
 /// Every clash is in the one refusal, with its code.
@@ -146,11 +151,10 @@ fn every_clash_is_in_one_refusal() {
 #[test]
 fn the_shipped_stack_holds_the_proxy_s_ports() {
     let ctx = a_context().build();
-    let scratch = std::env::temp_dir().join(format!("lemonfiber-occupied-{}", std::process::id()));
     let taken = an_installed("tools", vec![reached("web", 443, None)]);
     let free = an_installed("tools", vec![reached("web", 25600, None)]);
 
-    let refused = unoccupied(&ctx, &taken, &[], &scratch).err();
+    let refused = unoccupied(&ctx, &taken, &[], &[]).err();
 
     assert_eq!(
         refused.as_ref().map(|one| one.code.to_string()).as_deref(),
@@ -160,7 +164,7 @@ fn the_shipped_stack_holds_the_proxy_s_ports() {
         .as_ref()
         .and_then(|one| one.detail.as_deref())
         .is_some_and(|detail| detail.contains("443")));
-    assert!(unoccupied(&ctx, &free, &[], &scratch).is_ok());
+    assert!(unoccupied(&ctx, &free, &[], &[]).is_ok());
 }
 
 /// A first-party plugin saying it replaces the stack's service is still held to that

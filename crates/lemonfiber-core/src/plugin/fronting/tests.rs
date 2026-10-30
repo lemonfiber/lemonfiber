@@ -1,5 +1,6 @@
-use super::{proxied, taken};
+use super::{routes, taken};
 use crate::plugin::installed::{Installed, Placed, Reached};
+use crate::ports::service::Route;
 
 fn placed(service: &str, reached: Option<Reached>) -> Placed {
     Placed {
@@ -73,39 +74,64 @@ const fn loopback() -> Reached {
     }
 }
 
+/// A route for `host` at `port`, answering `label` under the test's domain.
+fn route(label: &str, host: &str, port: u16) -> Route {
+    Route {
+        name: format!("{label}.home.example"),
+        host: host.to_owned(),
+        port,
+    }
+}
+
 #[test]
-fn a_household_service_is_proxied_at_its_label_by_its_name_and_port() {
+fn a_household_service_is_routed_at_its_label_to_its_name_and_the_port_it_listens_on() {
+    let mut listening = placed("komga", Some(household(None)));
     assert_eq!(
-        proxied(&installed(vec![placed("komga", Some(household(None)))])),
-        "comics.{$DOMAIN:home.local} {\n\treverse_proxy komga:25600\n}\n"
+        routes(&[installed(vec![listening.clone()])], "home.example"),
+        vec![route("comics", "komga", 25600)]
+    );
+    listening.listens = Some(8080);
+    assert_eq!(
+        routes(&[installed(vec![listening])], "home.example"),
+        vec![route("comics", "komga", 8080)]
     );
 }
 
 /// The bundled policy holding: an operator surface is never given a route.
 #[test]
-fn an_operator_surface_and_a_service_nothing_reaches_are_not_proxied() {
+fn an_operator_surface_and_a_service_nothing_reaches_are_not_routed() {
     let plugin = installed(vec![
         placed("admin", Some(loopback())),
         placed("worker", None),
     ]);
 
-    assert_eq!(proxied(&plugin), "");
+    assert!(routes(&[plugin], "home.example").is_empty());
 }
 
 #[test]
-fn two_household_services_are_two_stanzas() {
+fn every_household_service_of_every_plugin_is_a_route_in_the_order_installed() {
     let mut second = placed("reader", Some(household(None)));
     second.reached = Some(Reached::Household {
         port: 8080,
         hostname: "reader".to_owned(),
         group: None,
     });
-    let both = proxied(&installed(vec![
-        placed("komga", Some(household(None))),
-        second,
-    ]));
+    let mut other = installed(vec![second]);
+    other.plugin = "reading".to_owned();
 
-    assert_eq!(both.matches("reverse_proxy").count(), 2, "{both}");
+    assert_eq!(
+        routes(
+            &[
+                installed(vec![placed("komga", Some(household(None)))]),
+                other
+            ],
+            "home.example"
+        ),
+        vec![
+            route("comics", "komga", 25600),
+            route("reader", "reader", 8080)
+        ]
+    );
 }
 
 #[test]
@@ -134,7 +160,7 @@ fn a_label_another_plugin_answers_on_is_taken_and_one_nobody_does_is_not() {
 }
 
 #[test]
-fn no_route_is_written_to_the_port_a_service_speaks_its_contracts_on() {
+fn no_route_is_made_to_the_port_a_service_speaks_its_contracts_on() {
     let routed = |contract: u16| {
         let mut door = placed(
             "door",
@@ -144,15 +170,41 @@ fn no_route_is_written_to_the_port_a_service_speaks_its_contracts_on() {
                 group: None,
             }),
         );
-        door.listens = Some(8096);
         door.contract = Some(contract);
         door.speaks = vec!["stream.guard@1".to_owned()];
-        proxied(&installed(vec![door]))
+        routes(&[installed(vec![door])], "home.example")
     };
-    assert_eq!(routed(8081), "");
+    assert!(routed(8081).is_empty());
+    assert_eq!(routed(8082), vec![route("watch", "door", 8081)]);
+}
+
+#[test]
+fn a_stack_household_service_is_routed_at_the_label_its_part_declares_until_it_moves() {
+    use lemonfiber_manifest::Bind;
+    let mut requests = crate::door::fixtures::service("seerr", Some(Bind::Lan));
+    requests.port = Some(5055);
+    let wanted: Vec<Route> = lemonfiber_plugin::refusing::shipped_label("seerr")
+        .map(|label| Route {
+            name: format!("{label}.home.example"),
+            host: "seerr".to_owned(),
+            port: 5055,
+        })
+        .into_iter()
+        .collect();
     assert!(
-        routed(8082).contains("reverse_proxy door:8081"),
-        "{}",
-        routed(8082)
+        !wanted.is_empty(),
+        "the bundle declares the request service's label"
     );
+    let mut portless = requests.clone();
+    portless.port = None;
+    let services = [
+        requests.clone(),
+        portless,
+        crate::door::fixtures::service("sonarr", Some(Bind::Loopback)),
+        crate::door::fixtures::service("stranger", Some(Bind::Lan)),
+    ];
+
+    assert_eq!(super::stack_routes(&services, &[], "home.example"), wanted);
+    let moved = crate::test_support::adapted::installed_parts();
+    assert!(super::stack_routes(&[requests], &moved, "home.example").is_empty());
 }

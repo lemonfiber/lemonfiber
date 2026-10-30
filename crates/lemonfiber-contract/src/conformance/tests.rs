@@ -24,6 +24,22 @@ fn a_capability_opens_with_an_unkeyed_case_and_has_one_per_operation() {
         && case.case == format!("{}-answers", case.operation.name)));
 }
 
+/// An operation whose case asks what it must refuse is held to the refusal, under its key,
+/// beside every other operation's answer.
+#[test]
+fn a_case_asking_what_an_operation_must_refuse_is_held_to_the_refusal() {
+    let proxy = crate::capabilities::indexer::proxy::capability();
+    let listed = cases(&proxy);
+
+    assert!(listed.iter().any(|case| case.case == "solve-refuses"
+        && case.keyed
+        && !case.live
+        && case.expect == Expect::Status(&[400])));
+    assert!(listed
+        .iter()
+        .any(|case| case.case == "answers-answers" && case.expect == Expect::Conforms));
+}
+
 #[tokio::test]
 async fn every_operation_reads_an_answer_as_the_client_does() {
     for capability in crate::capabilities::all() {

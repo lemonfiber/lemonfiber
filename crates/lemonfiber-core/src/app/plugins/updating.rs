@@ -64,16 +64,19 @@ pub(crate) async fn update(
     let mut without = held.clone();
     without.forget(&was.plugin);
     let wiring = super::standing::standing(ctx, &stack_manifest, &without, &would);
-    unheld(ctx, &would, without.installed(), stack)?;
+    let served = crate::seed::run::served(ctx).await;
+    unheld(ctx, &would, without.installed(), &served)?;
     let trusted = crate::plugin::first_party::EMBEDDED;
     super::granting::aimed(&would, trusted)?;
     let granting =
         super::granting::asked(ctx, &stack_manifest, without.installed(), &would, trusted);
     would.granted = super::granting::approved(&granting, &stamp);
-    let changes = crate::plugin::changes(&super::writing::landing(
+    let changes = crate::plugin::changes(&super::planned::writes(
         ctx,
-        super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?,
-    ));
+        &would,
+        stack,
+        Some(&crate::plugin::root(path)),
+    )?);
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
     let (acting, taking) =
         super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;
@@ -190,7 +193,7 @@ async fn recorded(
     coming: &Coming<'_>,
     account: &mut Update,
 ) -> Result<Register, String> {
-    let (would, stack) = (coming.would, coming.stack);
+    let would = coming.would;
     let mut after = held.clone();
     after.forget(&was.plugin);
     let _ = after.record(would.clone());
@@ -211,14 +214,7 @@ async fn recorded(
     account.install.recorded = true;
     super::kept::kept(ctx, would, coming.source);
     let _ = super::conformance::cleared(ctx, &would.plugin);
-    let proxy = stack.join(crate::plugin::PROXY).display().to_string();
-    let written = account
-        .install
-        .changes
-        .iter()
-        .any(|change| change.puts == crate::plugin::Puts::Region && change.path == proxy);
-    let routed = written || super::proving::routes_withdrawn(&account.went_back);
-    super::proving::refronted(ctx, stack, routed).await;
+    let _ = crate::seed::run::refront(ctx).await;
     Ok(after)
 }
 
@@ -304,7 +300,6 @@ enum Came {
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
     let put = super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source))
         .and_then(|planned| {
-            let planned = super::writing::landing(ctx, planned);
             super::writing::unlinked(ctx, coming.would, coming.stack)
                 .and_then(|()| {
                     super::minting::minted(
@@ -426,14 +421,7 @@ pub(super) fn brought_back(
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()
         && super::planned::writes(ctx, was, stack, None)
-            .and_then(|planned| {
-                carry_out(
-                    ctx,
-                    &was.plugin,
-                    stamp,
-                    &super::writing::landing(ctx, planned),
-                )
-            })
+            .and_then(|planned| carry_out(ctx, &was.plugin, stamp, &planned))
             .is_ok();
     let running = placed && proving::up(ctx, was, stack).await.is_none();
     Restored {
@@ -530,9 +518,9 @@ fn unheld(
     ctx: &Ctx,
     would: &Installed,
     others: &[Installed],
-    stack: &Path,
+    served: &[crate::ports::service::Route],
 ) -> Result<(), Box<Problem>> {
     super::colliding::apart(would, others)?;
     super::replacing::unreplaced(would, crate::plugin::first_party::EMBEDDED)?;
-    super::occupied::unoccupied(ctx, would, others, stack)
+    super::occupied::unoccupied(ctx, would, others, served)
 }

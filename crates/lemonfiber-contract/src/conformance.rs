@@ -140,6 +140,12 @@ pub fn answers(operation: &str) -> String {
     format!("{operation}-answers")
 }
 
+/// The name of the case that asks `operation` under the key for what it must refuse.
+#[must_use]
+pub fn refuses(operation: &str) -> String {
+    format!("{operation}-refuses")
+}
+
 /// What a case holds an answer to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Expect {
@@ -205,11 +211,14 @@ fn keyed(operation: &Operation) -> Vec<Case<'_>> {
         case,
         operation,
         keyed: true,
-        expect: Expect::Conforms,
+        expect: operation.refused.map_or(Expect::Conforms, Expect::Status),
         live: false,
         asks: asks.clone(),
         media_type,
     };
+    if operation.refused.is_some() {
+        return vec![asked(refuses(operation.name), &operation.asks, None)];
+    }
     if operation.filed.is_empty() {
         return vec![asked(answers(operation.name), &operation.asks, None)];
     }

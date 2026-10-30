@@ -3,7 +3,7 @@ use super::{pinned, written};
 #[test]
 fn only_a_plugin_the_bundle_installs_is_read_from_this_build() {
     assert!(pinned("jellyfin").is_some());
-    assert!(pinned("caddy").is_none());
+    assert!(pinned("flaresolverr").is_none());
     assert!(pinned("no-such-plugin").is_none());
 }
 

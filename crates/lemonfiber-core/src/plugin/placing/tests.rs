@@ -104,66 +104,10 @@ fn document(planned: &[Write]) -> Option<String> {
         Lands::Document { text, .. } => Some(text.clone()),
         Lands::Directory { .. }
         | Lands::Key
-        | Lands::Region { .. }
         | Lands::Secrets(_)
         | Lands::Starting { .. }
         | Lands::Upstream(_) => None,
     })
-}
-
-/// Every region a plan writes, as the file it goes in and whose it is.
-fn regions(planned: &[Write]) -> Vec<(String, String)> {
-    planned
-        .iter()
-        .filter_map(|one| match &one.lands {
-            Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
-            Lands::Directory { .. }
-            | Lands::Document { .. }
-            | Lands::Key
-            | Lands::Secrets(_)
-            | Lands::Starting { .. }
-            | Lands::Upstream(_) => None,
-        })
-        .collect()
-}
-
-/// A household service gets a region in the proxy, the plugin's, after the document
-/// that declares the service.
-#[test]
-fn a_household_service_is_written_into_the_proxy_after_its_document() {
-    let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
-
-    assert_eq!(
-        regions(&planned),
-        vec![(crate::plugin::PROXY.to_owned(), "plugin komga".to_owned())]
-    );
-    assert!(planned
-        .last()
-        .is_some_and(|one| matches!(one.lands, Lands::Region { .. })));
-}
-
-/// The tier decides: an operator surface is not proxied, and neither is a service
-/// nothing reaches, so a plugin of only those writes no region.
-#[test]
-fn a_service_the_household_does_not_reach_is_given_no_route() {
-    let mut plugin = installed("komga", &["komga", "worker"]);
-    let _ = plugin.services.first_mut().map(|one| {
-        one.reached = Some(crate::plugin::Reached::Loopback {
-            port: 8090,
-            group: None,
-        });
-    });
-    let _ = plugin.services.get_mut(1).map(|one| one.reached = None);
-
-    assert!(regions(&writes(&plugin, stack(), &Reading::bare())).is_empty());
-}
-
-#[test]
-fn a_plugin_whose_services_nothing_reaches_writes_into_neither() {
-    let mut plugin = installed("komga", &["komga"]);
-    let _ = plugin.services.first_mut().map(|one| one.reached = None);
-
-    assert!(regions(&writes(&plugin, stack(), &Reading::bare())).is_empty());
 }
 
 #[test]
@@ -180,7 +124,6 @@ fn installing_writes_a_directory_for_each_service_and_the_project() {
             PathBuf::from("/opt/lemonfiber/stack/config/komga"),
             PathBuf::from("/opt/lemonfiber/stack/config/komga-worker"),
             PathBuf::from("/opt/lemonfiber/stack/compose.generated.yml"),
-            PathBuf::from("/opt/lemonfiber/stack/config/caddy/Caddyfile"),
         ]
     );
 }
@@ -212,8 +155,8 @@ fn a_directory_carries_no_content_and_the_project_carries_what_was_generated() {
     let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
     assert_eq!(
         planned.len(),
-        3,
-        "one household service is one directory, the project, and a region in the proxy"
+        2,
+        "one household service is one directory and the project"
     );
     assert_eq!(planned.first().map(super::Write::is_directory), Some(true));
     assert_eq!(document(&planned).as_deref(), Some(GENERATED));

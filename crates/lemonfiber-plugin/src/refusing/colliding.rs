@@ -115,13 +115,13 @@ fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>)
 ///
 /// The highest-consequence of the three and the quietest. An id collides with
 /// something an operator installed on purpose and a port fails to bind; a hostname
-/// collision is a second stanza for a name the household already uses, and what it
+/// collision is a second route for a name the household already uses, and what it
 /// costs is that the thing behind `watch` is no longer the thing that was behind
 /// `watch` — with both services running, both healthy, and nothing failing.
 fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
     // The label each household service is proxied at once the default is applied,
     // which is its id where the manifest names none. An undeclared label is still a
-    // stanza lemonfiber writes, so it is held to the same names a declared one is.
+    // route lemonfiber applies, so it is held to the same names a declared one is.
     for service in proxied(manifest) {
         let hostname = manifest.entry(service).hostname;
         if !bundled::answering(hostname) {
@@ -151,8 +151,8 @@ fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
         found.push(Violation {
             location,
             message: format!(
-                "{said} is a name the stack's own proxy is already written to answer on, and a \
-                 second stanza for it puts this plugin in front of the bundled service rather than \
+                "{said} is a name the household already reaches a part of the bundle at, and a \
+                 second route for it puts this plugin in front of the bundled service rather than \
                  beside it; the label is the plugin's to choose, and this one is taken"
             ),
         });

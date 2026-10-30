@@ -1,53 +1,62 @@
-//! The proxy stanza a plugin's service gets.
+//! The routes the household's proxy serves for the installed plugins' services.
 //!
-//! The bundled stack puts a household service behind its proxy. A plugin's service gets
-//! the same on the same terms, and gets it written *for* it: what goes in the stanza is
-//! derived here from what the install recorded, which is what the manifest declared (the
-//! service's id and port, and the tier that decides whether it is reachable at all).
+//! The stack's own household service gets a route at the label the bundle's part declares
+//! for it, and a plugin's on the same terms, derived here from what the install recorded: the label in front of the operator's domain, and
+//! the service reached by its name and the port it listens on inside its container.
 //! There is no field a plugin could put a line of proxy configuration in, so nothing here
-//! reads one. Its dashboard entry is the panel list's, applied to the dashboard by
-//! [`crate::app::showing`].
+//! reads one.
 //!
-//! **The tier decides the route.** A household service gets a stanza; an operator
-//! surface gets none, which is the bundled policy holding: an admin surface does not get
-//! a name on the household network. The record cannot carry a hostname for one in the
-//! first place, so there is nothing here to refuse.
-//!
-//! Nothing here touches a disk. It answers with text, and where that text goes, and
-//! who owns the region it goes in, is [`super::placing`]'s.
+//! **The tier decides the route.** A household service gets one; an operator surface
+//! gets none, which is the bundled policy holding: an admin surface does not get a name
+//! on the household network. The record cannot carry a hostname for one in the first
+//! place, so there is nothing here to refuse. Nor is a route ever made to the port a
+//! service speaks its contracts on.
 
-use lemonfiber_manifest::container::{exposes, Reach};
+use lemonfiber_manifest::container::{exposes, inside, Reach};
+use lemonfiber_manifest::{Bind, Service};
 
 use super::installed::{Installed, Reached};
+use crate::ports::service::Route;
 
-/// The proxy's configuration, beneath the stack directory.
-pub const PROXY: &str = "config/caddy/Caddyfile";
-
-/// The proxy stanza for every one of the plugin's services the household reaches.
-///
-/// Empty where there is none, which is a plugin whose services are all operator
-/// surfaces or reached by nothing, and which writes nothing into the proxy at all.
-/// The same shape as the stack's own stanzas: the label in front of the operator's
-/// domain, and the service reached by its name and port on the stack's network.
+/// A route for every household service of the stack's own `services` that none of
+/// `installed` moved in place of, at the label the bundle's part declares for it in front
+/// of `domain`; none for one no part declares a label for.
 #[must_use]
-pub fn proxied(installed: &Installed) -> String {
-    installed
-        .services
+pub fn stack_routes(services: &[Service], installed: &[Installed], domain: &str) -> Vec<Route> {
+    services
         .iter()
-        .filter_map(|placed| match &placed.reached {
-            Some(Reached::Household { port, .. })
-                if exposes(Reach::Route, *port, placed.contract_port(), placed.listens) =>
-            {
-                None
-            }
-            Some(Reached::Household { port, hostname, .. }) => Some(format!(
-                "{hostname}.{{$DOMAIN:home.local}} {{\n\treverse_proxy {}:{port}\n}}\n",
-                placed.service
-            )),
-            Some(Reached::Loopback { .. }) | None => None,
+        .filter(|service| service.bind == Some(Bind::Lan))
+        .filter(|service| !crate::project::moved_in_place(installed, &service.id))
+        .filter_map(|service| {
+            let label = lemonfiber_plugin::refusing::shipped_label(&service.id)?;
+            Some(Route {
+                name: format!("{label}.{domain}"),
+                host: service.id.clone(),
+                port: inside(service.port?, service.listens),
+            })
         })
-        .collect::<Vec<String>>()
-        .join("\n")
+        .collect()
+}
+
+/// A route for every household service of every one of `installed`, at its label in
+/// front of `domain`, in the order they are installed.
+#[must_use]
+pub fn routes(installed: &[Installed], domain: &str) -> Vec<Route> {
+    installed
+        .iter()
+        .flat_map(|plugin| &plugin.services)
+        .filter_map(|placed| {
+            let Some(Reached::Household { port, hostname, .. }) = &placed.reached else {
+                return None;
+            };
+            let at = inside(*port, placed.listens);
+            (!exposes(Reach::Route, at, placed.contract_port(), placed.listens)).then(|| Route {
+                name: format!("{hostname}.{domain}"),
+                host: placed.service.clone(),
+                port: at,
+            })
+        })
+        .collect()
 }
 
 /// A label one of this plugin's household services would answer on that a service of

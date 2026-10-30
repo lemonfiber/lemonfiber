@@ -82,7 +82,7 @@
       ],
       "openapi": "indexer.proxy/v1/openapi.json",
       "operations": 2,
-      "sha256": "c7590a169c1b6434fbeeb62ef66d06142c899e016332282225af496bd7ee1ed6"
+      "sha256": "d9a046624e807d6afc6b1698a3393f94dac514840ff5ede20e12e99924d96d13"
     },
     {
       "capability": "subtitles.fetch",

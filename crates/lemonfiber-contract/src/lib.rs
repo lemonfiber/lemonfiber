@@ -84,6 +84,9 @@ pub struct Operation {
     pub filed: Vec<(&'static str, serde_json::Value)>,
     /// Whether it may answer that what it applied is in force once the upstream restarts.
     pub restarts: bool,
+    /// The statuses its conformance case is to be refused with, where what the case asks
+    /// is something the operation must refuse; nothing where the case is to be answered.
+    pub refused: Option<&'static [u16]>,
     /// How its answer is read.
     reads: Reading,
 }
@@ -108,6 +111,7 @@ impl Operation {
             filed: Vec::new(),
             restarts: std::any::TypeId::of::<R>()
                 == std::any::TypeId::of::<lemonfiber_ports::service::Applied>(),
+            refused: None,
             reads: read_as::<R>,
         }
     }
@@ -147,6 +151,14 @@ impl Operation {
     #[must_use]
     pub const fn holding(mut self, secret: &'static [&'static str]) -> Self {
         self.secret = secret;
+        self
+    }
+
+    /// The same operation, its conformance case to be refused with one of `refused`
+    /// where any is named.
+    #[must_use]
+    pub const fn refusing(mut self, refused: Option<&'static [u16]>) -> Self {
+        self.refused = refused;
         self
     }
 

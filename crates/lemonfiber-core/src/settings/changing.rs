@@ -169,6 +169,9 @@ async fn written(
     if changing.contains_key(super::own::DASHBOARD_SEARCH) {
         let _ = crate::seed::run::reshow(ctx).await;
     }
+    if changing.contains_key(super::own::DOMAIN) {
+        let _ = crate::seed::run::refront(ctx).await;
+    }
     change.applied = true;
     change.unrestarted = restarting::restarted(
         ctx,

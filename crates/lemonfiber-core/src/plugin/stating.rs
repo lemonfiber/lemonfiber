@@ -39,9 +39,6 @@ pub enum Puts {
     /// The key lemonfiber asks one of the plugin's adapters with, minted as it is
     /// written and never shown.
     Key,
-    /// A region written into one of the stack's own files, marked out as the plugin's:
-    /// its route through the proxy, or its entry on the dashboard.
-    Region,
     /// A service's own secrets file, readable by its owner alone, its values never shown.
     Secrets,
     /// A file the plugin ships for one of its services, written where none is yet; one
@@ -218,7 +215,6 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
                 Lands::Directory { .. } => Puts::Directory,
                 Lands::Document { .. } => Puts::Document,
                 Lands::Key => Puts::Key,
-                Lands::Region { .. } => Puts::Region,
                 Lands::Secrets(_) => Puts::Secrets,
                 Lands::Starting { .. } => Puts::Starting,
                 Lands::Upstream(_) => Puts::Upstream,

@@ -280,10 +280,6 @@ fn a_rehearsal_states_every_change_every_proof_and_every_override() {
         said.contains("a document   /opt/lemonfiber/stack/compose/plugins/komga.yml"),
         "{said}"
     );
-    assert!(
-        said.contains("a region in  /opt/lemonfiber/stack/config/caddy/Caddyfile"),
-        "{said}"
-    );
     assert!(said.contains("What would have to hold for it:"), "{said}");
     assert!(said.contains("answers — the library API answers"), "{said}");
     assert!(

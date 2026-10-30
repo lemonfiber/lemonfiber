@@ -96,15 +96,11 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     found
 }
 
-/// Every label a proxy configuration puts in front of the operator's domain, read the
-/// way the shipped one is read.
-///
-/// For the configuration on a machine rather than the one this build ships: an
-/// operator adds sites to the live file by hand, and a plugin's stanza for one of
-/// those names would stop the proxy as surely as one for a shipped name.
+/// The name the household reaches the shipped stack's service `service` at, where a part
+/// the bundle pins declares one for it.
 #[must_use]
-pub fn answered_in(proxy: &str) -> Vec<String> {
-    bundled::proxied(proxy)
+pub fn shipped_label(service: &str) -> Option<&'static str> {
+    bundled::label_of(service)
 }
 
 /// Who the plugin says it is, and whether an operator could go and check.

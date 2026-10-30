@@ -68,14 +68,12 @@ pub(crate) fn carry_out(
     let journal = paths.journal();
 
     for write in planned {
-        let (key, owner, body) = match &write.lands {
-            crate::plugin::Lands::Region { key, owner, body } => (key, owner, body),
+        match &write.lands {
             crate::plugin::Lands::Directory { beneath } => {
                 if ctx.seams.confined.lies(&write.path, beneath) == Lying::Escaped {
                     return Err(Box::new(unwritable(&write.path, LINKED)));
                 }
                 made_whole(ctx, plugin, stamp, &journal, (&write.path, beneath), None)?;
-                continue;
             }
             crate::plugin::Lands::Document { previous, text } => {
                 crate::app::recover::journalled(
@@ -93,11 +91,9 @@ pub(crate) fn carry_out(
                 super::super::project::kept(ctx, text)
                     .map_err(|failure| Box::new(unwritable(&write.path, &failure.to_string())))?;
                 super::super::project::overlaid(ctx)?;
-                continue;
             }
             crate::plugin::Lands::Key => {
                 keyed(ctx, plugin, stamp, &journal, (&write.path, &stack))?;
-                continue;
             }
             crate::plugin::Lands::Secrets(variables) => {
                 let text = crate::settings::text(ctx, variables)
@@ -110,7 +106,6 @@ pub(crate) fn carry_out(
                     (&write.path, crate::within::directory_of(&write.path)),
                     Some(text.as_bytes()),
                 )?;
-                continue;
             }
             crate::plugin::Lands::Starting { bytes, seeded } => {
                 seeding::starting(
@@ -121,36 +116,11 @@ pub(crate) fn carry_out(
                     bytes,
                     *seeded,
                 )?;
-                continue;
             }
             crate::plugin::Lands::Upstream(fields) => {
                 seeding::upstream(ctx, (plugin, stamp, &journal), &stack, &write.path, fields)?;
-                continue;
             }
-        };
-        // Journalled first, as every write is, holding what goes between the markers so
-        // the reversal can tell its own region from one somebody has edited since. A
-        // record that cannot be written stops the write it would have recorded.
-        crate::app::recover::journalled(
-            &journal,
-            &[bounded(plugin, &write.path, key, owner, body, stamp)],
-            ctx.seams.random.as_ref(),
-        )
-        .map_err(|failure| Box::new(failure.problem()))?;
-        let record = ctx
-            .settings
-            .env_file
-            .as_deref()
-            .map(super::super::bounded::record_beside);
-        super::super::bounded::put(
-            ctx.seams.confined.as_ref(),
-            &write.path,
-            key,
-            owner,
-            body,
-            record.as_deref(),
-        )
-        .map_err(|why| Box::new(unwritable(&write.path, &why)))?;
+        }
     }
     Ok(())
 }
@@ -235,22 +205,6 @@ fn keyed(
 
 /// Why an adapter's key could not be written.
 const UNMINTED: &str = "this machine would not supply the random bytes a key is made from";
-
-/// The journal entry for a region an install wrote into one of the stack's files.
-fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp: &str) -> Change {
-    let path = path.display().to_string();
-    Change {
-        at: stamp.to_owned(),
-        operation: crate::plugin::owner(plugin),
-        target: path.clone(),
-        kind: Kind::Region {
-            path,
-            key: key.to_owned(),
-            owner: owner.to_owned(),
-            written: super::super::bounded::written(body),
-        },
-    }
-}
 
 /// The stack's own manifest, which what a plugin's service joins and what installing it
 /// would leave contested are both read against.
@@ -401,32 +355,6 @@ fn not_overwritten(at: &Path, refusing: Refusing, why: &str) -> Problem {
     )
     .in_state(State::Guided)
     .with_detail(why.to_owned())
-}
-
-/// What the install decided, less every region with nowhere to land.
-///
-/// Settled before the account is stated as well as before the writes are carried out,
-/// so what a rehearsal says the install touches is what it touches. A region goes in a
-/// file the stack already has, and two things mean it does not go in at all: the file
-/// is not there, which is a stack that carries no proxy or no dashboard to be put on;
-/// or the operator declared the area it sits in unmanaged, which is the one statement
-/// that lemonfiber writes nothing there and has to hold for a plugin as it does for
-/// everything else.
-pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crate::plugin::Write> {
-    planned
-        .into_iter()
-        .filter(|write| match &write.lands {
-            crate::plugin::Lands::Region { key, .. } => {
-                write.path.is_file() && !crate::unmanaged::covers(&ctx.settings.unmanaged, key)
-            }
-            crate::plugin::Lands::Directory { .. }
-            | crate::plugin::Lands::Document { .. }
-            | crate::plugin::Lands::Key
-            | crate::plugin::Lands::Secrets(_)
-            | crate::plugin::Lands::Starting { .. }
-            | crate::plugin::Lands::Upstream(_) => true,
-        })
-        .collect()
 }
 
 /// Every path this write has to bring into being, parent before child.

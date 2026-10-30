@@ -68,19 +68,6 @@ fn a_hostname_the_stack_answers_on_is_refused_where_the_wiring_names_its_service
     assert!(names(&said, &["wiring.hostname", "watch"]), "got: {said:?}");
 }
 
-/// A stanza the shipped proxy writes out disabled is a name already spoken for.
-#[test]
-fn a_hostname_the_stack_answers_on_only_when_enabled_is_refused_too() {
-    let said = without(
-        r#"hostname        = "comics""#,
-        r#"hostname        = "sonarr""#,
-    );
-    assert!(
-        names(&said, &["wiring.hostname", "sonarr"]),
-        "got: {said:?}"
-    );
-}
-
 /// And the acceptance side of each, which is the half a rule can fail at while
 /// still refusing everything it was shown.
 #[test]
