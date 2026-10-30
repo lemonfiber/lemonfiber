@@ -1,10 +1,16 @@
 {
   "fields": {
+    "fenced": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
     "via": {
       "type": [
-        "string"
+        "null|string"
       ],
-      "required": true
+      "required": false
     }
   },
   "variants": []

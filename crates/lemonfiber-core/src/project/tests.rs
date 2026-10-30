@@ -130,9 +130,7 @@ fn an_address_in_the_upstreams_own_api_reaches_the_upstream_an_adapter_fronts() 
 #[test]
 fn a_service_inside_the_egress_guard_activates_the_guards_profile_and_no_other() {
     let mut inside = a_placed("client", &[], None);
-    inside.fields.network = Some(Network {
-        via: "network.egress-guard".into(),
-    });
+    inside.fields.network = Some(inside_the_guard());
     let manifest = carried();
     let installed = [an_installed("client", vec![inside])];
     let topology = project(&manifest, &installed).topology;
@@ -154,9 +152,7 @@ fn a_service_inside_the_egress_guard_activates_the_guards_profile_and_no_other()
 #[test]
 fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
     let mut inside = a_placed("client", &[], None);
-    inside.fields.network = Some(Network {
-        via: "network.egress-guard".into(),
-    });
+    inside.fields.network = Some(inside_the_guard());
     let mut manifest = carried();
     manifest.services.retain(|service| {
         !service
@@ -184,9 +180,7 @@ fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
 #[test]
 fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards() {
     let mut inside = a_placed("client", &[], Some(18999));
-    inside.fields.network = Some(Network {
-        via: "network.egress-guard".into(),
-    });
+    inside.fields.network = Some(inside_the_guard());
     inside.fields.publish = vec![Publish {
         port: 18998,
         listens: None,
@@ -377,9 +371,7 @@ fn an_adapter_filing_a_medium_is_reached_itself_where_the_ask_is_not_in_its_upst
 #[test]
 fn a_chosen_filler_is_the_one_a_service_runs_inside() {
     let mut inside = a_placed("client", &[], None);
-    inside.fields.network = Some(Network {
-        via: "network.egress-guard".into(),
-    });
+    inside.fields.network = Some(inside_the_guard());
     let chosen = Chosen::read(Some("network.egress-guard=gluetun"));
     let project = generated(
         &carried(),
@@ -398,9 +390,7 @@ fn an_adapter_inside_the_guard_has_its_contract_port_published_by_the_guard() {
     let mut adapter = a_placed("bridge", &[], Some(18997));
     adapter.reached = None;
     adapter.speaks = vec!["media.serve@1".into()];
-    adapter.fields.network = Some(Network {
-        via: "network.egress-guard".into(),
-    });
+    adapter.fields.network = Some(inside_the_guard());
     let project = project(&carried(), &[an_installed("bridge", vec![adapter])]);
     assert_eq!(
         text(&entry(&project, "bridge"), "network_mode"),
@@ -434,9 +424,7 @@ fn an_adapters_contract_port_is_published_on_loopback_alone() {
 fn an_installed_guard_the_operator_chose_holds_the_services_inside_it() {
     let guard = a_placed("tunnel", &["network.egress-guard"], Some(18996));
     let mut inside = a_placed("client", &[], Some(18995));
-    inside.fields.network = Some(Network {
-        via: "network.egress-guard".into(),
-    });
+    inside.fields.network = Some(inside_the_guard());
     let project = generated(
         &carried(),
         &[
@@ -795,3 +783,10 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
 mod pass;
 mod replaced;
 mod sources;
+
+fn inside_the_guard() -> Network {
+    Network {
+        via: Some("network.egress-guard".into()),
+        fenced: false,
+    }
+}

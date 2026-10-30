@@ -22,6 +22,7 @@ const MOST_BYTES: usize = 1024 * 1024;
 #[derive(Debug, Default)]
 pub(crate) struct Declared {
     pub(crate) id: String,
+    fenced: bool,
     provides: Vec<String>,
     speaks: Vec<String>,
     replaces: Option<String>,
@@ -59,6 +60,16 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>, broken: &
         parts.insert(pin.id.as_str(), part);
     }
     tables(bundle, &parts, broken);
+    if bundle.fence.is_none() {
+        for (id, part) in &parts {
+            for service in part.services.iter().filter(|service| service.fenced) {
+                broken.push(format!(
+                    "plugin {id}'s service {} is fenced, and the bundle pins no [fence] image",
+                    service.id
+                ));
+            }
+        }
+    }
 }
 
 /// The part `pin`'s copy declares, where it holds a manifest, with every rule its tree
@@ -390,6 +401,11 @@ pub(crate) fn declared(manifest: &str) -> Part {
         .iter()
         .map(|one| Declared {
             id: text(one, "id").unwrap_or_default(),
+            fenced: one
+                .get("network")
+                .and_then(|network| network.get("fenced"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
             provides: words(one.get("provides")),
             speaks: words(one.get("speaks")),
             replaces: text(one, "replaces"),

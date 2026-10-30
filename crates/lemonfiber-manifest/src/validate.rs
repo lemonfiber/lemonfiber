@@ -521,6 +521,11 @@ fn contained(service: &Service) -> Vec<String> {
         .into_iter()
         .map(|(at, what)| format!("{}: {what}", at.trim_start_matches(&field)))
         .chain(shaped)
+        .chain((service.host_managed && service.fenced()).then(|| {
+            "network: is fenced and host_managed, and lemonfiber writes a fence only into a \
+             project it writes the service's entry in"
+                .to_owned()
+        }))
         .chain(
             service
                 .secret

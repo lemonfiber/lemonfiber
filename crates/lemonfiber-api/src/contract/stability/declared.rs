@@ -115,7 +115,25 @@ pub const DECLARED: &[Declared] = &[
                   the proxy's routing table, applied over its contract, so no change it states \
                   is a region",
     },
+    Declared {
+        under: 1,
+        what: "ServiceNetwork.via",
+        moved: Moved::Retyped,
+        because: FENCED,
+    },
+    Declared {
+        under: 1,
+        what: "ServiceNetwork.via",
+        moved: Moved::MayBeAbsent,
+        because: FENCED,
+    },
 ];
+
+/// Why a network may name no capability: a fenced service runs inside its fence, whose
+/// network is no filler's, and a service taking `via` still names it as it always has.
+const FENCED: &str = "a fenced service runs inside its fence rather than a filler's network, so \
+                      its network says fenced and names no capability; a service running \
+                      inside a filler's network names it in via as it always has";
 
 /// Why a change's one setting is gone: a change moves one or more settings in one act, and
 /// each is carried in its `settings`.

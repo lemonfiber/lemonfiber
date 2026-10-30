@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::copies::Copy;
-use crate::{hex, parts, Bundle, Pin, DIGEST_PREFIX, EXTENSION, SCHEMAS};
+use crate::{hex, parts, Bundle, Image, Pin, DIGEST_PREFIX, EXTENSION, FENCE_IMAGE, SCHEMAS};
 
 /// What an https origin starts with.
 const SECURE: &str = "https://";
@@ -73,12 +73,44 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>) -> Vec<St
             unpinned.name
         ));
     }
+    if let Some(fence) = &bundle.fence {
+        fenced(fence, bundle.schema, &mut broken);
+    }
     if bundle.schema == 1 {
         first(bundle, copies, &mut broken);
     } else {
         parts::broken(bundle, copies, &mut broken);
     }
     broken
+}
+
+/// What the fence's pin breaks: being at schema 1, an image published elsewhere, a tag
+/// that is not a release, or a digest that is not one.
+fn fenced(fence: &Image, schema: u32, broken: &mut Vec<String>) {
+    if schema == 1 {
+        broken.push("[fence] is declared at schema 1, which has none".to_owned());
+    }
+    if fence.image != FENCE_IMAGE {
+        broken.push(format!(
+            "fence.image is {}, and the fence is published as {FENCE_IMAGE}",
+            fence.image
+        ));
+    }
+    let release = fence
+        .tag
+        .split_once('-')
+        .map_or(fence.tag.as_str(), |(release, _)| release);
+    if !is_release(release) {
+        broken.push(format!(
+            "fence.tag {} is not a release the train tags, without its v",
+            fence.tag
+        ));
+    }
+    if !is_digest(&fence.digest) {
+        broken.push(format!(
+            "fence.digest is not written {DIGEST_PREFIX}<{DIGEST_DIGITS} lowercase hex>"
+        ));
+    }
 }
 
 /// What a schema 1 bundle breaks: a stack table, or a field only schema 2 has, or a

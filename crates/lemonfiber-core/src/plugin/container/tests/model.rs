@@ -253,7 +253,8 @@ fn render_adds_the_devices_and_their_group_only_where_the_host_has_them() {
 fn a_service_inside_its_guards_network_has_none_of_its_own_and_waits_for_it() {
     let inside = with(Fields {
         network: Some(Network {
-            via: "network.egress-guard".to_owned(),
+            via: Some("network.egress-guard".to_owned()),
+            fenced: false,
         }),
         ..Fields::default()
     });

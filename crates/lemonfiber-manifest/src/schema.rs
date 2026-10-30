@@ -351,10 +351,16 @@ impl Service {
     /// providing the capability its `network.via` names.
     #[must_use]
     pub fn inside<'a>(&self, services: &'a [Self]) -> Option<&'a Self> {
-        let via = &self.network.as_ref()?.via;
+        let via = self.network.as_ref()?.via()?;
         services
             .iter()
             .find(|other| other.id != self.id && other.provides.iter().any(|named| named == via))
+    }
+
+    /// Whether this service's `network` says it is fenced.
+    #[must_use]
+    pub fn fenced(&self) -> bool {
+        self.network.as_ref().is_some_and(|network| network.fenced)
     }
 }
 

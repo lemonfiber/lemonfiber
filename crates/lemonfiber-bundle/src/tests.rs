@@ -266,3 +266,14 @@ fn a_copy_that_is_not_a_file_is_refused() {
 }
 
 mod second;
+
+/// A schema 1 bundle has no fence to pin.
+#[test]
+fn a_fence_at_schema_1_is_refused() {
+    let bundle = format!(
+        "schema = 1\nplugin = []\n\n[fence]\nimage = \"ghcr.io/lemonfiber/fence\"\ntag = \"0.18.0\"\ndigest = \"sha256:{}\"\n",
+        "a".repeat(64)
+    );
+    let broken = broken("fence-first", &bundle, &[]);
+    assert!(names(&broken, &["[fence]", "schema 1"]), "{broken:?}");
+}

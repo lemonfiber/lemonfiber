@@ -749,3 +749,28 @@ fn a_stack_setting_whose_default_is_not_one_of_its_choices_is_caught_naming_it()
         "{said:?}"
     );
 }
+
+/// A service the operating system runs has no entry for a fence to stand beside, so it
+/// may not be fenced; a fenced service lemonfiber writes is.
+#[test]
+fn a_fenced_service_the_host_manages_is_caught() {
+    let fenced = edited(
+        "id = \"unpackerr\"",
+        "id = \"unpackerr\"\nnetwork = { fenced = true }",
+    );
+    assert!(!messages(&fenced)
+        .iter()
+        .any(|said| said.contains("fenced and host_managed")));
+    let managed = fenced.replacen(
+        "network = { fenced = true }",
+        "network = { fenced = true }\nhost_managed = true",
+        1,
+    );
+    assert!(
+        messages(&managed)
+            .iter()
+            .any(|said| said.contains("network: is fenced and host_managed")),
+        "{:?}",
+        messages(&managed)
+    );
+}

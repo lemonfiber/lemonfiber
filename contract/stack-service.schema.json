@@ -565,13 +565,16 @@
       "required": ["from", "to"]
     },
     "ServiceNetwork": {
-      "description": "The network a service runs inside instead of its own.",
+      "description": "The network a service runs inside instead of its own: its filler's, or a fence's.",
       "type": "object",
       "properties": {
-        "via": {"description": "The capability whose filler's network it runs inside.", "type": "string"}
+        "fenced": {"description": "Whether it fetches whatever address it is handed, and so runs inside a fence that\nrefuses every private address.", "type": "boolean"},
+        "via": {
+          "description": "The capability whose filler's network it runs inside.",
+          "type": ["string", "null"]
+        }
       },
-      "additionalProperties": false,
-      "required": ["via"]
+      "additionalProperties": false
     },
     "ServicePosture": {
       "description": "How tightly the container is held.",
