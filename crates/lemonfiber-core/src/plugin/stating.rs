@@ -39,9 +39,6 @@ pub enum Puts {
     /// The key lemonfiber asks one of the plugin's adapters with, minted as it is
     /// written and never shown.
     Key,
-    /// A region written into one of the stack's own files, marked out as the plugin's:
-    /// its route through the proxy, or its entry on the dashboard.
-    Region,
     /// A service's own secrets file, readable by its owner alone, its values never shown.
     Secrets,
     /// A file the plugin ships for one of its services, written where none is yet; one
@@ -54,10 +51,9 @@ pub enum Puts {
 
 /// One change installing a plugin makes to the machine.
 ///
-/// A path and what goes at it, which is the whole of what an install touches. Two of
-/// them can be edits to a file the stack already has — the proxy's and the
-/// dashboard's — and those say so, as a region, so an operator reading the account
-/// knows which of their files the install writes into.
+/// A path and what goes at it, which is the whole of what an install touches. None is an
+/// edit to a file the stack already has: a plugin's route is the proxy's routing table
+/// and its dashboard entry the panel list's, each applied over its contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "PluginChange")]
 pub struct Changing {
@@ -218,7 +214,6 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
                 Lands::Directory { .. } => Puts::Directory,
                 Lands::Document { .. } => Puts::Document,
                 Lands::Key => Puts::Key,
-                Lands::Region { .. } => Puts::Region,
                 Lands::Secrets(_) => Puts::Secrets,
                 Lands::Starting { .. } => Puts::Starting,
                 Lands::Upstream(_) => Puts::Upstream,

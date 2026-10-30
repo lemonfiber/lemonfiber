@@ -690,6 +690,7 @@ mod curating;
 mod decline;
 mod enveloping;
 mod extraction;
+mod fronting;
 mod gate;
 mod identity;
 mod intake;

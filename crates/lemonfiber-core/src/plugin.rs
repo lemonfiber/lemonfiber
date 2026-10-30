@@ -91,7 +91,7 @@ pub(crate) use container::{
 };
 pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
-pub use fronting::{proxied as fronting_proxied, taken as label_taken, PROXY};
+pub use fronting::{routes as household_routes, stack_routes, taken as label_taken};
 pub use granted::{approval as grant_approval, granting, Grant, Granting};
 pub use installed::{
     answering, spelled_alike, Asking, Installed, Placed, Reached, RequestProof, RunProof,

@@ -107,6 +107,14 @@ pub const DECLARED: &[Declared] = &[
         moved: Moved::Gone,
         because: ONE_ACT,
     },
+    Declared {
+        under: 1,
+        what: r#"PluginPuts = "region""#,
+        moved: Moved::Gone,
+        because: "an install writes into no file the stack already has: a plugin's route is \
+                  the proxy's routing table, applied over its contract, so no change it states \
+                  is a region",
+    },
 ];
 
 /// Why a change's one setting is gone: a change moves one or more settings in one act, and

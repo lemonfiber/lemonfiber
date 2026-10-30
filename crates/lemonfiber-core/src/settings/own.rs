@@ -8,7 +8,13 @@ pub(crate) const DASHBOARD_SEARCH: &str = "LEMONFIBER_DASHBOARD_SEARCH";
 /// Where the dashboard's search box sends a search where nothing is recorded.
 pub(crate) const DEFAULT_SEARCH: &str = "https://duckduckgo.com/?q=";
 
-pub(crate) const CORE: [&str; 2] = [DEVICE_KEY_APPS, DASHBOARD_SEARCH];
+/// The domain the household's names are under where nothing is recorded.
+pub(crate) const DEFAULT_DOMAIN: &str = "home.local";
+
+/// The domain the household's names are under.
+pub(crate) const DOMAIN: &str = lemonfiber_manifest::container::DOMAIN;
+
+pub(crate) const CORE: [&str; 3] = [DEVICE_KEY_APPS, DASHBOARD_SEARCH, DOMAIN];
 
 const OWN_PREFIX: &str = "LEMONFIBER_";
 
@@ -21,6 +27,14 @@ pub(crate) fn is_configs(name: &str) -> bool {
 }
 
 pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
+    if name == DOMAIN {
+        return (!is_domain(value)).then(|| {
+            format!(
+                "{name} is the domain the household's names are under, labels of letters, \
+                 digits and hyphens joined by dots, and {value} is not one"
+            )
+        });
+    }
     if name == DASHBOARD_SEARCH {
         return (!is_web_address(value)).then(|| {
             format!(
@@ -49,6 +63,22 @@ pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
                 .join(", ")
         )
     })
+}
+
+/// Whether `value` is a domain a name can be put in front of: labels of ASCII letters,
+/// digits and hyphens, none empty, none longer than 63, none opening or closing with a
+/// hyphen, joined by dots.
+pub(crate) fn is_domain(value: &str) -> bool {
+    value.len() <= 253
+        && value.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .chars()
+                    .all(|letter| letter.is_ascii_alphanumeric() || letter == '-')
+        })
 }
 
 /// Whether `value` is an absolute `https` or `http` address with a host.

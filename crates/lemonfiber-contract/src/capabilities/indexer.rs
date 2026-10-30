@@ -40,11 +40,17 @@ const SITE_PORT: u16 = 58_180;
 /// The most a solved page may carry, in bytes.
 const PAGE_ANSWER: usize = 8 * crate::client::LARGEST;
 
+/// The statuses a challenge solver refuses a page inside the household with: the site the
+/// conformance cases name stands on the recorder's own network, and a solver fetches
+/// nothing anywhere but out on the internet.
+const INWARD: &[u16] = &[400];
+
 /// How long solving a challenge may take.
 const SOLVE_DEADLINE: Duration = Duration::from_secs(60);
 
-/// What answers as the site the conformance cases have a challenge solver fetch while it
-/// is recorded: one page, unchallenged.
+/// What answers as the site the conformance cases ask a challenge solver for while it is
+/// recorded: one page, unchallenged, which a solver that fetched it would answer with
+/// rather than refusing.
 #[must_use]
 pub fn site_answering() -> lemonfiber_ports::serving::StandIn {
     use lemonfiber_ports::serving::Said;
@@ -139,7 +145,7 @@ crate::contract! {
     pub mod proxy = "indexer.proxy" @ 1 {
         impl Solving {
             /// The page at `url`, fetched past whatever challenge stands in front of it.
-            fn solve(str url: &str) -> Solved where largest = PAGE_ANSWER, deadline = SOLVE_DEADLINE, asks = Asked {
+            fn solve(str url: &str) -> Solved where largest = PAGE_ANSWER, deadline = SOLVE_DEADLINE, refused = INWARD, asks = Asked {
                 url: format!("http://{SITE_HOST}:{SITE_PORT}/"),
             };
             /// Whether it answers.

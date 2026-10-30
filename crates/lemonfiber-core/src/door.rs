@@ -30,6 +30,7 @@ pub(crate) mod run;
 use serde::Serialize;
 
 use lemonfiber_contract::capabilities::media::serve;
+use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::{Bind, Service};
@@ -127,7 +128,7 @@ pub const SHELF_MEDIA: [&str; 5] = ["music", "books", "comics", "audiobooks", "p
 /// definition the one nobody thought about. So an entry is a decision somebody made
 /// and can be reviewed on; anything else is [`Facing::Unstated`] and is offered to
 /// nobody. It names no place to begin: those two are the contracts'.
-const NAMED: &[(&str, Facing)] = &[("homepage", Facing::Operators), ("caddy", Facing::Carriage)];
+const NAMED: &[(&str, Facing)] = &[("homepage", Facing::Operators)];
 
 /// What one of the stack's own services is to the household, or nothing where it is not
 /// published to them at all.
@@ -136,14 +137,19 @@ const NAMED: &[(&str, Facing)] = &[("homepage", Facing::Operators), ("caddy", Fa
 /// machine is not a candidate for anything here — which is the same fact the admin
 /// tier's loopback binding rests on, read from the same field rather than from a
 /// second list that could disagree with it. A service guarding the media stream is how
-/// the household reaches the library; anything else is what the register says.
+/// the household reaches the library, and the household's proxy is how the others are
+/// reached; anything else is what the register says.
 #[must_use]
 pub fn facing(service: &Service) -> Option<Facing> {
     if service.bind != Some(Bind::Lan) {
         return None;
     }
-    if service.provides.iter().any(|one| one == guard::CAPABILITY) {
+    let provides = |capability: &str| service.provides.iter().any(|one| one == capability);
+    if provides(guard::CAPABILITY) {
         return Some(Facing::Watching);
+    }
+    if provides(front::CAPABILITY) {
+        return Some(Facing::Carriage);
     }
     Some(named(&service.id))
 }
@@ -193,6 +199,9 @@ fn by_contract(plugin: &Installed, placed: &Placed) -> Option<Facing> {
     };
     if speaking(intake::CAPABILITY, intake::MAJOR).is_some() {
         return Some(Facing::Asking);
+    }
+    if speaking(front::CAPABILITY, front::MAJOR).is_some() {
+        return Some(Facing::Carriage);
     }
     speaking(serve::CAPABILITY, serve::MAJOR).map(|adapter| served(&adapter.media_types))
 }

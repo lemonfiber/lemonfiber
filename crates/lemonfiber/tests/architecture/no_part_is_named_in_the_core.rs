@@ -146,12 +146,6 @@ const NAMED: &[Named] = &[
         until: Until::Moves("recyclarr"),
     },
     Named {
-        file: "crates/lemonfiber-core/src/app/plugins/proving.rs",
-        part: "caddy",
-        count: 1,
-        until: Until::Moves("caddy"),
-    },
-    Named {
         file: "crates/lemonfiber-core/src/app/showing/configured.rs",
         part: "homepage",
         count: 4,
@@ -279,12 +273,6 @@ const NAMED: &[Named] = &[
     },
     Named {
         file: "crates/lemonfiber-core/src/door.rs",
-        part: "caddy",
-        count: 1,
-        until: Until::Moves("caddy"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/door.rs",
         part: "homepage",
         count: 1,
         until: Until::Moves("homepage"),
@@ -294,12 +282,6 @@ const NAMED: &[Named] = &[
         part: "recyclarr",
         count: 1,
         until: Until::Moves("recyclarr"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/plugin/fronting.rs",
-        part: "caddy",
-        count: 1,
-        until: Until::Moves("caddy"),
     },
     Named {
         file: "crates/lemonfiber-core/src/recyclarr.rs",
@@ -372,12 +354,6 @@ const NAMED: &[Named] = &[
         part: "gluetun",
         count: 1,
         until: Until::Moves("gluetun"),
-    },
-    Named {
-        file: "crates/lemonfiber-plugin/src/refusing/bundled.rs",
-        part: "caddy",
-        count: 1,
-        until: Until::Moves("caddy"),
     },
     Named {
         file: "crates/lemonfiber-sidecar/src/decline.rs",

@@ -16,13 +16,6 @@
 //! over and journals what it held before ([`crate::journal::Kind::Rewritten`]), or makes
 //! it where there was none.
 //!
-//! **The exception is the stack's own proxy.** It reads one file, and a plugin's service
-//! is reachable through it only if it is written *into* that file. So that write is a
-//! region, marked out inside the file and owned by the plugin ([`crate::region`]), and
-//! journalled as [`crate::journal::Kind::Region`]: the reversal takes out exactly the
-//! region, and refuses where somebody has edited it. What goes in it is
-//! [`super::fronting`]'s to say.
-//!
 //! Nothing here touches a disk. It is given a record and a stack directory and
 //! answers with a list, so every arrangement can be put in front of a test without
 //! one.
@@ -77,16 +70,6 @@ pub enum Lands {
     /// The credentials an adapter reads its upstream's with: each field, to the id of the
     /// plugin's secret it holds.
     Upstream(std::collections::BTreeMap<String, String>),
-    /// A region inside a file the stack already has, holding this.
-    Region {
-        /// The file beneath the stack directory, as the record of what lemonfiber
-        /// materialised names it.
-        key: String,
-        /// Whose region it is, as its markers name it.
-        owner: String,
-        /// What it holds.
-        body: String,
-    },
 }
 
 impl Write {
@@ -114,18 +97,6 @@ impl Write {
         Self {
             path,
             lands: Lands::Key,
-        }
-    }
-
-    /// A region the install writes into one of the stack's own files.
-    fn region(stack: &Path, key: &str, owner: String, body: String) -> Self {
-        Self {
-            path: stack.join(key),
-            lands: Lands::Region {
-                key: key.to_owned(),
-                owner,
-                body,
-            },
         }
     }
 
@@ -181,10 +152,7 @@ pub(crate) fn configuration(stack: &Path, service: &str) -> PathBuf {
 ///
 /// `project`, where the project changes, comes after them for the same reason the applied
 /// marker is last in an apply: it is the write that makes the rest take effect, so a run
-/// that stopped short of it has changed nothing Compose will read. The proxy's region
-/// follows it, because a route to a service that is not declared is a route to nothing,
-/// and is planned only where it would hold something, so a plugin whose services the
-/// household does not reach writes none.
+/// that stopped short of it has changed nothing Compose will read.
 #[must_use]
 pub fn writes(
     installed: &Installed,
@@ -237,15 +205,6 @@ pub fn writes(
         })
     }));
     planned.extend(project);
-    let body = super::fronting::proxied(installed);
-    if !body.is_empty() {
-        planned.push(Write::region(
-            stack,
-            super::fronting::PROXY,
-            super::owning::owner(&installed.plugin),
-            body,
-        ));
-    }
     planned
 }
 

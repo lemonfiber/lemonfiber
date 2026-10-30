@@ -17,9 +17,11 @@
       "asked": {
         "url": "http://conformance-site:58180/"
       },
-      "case": "solve-answers",
+      "case": "solve-refuses",
       "expect": {
-        "conforms": true
+        "status": [
+          400
+        ]
       },
       "keyed": true,
       "live": false,

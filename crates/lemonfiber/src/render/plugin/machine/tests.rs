@@ -102,10 +102,6 @@ fn writes() -> Vec<Changing> {
             path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
             puts: Puts::Document,
         },
-        Changing {
-            path: "/opt/lemonfiber/stack/config/caddy/Caddyfile".to_owned(),
-            puts: Puts::Region,
-        },
     ]
 }
 

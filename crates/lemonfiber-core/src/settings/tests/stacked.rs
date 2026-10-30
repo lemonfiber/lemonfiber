@@ -43,8 +43,8 @@ fn each_legacy_setting_is_filed_for_a_setting_the_stack_reads() {
         .collect();
     for row in &legacy::TABLE {
         assert!(
-            row.secret || read.contains(row.name),
-            "{} is read by no service",
+            row.secret || read.contains(row.name) || super::super::own::is_core(row.name),
+            "{} is read by no service and is not the core's",
             row.name
         );
     }
@@ -72,9 +72,9 @@ async fn every_legacy_setting_is_recorded_in_the_store_and_never_in_the_environm
             .ok()
             .and_then(|report| report.settings.into_iter().find(|one| one.name == row.name));
         assert!(
-            read.as_ref().is_some_and(
-                |one| one.value.as_deref() == Some(value.as_str()) && !one.readers.is_empty()
-            ),
+            read.as_ref()
+                .is_some_and(|one| one.value.as_deref() == Some(value.as_str())
+                    && (!one.readers.is_empty() || super::super::own::is_core(row.name))),
             "{read:?}"
         );
         assert!(journal(&machine.ctx)

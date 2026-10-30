@@ -38,141 +38,44 @@ async fn removing_a_plugin_puts_back_what_installing_it_wrote() {
     );
 }
 
-/// The proxy's file and the dashboard's, as a stack that carries both has them
-/// before any plugin is installed.
-const SHIPPED_PROXY: &str = "watch.{$DOMAIN:home.local} {\n\treverse_proxy jellyfin:8096\n}\n";
-
+/// The dashboard's file, as a stack that carries one has it before any plugin is
+/// installed.
 const SHIPPED_DASHBOARD: &str = "- Watch:\n    - Jellyfin:\n        href: http://x:8096\n";
 
-/// Give the context's stack a proxy and a dashboard to be put on, answering with
-/// where each file is.
-fn fronted(ctx: &Ctx) -> (PathBuf, PathBuf) {
-    let proxy = stack_of(ctx).join(crate::plugin::PROXY);
-    let dashboard = stack_of(ctx).join("config/homepage/services.yaml");
-    for (at, holds) in [(&proxy, SHIPPED_PROXY), (&dashboard, SHIPPED_DASHBOARD)] {
-        let _ = at.parent().map(std::fs::create_dir_all);
-        let _ = std::fs::write(at, holds);
-    }
-    (proxy, dashboard)
+/// Give the context's stack a dashboard file, answering with where it is.
+fn dashboard(ctx: &Ctx) -> PathBuf {
+    let at = stack_of(ctx).join("config/homepage/services.yaml");
+    let _ = at.parent().map(std::fs::create_dir_all);
+    let _ = std::fs::write(&at, SHIPPED_DASHBOARD);
+    at
 }
 
-/// A household service is reachable through the stack's proxy once installed, the proxy
-/// is told to read its file again, and removing the plugin gives back the file exactly as
-/// it was. The dashboard is not written into: its entry is the panel list's.
+/// A household service is written into none of the stack's own files: its route is the
+/// proxy's routing table, applied over its contract, and its dashboard entry the panel
+/// list's. Where nothing speaks `proxy.front`, nothing is restarted for it either.
 #[tokio::test]
-async fn a_household_service_is_put_on_the_proxy_and_taken_off_again() {
+async fn a_household_service_is_written_into_none_of_the_stacks_own_files() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("fronting", runner.clone(), answering(200));
-    let (proxy, dashboard) = fronted(&ctx);
+    let dashboard = dashboard(&ctx);
 
     let installed = report(installing(&ctx, &source("fronting", PROVING)).await);
 
-    assert!(read(&proxy).contains("komga.{$DOMAIN:home.local} {\n\treverse_proxy komga:25600\n}"));
     assert_eq!(read(&dashboard), SHIPPED_DASHBOARD);
-    assert!(
-        runner.ran("restart"),
-        "the proxy was told to read its file again"
-    );
-    let puts: Vec<crate::plugin::Puts> = installed
+    assert!(!runner.ran("restart"), "no proxy is told to read anything");
+    let changes: Vec<String> = installed
         .and_then(|one| one.install)
-        .map(|install| install.changes.iter().map(|one| one.puts).collect())
+        .map(|install| install.changes.iter().map(|one| one.path.clone()).collect())
         .unwrap_or_default();
-    assert_eq!(
-        puts.iter()
-            .filter(|one| **one == crate::plugin::Puts::Region)
-            .count(),
-        1,
-        "the account names the proxy's region: {puts:?}"
+    assert!(
+        changes.iter().all(|path| !path.contains("config/homepage")),
+        "{changes:?}"
     );
 
     let gone = removal(removing(&ctx, "komga").await);
 
     assert_eq!(gone.map(|one| one.removed), Some(true));
-    assert_eq!(read(&proxy), SHIPPED_PROXY);
     assert_eq!(read(&dashboard), SHIPPED_DASHBOARD);
-}
-
-/// A region somebody edited is theirs now, so the removal is refused before
-/// anything is touched rather than taking their edit with it.
-#[tokio::test]
-async fn a_region_edited_since_the_install_refuses_the_removal() {
-    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let ctx = proving("edited-region", runner, answering(200));
-    let (proxy, _) = fronted(&ctx);
-    let _ = installing(&ctx, &source("edited-region", PROVING)).await;
-    let edited = read(&proxy).replace("reverse_proxy komga:25600", "reverse_proxy komga:9999");
-    let _ = std::fs::write(&proxy, &edited);
-
-    let refused = removing(&ctx, "komga").await;
-
-    assert!(refused.is_err(), "the removal is refused");
-    assert_eq!(read(&proxy), edited, "and the edit is where it was");
-    assert_eq!(
-        counted(reading(&ctx).await),
-        Some(1),
-        "and it is still installed"
-    );
-}
-
-/// A stack with no proxy file carries no proxy to be put on, and an area the
-/// operator declared unmanaged is one lemonfiber writes nothing into — so neither
-/// is written, nor stated, nor journalled.
-#[tokio::test]
-async fn no_region_is_written_where_there_is_no_file_or_the_area_is_unmanaged() {
-    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let mut ctx = proving("unfronted", runner.clone(), answering(200));
-    let (proxy, dashboard) = fronted(&ctx);
-    let _ = std::fs::remove_file(&proxy);
-    ctx.settings.unmanaged = vec![("config/homepage".to_owned(), "mine".to_owned())];
-
-    let installed = report(installing(&ctx, &source("unfronted", PROVING)).await);
-
-    assert!(!proxy.exists(), "no proxy file is brought into being");
-    assert!(!runner.ran("restart"), "and no proxy is told to read one");
-    assert_eq!(read(&dashboard), SHIPPED_DASHBOARD);
-    assert!(installed
-        .and_then(|one| one.install)
-        .is_some_and(|install| install
-            .changes
-            .iter()
-            .all(|one| one.puts != crate::plugin::Puts::Region)));
-}
-
-/// An operator surface is given no route, so the proxy is left exactly as it was and is
-/// not restarted for it.
-#[tokio::test]
-async fn an_operator_surface_is_given_no_route_and_the_proxy_is_left_alone() {
-    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let ctx = proving("loopback", runner.clone(), answering(200));
-    let (proxy, dashboard) = fronted(&ctx);
-    let loopback = PROVING.replace(r#"bind        = "lan""#, r#"bind        = "loopback""#);
-
-    let _ = installing(&ctx, &source("loopback", &loopback)).await;
-
-    assert_eq!(read(&proxy), SHIPPED_PROXY);
-    assert_eq!(read(&dashboard), SHIPPED_DASHBOARD);
-    assert!(!runner.ran("restart"), "nothing about the proxy changed");
-}
-
-/// A region that will not go into its file stops the install, reported as the
-/// install's own failure to write rather than passed over.
-#[cfg(unix)]
-#[tokio::test]
-async fn a_region_that_will_not_be_written_stops_the_install() {
-    use std::os::unix::fs::PermissionsExt as _;
-    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let ctx = proving("unwritable-region", runner, answering(200));
-    let (proxy, _) = fronted(&ctx);
-    let _ = std::fs::set_permissions(&proxy, std::fs::Permissions::from_mode(0o444));
-
-    let stopped = installing(&ctx, &source("unwritable-region", PROVING)).await;
-
-    let _ = std::fs::set_permissions(&proxy, std::fs::Permissions::from_mode(0o644));
-    assert_eq!(
-        stopped.err().map(|problem| problem.code),
-        Some(super::super::UNWRITABLE)
-    );
-    assert_eq!(read(&proxy), SHIPPED_PROXY, "nothing went into the file");
 }
 
 /// A second plugin whose service would answer on a label the first one's already
@@ -181,9 +84,8 @@ async fn a_region_that_will_not_be_written_stops_the_install() {
 async fn a_label_another_plugin_answers_on_refuses_the_install() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("label-taken", runner, answering(200));
-    let (proxy, _) = fronted(&ctx);
     let _ = installing(&ctx, &source("label-taken", PROVING)).await;
-    let before = read(&proxy);
+    let before = document(&ctx);
     let second = PROVING
         .replace(
             r#"id          = "komga"
@@ -207,7 +109,7 @@ id          = "shelf""#,
         refused.err().map(|problem| problem.code.to_string()),
         Some("PLUGIN-13".to_owned())
     );
-    assert_eq!(read(&proxy), before, "nothing of it was written");
+    assert_eq!(document(&ctx), before, "nothing of it was written");
 }
 
 /// A second plugin bringing a service named as the first one's is refused before
@@ -217,9 +119,8 @@ id          = "shelf""#,
 async fn a_service_named_as_another_plugins_refuses_the_install() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("service-taken", runner, answering(200));
-    let (proxy, _) = fronted(&ctx);
     let _ = installing(&ctx, &source("service-taken", PROVING)).await;
-    let before = read(&proxy);
+    let before = document(&ctx);
     let second = PROVING.replace(
         r#"id          = "komga"
 name        = "Komga"
@@ -240,7 +141,7 @@ version"#,
         said.is_some_and(|problem| problem.summary.contains("komga")),
         "the refusal names the service both would bring"
     );
-    assert_eq!(read(&proxy), before, "nothing of it was written");
+    assert_eq!(document(&ctx), before, "nothing of it was written");
 }
 
 /// A second plugin naming in `was` the variable the first one's setting names is refused
@@ -249,7 +150,6 @@ version"#,
 async fn a_variable_another_plugin_was_kept_under_refuses_the_install() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("was-taken", runner, answering(200));
-    let (proxy, _) = fronted(&ctx);
     let kept = |namespace: &str| {
         format!(
             "\n[service.env]\nLOG = {{ setting = \"{namespace}:log\", default = \"info\", was = \
@@ -259,7 +159,7 @@ async fn a_variable_another_plugin_was_kept_under_refuses_the_install() {
     let first = PROVING.to_owned() + &kept("komga");
     let installed = installing(&ctx, &source("was-taken", &first)).await;
     assert_eq!(counted(installed), Some(1));
-    let before = read(&proxy);
+    let before = document(&ctx);
     let second = PROVING.replace("\"komga\"", "\"shelf\"") + &kept("shelf");
 
     let refused = installing(&ctx, &source("was-taken-second", &second)).await;
@@ -274,34 +174,5 @@ async fn a_variable_another_plugin_was_kept_under_refuses_the_install() {
             && problem.summary.contains("komga's setting komga:log")),
         "the refusal names both"
     );
-    assert_eq!(read(&proxy), before, "nothing of it was written");
-}
-
-/// A proxy whose project mounts a directory reached through a link is not told to read
-/// its file again: a restart is a start.
-#[cfg(unix)]
-#[tokio::test]
-async fn a_removal_over_a_linked_directory_restarts_no_proxy() {
-    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let ctx = proving("fronting-linked", runner.clone(), answering(200));
-    let _ = fronted(&ctx);
-    let _ = installing(&ctx, &source("fronting-linked", PROVING)).await;
-    let before = runner.seen().len();
-    lemonfiber_fixtures::scratch::linked_away(
-        &crate::app::project::directory(&ctx).unwrap_or_default(),
-        "navidrome",
-    );
-
-    let gone = removal(removing(&ctx, "komga").await);
-
-    assert_eq!(gone.map(|one| one.removed), Some(true));
-    assert!(
-        !runner
-            .seen()
-            .iter()
-            .skip(before)
-            .any(|argv| argv.iter().any(|word| word == "restart")),
-        "{:?}",
-        runner.seen()
-    );
+    assert_eq!(document(&ctx), before, "nothing of it was written");
 }

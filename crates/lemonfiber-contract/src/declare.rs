@@ -19,7 +19,8 @@
 //! whose answer may take longer than [`crate::client::DEADLINE`] says so next, as
 //! `where deadline = DURATION, asks = …`, and one
 //! whose answer holds a credential the upstream issues names each place as a JSON pointer
-//! before `asks`, as `where secret = &["/token"], asks = …`.
+//! before `asks`, as `where secret = &["/token"], asks = …`. One whose case is to be
+//! refused says with which statuses last, as `where refused = &[400], asks = …`.
 //!
 //! The port's own type is written out, rather than derived from the mark, because the
 //! trait implementations go through `#[async_trait]`, which gives every reference in a
@@ -43,7 +44,7 @@ macro_rules! contract {
                 impl $Trait:path {
                     $(
                         $(#[$op_meta:meta])*
-                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? $(deadline = $deadline:expr,)? $(secret = $secret:expr,)? asks = $asks:expr;
+                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? $(deadline = $deadline:expr,)? $(secret = $secret:expr,)? $(refused = $refused:expr,)? asks = $asks:expr;
                     )*
                 }
             )*
@@ -184,6 +185,7 @@ macro_rules! contract {
                             .within($crate::contract!(@largest $($largest)?))
                             .awaited($crate::contract!(@deadline $($deadline)?))
                             .holding($crate::contract!(@secret $($secret)?))
+                            .refusing($crate::contract!(@refused $($refused)?))
                             .asking(&$op::asks()),
                         )*)*
                     ],
@@ -196,6 +198,9 @@ macro_rules! contract {
     (@largest $largest:expr) => { $largest };
     (@deadline) => { $crate::client::DEADLINE };
     (@deadline $deadline:expr) => { $deadline };
+
+    (@refused) => { None };
+    (@refused $refused:expr) => { Some($refused) };
 
     (@secret) => { &[] };
     (@secret $secret:expr) => { $secret };

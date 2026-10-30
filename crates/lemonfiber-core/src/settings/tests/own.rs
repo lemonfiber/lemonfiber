@@ -1,5 +1,6 @@
 use crate::settings::own::{
-    is_configs, is_core, refusal, DASHBOARD_SEARCH, DEFAULT_SEARCH, DEVICE_KEY_APPS,
+    is_configs, is_core, refusal, DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH,
+    DEVICE_KEY_APPS, DOMAIN,
 };
 
 fn fingerprint() -> String {
@@ -121,4 +122,52 @@ fn the_dashboards_search_address_is_the_one_recorded_or_the_default_and_a_bad_on
     assert!(record("ecosia.org/search?q="));
     assert!(crate::settings::dashboard_search(&ctx)
         .is_err_and(|said| said.starts_with(DASHBOARD_SEARCH)));
+}
+
+#[test]
+fn a_domain_is_taken_and_anything_a_name_cannot_be_put_in_front_of_is_refused() {
+    assert!(is_core(DOMAIN));
+    for value in ["home.example", "nas", "my-home.example.org"] {
+        assert_eq!(refusal(DOMAIN, value), None, "{value}");
+    }
+    let long = "a".repeat(64);
+    let longest = ["a"; 128].join(".");
+    for value in [
+        "",
+        "home..example",
+        "-home.example",
+        "home-.example",
+        "home example",
+        "https://home.example",
+        long.as_str(),
+        longest.as_str(),
+    ] {
+        assert!(
+            refusal(DOMAIN, value).is_some_and(|said| said.contains(DOMAIN)),
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn the_household_domain_is_the_one_recorded_or_the_default_where_none_or_no_domain_is() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("household-domain");
+    let env = scratch.path().join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let settings = env.with_file_name(crate::config::paths::SETTINGS);
+    let record = |value: &str| {
+        crate::settings::store::recorded(&settings, &[(DOMAIN, Some(value))].into()).is_ok()
+    };
+
+    assert_eq!(crate::settings::household_domain(&ctx), DEFAULT_DOMAIN);
+    assert!(record(" home.example "));
+    assert_eq!(crate::settings::household_domain(&ctx), "home.example");
+    assert!(record("home..example"));
+    assert_eq!(crate::settings::household_domain(&ctx), DEFAULT_DOMAIN);
 }

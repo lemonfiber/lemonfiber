@@ -89,11 +89,9 @@ pub(super) async fn install(
     // rehearsal to state and nothing for an install to do.
     let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
-    super::occupied::unoccupied(ctx, &would, held.installed(), stack)?;
-    let planned = writing::landing(
-        ctx,
-        super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?,
-    );
+    let served = crate::seed::run::served(ctx).await;
+    super::occupied::unoccupied(ctx, &would, held.installed(), &served)?;
+    let planned = super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?;
     let wiring = standing::standing(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
     let offer = offering::installing(&read.digest, &would, &changes, &wiring);
@@ -171,7 +169,7 @@ pub(super) async fn install(
             recorded = true;
             super::kept::kept(ctx, &would, &crate::plugin::root(path));
             let _ = super::conformance::cleared(ctx, &would.plugin);
-            proving::refronted(ctx, stack, proving::routes_written(&planned)).await;
+            let _ = crate::seed::run::refront(ctx).await;
         } else {
             put_back = Some(reversing(ctx, &would, stack, &stamp).await);
         }

@@ -321,8 +321,7 @@ fn a_history_whose_journal_cannot_be_read_is_refused() {
 }
 
 /// A write whose record cannot be written is not made: a change nothing could put
-/// back is not one to make. Asked of a directory and of a managed region both, the two
-/// ways a write is journalled first.
+/// back is not one to make.
 #[test]
 fn a_write_whose_record_cannot_be_written_is_not_made() {
     use crate::plugin::{Lands, Write};
@@ -344,27 +343,6 @@ fn a_write_whose_record_cannot_be_written_is_not_made() {
     assert!(
         !made.exists(),
         "the directory was made with no record of it"
-    );
-
-    let proxy = stack_of(&ctx)
-        .join("config")
-        .join("caddy")
-        .join("Caddyfile");
-    let _ = std::fs::create_dir_all(proxy.parent().unwrap_or(&proxy));
-    assert!(std::fs::write(&proxy, "as it was\n").is_ok());
-    let region = vec![Write {
-        path: proxy.clone(),
-        lands: Lands::Region {
-            key: "config/caddy/Caddyfile".to_owned(),
-            owner: "plugin komga".to_owned(),
-            body: "comics.{$DOMAIN:home.local} {\n\treverse_proxy komga:25600\n}\n".to_owned(),
-        },
-    }];
-    assert!(super::super::writing::carry_out(&ctx, "komga", "1", &region).is_err());
-    assert_eq!(
-        std::fs::read_to_string(&proxy).ok().as_deref(),
-        Some("as it was\n"),
-        "the region was written with no record of it"
     );
 }
 

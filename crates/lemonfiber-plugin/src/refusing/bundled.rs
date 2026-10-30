@@ -1,11 +1,11 @@
 //! What the stack this build ships already holds, which a plugin may not take.
 //!
-//! Read out of the shipped stack description and the proxy configuration beside it,
-//! rather than written down here as a list. A list would be a second answer to a
-//! question those two files already answer, and it would be free to disagree with
-//! them: a service dropped from the stack would go on reserving its id and its port,
-//! one added would reserve neither, and nothing would say either had happened. These
-//! are the files the binary is built from, so the pin moves and this moves with it.
+//! Read out of the shipped stack description and the parts the bundle pins, rather
+//! than written down here as a list. A list would be a second answer to a question those
+//! already answer, and it would be free to disagree with them: a service dropped from the
+//! stack would go on reserving its id and its port, one added would reserve neither, and
+//! nothing would say either had happened. These are what the binary is built from, so
+//! the pin moves and this moves with it.
 //!
 //! **A register that reads empty refuses nothing, and cannot notice that about
 //! itself.** Every rule over one walks what it found, so a register that found
@@ -20,17 +20,6 @@ use lemonfiber_manifest::{Manifest, Service};
 
 /// The stack description this build ships, which says which ids and ports are taken.
 const STACK: &str = lemonfiber_bundled::STACK;
-
-/// The proxy configuration beside it, which says which names the stack answers on.
-///
-/// The hostnames are here and not in the stack description because they are the
-/// proxy's own vocabulary — a label in front of the operator's domain rather than a
-/// property of a service — and the shipped file is where they are written.
-const PROXY: &str =
-    include_str!("../../../../assets/plugins/bundle/plugins/caddy/config/caddy/Caddyfile");
-
-/// What a proxied name is written in front of, in the shipped configuration.
-const DOMAIN: &str = ".{$DOMAIN";
 
 /// Every service the shipped stack declares.
 ///
@@ -54,16 +43,39 @@ fn declared(text: &str) -> Vec<Service> {
     Manifest::from_toml(text).map_or_else(|_| Vec::new(), |stack| stack.services)
 }
 
-/// Every name the shipped proxy is written to answer on.
+/// Every name the household reaches a part the bundle pins at, with the stack's service
+/// that part's service stands in for, or its own id where it stands in for none.
 ///
-/// The stanzas that are commented out count. They are not dead text: the shipped
-/// file writes each one out with what enabling it would mean, so they are names the
-/// operator has already been offered — and a plugin holding one would turn that
-/// offer into a collision on the day it was taken up, in a file the operator is
-/// editing by hand and would have no reason to suspect.
-pub(super) fn hostnames() -> &'static [String] {
-    static ANSWERED: LazyLock<Vec<String>> = LazyLock::new(|| proxied(PROXY));
-    &ANSWERED
+/// The label is each household service's entry, as an installed plugin's is: the one its
+/// manifest names, or its id. Every part counts, installed or still assembled into the
+/// stack, because the household reaches both.
+fn routed() -> &'static [(String, String)] {
+    static ROUTED: LazyLock<Vec<(String, String)>> = LazyLock::new(|| {
+        lemonfiber_bundled::PINNED
+            .iter()
+            .filter_map(|pinned| crate::Manifest::from_toml(pinned.copy).ok())
+            .flat_map(|part| labelled(&part))
+            .collect()
+    });
+    &ROUTED
+}
+
+/// Each label `part`'s household services are reached at, with the stack's service each
+/// stands in for, or its own id.
+fn labelled(part: &crate::Manifest) -> Vec<(String, String)> {
+    part.services
+        .iter()
+        .filter(|service| service.port.is_some() && service.bind == Some(crate::Bind::Lan))
+        .map(|service| {
+            (
+                part.entry(service).hostname.to_owned(),
+                service
+                    .replaces
+                    .clone()
+                    .unwrap_or_else(|| service.id.clone()),
+            )
+        })
+        .collect()
 }
 
 /// The shipped service with this id, where the stack ships one.
@@ -126,89 +138,27 @@ fn publishing_in(services: &[Service], port: u16) -> Option<&Service> {
     })
 }
 
-/// Whether the shipped proxy is written to answer on this name.
+/// Whether the household reaches a part the bundle pins at this name.
 pub(super) fn answering(label: &str) -> bool {
-    hostnames().iter().any(|held| held == label)
+    routed().iter().any(|(held, _)| held == label)
 }
 
-/// The service the shipped proxy sends this name to, where it answers on it.
+/// The service the household reaches at this name, where it reaches a part the bundle
+/// pins there.
 pub(super) fn routed_to(label: &str) -> Option<&'static str> {
-    static ROUTED: LazyLock<Vec<(String, String)>> = LazyLock::new(|| routes(PROXY));
-    ROUTED
+    routed()
         .iter()
         .find(|(held, _)| held == label)
         .map(|(_, service)| service.as_str())
 }
 
-/// Each label the proxy configuration answers on, with the service its first
-/// `reverse_proxy` inside that stanza names.
-fn routes(text: &str) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    let mut open: Option<String> = None;
-    for line in text.lines() {
-        let (said, stanza) = opened(line);
-        if let Some((label, rest)) = stanza {
-            open = Some(label.to_owned());
-            if let Some(service) = proxied_service(rest) {
-                found.push((label.to_owned(), service));
-                open = None;
-            }
-            continue;
-        }
-        let Some(label) = open.as_ref() else {
-            continue;
-        };
-        if let Some(service) = proxied_service(said) {
-            found.push((label.clone(), service));
-            open = None;
-        } else if said.starts_with('}') {
-            open = None;
-        }
-    }
-    found
-}
-
-/// The service a `reverse_proxy <service>:<port>` in `text` names.
-fn proxied_service(text: &str) -> Option<String> {
-    let (_, after) = text.split_once("reverse_proxy ")?;
-    let target = after.split_whitespace().next()?;
-    let service = target.split(':').next()?;
-    (!service.is_empty()).then(|| service.to_owned())
-}
-
-/// Every label the proxy configuration puts in front of the operator's domain.
-///
-/// Read off the one shape the file is written in — a label, the domain placeholder,
-/// and a block — with a leading comment marker allowed, because a disabled stanza is
-/// still a name the file has spoken for. Anything else in the file says nothing
-/// about a name, including the prose that mentions the placeholder without putting a
-/// label in front of it.
-pub(super) fn proxied(text: &str) -> Vec<String> {
-    let mut found: Vec<String> = Vec::new();
-    for line in text.lines() {
-        let Some((label, _)) = opened(line).1 else {
-            continue;
-        };
-        if !found.iter().any(|held| held == label) {
-            found.push(label.to_owned());
-        }
-    }
-    found
-}
-
-/// A line with any leading comment marker set aside, and the label and the rest of it
-/// where it opens a stanza in front of the operator's domain.
-fn opened(line: &str) -> (&str, Option<(&str, &str)>) {
-    let said = line.trim_start().trim_start_matches('#').trim_start();
-    let stanza = said
-        .split_once(DOMAIN)
-        .filter(|(label, _)| !label.is_empty() && label.chars().all(is_label));
-    (said, stanza)
-}
-
-/// Whether one character may appear in a DNS label.
-fn is_label(letter: char) -> bool {
-    letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '-'
+/// The name the household reaches the stack's service `service` at, where a part the
+/// bundle pins declares one for it.
+pub(super) fn label_of(service: &str) -> Option<&'static str> {
+    routed()
+        .iter()
+        .find(|(_, held)| held == service)
+        .map(|(label, _)| label.as_str())
 }
 
 #[cfg(test)]

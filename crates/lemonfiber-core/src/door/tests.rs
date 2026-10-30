@@ -58,8 +58,9 @@ fn a_service_reachable_only_from_this_machine_is_no_part_of_this() {
 
 #[test]
 fn the_proxy_carries_the_others_rather_than_being_one_of_them() {
-    let caddy = service("caddy", Some(Bind::Lan));
-    assert_eq!(facing(&caddy), Some(Facing::Carriage));
+    let mut proxy = service("front", Some(Bind::Lan));
+    proxy.provides = vec!["proxy.front".to_owned()];
+    assert_eq!(facing(&proxy), Some(Facing::Carriage));
     assert!(!Facing::Carriage.begins());
 }
 
@@ -74,7 +75,7 @@ fn a_published_service_nobody_vouched_for_is_offered_to_nobody() {
 /// it: only a contract makes a place to begin.
 #[test]
 fn a_service_is_no_door_by_its_name() {
-    for id in ["seerr", "jellyfin"] {
+    for id in ["seerr", "jellyfin", "caddy"] {
         let named = service(id, Some(Bind::Lan));
         assert_eq!(facing(&named), Some(Facing::Unstated), "{id}");
     }
@@ -116,8 +117,8 @@ fn judged(plugin: &Installed) -> Option<Facing> {
 }
 
 /// A plugin's service published to the household is judged by the contract the adapter in
-/// front of it speaks: a request service asks, a media server watches, anything else is
-/// unstated, and the register does not reach a stranger's service by its id. One reachable
+/// front of it speaks: a request service asks, a media server watches, the proxy carries
+/// the others, anything else is unstated, and the register does not reach a stranger's service by its id. One reachable
 /// from this machine alone is no part of this.
 #[test]
 fn a_plugins_service_is_judged_by_the_contract_in_front_of_it() {
@@ -133,6 +134,10 @@ fn a_plugins_service_is_judged_by_the_contract_in_front_of_it() {
         (
             fronted("server", Some("media.serve@2"), Some("watch")),
             Some(Facing::Unstated),
+        ),
+        (
+            fronted("front", Some("proxy.front@1"), Some("front")),
+            Some(Facing::Carriage),
         ),
         (
             fronted("curator", Some("library.curate@1"), Some("curate")),

@@ -174,11 +174,7 @@ pub(crate) async fn remove(
     crate::settings::forgotten(ctx, &going);
     super::kept::forgotten(ctx, &going.plugin);
 
-    // Its route came out of the proxy's file with everything else it wrote, and the
-    // proxy only reads that file when it starts. The stack is the one the judgement
-    // above already needed the layout of, so it is there.
-    let routed = super::proving::routes_withdrawn(&went_back);
-    super::proving::refronted(ctx, &directory, routed).await;
+    let _ = crate::seed::run::refront(ctx).await;
 
     Ok(answering(
         after.installed().to_vec(),

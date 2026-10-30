@@ -1,4 +1,4 @@
-use super::{put, record_beside, replace, withdraw, written, Withdrawn};
+use super::{record_beside, replace, withdraw, written, Withdrawn};
 use crate::materialised::{checksum, Materialised};
 
 const SHIPPED: &str = "watch {\n}\n";
@@ -22,6 +22,27 @@ fn scratch(name: &str, recorded: bool) -> lemonfiber_fixtures::scratch::Scratch 
 fn recorded(dir: &std::path::Path) -> Option<u32> {
     super::super::record::kept::<Materialised>(Some(&dir.join("materialised.json")))
         .checksum("config/caddy/Caddyfile")
+}
+
+/// `owner`'s region holding `body` written into the file at `path`, as an earlier release
+/// wrote one, through the one whole-file write there is.
+fn put(
+    confined: &dyn crate::ports::filesystem::Confined,
+    path: &std::path::Path,
+    key: &str,
+    owner: &str,
+    body: &str,
+    record: Option<&std::path::Path>,
+) -> Result<(), String> {
+    let before = crate::within::read_unlinked(confined, path, crate::within::directory_of(path))?
+        .unwrap_or_default();
+    replace(
+        confined,
+        path,
+        key,
+        &crate::region::put(&before, owner, body),
+        record,
+    )
 }
 
 fn read(dir: &std::path::Path) -> String {
@@ -156,15 +177,6 @@ fn a_file_that_will_not_read_is_a_failure_rather_than_nothing() {
         "config",
         "plugin komga",
         0,
-        None
-    )
-    .is_err());
-    assert!(put(
-        &lemonfiber_adapters::Disk,
-        &dir.join("absent"),
-        "config",
-        "plugin komga",
-        "x",
         None
     )
     .is_err());

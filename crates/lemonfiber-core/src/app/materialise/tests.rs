@@ -81,12 +81,11 @@ fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
         &[],
     );
     let file = into.join("compose.yaml");
-    let _ = super::super::bounded::put(
+    let _ = super::super::bounded::replace(
         &DISK,
         &file,
         "compose.yaml",
-        "plugin komga",
-        "# komga\n",
+        &crate::region::put(&read(&file), "plugin komga", "# komga\n"),
         Some(&record),
     );
     let with_region = read(&file);
@@ -125,12 +124,11 @@ fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
     );
     let file = into.join("compose.yaml");
     let shipped = read(&file);
-    let _ = super::super::bounded::put(
+    let _ = super::super::bounded::replace(
         &DISK,
         &file,
         "compose.yaml",
-        "plugin komga",
-        "# komga\n",
+        &crate::region::put(&read(&file), "plugin komga", "# komga\n"),
         Some(&record),
     );
     let _ = std::fs::write(&file, read(&file).replace("sonarr", "my-own-sonarr"));

@@ -2,18 +2,17 @@
 //!
 //! The manifest is held to the stack this build ships before anything here runs. What
 //! that cannot see is this machine: the stack it runs, the overlay the operator merged
-//! over it, the sites they added to the proxy by hand, and the ports other plugins
-//! already publish. Each is a collision of the same kind, and each lands the same way —
-//! a service Compose merges into the operator's own and runs with whatever that one
-//! holds, a port two services cannot both bind, a site the proxy will not start beside a
-//! second one at its address.
+//! over it, the names the proxy serves, and the ports other plugins already publish. Each
+//! is a collision of the same kind, and each lands the same way — a service Compose merges
+//! into the operator's own and runs with whatever that one holds, a port two services
+//! cannot both bind, a name that would reach a service other than the one it reaches.
 //!
 //! **Refused, never renamed or narrowed**, for the reason the manifest's own refusals
 //! are: a plugin installed under a name or a port its manifest does not carry is a
 //! plugin nothing it declares is about any more. And refused with every clash at once,
 //! so an operator does not find them one install at a time.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use lemonfiber_manifest::Manifest;
 
@@ -22,11 +21,12 @@ use crate::error::codes::plugin::OCCUPIED;
 use crate::error::{Problem, Remedy, State};
 use crate::model::MovedReport;
 use crate::plugin::Installed;
+use crate::ports::service::Route;
 use crate::project::overlay::{self, Declared, Published};
 
 /// Refuse a plugin any of whose services would take a name, a port or a label that the
-/// stack as this machine runs it, another installed plugin, or the live proxy already
-/// holds.
+/// stack as this machine runs it, another installed plugin, or the proxy, serving
+/// `served`, already holds.
 ///
 /// `installed` is every other plugin on the machine, without this one's own record, so
 /// an update is not held to the version it replaces. A stack service the plugin moves in
@@ -41,7 +41,7 @@ pub(crate) fn unoccupied(
     ctx: &Ctx,
     would: &Installed,
     installed: &[Installed],
-    stack: &Path,
+    served: &[Route],
 ) -> Result<(), Box<Problem>> {
     let settings = ctx
         .settings
@@ -67,10 +67,13 @@ pub(crate) fn unoccupied(
         overlay::read(&overlays, &|name| settings.get(name).map(str::to_owned));
     services.extend(theirs);
     ports.extend(their_ports);
-    let proxy = std::fs::read_to_string(stack.join(crate::plugin::PROXY)).unwrap_or_default();
     let mut clashes = named(would, &services);
     clashes.extend(bound(would, &ports, installed));
-    clashes.extend(answered(would, &proxy));
+    clashes.extend(answered(
+        would,
+        served,
+        &crate::settings::household_domain(ctx),
+    ));
     if clashes.is_empty() {
         return Ok(());
     }
@@ -168,24 +171,24 @@ fn bound(would: &Installed, ports: &[Published], installed: &[Installed]) -> Vec
     clashes
 }
 
-/// Every label the plugin would be proxied at that the live proxy configuration already
-/// answers on, outside the plugin's own region.
-fn answered(would: &Installed, proxy: &str) -> Vec<String> {
-    let others = crate::region::without(proxy, &crate::plugin::owner(&would.plugin))
-        .unwrap_or_else(|| proxy.to_owned());
-    let held = lemonfiber_plugin::refusing::answered_in(&others);
+/// Every label the plugin would be proxied at, in front of `domain`, that the proxy
+/// already serves `served` at for a service that is not the plugin's own.
+fn answered(would: &Installed, served: &[Route], domain: &str) -> Vec<String> {
+    let own = |host: &str| would.services.iter().any(|placed| placed.service == host);
     would
         .services
         .iter()
         .filter_map(|placed| {
             let label = placed.reached.as_ref()?.hostname()?;
-            held.iter().any(|one| one == label).then(|| {
-                format!(
-                    "service {}: the proxy's configuration already has a site at {label}, and \
-                     it will not start with two",
-                    placed.service
-                )
-            })
+            let name = format!("{label}.{domain}");
+            let held = served
+                .iter()
+                .find(|route| route.name == name && !own(&route.host))?;
+            Some(format!(
+                "service {}: the proxy already serves {name} for {}, and one name reaches one \
+                 service",
+                placed.service, held.host
+            ))
         })
         .collect()
 }
