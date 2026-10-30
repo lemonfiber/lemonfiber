@@ -152,10 +152,7 @@ pub(crate) fn configuration(stack: &Path, service: &str) -> PathBuf {
 ///
 /// `project`, where the project changes, comes after them for the same reason the applied
 /// marker is last in an apply: it is the write that makes the rest take effect, so a run
-/// that stopped short of it has changed nothing Compose will read. The proxy's region
-/// follows it, because a route to a service that is not declared is a route to nothing,
-/// and is planned only where it would hold something, so a plugin whose services the
-/// household does not reach writes none.
+/// that stopped short of it has changed nothing Compose will read.
 #[must_use]
 pub fn writes(
     installed: &Installed,

@@ -7,9 +7,8 @@
 //! with a list and reaches nothing.
 //!
 //! Nothing here reverses anything, and that is the point. Every write goes into the
-//! journal first — a path lemonfiber made, or a region it wrote into one of the stack's
-//! own files — which the rollback layer knows how to classify and the reversal knows
-//! how to undo, so removal is that machinery pointed at these entries rather than a
+//! journal first — a path lemonfiber made, or the project it rewrote — which the rollback
+//! layer knows how to classify and the reversal knows how to undo, so removal is that machinery pointed at these entries rather than a
 //! second implementation of undoing.
 
 use std::path::{Path, PathBuf};
