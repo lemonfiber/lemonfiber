@@ -4,10 +4,10 @@
 //! two, and two places assuming them are two places to assume differently.
 
 /// Where `http://` is reached on.
-pub(crate) const PLAIN: u16 = 80;
+pub const PLAIN: u16 = 80;
 
 /// Where `https://` is reached on.
-pub(crate) const SECURE: u16 = 443;
+pub const SECURE: u16 = 443;
 
 /// The scheme an address is reached over when what travels must be encrypted.
-pub(crate) const SECURE_SCHEME: &str = "https";
+pub const SECURE_SCHEME: &str = "https";

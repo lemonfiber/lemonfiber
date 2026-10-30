@@ -201,9 +201,15 @@ fn keyed(kit: &Kit, headers: &HeaderMap) -> bool {
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .unwrap_or_default()
-        .as_bytes();
-    let mine = kit.key.as_bytes();
+        .unwrap_or_default();
+    same_secret(&kit.key, offered)
+}
+
+/// Whether `offered` is the secret `mine`, compared in a time that does not depend on
+/// where the two differ, and never where `mine` is empty.
+#[must_use]
+pub fn same_secret(mine: &str, offered: &str) -> bool {
+    let (mine, offered) = (mine.as_bytes(), offered.as_bytes());
     !mine.is_empty()
         && mine.len() == offered.len()
         && mine

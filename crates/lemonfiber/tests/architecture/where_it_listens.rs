@@ -148,12 +148,12 @@ const DECIDES: &str = "crates/lemonfiber/src/ui/reach.rs";
 /// reviewer checks.
 const REFUSES: &[(&str, &str)] = &[
     (
-        "crates/lemonfiber-core/src/outward.rs",
+        "crates/lemonfiber-outward/src/lib.rs",
         "reading an address a name or a source was written as, in every spelling, so it can \
          be classed before anything is asked",
     ),
     (
-        "crates/lemonfiber-core/src/outward/classes.rs",
+        "crates/lemonfiber-outward/src/classes.rs",
         "the ranges no call or fetch goes to — this machine, a network of its own, and the \
          ranges nothing out on the internet answers on",
     ),

@@ -27,6 +27,7 @@ lemonfiber-core = { path = "crates/lemonfiber-core" }
 lemonfiber-error = { path = "crates/lemonfiber-error" }
 lemonfiber-fixtures = { path = "crates/lemonfiber-fixtures" }
 lemonfiber-manifest = { path = "crates/lemonfiber-manifest" }
+lemonfiber-outward = { path = "crates/lemonfiber-outward" }
 lemonfiber-plugin = { path = "crates/lemonfiber-plugin" }
 lemonfiber-ports = { path = "crates/lemonfiber-ports" }
 lemonfiber-pinned = { path = "crates/lemonfiber-pinned" }
