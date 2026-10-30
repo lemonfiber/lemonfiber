@@ -1,10 +1,13 @@
 //! A hand edit a quality sync answers, held to what may be shown before anything else
 //! reads it. The adapter's own masking is not trusted and a crafted edit is assumed, so
-//! masking fails closed: every kept secret is taken out wherever it stands, and a side of
-//! the diff is read line by line only where every line is one no YAML reader can read
-//! another way, a plain key and a plain value, a list item, a comment or nothing. On such
-//! a side nothing after a word naming a credential is shown, nor any line continuing its
-//! value; any other side shows each line's key name at most.
+//! masking fails closed. Every kept secret is taken out wherever it stands. Each version
+//! of the file the diff holds, what was on disk and what is written in its place, is read
+//! in file order, and line by line only where every line of it is one no YAML reader can
+//! read another way: a plain key and a plain value, a list item, a comment or nothing. In
+//! such a version nothing after a word naming a credential is shown, nor any line
+//! continuing its value, nor any line whose parent the version does not show; any other
+//! version shows each line's key name at most. A line stands as the more masked of the
+//! versions it belongs to.
 
 use std::fmt::Write as _;
 
@@ -25,13 +28,14 @@ const BOUNDARIES: [char; 16] = [
 ];
 
 /// What may not stand in a plain value: YAML's indicators, quotes, escapes and tabs, any
-/// of which a YAML reader may read apart from how the line reads.
-const UNPLAIN: [char; 15] = [
-    '#', '&', '*', '!', '|', '>', '\'', '"', '{', '}', '[', ']', '`', '\\', '\t',
+/// of which a YAML reader may read apart from how the line reads, and the `@` and `%` a
+/// login or an encoded name rides in an address on.
+const UNPLAIN: [char; 17] = [
+    '#', '&', '*', '!', '|', '>', '\'', '"', '{', '}', '[', ']', '`', '\\', '\t', '@', '%',
 ];
 
 /// What may not open a plain value besides [`UNPLAIN`].
-const UNOPENING: [char; 5] = ['-', '?', ':', '%', '@'];
+const UNOPENING: [char; 3] = ['-', '?', ':'];
 
 /// Every value the secret store keeps, and every value each replaced; refused where there
 /// is no store to read or it cannot be read, since an edit cannot then be shown safely.
@@ -66,19 +70,26 @@ pub(super) fn masked(edit: Edited, secrets: &[String]) -> Result<StackEdit, Stri
         .lines()
         .map(|line| Line::of(&taken_out(line, secrets)))
         .collect();
-    let diff = Side::ALL
-        .iter()
-        .fold(lines, |lines, side| side.masked(lines))
-        .into_iter()
-        .fold(String::new(), |mut diff, line| {
+    let old = Version::Old.shown(&lines);
+    let new = Version::New.shown(&lines);
+    let diff = lines.iter().zip(old.into_iter().zip(new)).fold(
+        String::new(),
+        |mut diff, (line, shown)| {
+            let body = match (line.side, shown) {
+                (Side::Hunk, _) => header(&line.body),
+                (_, (Some(old), Some(new))) if old != new => unvouched(&line.body),
+                (_, (Some(shown), _) | (None, Some(shown))) => shown,
+                (_, (None, None)) => unvouched(&line.body),
+            };
             let _ = writeln!(
                 diff,
                 "{}{}",
                 line.marker,
-                withheld_by(&line.body, &shown_in_a_file)
+                withheld_by(&body, &shown_in_a_file)
             );
             diff
-        });
+        },
+    );
     Ok(StackEdit {
         path: taken_out(&path, secrets),
         diff,
@@ -88,41 +99,126 @@ pub(super) fn masked(edit: Edited, secrets: &[String]) -> Result<StackEdit, Stri
 /// Which side of the diff a line stands on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Side {
-    /// Only in what is on disk.
+    /// Only in what was on disk.
     Removed,
     /// Only in what is written in its place.
     Added,
     /// In both.
     Kept,
+    /// A hunk's header, where the lines after it stop following on from those before.
+    Hunk,
 }
 
-impl Side {
-    /// Every side.
-    const ALL: [Self; 3] = [Self::Removed, Self::Added, Self::Kept];
+/// One version of the file the diff holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Version {
+    /// What was on disk: the lines kept and the lines removed.
+    Old,
+    /// What is written in its place: the lines kept and the lines added.
+    New,
+}
 
-    /// `lines` with this side's lines masked: line by line where every one of them is
-    /// [`plain`], and with no value shown otherwise.
-    fn masked(self, mut lines: Vec<Line>) -> Vec<Line> {
+impl Version {
+    /// Whether this version holds a line on `side`.
+    const fn holds(self, side: Side) -> bool {
+        matches!(
+            (self, side),
+            (_, Side::Kept) | (Self::Old, Side::Removed) | (Self::New, Side::Added)
+        )
+    }
+
+    /// What this version shows of each of `lines`, walked in file order, or nothing for a
+    /// line it does not hold: line by line where every line it holds is [`plain`], and
+    /// with no value shown otherwise.
+    fn shown(self, lines: &[Line]) -> Vec<Option<String>> {
         let plain = lines
             .iter()
-            .filter(|line| line.side == self)
+            .filter(|line| self.holds(line.side))
             .all(|line| plain(&line.body));
         let mut block = None;
-        for line in lines.iter_mut().filter(|line| line.side == self) {
-            line.body = if plain {
-                keyed(&line.body, &mut block)
-            } else {
-                unvouched(&line.body)
-            };
-        }
+        let mut above: Vec<Above> = Vec::new();
         lines
+            .iter()
+            .map(|line| {
+                if line.side == Side::Hunk {
+                    block = None;
+                    above.clear();
+                }
+                if !self.holds(line.side) {
+                    return None;
+                }
+                let orphaned = orphan(&line.body, &above);
+                if let Some(one) = Above::of(&line.body) {
+                    above.push(one);
+                }
+                let keyed = keyed(&line.body, &mut block);
+                Some(if !plain || orphaned {
+                    unvouched(&line.body)
+                } else {
+                    keyed
+                })
+            })
+            .collect()
     }
+}
+
+/// A line a version has shown since its hunk began, as a later line finds its parent.
+#[derive(Debug, Clone, Copy)]
+struct Above {
+    /// Its indentation.
+    indent: usize,
+    /// Whether it is a key whose value is what follows below it.
+    opens: bool,
+}
+
+impl Above {
+    /// `body` as a later line finds its parent; nothing where it is blank.
+    fn of(body: &str) -> Option<Self> {
+        let rest = body.trim_start_matches(' ');
+        (!rest.is_empty()).then(|| Self {
+            indent: indentation(body),
+            opens: rest.trim_end().ends_with(':'),
+        })
+    }
+}
+
+/// Whether `body` is indented, or a list item, with no parent among `above`: no line less
+/// indented, and for a list item no key opening at its own indentation either.
+fn orphan(body: &str, above: &[Above]) -> bool {
+    let rest = body.trim_start_matches(' ');
+    let indent = indentation(body);
+    let listed = rest.starts_with('-');
+    if rest.is_empty() || rest.starts_with('#') || (indent == 0 && !listed) {
+        return false;
+    }
+    !above
+        .iter()
+        .rev()
+        .any(|one| one.indent < indent || (listed && one.indent == indent && one.opens))
+}
+
+/// A hunk's header as it may be shown: its line numbers, and nothing of what follows them.
+fn header(line: &str) -> String {
+    let numbers = line
+        .strip_prefix("@@")
+        .and_then(|rest| rest.split_once("@@"))
+        .map(|(numbers, _)| numbers)
+        .filter(|numbers| {
+            numbers.chars().all(|character| {
+                character.is_ascii_digit() || matches!(character, ' ' | '-' | '+' | ',')
+            })
+        });
+    numbers.map_or_else(
+        || format!("@@ {REDACTED}"),
+        |numbers| format!("@@{numbers}@@"),
+    )
 }
 
 /// One line of a diff: its marker, its side, and what follows the marker.
 #[derive(Debug)]
 struct Line {
-    /// The `-` or `+` it opens with and the space after it, or nothing.
+    /// The `-` or `+` it opens with and the space after it, the space a kept line opens
+    /// with, or nothing.
     marker: String,
     /// Its side.
     side: Side,
@@ -133,13 +229,18 @@ struct Line {
 impl Line {
     /// `line`, read as a line of a diff.
     fn of(line: &str) -> Self {
-        let side = match line.chars().next() {
-            Some('-') => Side::Removed,
-            Some('+') => Side::Added,
-            _ => Side::Kept,
+        let side = if line.starts_with("@@") {
+            Side::Hunk
+        } else {
+            match line.chars().next() {
+                Some('-') => Side::Removed,
+                Some('+') => Side::Added,
+                _ => Side::Kept,
+            }
         };
         let after = match side {
-            Side::Kept => 0,
+            Side::Hunk => 0,
+            Side::Kept => usize::from(line.starts_with(' ')),
             Side::Removed | Side::Added => 1 + usize::from(line.get(1..2) == Some(" ")),
         };
         Self {

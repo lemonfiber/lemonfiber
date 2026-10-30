@@ -11,7 +11,7 @@ use crate::quality::{Preset, Selection};
 use crate::test_support::syncing::{a_trusted_sync, minted_for_every_part};
 
 /// A hand edit, as the sync answers it.
-const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"-  min: 0\n+  min: 25\n"}"#;
+const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"- min: 0\n+ min: 25\n"}"#;
 
 /// The preset every curator is put back to.
 fn selection() -> Selection {
@@ -65,7 +65,7 @@ async fn a_hand_edit_is_shown_and_put_back_through_a_sync_speaking_its_contract(
         reapplied(&rehearsing, &selection(), None).await.ok(),
         Some(Some(StackEdit {
             path: "recyclarr.yml".to_owned(),
-            diff: "-  min: 0\n+  min: 25\n".to_owned(),
+            diff: "- min: 0\n+ min: 25\n".to_owned(),
         }))
     );
     assert!(customised(&rehearsing, &selection(), None).await);

@@ -26,15 +26,15 @@ fn the_curators_own_key_is_taken_out_wherever_the_sync_left_it() {
     let encoded = "k%2Fey%3D1";
     let diff = shown(
         &format!(
-            "-  base_url: http://sonarr:8989/?apikey={KEY}\n-  note: {KEY}\n+  url: http://x/?a={encoded}\n+  quality_profiles: balanced\n"
+            "- base_url: http://sonarr:8989/?apikey={KEY}\n- note: {KEY}\n+ url: http://x/?a={encoded}\n+ quality_profiles: balanced\n"
         ),
         &[KEY, "k/ey=1"],
     );
 
     assert!(!diff.contains(KEY), "{diff}");
     assert!(!diff.contains(encoded), "{diff}");
-    assert!(diff.contains(&format!("-  note: {REDACTED}")), "{diff}");
-    assert!(diff.contains("+  quality_profiles: balanced"), "{diff}");
+    assert!(diff.contains(&format!("- note: {REDACTED}")), "{diff}");
+    assert!(diff.contains("+ quality_profiles: balanced"), "{diff}");
 }
 
 #[test]
@@ -106,8 +106,8 @@ fn an_edit_too_long_or_named_by_no_path_is_refused() {
     assert!(long.is_err_and(|why| why.contains("longer than")));
     assert!(unnamed.is_err_and(|why| why.contains("not a path")));
     assert_eq!(
-        shown("-  min: 0\n+  min: 25\n", &[""]),
-        "-  min: 0\n+  min: 25\n"
+        shown("- min: 0\n+ min: 25\n", &[""]),
+        "- min: 0\n+ min: 25\n"
     );
 }
 
@@ -265,4 +265,57 @@ fn a_plain_side_is_read_line_by_line_and_shows_what_names_no_credential() {
     );
     assert!(diff.contains("-     min: 0"), "{diff}");
     assert!(diff.contains("+ min: 25"), "{diff}");
+}
+
+#[test]
+fn a_list_at_a_credentials_own_indentation_shows_none_of_its_items() {
+    let diff = shown(
+        &format!("+ tokens:\n+ - {PASTED}\n+ - other{PASTED}\n+ min: 25\n"),
+        &[],
+    );
+
+    assert!(!diff.contains(PASTED), "{diff}");
+    assert!(diff.contains("+ min: 25"), "{diff}");
+}
+
+#[test]
+fn a_line_under_a_credential_kept_as_it_was_or_outside_the_hunk_shows_nothing() {
+    for diff in [
+        format!(" auth:\n+   value: {PASTED}\n+ min: 25\n"),
+        format!(" auth:\n+   - {PASTED}\n+ min: 25\n"),
+        format!("@@ -4,2 +4,2 @@\n+   - {PASTED}\n+ min: 25\n"),
+        format!("+   value: {PASTED}\n+ min: 25\n"),
+        format!(" api_key:\n-   - {PASTED}\n+   - other{PASTED}\n"),
+    ] {
+        let shown = shown(&diff, &[]);
+        assert!(!shown.contains(PASTED), "{diff} came out as {shown}");
+    }
+}
+
+#[test]
+fn a_hunks_header_shows_its_line_numbers_alone() {
+    let diff = shown(
+        &format!("@@ -4,2 +4,2 @@ api_key: {PASTED}\n@@ {PASTED} @@\n+ min: 25\n"),
+        &[],
+    );
+
+    assert!(!diff.contains(PASTED), "{diff}");
+    assert!(diff.starts_with("@@ -4,2 +4,2 @@\n"), "{diff}");
+    assert!(diff.contains("+ min: 25"), "{diff}");
+}
+
+#[test]
+fn a_login_or_a_credential_inside_an_address_never_shows() {
+    for line in [
+        "+ url: http://admin:hunter2@sonarr:8989".to_owned(),
+        "+ base: https://user:pw0rdvalue@host/path".to_owned(),
+        format!("+ url: http://sonarr:8989/?apikey={PASTED}"),
+        format!("+ url: http://sonarr:8989/a;password={PASTED}"),
+        format!("+ url: http://sonarr:8989/?api%4Bey={PASTED}"),
+    ] {
+        let diff = shown(&format!("{line}\n"), &[]);
+        for leaked in ["hunter2", "pw0rdvalue", PASTED] {
+            assert!(!diff.contains(leaked), "{line} came out as {diff}");
+        }
+    }
 }

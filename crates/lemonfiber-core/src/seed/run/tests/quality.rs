@@ -277,7 +277,7 @@ const EDITED: &str = "/lemonfiber/quality.sync/v1/edited";
 const REAPPLY: &str = "/lemonfiber/quality.sync/v1/reapply";
 
 /// A hand edit, as the sync answers it.
-const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"-  min: 0\n+  min: 25\n"}"#;
+const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"- min: 0\n+ min: 25\n"}"#;
 
 /// A sync answering `edited` with [`AN_EDIT`] and `reapply` with `reapplied`.
 fn reapplying(reapplied: &'static str) -> Arc<Fake> {
@@ -302,7 +302,7 @@ async fn a_rehearsal_shows_the_edit_and_the_real_run_puts_the_preset_back_over_i
     let selection = crate::quality::Selection::everywhere(crate::quality::Preset::default_preset());
     let edit = crate::model::StackEdit {
         path: "recyclarr.yml".to_owned(),
-        diff: "-  min: 0\n+  min: 25\n".to_owned(),
+        diff: "- min: 0\n+ min: 25\n".to_owned(),
     };
     let http = reapplying(format!(r#"{{"replaced":{AN_EDIT},"applied":null}}"#).leak());
     let mut ctx = contracted_ctx(&project, "sync", true, http.clone());
