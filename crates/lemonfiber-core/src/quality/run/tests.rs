@@ -41,8 +41,8 @@ fn set(preset: Preset, media_type: Option<&str>, confirm: bool) -> QualityAction
 /// Run a command, taking a defaulted (empty) report where it errored — the
 /// error cases assert on the `Err` directly, so a default here fails an
 /// assertion rather than hiding a fault.
-fn run(context: &Ctx, action: QualityAction) -> QualityReport {
-    quality(context, action).ok().unwrap_or_default()
+async fn run(context: &Ctx, action: QualityAction) -> QualityReport {
+    quality(context, action).await.ok().unwrap_or_default()
 }
 
 /// The global choice — the first row of a report.
@@ -50,9 +50,9 @@ fn global(report: &QualityReport) -> PresetChoice {
     report.choices.first().cloned().unwrap_or_default()
 }
 
-#[test]
-fn showing_with_nothing_chosen_offers_the_default() {
-    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show);
+#[tokio::test]
+async fn showing_with_nothing_chosen_offers_the_default() {
+    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show).await;
     assert_eq!(report.disposition, Disposition::Shown);
     assert_eq!(report.choices.len(), 1);
     let global = global(&report);
@@ -62,26 +62,26 @@ fn showing_with_nothing_chosen_offers_the_default() {
     assert!(!global.needs_transcoding_here);
 }
 
-#[test]
-fn a_chosen_preset_is_recorded_and_reads_back() {
+#[tokio::test]
+async fn a_chosen_preset_is_recorded_and_reads_back() {
     let env = scratch("recorded");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
-    let report = run(&context, set(Preset::HighQuality, None, false));
+    let report = run(&context, set(Preset::HighQuality, None, false)).await;
     assert_eq!(report.disposition, Disposition::Recorded);
     assert_eq!(global(&report).preset, Preset::HighQuality.label());
 
     // A later show reads the recorded choice rather than the default.
-    let shown = run(&context, QualityAction::Show);
+    let shown = run(&context, QualityAction::Show).await;
     assert_eq!(global(&shown).preset, Preset::HighQuality.label());
 }
 
-#[test]
-fn a_per_type_choice_is_recorded_apart_from_the_global() {
+#[tokio::test]
+async fn a_per_type_choice_is_recorded_apart_from_the_global() {
     let env = scratch("per-type");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
-    let report = run(&context, set(Preset::HighQuality, Some("movies"), false));
+    let report = run(&context, set(Preset::HighQuality, Some("movies"), false)).await;
     assert_eq!(report.disposition, Disposition::Recorded);
     // The global stays the default; movies is set apart.
     assert_eq!(global(&report).scope, "everything");
@@ -94,8 +94,8 @@ fn a_per_type_choice_is_recorded_apart_from_the_global() {
     assert_eq!(movies, Some(Preset::HighQuality.label()));
 }
 
-#[test]
-fn a_chosen_music_format_is_shown_apart_from_the_resolution_presets() {
+#[tokio::test]
+async fn a_chosen_music_format_is_shown_apart_from_the_resolution_presets() {
     use crate::audio::Format;
     use crate::quality::Selection;
     let env = scratch("music-show");
@@ -111,7 +111,8 @@ fn a_chosen_music_format_is_shown_apart_from_the_resolution_presets() {
     let report = run(
         &ctx(Some(env.to_path_buf()), Environment::LinuxNative),
         QualityAction::Show,
-    );
+    )
+    .await;
     let music = report.music.unwrap_or_default();
     assert_eq!(music.scope, "music");
     assert_eq!(music.format, Format::HiRes.label());
@@ -119,36 +120,36 @@ fn a_chosen_music_format_is_shown_apart_from_the_resolution_presets() {
     assert!(!music.targets.is_empty());
 }
 
-#[test]
-fn showing_with_no_music_chosen_reports_none() {
+#[tokio::test]
+async fn showing_with_no_music_chosen_reports_none() {
     // The default axis stands in for playback, but music is only reported once the
     // operator has actually chosen a format — otherwise it is absent, not defaulted.
-    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show);
+    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show).await;
     assert!(report.music.is_none());
 }
 
-#[test]
-fn a_transcoding_choice_is_held_on_a_software_only_host() {
+#[tokio::test]
+async fn a_transcoding_choice_is_held_on_a_software_only_host() {
     let env = scratch("held");
     // A media server in Docker on macOS cannot hardware-transcode.
     let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
-    let report = run(&context, set(Preset::Maximum, None, false));
+    let report = run(&context, set(Preset::Maximum, None, false)).await;
     assert_eq!(report.disposition, Disposition::Held);
     assert!(global(&report).needs_transcoding_here);
     // Held means not recorded: a show falls back to the default.
-    let shown = run(&context, QualityAction::Show);
+    let shown = run(&context, QualityAction::Show).await;
     assert_eq!(global(&shown).preset, Preset::default_preset().label());
 }
 
-#[test]
-fn a_confirmed_transcoding_choice_is_recorded() {
+#[tokio::test]
+async fn a_confirmed_transcoding_choice_is_recorded() {
     let env = scratch("confirmed");
     let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
-    let report = run(&context, set(Preset::Maximum, None, true));
+    let report = run(&context, set(Preset::Maximum, None, true)).await;
     assert_eq!(report.disposition, Disposition::Recorded);
     assert!(global(&report).needs_transcoding_here);
 }
@@ -158,8 +159,8 @@ fn a_confirmed_transcoding_choice_is_recorded() {
 ///
 /// A per-type exception is the case worth driving: the global preset asks for
 /// nothing, and film night still meets the transcode.
-#[test]
-fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
+#[tokio::test]
+async fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
     let env = scratch("straining");
     let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
@@ -168,7 +169,7 @@ fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
         "nothing is chosen yet, so nothing is strained"
     );
 
-    let recorded = run(&context, set(Preset::Maximum, Some("movies"), true));
+    let recorded = run(&context, set(Preset::Maximum, Some("movies"), true)).await;
     assert_eq!(recorded.disposition, Disposition::Recorded);
 
     assert_eq!(
@@ -179,51 +180,52 @@ fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
 }
 
 /// A host that reaches its encoder is strained by nothing, whatever is chosen.
-#[test]
-fn a_host_that_transcodes_in_hardware_is_never_strained() {
+#[tokio::test]
+async fn a_host_that_transcodes_in_hardware_is_never_strained() {
     let env = scratch("unstrained");
     let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
-    let recorded = run(&context, set(Preset::Maximum, None, false));
+    let recorded = run(&context, set(Preset::Maximum, None, false)).await;
     assert_eq!(recorded.disposition, Disposition::Recorded);
     assert!(straining(&context).is_none());
 }
 
 /// A machine with nothing configured is answered rather than refused.
-#[test]
-fn a_machine_with_no_choice_and_no_stack_is_strained_by_nothing() {
+#[tokio::test]
+async fn a_machine_with_no_choice_and_no_stack_is_strained_by_nothing() {
     assert!(straining(&ctx(None, Environment::MacOs)).is_none());
 }
 
-#[test]
-fn a_native_media_server_lets_a_transcoding_choice_through_unheld() {
+#[tokio::test]
+async fn a_native_media_server_lets_a_transcoding_choice_through_unheld() {
     let env = scratch("native");
     let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "native");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
-    let report = run(&context, set(Preset::Maximum, None, false));
+    let report = run(&context, set(Preset::Maximum, None, false)).await;
     assert_eq!(report.disposition, Disposition::Recorded);
     assert!(!global(&report).needs_transcoding_here);
 }
 
-#[test]
-fn a_rehearsed_set_reports_what_it_would_do_and_writes_nothing() {
+#[tokio::test]
+async fn a_rehearsed_set_reports_what_it_would_do_and_writes_nothing() {
     let env = scratch("rehearsed");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative).rehearsing();
 
-    let report = run(&context, set(Preset::SpaceSaving, None, false));
+    let report = run(&context, set(Preset::SpaceSaving, None, false)).await;
     assert_eq!(report.disposition, Disposition::Rehearsed);
     // Nothing was written: a real show sees the default.
     let shown = run(
         &ctx(Some(env.to_path_buf()), Environment::LinuxNative),
         QualityAction::Show,
-    );
+    )
+    .await;
     assert_eq!(global(&shown).preset, Preset::default_preset().label());
 }
 
-#[test]
-fn an_unparsable_choice_is_surfaced_and_never_overwritten() {
+#[tokio::test]
+async fn an_unparsable_choice_is_surfaced_and_never_overwritten() {
     let env = scratch("corrupt");
     // A present-but-corrupt quality.json: not a first run, and not a value to
     // guess past.
@@ -232,15 +234,17 @@ fn an_unparsable_choice_is_surfaced_and_never_overwritten() {
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
     // Both showing and setting refuse rather than reading it as the default.
-    assert!(quality(&context, QualityAction::Show).is_err());
-    assert!(quality(&context, set(Preset::Maximum, None, true)).is_err());
+    assert!(quality(&context, QualityAction::Show).await.is_err());
+    assert!(quality(&context, set(Preset::Maximum, None, true))
+        .await
+        .is_err());
     // The corrupt file is left exactly as it was — a set did not overwrite it.
     let after = std::fs::read_to_string(&corrupt).unwrap_or_default();
     assert_eq!(after, "this is not json");
 }
 
-#[test]
-fn a_choice_file_that_cannot_be_read_is_surfaced() {
+#[tokio::test]
+async fn a_choice_file_that_cannot_be_read_is_surfaced() {
     // A directory where the file should be: reading it fails with something
     // other than "not found", which must be surfaced, not read as a first run.
     let env = scratch("unreadable");
@@ -251,19 +255,20 @@ fn a_choice_file_that_cannot_be_read_is_surfaced() {
         &ctx(Some(env.to_path_buf()), Environment::LinuxNative),
         QualityAction::Show
     )
+    .await
     .is_err());
 }
 
-#[test]
-fn the_projection_reads_the_recorded_choice() {
+#[tokio::test]
+async fn the_projection_reads_the_recorded_choice() {
     let env = scratch("projection-recorded");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
-    let _ = quality(&context, set(Preset::Maximum, None, true));
+    let _ = quality(&context, set(Preset::Maximum, None, true)).await;
     assert_eq!(super::most_demanding_or_default(&context), Preset::Maximum);
 }
 
-#[test]
-fn the_projection_falls_back_to_the_default_on_an_unreadable_choice() {
+#[tokio::test]
+async fn the_projection_falls_back_to_the_default_on_an_unreadable_choice() {
     // A corrupt choice must not fail a diagnostic run: the projection quietly
     // uses the default rather than surfacing, since it writes nothing.
     let env = scratch("projection-corrupt");
@@ -275,18 +280,19 @@ fn the_projection_falls_back_to_the_default_on_an_unreadable_choice() {
     );
 }
 
-#[test]
-fn a_set_with_nowhere_to_record_is_refused() {
+#[tokio::test]
+async fn a_set_with_nowhere_to_record_is_refused() {
     let refused = quality(
         &ctx(None, Environment::LinuxNative),
         set(Preset::Balanced, None, false),
-    );
+    )
+    .await;
     assert!(refused.is_err(), "a set with no config path cannot record");
 }
 
 #[cfg(unix)]
-#[test]
-fn a_set_that_cannot_be_written_is_reported() {
+#[tokio::test]
+async fn a_set_that_cannot_be_written_is_reported() {
     use std::os::unix::fs::PermissionsExt as _;
 
     // A directory that can be read (so an absent choice loads as the default)
@@ -300,7 +306,8 @@ fn a_set_that_cannot_be_written_is_reported() {
     let refused = quality(
         &ctx(Some(dir.join(".env")), Environment::LinuxNative),
         set(Preset::Balanced, None, false),
-    );
+    )
+    .await;
     assert!(refused.is_err(), "an unwritable location is reported");
 
     let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
@@ -320,39 +327,39 @@ fn embedded_ctx(env: Option<PathBuf>, into: Option<PathBuf>) -> Ctx {
         .build()
 }
 
-#[test]
-fn reapply_on_an_external_stack_changes_nothing() {
+#[tokio::test]
+async fn reapply_on_an_external_stack_changes_nothing() {
     // An external stack is the operator's; there is nothing lemonfiber wrote to
     // re-assert, so a reapply reports itself and touches nothing.
-    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Reapply);
+    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Reapply).await;
     assert_eq!(report.disposition, Disposition::Reapplied);
     assert!(!report.customised);
 }
 
-#[test]
-fn a_rehearsed_reapply_reports_it_would_reapply() {
+#[tokio::test]
+async fn a_rehearsed_reapply_reports_it_would_reapply() {
     let context = ctx(None, Environment::LinuxNative).rehearsing();
-    let report = run(&context, QualityAction::Reapply);
+    let report = run(&context, QualityAction::Reapply).await;
     assert_eq!(report.disposition, Disposition::WouldReapply);
 }
 
-#[test]
-fn reapply_overwrites_a_customised_config_through_the_command() {
+#[tokio::test]
+async fn reapply_overwrites_a_customised_config_through_the_command() {
     let env = scratch("reapply-overwrite");
     let into = env.with_file_name("stack");
     let context = embedded_ctx(Some(env.to_path_buf()), Some(into.clone()));
 
     // Choose a preset and bring it onto disk, then hand-edit the config.
-    let _ = quality(&context, set(Preset::Maximum, None, true));
+    let _ = quality(&context, set(Preset::Maximum, None, true)).await;
     let quality_sync = into.join("config/recyclarr/recyclarr.yml");
     // The set records the choice but does not materialise; bring it on disk via a
     // reapply, then the operator edits it by hand.
-    let _ = quality(&context, QualityAction::Reapply);
+    let _ = quality(&context, QualityAction::Reapply).await;
     let _ = std::fs::write(&quality_sync, "# mine\n");
 
     // The command sees the customisation and, being the explicit consent,
     // overwrites it with the recorded preset.
-    let report = run(&context, QualityAction::Reapply);
+    let report = run(&context, QualityAction::Reapply).await;
     assert_eq!(report.disposition, Disposition::Reapplied);
     assert!(report.customised, "it reports that it overwrote an edit");
     // And says which lines went, rather than only that some did.
@@ -369,37 +376,38 @@ fn reapply_overwrites_a_customised_config_through_the_command() {
 
 /// Nothing of the operator's to lose is nothing to show, which keeps the word and
 /// the diff from coming apart.
-#[test]
-fn a_reapply_over_a_config_nobody_edited_shows_no_diff() {
+#[tokio::test]
+async fn a_reapply_over_a_config_nobody_edited_shows_no_diff() {
     let env = scratch("reapply-unedited");
     let into = env.with_file_name("stack");
     let context = embedded_ctx(Some(env.to_path_buf()), Some(into));
 
-    let _ = quality(&context, set(Preset::Maximum, None, true));
-    let _ = quality(&context, QualityAction::Reapply);
+    let _ = quality(&context, set(Preset::Maximum, None, true)).await;
+    let _ = quality(&context, QualityAction::Reapply).await;
 
-    let report = run(&context, QualityAction::Reapply);
+    let report = run(&context, QualityAction::Reapply).await;
     assert!(!report.customised);
     assert!(report.overwritten.is_none(), "{:?}", report.overwritten);
 }
 
-#[test]
-fn a_reapply_with_nowhere_to_write_is_reported() {
+#[tokio::test]
+async fn a_reapply_with_nowhere_to_write_is_reported() {
     // The embedded stack has a quality sync config to re-assert, but no directory it
     // is materialised into, so the reapply is refused rather than guessing.
     let refused = quality(
         &embedded_ctx(Some(scratch("reapply-nowhere").to_path_buf()), None),
         QualityAction::Reapply,
-    );
+    )
+    .await;
     assert!(
         refused.is_err(),
         "a reapply with nowhere to write is refused"
     );
 }
 
-#[test]
-fn every_answer_offers_the_presets_formats_and_media_types_the_command_takes() {
-    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show);
+#[tokio::test]
+async fn every_answer_offers_the_presets_formats_and_media_types_the_command_takes() {
+    let report = run(&ctx(None, Environment::LinuxNative), QualityAction::Show).await;
 
     assert_eq!(
         report.offered.presets,
@@ -409,13 +417,13 @@ fn every_answer_offers_the_presets_formats_and_media_types_the_command_takes() {
     assert_eq!(report.offered.media_types, ["tv", "movies", "music"]);
 }
 
-#[test]
-fn only_an_answer_to_a_choice_says_it_shapes_future_acquisitions_alone() {
+#[tokio::test]
+async fn only_an_answer_to_a_choice_says_it_shapes_future_acquisitions_alone() {
     let env = scratch("changes");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
-    let chosen = run(&context, set(Preset::Balanced, None, false));
-    let shown = run(&context, QualityAction::Show);
+    let chosen = run(&context, set(Preset::Balanced, None, false)).await;
+    let shown = run(&context, QualityAction::Show).await;
 
     assert_eq!(chosen.changes.as_deref(), Some(super::CHANGES));
     assert!(super::CHANGES.contains("from now on"));

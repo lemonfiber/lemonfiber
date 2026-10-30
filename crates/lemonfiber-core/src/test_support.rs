@@ -43,6 +43,7 @@ mod crossing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader};
 pub(crate) mod egress;
 mod gating;
+pub(crate) mod syncing;
 pub(crate) use gating::{a_contracted_gate, unaskable_gates, GATE_TRUSTED};
 
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.

@@ -31,4 +31,14 @@ codes! {
         remedy: "Check the indexer carries this content, or wait. No action is needed if it is \
             merely not out yet.",
     }
+    /// Raised where a quality sync speaking its contract would not show or put back the
+    /// preset over a hand edit.
+    UNREAPPLIED = "QUAL-4" {
+        severity: Error,
+        status: 502,
+        since: "0.18.0",
+        meaning: "The quality sync did not show or put back the preset over the hand-edited \
+            configuration, so the edit stands as it was.",
+        remedy: "Check the quality sync is running with lemonfiber status, then ask again.",
+    }
 }

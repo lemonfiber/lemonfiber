@@ -379,6 +379,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `QUAL-1` | `HEADROOM_LOW` | warning | 1 | 500 | 0.4.0 | Raised when the free space holds too little content at the chosen quality. |
 | `QUAL-2` | `PRESET_UNMET` | warning | 1 | 500 | 0.4.0 | Raised when releases exist but the profile — the chosen quality included — wants none of them. |
 | `QUAL-3` | `NONE_AVAILABLE` | warning | 1 | 500 | 0.4.0 | Raised when a clean search turns up nothing at all for wanted content. |
+| `QUAL-4` | `UNREAPPLIED` | error | 1 | 502 | 0.18.0 | Raised where a quality sync speaking its contract would not show or put back the preset over a hand edit. |
 
 ## `QUOTA` — what the household may ask for
 

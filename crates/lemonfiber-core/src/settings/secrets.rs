@@ -56,6 +56,13 @@ impl Secrets {
         self.held.get(name).map(|kept| kept.value.as_str())
     }
 
+    /// Every value held, and every value each replaced.
+    pub(crate) fn values(&self) -> impl Iterator<Item = &str> {
+        self.held
+            .values()
+            .flat_map(|kept| std::iter::once(kept.value.as_str()).chain(kept.previous.as_deref()))
+    }
+
     pub(crate) fn source(&self, name: &str) -> Option<Source> {
         self.held.get(name).map(|kept| kept.from)
     }

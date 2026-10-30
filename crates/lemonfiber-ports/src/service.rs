@@ -99,7 +99,7 @@ pub use searching::{Asked, Detail, Found, Page, Searching, Season, Wish};
 pub use showing::{Entry, EntryWidget, Group, PageWidget, Panels, Showing};
 pub use solving::{Cookie, Solved, Solving};
 pub use subtitles::{Subtitles, Watched, Watching};
-pub use syncing::{Profiled, Syncing};
+pub use syncing::{Edited, Profiled, Reapplied, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 pub use tunnelling::Tunnelling;

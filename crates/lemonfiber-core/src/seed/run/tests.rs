@@ -17,6 +17,7 @@ use crate::stack::Source;
 use crate::test_support::curators::curated;
 use crate::test_support::indexer::INDEXER;
 use crate::test_support::requests::REQUESTS;
+use crate::test_support::syncing::minted_for_every_part;
 use crate::test_support::{
     a_context, contracted, first_party, seeding, seeding_with, FixedRandom, Reporting, SeedFs,
 };
@@ -483,36 +484,6 @@ fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: A
 fn forgetting_minted(ctx: Ctx) -> Ctx {
     let _ = std::fs::remove_file(crate::settings::secrets_at(&ctx).unwrap_or_default());
     ctx
-}
-
-/// `key` kept in `ctx`'s secret store as the key lemonfiber minted for every part the
-/// bundle pins.
-fn minted_for_every_part(ctx: &Ctx, key: &str) {
-    let names: Vec<String> = lemonfiber_bundled::PINNED
-        .iter()
-        .filter_map(|pinned| lemonfiber_plugin::Manifest::from_toml(pinned.copy).ok())
-        .flat_map(|manifest| {
-            let installed = crate::plugin::Installed::of(&manifest);
-            installed
-                .declared
-                .secrets
-                .iter()
-                .filter(|secret| secret.minted)
-                .map(|secret| crate::settings::named(&installed.plugin, &secret.id))
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    let keeping: Vec<crate::settings::Keeping<'_>> = names
-        .iter()
-        .map(|name| crate::settings::Keeping {
-            name,
-            value: key,
-            from: crate::settings::Source::Minted,
-            at: 1,
-        })
-        .collect();
-    let at = crate::settings::secrets_at(ctx).unwrap_or_default();
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
 }
 
 /// `installed`, each of its services asking for every curator.

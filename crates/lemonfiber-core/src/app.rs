@@ -438,7 +438,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),
         Command::ConfigShow => configuring::get(ctx, None).await.map(Outcome::Config),
-        Command::Quality(action) => quality::quality(ctx, action).map(Outcome::Quality),
+        Command::Quality(action) => quality::quality(ctx, action).await.map(Outcome::Quality),
         Command::Alerts(action) => appetite::alerts(ctx, action).map(Outcome::Alerts),
         Command::History => history::history(ctx).map(Outcome::History),
         Command::Migrate(action) => migration::migrate(ctx, action).await,
