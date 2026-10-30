@@ -184,6 +184,13 @@ async fn an_adapter_not_recorded_at_its_upstream_or_answering_without_the_key_is
             "lists no release recorded at",
         ),
         (
+            "adapter-unrecorded-release",
+            about(r#"["media.serve@1"]"#, UPSTREAM)
+                .replace("}]}", r#"},{"version":"1.12.0","digest":"sha256:1111"}]}"#),
+            lemonfiber_fixtures::http::Answer::reply(401, ""),
+            "it lists release 1.12.0 at sha256:1111, and its recordings were taken from",
+        ),
+        (
             "adapter-open",
             about(r#"["media.serve@1"]"#, UPSTREAM),
             lemonfiber_fixtures::http::Answer::reply(200, ""),
