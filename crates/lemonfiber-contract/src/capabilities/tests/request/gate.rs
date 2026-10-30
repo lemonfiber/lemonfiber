@@ -2,7 +2,9 @@
 //! through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Admitted, Failure, Gated, Gating, Target};
+use lemonfiber_ports::service::{
+    Admitted, Failure, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target,
+};
 
 use super::super::{crosses_alike, gate, json, Upstream};
 
@@ -30,6 +32,24 @@ impl Gating for Upstream {
         self.tell("admitted".to_owned());
         Ok(vec![Admitted::of(&curator("music"))])
     }
+    async fn admit_tokens(&self, route: &str, tokens: &[String]) -> Result<(), Failure> {
+        self.tell(format!("admit_tokens {route} {tokens:?}"));
+        Ok(())
+    }
+    async fn record(&self, after: u64) -> Result<GateRecord, Failure> {
+        self.tell(format!("record {after}"));
+        Ok(GateRecord {
+            entries: vec![GateEntry {
+                seq: after + 1,
+                at: 1_799_000_000,
+                route: "tv".to_owned(),
+                method: "DELETE".to_owned(),
+                path: "/api/v3/series/7".to_owned(),
+                outcome: GateOutcome::Removed,
+            }],
+            lost: 2,
+        })
+    }
 }
 
 /// Every operation of the capability, each answer written down.
@@ -50,12 +70,21 @@ async fn script<G: Gating>(gate: &G) -> Vec<String> {
     vec![
         format!("{:?}", gate.admit(&routes).await),
         format!("{:?}", gate.admitted().await),
+        format!(
+            "{:?}",
+            gate.admit_tokens("movies", &["ab".repeat(32)]).await
+        ),
+        format!("{:?}", gate.record(40).await),
     ]
 }
 
 #[tokio::test]
 async fn a_gate_answers_and_is_told_through_its_contract_as_it_is_in_process() {
-    crosses_alike!(script, gate::Adapter, ["admit", "admitted"]);
+    crosses_alike!(
+        script,
+        gate::Adapter,
+        ["admit", "admitted", "admit_tokens", "record"]
+    );
 }
 
 #[test]

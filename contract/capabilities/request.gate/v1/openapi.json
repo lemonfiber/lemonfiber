@@ -88,8 +88,14 @@
     "/lemonfiber/request.gate/v1/admit": {
       "$ref": "operations/admit.json"
     },
+    "/lemonfiber/request.gate/v1/admit_tokens": {
+      "$ref": "operations/admit_tokens.json"
+    },
     "/lemonfiber/request.gate/v1/admitted": {
       "$ref": "operations/admitted.json"
+    },
+    "/lemonfiber/request.gate/v1/record": {
+      "$ref": "operations/record.json"
     }
   }
 }

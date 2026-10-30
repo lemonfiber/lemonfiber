@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "request.gate/v1/openapi.json",
-      "sha256": "ef58fefc9d945212fe186be98f8bcdf3766f51f09c831077d7cb94693356783c"
+      "sha256": "c96bbf25a3cc1497ee4a22e2a7acb0dd6e5e573c4def532d987ef62fa2e4a3f4"
     },
     {
       "path": "request.gate/v1/operations/admit.json",
@@ -14,8 +14,16 @@
       "sha256": "64ec38d6243ead0e6f69cae5ad1f285d3c996c58e033bdf1de5678e0f013c322"
     },
     {
+      "path": "request.gate/v1/operations/admit_tokens.json",
+      "sha256": "45b8ce28362d9cbc6af2f45f7fd68a86d790bab3a5b0590b2d3dbabd9838f3ee"
+    },
+    {
+      "path": "request.gate/v1/operations/record.json",
+      "sha256": "19d738a1b3e9c11e02be8d2cd6193c3471089669f39594b50adf136fbba18882"
+    },
+    {
       "path": "request.gate/v1/conformance.json",
-      "sha256": "27d7969812e530b7ae7b8a9cc36fe4db6e02818148e02e7aa4b1f240cb9a0890"
+      "sha256": "9a36f569007e68d637045cee76242d30253a9b8ea72202f699ac816ec23a0cd7"
     }
   ],
   "major": 1

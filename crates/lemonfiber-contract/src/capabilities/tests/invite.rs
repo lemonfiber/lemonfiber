@@ -2,7 +2,10 @@
 //! process and through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Claimed, Declinable, Declining, Failure, Invitations, KeyHeld};
+use lemonfiber_ports::service::{
+    Claimed, Declinable, Declined, Declining, Failure, Invitations, KeyHeld, Lapsed, LeftBecause,
+    TakenBack,
+};
 
 use super::{crosses_alike, decline, Upstream};
 
@@ -22,6 +25,38 @@ impl Declining for Upstream {
     async fn apply_invitations(&self, invitations: &Invitations) -> Result<(), Failure> {
         self.tell(format!("apply_invitations {invitations:?}"));
         Ok(())
+    }
+    async fn refusals(&self) -> Result<Vec<Declined>, Failure> {
+        self.tell("refusals".to_owned());
+        Ok(vec![Declined {
+            token: "ab".repeat(32),
+            account: "a7f3".to_owned(),
+            at: 1_799_500_000,
+        }])
+    }
+    async fn lapses(&self) -> Result<Vec<Lapsed>, Failure> {
+        self.tell("lapses".to_owned());
+        Ok([
+            TakenBack::Removed,
+            TakenBack::SwitchedOff,
+            TakenBack::Left {
+                why: LeftBecause::Claimed,
+            },
+        ]
+        .into_iter()
+        .map(|outcome| Lapsed {
+            token: "cd".repeat(32),
+            account: "b8e4".to_owned(),
+            name: "Bo".to_owned(),
+            issued: 1_799_086_400,
+            at: 1_800_086_400,
+            outcome,
+        })
+        .collect())
+    }
+    async fn page(&self) -> Result<String, Failure> {
+        self.tell("page".to_owned());
+        Ok("/decline/{token}".to_owned())
     }
 }
 
@@ -53,6 +88,9 @@ async fn script<D: Declining>(decline: &D) -> Vec<String> {
         ),
         format!("{:?}", decline.held().await),
         format!("{:?}", decline.apply_invitations(&invitations).await),
+        format!("{:?}", decline.refusals().await),
+        format!("{:?}", decline.lapses().await),
+        format!("{:?}", decline.page().await),
     ]
 }
 
@@ -61,6 +99,13 @@ async fn a_decline_service_answers_and_is_told_through_its_contract_as_it_is_in_
     crosses_alike!(
         script,
         decline::Adapter,
-        ["hold", "held", "apply_invitations"]
+        [
+            "hold",
+            "held",
+            "apply_invitations",
+            "refusals",
+            "lapses",
+            "page"
+        ]
     );
 }

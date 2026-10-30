@@ -91,6 +91,50 @@ impl Admitted {
     }
 }
 
+/// What became of one call the gate recorded.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum GateOutcome {
+    /// Refused, and not passed on.
+    Refused,
+    /// A removal, passed on.
+    Removed,
+}
+
+/// One call the gate recorded: never a token, a query string or a body.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct GateEntry {
+    /// Its place in the record, counting from one and never reused.
+    pub seq: u64,
+    /// When, in seconds since the Unix epoch.
+    pub at: u64,
+    /// The path segment of the route it was made on.
+    pub route: String,
+    /// Its method, as it was sent.
+    pub method: String,
+    /// Its path, without a query string.
+    pub path: String,
+    /// What became of it.
+    pub outcome: GateOutcome,
+}
+
+/// What the gate recorded after one entry.
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct GateRecord {
+    /// Every entry after it that the gate still holds, oldest first.
+    pub entries: Vec<GateEntry>,
+    /// How many entries after it the gate no longer holds.
+    pub lost: u64,
+}
+
 /// A request gate, told every route it admits.
 #[async_trait]
 pub trait Gating: Send + Sync {
@@ -107,6 +151,21 @@ pub trait Gating: Send + Sync {
     ///
     /// Returns [`Failure`] where it is unreachable or answers unreadably.
     async fn admitted(&self) -> Result<Vec<Admitted>, Failure>;
+
+    /// Admit only `tokens`, each a SHA-256 in lower-case hexadecimal, on the route under
+    /// the path segment `route`, leaving every credential it holds as it is.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where it is unreachable or refuses.
+    async fn admit_tokens(&self, route: &str, tokens: &[String]) -> Result<(), Failure>;
+
+    /// Every refusal and forwarded removal it recorded after the entry numbered `after`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where it is unreachable or answers unreadably.
+    async fn record(&self, after: u64) -> Result<GateRecord, Failure>;
 }
 
 #[cfg(test)]

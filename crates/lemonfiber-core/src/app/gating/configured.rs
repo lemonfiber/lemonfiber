@@ -6,13 +6,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_sidecar::gate::{Accepted, Credential, File, Kind, Tokens, Upstream, Upstreams};
+use lemonfiber_sidecar::gate::{
+    Accepted, Credential, File, Kind, Outcome, Record, Tokens, Upstream, Upstreams,
+};
 use lemonfiber_sidecar::{Pins, TokenHash};
 
 use super::{path, SERVICE};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::media;
-use crate::ports::service::{Admitted, Failure, Gated, Gating, Target};
+use crate::ports::service::{
+    Admitted, Failure, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target,
+};
 
 /// The stack's own request gate, beneath the project its configuration is mounted from.
 pub(crate) struct Configured {
@@ -117,6 +121,54 @@ impl Gating for Configured {
                 })
             })
             .collect())
+    }
+
+    async fn admit_tokens(&self, route: &str, tokens: &[String]) -> Result<(), Failure> {
+        let held = self.read(File::Tokens).await;
+        let mut routes = held
+            .as_deref()
+            .and_then(|text| Tokens::read(text).ok())
+            .map(|read| read.routes)
+            .unwrap_or_default();
+        let accepted: Vec<_> = tokens.iter().map(|hash| TokenHash::written(hash)).collect();
+        match routes.iter_mut().find(|one| one.route == route) {
+            Some(one) => one.tokens = accepted,
+            None => {
+                return Err(Failure::Refused {
+                    service: SERVICE.to_owned(),
+                    detail: format!("it admits no route under {route}"),
+                })
+            }
+        }
+        self.written(File::Tokens, held.as_deref(), &Tokens::of(routes).written())
+    }
+
+    async fn record(&self, after: u64) -> Result<GateRecord, Failure> {
+        let Some(text) = self.read(File::Record).await else {
+            return Ok(GateRecord::default());
+        };
+        let record = Record::read(&text).map_err(|unreadable| Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: format!("its record could not be read: {unreadable}"),
+        })?;
+        let (entries, lost) = record.since(after);
+        Ok(GateRecord {
+            entries: entries
+                .into_iter()
+                .map(|entry| GateEntry {
+                    seq: entry.seq,
+                    at: entry.at,
+                    route: entry.route.clone(),
+                    method: entry.method.clone(),
+                    path: entry.path.clone(),
+                    outcome: match entry.outcome {
+                        Outcome::Refused => GateOutcome::Refused,
+                        Outcome::Removed => GateOutcome::Removed,
+                    },
+                })
+                .collect(),
+            lost,
+        })
     }
 }
 

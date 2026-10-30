@@ -7,12 +7,15 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_sidecar::decline::{
-    Claimed as Telling, File, Invitation, Key, Pins, Table, TokenHash,
+    Claimed as Telling, File, Invitation, Key, Lapses, Left, Outcome, Pins, Refusals, Table,
+    TokenHash,
 };
 
 use super::{path, SERVICE};
 use crate::ports::filesystem::FileSystem;
-use crate::ports::service::{Claimed, Declining, Failure, Invitations, KeyHeld};
+use crate::ports::service::{
+    Claimed, Declined, Declining, Failure, Invitations, KeyHeld, Lapsed, LeftBecause, TakenBack,
+};
 
 /// The stack's own decline service, beneath the project its configuration is mounted from.
 pub(crate) struct Configured {
@@ -81,6 +84,74 @@ impl Declining for Configured {
 
     async fn apply_invitations(&self, invitations: &Invitations) -> Result<(), Failure> {
         self.written(File::Table, &table(invitations).written())
+    }
+
+    async fn refusals(&self) -> Result<Vec<Declined>, Failure> {
+        let refusals = match self.read(File::Refusals).await {
+            Some(text) => Refusals::read(&text).map_err(|why| unread(&why))?,
+            None => Refusals::default(),
+        };
+        Ok(refusals
+            .refusals
+            .into_iter()
+            .map(|one| Declined {
+                token: one.token.as_str().to_owned(),
+                account: one.account,
+                at: one.at,
+            })
+            .collect())
+    }
+
+    async fn lapses(&self) -> Result<Vec<Lapsed>, Failure> {
+        let lapses = match self.read(File::Lapses).await {
+            Some(text) => Lapses::read(&text).map_err(|why| unread(&why))?,
+            None => Lapses::default(),
+        };
+        Ok(lapses
+            .lapses
+            .into_iter()
+            .map(|one| Lapsed {
+                token: one.token.as_str().to_owned(),
+                account: one.account,
+                name: one.name,
+                issued: one.issued,
+                at: one.at,
+                outcome: taken_back(one.outcome),
+            })
+            .collect())
+    }
+
+    async fn page(&self) -> Result<String, Failure> {
+        Ok(PAGE.to_owned())
+    }
+}
+
+/// Where the stack's own decline service serves the page an invitation is declined on.
+const PAGE: &str = "/decline/{token}";
+
+/// The failure of a record the service keeps that could not be read.
+fn unread(unreadable: &lemonfiber_sidecar::Unreadable) -> Failure {
+    Failure::Refused {
+        service: SERVICE.to_owned(),
+        detail: format!("its record could not be read: {unreadable}"),
+    }
+}
+
+/// What the service did with a lapsed invitation's account, as its contract says it.
+const fn taken_back(outcome: Outcome) -> TakenBack {
+    match outcome {
+        Outcome::Removed => TakenBack::Removed,
+        Outcome::SwitchedOff => TakenBack::SwitchedOff,
+        Outcome::Left(left) => TakenBack::Left {
+            why: match left {
+                Left::Claimed => LeftBecause::Claimed,
+                Left::Administrator => LeftBecause::Administrator,
+                Left::Disabled => LeftBecause::Disabled,
+                Left::Gone => LeftBecause::Gone,
+                Left::Reoffered => LeftBecause::Reoffered,
+                Left::Unmatched => LeftBecause::Unmatched,
+            },
+        },
     }
 }
 
