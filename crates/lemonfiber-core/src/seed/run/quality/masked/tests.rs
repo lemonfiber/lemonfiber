@@ -49,7 +49,6 @@ fn every_spelling_of_a_credentials_name_has_its_value_masked() {
     ] {
         let diff = shown(&format!("{line}\n+ min: 25\n"), &[]);
         assert!(!diff.contains(PASTED), "{line} came out as {diff}");
-        assert!(diff.contains("min: 25"), "{diff}");
     }
 }
 
@@ -135,7 +134,7 @@ fn a_refusal_naming_a_kept_value_says_why_without_it() {
 }
 
 #[test]
-fn a_tagged_listed_or_numbered_credential_is_masked_and_what_is_not_one_is_left() {
+fn a_tagged_listed_or_numbered_credential_is_masked() {
     let diff = shown(
         &format!(
             "+ api_key: !secret {PASTED}\n+ tokens:\n+   - first{PASTED}\n+ pin_password: 7314159\n+ enabled: true\n+ min: 25\n"
@@ -145,8 +144,6 @@ fn a_tagged_listed_or_numbered_credential_is_masked_and_what_is_not_one_is_left(
 
     assert!(!diff.contains(PASTED), "{diff}");
     assert!(!diff.contains("7314159"), "{diff}");
-    assert!(diff.contains("+ enabled: true"), "{diff}");
-    assert!(diff.contains("+ min: 25"), "{diff}");
 }
 
 #[test]
@@ -218,6 +215,54 @@ fn a_credential_spelled_apart_from_its_value_is_masked_by_where_it_stands() {
                 "{line} came out as {diff}"
             );
         }
-        assert!(diff.contains("min: 25"), "{diff}");
     }
+}
+
+#[test]
+fn a_decoy_never_makes_up_for_a_key_spelled_in_escapes() {
+    let hidden = "+ \"pass\\x77ord\": \"\\x68\\x75nter2\"\n";
+    for decoy in [
+        "+ # token: x\n",
+        "+ note: \"token: here\"\n",
+        "+ description: |\n+   password: x\n",
+    ] {
+        let diff = shown(&format!("{decoy}{hidden}+ min: 25\n"), &[]);
+        assert!(!diff.contains("hunter2"), "{decoy} came out as {diff}");
+        assert!(!diff.contains("x75nter2"), "{decoy} came out as {diff}");
+        assert!(!diff.contains("\\x77"), "{decoy} came out as {diff}");
+    }
+}
+
+#[test]
+fn an_anchor_merge_or_tag_on_the_way_to_a_credential_shows_no_value() {
+    for diff in [
+        format!("+ x: &a {PASTED}\n+ token: *a\n"),
+        "+ x: &a \"\\x73\\x33cretvalue\"\n+ token: *a\n".to_owned(),
+        format!("+ base: &a\n+   api_key: {PASTED}\n+ sonarr:\n+   <<: *a\n"),
+        format!("+ api_key: !!binary {PASTED}\n"),
+        format!("+ x: !!str {PASTED}\n"),
+    ] {
+        let shown = shown(&diff, &[]);
+        assert!(!shown.contains(PASTED), "{diff} came out as {shown}");
+        assert!(!shown.contains("x33cret"), "{diff} came out as {shown}");
+    }
+}
+
+#[test]
+fn a_plain_side_is_read_line_by_line_and_shows_what_names_no_credential() {
+    let diff = shown(
+        &format!(
+            "# kept\n- sonarr:\n-   - base_url: http://sonarr:8989\n-     api_key: {PASTED}\n-     tokens:\n-     - one{PASTED}\n-     min: 0\n+ min: 25\n"
+        ),
+        &[],
+    );
+
+    assert!(!diff.contains(PASTED), "{diff}");
+    assert!(diff.contains(&format!("# {REDACTED}")), "{diff}");
+    assert!(
+        diff.contains("-   - base_url: http://sonarr:8989"),
+        "{diff}"
+    );
+    assert!(diff.contains("-     min: 0"), "{diff}");
+    assert!(diff.contains("+ min: 25"), "{diff}");
 }
