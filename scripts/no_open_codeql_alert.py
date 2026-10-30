@@ -66,10 +66,7 @@ def expected(workflow: str) -> list[str]:
     traceback in it, which tells a maintainer nothing about their pull request.
     """
     job = (yaml.safe_load(workflow) or {}).get("jobs", {}).get("analyze") or {}
-    languages = (
-        ((job.get("strategy") or {}).get("matrix") or {}).get("language")
-        or _init_languages(job)
-    )
+    languages = ((job.get("strategy") or {}).get("matrix") or {}).get("language") or _init_languages(job)
     if isinstance(languages, str):
         languages = [part.strip() for part in languages.split(",") if part.strip()]
     if not languages:
@@ -170,8 +167,7 @@ def judge(alerts: list, out, seen: bool = True) -> int:
             file=out,
         )
     print(
-        f"::error::{len(alerts)} open alert(s) against this branch; "
-        f"fix them, or dismiss each with a reason.",
+        f"::error::{len(alerts)} open alert(s) against this branch; fix them, or dismiss each with a reason.",
         file=out,
     )
     return 1
@@ -186,6 +182,7 @@ ACTIONS = "/language:actions"
 # this repository does not run", and because a third repeated literal is how the
 # other two came to be constants.
 PYTHON = "/language:python"
+
 
 # One CodeQL analysis, as the API describes it, for the fixtures to vary.
 def _analysis(sha: str, category: str, tool: str = "CodeQL") -> dict:
@@ -304,9 +301,7 @@ jobs:
         wrong.append("a language whose analysis never landed was not named")
     if expected(single) != [ACTIONS]:
         wrong.append("a job with one language and no matrix was not read")
-    if expected(
-        single.replace("languages: actions", "languages: actions, python")
-    ) != [ACTIONS, PYTHON]:
+    if expected(single.replace("languages: actions", "languages: actions, python")) != [ACTIONS, PYTHON]:
         wrong.append("a comma-separated languages: was not read as a list")
     for empty in ("jobs: {}\n", "jobs:\n  analyze:\n    steps: []\n"):
         try:
@@ -380,8 +375,7 @@ def main() -> int:
     )
     ap.add_argument(
         "--workflow",
-        help="The CodeQL workflow, whose matrix names every language that is "
-        "meant to be analysed here.",
+        help="The CodeQL workflow, whose matrix names every language that is meant to be analysed here.",
     )
     args = ap.parse_args()
     if args.self_test:
