@@ -1,8 +1,8 @@
 //! A hand edit a quality sync answers, held to what may be shown before anything else
-//! reads it. The adapter's own masking is not trusted, and a crafted edit is assumed: every
-//! kept secret is taken out wherever it stands, each side of the diff is read as YAML and
-//! every value under a key that names a credential is masked at any depth, and a side that
-//! does not read as YAML has every value it sets masked.
+//! reads it. The adapter's own masking is not trusted and a crafted edit is assumed, so
+//! masking fails closed: every kept secret is taken out wherever it stands, every line
+//! naming a credential's key shows nothing after that key, and a side of the diff the
+//! core cannot account for line by line shows no value it sets at all.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use serde_norway::Value;
 
 use crate::config::display::shown_in_a_file;
-use crate::error::withheld::{withheld_by, withheld_text, REDACTED};
+use crate::error::withheld::{is_secret, withheld_by, withheld_text, REDACTED};
 use crate::model::StackEdit;
 use crate::ports::service::Edited;
 
@@ -20,18 +20,19 @@ pub(super) const LARGEST: usize = 64 * 1024;
 /// The longest path a hand edit may be named by.
 const LONGEST_PATH: usize = 255;
 
-/// What a key's name holds, lower-cased and with `-`, `_`, `.` and spaces taken out, where
-/// its value is a credential.
-const CREDENTIAL_NAMES: [&str; 8] = [
-    "apikey", "key", "token", "secret", "password", "passwd", "auth", "bearer",
+/// What ends a word of a line besides whitespace: YAML's punctuation.
+const BOUNDARIES: [char; 16] = [
+    '{', '}', '[', ']', ',', ':', '=', '"', '\'', '?', '&', '*', '!', '#', '|', '>',
 ];
 
-/// Every value the secret store keeps, and every value each replaced.
-pub(super) fn held(ctx: &crate::app::Ctx) -> Vec<String> {
-    crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .map(|secrets| secrets.values().map(str::to_owned).collect())
-        .unwrap_or_default()
+/// Every value the secret store keeps, and every value each replaced; refused where there
+/// is no store to read or it cannot be read, since an edit cannot then be shown safely.
+pub(super) fn held(ctx: &crate::app::Ctx) -> Result<Vec<String>, String> {
+    let at = crate::settings::secrets_at(ctx)
+        .ok_or_else(|| "there is no secret store to hold the edit against".to_owned())?;
+    let secrets = crate::settings::Secrets::at(&at)
+        .map_err(|_| "the secret store could not be read to hold the edit against".to_owned())?;
+    Ok(secrets.values().map(str::to_owned).collect())
 }
 
 /// What a sync said in refusing, as it may be shown: withheld as prose is, with every one
@@ -91,21 +92,24 @@ impl Side {
     /// Every side.
     const ALL: [Self; 3] = [Self::Removed, Self::Added, Self::Kept];
 
-    /// `lines` with every credential this side's lines set masked.
+    /// `lines` with this side's lines masked: line by line where every credential the
+    /// side sets is accounted for on a line that names its key, and every value hidden
+    /// otherwise.
     fn masked(self, mut lines: Vec<Line>) -> Vec<Line> {
-        let bodies: Vec<&str> = lines
+        let bodies: Vec<String> = lines
             .iter()
             .filter(|line| line.side == self)
-            .map(|line| line.body.as_str())
+            .map(|line| line.body.clone())
             .collect();
-        let read = read(&bodies);
-        let mut block: Option<usize> = None;
-        for line in lines.iter_mut().filter(|line| line.side == self) {
-            line.body = match &read {
-                Some(values) => hidden(&line.body, values),
-                None => unvouched(&line.body),
-            };
-            line.body = keyed(&line.body, &mut block);
+        let mut block = None;
+        let named: usize = bodies.iter().map(|body| keys_named(body)).sum();
+        let keyed: Vec<String> = bodies.iter().map(|body| keyed(body, &mut block)).collect();
+        let shown: Vec<String> = match accounted(&bodies, named) {
+            Some(values) => keyed.iter().map(|body| hidden(body, &values)).collect(),
+            None => bodies.iter().map(|body| unvouched(body)).collect(),
+        };
+        for (line, body) in lines.iter_mut().filter(|line| line.side == self).zip(shown) {
+            line.body = body;
         }
         lines
     }
@@ -142,9 +146,13 @@ impl Line {
     }
 }
 
-/// Every scalar `bodies` set under a key naming a credential, read as YAML once their
-/// shared indentation is taken off; nothing where they do not read as YAML.
-fn read(bodies: &[&str]) -> Option<BTreeSet<String>> {
+/// Every scalar `bodies` set under a key naming a credential, where they read as one YAML
+/// mapping with no anchor, alias, explicit key or collection running over lines, and name
+/// no more such keys than `named` counts on lines of their own; nothing otherwise.
+fn accounted(bodies: &[String], named: usize) -> Option<BTreeSet<String>> {
+    if bodies.iter().any(|body| unaccountable(body)) {
+        return None;
+    }
     let indent = bodies
         .iter()
         .filter(|body| !body.trim().is_empty())
@@ -158,28 +166,47 @@ fn read(bodies: &[&str]) -> Option<BTreeSet<String>> {
                 .unwrap_or_default()
         })
         .collect();
+    if text.iter().all(|line| line.trim().is_empty()) {
+        return Some(BTreeSet::new());
+    }
     let value: Value = serde_norway::from_str(&text.join("\n")).ok()?;
+    if !matches!(value, Value::Mapping(_)) {
+        return None;
+    }
     let mut found = BTreeSet::new();
-    gathered(&value, false, &mut found);
-    Some(found)
+    (credentials(&value, false, &mut found) <= named).then_some(found)
 }
 
-/// Every scalar beneath `value` gathered into `found` where it stands under a key naming a
-/// credential, or `beneath` one already.
-fn gathered(value: &Value, beneath: bool, found: &mut BTreeSet<String>) {
+/// Whether `body` holds what the core does not place line by line: an anchor or alias, an
+/// explicit key, or a flow collection left open at its end.
+fn unaccountable(body: &str) -> bool {
+    let opened = body.matches(['{', '[']).count();
+    let closed = body.matches(['}', ']']).count();
+    body.trim_start().starts_with('?')
+        || opened != closed
+        || words(body).any(|(start, _)| {
+            body.get(..start)
+                .and_then(|ahead| ahead.chars().next_back())
+                .is_some_and(|mark| matches!(mark, '&' | '*'))
+        })
+}
+
+/// How many keys naming a credential stand beneath `value`, every scalar beneath one
+/// gathered into `found`, `beneath` where `value` already stands under one.
+fn credentials(value: &Value, beneath: bool, found: &mut BTreeSet<String>) -> usize {
     match value {
-        Value::Mapping(mapping) => {
-            for (key, value) in mapping {
+        Value::Mapping(mapping) => mapping
+            .iter()
+            .map(|(key, value)| {
                 let named = key.as_str().is_some_and(names_a_credential);
-                gathered(value, beneath || named, found);
-            }
-        }
-        Value::Sequence(sequence) => {
-            for value in sequence {
-                gathered(value, beneath, found);
-            }
-        }
-        Value::Tagged(tagged) => gathered(&tagged.value, beneath, found),
+                usize::from(named) + credentials(value, beneath || named, found)
+            })
+            .sum(),
+        Value::Sequence(sequence) => sequence
+            .iter()
+            .map(|value| credentials(value, beneath, found))
+            .sum(),
+        Value::Tagged(tagged) => credentials(&tagged.value, beneath, found),
         Value::String(text) if beneath => {
             found.extend(
                 text.lines()
@@ -187,12 +214,51 @@ fn gathered(value: &Value, beneath: bool, found: &mut BTreeSet<String>) {
                     .filter(|line| !line.is_empty())
                     .map(str::to_owned),
             );
+            0
         }
         Value::Number(number) if beneath => {
             found.insert(number.to_string());
+            0
         }
-        Value::Bool(_) | Value::Null | Value::String(_) | Value::Number(_) => {}
+        Value::Bool(_) | Value::Null | Value::String(_) | Value::Number(_) => 0,
     }
+}
+
+/// How many words of `body` name a credential and stand as a key, a separator after them.
+fn keys_named(body: &str) -> usize {
+    words(body)
+        .filter(|(start, end)| {
+            body.get(*start..*end).is_some_and(names_a_credential)
+                && body
+                    .get(*end..)
+                    .map(|rest| rest.trim_start_matches(['"', '\'', ' ']))
+                    .is_some_and(|rest| rest.starts_with([':', '=']))
+        })
+        .count()
+}
+
+/// `body` with nothing after the first word naming a credential shown, and wholly masked
+/// where it continues such a word's value from an earlier line; `block` holds the
+/// indentation of that word's line, and whether a list at that indentation continues it.
+fn keyed(body: &str, block: &mut Option<(usize, bool)>) -> String {
+    let indent = indentation(body);
+    if let Some((opened, listed)) = *block {
+        let listing = listed && indent == opened && body.trim_start().starts_with('-');
+        if body.trim().is_empty() || indent > opened || listing {
+            return format!("{}{REDACTED}", " ".repeat(indent));
+        }
+        *block = None;
+    }
+    let Some((_, end)) =
+        words(body).find(|(start, end)| body.get(*start..*end).is_some_and(names_a_credential))
+    else {
+        return body.to_owned();
+    };
+    let rest = body.get(end..).unwrap_or_default();
+    let value = rest.trim_start_matches(['"', '\'', ' ', ':', '=']);
+    *block = Some((indent, value.trim().is_empty()));
+    let shown = body.get(..body.len() - value.len()).unwrap_or_default();
+    format!("{} {REDACTED}", shown.trim_end())
 }
 
 /// `body` with every one of `values` masked where it stands as a scalar of its own.
@@ -227,74 +293,57 @@ fn bounded(body: &str, value: &str) -> String {
     out
 }
 
-/// `body`, a line of a side that does not read as YAML, with any value it sets masked.
+/// `body`, a line of a side the core cannot account for, showing its key's name at most.
 fn unvouched(body: &str) -> String {
-    match split(body) {
-        Some((name, separator, value)) if !value.trim().is_empty() => {
-            format!("{name}{separator} {REDACTED}")
-        }
-        _ => body.to_owned(),
-    }
-}
-
-/// `body` with the value masked where its key names a credential, and wholly masked where
-/// it continues such a value from an earlier line; `block` holds the indentation of a key
-/// whose value runs on below it.
-fn keyed(body: &str, block: &mut Option<usize>) -> String {
-    let indent = indentation(body);
-    if let Some(opened) = *block {
-        if body.trim().is_empty() || indent > opened {
-            return format!("{}{REDACTED}", " ".repeat(indent));
-        }
-        *block = None;
-    }
-    let Some((name, separator, value)) = split(body) else {
-        return body.to_owned();
-    };
-    if !names_a_credential(name) {
+    if body.trim().is_empty() {
         return body.to_owned();
     }
-    if runs_on(value) {
-        *block = Some(indent);
+    let indent = " ".repeat(indentation(body));
+    let named = body
+        .split_once([':', '='])
+        .map(|(name, _)| name.trim())
+        .filter(|name| {
+            !name.is_empty()
+                && name.chars().all(|character| {
+                    character.is_alphanumeric() || matches!(character, '_' | '-' | '.')
+                })
+        });
+    match named {
+        Some(name) => format!("{indent}{name}: {REDACTED}"),
+        None => format!("{indent}{REDACTED}"),
     }
-    format!("{name}{separator} {REDACTED}")
 }
 
-/// Whether a value opening on a key's line runs on to the lines below it: nothing yet, a
-/// block scalar, or a quotation not closed on the line.
-fn runs_on(value: &str) -> bool {
-    let value = value.trim();
-    value.is_empty()
-        || value.starts_with(['|', '>'])
-        || value.starts_with('&') && !value.contains(' ')
-        || ['"', '\'']
-            .iter()
-            .any(|quote| value.starts_with(*quote) && value.matches(*quote).count() % 2 == 1)
+/// Where each word of `body` starts and ends, words being split at whitespace and at
+/// [`BOUNDARIES`].
+fn words(body: &str) -> impl Iterator<Item = (usize, usize)> + '_ {
+    let mut start = None;
+    body.char_indices()
+        .chain(std::iter::once((body.len(), ' ')))
+        .filter_map(move |(at, character)| {
+            let ends = character.is_whitespace() || BOUNDARIES.contains(&character);
+            match (start, ends) {
+                (None, false) => {
+                    start = Some(at);
+                    None
+                }
+                (Some(from), true) => {
+                    start = None;
+                    Some((from, at))
+                }
+                _ => None,
+            }
+        })
 }
 
-/// `body` split at its first `:` or `=`: what stands before it, the separator, and what
-/// follows.
-fn split(body: &str) -> Option<(&str, char, &str)> {
-    let (at, separator) = body
-        .char_indices()
-        .find(|(_, character)| matches!(character, ':' | '='))?;
-    Some((
-        body.get(..at)?,
-        separator,
-        body.get(at + separator.len_utf8()..)?,
-    ))
-}
-
-/// Whether `name`, with its quotes, braces and list marker, names a credential.
+/// Whether `name`, with its quotes, braces and list marker and every `-`, `_`, `.` and
+/// space taken out, names a credential as a setting's name does.
 fn names_a_credential(name: &str) -> bool {
     let normalised: String = name
         .chars()
         .filter(|character| !matches!(character, '-' | '_' | '.' | ' ' | '"' | '\'' | '{' | '['))
-        .flat_map(char::to_lowercase)
         .collect();
-    CREDENTIAL_NAMES
-        .iter()
-        .any(|credential| normalised.contains(credential))
+    is_secret(&normalised)
 }
 
 /// How many spaces `body` opens with.

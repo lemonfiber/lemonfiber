@@ -1,4 +1,4 @@
-use super::{masked, said, LARGEST};
+use super::{held, masked, said, LARGEST};
 use crate::error::withheld::REDACTED;
 use crate::ports::service::Edited;
 
@@ -22,7 +22,7 @@ fn shown(diff: &str, secrets: &[&str]) -> String {
 }
 
 #[test]
-fn the_curators_own_key_is_taken_out_under_any_name_and_percent_encoded() {
+fn the_curators_own_key_is_taken_out_wherever_the_sync_left_it() {
     let encoded = "k%2Fey%3D1";
     let diff = shown(
         &format!(
@@ -54,14 +54,14 @@ fn every_spelling_of_a_credentials_name_has_its_value_masked() {
 }
 
 #[test]
-fn a_value_reached_through_an_anchor_is_masked_where_the_anchor_is_set() {
+fn a_side_reaching_a_value_through_an_anchor_shows_names_alone() {
     let diff = shown(
         &format!("+ shared: &k {PASTED}\n+ sonarr:\n+   api_key: *k\n+ min: 25\n"),
         &[],
     );
 
     assert!(!diff.contains(PASTED), "{diff}");
-    assert!(diff.contains("min: 25"), "{diff}");
+    assert!(diff.contains(&format!("+ min: {REDACTED}")), "{diff}");
 }
 
 #[test]
@@ -147,4 +147,77 @@ fn a_tagged_listed_or_numbered_credential_is_masked_and_what_is_not_one_is_left(
     assert!(!diff.contains("7314159"), "{diff}");
     assert!(diff.contains("+ enabled: true"), "{diff}");
     assert!(diff.contains("+ min: 25"), "{diff}");
+}
+
+#[test]
+fn a_secret_store_that_cannot_be_read_or_is_not_there_refuses_rather_than_hides_nothing() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("masked-unread-store");
+    let mut ctx = crate::test_support::a_context().build();
+    ctx.settings.env_file = Some(scratch.path().join(".env"));
+    let _ = std::fs::write(
+        crate::settings::secrets_at(&ctx).unwrap_or_default(),
+        "not a store",
+    );
+
+    assert!(held(&ctx).is_err());
+    ctx.settings.env_file = None;
+    assert!(held(&ctx).is_err());
+}
+
+#[test]
+fn a_side_that_cannot_be_accounted_for_shows_no_value_it_sets_listed_or_continued() {
+    for (diff, why) in [
+        (
+            format!("+ : : [\n+ tokens:\n+ - {PASTED}\n+ - also{PASTED}\n"),
+            "a bare list item",
+        ),
+        (
+            format!("-     {PASTED}\n-   min: 0\n"),
+            "a block scalar's body, its key outside the hunk",
+        ),
+        (format!("-   {PASTED}\n"), "a lone continuation"),
+        (format!("+ ? token\n+ : {PASTED}\n"), "an explicit key"),
+        (
+            format!("+ shared: &k {PASTED}\n+ api_key: *k\n"),
+            "an anchor",
+        ),
+        (
+            format!("+ \"\\x74oken\": {PASTED}\n"),
+            "a key spelled in escapes",
+        ),
+        (
+            format!("+ settings: {{url: x,\n+   token: {PASTED}}}\n"),
+            "a flow mapping over lines",
+        ),
+    ] {
+        let diff = shown(&diff, &[]);
+        assert!(!diff.contains(PASTED), "{why} came out as {diff}");
+    }
+}
+
+#[test]
+fn a_credential_spelled_apart_from_its_value_is_masked_by_where_it_stands() {
+    for line in [
+        "+ settings: {url: x, token: \"\\x73\\x65cret\"}".to_owned(),
+        "+ token: 0x1F2E3D".to_owned(),
+        "+ pin_password: 1_000_000".to_owned(),
+        "+ token: first\n+   folded-on".to_owned(),
+        "+ api_key: >\n+   folded\n+   on".to_owned(),
+    ] {
+        let diff = shown(&format!("{line}\n+ min: 25\n"), &[]);
+        for leaked in [
+            "x73",
+            "0x1F2E3D",
+            "1_000_000",
+            "folded-on",
+            "folded",
+            "on\n",
+        ] {
+            assert!(
+                !diff.contains(leaked) || !line.contains(leaked),
+                "{line} came out as {diff}"
+            );
+        }
+        assert!(diff.contains("min: 25"), "{diff}");
+    }
 }

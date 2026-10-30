@@ -89,7 +89,7 @@ async fn put_back(
     selection: &Selection,
 ) -> Result<Option<StackEdit>, String> {
     let adapter = sync::Adapter(syncer.adapter().clone());
-    let mut held = masked::held(ctx);
+    let mut held = masked::held(ctx)?;
     let (mut replaced, mut restart) = (None, false);
     for (curator, which, at) in curators {
         let api_key = super::keys::minted_key(ctx, curator)

@@ -32,7 +32,15 @@
 
 /// The words that name a credential itself: a setting called by one is secret, and a
 /// path segment after one is the credential it names.
-const KEY_MARKERS: &[&str] = &["KEY", "PASS", "SECRET", "TOKEN", "PRIVATE", "CREDENTIAL"];
+const KEY_MARKERS: &[&str] = &[
+    "KEY",
+    "PASS",
+    "SECRET",
+    "TOKEN",
+    "PRIVATE",
+    "CREDENTIAL",
+    "BEARER",
+];
 
 /// The words that name the account or the sign-in a credential belongs to: a setting
 /// called by one is secret too.
