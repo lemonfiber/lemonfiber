@@ -325,3 +325,27 @@ async fn the_host_checked_is_the_one_the_call_connects_as() {
     let hostless = checked(&*Resolving::anywhere(), calling("data:text/plain,x")).await;
     assert_eq!(hostless, Err(Inward::Nameless));
 }
+
+/// Each range listed as carrying an IPv4 address carries one where a connection ends up,
+/// so an address in it carrying loopback is internal, and an address just past every
+/// listed range carrying the same bits is not.
+#[test]
+fn every_range_carrying_an_ipv4_address_is_listed_as_one() {
+    let carrying = [
+        "::ffff:127.0.0.1",
+        "::127.0.0.1",
+        "64:ff9b::127.0.0.1",
+        "2002:7f00:1::",
+        "2001:0:7f00:1::",
+    ];
+    for (written, (network, prefix)) in carrying.iter().zip(crate::CARRYING_V6) {
+        let address = ip(written);
+        let IpAddr::V6(v6) = address else {
+            unreachable!("{written} is an IPv6 address");
+        };
+        let mask = u128::MAX.checked_shl(128 - u32::from(prefix)).unwrap_or(0);
+        assert_eq!(u128::from(v6) & mask, u128::from(network), "{written}");
+        assert!(crate::internal(address), "{written}");
+    }
+    assert!(!crate::internal(ip("2003:7f00:1::")));
+}

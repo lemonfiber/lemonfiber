@@ -33,7 +33,7 @@ mod classes;
 pub mod resolve;
 pub mod schemes;
 
-pub use classes::internal;
+pub use classes::{internal, CARRYING_V6, INTERNAL_V4, INTERNAL_V6};
 
 /// Why a host is not one to reach.
 #[derive(Debug, Clone, PartialEq, Eq)]
