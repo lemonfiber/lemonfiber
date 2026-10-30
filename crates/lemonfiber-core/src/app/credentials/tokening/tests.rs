@@ -452,7 +452,8 @@ async fn a_token_is_never_printed() {
         CURATOR_LINE,
     );
 
-    let shown = super::super::revealing::reveal(&ctx, &line, true).await;
+    let reaching = fillers(true, Some(&at));
+    let shown = super::super::revealing::reveal(&ctx, &line, true, (&reaching, Some(&at))).await;
 
     assert_eq!(shown.value, None);
     assert_eq!(shown.warning, UNPRINTED);

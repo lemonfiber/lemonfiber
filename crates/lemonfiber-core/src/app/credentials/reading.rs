@@ -39,7 +39,7 @@ pub(crate) async fn taken(
         .into_iter()
         .map(|entry| recorded(ctx, entry))
         .collect();
-    taken.extend(super::declining::held(ctx, services, project).await);
+    taken.extend(super::declining::held(ctx, services, fillers, project).await);
     taken.extend(super::gating::held(ctx, services, fillers, project).await);
     taken.extend(super::tokening::held(ctx, services, fillers, project).await);
     taken.extend(super::certifying::held(

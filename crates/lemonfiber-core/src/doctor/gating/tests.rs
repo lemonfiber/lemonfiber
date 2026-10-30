@@ -32,7 +32,7 @@ fn scene(name: &str, record: Option<&str>, read: Option<&str>) -> PathBuf {
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     if let Some(record) = record {
-        let _ = store::write(&at.join("record.json"), record);
+        let _ = store::write(&kept_at(&at), record);
     }
     if let Some(read) = read {
         let _ = store::write(&at.join("gate-read.json"), read);
@@ -45,10 +45,17 @@ fn check(at: &Path, keeping: bool) -> GateRecordCheck {
     GateRecordCheck::new(
         files(),
         Some(Gate {
-            record: at.join("record.json"),
+            service: Some(std::sync::Arc::new(
+                crate::app::gating::configured::Configured::at(at, files()),
+            )),
             read: keeping.then(|| at.join("gate-read.json")),
         }),
     )
+}
+
+/// Where the gate under the project `at` keeps its record.
+fn kept_at(at: &Path) -> PathBuf {
+    crate::app::gating::path(at, lemonfiber_sidecar::gate::File::Record)
 }
 
 /// The filesystem the checks read through.
@@ -112,8 +119,29 @@ async fn without_a_gate_or_a_record_there_is_nothing_to_report() {
     let none = verdicts(&check(&at, true)).await;
     assert_eq!(
         none.first().and_then(note),
-        Some("the request gate has refused nothing and removed nothing")
+        Some("nothing refused or removed since the last check")
     );
+}
+
+#[tokio::test]
+async fn a_gate_that_cannot_be_asked_or_answers_no_record_is_unverified_never_a_pass() {
+    let unaskable = verdicts(&GateRecordCheck::new(
+        files(),
+        Some(Gate {
+            service: None,
+            read: None,
+        }),
+    ))
+    .await;
+    let at = scene("gate-record-garbled", Some("not a record"), None);
+    let garbled = verdicts(&check(&at, false)).await;
+
+    for found in [unaskable, garbled] {
+        assert!(
+            matches!(found.as_slice(), [Verdict::Unverified { .. }]),
+            "{found:?}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -204,7 +232,7 @@ async fn entries_that_fell_off_unread_are_counted() {
         .unwrap_or_default();
     assert_eq!(
         lost,
-        "12 entries were dropped before they were read, because more than 1000 arrived \
-         between checks"
+        "12 entries were dropped before they were read, because more arrived between checks \
+         than the request gate keeps"
     );
 }

@@ -130,7 +130,7 @@ async fn repinned(
 }
 
 /// The key filed under the service's name whose SHA-256 is `hash`, where one is.
-fn named_by(filed: &[String], hash: &str) -> Option<String> {
+pub(crate) fn named_by(filed: &[String], hash: &str) -> Option<String> {
     filed
         .iter()
         .find(|one| Key::read(one).is_ok_and(|key| key.fingerprint() == hash))

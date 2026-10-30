@@ -60,6 +60,36 @@
       "keyed": true,
       "live": false,
       "operation": "apply_invitations"
+    },
+    {
+      "asked": {},
+      "case": "refusals-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "refusals"
+    },
+    {
+      "asked": {},
+      "case": "lapses-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "lapses"
+    },
+    {
+      "asked": {},
+      "case": "page-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "page"
     }
   ],
   "major": 1

@@ -187,3 +187,68 @@ async fn a_film_curators_route_round_trips_as_one() {
         Some(films.iter().map(Admitted::of).collect())
     );
 }
+
+/// A route's tokens are replaced and every credential is left as it was; a route the gate
+/// does not admit is refused.
+#[tokio::test]
+async fn one_routes_tokens_are_replaced_and_nothing_else() {
+    let scratch = Scratch::new("gate-configured-tokens");
+    let gate = gate(&scratch);
+    assert!(gate.admit(&routes()).await.is_ok());
+    let fresh = TokenHash::of("fresh-token").as_str().to_owned();
+
+    assert!(gate
+        .admit_tokens("sonarr", std::slice::from_ref(&fresh))
+        .await
+        .is_ok());
+    assert!(gate
+        .admit_tokens("radarr", std::slice::from_ref(&fresh))
+        .await
+        .is_err());
+
+    let admitted = gate.admitted().await.unwrap_or_default();
+    let tokens = |path: &str| {
+        admitted
+            .iter()
+            .find(|one| one.path == path)
+            .map(|one| one.tokens.clone())
+    };
+    assert_eq!(tokens("sonarr"), Some(vec![fresh]));
+    assert_eq!(
+        tokens("jellyfin"),
+        Some(vec![TokenHash::of("media-token").as_str().to_owned()])
+    );
+    assert_eq!(
+        admitted
+            .iter()
+            .map(|one| one.credential.clone())
+            .collect::<Vec<_>>(),
+        routes()
+            .iter()
+            .map(|one| Admitted::of(one).credential)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A record that is a link is never followed, and one that does not read is refused.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_record_that_is_a_link_or_does_not_read_is_refused() {
+    let scratch = Scratch::new("gate-configured-record");
+    let gate = gate(&scratch);
+    let record = path(scratch.path(), File::Record);
+    let _ = std::fs::create_dir_all(record.parent().unwrap_or(scratch.path()));
+    assert!(gate
+        .record(0)
+        .await
+        .is_ok_and(|kept| kept.entries.is_empty()));
+
+    let _ = std::fs::write(&record, "not a record");
+    assert!(gate.record(0).await.is_err());
+
+    let _ = std::fs::remove_file(&record);
+    let elsewhere = scratch.path().join("elsewhere.json");
+    let _ = std::fs::write(&elsewhere, "{}");
+    let _ = std::os::unix::fs::symlink(&elsewhere, &record);
+    assert!(gate.record(0).await.is_err());
+}

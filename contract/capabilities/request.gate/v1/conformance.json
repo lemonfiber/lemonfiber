@@ -67,6 +67,33 @@
       "keyed": true,
       "live": false,
       "operation": "admitted"
+    },
+    {
+      "asked": {
+        "route": "tv",
+        "tokens": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      },
+      "case": "admit_tokens-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "admit_tokens"
+    },
+    {
+      "asked": {
+        "after": 0
+      },
+      "case": "record-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "record"
     }
   ],
   "major": 1

@@ -29,12 +29,12 @@ mod proxies;
 // The household's routes through the proxy.
 mod fronting;
 // The decline service's own media-server key, minted for it alone.
-mod decline;
+pub(crate) mod decline;
 pub(crate) mod encrypting;
 mod enveloping;
 mod fulfilment;
 // The request gate's routes, and the key it holds for the media server.
-mod gate;
+pub(crate) mod gate;
 // The media server keys minted for the services lemonfiber builds.
 mod keys;
 mod minted;

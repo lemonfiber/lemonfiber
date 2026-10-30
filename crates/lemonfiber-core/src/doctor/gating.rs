@@ -1,10 +1,10 @@
 //! What the request gate refused and what removals it passed on, since the last time a
 //! diagnosis looked.
 //!
-//! The gate writes every call it refuses and every removal it forwards to a record in
-//! its configuration directory, with when, where and how, and never a token, a query
-//! string or a body. This reads that record from the entry after the last one it read,
-//! and keeps the place it reached, so each run reports only what is new.
+//! The gate records every call it refuses and every removal it forwards, with when, where
+//! and how, and never a token, a query string or a body. This asks it, over `record`, for
+//! the entries after the last one read, and keeps the place it reached, so each run
+//! reports only what is new.
 //!
 //! **A refusal warns and a removal does not.** A refused call is one the request service
 //! has no use for, which is either a setting somebody changed or something running in it
@@ -15,12 +15,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_sidecar::gate::{Entry, Outcome, Record};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::gate::{LOST, REFUSED};
-use crate::error::{Problem, Remedy};
+use crate::error::{Diagnose as _, Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
+use crate::ports::service::{GateEntry as Entry, GateOutcome as Outcome, Gating};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "services.request-gate-record";
@@ -28,10 +28,10 @@ const CHECK: &str = "services.request-gate-record";
 /// The heading an operator reads this under.
 const TITLE: &str = "What the request gate refused and removed";
 
-/// Where the record is, and where the last place read is kept.
+/// The gate, and where the last place read is kept.
 pub struct Gate {
-    /// The gate's record.
-    pub record: PathBuf,
+    /// The gate as the core asks it, absent where it cannot be asked.
+    pub service: Option<Arc<dyn Gating>>,
     /// The last entry read, where there is anywhere to keep it.
     pub read: Option<PathBuf>,
 }
@@ -71,21 +71,14 @@ async fn ran(files: &dyn FileSystem, gate: Option<&Gate>) -> Vec<Finding> {
                 .to_owned(),
         })];
     };
-    let within = crate::within::directory_of(&gate.record);
-    let Some(text) = crate::app::targets::read_owned(files, &gate.record, within).await else {
-        return vec![finding(Verdict::Pass {
-            note: Some("the request gate has refused nothing and removed nothing".to_owned()),
+    let Some(service) = &gate.service else {
+        return vec![finding(Verdict::Unverified {
+            reason: "the request gate cannot be asked over its contract, so what it refused \
+                     cannot be read"
+                .to_owned(),
+            remedy: Remedy::new("Check the request gate is running")
+                .with_detail("lemonfiber status"),
         })];
-    };
-    let record = match Record::read(&text) {
-        Ok(record) => record,
-        Err(unreadable) => {
-            return vec![finding(Verdict::Unverified {
-                reason: format!("the request gate's record could not be read: {unreadable}"),
-                remedy: Remedy::new("Check the request gate is running")
-                    .with_detail("lemonfiber status"),
-            })]
-        }
     };
     let reached = match &gate.read {
         Some(read) => files
@@ -95,11 +88,24 @@ async fn ran(files: &dyn FileSystem, gate: Option<&Gate>) -> Vec<Finding> {
             .unwrap_or_default(),
         None => 0,
     };
-    let (unread, lost) = record.since(reached);
-    if let (Some(read), Some(newest)) = (&gate.read, unread.last()) {
+    let record = match service.record(reached).await {
+        Ok(record) => record,
+        Err(failure) => {
+            return vec![finding(Verdict::Unverified {
+                reason: format!(
+                    "the request gate's record could not be read: {}",
+                    failure.problem().summary
+                ),
+                remedy: Remedy::new("Check the request gate is running")
+                    .with_detail("lemonfiber status"),
+            })]
+        }
+    };
+    if let (Some(read), Some(newest)) = (&gate.read, record.entries.last()) {
         let _ = crate::config::store::write(read, &format!("{}\n", newest.seq));
     }
-    findings(&unread, lost)
+    let unread: Vec<&Entry> = record.entries.iter().collect();
+    findings(&unread, record.lost)
 }
 
 /// The findings for the entries read, and the count that fell off unread.
@@ -177,9 +183,8 @@ fn dropped(lost: u64) -> Problem {
     Problem::new(
         LOST,
         format!(
-            "{lost} entries were dropped before they were read, because more than {} arrived \
-             between checks",
-            lemonfiber_sidecar::gate::Kept::standard().entries()
+            "{lost} entries were dropped before they were read, because more arrived between \
+             checks than the request gate keeps"
         ),
         "What those entries were cannot be told now",
         Remedy::new("Run the diagnosis more often while this keeps happening"),

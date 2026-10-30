@@ -4,6 +4,18 @@ use crate::config::Settings;
 use crate::credential::{Held, Origin, State, REVEALED, SHOULDER};
 use crate::test_support::a_context;
 
+/// Reached through no filler and no stack directory: the lines these tests name are none a
+/// filler holds.
+fn nowhere() -> (
+    &'static crate::wiring::Fillers,
+    Option<&'static std::path::Path>,
+) {
+    (&EMPTY, None)
+}
+
+static EMPTY: std::sync::LazyLock<crate::wiring::Fillers> =
+    std::sync::LazyLock::new(crate::wiring::Fillers::default);
+
 /// An inventory line naming a credential recorded under a test's own setting.
 fn line(setting: &str) -> Held {
     Held {
@@ -43,7 +55,7 @@ async fn asking_once_prints_the_warning_and_not_the_value() {
     let secret = a_value();
     let _ = record_secret(&ctx, "A_TEST_PASS", &secret);
 
-    let revealed = reveal(&ctx, &line("A_TEST_PASS"), false).await;
+    let revealed = reveal(&ctx, &line("A_TEST_PASS"), false, nowhere()).await;
 
     assert_eq!(revealed.value, None);
     assert_eq!(revealed.warning, SHOULDER);
@@ -55,7 +67,7 @@ async fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
     let secret = a_value();
     let _ = record_secret(&ctx, "A_TEST_PASS", &secret);
 
-    let revealed = reveal(&ctx, &line("A_TEST_PASS"), true).await;
+    let revealed = reveal(&ctx, &line("A_TEST_PASS"), true, nowhere()).await;
 
     assert_eq!(revealed.value.as_deref(), Some(secret.as_str()));
     assert_eq!(revealed.warning, REVEALED);
@@ -72,7 +84,7 @@ async fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
         named: "comics".to_owned(),
     };
 
-    let revealed = reveal(&ctx, &held, true).await;
+    let revealed = reveal(&ctx, &held, true, nowhere()).await;
 
     assert_eq!(revealed.value, None);
     assert!(
@@ -86,7 +98,7 @@ async fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
 async fn a_credential_with_nothing_recorded_says_so_rather_than_showing_an_empty_value() {
     let ctx = keeping("nothing");
 
-    let revealed = reveal(&ctx, &line("NOTHING_RECORDED_PASS"), true).await;
+    let revealed = reveal(&ctx, &line("NOTHING_RECORDED_PASS"), true, nowhere()).await;
 
     assert_eq!(revealed.value, None);
     assert!(
@@ -118,8 +130,20 @@ async fn a_plugins_secret_the_store_holds_is_printed_and_one_it_does_not_is_not(
         ..line(setting)
     };
 
-    let held = reveal(&ctx, &plugin("comics:token", State::Active), true).await;
-    let absent = reveal(&ctx, &plugin("comics:other", State::Absent), true).await;
+    let held = reveal(
+        &ctx,
+        &plugin("comics:token", State::Active),
+        true,
+        nowhere(),
+    )
+    .await;
+    let absent = reveal(
+        &ctx,
+        &plugin("comics:other", State::Absent),
+        true,
+        nowhere(),
+    )
+    .await;
 
     assert_eq!(held.value.as_deref(), Some(secret.as_str()));
     assert_eq!(held.warning, REVEALED);

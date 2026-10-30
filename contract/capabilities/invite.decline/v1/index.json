@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "invite.decline/v1/openapi.json",
-      "sha256": "31f6181e61577e34f691a03bc43fe4fb8863b853500d27c570cb87bd0650ff0a"
+      "sha256": "64124d4e3538ed27069bdc7a167efcca45ae08a60e18441882fc3139ecdc8856"
     },
     {
       "path": "invite.decline/v1/operations/hold.json",
@@ -18,8 +18,20 @@
       "sha256": "f60f1294c1f427d6018bc3c5c2843792337e297d4383b5d88dd48edef735121f"
     },
     {
+      "path": "invite.decline/v1/operations/refusals.json",
+      "sha256": "02ba132c0ebb46f8449c5ad5182b3d2c48a319b3594c3368ce34758f9fa4c19b"
+    },
+    {
+      "path": "invite.decline/v1/operations/lapses.json",
+      "sha256": "53246f51db7efd06ff64bd4c4b5b995e18b71fb07b9496fa7f4869aa3a9e9bcd"
+    },
+    {
+      "path": "invite.decline/v1/operations/page.json",
+      "sha256": "d36afdec72c85a3c79246fecfe64e368f7a9de7a67fddc7436f5e5d8c4daa624"
+    },
+    {
       "path": "invite.decline/v1/conformance.json",
-      "sha256": "569146162babad33ccdd891865b9f8e3e602bd258bcb322171c7209a32a4a180"
+      "sha256": "99c52baa2da53792a5d12437999cde0a682ddab8199cb47f137ed3eba83baccd"
     }
   ],
   "major": 1

@@ -117,7 +117,7 @@ enum Found {
 }
 
 /// The line for `route`, from what the request service was `found` holding there.
-fn line(route: &Route, found: Found, kept: &Kept<'_>) -> Held {
+fn line(route: &Route, found: Found, kept: &Kept) -> Held {
     let (state, token, advisory) = match found {
         Found::Unread => (State::Stale, None, Some(UNREAD.to_owned())),
         Found::Unheld => (State::Absent, None, Some(not_handed(&name(route)))),
@@ -326,7 +326,7 @@ fn consumer(route: &Route) -> String {
 }
 
 /// Every route the gate admits, each named as the household calls the service behind it.
-fn routes(kept: &Kept<'_>, services: &[Service]) -> Vec<Route> {
+fn routes(kept: &Kept, services: &[Service]) -> Vec<Route> {
     kept.admitted()
         .iter()
         .map(|route| Route {

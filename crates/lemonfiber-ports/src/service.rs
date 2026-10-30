@@ -65,14 +65,16 @@ pub use declaring::{
     joined, Addressee, Answers, BytePath, Declared, Declaring, Held, LivePath, Locations, Naming,
     Ports, Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, STREAM_NAME, TOKEN,
 };
-pub use declining::{Claimed, Declinable, Declining, Invitations, KeyHeld};
+pub use declining::{
+    Claimed, Declinable, Declined, Declining, Invitations, KeyHeld, Lapsed, LeftBecause, TakenBack,
+};
 pub use encrypting::Encrypting;
 pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use filing::{Filed, Filing};
 pub use fronting::{AppKeys, Dated, Fronted};
-pub use gating::{Admitted, Gated, Gating, Target};
+pub use gating::{Admitted, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target};
 pub use guarding::{Guarded, Guarding, Presented};
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Playback, Session,

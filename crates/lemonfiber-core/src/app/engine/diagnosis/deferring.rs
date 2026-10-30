@@ -14,6 +14,7 @@ use crate::app::Ctx;
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::declining::{Dating, Decline, DeclineKeyCheck, KeyDates};
 use crate::doctor::deferred::Deferred;
+use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::owned::{OwnedCheck, Part};
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
@@ -115,31 +116,63 @@ pub(super) fn declined(
         let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
         async move {
             Box::new(DeclineKeyCheck::new(
-                ctx.seams.filesystem.clone(),
                 decline(&ctx, &manifest, project.as_deref()).await,
             )) as Box<dyn Check>
         }
     })
 }
 
-/// The decline service's two records and the media server that dates its key, where the
-/// stack runs one.
+/// What the request gate refused and removed since the last diagnosis, built when it runs.
+pub(super) fn gated(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    project: Option<&Path>,
+) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    let project: Option<PathBuf> = project.map(Path::to_path_buf);
+    Deferred::new(Category::Services, CHECK_BUDGET, move || {
+        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
+        async move {
+            Box::new(GateRecordCheck::new(
+                ctx.seams.filesystem.clone(),
+                gate(&ctx, &manifest, project.as_deref()).await,
+            )) as Box<dyn Check>
+        }
+    })
+}
+
+/// The request gate as the core asks it, and where the last place read in its record is
+/// kept beside the settings, where the stack runs one.
+async fn gate(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    project: Option<&Path>,
+) -> Option<Gate> {
+    let project = project.filter(|_| crate::app::gating::service(&manifest.services).is_some())?;
+    let fillers = crate::app::targets::fillers_here(ctx, manifest);
+    Some(Gate {
+        service: crate::app::gating::asked(ctx, &fillers, project).await,
+        read: crate::app::targets::beside_env(ctx, crate::config::paths::GATE_READ),
+    })
+}
+
+/// The decline service as the core asks it and the media server that dates its key, where
+/// the stack runs one it can ask.
 async fn decline(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     project: Option<&Path>,
 ) -> Option<Decline> {
-    use lemonfiber_sidecar::decline::File;
     let project =
         project.filter(|_| crate::app::invite::declining::service(&manifest.services).is_some())?;
     let fillers = crate::app::targets::fillers_here(ctx, manifest);
+    let service = crate::app::invite::declining::asked(ctx, &fillers, project).await;
     let keys = match crate::app::targets::declined_server(&fillers) {
         Some(server) => server.administering(ctx).await,
         None => None,
     };
     Some(Decline {
-        refusals: crate::app::invite::declining::path(project, File::Refusals),
-        lapses: crate::app::invite::declining::path(project, File::Lapses),
+        service,
         keys: keys.map(|server| Arc::new(Dating(server)) as Arc<dyn KeyDates>),
     })
 }

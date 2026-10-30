@@ -460,24 +460,24 @@ async fn without_randomness_no_token_is_minted() {
 }
 
 /// A route whose credential the gate presents is not the one lemonfiber knows the curator
-/// by is never handed back to the gate with lemonfiber's: its tokens are left as they are,
-/// and nothing is given to the request service.
+/// by is handed its tokens alone: the credential it presents is left as it is.
 #[tokio::test]
-async fn a_route_presenting_a_credential_lemonfiber_does_not_know_is_not_handed_back() {
+async fn a_route_presenting_a_credential_lemonfiber_does_not_know_keeps_it() {
     let at = project("tokens-unvouched", &[]);
     routed(&at, &[("sonarr", Kind::Sonarr, "a-key-nobody-wrote")]);
-    let http = serving(vec![nothing()], requests::taken(), requests::taken());
+    let before = std::fs::read_to_string(crate::app::gating::path(&at, File::Upstreams));
+    let http = serving(
+        vec![nothing(), nothing(), at_the_gate(&minted())],
+        requests::taken(),
+        requests::taken(),
+    );
 
     let wirings = seeded(&stack(true), &at, &http, true, false).await;
 
+    assert_eq!(states(&wirings), vec![State::Wired]);
+    assert_eq!(accepted(&at), Some(accepting(&[&minted()])));
     assert_eq!(
-        wirings.first().map(|one| &one.state),
-        Some(&State::Failed {
-            detail: "the tokens could not be handed to the request gate: lemonfiber does not \
-                     hold the credential it presents on its route sonarr"
-                .to_owned(),
-        })
+        std::fs::read_to_string(crate::app::gating::path(&at, File::Upstreams)).ok(),
+        before.ok()
     );
-    assert_eq!(accepted(&at), None);
-    assert!(!written(&http));
 }

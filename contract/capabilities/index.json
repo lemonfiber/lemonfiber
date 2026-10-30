@@ -201,8 +201,8 @@
         1
       ],
       "openapi": "invite.decline/v1/openapi.json",
-      "operations": 3,
-      "sha256": "4522766b0f6058a84b15e8f076534714e009059a81a5044a18827db2fb1bb032"
+      "operations": 6,
+      "sha256": "1be8c587a6addaa2e5585c1ada3351fb2f72510e068aecbe4442abb02d3210d4"
     },
     {
       "capability": "request.gate",
@@ -213,8 +213,8 @@
         1
       ],
       "openapi": "request.gate/v1/openapi.json",
-      "operations": 2,
-      "sha256": "2968c6b63848efab23fe6d3ae88f5df8c1c51d2851d79ec96542dde3a1b74587"
+      "operations": 4,
+      "sha256": "85d2fc3dd73b8e88cbe02bc6af9fad97067d3a91f76abbc11e90cb165187c13d"
     },
     {
       "capability": "owner.claim",

@@ -5,7 +5,9 @@
 //! certificates the media server's internal TLS port may present, answers each by its
 //! fingerprint alone, and is handed every invitation it may act on.
 
-use lemonfiber_ports::service::{Claimed, Declinable, Declining, Invitations, KeyHeld};
+use lemonfiber_ports::service::{
+    Claimed, Declinable, Declined, Declining, Invitations, KeyHeld, Lapsed,
+};
 
 use super::{CERTIFICATE_PIN, NAMED, NOWHERE, TOKEN_HASH};
 use crate::conformance::Placeholder;
@@ -42,6 +44,12 @@ crate::contract! {
                     }],
                 },
             };
+            /// Every invitation it declined.
+            fn refusals() -> Vec<Declined> where asks = Asked {};
+            /// Every invitation it took back, or looked at and left, as its window closed.
+            fn lapses() -> Vec<Lapsed> where asks = Asked {};
+            /// Where it serves the page an invitation is declined on, `{token}` in its place.
+            fn page() -> String where asks = Asked {};
         }
     }
 }

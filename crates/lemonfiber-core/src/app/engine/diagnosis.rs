@@ -16,7 +16,6 @@ mod deferring;
 use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::environment::EnvironmentCheck;
-use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
@@ -223,22 +222,6 @@ fn indexer_still_answers(ctx: &Ctx) -> IndexerCheck {
     )
 }
 
-/// What the request gate refused and removed since the last diagnosis, where the
-/// stack runs one: its record, and the place last read kept beside the settings.
-fn gate_record(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&std::path::Path>,
-) -> GateRecordCheck {
-    let gate = project
-        .filter(|_| crate::app::gating::service(services).is_some())
-        .map(|project| Gate {
-            record: crate::app::gating::path(project, lemonfiber_sidecar::gate::File::Record),
-            read: crate::app::targets::beside_env(ctx, crate::config::paths::GATE_READ),
-        });
-    GateRecordCheck::new(ctx.seams.filesystem.clone(), gate)
-}
-
 /// The checks this stack is examined by, built and ready to run.
 ///
 /// Assembled apart from the running of them because a repair has to ask the very same
@@ -357,7 +340,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     );
     let telling = deferring::telling(ctx, manifest);
     let owned = deferring::owned(ctx, manifest);
-    let gate = gate_record(ctx, &manifest.services, project.as_deref());
+    let gate = deferring::gated(ctx, manifest, project.as_deref());
     let decline = deferring::declined(ctx, manifest, project.as_deref());
     let moves = crate::doctor::moving::MovesCheck::new(Arc::new(
         crate::app::plugins::moving_in::Offering::of(ctx, manifest),

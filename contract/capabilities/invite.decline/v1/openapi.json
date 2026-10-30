@@ -93,6 +93,15 @@
     },
     "/lemonfiber/invite.decline/v1/hold": {
       "$ref": "operations/hold.json"
+    },
+    "/lemonfiber/invite.decline/v1/lapses": {
+      "$ref": "operations/lapses.json"
+    },
+    "/lemonfiber/invite.decline/v1/page": {
+      "$ref": "operations/page.json"
+    },
+    "/lemonfiber/invite.decline/v1/refusals": {
+      "$ref": "operations/refusals.json"
     }
   }
 }

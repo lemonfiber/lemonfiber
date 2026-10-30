@@ -1,0 +1,92 @@
+{
+  "post": {
+    "operationId": "refusals",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Declined": {
+                  "additionalProperties": false,
+                  "description": "One invitation the service declined.",
+                  "properties": {
+                    "account": {
+                      "description": "The media server's id for the account made for it.",
+                      "type": "string"
+                    },
+                    "at": {
+                      "description": "When, in seconds since the Unix epoch.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "token": {
+                      "description": "The SHA-256 of its decline token, in lower-case hexadecimal.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "account",
+                    "at"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Declined"
+              },
+              "title": "Array_of_Declined",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576
+  }
+}

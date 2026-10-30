@@ -65,6 +65,83 @@ pub struct KeyHeld {
     pub pins: Vec<String>,
 }
 
+/// One invitation the service declined.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct Declined {
+    /// The SHA-256 of its decline token, in lower-case hexadecimal.
+    pub token: String,
+    /// The media server's id for the account made for it.
+    pub account: String,
+    /// When, in seconds since the Unix epoch.
+    pub at: u64,
+}
+
+/// Why the service left an account as it was when its invitation's window closed.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum LeftBecause {
+    /// Somebody had set a password on it since the invitation was issued.
+    Claimed,
+    /// It administers the server.
+    Administrator,
+    /// It was already switched off.
+    Disabled,
+    /// The server no longer held it.
+    Gone,
+    /// The invitation was offered again under another issue time.
+    Reoffered,
+    /// The server answered for an account other than the one asked for.
+    Unmatched,
+}
+
+/// What the service did with an account when its invitation's window closed.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum TakenBack {
+    /// Nobody was ever seen in it and every guard held: it was removed.
+    Removed,
+    /// Somebody had been in it, or a guard did not hold: it was switched off and kept.
+    SwitchedOff,
+    /// It was left as it was.
+    Left {
+        /// Why.
+        why: LeftBecause,
+    },
+}
+
+impl From<LeftBecause> for TakenBack {
+    fn from(why: LeftBecause) -> Self {
+        Self::Left { why }
+    }
+}
+
+/// One invitation the service took back, or looked at and left, as its window closed.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct Lapsed {
+    /// The SHA-256 of its decline token, in lower-case hexadecimal.
+    pub token: String,
+    /// The media server's id for the account made for it.
+    pub account: String,
+    /// The name the account was made under.
+    pub name: String,
+    /// When it was issued, in seconds since the Unix epoch.
+    pub issued: u64,
+    /// When it was taken back, in seconds since the Unix epoch.
+    pub at: u64,
+    /// What became of its account.
+    pub outcome: TakenBack,
+}
+
 /// A decline service, told the key it acts with and the invitations it may act on.
 #[async_trait]
 pub trait Declining: Send + Sync {
@@ -90,4 +167,26 @@ pub trait Declining: Send + Sync {
     ///
     /// Returns [`Failure`] where it is unreachable or refuses.
     async fn apply_invitations(&self, invitations: &Invitations) -> Result<(), Failure>;
+
+    /// Every invitation it declined.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where it is unreachable or answers unreadably.
+    async fn refusals(&self) -> Result<Vec<Declined>, Failure>;
+
+    /// Every invitation it took back, or looked at and left, as its window closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where it is unreachable or answers unreadably.
+    async fn lapses(&self) -> Result<Vec<Lapsed>, Failure>;
+
+    /// The path under which it serves the page an invitation is declined on, with
+    /// `{token}` where the token goes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where it is unreachable or answers unreadably.
+    async fn page(&self) -> Result<String, Failure>;
 }

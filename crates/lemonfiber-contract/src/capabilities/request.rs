@@ -15,9 +15,9 @@ use std::collections::BTreeSet;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     Address, Addressing, Admitted, Approving, Asked, Asking, Credential, Detail, Endpoint,
-    FulfilmentTarget, Gated, Gating, Headroom, Holding, HouseholdRequest, IdentitySource,
-    MediaServerLink, Noticing, Occasion, Page, Protocol, QualityProfile, Quota, RegisteredTarget,
-    Requesting, Requests, Searching, Target, Telling, Wish,
+    FulfilmentTarget, GateRecord, Gated, Gating, Headroom, Holding, HouseholdRequest,
+    IdentitySource, MediaServerLink, Noticing, Occasion, Page, Protocol, QualityProfile, Quota,
+    RegisteredTarget, Requesting, Requests, Searching, Target, Telling, Wish,
 };
 
 use super::{
@@ -335,6 +335,13 @@ crate::contract! {
             };
             /// Every route it admits, each credential by its SHA-256.
             fn admitted() -> Vec<Admitted> where asks = Asked {};
+            /// Admit only these token hashes on one route, every credential left as it is.
+            fn admit_tokens(str route: &str, slice tokens: &[String] as String) -> () where asks = Asked {
+                route: Kind::Tv.media_type().to_owned(),
+                tokens: vec![TOKEN_HASH.to_owned()],
+            };
+            /// Every refusal and forwarded removal recorded after one entry.
+            fn record(value after: u64) -> GateRecord where asks = Asked { after: 0 };
         }
     }
 }

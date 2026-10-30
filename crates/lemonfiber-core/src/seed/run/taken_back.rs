@@ -253,7 +253,7 @@ async fn still_direct(
 }
 
 /// Whether the gate admits `token` on `route`: never where it cannot be asked.
-fn accepted(kept: Option<&Kept<'_>>, route: &str, token: &str) -> bool {
+fn accepted(kept: Option<&Kept>, route: &str, token: &str) -> bool {
     kept.is_some_and(|kept| kept.accepts(route, token))
 }
 
@@ -262,7 +262,7 @@ fn accepted(kept: Option<&Kept<'_>>, route: &str, token: &str) -> bool {
 async fn gated_target(
     requests: &dyn Requests,
     held: &[RegisteredTarget],
-    kept: Option<&Kept<'_>>,
+    kept: Option<&Kept>,
     host: &str,
     kind: Kind,
 ) -> bool {
