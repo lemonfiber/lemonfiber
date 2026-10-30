@@ -2,8 +2,11 @@ use std::collections::BTreeMap;
 
 use base64::Engine as _;
 
+use lemonfiber_contract::conformance::MINTED_HASH;
+
 use super::{Scrub, REDACTED};
 use crate::plugin::recorded::Answer;
+use crate::plugin::recording::alike::alike;
 use crate::ports::serving::Served;
 
 const KEY: &str = "Ab/c+d=e f\"g";
@@ -122,4 +125,41 @@ fn an_answers_headers_keys_strings_and_text_are_scrubbed_and_its_numbers_kept() 
 fn the_longest_spelling_goes_first_so_a_shorter_one_inside_it_leaves_nothing_behind() {
     let scrub = Scrub::of(&["abcd".to_owned(), "abcdefgh".to_owned()], None);
     assert_eq!(scrub.text("abcdefgh"), REDACTED);
+}
+
+fn sha256(value: &str) -> String {
+    crate::secret::render(ring::digest::digest(&ring::digest::SHA256, value.as_bytes()).as_ref())
+}
+
+fn admitted(credential: &str) -> Answer {
+    Answer {
+        status: 200,
+        headers: BTreeMap::new(),
+        json: Some(serde_json::json!([{ "route": "tv", "credential": sha256(credential) }])),
+        body_starts_with: None,
+    }
+}
+
+#[test]
+fn the_hash_of_a_minted_credential_is_its_placeholder_on_every_run_and_any_other_hash_differs() {
+    let taken = |minted: &str, answered: &str| {
+        Scrub::of(&[minted.to_owned()], None)
+            .and_hashed(&[sha256(minted)])
+            .answer(admitted(answered))
+            .json
+            .unwrap_or_default()
+    };
+    let recorded = taken("first-run-credential", "first-run-credential");
+    assert_eq!(
+        recorded,
+        serde_json::json!([{ "route": "tv", "credential": MINTED_HASH }])
+    );
+    let again = taken("second-run-credential", "second-run-credential");
+    assert!(alike(&recorded, &again));
+    let other = taken("second-run-credential", "another-credential");
+    assert_eq!(
+        other.pointer("/0/credential"),
+        Some(&serde_json::json!(sha256("another-credential")))
+    );
+    assert!(!alike(&recorded, &other));
 }

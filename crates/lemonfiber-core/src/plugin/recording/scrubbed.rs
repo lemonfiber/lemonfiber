@@ -1,7 +1,9 @@
 //! Taking every credential a recording run made or read, the container's identity and the
-//! recording machine's own, out of what it writes and prints.
+//! recording machine's own, out of what it writes and prints, and writing the hash of each
+//! credential minted for a case as the placeholder that stands for it.
 
 use base64::Engine as _;
+use lemonfiber_contract::conformance::MINTED_HASH;
 use serde_json::Value;
 
 use crate::plugin::recorded::Answer;
@@ -21,7 +23,7 @@ const SHORT_ID: usize = 12;
 /// Every spelling of every value a recording run must not write.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct Scrub {
-    spellings: Vec<String>,
+    spellings: Vec<(String, &'static str)>,
 }
 
 impl Scrub {
@@ -36,12 +38,13 @@ impl Scrub {
             values.extend(served.addresses.iter().cloned());
             values.extend(served.machine.iter().cloned());
         }
-        let spellings: Vec<String> = values
+        let spellings = values
             .iter()
             .filter(|value| value.chars().count() >= SHORTEST)
             .flat_map(|value| encoded(value))
             .flat_map(|spelling| [spelling.to_lowercase(), spelling.to_uppercase(), spelling])
             .filter(|spelling| spelling.chars().count() >= SHORTEST)
+            .map(|spelling| (spelling, REDACTED))
             .collect();
         Self::ordered(spellings)
     }
@@ -53,19 +56,26 @@ impl Scrub {
         Self::ordered(spellings)
     }
 
+    /// The same, with each hash in `hashed` written as [`MINTED_HASH`].
+    pub(super) fn and_hashed(self, hashed: &[String]) -> Self {
+        let mut spellings = self.spellings;
+        spellings.extend(hashed.iter().map(|hash| (hash.clone(), MINTED_HASH)));
+        Self::ordered(spellings)
+    }
+
     /// `spellings` once each, the longest first so that none is left half replaced.
-    fn ordered(mut spellings: Vec<String>) -> Self {
-        spellings.sort_by(|one, other| other.len().cmp(&one.len()).then(one.cmp(other)));
-        spellings.dedup();
+    fn ordered(mut spellings: Vec<(String, &'static str)>) -> Self {
+        spellings.sort_by(|(one, _), (other, _)| other.len().cmp(&one.len()).then(one.cmp(other)));
+        spellings.dedup_by(|(one, _), (other, _)| one == other);
         Self { spellings }
     }
 
-    /// `text` with every spelling written as [`REDACTED`].
+    /// `text` with every spelling written as what stands for it.
     pub(super) fn text(&self, text: &str) -> String {
         self.spellings
             .iter()
-            .fold(text.to_owned(), |text, spelling| {
-                text.replace(spelling.as_str(), REDACTED)
+            .fold(text.to_owned(), |text, (spelling, written)| {
+                text.replace(spelling.as_str(), written)
             })
     }
 
@@ -73,7 +83,7 @@ impl Scrub {
     pub(super) fn holds(&self, text: &str) -> bool {
         self.spellings
             .iter()
-            .any(|spelling| text.contains(spelling.as_str()))
+            .any(|(spelling, _)| text.contains(spelling.as_str()))
     }
 
     /// `answer` with every header, every key and string of its body and the beginning of

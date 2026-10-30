@@ -49,6 +49,7 @@ impl Filler {
             .into_iter()
             .collect(),
             made: Vec::new(),
+            hashed: Vec::new(),
             certificate: self.certificate.clone(),
         }
     }
@@ -202,4 +203,19 @@ fn a_minted_credential_is_written_into_what_the_adapter_holds_beside_its_fields(
         held,
         Some(json!({"username": "admin", "password": "s3cret"}))
     );
+}
+
+#[test]
+fn each_minted_credential_is_kept_with_its_lower_case_sha256() {
+    let Some(filler) = Filler::new(Some(7)) else {
+        return;
+    };
+    let mut filling = filler.filling();
+    assert!(filling
+        .filled(&json!(["{minted}", "{minted:upstream:key}"]))
+        .is_ok());
+    let hashed = crate::secret::render(
+        ring::digest::digest(&ring::digest::SHA256, MINTED.as_bytes()).as_ref(),
+    );
+    assert_eq!(filling.hashed, vec![hashed.clone(), hashed]);
 }
