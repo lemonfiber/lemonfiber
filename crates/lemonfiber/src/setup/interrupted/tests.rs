@@ -5,7 +5,7 @@ use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::wizard::{Answer, Choice, Guarded, Library, Phase, Vpn, Wizard};
+use lemonfiber_core::wizard::{Answer, Choice, Library, Phase, Vpn, Wizard};
 
 use super::{about_to, ask_recovery_choice, recover_setup};
 use crate::setup::tests::{ctx, working_ctx, Scripted};
@@ -105,7 +105,7 @@ fn halfway(paths: &Paths) -> Wizard {
     let mut wizard = Wizard::new(Environment::MacOs);
     for answer in [
         Answer::Protocols(Protocols::both()),
-        Answer::Vpn(Vpn::Carrying(Guarded::default())),
+        Answer::Vpn(Vpn::Carrying(crate::setup::tests::guarded())),
         Answer::DataLocation(paths.data_dir().join("media")),
         Answer::Credentials(None),
         Answer::Provider(None),

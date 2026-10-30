@@ -56,7 +56,7 @@ fn a_stack_service_is_reached_where_it_says_it_listens() {
         })
     );
     assert_eq!(
-        fillers.service("gluetun").map(|one| one.address.clone()),
+        fillers.service("recyclarr").map(|one| one.address.clone()),
         Some(None),
         "a service that says nowhere it listens has no address"
     );

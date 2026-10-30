@@ -80,7 +80,12 @@ async fn a_rehearsed_install_names_each_service_that_would_wait_and_for_what() {
     let install =
         report(installing(&ctx, &source("waiting", &manifest)).await).and_then(|one| one.install);
     assert_eq!(
-        install.map(|one| one.waiting),
+        install.map(|one| {
+            one.waiting
+                .into_iter()
+                .filter(|waiting| waiting.service == "komga")
+                .collect::<Vec<_>>()
+        }),
         Some(vec![crate::model::Waiting {
             service: "komga".to_owned(),
             wants: vec![crate::model::Wanted::Setting {

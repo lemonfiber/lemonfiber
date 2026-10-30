@@ -95,9 +95,10 @@ impl Surface for Scripted {
     }
 }
 
-/// Answers that are always empty — every question takes its default, which is
-/// what a person pressing enter through the whole walk would give — except the
-/// review, which is where a run that declines its plan says so.
+/// Answers that are empty — every question takes its default, which is what a person
+/// pressing enter through the whole walk would give — except the review, which is where a
+/// run that declines its plan says so, and the egress guard's VPN settings, which have no
+/// default because only the operator's VPN account holds them.
 struct Echoing {
     applies: bool,
 }
@@ -105,16 +106,53 @@ struct Echoing {
 /// The review's question, which is the one answer that is not a default.
 const REVIEW: &str = "Apply it?";
 
+/// The choice the egress guard's provider is asked as, which offers no default.
+const NO_DEFAULT: &str = "Choose []:";
+
+/// The egress guard's provider setting, and the provider the walk names.
+const PROVIDER: (&str, &str) = ("gluetun:provider", "mullvad");
+
+/// The egress guard's address setting, and the address the walk gives.
+const ADDRESSES: (&str, &str) = ("gluetun:addresses", "10.64.222.21/32");
+
+/// The egress guard's key secret, and the key the walk gives.
+const WIREGUARD_KEY: (&str, &str) = (
+    "gluetun:wireguard-key",
+    "yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=",
+);
+
+/// The VPN answer the walk gives: the egress guard's provider, address and key.
+pub(crate) fn guarded() -> lemonfiber_core::wizard::Guarded {
+    lemonfiber_core::wizard::Guarded {
+        settings: [PROVIDER, ADDRESSES]
+            .into_iter()
+            .map(|(name, value)| (name.to_owned(), value.to_owned()))
+            .collect(),
+        secrets: [WIREGUARD_KEY]
+            .into_iter()
+            .map(|(name, value)| (name.to_owned(), value.to_owned()))
+            .collect(),
+    }
+}
+
 impl crate::prompt::Answers for Echoing {
     fn ask(&self, question: &str) -> String {
         if !self.applies && question.contains(REVIEW) {
             return "n".to_owned();
         }
-        String::new()
+        match question.trim() {
+            NO_DEFAULT => PROVIDER.1.to_owned(),
+            asked if asked.strip_suffix(':') == Some(ADDRESSES.0) => ADDRESSES.1.to_owned(),
+            _ => String::new(),
+        }
     }
 
-    fn secret(&self, _prompt: &str) -> String {
-        String::new()
+    fn secret(&self, prompt: &str) -> String {
+        if prompt.trim().strip_suffix(':') == Some(WIREGUARD_KEY.0) {
+            WIREGUARD_KEY.1.to_owned()
+        } else {
+            String::new()
+        }
     }
 }
 
