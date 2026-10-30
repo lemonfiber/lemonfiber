@@ -15,7 +15,9 @@ const UPSTREAM_PORT: u16 = 80;
 
 crate::contract! {
     /// `proxy.front`: the household's proxy.
-    pub mod front = "proxy.front" @ 1 {
+    pub mod front = "proxy.front" @ 1 holds [
+        crate::Held::kept("certificates", "Certificates it obtained"),
+    ] {
         impl Proxying {
             /// Serve a routing table in place of the one it serves.
             fn apply(refer table: &Routing as Routing) -> Applied where asks = Asked {

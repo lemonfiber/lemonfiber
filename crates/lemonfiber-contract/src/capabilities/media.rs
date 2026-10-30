@@ -64,7 +64,11 @@ fn minted() -> String {
 
 crate::contract! {
     /// `media.serve`: a media server.
-    pub mod serve = "media.serve" @ 1 {
+    pub mod serve = "media.serve" @ 1 holds [
+        crate::Held::kept("libraries", "Libraries as the operator arranged them"),
+        crate::Held::kept("watch-history", "Watch history and progress"),
+        crate::Held::kept("devices", "Devices signed in"),
+    ] {
         impl Screening {
             /// Open a session on one member's account for one of their devices.
             fn signed_in(str member: &str, str device: &str) -> Option<String> where secret = &[""], asks = Asked {

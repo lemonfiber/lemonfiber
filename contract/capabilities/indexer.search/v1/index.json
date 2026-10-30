@@ -36,6 +36,10 @@
     {
       "path": "indexer.search/v1/conformance.json",
       "sha256": "f36390ba8b7bc711ca2c5f3e2ea22225e94a9c4f3ecf6a8604a4a8123ddfc618"
+    },
+    {
+      "path": "indexer.search/v1/holds.json",
+      "sha256": "5d7a7a7c771f0feeb9e7bb7ca411ef231b8024e012d4888d17d510419f620788"
     }
   ],
   "major": 1

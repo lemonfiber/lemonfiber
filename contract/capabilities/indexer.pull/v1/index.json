@@ -16,6 +16,10 @@
     {
       "path": "indexer.pull/v1/conformance.json",
       "sha256": "fb5c1bcf90441d7c3b3d8277afaec6cea10c7f7563517b273224d554258c9095"
+    },
+    {
+      "path": "indexer.pull/v1/holds.json",
+      "sha256": "350b2a447d587e57948010abc149647acddb2edbcfd1d6761ed82d2b68d7552a"
     }
   ],
   "major": 1

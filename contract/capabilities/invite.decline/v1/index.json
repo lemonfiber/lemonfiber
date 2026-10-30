@@ -32,6 +32,10 @@
     {
       "path": "invite.decline/v1/conformance.json",
       "sha256": "99c52baa2da53792a5d12437999cde0a682ddab8199cb47f137ed3eba83baccd"
+    },
+    {
+      "path": "invite.decline/v1/holds.json",
+      "sha256": "706384428a8db50194338f0191dcb2952e7bdee267be69b6edcdf1cc54935ede"
     }
   ],
   "major": 1

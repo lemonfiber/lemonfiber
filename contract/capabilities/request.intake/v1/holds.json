@@ -1,0 +1,11 @@
+{
+  "capability": "request.intake",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "requests",
+      "said": "Requests and their history"
+    }
+  ],
+  "major": 1
+}

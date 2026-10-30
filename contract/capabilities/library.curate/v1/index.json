@@ -120,6 +120,10 @@
     {
       "path": "library.curate/v1/conformance.json",
       "sha256": "ee4c92b4a2202cdbc7069d5eab89efdbdb6e62cd50ed5b269c3f954caf23e162"
+    },
+    {
+      "path": "library.curate/v1/holds.json",
+      "sha256": "8a7d3d8a60bbdce030c0687527bfe434999553978a7d86f5a600221c591eea92"
     }
   ],
   "major": 1

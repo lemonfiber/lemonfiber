@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One kind of thing the part a substitution stops holds, and the replacement does not\nreceive.",
+  "type": "object",
+  "properties": {
+    "capability": {
+      "description": "The capability whose contract declares it held.",
+      "type": "string"
+    },
+    "kind": {
+      "description": "The kind, by its stable id.",
+      "type": "string"
+    },
+    "said": {
+      "description": "The words the rehearsal names it in.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "capability",
+    "kind",
+    "said"
+  ]
+}

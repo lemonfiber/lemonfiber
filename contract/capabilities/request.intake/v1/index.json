@@ -132,6 +132,10 @@
     {
       "path": "request.intake/v1/conformance.json",
       "sha256": "88f279b6f6281e42dea522f3e9a99156f62ee12216e01ecb02a39349d4089844"
+    },
+    {
+      "path": "request.intake/v1/holds.json",
+      "sha256": "3cab73c20c265c7c8b68bd1fc4929695f6e0e3531530615cb0542c4f6bd3d41b"
     }
   ],
   "major": 1

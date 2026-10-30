@@ -1,0 +1,11 @@
+{
+  "capability": "quality.sync",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "hand-edits",
+      "said": "A configuration edited by hand"
+    }
+  ],
+  "major": 1
+}

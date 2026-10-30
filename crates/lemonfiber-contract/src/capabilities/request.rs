@@ -171,7 +171,9 @@ fn member() -> String {
 
 crate::contract! {
     /// `request.intake`: a request service.
-    pub mod intake = "request.intake" @ 1 {
+    pub mod intake = "request.intake" @ 1 holds [
+        crate::Held::kept("requests", "Requests and their history"),
+    ] {
         impl Requests {
             /// Hold an owner through an identity source, so it answers its key.
             fn establish(refer source: &IdentitySource as IdentitySource) -> () where asks = Asked { source: identity() };
@@ -314,7 +316,9 @@ fn gated(target: Target, path: &str, address: String, majors: Vec<u32>) -> Gated
 
 crate::contract! {
     /// `request.gate`: the gate the request service reaches through.
-    pub mod gate = "request.gate" @ 1 {
+    pub mod gate = "request.gate" @ 1 holds [
+        crate::Held::kept("record", "Its record of refusals and forwarded removals"),
+    ] {
         impl Gating {
             /// Admit every route in place of the ones it admits.
             fn admit(slice routes: &[Gated] as Gated) -> () where asks = Asked {

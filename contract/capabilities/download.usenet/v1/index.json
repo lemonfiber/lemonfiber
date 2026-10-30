@@ -52,6 +52,10 @@
     {
       "path": "download.usenet/v1/conformance.json",
       "sha256": "5382595cadd9fa30008cda1f636c74d050070f510eeaf437e4b0983d555ee035"
+    },
+    {
+      "path": "download.usenet/v1/holds.json",
+      "sha256": "6fb352a9ef684716be39480f8604c302cafe9d5fdeb8b60d67dafefee8f75047"
     }
   ],
   "major": 1

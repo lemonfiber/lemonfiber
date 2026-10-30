@@ -1,5 +1,5 @@
-//! The published documents: an `OpenAPI` document, a conformance list and an index of its
-//! files per capability, and an index of every capability.
+//! The published documents: an `OpenAPI` document, a conformance list, what a filler
+//! holds and an index of its files per capability, and an index of every capability.
 //!
 //! Generated from [`crate::capabilities::all`], never written by hand, and compared with
 //! the committed `contract/capabilities/` by a test, so a type that moves and a document
@@ -45,6 +45,7 @@ fn documents(capability: &Capability) -> Vec<(String, String)> {
         )
     }));
     documents.push((located(capability, CONFORMANCE), conformance(capability)));
+    documents.push((located(capability, HOLDS), holds(capability)));
     documents
         .into_iter()
         .map(|(path, document)| (path, written(&document)))
@@ -63,6 +64,20 @@ const OPERATIONS: &str = "operations";
 
 /// The name of a capability's conformance list.
 const CONFORMANCE: &str = "conformance.json";
+
+/// The name of a capability's declaration of what its filler holds.
+const HOLDS: &str = "holds.json";
+
+/// What a filler of `capability` holds that lemonfiber does not seed, each with whether
+/// the contract carries it from one filler to another.
+#[must_use]
+pub fn holds(capability: &Capability) -> Value {
+    json!({
+        "capability": capability.name,
+        "major": capability.major,
+        "holds": capability.holds,
+    })
+}
 
 /// Where the refusal every operation may answer with is described once.
 const REFUSED: &str = "../openapi.json#/components/responses/Refused";

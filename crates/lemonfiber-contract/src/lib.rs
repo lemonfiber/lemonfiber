@@ -194,4 +194,40 @@ pub struct Capability {
     pub major: u32,
     /// Every operation, in the order they are declared.
     pub operations: Vec<Operation>,
+    /// Each kind of thing a filler of it holds that lemonfiber does not seed.
+    pub holds: &'static [Held],
+}
+
+/// One kind of thing a filler of a contract holds that lemonfiber does not seed, and
+/// whether the contract carries it from one filler to another.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct Held {
+    /// Its stable id.
+    pub kind: &'static str,
+    /// The words a rehearsal names it in.
+    pub said: &'static str,
+    /// Whether an operation of the contract carries it from one filler to another.
+    pub carried: bool,
+}
+
+impl Held {
+    /// A kind a filler holds and the contract carries to no other filler.
+    #[must_use]
+    pub const fn kept(kind: &'static str, said: &'static str) -> Self {
+        Self {
+            kind,
+            said,
+            carried: false,
+        }
+    }
+
+    /// A kind a filler holds and an operation of the contract carries to another filler.
+    #[must_use]
+    pub const fn carried(kind: &'static str, said: &'static str) -> Self {
+        Self {
+            kind,
+            said,
+            carried: true,
+        }
+    }
 }

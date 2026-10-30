@@ -1,0 +1,16 @@
+{
+  "capability": "indexer.search",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "indexers",
+      "said": "Indexers added by hand"
+    },
+    {
+      "carried": false,
+      "kind": "search-history",
+      "said": "Search history"
+    }
+  ],
+  "major": 1
+}

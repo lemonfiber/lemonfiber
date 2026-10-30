@@ -28,6 +28,7 @@ use crate::error::codes::wire::{
 };
 use crate::error::Code;
 
+mod carrying;
 mod chosen;
 mod fillers;
 mod handing;
@@ -36,6 +37,7 @@ pub use run::listing;
 mod replacing;
 mod settling;
 
+pub use carrying::LeftBehind;
 pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
 pub use replacing::replaced;
@@ -254,6 +256,9 @@ pub struct Substitution {
     /// which is a working stack becoming a broken one, on a change that reads as
     /// swapping like for like.
     pub leaves_unfilled: Vec<Unfilled>,
+    /// Each kind of thing the part it stops holds that its replacement is not carried,
+    /// read from what each contract declares its filler holds.
+    pub leaves_behind: Vec<LeftBehind>,
     /// Each part the change takes out of its form, stopped with its configuration and
     /// data kept where they are.
     pub stops: Vec<String>,
@@ -343,6 +348,10 @@ pub fn substitute(
         .map(|one| (one.by, one.capability))
         .collect();
 
+    let leaves_behind = was
+        .as_deref()
+        .map(|was| carrying::left_behind(manifest, installed, capability, was, service))
+        .unwrap_or_default();
     Ok(Substitution {
         capability: capability.to_owned(),
         was,
@@ -362,6 +371,7 @@ pub fn substitute(
             .filter(|part| !left_out.contains(part))
             .cloned()
             .collect(),
+        leaves_behind,
         setting,
         why: None,
     })

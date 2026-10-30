@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "leaves_behind": {
+      "type": [
+        "array[ref:LeftBehind]"
+      ],
+      "required": true
+    },
     "leaves_unfilled": {
       "type": [
         "array[ref:Unfilled]"

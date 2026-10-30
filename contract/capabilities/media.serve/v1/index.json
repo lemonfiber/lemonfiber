@@ -104,6 +104,10 @@
     {
       "path": "media.serve/v1/conformance.json",
       "sha256": "7092df1c85a971af486f3cc37d03a70e28ba074cafaa5767c1752a2e78d8b438"
+    },
+    {
+      "path": "media.serve/v1/holds.json",
+      "sha256": "650a291577b7cff56169aea8c407bfe65e55255c285f712d91b4c57417fe6ee4"
     }
   ],
   "major": 1

@@ -16,6 +16,10 @@
     {
       "path": "subtitles.fetch/v1/conformance.json",
       "sha256": "32366d84655be6af598fbf1826fde81681457cf71c59f39cfc310ac202d1bfb8"
+    },
+    {
+      "path": "subtitles.fetch/v1/holds.json",
+      "sha256": "a0be173ad9d75cec79306f63d479406e7aaaec4b3b87d260a5583a5540c2286c"
     }
   ],
   "major": 1

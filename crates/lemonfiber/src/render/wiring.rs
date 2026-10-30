@@ -197,6 +197,7 @@ pub(crate) fn substituted(report: &SubstitutionReport) -> Lines {
         lines.put(format!("  because  {why}"));
     }
     lines.extend(cost(&made.leaves_unfilled, report.applied));
+    lines.extend(behind(made, report.applied));
     lines.extend(parts(report));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
     if !report.applied {
@@ -279,6 +280,28 @@ fn cost(leaves: &[Unfilled], applied: bool) -> Lines {
     lines.spaced(said);
     for one in leaves {
         lines.put(format!("  {} — asked for by {}", one.capability, one.by));
+    }
+    lines
+}
+
+/// What the part a substitution stops holds that its replacement is not carried.
+fn behind(made: &lemonfiber_core::wiring::Substitution, applied: bool) -> Lines {
+    let mut lines = Lines::default();
+    let Some(was) = made
+        .was
+        .as_deref()
+        .filter(|_| !made.leaves_behind.is_empty())
+    else {
+        return lines;
+    };
+    let said = if applied {
+        format!("Stays with {was} and did not carry over to {}:", made.now)
+    } else {
+        format!("Stays with {was} and would not carry over to {}:", made.now)
+    };
+    lines.spaced(said);
+    for one in &made.leaves_behind {
+        lines.put(format!("  {one}"));
     }
     lines
 }

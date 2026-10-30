@@ -20,6 +20,10 @@
     {
       "path": "proxy.front/v1/conformance.json",
       "sha256": "55eddca781df5bfd908b886956347eb7fa4a0ea1c08c9dea3e01aa6ae7c9509c"
+    },
+    {
+      "path": "proxy.front/v1/holds.json",
+      "sha256": "17466c2ba86ec0eaecc5f0f1c4a32a6028c51767d2324d609a32920034eb567c"
     }
   ],
   "major": 1

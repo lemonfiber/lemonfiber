@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "kind": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "said": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

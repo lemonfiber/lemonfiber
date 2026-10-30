@@ -474,3 +474,52 @@ async fn every_operation_of_every_capability_refuses_a_body_that_is_not_its_requ
         }
     }
 }
+
+/// Each kind a contract declares held is named once, by a lowercase id, in words a
+/// rehearsal can name it in; and a kind is carried only by a contract with an operation
+/// reading it from one filler and one writing it into another.
+#[test]
+fn what_a_filler_holds_is_named_once_and_carried_only_by_an_operation() {
+    let carrying = ["records", "carry"];
+    for capability in super::all() {
+        let mut kinds = HashSet::new();
+        for held in capability.holds {
+            assert!(
+                kinds.insert(held.kind),
+                "{} twice in {}",
+                held.kind,
+                capability.name
+            );
+            assert!(
+                held.kind
+                    .chars()
+                    .all(|one| one.is_ascii_lowercase() || one == '-'),
+                "{}",
+                held.kind
+            );
+            assert!(!held.said.trim().is_empty(), "{}", held.kind);
+        }
+        let carries = carrying.iter().all(|name| {
+            capability
+                .operations
+                .iter()
+                .any(|operation| operation.name == *name)
+        });
+        assert!(
+            carries || capability.holds.iter().all(|held| !held.carried),
+            "{} carries a kind with no operation to carry it",
+            capability.name
+        );
+    }
+    assert!(curate::HOLDS.iter().any(|held| held.carried));
+}
+
+/// A kind declared kept is not carried, and one declared carried is, whatever it is named.
+#[test]
+fn a_kind_is_carried_only_where_it_is_declared_carried() {
+    let kept = crate::Held::kept("history", "watch history");
+    let carried = crate::Held::carried("history", "watch history");
+    assert!(!kept.carried);
+    assert!(carried.carried);
+    assert_eq!((kept.kind, kept.said), (carried.kind, carried.said));
+}

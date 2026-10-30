@@ -40,7 +40,10 @@ fn device(case: &str) -> String {
 
 crate::contract! {
     /// `identity.source`: an identity source.
-    pub mod source = "identity.source" @ 1 {
+    pub mod source = "identity.source" @ 1 holds [
+        crate::Held::kept("accounts", "Accounts and their passwords"),
+        crate::Held::kept("invitations", "Invitations still open"),
+    ] {
         impl MediaServer {
             /// Whether its first-run setup is done.
             fn startup_completed() -> bool where asks = Asked {};

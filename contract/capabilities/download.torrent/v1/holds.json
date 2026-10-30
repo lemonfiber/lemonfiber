@@ -1,0 +1,16 @@
+{
+  "capability": "download.torrent",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "transfers",
+      "said": "Transfers in progress and finished"
+    },
+    {
+      "carried": false,
+      "kind": "seeding",
+      "said": "Torrents seeding"
+    }
+  ],
+  "major": 1
+}

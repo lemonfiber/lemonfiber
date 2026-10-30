@@ -16,6 +16,10 @@
     {
       "path": "owner.claim/v1/conformance.json",
       "sha256": "e5a00b8068cda61163518739bba75db6ff768fb39ff29f0630f93f7d821032cf"
+    },
+    {
+      "path": "owner.claim/v1/holds.json",
+      "sha256": "041375aefba9f3998b3bd39ec6e5e74811e0fd6e9aabdb854526047423a46a3e"
     }
   ],
   "major": 1

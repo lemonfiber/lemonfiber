@@ -1,0 +1,11 @@
+{
+  "capability": "request.gate",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "record",
+      "said": "Its record of refusals and forwarded removals"
+    }
+  ],
+  "major": 1
+}

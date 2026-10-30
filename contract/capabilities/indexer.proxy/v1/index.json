@@ -16,6 +16,10 @@
     {
       "path": "indexer.proxy/v1/conformance.json",
       "sha256": "b0a2059894a9416d32d1b4d02af84038082393a92e42af93c99ea7544fc0f40a"
+    },
+    {
+      "path": "indexer.proxy/v1/holds.json",
+      "sha256": "2b069dd0a88748a5b0437f13f462752aab200da6d2866bb471f40370502db80b"
     }
   ],
   "major": 1

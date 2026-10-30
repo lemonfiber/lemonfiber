@@ -39,7 +39,7 @@
 macro_rules! contract {
     (
         $(#[$meta:meta])*
-        $vis:vis mod $module:ident = $capability:literal @ $major:literal {
+        $vis:vis mod $module:ident = $capability:literal @ $major:literal $(holds [ $($held:expr),* $(,)? ])? {
             $(
                 impl $Trait:path {
                     $(
@@ -60,6 +60,9 @@ macro_rules! contract {
 
             /// The major of its contract this build speaks.
             pub const MAJOR: u32 = $major;
+
+            /// Each kind of thing a filler of it holds that lemonfiber does not seed.
+            pub const HOLDS: &[$crate::Held] = &[$($($held),*)?];
 
             $($(
                 $(#[$op_meta])*
@@ -175,6 +178,7 @@ macro_rules! contract {
                 $crate::Capability {
                     name: CAPABILITY,
                     major: MAJOR,
+                    holds: HOLDS,
                     operations: vec![
                         $($(
                             $crate::Operation::new::<$op::Asked, $ret>(

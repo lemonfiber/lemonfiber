@@ -1,0 +1,16 @@
+{
+  "capability": "subtitles.fetch",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "subtitles",
+      "said": "Subtitles fetched and their history"
+    },
+    {
+      "carried": false,
+      "kind": "languages",
+      "said": "Language choices made by hand"
+    }
+  ],
+  "major": 1
+}

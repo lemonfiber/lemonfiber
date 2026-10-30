@@ -78,7 +78,10 @@ fn registered() -> RegisteredApplication {
 
 crate::contract! {
     /// `indexer.search`: an indexer.
-    pub mod search = "indexer.search" @ 1 {
+    pub mod search = "indexer.search" @ 1 holds [
+        crate::Held::kept("indexers", "Indexers added by hand"),
+        crate::Held::kept("search-history", "Search history"),
+    ] {
         impl AppSync {
             /// Tell it about an application to search for.
             fn register_application(refer application: &Application as Application) -> () where asks = Asked {

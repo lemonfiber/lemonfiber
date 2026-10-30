@@ -24,6 +24,10 @@
     {
       "path": "request.gate/v1/conformance.json",
       "sha256": "9a36f569007e68d637045cee76242d30253a9b8ea72202f699ac816ec23a0cd7"
+    },
+    {
+      "path": "request.gate/v1/holds.json",
+      "sha256": "f8a849bc6a23fc578a0210564cbf787af88423c8ec66420f9815653b9628d881"
     }
   ],
   "major": 1

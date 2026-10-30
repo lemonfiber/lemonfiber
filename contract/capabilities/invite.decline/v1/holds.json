@@ -1,0 +1,11 @@
+{
+  "capability": "invite.decline",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "refusals-and-lapses",
+      "said": "Refusals and lapses it recorded"
+    }
+  ],
+  "major": 1
+}

@@ -1,6 +1,6 @@
 use super::{
-    contested_by, filled, recorded, settle, substitute, unfilled, Chosen, Reaches, Refused,
-    Settled, Substitution, Unfilled, Whose, FILLS_KEY,
+    contested_by, filled, recorded, settle, substitute, unfilled, Chosen, LeftBehind, Reaches,
+    Refused, Settled, Substitution, Unfilled, Whose, FILLS_KEY,
 };
 use lemonfiber_manifest::Manifest;
 
@@ -300,6 +300,18 @@ fn a_substitution_names_the_capability_both_services_and_everything_that_asked()
             now: "nzbhydra2".to_owned(),
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: Vec::new(),
+            leaves_behind: vec![
+                LeftBehind {
+                    capability: "indexer.search".to_owned(),
+                    kind: "indexers".to_owned(),
+                    said: "Indexers added by hand".to_owned(),
+                },
+                LeftBehind {
+                    capability: "indexer.search".to_owned(),
+                    kind: "search-history".to_owned(),
+                    said: "Search history".to_owned(),
+                },
+            ],
             stops: vec!["prowlarr".to_owned()],
             starts: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),
@@ -734,6 +746,7 @@ fn a_link_that_says_neither_what_it_asks_for_nor_what_it_names_is_left_out() {
 }
 
 mod asking;
+mod carrying;
 mod installed;
 mod moved;
 mod native;
