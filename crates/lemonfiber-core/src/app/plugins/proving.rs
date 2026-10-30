@@ -268,7 +268,8 @@ pub(super) async fn spoken(
 
 /// Every way an adapter's account of itself and its live cases depart from what its
 /// plugin declares: the contracts it speaks, a release at the digest its upstream is
-/// pinned by, and each live case of each contract answered as the contract says.
+/// pinned by and none at any other, since that digest is the one its recordings were
+/// taken from, and each live case of each contract answered as the contract says.
 async fn held_to(
     adapter: &lemonfiber_contract::Contracted,
     installed: &Installed,
@@ -295,6 +296,13 @@ async fn held_to(
             upstream.digest, upstream.service
         ));
     }
+    faults.extend(about.releases.iter().filter_map(|release| {
+        let pinned = upstream.filter(|pinned| pinned.digest != release.digest)?;
+        Some(format!(
+            "it lists release {} at {}, and its recordings were taken from {} alone",
+            release.version, release.digest, pinned.digest
+        ))
+    }));
     let spoken: Vec<_> = lemonfiber_contract::capabilities::all()
         .into_iter()
         .filter(|one| {
