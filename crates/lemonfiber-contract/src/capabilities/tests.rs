@@ -513,3 +513,13 @@ fn what_a_filler_holds_is_named_once_and_carried_only_by_an_operation() {
     }
     assert!(curate::HOLDS.iter().any(|held| held.carried));
 }
+
+/// A kind declared kept is not carried, and one declared carried is, whatever it is named.
+#[test]
+fn a_kind_is_carried_only_where_it_is_declared_carried() {
+    let kept = crate::Held::kept("history", "watch history");
+    let carried = crate::Held::carried("history", "watch history");
+    assert!(!kept.carried);
+    assert!(carried.carried);
+    assert_eq!((kept.kind, kept.said), (carried.kind, carried.said));
+}
