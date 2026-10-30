@@ -380,6 +380,7 @@ fn installed(
             granting: Vec::new(),
             sharing: Vec::new(),
             waiting: Vec::new(),
+            secured: None,
         })),
         update: None,
         substituted: Vec::new(),
@@ -544,6 +545,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
                     granting: Vec::new(),
                     sharing: Vec::new(),
                     waiting: Vec::new(),
+                    secured: None,
                 },
                 stopped: None,
                 restored: restored.then(|| lemonfiber_core::plugin::Restored {

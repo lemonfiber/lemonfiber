@@ -106,16 +106,12 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
 /// curator left out of one call is a curator it stops watching.
 async fn watched(ctx: &Ctx, extractor: &Restarting, curated: &[Curated]) -> State {
     if ctx.dry_run {
-        return State::WouldWire {
-            yours: None,
-            ours: Some(
-                curated
-                    .iter()
-                    .map(|one| format!("{} in {}", one.media_type, one.folder))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ),
-        };
+        let ours = curated
+            .iter()
+            .map(|one| format!("{} in {}", one.media_type, one.folder))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return extractor.would(None, &ours);
     }
     let watching = extract::Adapter(extractor.adapter().clone());
     extractor.taken_up(ctx, watching.watch(curated).await).await

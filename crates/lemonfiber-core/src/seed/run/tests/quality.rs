@@ -145,7 +145,7 @@ async fn a_sync_already_holding_the_preset_is_told_nothing_and_a_rehearsal_says_
         wirings.iter().all(|wiring| wiring.state
             == crate::seed::State::WouldWire {
                 yours: Some("maximum".to_owned()),
-                ours: Some("balanced".to_owned()),
+                ours: Some("balanced, and sync may restart to take it up".to_owned()),
             }),
         "{wirings:?}"
     );

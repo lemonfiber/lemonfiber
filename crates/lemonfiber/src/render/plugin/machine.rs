@@ -62,6 +62,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(changes(&install.changes, acted));
         lines.extend(proving(&install.proofs, install.against, acted));
         lines.extend(verified(install.verified.as_ref()));
+        lines.extend(secured(install.secured.as_deref()));
         // Read off `recorded` rather than off acting, and this is the one place the
         // two part. What is listed is what the plugin may change of the stack's, and
         // an install that went back changed none of it — the same as a rehearsal.
@@ -245,6 +246,16 @@ fn came_to(verdict: &Verdict) -> String {
             super::as_declared(declared)
         ),
     }
+}
+
+/// What asking the egress guard among its services to hold its control credential came
+/// to, where it was more than held at once.
+fn secured(said: Option<&str>) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(said) = said {
+        lines.spaced(format!("    {said}"));
+    }
+    lines
 }
 
 /// What the stack's own checks made of the install.

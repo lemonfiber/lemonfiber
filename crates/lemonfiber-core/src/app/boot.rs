@@ -392,6 +392,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         // teardown reports and reads the same way: no clash was found.
         port_conflicts: Vec::new(),
         forwarding: None,
+        secured: None,
         switched: None,
         held: Some(reason.to_owned()),
         offer: None,

@@ -62,6 +62,7 @@ fn running() -> Vec<Outcome> {
                 held_by: "somebody-elses/sonarr".to_owned(),
             }],
             forwarding: None,
+            secured: None,
             switched: None,
             held: None,
             offer: None,

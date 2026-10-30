@@ -33,6 +33,18 @@ impl Restarting {
         &self.adapter
     }
 
+    /// What a rehearsal of writing `ours` over `yours` says: the write, and that the
+    /// upstream may restart to take it up.
+    pub(super) fn would(&self, yours: Option<String>, ours: &str) -> State {
+        State::WouldWire {
+            yours,
+            ours: Some(format!(
+                "{ours}, and {} may restart to take it up",
+                self.upstream
+            )),
+        }
+    }
+
     /// What `applied` comes to: written and in force, or in force once the upstream
     /// started again, said as such.
     pub(super) async fn taken_up(&self, ctx: &Ctx, applied: Result<Applied, Failure>) -> State {

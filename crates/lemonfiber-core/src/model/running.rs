@@ -54,6 +54,12 @@ pub struct LifecycleReport {
     /// moved, or could not be.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forwarding: Option<String>,
+    /// What asking the egress guard to hold its control server to the credential its
+    /// adapter was handed came to, where it was more than held at once: the guard
+    /// restarted to take it up, or why it did not. Absent where it held it at once or no
+    /// guard speaks its contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secured: Option<String>,
     /// What narrowing moved, where the command was a switch. Absent for every
     /// other action, which is what tells a reader that nothing was left running
     /// on purpose.

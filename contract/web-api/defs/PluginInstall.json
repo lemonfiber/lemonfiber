@@ -78,6 +78,13 @@
         }
       ]
     },
+    "secured": {
+      "description": "What asking the egress guard among its services to hold its control server to the\ncredential its adapter was handed came to, where it was more than held at once:\nthe guard restarted to take it up, or why it did not. Absent where none of its\nservices is a guard speaking its contract, and on every rehearsal.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "sharing": {
       "description": "Every adapter that writes the files of the service it fronts.",
       "type": "array",

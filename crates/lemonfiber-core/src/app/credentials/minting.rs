@@ -32,6 +32,9 @@ const REPLACING: &str = "a real run would mint a new value, write it where the o
      in the service's settings, its secrets file and its adapter's upstream.json, and restart \
      what reads it. Nothing was replaced.";
 
+/// What the egress guard's hold on its control credential is reported as.
+const GUARD_CONTROL: &str = "the egress guard's control server";
+
 /// The installed `plugin` that `held` is a secret lemonfiber minted for, and the secret.
 pub(super) fn minted<'a>(
     held: &Held,
@@ -167,6 +170,7 @@ async fn replaced(
             &format!("they did not restart: {why}; lemonfiber restart finishes it"),
         ));
     }
+    consumers.extend(secured(ctx, installed, amid).await);
     consumers.extend(copies(ctx, &declared.of, amid).await);
     Rotation::landed(name, &fingerprint(&value), consumers)
 }
@@ -355,6 +359,21 @@ fn handed(ctx: &Ctx, installed: &Installed, stack: &Path, secret: &str) -> Vec<P
             reached(&placed.service, written.err())
         })
         .collect()
+}
+
+/// The egress guard among `installed`'s services, asked to hold its control server to
+/// the credential it now holds, where it did more than hold it at once.
+async fn secured(ctx: &Ctx, installed: &Installed, amid: &Amid<'_>) -> Option<Propagation> {
+    let now = ctx.seams.clock.now();
+    let secured = crate::seed::run::secured_by(ctx, amid.fillers, &installed.plugin, now).await?;
+    Some(match &secured {
+        crate::seed::run::Secured::Restarted { service } => {
+            Propagation::updated(&format!("{service}, restarted to take it up"))
+        }
+        crate::seed::run::Secured::Untaken { .. } => {
+            Propagation::failed(GUARD_CONTROL, &secured.said())
+        }
+    })
 }
 
 /// Whether `placed` hands its upstream `secret` in its `upstream.json`.

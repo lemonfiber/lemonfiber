@@ -390,6 +390,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             granting: Vec::new(),
             sharing: Vec::new(),
             waiting: Vec::new(),
+            secured: None,
         })),
         update: None,
         substituted: Vec::new(),

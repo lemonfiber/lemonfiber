@@ -52,6 +52,7 @@ use fulfilment::{fulfilling, seed_fulfilment_targets};
 pub(crate) mod identity;
 mod reset;
 mod restarting;
+mod securing;
 mod withholding;
 
 use applications::{seed_applications, skipped};
@@ -69,6 +70,7 @@ pub(crate) use gate::reroute;
 use identity::seed_request_identity;
 pub(crate) use quality::reprofile;
 pub(crate) use reset::reset_connections;
+pub(crate) use securing::{secured, secured_by, securing_installed, would_restart, Secured};
 pub(crate) use showing::reshow;
 pub(crate) use subtitles::rewatch;
 use withholding::{withheld, withheld_brought};
@@ -459,6 +461,31 @@ async fn seed_media_server(
         .and_then(|topology| crate::screening::door::upstream(&topology));
     wirings.extend(proxies::seed_proxies(ctx, door, server).await);
     wirings
+}
+
+/// Who fills what in the stack, `installed` taken as installed beside every other plugin
+/// the register holds; nothing where the stack cannot be read.
+fn installed_beside(
+    ctx: &Ctx,
+    installed: &crate::plugin::Installed,
+) -> Option<crate::wiring::Fillers> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let every: Vec<crate::plugin::Installed> = register
+        .installed()
+        .iter()
+        .filter(|one| one.plugin != installed.plugin)
+        .chain(std::iter::once(installed))
+        .cloned()
+        .collect();
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    Some(crate::wiring::Fillers::of(
+        &manifest,
+        &every,
+        &crate::app::targets::chosen_fillers(ctx),
+        project.as_deref(),
+    ))
 }
 
 #[cfg(test)]

@@ -90,6 +90,12 @@ pub struct Install {
     pub sharing: Vec<super::Sharing>,
     /// The services held back once the install is made, each with what it waits for.
     pub waiting: Vec<crate::model::Waiting>,
+    /// What asking the egress guard among its services to hold its control server to the
+    /// credential its adapter was handed came to, where it was more than held at once:
+    /// the guard restarted to take it up, or why it did not. Absent where none of its
+    /// services is a guard speaking its contract, and on every rehearsal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secured: Option<String>,
 }
 
 /// A capability that would have nothing filling it.

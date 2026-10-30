@@ -100,8 +100,7 @@ pub(super) async fn install(
     let (acting, taking) = offering::answered(ctx, consent, &would, &offer, &offering::INSTALLING)?;
 
     let mut stated = crate::plugin::proofs(&read.manifest);
-    let mut against = None;
-    let mut checked = None;
+    let (mut against, mut checked, mut secured) = (None, None, None);
     let mut put_back = None;
     let mut recorded = false;
     let mut recipes_ran = Vec::new();
@@ -132,7 +131,7 @@ pub(super) async fn install(
         // document into the stack, and it is deliberately not written yet.
         proving::started(ctx, &would, stack, &stamp).await?;
         let source = crate::plugin::root(path);
-        proving::asked(ctx, &read.manifest, &would, stack, &source, &mut stated).await;
+        secured = proving::asked(ctx, &read.manifest, &would, stack, &source, &mut stated).await;
         against = Some(proving::AGAINST);
 
         // The stack is asked only where the plugin's own proofs held. A run that has
@@ -195,6 +194,7 @@ pub(super) async fn install(
             granting: crate::plugin::granting(&would),
             sharing: crate::plugin::sharing(&would),
             waiting: standing::waiting(ctx, &stack_manifest, standing.installed(), &would),
+            secured: secured.or_else(|| proving::rehearsed(ctx, &would, acting)),
             would,
             recorded,
             changes,

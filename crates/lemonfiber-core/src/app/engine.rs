@@ -323,6 +323,7 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         stack_edits,
         port_conflicts,
         forwarding: None,
+        secured: None,
         switched: None,
         held: None,
         offer: None,

@@ -76,6 +76,13 @@
       "description": "Whether this was a rehearsal.",
       "type": "boolean"
     },
+    "secured": {
+      "description": "What asking the egress guard to hold its control server to the credential its\nadapter was handed came to, where it was more than held at once: the guard\nrestarted to take it up, or why it did not. Absent where it held it at once or no\nguard speaks its contract.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "services": {
       "description": "What each service ended up doing, where the action waited to find out, or\nwhere a start did not complete, read once when it ended.\n\nEmpty for actions that do not wait. Stopping is finished when Compose\nsays it is, and surveying afterwards would only report the absence it\nwas asked to produce. A start that failed is not waited on, and names every\nservice it addressed and those they depend on as the engine had them then.",
       "type": "array",

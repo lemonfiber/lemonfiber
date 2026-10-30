@@ -79,7 +79,7 @@ async fn envelope_through(
 }
 
 /// How often a guard that does not answer yet is asked again.
-const POLL: Duration = Duration::from_millis(500);
+pub(super) const POLL: Duration = Duration::from_millis(500);
 
 /// How applying the stream guard among `installed`'s services the envelope it enforces came
 /// out, the plugin taken as installed beside every other the register holds, asked again
@@ -90,24 +90,7 @@ pub(crate) async fn guarding_installed(
     installed: &crate::plugin::Installed,
     until: SystemTime,
 ) -> Option<State> {
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let register =
-        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
-    let every: Vec<crate::plugin::Installed> = register
-        .installed()
-        .iter()
-        .filter(|one| one.plugin != installed.plugin)
-        .chain(std::iter::once(installed))
-        .cloned()
-        .collect();
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let fillers = Fillers::of(
-        &manifest,
-        &every,
-        &crate::app::targets::chosen_fillers(ctx),
-        project.as_deref(),
-    );
+    let fillers = super::installed_beside(ctx, installed)?;
     let guarding = fillers.services().find(|one| {
         one.brought_by() == Some(installed.plugin.as_str())
             && one.provides.iter().any(|name| name == guard::CAPABILITY)
