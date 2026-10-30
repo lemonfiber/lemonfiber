@@ -15,7 +15,7 @@ const PLUGIN_ONLY: [&str; 5] = ["replaces", "native", "env", "speaks", "contract
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's own services declare none of them.
-const FROM_SECRETS: [(&str, &str, &str); 9] = [
+const FROM_SECRETS: [(&str, &str, &str); 7] = [
     ("gluetun", "WIREGUARD_PRIVATE_KEY", "wireguard-key"),
     (
         "gluetun",
