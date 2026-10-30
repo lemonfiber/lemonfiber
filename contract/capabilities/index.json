@@ -10,7 +10,7 @@
       ],
       "openapi": "download.usenet/v1/openapi.json",
       "operations": 11,
-      "sha256": "91f7ed92470044e3e2f8bbd11d4ebd2157c51d3784de0a9dc9bddedc2c8d2f24"
+      "sha256": "367319d063924c055cdd29b41e6b7845dfea8727f70db9d6a5bc7cc3ac137ae3"
     },
     {
       "capability": "download.torrent",
@@ -22,7 +22,7 @@
       ],
       "openapi": "download.torrent/v1/openapi.json",
       "operations": 14,
-      "sha256": "a67589e00ddf282f1291c8eeb452053b59c2a961f833fb701dcb641918e4e7fb"
+      "sha256": "5ebd2d254e18585ccb83d65543867a4c3bc92b8892db47ee67246e106e708d6c"
     },
     {
       "capability": "network.egress-guard",
@@ -34,7 +34,7 @@
       ],
       "openapi": "network.egress-guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "99482adaf3cdc64f155715ffde2e6bffd699daed90280d97d8fa190855f6d673"
+      "sha256": "fc4c815237b8a84c1aa404b3e96016bf1b4489ced1430c752185a948c00f3712"
     },
     {
       "capability": "library.curate",
@@ -46,7 +46,7 @@
       ],
       "openapi": "library.curate/v1/openapi.json",
       "operations": 28,
-      "sha256": "e8ca01ee82db7960252f35ef0dfefcf9077f0bf58e330d4973c0c0a6717fd8a9"
+      "sha256": "55bc709fb7cfc68fa311bb51592f94caa4744988b06b611a9aeb0a5f4980cebf"
     },
     {
       "capability": "indexer.search",
@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "52df0b22da174d919585cfc1e91bb75dc2c2c42b28c216f69e9ee5566faea79a"
+      "sha256": "3ca3d0cbd5c2cd55911c6aadb4a512ff940a0704d76020e111a6e569d0372391"
     },
     {
       "capability": "indexer.pull",
@@ -70,7 +70,7 @@
       ],
       "openapi": "indexer.pull/v1/openapi.json",
       "operations": 2,
-      "sha256": "0f177374914b58fe1b56930e85b24beeda028946521d51258d3e3b051dfa8e92"
+      "sha256": "842a8a1e42c542c7e0362dbd4790dad8a9e45d24263dcc0d15985f18c65ba32d"
     },
     {
       "capability": "indexer.proxy",
@@ -82,7 +82,7 @@
       ],
       "openapi": "indexer.proxy/v1/openapi.json",
       "operations": 2,
-      "sha256": "d9a046624e807d6afc6b1698a3393f94dac514840ff5ede20e12e99924d96d13"
+      "sha256": "431c71c017c7b7b30e7b02c69a58a17c4d9ff4c027420c907be35e358c6d022b"
     },
     {
       "capability": "subtitles.fetch",
@@ -94,7 +94,7 @@
       ],
       "openapi": "subtitles.fetch/v1/openapi.json",
       "operations": 2,
-      "sha256": "2748a6da574d6499a0c91e9221f509877d57164a8e41494a4de6e166ffbe3725"
+      "sha256": "9f0274e2a3226929408ca5d66320dee44707d61c0cd6336c8e759fbfd5647247"
     },
     {
       "capability": "request.intake",
@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 31,
-      "sha256": "a694807ecfd12ec21e001f07209292404621ccb45eca04a2179f621f940d92f6"
+      "sha256": "b20fedda1ee6868e81a33580c1bfa5ac6d1209c8d5c7a09e1a2709bd2e598277"
     },
     {
       "capability": "identity.source",
@@ -118,7 +118,7 @@
       ],
       "openapi": "identity.source/v1/openapi.json",
       "operations": 19,
-      "sha256": "eb4eda60736ea14fe89fae4159d67f55723b3ea3c873d59ae8fa9293ebac69ae"
+      "sha256": "de8597ad57a616eb3911000e5c36c8e321d5a62ca50d3587cdd009c17624df2c"
     },
     {
       "capability": "media.serve",
@@ -130,7 +130,7 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 24,
-      "sha256": "ac89831a5b9cc870c207fbbe11434ba2993f9b25fa2e0005a01eeac00d98d2aa"
+      "sha256": "4aa6067bd26aca2a799fdc596ee52965f00bc2d4fdd67a6de2683ed536c74ab1"
     },
     {
       "capability": "proxy.front",
@@ -142,7 +142,7 @@
       ],
       "openapi": "proxy.front/v1/openapi.json",
       "operations": 3,
-      "sha256": "e216955f2c7ce180bf5a994bed9d0c461fe3ad7b409d7ecc3f2692f3de0a5714"
+      "sha256": "86270ebfcdd22dfa230a3b839bbba0e832e6b5c8bf3f51ad06d4014d81b407f4"
     },
     {
       "capability": "quality.sync",
@@ -154,7 +154,7 @@
       ],
       "openapi": "quality.sync/v1/openapi.json",
       "operations": 4,
-      "sha256": "9ffa87d1d16376b0053922db7e7564fc293c052014fa9fa8cb355708c3b4250b"
+      "sha256": "e04a06982c600e51ca4df8c8a1bdd48227b4de8f1f57c7eb506c6d8d8bfae547"
     },
     {
       "capability": "dashboard.show",
@@ -166,7 +166,7 @@
       ],
       "openapi": "dashboard.show/v1/openapi.json",
       "operations": 2,
-      "sha256": "d2cacc7d8e9ccf4307100f318805a8c5b7f43a67bc472a009c09722c3229be20"
+      "sha256": "1374342f34ce44d2c8c151dfefdcc10f4b447ec3efff652cc8c7b378a467f4f5"
     },
     {
       "capability": "archive.extract",
@@ -178,7 +178,7 @@
       ],
       "openapi": "archive.extract/v1/openapi.json",
       "operations": 2,
-      "sha256": "e2102f58993036eb38341f8bfc60bd70e5a5ef634fde074f8bd6c09b24863bb9"
+      "sha256": "df86aca21778348140c122c1fbcf15ba320f47b0d4a937ef251f167a7f963b2c"
     },
     {
       "capability": "stream.guard",
@@ -190,7 +190,7 @@
       ],
       "openapi": "stream.guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "466b0b51850463bacf2ae5683cd4b727005e3fe6763251aa98439edf36e12aea"
+      "sha256": "4f5dff17020c4fde72a46cf11df04065e9442d9ce808e45250c87caea8ef561a"
     },
     {
       "capability": "invite.decline",
@@ -202,7 +202,7 @@
       ],
       "openapi": "invite.decline/v1/openapi.json",
       "operations": 6,
-      "sha256": "1be8c587a6addaa2e5585c1ada3351fb2f72510e068aecbe4442abb02d3210d4"
+      "sha256": "05b114f3879b461ac6031ea94dbc89ac319d28f1b1324cf0611646b33d75adbf"
     },
     {
       "capability": "request.gate",
@@ -214,7 +214,7 @@
       ],
       "openapi": "request.gate/v1/openapi.json",
       "operations": 4,
-      "sha256": "85d2fc3dd73b8e88cbe02bc6af9fad97067d3a91f76abbc11e90cb165187c13d"
+      "sha256": "951ac5e2fbaa09692f1ecf6e9efedda00d3f92f6a6c376f48327ef360ab4057b"
     },
     {
       "capability": "owner.claim",
@@ -226,7 +226,7 @@
       ],
       "openapi": "owner.claim/v1/openapi.json",
       "operations": 2,
-      "sha256": "31fba173881451de474895934e951562321ee81446749a7781b015a6c8ab6869"
+      "sha256": "9bbb4e7ed2d38e47eac0509fbdabb333d81cd6fd319f321d5f3bd8462aa40ab1"
     }
   ]
 }

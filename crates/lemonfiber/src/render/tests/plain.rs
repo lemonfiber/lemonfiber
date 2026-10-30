@@ -165,6 +165,7 @@ fn what_this_stack_wires_to_what_and_one_change_to_it_render_apart() {
                 now: "nzbhydra2".to_owned(),
                 asked_by: vec!["bindery".to_owned()],
                 leaves_unfilled: Vec::new(),
+                leaves_behind: Vec::new(),
                 stops: Vec::new(),
                 starts: Vec::new(),
                 setting: "indexer.search=nzbhydra2".to_owned(),

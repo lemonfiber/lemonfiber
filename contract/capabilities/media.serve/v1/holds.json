@@ -1,0 +1,21 @@
+{
+  "capability": "media.serve",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "libraries",
+      "said": "Libraries as the operator arranged them"
+    },
+    {
+      "carried": false,
+      "kind": "watch-history",
+      "said": "Watch history and progress"
+    },
+    {
+      "carried": false,
+      "kind": "devices",
+      "said": "Devices signed in"
+    }
+  ],
+  "major": 1
+}

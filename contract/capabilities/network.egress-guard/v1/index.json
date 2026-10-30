@@ -20,6 +20,10 @@
     {
       "path": "network.egress-guard/v1/conformance.json",
       "sha256": "30b198b17384d1594dd79f21be26b91786e5e626d34cab0faede476e51c5a1fe"
+    },
+    {
+      "path": "network.egress-guard/v1/holds.json",
+      "sha256": "ce5431553d8527059895cabe0065f385b546fa61dcd721197064cadf48fcaca1"
     }
   ],
   "major": 1

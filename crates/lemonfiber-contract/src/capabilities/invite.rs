@@ -22,7 +22,9 @@ const LAPSES: u64 = 4_102_444_800;
 
 crate::contract! {
     /// `invite.decline`: the decline service.
-    pub mod decline = "invite.decline" @ 1 {
+    pub mod decline = "invite.decline" @ 1 holds [
+        crate::Held::kept("refusals-and-lapses", "Refusals and lapses it recorded"),
+    ] {
         impl Declining {
             /// Switch an invitation off with this key from now on, reaching the media server only over TLS presenting one of these certificates.
             fn hold(str key: &str, slice pins: &[String] as String) -> () where asks = Asked {

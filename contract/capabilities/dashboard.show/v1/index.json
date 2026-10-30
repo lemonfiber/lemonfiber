@@ -16,6 +16,10 @@
     {
       "path": "dashboard.show/v1/conformance.json",
       "sha256": "eaeb6ac8255c57cc3d256113b4f5d3e06bbe697d1b59875ca620410e06f78d31"
+    },
+    {
+      "path": "dashboard.show/v1/holds.json",
+      "sha256": "8b1d8f8552207c3ab2c845eecb28996b6c0a1fb95d628b422bfd7a61bd2a2f15"
     }
   ],
   "major": 1

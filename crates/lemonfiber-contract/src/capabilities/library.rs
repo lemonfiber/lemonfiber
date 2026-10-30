@@ -147,7 +147,15 @@ fn held() -> String {
 
 crate::contract! {
     /// `library.curate`: a curator.
-    pub mod curate = "library.curate" @ 1 {
+    pub mod curate = "library.curate" @ 1 holds [
+        crate::Held::carried("followed-series", "Followed series"),
+        crate::Held::carried("followed-films", "Followed films"),
+        crate::Held::carried("followed-artists", "Followed artists"),
+        crate::Held::carried("followed-authors", "Followed authors"),
+        crate::Held::carried("indexers", "Indexers"),
+        crate::Held::kept("quality-profiles", "Quality profiles edited by hand"),
+        crate::Held::kept("download-history", "Download history"),
+    ] {
         impl Client {
             /// Who it is and which release it runs.
             fn identity() -> Identity where asks = Asked {};

@@ -1,0 +1,41 @@
+{
+  "capability": "library.curate",
+  "holds": [
+    {
+      "carried": true,
+      "kind": "followed-series",
+      "said": "Followed series"
+    },
+    {
+      "carried": true,
+      "kind": "followed-films",
+      "said": "Followed films"
+    },
+    {
+      "carried": true,
+      "kind": "followed-artists",
+      "said": "Followed artists"
+    },
+    {
+      "carried": true,
+      "kind": "followed-authors",
+      "said": "Followed authors"
+    },
+    {
+      "carried": true,
+      "kind": "indexers",
+      "said": "Indexers"
+    },
+    {
+      "carried": false,
+      "kind": "quality-profiles",
+      "said": "Quality profiles edited by hand"
+    },
+    {
+      "carried": false,
+      "kind": "download-history",
+      "said": "Download history"
+    }
+  ],
+  "major": 1
+}

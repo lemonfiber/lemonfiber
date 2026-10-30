@@ -1,0 +1,5 @@
+{
+  "capability": "network.egress-guard",
+  "holds": [],
+  "major": 1
+}

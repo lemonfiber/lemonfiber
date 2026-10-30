@@ -10,7 +10,9 @@ use crate::conformance::Placeholder;
 
 crate::contract! {
     /// `quality.sync`: a quality sync.
-    pub mod sync = "quality.sync" @ 1 {
+    pub mod sync = "quality.sync" @ 1 holds [
+        crate::Held::kept("hand-edits", "A configuration edited by hand"),
+    ] {
         impl Syncing {
             /// Hold one curator's profiles to a preset.
             fn apply(refer profiled: &Profiled as Profiled) -> Applied where asks = Asked {

@@ -47,7 +47,9 @@ fn wanted() -> Wanted {
 
 crate::contract! {
     /// `download.usenet`: a Usenet client.
-    pub mod usenet = "download.usenet" @ 1 {
+    pub mod usenet = "download.usenet" @ 1 holds [
+        crate::Held::kept("transfers", "Transfers in progress and finished"),
+    ] {
         impl Transfers {
             /// What it is downloading now.
             fn transfers() -> Vec<Download> where asks = Asked {};
@@ -87,7 +89,10 @@ crate::contract! {
 
 crate::contract! {
     /// `download.torrent`: a torrent client.
-    pub mod torrent = "download.torrent" @ 1 {
+    pub mod torrent = "download.torrent" @ 1 holds [
+        crate::Held::kept("transfers", "Transfers in progress and finished"),
+        crate::Held::kept("seeding", "Torrents seeding"),
+    ] {
         impl Transfers {
             /// What it is downloading now.
             fn transfers() -> Vec<Download> where asks = Asked {};

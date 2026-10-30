@@ -20,6 +20,10 @@
     {
       "path": "stream.guard/v1/conformance.json",
       "sha256": "60dc892570c84efb9d7dc6b6f5ebeba134e599a751028cf9c88c2173a4067f8a"
+    },
+    {
+      "path": "stream.guard/v1/holds.json",
+      "sha256": "40bfc3c15bf548774b7013e62ec2124e6b044ee7a7766627c604818ba40c72aa"
     }
   ],
   "major": 1

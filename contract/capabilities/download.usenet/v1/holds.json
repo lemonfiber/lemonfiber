@@ -1,0 +1,11 @@
+{
+  "capability": "download.usenet",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "transfers",
+      "said": "Transfers in progress and finished"
+    }
+  ],
+  "major": 1
+}

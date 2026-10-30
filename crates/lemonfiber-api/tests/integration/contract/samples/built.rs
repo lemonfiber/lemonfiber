@@ -207,6 +207,11 @@ pub(super) fn a_substitution() -> SubstitutionReport {
                 by: "bindery".to_owned(),
                 capability: "indexer.proxy".to_owned(),
             }],
+            leaves_behind: vec![lemonfiber_core::wiring::LeftBehind {
+                capability: "indexer.search".to_owned(),
+                kind: "search-history".to_owned(),
+                said: "Search history".to_owned(),
+            }],
             stops: vec!["prowlarr".to_owned()],
             starts: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),

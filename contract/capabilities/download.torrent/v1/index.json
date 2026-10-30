@@ -64,6 +64,10 @@
     {
       "path": "download.torrent/v1/conformance.json",
       "sha256": "6d089c4b0151c8288d9c9f14f89f8aa0d9863831f7876395422280f8b3d7fe6a"
+    },
+    {
+      "path": "download.torrent/v1/holds.json",
+      "sha256": "f44661416f19bac0a05448418aed86231578dc3dad7c2f74f5d4318095d6d1f8"
     }
   ],
   "major": 1

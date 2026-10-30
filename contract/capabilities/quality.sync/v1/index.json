@@ -24,6 +24,10 @@
     {
       "path": "quality.sync/v1/conformance.json",
       "sha256": "bc0066b36c93f8af825de6051c95529cbb5cd2f15a9914ac3b897861d623645a"
+    },
+    {
+      "path": "quality.sync/v1/holds.json",
+      "sha256": "cf38b26289113ed5b79300b4589378a8859e2c4b3f1c48cf684feb53ab1b20ca"
     }
   ],
   "major": 1

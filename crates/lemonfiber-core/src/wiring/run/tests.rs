@@ -447,6 +447,7 @@ fn an_answer_carried_over_to_another_service_names_the_choice_itself() {
         now: "nzbhydra2".to_owned(),
         asked_by: vec!["bindery".to_owned()],
         leaves_unfilled: Vec::new(),
+        leaves_behind: Vec::new(),
         stops: Vec::new(),
         starts: Vec::new(),
         setting: "indexer.search=nzbhydra2".to_owned(),

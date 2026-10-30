@@ -1,0 +1,11 @@
+{
+  "capability": "proxy.front",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "certificates",
+      "said": "Certificates it obtained"
+    }
+  ],
+  "major": 1
+}

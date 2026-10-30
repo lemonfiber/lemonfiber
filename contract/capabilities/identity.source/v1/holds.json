@@ -1,0 +1,16 @@
+{
+  "capability": "identity.source",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "accounts",
+      "said": "Accounts and their passwords"
+    },
+    {
+      "carried": false,
+      "kind": "invitations",
+      "said": "Invitations still open"
+    }
+  ],
+  "major": 1
+}

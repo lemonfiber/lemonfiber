@@ -12,7 +12,10 @@ use crate::conformance::Placeholder;
 
 crate::contract! {
     /// `subtitles.fetch`: a subtitle finder.
-    pub mod fetch = "subtitles.fetch" @ 1 {
+    pub mod fetch = "subtitles.fetch" @ 1 holds [
+        crate::Held::kept("subtitles", "Subtitles fetched and their history"),
+        crate::Held::kept("languages", "Language choices made by hand"),
+    ] {
         impl Subtitles {
             /// What it holds for the curator of one kind of video.
             fn watching(value which: Kind) -> Watching where asks = Asked { which: Kind::Tv };

@@ -255,6 +255,7 @@ fn substituting(applied: bool, leaves: Vec<Unfilled>) -> SubstitutionReport {
             now: "nzbhydra2".to_owned(),
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: leaves,
+            leaves_behind: Vec::new(),
             stops: Vec::new(),
             starts: Vec::new(),
             setting: "indexer.search=nzbhydra2".to_owned(),
@@ -396,4 +397,32 @@ fn a_reading_says_which_parts_it_stops_and_starts_and_a_change_which_did_not() {
         said.contains("prowlarr — the container engine refused: busy"),
         "{said}"
     );
+}
+
+/// What the stopped part holds and its replacement is not carried is named on a reading
+/// and after it landed, and nothing is said where nothing stays behind.
+#[test]
+fn what_stays_with_the_stopped_part_is_named() {
+    let mut reading = substituting(false, Vec::new());
+    reading.substitution.leaves_behind = vec![lemonfiber_core::wiring::LeftBehind {
+        capability: "indexer.search".to_owned(),
+        kind: "search-history".to_owned(),
+        said: "Search history".to_owned(),
+    }];
+    let said = substituted(&reading).text();
+    assert!(
+        said.contains("Stays with prowlarr and would not carry over to nzbhydra2:"),
+        "{said}"
+    );
+    assert!(said.contains("  Search history (indexer.search)"), "{said}");
+
+    reading.applied = true;
+    let landed = substituted(&reading).text();
+    assert!(
+        landed.contains("Stays with prowlarr and did not carry over to nzbhydra2:"),
+        "{landed}"
+    );
+
+    let nothing = substituted(&substituting(false, Vec::new())).text();
+    assert!(!nothing.contains("Stays with"), "{nothing}");
 }

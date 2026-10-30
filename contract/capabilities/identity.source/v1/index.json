@@ -84,6 +84,10 @@
     {
       "path": "identity.source/v1/conformance.json",
       "sha256": "d8cd189b17d991e059ca03a3618a58f9bce010a69b83066038a1ec42e09a1d47"
+    },
+    {
+      "path": "identity.source/v1/holds.json",
+      "sha256": "021029113130e4e73895b36cbb0386919fff431d18664ad6cca60ba37de0c827"
     }
   ],
   "major": 1

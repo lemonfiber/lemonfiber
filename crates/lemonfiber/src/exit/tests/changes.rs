@@ -640,6 +640,7 @@ fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out()
                 now: "nzbhydra2".to_owned(),
                 asked_by: vec!["bindery".to_owned()],
                 leaves_unfilled: Vec::new(),
+                leaves_behind: Vec::new(),
                 stops: Vec::new(),
                 starts: Vec::new(),
                 setting: "indexer.search=nzbhydra2".to_owned(),
