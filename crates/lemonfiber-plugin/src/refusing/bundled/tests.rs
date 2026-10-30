@@ -93,3 +93,26 @@ fn a_further_port_a_shipped_service_publishes_is_held() {
     );
     assert_eq!(publishing_in(&shipped, further + 1), None);
 }
+
+/// A household service standing in for none of the stack's is routed to its own id.
+#[test]
+fn a_name_standing_in_for_nothing_is_routed_to_its_own_service() {
+    let mut routed = 0;
+    for pinned in lemonfiber_bundled::PINNED {
+        let Ok(mut part) = crate::Manifest::from_toml(pinned.copy) else {
+            continue;
+        };
+        for service in &mut part.services {
+            service.replaces = None;
+        }
+        for (_, service) in super::labelled(&part) {
+            assert!(
+                part.services.iter().any(|own| own.id == service),
+                "{service}"
+            );
+            routed += 1;
+        }
+    }
+
+    assert!(routed > 0, "a pinned part with a household service");
+}
