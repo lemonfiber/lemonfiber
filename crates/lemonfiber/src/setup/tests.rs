@@ -115,11 +115,13 @@ const PROVIDER: (&str, &str) = ("gluetun:provider", "mullvad");
 /// The egress guard's address setting, and the address the walk gives.
 const ADDRESSES: (&str, &str) = ("gluetun:addresses", "10.64.222.21/32");
 
-/// The egress guard's key secret, and the key the walk gives.
-const WIREGUARD_KEY: (&str, &str) = (
-    "gluetun:wireguard-key",
-    "yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=",
-);
+/// The egress guard's key secret.
+const WIREGUARD_KEY: &str = "gluetun:wireguard-key";
+
+/// The key the walk gives, which is no key at all.
+fn dialled() -> String {
+    ["wireguard", "not", "real"].join("-")
+}
 
 /// The VPN answer the walk gives: the egress guard's provider, address and key.
 pub(crate) fn guarded() -> lemonfiber_core::wizard::Guarded {
@@ -128,9 +130,8 @@ pub(crate) fn guarded() -> lemonfiber_core::wizard::Guarded {
             .into_iter()
             .map(|(name, value)| (name.to_owned(), value.to_owned()))
             .collect(),
-        secrets: [WIREGUARD_KEY]
+        secrets: [(WIREGUARD_KEY.to_owned(), dialled())]
             .into_iter()
-            .map(|(name, value)| (name.to_owned(), value.to_owned()))
             .collect(),
     }
 }
@@ -148,8 +149,8 @@ impl crate::prompt::Answers for Echoing {
     }
 
     fn secret(&self, prompt: &str) -> String {
-        if prompt.trim().strip_suffix(':') == Some(WIREGUARD_KEY.0) {
-            WIREGUARD_KEY.1.to_owned()
+        if prompt.trim().strip_suffix(':') == Some(WIREGUARD_KEY) {
+            dialled()
         } else {
             String::new()
         }
