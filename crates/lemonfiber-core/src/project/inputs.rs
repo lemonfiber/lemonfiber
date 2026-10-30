@@ -24,6 +24,8 @@ pub(super) struct Standing {
     pub(super) inside: Option<String>,
     /// The upstream it fronts, where it is an adapter.
     pub(super) fronts: Option<String>,
+    /// Whether it declares itself fenced.
+    pub(super) fenced: bool,
 }
 
 /// Everything the derivation reads, owned.
@@ -39,6 +41,9 @@ pub(super) struct Inputs {
     pub(super) guard: Option<String>,
     /// Whether the pass service runs beside the guard.
     pub(super) pass: bool,
+    /// Each service declaring itself fenced, with the fence it runs inside, or none where
+    /// another service already holds that fence's id.
+    pub(super) fenced: Vec<(String, Option<String>)>,
 }
 
 impl Inputs {
@@ -88,6 +93,7 @@ pub(super) fn read(
                 .as_ref()
                 .and_then(|network| fill(network.via()?)),
             fronts: None,
+            fenced: service.fenced(),
         })
         .chain(
             installed
@@ -105,9 +111,15 @@ pub(super) fn read(
                         .as_ref()
                         .and_then(|network| fill(network.via()?)),
                     fronts: placed.fronts.clone(),
+                    fenced: placed
+                        .fields
+                        .network
+                        .as_ref()
+                        .is_some_and(|network| network.fenced),
                 }),
         )
         .collect();
+    let fenced = fences(&mut members);
     let hosting: Vec<String> = members
         .iter()
         .filter(|standing| standing.publishes)
@@ -127,6 +139,7 @@ pub(super) fn read(
             publishes: false,
             inside: None,
             fronts: None,
+            fenced: false,
         });
     }
     let mut asks = Vec::new();
@@ -153,7 +166,37 @@ pub(super) fn read(
         links,
         guard,
         pass,
+        fenced,
     }
+}
+
+/// A fence beside each of `members` that declares one, holding the networks and the
+/// ports it would have held, with the member placed inside it: each such member with its
+/// fence, or with none where another member already holds the fence's id.
+fn fences(members: &mut Vec<Standing>) -> Vec<(String, Option<String>)> {
+    let ids: std::collections::BTreeSet<String> =
+        members.iter().map(|standing| standing.id.clone()).collect();
+    let mut fenced = Vec::new();
+    let mut written = Vec::new();
+    for standing in members.iter_mut().filter(|standing| standing.fenced) {
+        let fence = crate::fence::of(&standing.id);
+        if ids.contains(&fence) {
+            fenced.push((standing.id.clone(), None));
+            continue;
+        }
+        written.push(Standing {
+            id: fence.clone(),
+            confined: standing.confined,
+            publishes: false,
+            inside: None,
+            fronts: standing.fronts.clone(),
+            fenced: false,
+        });
+        standing.inside = Some(fence.clone());
+        fenced.push((standing.id.clone(), Some(fence)));
+    }
+    members.extend(written);
+    fenced
 }
 
 /// Whether a service of the stack or of a plugin holds the id the pass service runs

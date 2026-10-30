@@ -13,6 +13,7 @@ use crate::stack::compose::{build, Action};
 mod declared;
 pub(crate) use declared::{catalogue, forms, provenance, version};
 mod diagnosis;
+mod fenced;
 mod fetching;
 mod grounded;
 pub(crate) mod halted;
@@ -251,10 +252,10 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
     // materialised rather than after, so a run that is going to be refused does not
     // rewrite anything on the way to saying so.
     verified(ctx).await?;
-    let passing = if starts(action) {
-        pass_readied(ctx).await
+    let (passing, fencing) = if starts(action) {
+        beside_readied(ctx).await
     } else {
-        None
+        (None, None)
     };
 
     let Composed {
@@ -314,6 +315,12 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         },
         swept: sweep.networks.clone(),
         passing,
+        fencing,
+        unfenced: if starts(action) {
+            fenced::held_back(action, &project)?
+        } else {
+            Vec::new()
+        },
     };
     Ok(Readied {
         manifest,
@@ -332,6 +339,19 @@ async fn pass_readied(ctx: &Ctx) -> Option<String> {
     }
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     super::project::pass_readied(ctx, &manifest).await
+}
+
+/// Ready the pass service and ask the engine for its host's addresses before a start
+/// writes the project that runs them, and say why each is left out, where it is.
+async fn beside_readied(ctx: &Ctx) -> (Option<String>, Option<String>) {
+    (pass_readied(ctx).await, fence_readied(ctx).await)
+}
+
+/// Ask the engine for its host's addresses before a start writes a project holding a
+/// fence, and say why none is kept, where none is. A rehearsal asks nothing.
+async fn fence_readied(ctx: &Ctx) -> Option<String> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    super::project::fence_readied(ctx, &manifest, lemonfiber_bundled::FENCE).await
 }
 
 /// What a lifecycle command settled before anything runs.

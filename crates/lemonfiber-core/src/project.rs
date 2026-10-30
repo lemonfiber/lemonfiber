@@ -7,16 +7,19 @@
 
 pub(crate) mod document;
 pub mod entry;
+mod fencing;
 mod inputs;
 pub mod overlay;
 
 use std::collections::BTreeMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 use lemonfiber_manifest::container::{UrlOf, UserMode, Value};
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
 use crate::config::storage::Export;
+use crate::fence::Unfenced;
 use crate::model::MovedReport;
 use crate::plugin::{self, Installed};
 use crate::topology::{Placed, Topology};
@@ -37,6 +40,10 @@ pub const WAITING: &str = "lemonfiber.waiting";
 /// The profile a part a choice of filler replaced is written under, its configuration and
 /// data kept where they are: one no start activates, and no form or plugin can be named.
 pub const REPLACED: &str = "lemonfiber.replaced";
+
+/// The profile a fenced service no fence can be written for is held under: one no start
+/// activates, and no form or plugin can be named.
+pub const UNFENCED: &str = "lemonfiber.unfenced";
 
 /// What the project's values are read from beyond the manifest and the register.
 pub struct Reading<'a> {
@@ -62,6 +69,10 @@ pub struct Reading<'a> {
     pub pass: Option<&'a str>,
     /// Whether a secret, by its name in the secret store, holds a value.
     pub held: &'a dyn Fn(&str) -> bool,
+    /// The image a fence runs, pinned by its digest, where this build's bundle pins one.
+    pub fence: Option<&'a str>,
+    /// The addresses of the engine's host, as the engine last answered them.
+    pub host: &'a [IpAddr],
 }
 
 impl Reading<'_> {
@@ -79,6 +90,8 @@ impl Reading<'_> {
             operator: &|_| None,
             pass: None,
             held: &|_| false,
+            fence: None,
+            host: &[],
         }
     }
 }
@@ -90,6 +103,9 @@ pub struct Project {
     pub text: String,
     /// Every network and every service's place on them.
     pub topology: Topology,
+    /// Each fenced service no fence can be written for, held back under [`UNFENCED`], and
+    /// why.
+    pub unfenced: Vec<(String, Unfenced)>,
 }
 
 /// The project `manifest`'s services and `installed`'s come to, wired as `chosen`
@@ -114,6 +130,7 @@ pub fn generated(
     .map(|held| held.service)
     .collect();
     let replaced = crate::wiring::replaced(manifest, installed, chosen);
+    let fencing = fencing::Fencing::of(&inputs, reading);
     let address =
         |service: &str, url: &UrlOf| address(manifest, installed, &inputs, &topology, service, url);
     let values = Values {
@@ -123,7 +140,7 @@ pub fn generated(
         nfs: reading.nfs,
         operator: reading.operator,
     };
-    let units: Vec<Unit<'_>> = inputs::written(manifest, installed)
+    let mut units: Vec<Unit<'_>> = inputs::written(manifest, installed)
         .map(|service| stack_unit(service, reading))
         .chain(installed.iter().flat_map(|one| {
             let secrets = plugin::Reading {
@@ -145,7 +162,10 @@ pub fn generated(
         .map(|unit| beside(unit, reading.moved))
         .map(|unit| waiting_for(unit, &waiting))
         .map(|unit| replaced_by(unit, &replaced))
+        .map(|unit| fencing.held_back(unit))
         .collect();
+    let fences = fencing.units(&units);
+    units.extend(fences);
     let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for unit in &units {
         if let Some(Placed::Inside(host)) = topology.placed.get(unit.id) {
@@ -158,11 +178,7 @@ pub fn generated(
     let entries: Vec<(String, _)> = units
         .iter()
         .map(|unit| {
-            let placed = topology
-                .placed
-                .get(unit.id)
-                .cloned()
-                .unwrap_or(Placed::Nowhere);
+            let placed = fencing.placed(unit.id, &topology);
             let id = literal(unit.id);
             let mut written = entry(unit, &placed, &values);
             written.ports.extend(hosted.remove(&id).unwrap_or_default());
@@ -179,6 +195,7 @@ pub fn generated(
     Project {
         text: document::yaml(&document),
         topology,
+        unfenced: fencing.unfenced(),
     }
 }
 
@@ -292,7 +309,7 @@ fn pass_unit<'a>(
         published: Vec::new(),
         contract: None,
         takes_data: false,
-        config_path: crate::pass::CONFIGURATION,
+        config_path: Some(crate::pass::CONFIGURATION),
         config_ro: true,
         mounts: &[],
         shares: None,
@@ -304,6 +321,7 @@ fn pass_unit<'a>(
         shape: None,
         secrets_file: None,
         command: crate::pass::command(at),
+        granted: &[],
     })
 }
 
@@ -360,7 +378,9 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
         published,
         contract: None,
         takes_data: service.takes_data,
-        config_path: configuration(service.config_path.as_deref().unwrap_or_default()),
+        config_path: Some(configuration(
+            service.config_path.as_deref().unwrap_or_default(),
+        )),
         config_ro: service.config_ro,
         mounts: &service.mount,
         shares: None,
@@ -374,6 +394,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
             .then(|| (reading.secrets_file)(&service.id))
             .flatten(),
         command: Vec::new(),
+        granted: &[],
     }
 }
 

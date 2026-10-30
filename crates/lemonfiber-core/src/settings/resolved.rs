@@ -20,6 +20,7 @@ pub(crate) struct Resolved {
     moved: Vec<crate::model::MovedReport>,
     name: String,
     pass: Option<String>,
+    host: Vec<std::net::IpAddr>,
     secrets: Option<super::Secrets>,
 }
 
@@ -49,6 +50,7 @@ impl Resolved {
             changing: BTreeMap::new(),
             name: ctx.settings.project.clone(),
             pass: crate::app::project::pinned(ctx),
+            host: crate::app::project::host_addresses(ctx),
             files: files_of(ctx),
             secrets: super::secrets_at(ctx).and_then(|at| super::Secrets::at(&at).ok()),
             nfs: ctx.settings.nfs.clone(),
@@ -150,6 +152,8 @@ impl Resolved {
             name: &self.name,
             operator: &operator,
             pass: self.pass.as_deref(),
+            fence: lemonfiber_bundled::FENCE,
+            host: &self.host,
             held: &|name| {
                 self.secrets
                     .as_ref()

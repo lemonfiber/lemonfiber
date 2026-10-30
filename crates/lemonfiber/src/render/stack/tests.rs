@@ -87,6 +87,25 @@ fn a_start_that_leaves_the_pass_service_out_says_why() {
     );
 }
 
+#[test]
+fn a_start_that_holds_a_fenced_service_back_says_why_and_what_was_not_asked() {
+    let report = LifecycleReport {
+        status: Some(0),
+        fencing: Some("the engine's host answered no address that can be read".to_owned()),
+        unfenced: vec![
+            "flaresolverr is fenced, and the addresses of the engine's host are not known"
+                .to_owned(),
+        ],
+        ..a_lifecycle("up", a_plan("media", Vec::new()))
+    };
+    let text = lifecycle(&report).text();
+    assert!(
+        text.contains("left out: flaresolverr is fenced, and the addresses")
+            && text.contains("not asked: the engine's host answered no address"),
+        "{text}"
+    );
+}
+
 /// What asking the egress guard to hold its control credential and passing the forwarded
 /// port came to is said after what the services came to.
 #[test]

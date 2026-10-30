@@ -710,7 +710,13 @@ fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
         "fence-pinned",
         &with(&fence("ghcr.io/lemonfiber/fence", "0.18.0", &digest)),
     ));
-    assert!(pinned.is_ok(), "{pinned:?}");
+    assert_eq!(
+        pinned
+            .ok()
+            .and_then(|(bundle, _)| bundle.fence)
+            .map(|image| image.reference()),
+        Some(format!("ghcr.io/lemonfiber/fence:0.18.0@{digest}"))
+    );
     let pre = read(&catalogued(
         "fence-pre",
         &with(&fence("ghcr.io/lemonfiber/fence", "0.18.0-beta.1", &digest)),

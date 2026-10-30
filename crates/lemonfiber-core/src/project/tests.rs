@@ -780,6 +780,7 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+mod fenced;
 mod pass;
 mod replaced;
 mod sources;

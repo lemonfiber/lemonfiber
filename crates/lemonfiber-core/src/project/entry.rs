@@ -110,8 +110,9 @@ pub struct Unit<'a> {
     pub contract: Option<u16>,
     /// Whether the library is mounted for it.
     pub takes_data: bool,
-    /// Where inside the container its configuration directory lands.
-    pub config_path: &'a str,
+    /// Where inside the container its configuration directory lands, where it is given one:
+    /// every service is, and a fence, which reads nothing but its environment, is not.
+    pub config_path: Option<&'a str>,
     /// Whether its configuration directory is read-only.
     pub config_ro: bool,
     /// Its further mounts.
@@ -135,6 +136,9 @@ pub struct Unit<'a> {
     pub secrets_file: Option<PathBuf>,
     /// The arguments its image's program is run with, where not the image's own.
     pub command: Vec<String>,
+    /// The capabilities it alone is given back, whatever its posture: a fence's, and none
+    /// for any other service.
+    pub granted: &'static [&'static str],
 }
 
 /// What an entry's values are read from beyond its unit.
@@ -252,6 +256,9 @@ struct Holds {
 struct Waiting {
     /// The state it waits for.
     condition: &'static str,
+    /// Whether it is restarted whenever the one it waits on is, so it never runs in a
+    /// network that went away under it.
+    restart: bool,
 }
 
 /// One service's entry, placed as `placed` says.
@@ -267,7 +274,14 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         Placed::Inside(host) => (
             BTreeMap::new(),
             Some(format!("service:{}", literal(host))),
-            std::iter::once((literal(host), Waiting { condition: HEALTHY })).collect(),
+            std::iter::once((
+                literal(host),
+                Waiting {
+                    condition: HEALTHY,
+                    restart: true,
+                },
+            ))
+            .collect(),
         ),
         Placed::Nowhere => (
             BTreeMap::new(),
@@ -313,9 +327,12 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         security_opt: SECURITY,
         cap_drop: DROPPED,
         cap_add: if confined {
-            Vec::new()
+            unit.granted.to_vec()
         } else {
-            KEPT.into_iter().chain(granted(unit.shape)).collect()
+            KEPT.into_iter()
+                .chain(granted(unit.shape))
+                .chain(unit.granted.iter().copied())
+                .collect()
         },
         devices: passed(unit.shape).chain(render_devices).collect(),
         group_add: render_groups,
@@ -438,11 +455,13 @@ fn volumes(unit: &Unit<'_>, values: &Values<'_>) -> Vec<String> {
         };
         volumes.push(format!("{from}:{LIBRARY_TARGET}"));
     }
-    volumes.push(mounted(
-        &format!("./{CONFIGURATION_TREE}/{service}"),
-        configuration(unit.config_path),
-        unit.config_ro,
-    ));
+    volumes.extend(unit.config_path.map(|path| {
+        mounted(
+            &format!("./{CONFIGURATION_TREE}/{service}"),
+            configuration(path),
+            unit.config_ro,
+        )
+    }));
     if let Some((fronted, to)) = unit.shares.filter(|(_, to)| is_target(to, unit.takes_data)) {
         volumes.push(mounted(
             &format!("./{CONFIGURATION_TREE}/{}", literal(fronted)),

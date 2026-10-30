@@ -400,6 +400,8 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         moves: Vec::new(),
         swept: Vec::new(),
         passing: None,
+        fencing: None,
+        unfenced: Vec::new(),
     }
 }
 

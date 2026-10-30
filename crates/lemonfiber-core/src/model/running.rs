@@ -99,6 +99,14 @@ pub struct LifecycleReport {
     /// guard is filled and it is. Absent for every other action.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passing: Option<String>,
+    /// Why the addresses of the engine's host were not asked or not kept for a fence, where
+    /// a service is fenced and they were not. Absent for every other action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fencing: Option<String>,
+    /// Each fenced service a start holds back because no fence can be written for it, in
+    /// words naming it and why. Empty for every other action.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unfenced: Vec<String>,
 }
 
 /// The operator's own overlay, named because nothing in it was held to the model.

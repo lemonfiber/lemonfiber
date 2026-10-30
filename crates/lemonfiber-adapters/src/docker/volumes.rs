@@ -117,7 +117,7 @@ fn reaching(name: &str, image: &str) -> ContainerCreateBody {
 }
 
 /// Pull `image`, waiting for the engine to finish.
-async fn pulled(docker: &Docker, image: &str) -> Result<(), bollard::errors::Error> {
+pub(super) async fn pulled(docker: &Docker, image: &str) -> Result<(), bollard::errors::Error> {
     let options = CreateImageOptionsBuilder::default()
         .from_image(image)
         .build();

@@ -152,4 +152,17 @@ codes! {
             there, or either is not what it should be, move both aside and start again, and \
             lemonfiber makes a new pair.",
     }
+    /// Raised where a start names a fenced service no fence can be written for.
+    SERVICE_UNFENCED = "STACK-15" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "The service declares itself fenced: it runs inside a fence lemonfiber \
+            writes beside it, which refuses every connection it opens to a private address or \
+            to the host. No fence can be written for it here, so it was not started: starting \
+            it unfenced would let whatever page it fetches reach every private address.",
+        remedy: "The message names why. Where the engine's host was not asked its addresses, \
+            check the container engine is running and the fence's image can be fetched, then \
+            start again.",
+    }
 }

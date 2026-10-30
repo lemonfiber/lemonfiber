@@ -25,6 +25,13 @@
         }
       ]
     },
+    "fencing": {
+      "description": "Why the addresses of the engine's host were not asked or not kept for a fence, where\na service is fenced and they were not. Absent for every other action.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "forwarding": {
       "description": "What starting the stack did about the VPN's forwarded port, where it did\nanything. Absent in the ordinary case — the client was already on it, or\nthere is no tunnel to forward through — and a sentence where the client was\nmoved, or could not be.",
       "type": [
@@ -122,6 +129,13 @@
           "type": "null"
         }
       ]
+    },
+    "unfenced": {
+      "description": "Each fenced service a start holds back because no fence can be written for it, in\nwords naming it and why. Empty for every other action.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "unvetted": {
       "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this run starts, and held to nothing lemonfiber vets.",

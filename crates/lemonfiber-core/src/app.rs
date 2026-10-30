@@ -124,12 +124,14 @@ use self_update::standing as stands;
 pub use watch::{supervise, WATCH};
 
 /// Every refusal a run on the stack answers with before it acts, named by its code: another
-/// run holding it, a registry refusing it, a project the operator edited, a data location
-/// the project cannot be written from, and a mount source reached through a link.
-pub const REFUSALS: [Code; 5] = [
+/// run holding it, a registry refusing it, a project the operator edited, a fenced service
+/// it names that no fence can be written for, a data location the project cannot be
+/// written from, and a mount source reached through a link.
+pub const REFUSALS: [Code; 6] = [
     ALREADY_WORKING,
     REGISTRY_REFUSED,
     crate::error::codes::stack::PROJECT_EDITED,
+    crate::error::codes::stack::SERVICE_UNFENCED,
     crate::error::codes::storage::ROOT_REFUSED,
     crate::error::codes::life::MOUNT_LINKED,
 ];

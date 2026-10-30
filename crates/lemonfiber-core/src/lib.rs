@@ -73,6 +73,7 @@ pub mod docker;
 pub mod doctor;
 pub mod door;
 mod endpoint;
+pub mod fence;
 pub mod filling;
 pub mod frontend;
 pub mod generated;
