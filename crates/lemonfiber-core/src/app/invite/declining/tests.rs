@@ -188,14 +188,14 @@ fn lapses_are_recorded_beside_the_refusals() {
     );
 }
 
-/// A context over a stack written to `project`, on the real disk.
-fn over(project: &Path) -> crate::app::Ctx {
-    crate::test_support::a_context()
-        .settings(crate::config::Settings {
-            stack_dir: Some(project.to_path_buf()),
-            ..crate::config::Settings::default()
-        })
-        .build()
+/// A context over a stack written out on the real disk, and the directory it is written
+/// to, where the decline service's records go.
+fn written() -> (crate::app::Ctx, std::path::PathBuf) {
+    let ctx = crate::test_support::a_context().build();
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
+            .unwrap_or_default();
+    (ctx, project)
 }
 
 /// A pipe the decline service put where its record goes is refused at once rather than
@@ -203,7 +203,7 @@ fn over(project: &Path) -> crate::app::Ctx {
 #[cfg(unix)]
 #[tokio::test]
 async fn a_record_that_is_a_pipe_or_a_link_declines_nobody_and_never_waits() {
-    let project = lemonfiber_fixtures::scratch::Scratch::new("refusals-planted");
+    let (ctx, project) = written();
     let record = path(&project, super::File::Refusals);
     let _ = std::fs::create_dir_all(record.parent().unwrap_or(&project));
     let offers: Offers = [("9".to_owned(), offer(Some("ana-token")))]
@@ -217,7 +217,7 @@ async fn a_record_that_is_a_pipe_or_a_link_declines_nobody_and_never_waits() {
 
     let piped = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        super::declined(&over(&project), &offers),
+        super::declined(&ctx, &offers),
     )
     .await;
 
@@ -227,7 +227,46 @@ async fn a_record_that_is_a_pipe_or_a_link_declines_nobody_and_never_waits() {
     let _ = std::fs::write(&elsewhere, "{}");
     let _ = std::fs::remove_file(&record);
     let _ = std::os::unix::fs::symlink(&elsewhere, &record);
-    assert!(super::declined(&over(&project), &offers).await.is_empty());
+    assert!(super::declined(&ctx, &offers).await.is_empty());
+}
+
+/// A record the decline service wrote that does not read, or that has grown past what is
+/// read, declines nobody and removed nobody: what it says cannot be told.
+#[tokio::test]
+async fn a_record_that_does_not_read_declines_and_removed_nobody() {
+    let (ctx, project) = written();
+    let offers: Offers = [("9".to_owned(), offer(Some("ana-token")))]
+        .into_iter()
+        .collect();
+    let overlong =
+        "x".repeat(usize::try_from(crate::ports::filesystem::READ_LIMIT).unwrap_or(0) + 1);
+    let refused = lemonfiber_sidecar::decline::Refusals::default()
+        .with(lemonfiber_sidecar::decline::Refusal {
+            token: TokenHash::of("ana-token"),
+            account: "9".to_owned(),
+            at: 1,
+        })
+        .written();
+    let at = path(&project, super::File::Refusals);
+    let _ = std::fs::create_dir_all(at.parent().unwrap_or(&project));
+    let _ = std::fs::write(&at, refused);
+    assert_eq!(
+        super::declined(&ctx, &offers)
+            .await
+            .into_iter()
+            .collect::<Vec<_>>(),
+        vec!["9".to_owned()],
+        "the record read is the one written here"
+    );
+
+    for record in ["not a record".to_owned(), overlong] {
+        for file in [super::File::Refusals, super::File::Lapses] {
+            let _ = std::fs::write(path(&project, file), &record);
+        }
+
+        assert!(super::declined(&ctx, &offers).await.is_empty());
+        assert!(super::removed_at_lapse(&ctx, &offers).await.is_empty());
+    }
 }
 
 /// A stack compiled in, which is written out nowhere until a directory is chosen for it.
