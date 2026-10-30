@@ -47,6 +47,11 @@ const ABSENT: &str = "The media server's request-gate key is not there yet, so t
                       gate cannot read the media server for the request service. Run \
                       lemonfiber seed.";
 
+/// Why there is no key to replace.
+const UNREPLACEABLE: &str = "the request gate did not answer presenting a key the media server \
+                             lists, so there is nothing to replace and nothing was minted; run \
+                             lemonfiber seed";
+
 /// What is said where the gate cannot be asked, or may not be handed the key.
 const UNASKED: &str = "the request gate cannot be asked over its contract, or is not one the \
                        media server's key may be handed to, so nothing was minted";
@@ -136,13 +141,10 @@ pub(super) async fn rotate(
     let Some(gate) = asked(ctx, fillers, (&server, project)).await else {
         return unproven(held, UNASKED);
     };
-    let admitted = match gate.admitted().await {
-        Ok(admitted) => admitted,
-        Err(failure) => return unproven(held, &said(&failure)),
-    };
+    let admitted = gate.admitted().await.unwrap_or_default();
     let filed = client.filed_as(GATE_APP).await.unwrap_or_default();
     let Some(old) = crate::seed::run::gate::held(&admitted, &filed) else {
-        return unproven(held, ABSENT);
+        return unproven(held, UNREPLACEABLE);
     };
     let before = match restated(ctx, fillers, &admitted, &old) {
         Ok(before) => before,

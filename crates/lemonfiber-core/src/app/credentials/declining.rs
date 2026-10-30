@@ -54,6 +54,11 @@ const LANDED: &str = "The media server took the new key, and the decline service
 const UNASKED: &str = "the decline service cannot be asked over its contract, or is not one the \
                        media server's key may be handed to, so nothing was minted";
 
+/// Why there is no key to replace.
+const UNREPLACEABLE: &str = "the decline service did not answer holding a key the media server \
+                             lists, so there is nothing to replace and nothing was minted; run \
+                             lemonfiber seed";
+
 /// Why there is nothing to mint with.
 pub(super) const NO_ADMINISTRATOR: &str =
     "lemonfiber holds no administrator for this media server, so there is nothing to mint \
@@ -133,15 +138,12 @@ pub(super) async fn rotate(
     let Some(decline) = asked(ctx, fillers, (&server.filler, project)).await else {
         return unproven(held, UNASKED);
     };
-    let holding = match decline.held().await {
-        Ok(holding) => holding,
-        Err(failure) => return unproven(held, &said(&failure)),
-    };
+    let holding = decline.held().await.ok().flatten();
     let filed = client.filed_as(DECLINE_APP).await.unwrap_or_default();
     let Some((old, KeyHeld { pins, .. })) = holding.and_then(|holding| {
         crate::seed::run::decline::named_by(&filed, &holding.key).map(|old| (old, holding))
     }) else {
-        return unproven(held, ABSENT);
+        return unproven(held, UNREPLACEABLE);
     };
     let minted = match client.mint(DECLINE_APP).await {
         Ok(minted) => minted,
