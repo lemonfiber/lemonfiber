@@ -44,7 +44,7 @@ fn the_curators_own_key_is_taken_out_wherever_the_sync_left_it() {
 fn a_plain_file_shows_what_names_no_credential_and_the_diff_is_the_cores_own() {
     let diff = shown(
         &format!(
-            "# kept\nsonarr:\n  - base_url: http://sonarr:8989\n    api_key: {PASTED}\n    tokens:\n    - one{PASTED}\n    min: 0\n"
+            "# kept\n\nsonarr:\n  - base_url: http://sonarr:8989\n    api_key: {PASTED}\n    tokens:\n    - one{PASTED}\n    min: 0\n"
         ),
         &[],
     );
@@ -150,7 +150,7 @@ fn whatever_stands_beneath_a_credentials_key_shows_nothing() {
 #[test]
 fn a_file_that_cannot_be_read_line_by_line_shows_no_value_it_sets() {
     let diff = shown(
-        &format!(": : [\nnote: {PASTED}\napi_key = {PASTED}\n- {PASTED}\n  {PASTED}\n"),
+        &format!(": : [\n\nnote: {PASTED}\napi_key = {PASTED}\n- {PASTED}\n  {PASTED}\n"),
         &[],
     );
 

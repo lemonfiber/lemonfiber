@@ -128,3 +128,50 @@ async fn a_key_the_sync_left_in_its_edit_reaches_neither_the_report_nor_the_jour
         .unwrap_or_default();
     assert!(!journal.contains("the-key-held"));
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_sync_taking_the_profiles_up_once_it_restarts_is_restarted_once() {
+    let runner = crate::test_support::egress::ran();
+    let http = Fake::by_path(vec![
+        (
+            "/reapply",
+            Answer::reply(200, r#"{"replaced":null,"applied":"on-restart"}"#),
+        ),
+        ("/lemonfiber/adapter/v1/ready", Answer::reply(200, "true")),
+    ]);
+    let mut ctx = machine("reapplying-restarted", http, false);
+    ctx.seams.runner = runner.clone();
+
+    assert_eq!(reapplied(&ctx, &selection(), None).await.ok(), Some(None));
+    assert_eq!(crate::test_support::egress::restarts(&runner), 1);
+}
+
+#[tokio::test]
+async fn an_edit_too_long_or_a_store_that_cannot_be_read_is_refused_by_its_code() {
+    let long = "x".repeat(70_000);
+    let answered = format!(r#"{{"path":"recyclarr.yml","on_disk":"{long}","preset":"min: 25\n"}}"#);
+    let too_long = machine(
+        "reapplying-too-long",
+        Fake::by_path(vec![("/edited", Answer::reply(200, &answered))]),
+        true,
+    );
+    let unread = machine(
+        "reapplying-unread-store",
+        Fake::by_path(vec![("/edited", Answer::reply(200, AN_EDIT))]),
+        true,
+    );
+    let _ = std::fs::write(
+        crate::settings::secrets_at(&unread).unwrap_or_default(),
+        "not a store",
+    );
+
+    for ctx in [too_long, unread] {
+        assert_eq!(
+            reapplied(&ctx, &selection(), None)
+                .await
+                .err()
+                .map(|problem| problem.code.to_string()),
+            Some("QUAL-4".to_owned())
+        );
+    }
+}
