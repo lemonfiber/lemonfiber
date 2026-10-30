@@ -210,6 +210,23 @@ async fn an_unreadable_key_list_or_no_server_is_unverified_never_a_pass() {
     );
 }
 
+/// A decline service that cannot be asked over its contract accounts for nothing, so a
+/// key the server dates is never said to be explained.
+#[tokio::test]
+async fn a_decline_service_that_cannot_be_asked_is_unverified_never_a_pass() {
+    let check = DeclineKeyCheck::new(Some(Decline {
+        service: None,
+        keys: Some(Arc::new(Server(Ok(vec![key(0, Some(60))]))) as Arc<dyn KeyDates>),
+    }));
+
+    let said = check.run().await.into_iter().next().map(|one| one.verdict);
+
+    assert!(
+        matches!(&said, Some(Verdict::Unverified { reason, .. }) if reason.contains("cannot be asked")),
+        "{said:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_record_that_cannot_be_read_explains_nothing_and_says_so() {
     let at = scene("decline-key-garbled", &[], &[]);

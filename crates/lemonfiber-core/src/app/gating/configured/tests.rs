@@ -229,3 +229,26 @@ async fn one_routes_tokens_are_replaced_and_nothing_else() {
             .collect::<Vec<_>>()
     );
 }
+
+/// A record that is a link is never followed, and one that does not read is refused.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_record_that_is_a_link_or_does_not_read_is_refused() {
+    let scratch = Scratch::new("gate-configured-record");
+    let gate = gate(&scratch);
+    let record = path(scratch.path(), File::Record);
+    let _ = std::fs::create_dir_all(record.parent().unwrap_or(scratch.path()));
+    assert!(gate
+        .record(0)
+        .await
+        .is_ok_and(|kept| kept.entries.is_empty()));
+
+    let _ = std::fs::write(&record, "not a record");
+    assert!(gate.record(0).await.is_err());
+
+    let _ = std::fs::remove_file(&record);
+    let elsewhere = scratch.path().join("elsewhere.json");
+    let _ = std::fs::write(&elsewhere, "{}");
+    let _ = std::os::unix::fs::symlink(&elsewhere, &record);
+    assert!(gate.record(0).await.is_err());
+}

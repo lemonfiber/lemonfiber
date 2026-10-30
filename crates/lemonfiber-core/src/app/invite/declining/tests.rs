@@ -235,7 +235,7 @@ static STACKLET: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 /// With no record on disk, or no stack written out to hold one, there is nothing to read,
-/// and nobody is declined.
+/// and nobody is declined or removed.
 #[tokio::test]
 async fn without_a_stack_on_disk_nobody_is_declined() {
     let ctx = crate::test_support::a_context().build();
@@ -244,11 +244,15 @@ async fn without_a_stack_on_disk_nobody_is_declined() {
         .collect();
 
     assert!(super::declined(&ctx, &offers).await.is_empty());
+    assert!(super::removed_at_lapse(&ctx, &offers).await.is_empty());
 
     let unwritten = crate::test_support::a_context()
         .over(crate::stack::Source::Embedded(&STACKLET))
         .build();
     assert!(super::declined(&unwritten, &offers).await.is_empty());
+    assert!(super::removed_at_lapse(&unwritten, &offers)
+        .await
+        .is_empty());
 }
 
 /// The plugin that fills the decline service in the tests that ask it.
