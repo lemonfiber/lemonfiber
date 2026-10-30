@@ -15,31 +15,6 @@ networks:
       config:
       - subnet: 10.80.96.16/28
         ip_range: 10.80.96.24/29
-  ask__homepage__proxy.front__caddy:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.162.192/29
-  ask__recyclarr__library.curate__bindery:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.148.120/29
-  ask__recyclarr__library.curate__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.25.32/29
-  ask__recyclarr__library.curate__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.245.80/29
-  ask__recyclarr__library.curate__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.163.120/29
   ask__request-gate__identity.source__jellyfin:
     internal: true
     ipam:

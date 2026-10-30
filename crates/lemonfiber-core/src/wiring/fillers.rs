@@ -181,6 +181,8 @@ pub struct Fillers {
     /// What each of the stack's own services declares it provides and handles, by id,
     /// which a part moved in place of one is named by.
     declared: BTreeMap<String, (Vec<String>, Vec<String>)>,
+    /// The service the operator chose for each capability, by id.
+    chosen: BTreeMap<String, String>,
 }
 
 impl Fillers {
@@ -285,6 +287,10 @@ impl Fillers {
                     )
                 })
                 .collect(),
+            chosen: chosen
+                .choices()
+                .map(|(capability, service)| (capability.to_owned(), service.to_owned()))
+                .collect(),
         }
     }
 
@@ -343,8 +349,9 @@ impl Fillers {
 
     /// The one service filling `capability`, with the service asking for it where one
     /// does: the one the ask settled on, or where nothing asks, the one service here
-    /// providing it. Nothing where the ask is contested, or where nothing asks and other
-    /// than exactly one service provides it.
+    /// providing it, or among several the one the operator chose. Nothing where the ask is
+    /// contested, or where nothing asks and no one service of those providing it is
+    /// settled on.
     #[must_use]
     pub fn filling(&self, capability: &str) -> Option<(&Filler, Option<&Filler>)> {
         if let Some(ask) = self.asks.iter().find(|ask| ask.capability == capability) {
@@ -353,12 +360,18 @@ impl Fillers {
             };
             return Some((filler, self.service(&ask.by)));
         }
-        let mut providing = self
+        let providing: Vec<&Filler> = self
             .services
             .iter()
-            .filter(|one| one.provides.iter().any(|provided| provided == capability));
-        let one = providing.next()?;
-        providing.next().is_none().then_some((one, None))
+            .filter(|one| one.provides.iter().any(|provided| provided == capability))
+            .collect();
+        let one = match providing.as_slice() {
+            [one] => one,
+            several => several
+                .iter()
+                .find(|one| self.chosen.get(capability) == Some(&one.id))?,
+        };
+        Some((one, None))
     }
 
     /// Every service answering in this API, as its `native` declares, the stack's first.

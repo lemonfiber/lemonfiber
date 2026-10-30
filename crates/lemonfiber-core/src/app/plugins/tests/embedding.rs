@@ -137,6 +137,7 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
             "caddy".to_owned(),
             "calibre-web-automated".to_owned(),
             "door".to_owned(),
+            "homepage".to_owned(),
             BUNDLED.to_owned(),
             "lidarr".to_owned(),
             "navidrome".to_owned(),
@@ -144,6 +145,7 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
             "prowlarr".to_owned(),
             "qbittorrent".to_owned(),
             "radarr".to_owned(),
+            "recyclarr".to_owned(),
             "sabnzbd".to_owned(),
             "seerr".to_owned(),
             "sonarr".to_owned()
@@ -165,7 +167,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((16, 0))
+        Some((18, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -191,12 +193,14 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
             "caddy",
             "calibre-web-automated",
             "door",
+            "homepage",
             "lidarr",
             "navidrome",
             "nzbhydra2",
             "prowlarr",
             "qbittorrent",
             "radarr",
+            "recyclarr",
             "sabnzbd",
             "seerr",
             "sonarr"
@@ -212,14 +216,14 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
     let ctx = unmoved("embedded-narrowed", &serving);
 
-    let confirmed = crate::update::run::update(&ctx, updating(Some("recyclarr"), true)).await;
+    let confirmed = crate::update::run::update(&ctx, updating(Some("unpackerr"), true)).await;
 
     assert_eq!(
         confirmed
             .as_ref()
             .ok()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((16, 0)),
+        Some((18, 0)),
         "{confirmed:?}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));

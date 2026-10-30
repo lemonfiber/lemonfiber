@@ -54,12 +54,11 @@ pub(crate) async fn quality(
     let mut selection = load_selection(ctx)?;
     let chose = matches!(action, QualityAction::Set { .. });
     let playback = playback(ctx);
-    let record = materialised_record(ctx);
 
     let (disposition, customised, overwritten) = match action {
         QualityAction::Show => (
             Disposition::Shown,
-            reapplying::customised(ctx, &selection, record.as_deref()).await,
+            reapplying::customised(ctx, &selection).await,
             None,
         ),
         QualityAction::Set {
@@ -85,12 +84,12 @@ pub(crate) async fn quality(
             };
             (
                 disposition,
-                reapplying::customised(ctx, &selection, record.as_deref()).await,
+                reapplying::customised(ctx, &selection).await,
                 None,
             )
         }
         QualityAction::Reapply => {
-            let overwritten = reapplying::reapplied(ctx, &selection, record.as_deref()).await?;
+            let overwritten = reapplying::reapplied(ctx, &selection).await?;
             let disposition = if ctx.dry_run {
                 Disposition::WouldReapply
             } else {
@@ -107,12 +106,6 @@ pub(crate) async fn quality(
         answered.changes = Some(CHANGES.to_owned());
     }
     Ok(answered)
-}
-
-/// Where the record of what lemonfiber last wrote to the stack is kept — beside the
-/// environment file, the same derivation the lifecycle path uses.
-fn materialised_record(ctx: &Ctx) -> Option<PathBuf> {
-    crate::app::targets::beside_env(ctx, crate::config::paths::MATERIALISED)
 }
 
 /// The choice on record, or the default where none has been made.

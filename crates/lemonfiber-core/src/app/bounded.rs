@@ -1,6 +1,6 @@
-//! Writing one of the stack's own files whole, and taking a region back out of one.
+//! Taking a region back out of one of the stack's own files.
 //!
-//! Both keep the record of what lemonfiber materialised true. That record is how the pass
+//! It keeps the record of what lemonfiber materialised true. That record is how the pass
 //! that writes the stack's files tells an operator's edit from lemonfiber's own, so a
 //! write that did not re-record the file would read to that pass as the operator's edit,
 //! and the file would be preserved as theirs from then on, never updated again. So the
@@ -8,8 +8,8 @@
 //! already holding the file as lemonfiber last wrote it. A file the operator had edited
 //! before is still theirs afterwards, and still reads that way.
 //!
-//! Taking a region out is the undo of [`crate::journal::Kind::Region`], which an earlier
-//! release journalled when it wrote a plugin's region into one of the stack's files.
+//! It is the undo of [`crate::journal::Kind::Region`], which an earlier release journalled
+//! when it wrote a plugin's region into one of the stack's files.
 
 use std::path::Path;
 
@@ -23,30 +23,6 @@ use crate::within::{directory_of, read_unlinked, write_unlinked};
 /// is the one the next pass over the stack reads.
 pub(crate) fn record_beside(env_file: &Path) -> std::path::PathBuf {
     env_file.with_file_name(crate::config::paths::MATERIALISED)
-}
-
-/// Write `text` as the whole of the file at `path`, where it holds anything else, and
-/// carry the record of what was materialised with it where that held the file as it
-/// stood.
-///
-/// For a file of the stack's whose whole text a part's adapter owns. It is read and
-/// written the way a region's file is, never through a link.
-///
-/// # Errors
-///
-/// Where the file cannot be read or written.
-pub(crate) fn replace(
-    confined: &dyn Confined,
-    path: &Path,
-    key: &str,
-    text: &str,
-    record: Option<&Path>,
-) -> Result<(), String> {
-    let before = read_unlinked(confined, path, directory_of(path))?.unwrap_or_default();
-    if before == text {
-        return Ok(());
-    }
-    rewritten(confined, path, (key, &before), text, record)
 }
 
 /// What taking a region back out came to.

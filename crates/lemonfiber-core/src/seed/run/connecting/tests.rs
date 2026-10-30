@@ -181,6 +181,16 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
                 Some(Connection::Application(ApplicationKind::Tv))
             ),
             (
+                "recyclarr".to_owned(),
+                "radarr".to_owned(),
+                Some(Connection::Quality(Kind::Movies))
+            ),
+            (
+                "recyclarr".to_owned(),
+                "sonarr".to_owned(),
+                Some(Connection::Quality(Kind::Tv))
+            ),
+            (
                 "seerr".to_owned(),
                 "radarr".to_owned(),
                 Some(Connection::Fulfilment { kind: Kind::Movies })
@@ -197,6 +207,8 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
         vec![
             "Bindery into Bazarr",
             "Lidarr into Bazarr",
+            "Bindery into Recyclarr",
+            "Lidarr into Recyclarr",
             "Bindery into Seerr",
             "Lidarr into Seerr",
         ]

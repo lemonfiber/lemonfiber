@@ -82,67 +82,6 @@ services:
     devices:
     - /dev/net/tun:/dev/net/tun
     pids_limit: 1024
-  homepage:
-    image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
-    profiles:
-    - dash
-    restart: unless-stopped
-    environment:
-      HOMEPAGE_ALLOWED_HOSTS: localhost:3000
-      HOMEPAGE_VAR_LAN_HOST: localhost
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:3000:3000
-    volumes:
-    - ./config/homepage:/app/config
-    networks:
-    - ask__homepage__proxy.front__caddy
-    - own__homepage
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:8.7.3@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9
-    profiles:
-    - tuning
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      CRON_SCHEDULE: '@daily'
-      TZ: Europe/Amsterdam
-    volumes:
-    - ./config/recyclarr:/config
-    networks:
-    - ask__recyclarr__library.curate__bindery
-    - ask__recyclarr__library.curate__lidarr
-    - ask__recyclarr__library.curate__radarr
-    - ask__recyclarr__library.curate__sonarr
-    - link__recyclarr__radarr
-    - link__recyclarr__sonarr
-    - own__recyclarr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   request-gate:
     image: ghcr.io/lemonfiber/request-gate:main-b1472d34833c@sha256:fc84286bdac98df045a6df97837ae5134ff5a5c4dc75a8875675988992cec55e
     profiles:
@@ -277,7 +216,6 @@ services:
     - ./config/bindery:/config
     networks:
     - ask__bindery__indexer.search__prowlarr
-    - ask__recyclarr__library.curate__bindery
     - ask__request-gate__library.curate__bindery
     - own__bindery
     security_opt:
@@ -308,7 +246,6 @@ services:
     - ./mounts/caddy/data:/data
     - ./mounts/caddy/config:/config
     networks:
-    - ask__homepage__proxy.front__caddy
     - own__caddy
     security_opt:
     - no-new-privileges:true
@@ -374,6 +311,35 @@ services:
     - ALL
     pids_limit: 1024
     read_only: true
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
+    profiles:
+    - dash
+    restart: unless-stopped
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: localhost:3000
+      HOMEPAGE_VAR_LAN_HOST: localhost
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:3000:3000
+    volumes:
+    - ./config/homepage:/app/config
+    networks:
+    - own__homepage
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
   jellyfin:
     image: docker.io/jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     profiles:
@@ -421,7 +387,6 @@ services:
     - ./data:/data
     - ./config/lidarr:/config
     networks:
-    - ask__recyclarr__library.curate__lidarr
     - ask__request-gate__library.curate__lidarr
     - ask__unpackerr__library.curate__lidarr
     - link__unpackerr__lidarr
@@ -569,12 +534,38 @@ services:
     - ./data:/data
     - ./config/radarr:/config
     networks:
-    - ask__recyclarr__library.curate__radarr
     - ask__request-gate__library.curate__radarr
     - ask__unpackerr__library.curate__radarr
     - link__recyclarr__radarr
     - link__unpackerr__radarr
     - own__radarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:8.7.3@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9
+    profiles:
+    - tuning
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      CRON_SCHEDULE: '@daily'
+      TZ: Europe/Amsterdam
+    volumes:
+    - ./config/recyclarr:/config
+    networks:
+    - link__recyclarr__radarr
+    - link__recyclarr__sonarr
+    - own__recyclarr
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -657,7 +648,6 @@ services:
     - ./data:/data
     - ./config/sonarr:/config
     networks:
-    - ask__recyclarr__library.curate__sonarr
     - ask__request-gate__library.curate__sonarr
     - ask__unpackerr__library.curate__sonarr
     - link__recyclarr__sonarr

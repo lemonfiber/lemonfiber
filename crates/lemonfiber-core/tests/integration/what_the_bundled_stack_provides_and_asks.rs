@@ -2,10 +2,10 @@
 //! provide and ask them.
 //!
 //! Every part the bundle carries fills one, and the services that reach those parts ask
-//! for them: each service given a household hostname asks the proxy, each service whose
-//! dashboard panel reads it asks the dashboard, from its plugin where the bundle installs
-//! it, the request service asks the gate, and the gate, quality sync and decline ask what
-//! they act on. The core asks quality sync, archive extraction, the stream guard and
+//! for them: each service given a household hostname asks the proxy and each service
+//! whose dashboard panel reads it asks the dashboard, from its plugin where the bundle
+//! installs it, the request service asks the gate, and the gate and decline ask what they
+//! act on. The core asks quality sync, archive extraction, the stream guard and
 //! decline over their contracts, so no service asks those.
 
 use std::collections::BTreeSet;
@@ -63,9 +63,31 @@ fn each_part_fills_the_capability_it_is_the_bundled_claimant_of() {
     }
 }
 
+/// Every service the household reaches by a hostname is a part the bundle installs, and
+/// asks the proxy from its plugin, so no service the bundle assembles asks for it.
 #[test]
 fn every_service_given_a_household_hostname_asks_the_proxy() {
-    assert_eq!(askers(&stack(), "proxy.front"), once(&["homepage"]));
+    assert_eq!(askers(&stack(), "proxy.front"), once(&[]));
+    let mut named = 0;
+    for pinned in lemonfiber_bundled::PINNED {
+        let Ok(part) = lemonfiber_plugin::Manifest::from_toml(pinned.copy) else {
+            continue;
+        };
+        for wiring in part
+            .wirings
+            .iter()
+            .filter(|wiring| wiring.hostname.is_some())
+        {
+            named += 1;
+            assert!(
+                part.asking.iter().any(|ask| ask.capability == "proxy.front"
+                    && (ask.service.is_none() || ask.service == wiring.service)),
+                "{} names a hostname and does not ask the proxy",
+                part.plugin.id
+            );
+        }
+    }
+    assert!(named > 0, "the bundle's parts name hostnames");
 }
 
 /// Every service whose panel the dashboard reads is a part the bundle installs, which asks
@@ -194,9 +216,8 @@ fn the_door_asks_the_media_server_and_names_none() {
 }
 
 #[test]
-fn quality_sync_and_decline_ask_what_they_act_on() {
+fn the_decline_service_asks_what_it_acts_on() {
     let manifest = stack();
-    assert!(askers(&manifest, "library.curate").contains(&("recyclarr".to_owned(), true)));
     assert!(askers(&manifest, "identity.source").contains(&("decline".to_owned(), false)));
 }
 

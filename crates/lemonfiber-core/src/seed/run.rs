@@ -76,6 +76,7 @@ pub(crate) use reset::reset_connections;
 pub(crate) use securing::{secured, secured_by, securing_installed, would_restart, Secured};
 pub(crate) use showing::reshow;
 pub(crate) use subtitles::rewatch;
+pub(crate) use withholding::managed;
 use withholding::{withheld, withheld_brought};
 
 /// Wire the stack's services to each other, idempotently, and report what was
@@ -242,16 +243,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     wirings.extend(quality::seed_quality(ctx, &fillers).await);
 
     wirings.extend(fronting::seed_routes(ctx, &manifest.services, &installed, &fillers).await);
-    wirings.extend(
-        showing::seed_dashboard(
-            ctx,
-            &manifest.services,
-            &installed,
-            &fillers,
-            project.as_deref(),
-        )
-        .await,
-    );
+    wirings.extend(showing::seed_dashboard(ctx, &manifest.services, &installed, &fillers).await);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the

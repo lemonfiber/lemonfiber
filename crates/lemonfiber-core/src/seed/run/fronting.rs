@@ -10,8 +10,8 @@ use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_manifest::Service;
 
 use super::restarting::Restarting;
-use super::{withheld, withheld_brought, Ctx};
-use crate::app::targets::{chosen_fillers, project_directory, spoken, Spoken};
+use super::Ctx;
+use crate::app::targets::{spoken, Spoken};
 use crate::plugin::Installed;
 use crate::ports::service::{Proxying, Route, Routing};
 use crate::seed::{State, Wiring};
@@ -71,30 +71,11 @@ async fn asked(ctx: &Ctx, fillers: &Fillers) -> Option<(Restarting, String)> {
     }
 }
 
-/// The stack's services and what is installed here, as a seed pass reads them, and who
-/// fills each ask: nothing where the stack or the record of what is installed cannot be
-/// read.
-fn here(ctx: &Ctx) -> Option<(Vec<Service>, Vec<Installed>, Fillers)> {
-    let mut manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let _ = withheld(&mut manifest.services, &ctx.settings.unmanaged);
-    let register = crate::app::plugins::read(ctx).ok()?;
-    let (installed, _) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let fillers = Fillers::of(
-        &manifest,
-        &installed,
-        &chosen_fillers(ctx),
-        project.as_deref(),
-    )
-    .numbered(crate::app::targets::ordinals(ctx));
-    Some((manifest.services, installed, fillers))
-}
-
 /// Apply the proxy the routing table again, as installing, updating or removing a plugin
 /// or changing the domain owes it, and say how that came out: nothing where the stack or
 /// the record of what is installed cannot be read, or nothing speaks `proxy.front`.
 pub(crate) async fn refront(ctx: &Ctx) -> Option<State> {
-    let (services, installed, fillers) = here(ctx)?;
+    let (services, installed, fillers) = super::managed(ctx)?;
     seed_routes(ctx, &services, &installed, &fillers)
         .await
         .map(|wiring| wiring.state)
@@ -103,7 +84,7 @@ pub(crate) async fn refront(ctx: &Ctx) -> Option<State> {
 /// Every route the proxy serves now: none where nothing speaks `proxy.front` or it does
 /// not answer.
 pub(crate) async fn served(ctx: &Ctx) -> Vec<Route> {
-    let Some((_, _, fillers)) = here(ctx) else {
+    let Some((_, _, fillers)) = super::managed(ctx) else {
         return Vec::new();
     };
     let Some((proxy, _)) = asked(ctx, &fillers).await else {

@@ -140,18 +140,6 @@ const NAMED: &[Named] = &[
         until: Until::Moves("request-gate"),
     },
     Named {
-        file: "crates/lemonfiber-core/src/app/materialise.rs",
-        part: "recyclarr",
-        count: 3,
-        until: Until::Moves("recyclarr"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/app/showing/configured.rs",
-        part: "homepage",
-        count: 4,
-        until: Until::Moves("homepage"),
-    },
-    Named {
         file: "crates/lemonfiber-core/src/app/targets/media.rs",
         part: "jellyfin",
         count: 1,
@@ -245,7 +233,7 @@ const NAMED: &[Named] = &[
         file: "crates/lemonfiber-core/src/config/keys.rs",
         part: "homepage",
         count: 1,
-        until: Until::Moves("homepage"),
+        until: Until::Migrated,
     },
     Named {
         file: "crates/lemonfiber-core/src/credential/held.rs",
@@ -270,30 +258,6 @@ const NAMED: &[Named] = &[
         part: "gluetun",
         count: 5,
         until: Until::Moves("gluetun"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/door.rs",
-        part: "homepage",
-        count: 1,
-        until: Until::Moves("homepage"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/lib.rs",
-        part: "recyclarr",
-        count: 1,
-        until: Until::Moves("recyclarr"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/recyclarr.rs",
-        part: "radarr",
-        count: 5,
-        until: Until::Moves("recyclarr"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/recyclarr.rs",
-        part: "sonarr",
-        count: 3,
-        until: Until::Moves("recyclarr"),
     },
     Named {
         file: "crates/lemonfiber-core/src/seed/run/taken_back.rs",

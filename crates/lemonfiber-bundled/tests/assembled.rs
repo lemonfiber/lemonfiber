@@ -24,8 +24,6 @@ const FROM_SECRETS: [(&str, &str, &str); 9] = [
     ),
     ("gluetun", "OPENVPN_USER", "openvpn-user"),
     ("gluetun", "OPENVPN_PASSWORD", "openvpn-password"),
-    ("recyclarr", "RADARR_API_KEY", "movies-key"),
-    ("recyclarr", "SONARR_API_KEY", "tv-key"),
     ("unpackerr", "UN_LIDARR_0_API_KEY", "music-key"),
     ("unpackerr", "UN_RADARR_0_API_KEY", "movies-key"),
     ("unpackerr", "UN_SONARR_0_API_KEY", "tv-key"),

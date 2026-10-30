@@ -387,8 +387,8 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     )
     .is_ok());
 
-    let edited = paths.stack().join("config/homepage/settings.yaml");
-    let theirs = "title: a dashboard of my own\n";
+    let edited = paths.stack().join("services/bazarr.toml");
+    let theirs = "# a service description of my own\n";
     assert!(
         std::fs::write(&edited, theirs).is_ok(),
         "the operator's edit"
@@ -427,10 +427,7 @@ fn an_apply_records_the_checksums_of_what_it_wrote() {
     .is_ok());
 
     let recorded = std::fs::read_to_string(paths.materialised()).unwrap_or_default();
-    assert!(
-        recorded.contains("config/homepage/settings.yaml"),
-        "{recorded}"
-    );
+    assert!(recorded.contains("services/bazarr.toml"), "{recorded}");
     assert!(recorded.contains("stack.toml"), "{recorded}");
 }
 

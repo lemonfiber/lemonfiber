@@ -90,9 +90,11 @@ fn the_index_over_every_service_is_refused_in_the_registers_own_words() {
     // this stack runs, which is the one thing the register already says it is
     // not for — so the refusal borrows that sentence rather than writing a
     // second one to keep in step with it.
-    let services = [service("homepage", Some(Bind::Lan))];
+    let mut index = service("homepage", Some(Bind::Lan));
+    index.provides =
+        vec![lemonfiber_contract::capabilities::dashboard::show::CAPABILITY.to_owned()];
     assert_eq!(
-        door(&services, &[asking()], Some("homepage")),
+        door(&[index], &[asking()], Some("homepage")),
         (
             refused("homepage", Facing::Operators.because()),
             Some("seerr".to_owned())

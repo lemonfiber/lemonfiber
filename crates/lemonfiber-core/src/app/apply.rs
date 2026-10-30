@@ -35,7 +35,6 @@ use crate::error::{Diagnose, Problem, Remedy};
 use crate::journal::{Change, Journal, Kind, Seal};
 use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
-use crate::quality::{Preset, Selection};
 use crate::settings::Keeping;
 use crate::stack::{self, Source};
 use crate::wizard::{Guarded, Phase, Plan, Vpn, Wizard};
@@ -197,17 +196,11 @@ fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<()
     // carried further from here — nothing was overwritten, so nothing is owed a diff
     // at this point, and the next lifecycle command reports exactly these files and
     // exactly these diffs through the surface that already carries them.
-    //
-    // The default preset rather than no choice at all, because no choice means "leave
-    // the quality config exactly as it is on disk", and at setup there may be nothing
-    // there to leave. It rewrites the shipped config to itself, so an install that
-    // chose nothing gets the file the stack ships.
     super::materialise::materialise(
         applying.confined,
         applying.source,
         Some(&paths.stack()),
         Some(&paths.materialised()),
-        Some(&Selection::everywhere(Preset::default_preset())),
         // Read from the file as it stands rather than assumed empty. A first install
         // has declared nothing, and this function is reached by a resumed apply, a
         // recovered one, and setup run again on a machine that has been set up for

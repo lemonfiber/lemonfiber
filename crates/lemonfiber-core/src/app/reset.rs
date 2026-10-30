@@ -5,10 +5,6 @@
 //! win and discard the edits. Because it discards work, it names exactly what will be
 //! lost first, and does nothing until the offer that reading made is answered; the reset
 //! reads it again when it runs and refuses where anything moved.
-//!
-//! A reset restores lemonfiber's state *including* the operator's recorded quality choice
-//! — that is a managed setting, not drift — so the stack is written carrying the recorded
-//! preset, with only the hand-edits on top of it reverted.
 
 use crate::error::codes::stack::RESET_MOVED;
 use crate::error::{Diagnose, Problem, Remedy, State};
@@ -24,8 +20,8 @@ const OFFERED: [&str; 2] = ["the edits it reverts", "the connections it reverts"
 ///
 /// # Errors
 ///
-/// Returns the [`Problem`] a surface renders when the recorded choice or the record of
-/// installed plugins cannot be read, a file cannot be written, or the offer answered is
+/// Returns the [`Problem`] a surface renders when the record of installed plugins cannot
+/// be read, a file cannot be written, or the offer answered is
 /// not the one a reading makes now.
 pub(crate) async fn reset(
     ctx: &Ctx,
@@ -84,7 +80,6 @@ fn reset_moved(moved: &[&str], standing: &str) -> Problem {
 
 /// What a reset reverts, carried out where `confirm` and only read otherwise.
 async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String>), Box<Problem>> {
-    let selection = super::quality::load_selection(ctx)?;
     let record = super::targets::beside_env(ctx, crate::config::paths::MATERIALISED);
     let into = ctx.settings.stack_dir.as_deref();
 
@@ -94,7 +89,6 @@ async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String
             ctx.stack,
             into,
             record.as_deref(),
-            Some(&selection),
             &ctx.settings.unmanaged,
         )
         .map(|(_, edits)| edits)
@@ -104,7 +98,6 @@ async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String
             ctx.stack,
             into,
             record.as_deref(),
-            Some(&selection),
             &ctx.settings.unmanaged,
         )
     }
