@@ -111,20 +111,25 @@
               "$defs": {
                 "Edited": {
                   "additionalProperties": false,
-                  "description": "A hand edit to a quality sync's configuration: the file, and the diff of what is on\ndisk against what putting the profiles back writes, every credential value masked.",
+                  "description": "A hand-edited quality sync configuration and what putting the profiles back writes in\nits place, both whole, as the sync answers them: unmasked, so read by nothing before\nthe core has masked each.",
                   "properties": {
-                    "diff": {
-                      "description": "What is on disk against what is written in its place, masked.",
+                    "on_disk": {
+                      "description": "The whole of what is on disk.",
                       "type": "string"
                     },
                     "path": {
                       "description": "The configuration file, as the upstream's configuration directory names it.",
                       "type": "string"
+                    },
+                    "preset": {
+                      "description": "The whole of what putting the profiles back writes in its place.",
+                      "type": "string"
                     }
                   },
                   "required": [
                     "path",
-                    "diff"
+                    "on_disk",
+                    "preset"
                   ],
                   "type": "object"
                 }

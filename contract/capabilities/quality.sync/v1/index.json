@@ -15,11 +15,11 @@
     },
     {
       "path": "quality.sync/v1/operations/edited.json",
-      "sha256": "ba93e8e2da48f16939bb6c79b54094b41c67327139d76d027475e74cdf340c5b"
+      "sha256": "a88dff3e8a170ee45d1b579ddbf98d5bc18f32a934347ec54652ec2631403add"
     },
     {
       "path": "quality.sync/v1/operations/reapply.json",
-      "sha256": "ba4dd50fe80822dea055be82ffe1f7fb99f140af9cbdacfb3e4d00f55867f2a6"
+      "sha256": "f687602137389ecc77db0672c55c864d549d318969fdc70bd9043aeed5d941b6"
     },
     {
       "path": "quality.sync/v1/conformance.json",

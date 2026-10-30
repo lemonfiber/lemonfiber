@@ -18,12 +18,13 @@ crate::contract! {
             };
             /// The preset it last applied to the curator of one kind of video.
             fn applied(value which: Kind) -> Option<Preset> where asks = Asked { which: Kind::Tv };
-            /// The hand edit putting one curator's profiles back would replace, masked,
-            /// with nothing written.
+            /// The hand-edited configuration putting one curator's profiles back would
+            /// replace and what it would write, both whole, with nothing written.
             fn edited(refer profiled: &Profiled as Profiled) -> Option<Edited> where asks = Asked {
                 profiled: profiled(),
             };
-            /// Put one curator's profiles back over a hand edit, and the edit it replaced.
+            /// Put one curator's profiles back over a hand edit, and the configuration it
+            /// replaced and what it wrote.
             fn reapply(refer profiled: &Profiled as Profiled) -> Reapplied where asks = Asked {
                 profiled: profiled(),
             };

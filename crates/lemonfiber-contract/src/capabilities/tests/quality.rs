@@ -31,11 +31,12 @@ impl Syncing for Upstream {
     }
 }
 
-/// A hand edit, masked.
+/// A hand edit, and what putting the profiles back writes in its place.
 fn edit() -> Edited {
     Edited {
         path: "recyclarr.yml".to_owned(),
-        diff: "-  api_key: ****\n+  api_key: ****\n".to_owned(),
+        on_disk: "min: 0\n".to_owned(),
+        preset: "min: 25\n".to_owned(),
     }
 }
 

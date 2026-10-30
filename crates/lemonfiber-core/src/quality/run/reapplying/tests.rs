@@ -11,7 +11,7 @@ use crate::quality::{Preset, Selection};
 use crate::test_support::syncing::{a_trusted_sync, minted_for_every_part};
 
 /// A hand edit, as the sync answers it.
-const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"- min: 0\n+ min: 25\n"}"#;
+const AN_EDIT: &str = r#"{"path":"recyclarr.yml","on_disk":"min: 0\n","preset":"min: 25\n"}"#;
 
 /// The preset every curator is put back to.
 fn selection() -> Selection {
@@ -109,7 +109,8 @@ async fn a_configuration_the_operator_declared_their_own_is_never_put_back() {
 
 #[tokio::test]
 async fn a_key_the_sync_left_in_its_edit_reaches_neither_the_report_nor_the_journal() {
-    let leaking = r#"{"path":"recyclarr.yml","diff":"-  note: the-key-held\n+  note: balanced\n"}"#;
+    let leaking =
+        r#"{"path":"recyclarr.yml","on_disk":"note: the-key-held\n","preset":"note: balanced\n"}"#;
     let http = Fake::by_path(vec![("/edited", Answer::reply(200, leaking))]);
     let ctx = machine("reapplying-leaking", http, true);
     minted_for_every_part(&ctx, "the-key-held");

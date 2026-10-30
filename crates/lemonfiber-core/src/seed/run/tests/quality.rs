@@ -277,7 +277,7 @@ const EDITED: &str = "/lemonfiber/quality.sync/v1/edited";
 const REAPPLY: &str = "/lemonfiber/quality.sync/v1/reapply";
 
 /// A hand edit, as the sync answers it.
-const AN_EDIT: &str = r#"{"path":"recyclarr.yml","diff":"- min: 0\n+ min: 25\n"}"#;
+const AN_EDIT: &str = r#"{"path":"recyclarr.yml","on_disk":"min: 0\n","preset":"min: 25\n"}"#;
 
 /// A sync answering `edited` with [`AN_EDIT`] and `reapply` with `reapplied`.
 fn reapplying(reapplied: &'static str) -> Arc<Fake> {

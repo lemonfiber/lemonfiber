@@ -154,7 +154,7 @@
       ],
       "openapi": "quality.sync/v1/openapi.json",
       "operations": 4,
-      "sha256": "4afdc31fc037d178868c6375975e6794887875e8ee4f5f48d566b11635a68b54"
+      "sha256": "9ffa87d1d16376b0053922db7e7564fc293c052014fa9fa8cb355708c3b4250b"
     },
     {
       "capability": "dashboard.show",
