@@ -30,6 +30,15 @@ fn shipped() -> Project {
     generated(&manifest, &[], &Chosen::read(None), &Reading::bare())
 }
 
+/// The carried stack, generated with every part the bundle installs installed.
+fn installed() -> Project {
+    let Ok(manifest) = Manifest::from_toml(STACK) else {
+        unreachable!("the embedded stack parses; the manifest crate asserts it separately");
+    };
+    let parts = lemonfiber_testing::adapted::installed_parts();
+    generated(&manifest, &parts, &Chosen::read(None), &Reading::bare())
+}
+
 /// The project's document, read back.
 fn document(project: &Project) -> Value {
     serde_norway::from_str(&project.text).unwrap_or_default()
@@ -273,13 +282,9 @@ fn fixed(project: &Project, service: &str) -> BTreeSet<Ipv4Addr> {
     }
 }
 
-/// The door's own configuration, as the bundle carries it.
-const DOOR_CADDYFILE: &str =
-    include_str!("../../../../assets/plugins/bundle/plugins/door/config/door/Caddyfile");
-
 #[test]
 fn the_door_and_the_proxy_hold_the_addresses_each_side_trusts() {
-    let project = shipped();
+    let project = installed();
     assert_eq!(
         fixed(&project, "door"),
         BTreeSet::from([
@@ -291,8 +296,4 @@ fn the_door_and_the_proxy_hold_the_addresses_each_side_trusts() {
         fixed(&project, "caddy"),
         BTreeSet::from([lemonfiber_core::topology::PROXY_ON_PROXY])
     );
-    assert!(DOOR_CADDYFILE.contains(&format!(
-        "trusted_proxies static {}\n",
-        lemonfiber_core::topology::PROXY_ON_PROXY
-    )));
 }

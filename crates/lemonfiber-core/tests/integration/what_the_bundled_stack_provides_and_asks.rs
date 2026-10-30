@@ -65,10 +65,7 @@ fn each_part_fills_the_capability_it_is_the_bundled_claimant_of() {
 
 #[test]
 fn every_service_given_a_household_hostname_asks_the_proxy() {
-    assert_eq!(
-        askers(&stack(), "proxy.front"),
-        once(&["calibre-web-automated", "door", "homepage"])
-    );
+    assert_eq!(askers(&stack(), "proxy.front"), once(&["homepage"]));
 }
 
 /// Every service whose panel the dashboard reads is a part the bundle installs, which asks

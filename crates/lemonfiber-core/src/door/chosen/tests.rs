@@ -102,10 +102,13 @@ fn the_index_over_every_service_is_refused_in_the_registers_own_words() {
 
 #[test]
 fn a_shelf_is_refused_for_the_reason_it_is_not_a_way_in() {
-    let services = [service("calibre-web-automated", Some(Bind::Lan))];
+    let installed = [
+        asking(),
+        super::super::fixtures::serving("books", &["books"]),
+    ];
     assert_eq!(
-        door(&services, &[asking()], Some("calibre-web-automated")).0,
-        refused("calibre-web-automated", Facing::Shelf.because())
+        door(&[], &installed, Some("books")).0,
+        refused("books", Facing::Shelf.because())
     );
 }
 

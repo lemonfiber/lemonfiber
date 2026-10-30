@@ -227,7 +227,7 @@ fn a_stack_image_without_a_digest_is_written_by_its_tag() {
 
 #[test]
 fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
-    let project = project(&carried(), &[]);
+    let project = project(&carried(), &crate::test_support::adapted::installed_parts());
     let document: Yaml = serde_norway::from_str(&project.text).unwrap_or_default();
     let declared = document.get("networks").cloned().unwrap_or_default();
     assert!(project.text.contains(&PROXY_ON_PROXY.to_string()));

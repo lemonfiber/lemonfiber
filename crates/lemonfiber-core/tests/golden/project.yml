@@ -17,40 +17,8 @@ services:
     - ./mounts/caddy/data:/data
     - ./mounts/caddy/config:/config
     networks:
-      ask__calibre-web-automated__proxy.front__caddy: {}
-      ask__door__proxy.front__caddy:
-        ipv4_address: 10.80.96.3
-      ask__homepage__proxy.front__caddy: {}
-      own__caddy: {}
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  calibre-web-automated:
-    image: crocodilestick/calibre-web-automated:V3.1.4@sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd
-    profiles:
-    - media
-    restart: unless-stopped
-    environment:
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:8083:8083
-    volumes:
-    - ./data:/data
-    - ./config/calibre-web-automated:/config
-    networks:
-    - ask__calibre-web-automated__proxy.front__caddy
-    - own__calibre-web-automated
+    - ask__homepage__proxy.front__caddy
+    - own__caddy
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -86,40 +54,6 @@ services:
     pids_limit: 1024
     read_only: true
     mem_limit: 64m
-  door:
-    image: ghcr.io/lemonfiber/door:main-0c3ae0d8a425@sha256:bb78c5b83612d5ad038be38da1ceb05c541c2502cdd95720ebbb1db3e1be0a55
-    profiles:
-    - media
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:8096:8096
-    - 0.0.0.0:8920:8920
-    volumes:
-    - ./config/door:/etc/caddy:ro
-    tmpfs:
-    - /data
-    - /config
-    networks:
-      ask__door__media.serve__jellyfin:
-        ipv4_address: 10.80.96.18
-      ask__door__proxy.front__caddy:
-        ipv4_address: 10.80.96.2
-      own__door: {}
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.5.2@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
     profiles:
@@ -149,16 +83,15 @@ services:
   gluetun:
     image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
     profiles:
-    - torrent
+    - lemonfiber.waiting
     restart: unless-stopped
     environment:
-      PORT_FORWARD_ONLY: off
       SERVER_COUNTRIES: Netherlands
       TZ: Europe/Amsterdam
       VPN_PORT_FORWARDING: off
-      VPN_PORT_FORWARDING_PROVIDER: ''
       VPN_SERVICE_PROVIDER: ''
       VPN_TYPE: wireguard
+      WIREGUARD_ADDRESSES: ''
     ports:
     - 127.0.0.1:8081:8081
     volumes:
@@ -390,6 +323,58 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
+  calibre-web-automated:
+    image: crocodilestick/calibre-web-automated:V3.1.4@sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd
+    profiles:
+    - media
+    restart: unless-stopped
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:8083:8083
+    volumes:
+    - ./data:/data
+    - ./config/calibre-web-automated:/config
+    networks:
+    - own__calibre-web-automated
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  door:
+    image: ghcr.io/lemonfiber/door:main-5b65b742fdf9@sha256:e8fa70c407ba25320f0a8606681837b6bdc1cecad7c4b649639de32afebb2def
+    profiles:
+    - media
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:8096:8096
+    - 0.0.0.0:8920:8920
+    volumes:
+    - ./config/door:/config:ro
+    - ./mounts/door/state:/state
+    networks:
+      ask__door__media.serve__jellyfin:
+        ipv4_address: 10.80.96.18
+      own__door: {}
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    pids_limit: 1024
+    read_only: true
   jellyfin:
     image: docker.io/jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     profiles:
@@ -544,7 +529,7 @@ services:
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480@sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed
     profiles:
-    - torrent
+    - lemonfiber.waiting
     restart: unless-stopped
     environment:
       PGID: '1000'

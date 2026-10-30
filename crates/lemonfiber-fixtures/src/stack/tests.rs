@@ -34,7 +34,9 @@ fn gluetun_env(stack: &toml::Table) -> toml::Table {
 fn the_carried_stack_leaves_out_each_secret_and_only_the_variables_naming_one() {
     let bundled: toml::Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
     let mut expected = gluetun_env(&bundled);
-    assert!(expected.remove("WIREGUARD_PRIVATE_KEY").is_some());
+    let secret = |value: &toml::Value| value.get("secret").is_some();
+    assert!(expected.get("WIREGUARD_PRIVATE_KEY").is_some_and(secret));
+    expected.retain(|_, value| !secret(value));
     assert!(!expected.is_empty());
     let stack = carried();
     assert_eq!(gluetun_env(&stack), expected);

@@ -4,11 +4,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.111.216/29
-  ask__calibre-web-automated__proxy.front__caddy:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.160.240/29
   ask__decline__identity.source__jellyfin:
     internal: true
     ipam:
@@ -20,12 +15,6 @@ networks:
       config:
       - subnet: 10.80.96.16/28
         ip_range: 10.80.96.24/29
-  ask__door__proxy.front__caddy:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.96.0/28
-        ip_range: 10.80.96.8/29
   ask__homepage__proxy.front__caddy:
     internal: true
     ipam:
@@ -148,6 +137,8 @@ networks:
       config:
       - subnet: 10.80.240.8/29
   own__door:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: 'false'
     ipam:
       config:
       - subnet: 10.80.25.136/29

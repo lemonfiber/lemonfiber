@@ -127,11 +127,7 @@ pub const SHELF_MEDIA: [&str; 5] = ["music", "books", "comics", "audiobooks", "p
 /// definition the one nobody thought about. So an entry is a decision somebody made
 /// and can be reviewed on; anything else is [`Facing::Unstated`] and is offered to
 /// nobody. It names no place to begin: those two are the contracts'.
-const NAMED: &[(&str, Facing)] = &[
-    ("calibre-web-automated", Facing::Shelf),
-    ("homepage", Facing::Operators),
-    ("caddy", Facing::Carriage),
-];
+const NAMED: &[(&str, Facing)] = &[("homepage", Facing::Operators), ("caddy", Facing::Carriage)];
 
 /// What one of the stack's own services is to the household, or nothing where it is not
 /// published to them at all.
@@ -155,14 +151,19 @@ pub fn facing(service: &Service) -> Option<Facing> {
 /// What a plugin's service is to the household, or nothing where it is not published to
 /// them at all.
 ///
-/// Judged by the contract the adapter of `installed` in front of it speaks. Where none
-/// settles it, a first-party part moved in place of one of the stack's services is what
-/// the register says of the service it stands in for, and any other plugin's service is
-/// unstated: a plugin's service choosing an id the register names is not thereby what
-/// the register says.
+/// A first-party part moved in place of the stack's guard of the media stream is how the
+/// household reaches the library, as the stack's own is; a plugin declaring that it
+/// guards the stream is not thereby the way in. Anything else is judged by the contract
+/// the adapter of `installed` in front of it speaks. Where none settles it, a first-party
+/// part moved in place of one of the stack's services is what the register says of the
+/// service it stands in for, and any other plugin's service is unstated: a plugin's
+/// service choosing an id the register names is not thereby what the register says.
 #[must_use]
 pub fn brought(installed: &[Installed], plugin: &Installed, placed: &Placed) -> Option<Facing> {
     placed.reached.as_ref()?.hostname()?;
+    if guards_in_place(installed, placed) {
+        return Some(Facing::Watching);
+    }
     Some(by_contract(plugin, placed).unwrap_or_else(|| {
         if crate::project::moved_in_place(installed, &placed.service) {
             named(&placed.service)
@@ -170,6 +171,14 @@ pub fn brought(installed: &[Installed], plugin: &Installed, placed: &Placed) -> 
             Facing::Unstated
         }
     }))
+}
+
+/// Whether `placed` guards the media stream as a first-party part moved in place of one of
+/// the stack's services, which is the only way a plugin's service is trusted to: facing
+/// the household is decided by who a part is, not by what it declares.
+fn guards_in_place(installed: &[Installed], placed: &Placed) -> bool {
+    crate::project::moved_in_place(installed, &placed.service)
+        && placed.provides.iter().any(|one| one == guard::CAPABILITY)
 }
 
 /// What the contract the adapter of `plugin` in front of `placed` speaks makes it to the
@@ -238,14 +247,30 @@ pub fn candidates<'a>(
         .filter(|service| !crate::project::moved_in_place(installed, &service.id))
         .map(move |service| Candidate {
             id: &service.id,
-            name: guarded(services, installed, fillers, service).unwrap_or(&service.name),
+            name: guarded(
+                services,
+                installed,
+                fillers,
+                (&service.id, &service.provides),
+            )
+            .unwrap_or(&service.name),
             facing: facing(service),
             reached: Reached::Port(service.port),
         });
     let plugins = installed.iter().flat_map(move |plugin| {
         plugin.services.iter().map(move |placed| Candidate {
             id: &placed.service,
-            name: placed.called(),
+            name: guards_in_place(installed, placed)
+                .then(|| {
+                    guarded(
+                        services,
+                        installed,
+                        fillers,
+                        (&placed.service, &placed.provides),
+                    )
+                })
+                .flatten()
+                .unwrap_or_else(|| placed.called()),
             facing: brought(installed, plugin, placed),
             reached: match placed.reached.as_ref() {
                 Some(reached) if crate::project::moved_in_place(installed, &placed.service) => {
@@ -261,22 +286,22 @@ pub fn candidates<'a>(
     bundled.chain(plugins).collect()
 }
 
-/// The name of the library `guard` guards, where it guards the media stream and its ask
-/// for `media.serve` settles on one service among `fillers`: the upstream that service
-/// fronts, or the service itself.
+/// The name of the library the service `guard`, by its id and what it provides, guards,
+/// where it guards the media stream and its ask for `media.serve` settles on one service
+/// among `fillers`: the upstream that service fronts, or the service itself.
 fn guarded<'a>(
     services: &'a [Service],
     installed: &'a [Installed],
     fillers: &crate::wiring::Fillers,
-    guard: &Service,
+    (id, provides): (&str, &[String]),
 ) -> Option<&'a str> {
-    if !guard.provides.iter().any(|one| one == guard::CAPABILITY) {
+    if !provides.iter().any(|one| one == guard::CAPABILITY) {
         return None;
     }
     let [filler] = fillers
         .asks()
         .iter()
-        .find(|ask| ask.by == guard.id && ask.capability == serve::CAPABILITY)?
+        .find(|ask| ask.by == id && ask.capability == serve::CAPABILITY)?
         .fillers
         .as_slice()
     else {

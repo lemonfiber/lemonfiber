@@ -75,6 +75,7 @@ mod what_is_actually_listening;
 mod what_is_already_here;
 mod what_removing_somebody_costs;
 mod what_running_out_of_time_closes;
+mod what_the_bundled_adapters_answer;
 mod what_the_bundled_stack_claims;
 mod what_the_bundled_stack_provides_and_asks;
 mod what_the_household_is_handed;

@@ -11,6 +11,23 @@ use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::settings::legacy;
 
+/// The first value the stack offers the setting `name` as a choice, where it offers any.
+fn chosen(ctx: &Ctx, name: &str) -> Option<String> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let one_of = manifest
+        .services
+        .iter()
+        .flat_map(|service| service.env.values())
+        .find_map(|value| match value {
+            Value::Setting(setting) if setting.setting == name => setting.one_of.clone(),
+            _ => None,
+        })?;
+    crate::settings::readers::choosable(&one_of, &|_| None)
+        .into_iter()
+        .find(|choice| choice.open)
+        .map(|choice| choice.value)
+}
+
 #[test]
 fn each_legacy_setting_is_filed_for_a_setting_the_stack_reads() {
     let ctx = crate::test_support::a_context().build();
@@ -41,7 +58,8 @@ fn each_legacy_setting_is_filed_for_a_setting_the_stack_reads() {
 async fn every_legacy_setting_is_recorded_in_the_store_and_never_in_the_environment_file() {
     let machine = machine("legacy", running(&[]));
     for row in legacy::TABLE.iter().filter(|row| !row.secret) {
-        let value = format!("value-of-{}", row.key.to_lowercase());
+        let value = chosen(&machine.ctx, row.name)
+            .unwrap_or_else(|| format!("value-of-{}", row.key.to_lowercase()));
 
         let made = agreed(&machine.ctx, row.name, Some(&value)).await;
 
