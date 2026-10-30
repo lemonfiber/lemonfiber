@@ -12,7 +12,7 @@ use lemonfiber_sidecar::decline::{
 };
 
 use super::{path, SERVICE};
-use crate::ports::filesystem::FileSystem;
+use crate::ports::filesystem::{Beneath, FileSystem};
 use crate::ports::service::{
     Claimed, Declined, Declining, Failure, Invitations, KeyHeld, Lapsed, LeftBecause, TakenBack,
 };
@@ -40,6 +40,25 @@ impl Configured {
         let at = path(&self.project, file);
         crate::app::targets::read_owned(self.files.as_ref(), &at, crate::within::directory_of(&at))
             .await
+    }
+
+    /// What one of the records the service keeps holds: nothing where it is not there, and
+    /// a refusal where something other than a plain file of the service's own directory
+    /// is, which is never followed.
+    async fn record(&self, file: File) -> Result<Option<String>, Failure> {
+        let at = path(&self.project, file);
+        match self
+            .files
+            .read_beneath(&at, crate::within::directory_of(&at))
+            .await
+        {
+            Beneath::Read(text) => Ok(Some(text)),
+            Beneath::Absent => Ok(None),
+            Beneath::Escaped => Err(Failure::Refused {
+                service: SERVICE.to_owned(),
+                detail: format!("its record {} is not a file of its own", file.name()),
+            }),
+        }
     }
 
     /// Write `text` to `file`, as the service reads it.
@@ -87,7 +106,7 @@ impl Declining for Configured {
     }
 
     async fn refusals(&self) -> Result<Vec<Declined>, Failure> {
-        let refusals = match self.read(File::Refusals).await {
+        let refusals = match self.record(File::Refusals).await? {
             Some(text) => Refusals::read(&text).map_err(|why| unread(&why))?,
             None => Refusals::default(),
         };
@@ -103,7 +122,7 @@ impl Declining for Configured {
     }
 
     async fn lapses(&self) -> Result<Vec<Lapsed>, Failure> {
-        let lapses = match self.read(File::Lapses).await {
+        let lapses = match self.record(File::Lapses).await? {
             Some(text) => Lapses::read(&text).map_err(|why| unread(&why))?,
             None => Lapses::default(),
         };

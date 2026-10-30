@@ -44,7 +44,7 @@ fn key(made: u64, used: Option<u64>) -> Dated {
 fn scene(name: &str, refused: &[u64], taken_back: &[u64]) -> PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+    let _ = std::fs::create_dir_all(record(&at, ""));
     let refusals = refused.iter().fold(Refusals::default(), |all, when| {
         all.with(Refusal {
             token: TokenHash::of(&format!("r{when}")),
@@ -63,12 +63,17 @@ fn scene(name: &str, refused: &[u64], taken_back: &[u64]) -> PathBuf {
         })
     });
     if !refused.is_empty() {
-        let _ = store::write(&at.join("refusals.json"), &refusals.written());
+        let _ = store::write(&record(&at, "refusals.json"), &refusals.written());
     }
     if !taken_back.is_empty() {
-        let _ = store::write(&at.join("lapses.json"), &lapses.written());
+        let _ = store::write(&record(&at, "lapses.json"), &lapses.written());
     }
     at
+}
+
+/// Where the decline service under the project `at` keeps the record `name`.
+fn record(at: &Path, name: &str) -> PathBuf {
+    at.join("config").join("decline").join(name)
 }
 
 fn files() -> Arc<dyn crate::ports::filesystem::FileSystem> {
@@ -81,14 +86,12 @@ fn files() -> Arc<dyn crate::ports::filesystem::FileSystem> {
 
 /// What the check says over the records under `at`, the server answering `server`.
 async fn verdict(at: &Path, server: Option<Result<Vec<Dated>, ()>>) -> Verdict {
-    let check = DeclineKeyCheck::new(
-        files(),
-        Some(Decline {
-            refusals: at.join("refusals.json"),
-            lapses: at.join("lapses.json"),
-            keys: server.map(|answer| Arc::new(Server(answer)) as Arc<dyn KeyDates>),
-        }),
-    );
+    let check = DeclineKeyCheck::new(Some(Decline {
+        service: Some(Arc::new(
+            crate::app::invite::declining::configured::Configured::at(at, files()),
+        )),
+        keys: server.map(|answer| Arc::new(Server(answer)) as Arc<dyn KeyDates>),
+    }));
     let found = check.run().await;
     let _ = std::fs::remove_dir_all(at);
     found.into_iter().next().map_or(
@@ -105,7 +108,7 @@ fn warned_unexplained(verdict: &Verdict) -> bool {
 
 #[tokio::test]
 async fn a_stack_without_the_decline_service_has_no_key_to_account_for() {
-    let check = DeclineKeyCheck::new(files(), None);
+    let check = DeclineKeyCheck::new(None);
 
     let found = check.run().await;
 
@@ -210,7 +213,7 @@ async fn an_unreadable_key_list_or_no_server_is_unverified_never_a_pass() {
 #[tokio::test]
 async fn a_record_that_cannot_be_read_explains_nothing_and_says_so() {
     let at = scene("decline-key-garbled", &[], &[]);
-    let _ = store::write(&at.join("lapses.json"), "not a record");
+    let _ = store::write(&record(&at, "lapses.json"), "not a record");
 
     let said = verdict(&at, Some(Ok(vec![key(0, Some(60))]))).await;
 
@@ -273,7 +276,7 @@ async fn a_last_use_the_server_dates_in_a_form_nobody_reads_is_unverified_never_
 #[tokio::test]
 async fn a_record_of_refusals_that_cannot_be_read_is_unverified_never_a_pass() {
     let at = scene("decline-key-bad-refusals", &[], &[]);
-    let _ = std::fs::write(at.join("refusals.json"), "not a record");
+    let _ = std::fs::write(record(&at, "refusals.json"), "not a record");
 
     let said = verdict(&at, Some(Ok(vec![key(0, Some(60))]))).await;
 
@@ -283,7 +286,7 @@ async fn a_record_of_refusals_that_cannot_be_read_is_unverified_never_a_pass() {
 #[tokio::test]
 async fn a_record_of_lapses_that_cannot_be_read_is_unverified_never_a_pass() {
     let at = scene("decline-key-bad-lapses", &[], &[]);
-    let _ = std::fs::write(at.join("lapses.json"), "not a record");
+    let _ = std::fs::write(record(&at, "lapses.json"), "not a record");
 
     let said = verdict(&at, Some(Ok(vec![key(0, Some(60))]))).await;
 
@@ -315,7 +318,7 @@ async fn a_record_that_is_a_link_is_not_followed() {
     let at = scene("decline-key-linked", &[], &[]);
     let elsewhere = at.with_file_name("decline-key-linked-elsewhere.json");
     let _ = store::write(&elsewhere, &Lapses::default().written());
-    let _ = std::os::unix::fs::symlink(&elsewhere, at.join("lapses.json"));
+    let _ = std::os::unix::fs::symlink(&elsewhere, record(&at, "lapses.json"));
 
     let said = verdict(&at, Some(Ok(vec![key(0, Some(3_600))]))).await;
     let _ = std::fs::remove_file(&elsewhere);

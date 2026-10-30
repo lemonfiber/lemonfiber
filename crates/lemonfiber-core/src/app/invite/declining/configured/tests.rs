@@ -131,3 +131,93 @@ fn each_way_a_claim_is_told_is_the_tables() {
         assert_eq!(super::table(&invitations).claimed, told);
     }
 }
+
+/// What the service recorded is answered as its contract says it, every way it took an
+/// invitation back included, and where it serves the decline page.
+#[tokio::test]
+async fn its_records_and_its_page_are_answered_as_the_contract_says() {
+    use lemonfiber_sidecar::decline::{Lapse, Lapses, Left, Outcome, Refusal, Refusals};
+
+    use crate::ports::service::{LeftBecause, TakenBack};
+
+    let scratch = Scratch::new("decline-configured-records");
+    let decline = decline(&scratch);
+    assert_eq!(decline.refusals().await.ok(), Some(Vec::new()));
+    assert_eq!(decline.lapses().await.ok(), Some(Vec::new()));
+
+    let refusals = Refusals::default().with(Refusal {
+        token: TokenHash::of("ana"),
+        account: "9".to_owned(),
+        at: 3,
+    });
+    let outcomes = [
+        (Outcome::Removed, TakenBack::Removed),
+        (Outcome::SwitchedOff, TakenBack::SwitchedOff),
+        (Outcome::Left(Left::Claimed), LeftBecause::Claimed.into()),
+        (
+            Outcome::Left(Left::Administrator),
+            LeftBecause::Administrator.into(),
+        ),
+        (Outcome::Left(Left::Disabled), LeftBecause::Disabled.into()),
+        (Outcome::Left(Left::Gone), LeftBecause::Gone.into()),
+        (
+            Outcome::Left(Left::Reoffered),
+            LeftBecause::Reoffered.into(),
+        ),
+        (
+            Outcome::Left(Left::Unmatched),
+            LeftBecause::Unmatched.into(),
+        ),
+    ];
+    let written = outcomes
+        .iter()
+        .zip(0_u8..)
+        .fold(Lapses::default(), |all, ((outcome, _), n)| {
+            all.with(Lapse {
+                token: TokenHash::of(&format!("bo-{n}")),
+                account: "10".to_owned(),
+                name: "bo".to_owned(),
+                issued: 1,
+                at: 2,
+                outcome: *outcome,
+            })
+        });
+    let at = |file| path(scratch.path(), file);
+    let _ = std::fs::create_dir_all(at(File::Refusals).parent().unwrap_or(scratch.path()));
+    let _ = std::fs::write(at(File::Refusals), refusals.written());
+    let _ = std::fs::write(at(File::Lapses), written.written());
+
+    let declined = decline.refusals().await.unwrap_or_default();
+    let taken = decline.lapses().await.unwrap_or_default();
+
+    assert_eq!(declined.len(), 1);
+    assert_eq!(declined.first().map(|one| one.at), Some(3));
+    assert_eq!(
+        taken.iter().map(|one| one.outcome).collect::<Vec<_>>(),
+        outcomes.iter().map(|(_, taken)| *taken).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        decline.page().await.ok().as_deref(),
+        Some("/decline/{token}")
+    );
+
+    let _ = std::fs::write(at(File::Lapses), "not a record");
+    assert!(decline.lapses().await.is_err());
+    let _ = std::fs::write(at(File::Refusals), "not a record");
+    assert!(decline.refusals().await.is_err());
+}
+
+/// A record that is a link is never followed.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_record_that_is_a_link_is_refused() {
+    let scratch = Scratch::new("decline-configured-linked");
+    let decline = decline(&scratch);
+    let record = path(scratch.path(), File::Refusals);
+    let elsewhere = scratch.path().join("elsewhere.json");
+    let _ = std::fs::create_dir_all(record.parent().unwrap_or(scratch.path()));
+    let _ = std::fs::write(&elsewhere, "{}");
+    let _ = std::os::unix::fs::symlink(&elsewhere, &record);
+
+    assert!(decline.refusals().await.is_err());
+}

@@ -18,7 +18,7 @@ use crate::ports::media;
 use crate::ports::service::Gating;
 use crate::wiring::Fillers;
 
-mod configured;
+pub(crate) mod configured;
 
 /// The request gate's id in the stack manifest.
 pub(crate) const SERVICE: &str = "request-gate";

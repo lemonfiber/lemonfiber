@@ -143,6 +143,7 @@ fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
     crate::app::record::keep_beside(&context, crate::invitation::RECORD, &offers);
     let project =
         lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}-stack")).kept();
+    lemonfiber_fixtures::stack::manifest_into(&project);
     if refused {
         let record = crate::app::invite::declining::path(&project, File::Refusals);
         let refusals = Refusals::default().with(Refusal {

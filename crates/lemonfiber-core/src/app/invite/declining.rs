@@ -11,13 +11,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::invite::decline;
-use lemonfiber_sidecar::decline::{File, Lapses, Outcome, Refusals, TokenHash};
+use lemonfiber_sidecar::decline::{File, TokenHash};
 
 use crate::app::targets::{spoken, Spoken};
 use crate::app::Ctx;
 use crate::invitation::Offers;
 use crate::origin::Origin;
-use crate::ports::service::{Claimed, Declinable, Declining, Invitations, Member};
+use crate::ports::service::{
+    Claimed, Declinable, Declined, Declining, Invitations, Lapsed, Member, TakenBack,
+};
 use crate::wiring::Fillers;
 
 /// The decline service's id in the stack manifest.
@@ -110,41 +112,47 @@ pub(crate) fn path(project: &Path, file: File) -> PathBuf {
 }
 
 /// The accounts whose standing offer was declined: the ones whose offer's token the
-/// decline service recorded a refusal for.
+/// decline service answers a refusal for.
 ///
 /// Matched on the token rather than the account, so an account offered again since it
 /// was declined, under a new token, is an invitation again rather than still declined.
-/// A record the service has not written, or one that cannot be read, declines nobody.
+/// A service that cannot be asked, or does not answer, declines nobody.
 pub(crate) async fn declined(ctx: &Ctx, offers: &Offers) -> BTreeSet<String> {
-    kept(ctx, File::Refusals)
+    let Some(declining) = here(ctx).await else {
+        return BTreeSet::new();
+    };
+    declining
+        .refusals()
         .await
-        .and_then(|text| Refusals::read(&text).ok())
-        .map_or_else(BTreeSet::new, |refusals| refused(offers, &refusals))
+        .map_or_else(|_| BTreeSet::new(), |refusals| refused(offers, &refusals))
 }
 
-/// What one of the decline service's records holds, where the stack is on disk and the
-/// service has written it.
-///
-/// The service writes its records into a directory it owns, so each is read never
-/// through a link, never waited on as a pipe, and never past a small file's size.
-async fn kept(ctx: &Ctx, file: File) -> Option<String> {
+/// The decline service of the stack written to disk, as the core asks it.
+async fn here(ctx: &Ctx) -> Option<Arc<dyn Declining>> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
-    let record = path(&project, file);
-    let within = crate::within::directory_of(&record);
-    crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), &record, within).await
+    asked(
+        ctx,
+        &crate::app::targets::fillers_here(ctx, &manifest),
+        &project,
+    )
+    .await
 }
 
-/// The accounts among `offers` whose token `refusals` records a refusal of.
-fn refused(offers: &Offers, refusals: &Refusals) -> BTreeSet<String> {
+/// Whether `offer`'s token is the one `hash` names.
+fn tokened(offer: &crate::invitation::Offer, hash: &str) -> bool {
+    offer
+        .decline
+        .as_ref()
+        .is_some_and(|token| token.as_str() == hash)
+}
+
+/// The accounts among `offers` whose token `refusals` holds a refusal of.
+fn refused(offers: &Offers, refusals: &[Declined]) -> BTreeSet<String> {
     offers
         .iter()
-        .filter(|(_, offer)| {
-            offer
-                .decline
-                .as_ref()
-                .is_some_and(|token| refusals.of(token).is_some())
-        })
+        .filter(|(_, offer)| refusals.iter().any(|one| tokened(offer, &one.token)))
         .map(|(id, _)| id.clone())
         .collect()
 }
@@ -153,22 +161,25 @@ fn refused(offers: &Offers, refusals: &Refusals) -> BTreeSet<String> {
 /// against the name it was made under.
 ///
 /// Matched on the offer's token, as a refusal is, so a removal recorded against an
-/// earlier offer of the same account says nothing about the one standing now. A record
-/// the service has not written, or one that cannot be read, removed nobody.
+/// earlier offer of the same account says nothing about the one standing now. A service
+/// that cannot be asked, or does not answer, removed nobody.
 pub(crate) async fn removed_at_lapse(ctx: &Ctx, offers: &Offers) -> BTreeMap<String, String> {
-    kept(ctx, File::Lapses)
+    let Some(declining) = here(ctx).await else {
+        return BTreeMap::new();
+    };
+    declining
+        .lapses()
         .await
-        .and_then(|text| Lapses::read(&text).ok())
-        .map_or_else(BTreeMap::new, |lapses| removed(offers, &lapses))
+        .map_or_else(|_| BTreeMap::new(), |lapses| removed(offers, &lapses))
 }
 
-/// The accounts among `offers` whose token `lapses` records the removal of.
-fn removed(offers: &Offers, lapses: &Lapses) -> BTreeMap<String, String> {
+/// The accounts among `offers` whose token `lapses` holds the removal of.
+fn removed(offers: &Offers, lapses: &[Lapsed]) -> BTreeMap<String, String> {
     offers
         .iter()
         .filter_map(|(id, offer)| {
-            let lapse = lapses.of(offer.decline.as_ref()?)?;
-            (lapse.outcome == Outcome::Removed && &lapse.account == id)
+            let lapse = lapses.iter().find(|one| tokened(offer, &one.token))?;
+            (lapse.outcome == TakenBack::Removed && &lapse.account == id)
                 .then(|| (id.clone(), lapse.name.clone()))
         })
         .collect()
@@ -180,18 +191,26 @@ pub(super) fn with_token(mut offers: Offers, member: &str, token: &str) -> Optio
     Some(offers)
 }
 
-/// The decline address for `token`, on the household's address for the service's port.
+/// The decline address for `token`: the household's address for the service's port, and
+/// the page the service says it declines an invitation on.
 pub(super) async fn address(
     ctx: &Ctx,
     service: &lemonfiber_manifest::Service,
+    declining: &dyn Declining,
     token: &str,
 ) -> Option<String> {
+    let page = declining.page().await.ok()?;
+    let page = page.strip_prefix('/').filter(|page| page.contains(TOKEN))?;
     let reachable = super::household_address(ctx, service.port?).await?;
     Some(format!(
-        "{}/decline/{token}",
-        reachable.url.trim_end_matches('/')
+        "{}/{}",
+        reachable.url.trim_end_matches('/'),
+        page.replace(TOKEN, token)
     ))
 }
+
+/// Where a decline page's path holds the token.
+const TOKEN: &str = "{token}";
 
 /// Give the offer just recorded for `member` a decline token, and say where it declines.
 ///
@@ -230,7 +249,7 @@ pub(super) async fn issued(
         .apply_invitations(&invitations(&offers, &household))
         .await
         .ok()?;
-    address(ctx, service, &token).await
+    address(ctx, service, declining.as_ref(), &token).await
 }
 
 /// The seconds since the Unix epoch a recorded moment names.
@@ -239,7 +258,7 @@ pub(super) fn seconds(moment: &str) -> Option<u64> {
     u64::try_from(at.as_second()).ok()
 }
 
-mod configured;
+pub(crate) mod configured;
 
 #[cfg(test)]
 mod tests;

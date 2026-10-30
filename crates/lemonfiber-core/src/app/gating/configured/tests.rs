@@ -187,3 +187,45 @@ async fn a_film_curators_route_round_trips_as_one() {
         Some(films.iter().map(Admitted::of).collect())
     );
 }
+
+/// A route's tokens are replaced and every credential is left as it was; a route the gate
+/// does not admit is refused.
+#[tokio::test]
+async fn one_routes_tokens_are_replaced_and_nothing_else() {
+    let scratch = Scratch::new("gate-configured-tokens");
+    let gate = gate(&scratch);
+    assert!(gate.admit(&routes()).await.is_ok());
+    let fresh = TokenHash::of("fresh-token").as_str().to_owned();
+
+    assert!(gate
+        .admit_tokens("sonarr", std::slice::from_ref(&fresh))
+        .await
+        .is_ok());
+    assert!(gate
+        .admit_tokens("radarr", std::slice::from_ref(&fresh))
+        .await
+        .is_err());
+
+    let admitted = gate.admitted().await.unwrap_or_default();
+    let tokens = |path: &str| {
+        admitted
+            .iter()
+            .find(|one| one.path == path)
+            .map(|one| one.tokens.clone())
+    };
+    assert_eq!(tokens("sonarr"), Some(vec![fresh]));
+    assert_eq!(
+        tokens("jellyfin"),
+        Some(vec![TokenHash::of("media-token").as_str().to_owned()])
+    );
+    assert_eq!(
+        admitted
+            .iter()
+            .map(|one| one.credential.clone())
+            .collect::<Vec<_>>(),
+        routes()
+            .iter()
+            .map(|one| Admitted::of(one).credential)
+            .collect::<Vec<_>>()
+    );
+}

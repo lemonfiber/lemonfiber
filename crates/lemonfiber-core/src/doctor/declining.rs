@@ -7,17 +7,14 @@
 //! newest of those is a use nothing explains, which is either the service doing
 //! something it should not or the key in somebody else's hands.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_sidecar::decline::{Lapses, Refusals};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::decline::UNEXPLAINED;
 use crate::error::{Problem, Remedy};
-use crate::ports::filesystem::{Beneath, FileSystem};
-use crate::ports::service::{AppKeys, Dated};
+use crate::ports::service::{AppKeys, Dated, Declining};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "services.decline-key";
@@ -58,29 +55,25 @@ impl KeyDates for Dating {
     }
 }
 
-/// Where the decline service's records are, and who dates its key.
+/// The decline service, asked what it recorded, and who dates its key.
 pub struct Decline {
-    /// What it declined.
-    pub refusals: PathBuf,
-    /// What it took back when an invitation's window closed.
-    pub lapses: PathBuf,
+    /// The service as the core asks it, absent where it cannot be asked.
+    pub service: Option<Arc<dyn Declining>>,
     /// The media server, where there is one to ask.
     pub keys: Option<Arc<dyn KeyDates>>,
 }
 
 /// Reports a use of the decline service's key that nothing it recorded explains.
 pub struct DeclineKeyCheck {
-    /// The filesystem the records are read through.
-    files: Arc<dyn FileSystem>,
     /// The decline service, absent where the stack runs none.
     decline: Option<Decline>,
 }
 
 impl DeclineKeyCheck {
-    /// A check over the decline service given, its records read through `files`.
+    /// A check over the decline service given.
     #[must_use]
-    pub fn new(files: Arc<dyn FileSystem>, decline: Option<Decline>) -> Self {
-        Self { files, decline }
+    pub const fn new(decline: Option<Decline>) -> Self {
+        Self { decline }
     }
 }
 
@@ -91,14 +84,12 @@ impl Check for DeclineKeyCheck {
     }
 
     async fn run(&self) -> Vec<Finding> {
-        vec![finding(
-            ran(self.files.as_ref(), self.decline.as_ref()).await,
-        )]
+        vec![finding(ran(self.decline.as_ref()).await)]
     }
 }
 
 /// What the key's last use says against what the service recorded.
-async fn ran(files: &dyn FileSystem, decline: Option<&Decline>) -> Verdict {
+async fn ran(decline: Option<&Decline>) -> Verdict {
     let Some(decline) = decline else {
         return Verdict::Skipped {
             reason: "this stack has no decline service, so there is no key of its to account for"
@@ -123,7 +114,16 @@ async fn ran(files: &dyn FileSystem, decline: Option<&Decline>) -> Verdict {
                 .with_detail("lemonfiber status"),
         };
     };
-    let Ok(recorded) = latest_recorded(files, decline).await else {
+    let Some(service) = &decline.service else {
+        return Verdict::Unverified {
+            reason: "the decline service cannot be asked over its contract, so what it did \
+                     with its key cannot be read"
+                .to_owned(),
+            remedy: Remedy::new("Check the decline service is running")
+                .with_detail("lemonfiber status"),
+        };
+    };
+    let Ok(recorded) = latest_recorded(service.as_ref()).await else {
         return Verdict::Unverified {
             reason: "the decline service's record of what it did could not be read, so a use \
                      of its key cannot be accounted for"
@@ -163,40 +163,16 @@ fn graver(gravest: &Verdict, next: &Verdict) -> bool {
     )
 }
 
-/// The newest moment the service recorded acting, in seconds since the Unix epoch, or
-/// nothing where it recorded nothing. A record that is not there is a record of nothing;
-/// one that is there and cannot be read is refused.
-async fn latest_recorded(files: &dyn FileSystem, decline: &Decline) -> Result<Option<u64>, ()> {
-    let refusals = match kept(files, &decline.refusals).await? {
-        Some(text) => Refusals::read(&text).map_err(|_| ())?,
-        None => Refusals::default(),
-    };
-    let lapses = match kept(files, &decline.lapses).await? {
-        Some(text) => Lapses::read(&text).map_err(|_| ())?,
-        None => Lapses::default(),
-    };
+/// The newest moment the service answers acting, in seconds since the Unix epoch, or
+/// nothing where it recorded nothing; refused where it does not answer.
+async fn latest_recorded(service: &dyn Declining) -> Result<Option<u64>, ()> {
+    let refusals = service.refusals().await.map_err(|_| ())?;
+    let lapses = service.lapses().await.map_err(|_| ())?;
     Ok(refusals
-        .refusals
         .iter()
         .map(|refusal| refusal.at)
-        .chain(lapses.lapses.iter().map(|lapse| lapse.at))
+        .chain(lapses.iter().map(|lapse| lapse.at))
         .max())
-}
-
-/// What one of the service's records holds: nothing where it is not there, and a refusal
-/// where something other than a plain file of the service's own directory is.
-///
-/// The service writes its records into a directory it owns, so each is read never through
-/// a link, never waited on as a pipe, and never past a small file's size.
-async fn kept(files: &dyn FileSystem, record: &std::path::Path) -> Result<Option<String>, ()> {
-    match files
-        .read_beneath(record, crate::within::directory_of(record))
-        .await
-    {
-        Beneath::Read(text) => Ok(Some(text)),
-        Beneath::Absent => Ok(None),
-        Beneath::Escaped => Err(()),
-    }
 }
 
 /// Whether the key's last use is explained by its making or by something the service

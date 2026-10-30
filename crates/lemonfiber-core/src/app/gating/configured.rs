@@ -12,7 +12,7 @@ use lemonfiber_sidecar::gate::{
 use lemonfiber_sidecar::{Pins, TokenHash};
 
 use super::{path, SERVICE};
-use crate::ports::filesystem::FileSystem;
+use crate::ports::filesystem::{Beneath, FileSystem};
 use crate::ports::media;
 use crate::ports::service::{
     Admitted, Failure, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target,
@@ -40,6 +40,25 @@ impl Configured {
         let at = path(&self.project, file);
         crate::app::targets::read_owned(self.files.as_ref(), &at, crate::within::directory_of(&at))
             .await
+    }
+
+    /// What the record the gate keeps holds: nothing where it is not there, and a refusal
+    /// where something other than a plain file of the gate's own directory is, which is
+    /// never followed.
+    async fn kept(&self) -> Result<Option<String>, Failure> {
+        let at = path(&self.project, File::Record);
+        match self
+            .files
+            .read_beneath(&at, crate::within::directory_of(&at))
+            .await
+        {
+            Beneath::Read(text) => Ok(Some(text)),
+            Beneath::Absent => Ok(None),
+            Beneath::Escaped => Err(Failure::Refused {
+                service: SERVICE.to_owned(),
+                detail: "its record is not a file of its own".to_owned(),
+            }),
+        }
     }
 
     /// Write `text` to `file` where it differs from `held`.
@@ -144,7 +163,7 @@ impl Gating for Configured {
     }
 
     async fn record(&self, after: u64) -> Result<GateRecord, Failure> {
-        let Some(text) = self.read(File::Record).await else {
+        let Some(text) = self.kept().await? else {
             return Ok(GateRecord::default());
         };
         let record = Record::read(&text).map_err(|unreadable| Failure::Refused {

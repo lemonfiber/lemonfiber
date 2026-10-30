@@ -94,7 +94,7 @@ fn the_table_goes_into_the_decline_services_configuration_directory() {
 
 #[test]
 fn an_account_is_declined_where_its_offers_token_was_refused() {
-    use lemonfiber_sidecar::decline::{Refusal, Refusals};
+    use crate::ports::service::Declined;
 
     let offers: Offers = [
         ("9".to_owned(), offer(Some("ana-token"))),
@@ -103,17 +103,18 @@ fn an_account_is_declined_where_its_offers_token_was_refused() {
     ]
     .into_iter()
     .collect();
-    let refusals = Refusals::default()
-        .with(Refusal {
-            token: TokenHash::of("ana-token"),
+    let refusals = [
+        Declined {
+            token: TokenHash::of("ana-token").as_str().to_owned(),
             account: "9".to_owned(),
             at: 1,
-        })
-        .with(Refusal {
-            token: TokenHash::of("an-older-token"),
+        },
+        Declined {
+            token: TokenHash::of("an-older-token").as_str().to_owned(),
             account: "10".to_owned(),
             at: 1,
-        });
+        },
+    ];
 
     let declined = super::refused(&offers, &refusals);
 
@@ -136,7 +137,7 @@ fn refusals_are_recorded_beside_the_table() {
 
 #[test]
 fn an_account_is_removed_at_its_lapse_only_for_the_offer_standing_now() {
-    use lemonfiber_sidecar::decline::{Lapse, Lapses, Left, Outcome};
+    use crate::ports::service::{Lapsed, LeftBecause, TakenBack};
 
     let offers: Offers = [
         ("9".to_owned(), offer(Some("ana-token"))),
@@ -146,19 +147,27 @@ fn an_account_is_removed_at_its_lapse_only_for_the_offer_standing_now() {
     ]
     .into_iter()
     .collect();
-    let lapse = |token: &str, account: &str, name: &str, outcome| Lapse {
-        token: TokenHash::of(token),
+    let lapse = |token: &str, account: &str, name: &str, outcome| Lapsed {
+        token: TokenHash::of(token).as_str().to_owned(),
         account: account.to_owned(),
         name: name.to_owned(),
         issued: 1,
         at: 2,
         outcome,
     };
-    let lapses = Lapses::default()
-        .with(lapse("ana-token", "9", "ana", Outcome::Removed))
-        .with(lapse("an-older-token", "10", "bo", Outcome::Removed))
-        .with(lapse("cy-token", "11", "cy", Outcome::Left(Left::Claimed)))
-        .with(lapse("bo-token", "somebody-else", "bo", Outcome::Removed));
+    let lapses = [
+        lapse("ana-token", "9", "ana", TakenBack::Removed),
+        lapse("an-older-token", "10", "bo", TakenBack::Removed),
+        lapse(
+            "cy-token",
+            "11",
+            "cy",
+            TakenBack::Left {
+                why: LeftBecause::Claimed,
+            },
+        ),
+        lapse("bo-token", "somebody-else", "bo", TakenBack::Removed),
+    ];
 
     let removed = super::removed(&offers, &lapses);
 
