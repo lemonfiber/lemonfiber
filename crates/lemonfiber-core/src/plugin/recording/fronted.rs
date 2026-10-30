@@ -272,6 +272,7 @@ impl Asking<'_> {
             held: self.held,
             answers: BTreeMap::new(),
             made,
+            hashed: Vec::new(),
             certificate: self.certificate.cloned(),
         };
         let mut asked = Vec::new();
@@ -285,7 +286,7 @@ impl Asking<'_> {
                 asked.push(one);
             }
         }
-        self.scrubbed(upstream, asked, filling.made)
+        self.scrubbed(upstream, asked, filling.made, &filling.hashed)
     }
 
     /// The guard handed the envelope its own requests are asked under, over its contract.
@@ -419,15 +420,19 @@ impl Asking<'_> {
         Ok(response)
     }
 
-    /// Every answer scrubbed of what the run made and both containers' identity, or
+    /// Every answer scrubbed of what the run made and both containers' identity, with the
+    /// hash of each credential minted for a case in `hashed` written as its placeholder, or
     /// nothing where one still holds any of it.
     fn scrubbed(
         &self,
         upstream: Vec<Answer>,
         asked: Vec<Case>,
         made: Vec<String>,
+        hashed: &[String],
     ) -> Result<(Vec<Answer>, Vec<Case>), Faulted> {
-        let scrub = Scrub::of(&made, Some(self.served)).and_served(self.fronting);
+        let scrub = Scrub::of(&made, Some(self.served))
+            .and_served(self.fronting)
+            .and_hashed(hashed);
         let upstream: Vec<Answer> = upstream
             .into_iter()
             .map(|answer| scrub.answer(answer))

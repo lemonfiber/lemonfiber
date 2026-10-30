@@ -28,6 +28,10 @@ const CERTIFICATE: &str = "certificate";
 /// The placeholder for the SHA-256 of the internal certificate written for the case.
 const PINNED: &str = "certificate:sha256";
 
+/// What a recording holds in place of the lower-case hexadecimal SHA-256 of a credential
+/// minted for a case.
+pub const MINTED_HASH: &str = "{minted:sha256}";
+
 /// What a placeholder naming a field of `upstream.json` begins with.
 const UPSTREAM: &str = "upstream:";
 

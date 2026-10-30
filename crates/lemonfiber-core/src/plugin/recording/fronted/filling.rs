@@ -33,6 +33,8 @@ pub(super) struct Filling<'a> {
     pub(super) answers: BTreeMap<String, Value>,
     /// Every credential the run has made so far.
     pub(super) made: Vec<String>,
+    /// The lower-case hexadecimal SHA-256 of each credential minted for a case so far.
+    pub(super) hashed: Vec<String>,
     /// Where the upstream's container holds the internal certificate written for the run,
     /// and its SHA-256, where one was written.
     pub(super) certificate: Option<(String, String)>,
@@ -149,6 +151,9 @@ impl Filling<'_> {
         let fresh = crate::secret::generate(self.random)
             .ok_or_else(|| crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned())?;
         self.made.push(fresh.clone());
+        self.hashed.push(crate::secret::render(
+            ring::digest::digest(&ring::digest::SHA256, fresh.as_bytes()).as_ref(),
+        ));
         Ok(fresh)
     }
 
