@@ -70,6 +70,43 @@ impl Configured {
             }
         })
     }
+
+    /// What [`Declining::refusals`] answers, read from the service's refusal record.
+    async fn declined(&self) -> Result<Vec<Declined>, Failure> {
+        let refusals = match self.record(File::Refusals).await? {
+            Some(text) => Refusals::read(&text).map_err(|why| unread(&why))?,
+            None => Refusals::default(),
+        };
+        Ok(refusals
+            .refusals
+            .into_iter()
+            .map(|one| Declined {
+                token: one.token.as_str().to_owned(),
+                account: one.account,
+                at: one.at,
+            })
+            .collect())
+    }
+
+    /// What [`Declining::lapses`] answers, read from the service's lapse record.
+    async fn lapsed(&self) -> Result<Vec<Lapsed>, Failure> {
+        let lapses = match self.record(File::Lapses).await? {
+            Some(text) => Lapses::read(&text).map_err(|why| unread(&why))?,
+            None => Lapses::default(),
+        };
+        Ok(lapses
+            .lapses
+            .into_iter()
+            .map(|one| Lapsed {
+                token: one.token.as_str().to_owned(),
+                account: one.account,
+                name: one.name,
+                issued: one.issued,
+                at: one.at,
+                outcome: taken_back(one.outcome),
+            })
+            .collect())
+    }
 }
 
 #[async_trait]
@@ -106,38 +143,11 @@ impl Declining for Configured {
     }
 
     async fn refusals(&self) -> Result<Vec<Declined>, Failure> {
-        let refusals = match self.record(File::Refusals).await? {
-            Some(text) => Refusals::read(&text).map_err(|why| unread(&why))?,
-            None => Refusals::default(),
-        };
-        Ok(refusals
-            .refusals
-            .into_iter()
-            .map(|one| Declined {
-                token: one.token.as_str().to_owned(),
-                account: one.account,
-                at: one.at,
-            })
-            .collect())
+        self.declined().await
     }
 
     async fn lapses(&self) -> Result<Vec<Lapsed>, Failure> {
-        let lapses = match self.record(File::Lapses).await? {
-            Some(text) => Lapses::read(&text).map_err(|why| unread(&why))?,
-            None => Lapses::default(),
-        };
-        Ok(lapses
-            .lapses
-            .into_iter()
-            .map(|one| Lapsed {
-                token: one.token.as_str().to_owned(),
-                account: one.account,
-                name: one.name,
-                issued: one.issued,
-                at: one.at,
-                outcome: taken_back(one.outcome),
-            })
-            .collect())
+        self.lapsed().await
     }
 
     async fn page(&self) -> Result<String, Failure> {

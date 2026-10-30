@@ -106,7 +106,7 @@ const NAMED: &[Named] = &[
     Named {
         file: "crates/lemonfiber-core/src/app/credentials/gating.rs",
         part: "jellyfin",
-        count: 4,
+        count: 2,
         until: Until::Moves("request-gate"),
     },
     Named {

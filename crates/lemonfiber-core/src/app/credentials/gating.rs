@@ -24,7 +24,7 @@ use crate::app::gating;
 use crate::app::targets::MediaServer;
 use crate::app::Ctx;
 use crate::app_keys::GATE_APP;
-use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
+use crate::credential::{Held, Origin, Propagation, Reach, Rotation, State};
 use crate::ports::digest::sha256;
 use crate::ports::service::{Admitted, AppKeys, Gated, Gating, Target};
 use crate::wiring::Fillers;
@@ -69,7 +69,10 @@ const UNHELD: &str = "the request gate did not answer holding the new key, so it
                       and the old routes handed back";
 
 /// The key's line in the inventory, where the stack runs the gate beside a media server
-/// it answers for.
+/// it answers for: there where the gate answers presenting one on its media server route.
+///
+/// Read off the gate alone, so listing what the stack holds asks the media server nothing;
+/// the key itself is only read where the operator asks to see it.
 pub(super) async fn held(
     ctx: &Ctx,
     services: &[Service],
@@ -78,8 +81,15 @@ pub(super) async fn held(
 ) -> Option<Held> {
     gating::service(services)?;
     MediaServer::of(fillers)?.gate_kind()?;
-    let project = project?;
-    let key = value(ctx, fillers, Some(project)).await;
+    let gate = gating::asked(ctx, fillers, project?).await;
+    let presented = match gate {
+        Some(gate) => gate.admitted().await.is_ok_and(|admitted| {
+            admitted
+                .iter()
+                .any(|route| matches!(route.target, Target::MediaServer { .. }))
+        }),
+        None => false,
+    };
     Some(Held {
         name: NAME.to_owned(),
         setting: SETTING.to_owned(),
@@ -87,13 +97,13 @@ pub(super) async fn held(
         location: LOCATION.to_owned(),
         origin: Origin::Lemonfiber,
         from: crate::origin::Origin::Bundled,
-        state: if key.is_some() {
+        state: if presented {
             State::Active
         } else {
             State::Absent
         },
-        fingerprint: key.as_deref().map(fingerprint),
-        advisory: key.is_none().then(|| ABSENT.to_owned()),
+        fingerprint: None,
+        advisory: (!presented).then(|| ABSENT.to_owned()),
     })
 }
 

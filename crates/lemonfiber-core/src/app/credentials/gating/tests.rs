@@ -293,12 +293,13 @@ fn unproven(settled: &Settled) -> Option<&str> {
 }
 
 #[tokio::test]
-async fn the_key_is_listed_by_the_core_copy_of_what_the_gate_presents() {
+async fn the_key_is_listed_where_the_gate_presents_one_asking_the_media_server_nothing() {
+    let http = serving((200, "fresh"), &["stray", "kept"], 204, 204);
     let (ctx, at) = scene(
         "gate-held-present",
         (true, CURATOR_KEY),
         Some("kept"),
-        serving((200, "fresh"), &["stray", "kept"], 204, 204),
+        http.clone(),
     );
 
     let listed = listed(&ctx, &at).await;
@@ -306,36 +307,27 @@ async fn the_key_is_listed_by_the_core_copy_of_what_the_gate_presents() {
     assert_eq!(listed.state, State::Active);
     assert_eq!(listed.setting, SETTING);
     assert_eq!(listed.name, "Jellyfin request-gate key");
-    assert_eq!(
-        listed.fingerprint,
-        Some(crate::credential::fingerprint("kept"))
-    );
+    assert_eq!(listed.fingerprint, None);
     assert_eq!(listed.location, LOCATION);
     assert!(listed.advisory.is_none());
+    assert!(http.requests().is_empty());
 }
 
 #[tokio::test]
-async fn a_key_not_there_yet_or_not_filed_is_absent_and_says_how_to_get_one() {
-    for (name, key, filed) in [
-        ("gate-held-absent", None, &["kept"][..]),
-        ("gate-held-unfiled", Some("kept"), &["other"][..]),
-    ] {
-        let (ctx, at) = scene(
-            name,
-            (true, CURATOR_KEY),
-            key,
-            serving((200, "fresh"), filed, 204, 204),
-        );
+async fn a_key_not_there_yet_or_a_gate_not_asked_is_absent_and_says_how_to_get_one() {
+    let (ctx, at) = scene(
+        "gate-held-absent",
+        (true, CURATOR_KEY),
+        None,
+        serving((200, "fresh"), &["kept"], 204, 204),
+    );
+    let unasked = held(&ctx, &stack(true), &filling(stack(false), &at), Some(&at)).await;
 
-        let listed = listed(&ctx, &at).await;
-
-        assert_eq!(listed.state, State::Absent, "{name}");
-        assert!(
-            listed
-                .advisory
-                .is_some_and(|said| said.contains("lemonfiber seed")),
-            "{name}"
-        );
+    for listed in [Some(listed(&ctx, &at).await), unasked] {
+        assert_eq!(listed.as_ref().map(|one| one.state), Some(State::Absent));
+        assert!(listed
+            .and_then(|one| one.advisory)
+            .is_some_and(|said| said.contains("lemonfiber seed")));
     }
 }
 
