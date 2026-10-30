@@ -9,7 +9,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// The IPv4 ranges no call goes to, as a network and its prefix length.
-const V4: [(Ipv4Addr, u8); 14] = [
+pub const INTERNAL_V4: [(Ipv4Addr, u8); 14] = [
     // "This network", the unspecified address among it.
     (Ipv4Addr::UNSPECIFIED, 8),
     // Private.
@@ -45,7 +45,7 @@ const V4: [(Ipv4Addr, u8); 14] = [
 /// The unspecified address and loopback are not among them because they need not be:
 /// both are in the compatible range, `::/96`, and are classed by the IPv4 address that
 /// range carries, which is in `0/8`.
-const V6: [(Ipv6Addr, u8); 9] = [
+pub const INTERNAL_V6: [(Ipv6Addr, u8); 9] = [
     // Discard-only.
     (Ipv6Addr::new(0x100, 0, 0, 0, 0, 0, 0, 0), 64),
     // NAT64 for a network's own use.
@@ -66,6 +66,22 @@ const V6: [(Ipv6Addr, u8); 9] = [
     (Ipv6Addr::new(0xff00, 0, 0, 0, 0, 0, 0, 0), 8),
 ];
 
+/// The IPv6 ranges whose addresses carry an IPv4 one: mapped, compatible, NAT64, 6to4
+/// and Teredo, as a network and its prefix length. An address in one ends up at the
+/// IPv4 address it carries.
+pub const CARRYING_V6: [(Ipv6Addr, u8); 5] = [
+    // Mapped.
+    (Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0, 0), 96),
+    // Compatible.
+    (Ipv6Addr::UNSPECIFIED, 96),
+    // NAT64.
+    (Ipv6Addr::new(0x64, 0xff9b, 0, 0, 0, 0, 0, 0), 96),
+    // 6to4.
+    (Ipv6Addr::new(0x2002, 0, 0, 0, 0, 0, 0, 0), 16),
+    // Teredo.
+    (Ipv6Addr::new(0x2001, 0, 0, 0, 0, 0, 0, 0), 32),
+];
+
 /// Whether an address is not out on the internet: in one of the ranges above, or an
 /// IPv6 address carrying an IPv4 one that is.
 #[must_use]
@@ -79,14 +95,16 @@ pub fn internal(address: IpAddr) -> bool {
 /// Whether an IPv4 address is in a range no call goes to.
 fn within_v4(address: Ipv4Addr) -> bool {
     let bits = u32::from(address);
-    V4.iter()
+    INTERNAL_V4
+        .iter()
         .any(|(network, prefix)| bits & mask_v4(*prefix) == u32::from(*network))
 }
 
 /// Whether an IPv6 address is in a range no call goes to.
 fn within_v6(address: Ipv6Addr) -> bool {
     let bits = u128::from(address);
-    V6.iter()
+    INTERNAL_V6
+        .iter()
         .any(|(network, prefix)| bits & mask_v6(*prefix) == u128::from(*network))
 }
 
