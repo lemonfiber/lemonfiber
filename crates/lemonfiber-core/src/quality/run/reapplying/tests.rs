@@ -3,7 +3,6 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{customised, reapplied};
-use crate::app::materialise::QUALITY_SYNC_CONFIG;
 use crate::app::Ctx;
 use crate::model::StackEdit;
 use crate::plugin::Register;
@@ -62,19 +61,16 @@ async fn a_hand_edit_is_shown_and_put_back_through_a_sync_speaking_its_contract(
     let rehearsing = machine("reapplying-shown", Arc::clone(&http), true);
 
     assert_eq!(
-        reapplied(&rehearsing, &selection(), None).await.ok(),
+        reapplied(&rehearsing, &selection()).await.ok(),
         Some(Some(StackEdit {
             path: "recyclarr.yml".to_owned(),
             diff: "- min: 0\n+ min: 25\n".to_owned(),
         }))
     );
-    assert!(customised(&rehearsing, &selection(), None).await);
+    assert!(customised(&rehearsing, &selection()).await);
 
     let acting = machine("reapplying-put-back", http, false);
-    assert_eq!(
-        reapplied(&acting, &selection(), None).await.ok(),
-        Some(None)
-    );
+    assert_eq!(reapplied(&acting, &selection()).await.ok(), Some(None));
 }
 
 #[tokio::test]
@@ -85,7 +81,7 @@ async fn a_sync_that_will_not_answer_is_refused_by_its_code_and_reads_as_unedite
         false,
     );
 
-    let refused = reapplied(&ctx, &selection(), None).await.err();
+    let refused = reapplied(&ctx, &selection()).await.err();
 
     assert_eq!(
         refused.as_ref().map(|problem| problem.code.to_string()),
@@ -94,16 +90,16 @@ async fn a_sync_that_will_not_answer_is_refused_by_its_code_and_reads_as_unedite
     assert!(refused.is_some_and(|problem| problem
         .summary
         .starts_with("The quality sync did not put the preset back: ")));
-    assert!(!customised(&ctx, &selection(), None).await);
+    assert!(!customised(&ctx, &selection()).await);
 }
 
 #[tokio::test]
 async fn a_configuration_the_operator_declared_their_own_is_never_put_back() {
     let http = Fake::by_path(vec![("/reapply", Answer::reply(500, ""))]);
     let mut ctx = machine("reapplying-unmanaged", Arc::clone(&http), false);
-    ctx.settings.unmanaged = vec![(QUALITY_SYNC_CONFIG.to_owned(), "mine".to_owned())];
+    ctx.settings.unmanaged = vec![("sync".to_owned(), "mine".to_owned())];
 
-    assert_eq!(reapplied(&ctx, &selection(), None).await.ok(), Some(None));
+    assert_eq!(reapplied(&ctx, &selection()).await.ok(), Some(None));
     assert!(http.requests().is_empty());
 }
 
@@ -142,7 +138,7 @@ async fn a_sync_taking_the_profiles_up_once_it_restarts_is_restarted_once() {
     let mut ctx = machine("reapplying-restarted", http, false);
     ctx.seams.runner = runner.clone();
 
-    assert_eq!(reapplied(&ctx, &selection(), None).await.ok(), Some(None));
+    assert_eq!(reapplied(&ctx, &selection()).await.ok(), Some(None));
     assert_eq!(crate::test_support::egress::restarts(&runner), 1);
 }
 
@@ -167,7 +163,7 @@ async fn an_edit_too_long_or_a_store_that_cannot_be_read_is_refused_by_its_code(
 
     for ctx in [too_long, unread] {
         assert_eq!(
-            reapplied(&ctx, &selection(), None)
+            reapplied(&ctx, &selection())
                 .await
                 .err()
                 .map(|problem| problem.code.to_string()),

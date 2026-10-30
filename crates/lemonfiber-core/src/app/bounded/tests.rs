@@ -1,4 +1,4 @@
-use super::{record_beside, replace, withdraw, written, Withdrawn};
+use super::{record_beside, rewritten, withdraw, written, Withdrawn};
 use crate::materialised::{checksum, Materialised};
 
 const SHIPPED: &str = "watch {\n}\n";
@@ -36,13 +36,8 @@ fn put(
 ) -> Result<(), String> {
     let before = crate::within::read_unlinked(confined, path, crate::within::directory_of(path))?
         .unwrap_or_default();
-    replace(
-        confined,
-        path,
-        key,
-        &crate::region::put(&before, owner, body),
-        record,
-    )
+    let after = crate::region::put(&before, owner, body);
+    rewritten(confined, path, (key, &before), &after, record)
 }
 
 fn read(dir: &std::path::Path) -> String {
@@ -278,44 +273,4 @@ fn a_link_where_the_file_is_expected_is_neither_read_nor_written() {
         std::fs::read_to_string(&operator).ok().as_deref(),
         Some("ssh-ed25519 theirs\n")
     );
-}
-
-#[test]
-fn a_whole_file_is_replaced_and_the_record_moves_with_it() {
-    let dir = scratch("replace", true);
-
-    let done = replace(
-        &lemonfiber_adapters::Disk,
-        &dir.join("Caddyfile"),
-        "config/caddy/Caddyfile",
-        "[]\n",
-        Some(&dir.join("materialised.json")),
-    );
-
-    assert_eq!(done, Ok(()));
-    assert_eq!(read(&dir), "[]\n");
-    assert_eq!(recorded(&dir), Some(checksum(b"[]\n")));
-}
-
-#[cfg(unix)]
-#[test]
-fn a_whole_file_holding_the_text_already_is_left_as_it_is() {
-    use std::os::unix::fs::PermissionsExt as _;
-    let dir = scratch("replace-same", false);
-    let file = dir.join("Caddyfile");
-    let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555));
-    let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o444));
-
-    let done = replace(
-        &lemonfiber_adapters::Disk,
-        &file,
-        "config/caddy/Caddyfile",
-        SHIPPED,
-        Some(&dir.join("materialised.json")),
-    );
-
-    let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755));
-    let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644));
-    assert_eq!(done, Ok(()));
-    assert_eq!(read(&dir), SHIPPED);
 }

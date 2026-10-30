@@ -15,17 +15,7 @@ use crate::app::targets::held_beneath;
 use crate::materialised::{checksum, decide, diff, Decision, Materialised, Seen};
 use crate::model::StackEdit;
 use crate::ports::filesystem::{Confined, Readable};
-use crate::quality::Selection;
 use crate::stack::{Failure, Source};
-
-/// The stack file the quality choice is carried into: the quality sync tool's config, whose
-/// `include:` template lists a preset rewrites.
-///
-/// Matched against a file's key, which is its embedded path — baked with forward
-/// slashes on every platform by the stack embedding, the same separator the
-/// materialised record keys already use. It would need revisiting only if the
-/// stack ever came from a real filesystem walk on a back-slash OS.
-pub(crate) const QUALITY_SYNC_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 
 /// Write the stack under `into`, preserving any file the operator has edited, and
 /// return where it lives and which files were left as they set them.
@@ -36,15 +26,6 @@ pub(crate) const QUALITY_SYNC_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 /// not yet upgraded — the edit is preserved and reported, the rest written. The
 /// record of what was written is updated for the next run.
 ///
-/// When a `selection` is given, it is carried into the stack as it is written: the
-/// quality sync config's template lists are rewritten to the chosen preset, so what
-/// lemonfiber materialises already reflects the choice. The default selection
-/// rewrites the shipped config to itself, so an unconfigured stack is untouched.
-/// With no selection — a teardown, a restart, a rehearsal — the quality sync config
-/// is left exactly as it is on disk rather than being written back to the shipped
-/// default, so an already-applied preset is never reverted by a command that has
-/// no business changing it.
-///
 /// # Errors
 ///
 /// Returns [`Failure`] when there is nowhere to write an embedded stack to, or when
@@ -54,7 +35,6 @@ pub(crate) fn materialise(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
-    selection: Option<&Selection>,
     unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     write_stack(
@@ -62,7 +42,6 @@ pub(crate) fn materialise(
         source,
         into,
         record_path,
-        selection,
         unmanaged,
         Pass::Materialise,
     )
@@ -82,18 +61,9 @@ pub(crate) fn reset_stack(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
-    selection: Option<&Selection>,
     unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
-    write_stack(
-        confined,
-        source,
-        into,
-        record_path,
-        selection,
-        unmanaged,
-        Pass::Reset,
-    )
+    write_stack(confined, source, into, record_path, unmanaged, Pass::Reset)
 }
 
 /// Where the stack would live and which files the operator has edited, without
@@ -113,7 +83,6 @@ pub(crate) fn would_materialise(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
-    selection: Option<&Selection>,
     unmanaged: &[(String, String)],
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
     write_stack(
@@ -121,7 +90,6 @@ pub(crate) fn would_materialise(
         source,
         into,
         record_path,
-        selection,
         unmanaged,
         Pass::Preview,
     )
@@ -139,7 +107,6 @@ pub(crate) fn pending_reverts(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
-    selection: Option<&Selection>,
     unmanaged: &[(String, String)],
 ) -> Result<Vec<StackEdit>, Failure> {
     write_stack(
@@ -147,7 +114,6 @@ pub(crate) fn pending_reverts(
         source,
         into,
         record_path,
-        selection,
         unmanaged,
         Pass::Preview,
     )
@@ -173,7 +139,6 @@ fn write_stack(
     source: Source,
     into: Option<&Path>,
     record_path: Option<&Path>,
-    selection: Option<&Selection>,
     unmanaged: &[(String, String)],
     pass: Pass,
 ) -> Result<(PathBuf, Vec<StackEdit>), Failure> {
@@ -204,13 +169,7 @@ fn write_stack(
         if crate::unmanaged::covers(unmanaged, &key) {
             continue;
         }
-        let content = match selection {
-            Some(selection) => carrying_the_choice(&key, content, selection),
-            // No choice to carry, and the quality sync config left as it is rather than
-            // written back to the shipped default — which would revert a preset.
-            None if key == QUALITY_SYNC_CONFIG => continue,
-            None => Cow::Borrowed(content),
-        };
+        let content = Cow::Borrowed(content);
         let target = into.join(&relative);
         // A file that stands exactly as lemonfiber last left it, made from the same
         // shipped content, is current without being read or checksummed again — which
@@ -288,43 +247,6 @@ fn carrying_regions<'a>(content: Cow<'a, [u8]>, on_disk: Option<&[u8]>) -> Cow<'
     carried.map_or(content, |carried| Cow::Owned(carried.into_bytes()))
 }
 
-/// The content lemonfiber intends for a stack file, given the quality choice: the
-/// quality sync config with its template lists rewritten to the preset, every other
-/// file exactly as it ships. The rewrite is what makes the choice take effect on
-/// the next stack write, and the default selection returns the shipped config
-/// unchanged, so a stack no one has chosen a preset for is materialised as before.
-fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) -> Cow<'a, [u8]> {
-    if key == QUALITY_SYNC_CONFIG {
-        let rewritten = crate::recyclarr::rewrite(&String::from_utf8_lossy(content), selection);
-        Cow::Owned(rewritten.into_bytes())
-    } else {
-        Cow::Borrowed(content)
-    }
-}
-
-/// Whether the materialised quality sync config has been hand-edited since lemonfiber
-/// last wrote it — the `customised` state, in which a preset is no longer
-/// authoritative because the operator has tuned the config by hand.
-///
-/// False where there is nothing to judge against: no record of what lemonfiber
-/// wrote, or no config on disk. It is the same comparison [`decide`] makes — on-disk
-/// against the record — read without writing anything.
-pub(crate) fn quality_sync_customised(
-    confined: &dyn Confined,
-    into: Option<&Path>,
-    record_path: Option<&Path>,
-) -> bool {
-    let Some(into) = into else {
-        return false;
-    };
-    let Some(recorded) = load(record_path).checksum(QUALITY_SYNC_CONFIG) else {
-        return false;
-    };
-    let within = held_beneath(into, Path::new(QUALITY_SYNC_CONFIG));
-    on_disk(confined, &into.join(QUALITY_SYNC_CONFIG), &within)
-        .is_some_and(|bytes| checksum(&bytes) != recorded)
-}
-
 /// What a stack file holds on disk, read never through a link: nothing where it is not
 /// there, or where something other than a plain file of its directory's own is, which the
 /// write that follows then refuses by name.
@@ -333,85 +255,6 @@ fn on_disk(confined: &dyn Confined, target: &Path, within: &Path) -> Option<Vec<
         .ok()
         .flatten()
         .map(String::into_bytes)
-}
-
-/// Re-assert the recorded preset over the quality sync config, overwriting a hand-edit
-/// where an ordinary run would have preserved it — the operator's explicit consent
-/// to let the preset win. Records the new content so it is recognised as lemonfiber's
-/// own again.
-///
-/// Returns the edit it replaced, with the diff of what was lost against what was
-/// written, or nothing where the config was already in lemonfiber's own hand. A bare
-/// yes-or-no was what this answered for a long while, and consent given against a
-/// yes-or-no is consent to something the operator was never shown: they know a file
-/// they edited is about to go and not which of their lines is in it. The diff is
-/// masked the way every other diff of a stack file is, so a credential that drifted
-/// is named without either value being printed.
-///
-/// A rehearsal reports what it would replace and writes nothing. An external stack,
-/// which lemonfiber does not materialise, is left untouched.
-///
-/// # Errors
-///
-/// Returns [`Failure`] when there is nowhere to write, or the config cannot be written.
-pub(crate) fn reapply_preset(
-    confined: &dyn Confined,
-    source: Source,
-    into: Option<&Path>,
-    record_path: Option<&Path>,
-    selection: &Selection,
-    unmanaged: &[(String, String)],
-    rehearse: bool,
-) -> Result<Option<StackEdit>, Failure> {
-    // The one command whose whole purpose is to overwrite an operator's edit, held by
-    // the one declaration whose whole purpose is to stop that. Answered as "nothing was
-    // replaced", which is true: the config is theirs and stays exactly as it is.
-    if crate::unmanaged::covers(unmanaged, QUALITY_SYNC_CONFIG) {
-        return Ok(None);
-    }
-    let Some(shipped) = shipped_quality_sync(source) else {
-        // External, or a stack with no quality sync config: nothing lemonfiber manages.
-        // This is also the guard that keeps an external stack safe — `into` is the
-        // built-in stack directory, not where an external stack lives, so writing
-        // there would be wrong. An external source has no embedded files, so it
-        // returns here before touching `into`; that invariant is load-bearing.
-        return Ok(None);
-    };
-    let Some(into) = into else {
-        return Err(Failure::NowhereToWrite);
-    };
-    let target = into.join(QUALITY_SYNC_CONFIG);
-    let within = held_beneath(into, Path::new(QUALITY_SYNC_CONFIG));
-    let desired = crate::recyclarr::rewrite(&String::from_utf8_lossy(shipped), selection);
-
-    // Read before the write, and read once. The same comparison `quality_sync_customised`
-    // makes — a record of what lemonfiber wrote, and a file on disk that no longer
-    // matches it — but holding the content rather than the verdict, because what is
-    // about to be overwritten cannot be read back afterwards.
-    let recorded = load(record_path).checksum(QUALITY_SYNC_CONFIG);
-    let theirs = on_disk(confined, &target, &within)
-        .filter(|bytes| recorded.is_some_and(|was| was != checksum(bytes)));
-
-    if !rehearse {
-        write(confined, (&target, &within), desired.as_bytes())?;
-        let mut record = load(record_path);
-        record.record(QUALITY_SYNC_CONFIG, checksum(desired.as_bytes()));
-        save(record_path, &record);
-    }
-    Ok(theirs.map(|yours| StackEdit {
-        path: QUALITY_SYNC_CONFIG.to_owned(),
-        diff: diff(&String::from_utf8_lossy(&yours), &desired),
-    }))
-}
-
-/// The quality sync config this stack ships, or `None` for a stack that has none — an
-/// external stack lemonfiber does not write, or one without the file.
-fn shipped_quality_sync(source: Source) -> Option<&'static [u8]> {
-    source
-        .files()
-        .into_iter()
-        .find(|(relative, _)| relative.to_string_lossy() == QUALITY_SYNC_CONFIG)
-        .map(|(_, content)| content)
 }
 
 /// Read the record of what lemonfiber last wrote, or an empty one where none is

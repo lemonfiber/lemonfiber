@@ -63,3 +63,29 @@ pub(super) fn withheld_brought(
         .collect();
     (kept, observed)
 }
+
+/// The stack's services and what is installed here, each less what the operator declared
+/// unmanaged, and who fills each ask among them, as a pass reads them: nothing where the
+/// stack or the record of what is installed cannot be read.
+pub(crate) fn managed(
+    ctx: &crate::app::Ctx,
+) -> Option<(
+    Vec<lemonfiber_manifest::Service>,
+    Vec<crate::plugin::Installed>,
+    crate::wiring::Fillers,
+)> {
+    let mut manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let _ = withheld(&mut manifest.services, &ctx.settings.unmanaged);
+    let register = crate::app::plugins::read(ctx).ok()?;
+    let (installed, _) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let fillers = crate::wiring::Fillers::of(
+        &manifest,
+        &installed,
+        &crate::app::targets::chosen_fillers(ctx),
+        project.as_deref(),
+    )
+    .numbered(crate::app::targets::ordinals(ctx));
+    Some((manifest.services, installed, fillers))
+}

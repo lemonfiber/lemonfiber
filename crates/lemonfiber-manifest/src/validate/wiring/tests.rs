@@ -63,8 +63,8 @@ fn a_wiring_that_asks_and_names_is_caught() {
 #[test]
 fn a_wiring_with_neither_end_is_caught() {
     fault(
-        "asks = \"library.curate\"\nby = \"recyclarr\"\neach = true",
-        "by = \"recyclarr\"",
+        "asks = \"library.curate\"\nby = \"request-gate\"\neach = true",
+        "by = \"request-gate\"",
         "neither asks for a capability nor names a service",
     );
 }
@@ -72,8 +72,8 @@ fn a_wiring_with_neither_end_is_caught() {
 #[test]
 fn a_wiring_from_something_that_is_not_a_service_is_caught() {
     fault(
-        "asks = \"library.curate\"\nby = \"recyclarr\"",
-        "asks = \"library.curate\"\nby = \"subtitler\"",
+        "asks = \"identity.source\"\nby = \"decline\"",
+        "asks = \"identity.source\"\nby = \"subtitler\"",
         "by names subtitler, which is not a service",
     );
 }
@@ -123,8 +123,8 @@ fn a_chosen_filler_with_no_reason_is_caught() {
 #[test]
 fn a_wiring_that_reaches_all_of_them_and_chooses_one_is_caught() {
     fault(
-        "asks = \"library.curate\"\nby = \"recyclarr\"\neach = true",
-        "asks = \"library.curate\"\nby = \"recyclarr\"\neach = true\nfilled_by = \"sonarr\"",
+        "asks = \"library.curate\"\nby = \"request-gate\"\neach = true",
+        "asks = \"library.curate\"\nby = \"request-gate\"\neach = true\nfilled_by = \"sonarr\"",
         "it does both only by meaning neither",
     );
 }
@@ -150,10 +150,10 @@ fn a_wiring_from_a_service_to_itself_is_caught() {
 #[test]
 fn the_same_ask_written_twice_is_caught() {
     fault(
-        "asks = \"proxy.front\"\nby = \"homepage\"",
-        "asks = \"proxy.front\"\nby = \"homepage\"\n\n[[wiring]]\nasks = \"proxy.front\"\n\
-         by = \"homepage\"",
-        "names proxy.front more than once",
+        "asks = \"identity.source\"\nby = \"decline\"",
+        "asks = \"identity.source\"\nby = \"decline\"\n\n[[wiring]]\nasks = \"identity.source\"\n\
+         by = \"decline\"",
+        "names identity.source more than once",
     );
 }
 

@@ -97,7 +97,7 @@ fn a_key_nothing_holds_yet_is_skipped_until_it_is() {
     TELEVISION.minted(&ctx, "minted-k3y");
     let after = sonarr(said(&ctx, |_| ()));
 
-    assert_eq!(before, vec![skipped("Recyclarr"), skipped("Unpackerr")]);
+    assert_eq!(before, vec![skipped("Unpackerr")]);
     assert_eq!(after, Vec::new());
 }
 

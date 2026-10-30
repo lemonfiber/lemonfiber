@@ -739,3 +739,36 @@ mod moved;
 mod native;
 
 mod replacing;
+
+/// What nothing asks for is filled by the one service providing it, or among several by
+/// the one the operator chose; several and no choice among them fill nothing.
+#[test]
+fn what_nothing_asks_for_is_filled_by_its_one_provider_or_the_one_chosen() {
+    let manifest = written(&format!(
+        "{}{}",
+        service("dashboard", "\"dashboard.show\""),
+        service("index", "")
+    ));
+    let filled_by = |installed: &[crate::plugin::Installed], chosen: &Chosen| {
+        manifest.as_ref().and_then(|manifest| {
+            super::Fillers::of(manifest, installed, chosen, None)
+                .filling("dashboard.show")
+                .map(|(filler, asker)| (filler.id.clone(), asker.is_some()))
+        })
+    };
+    let theirs = [plugin_filling("shower", "shower", "dashboard.show")];
+
+    assert_eq!(
+        filled_by(&[], &Chosen::default()),
+        Some(("dashboard".to_owned(), false))
+    );
+    assert_eq!(filled_by(&theirs, &Chosen::default()), None);
+    assert_eq!(
+        filled_by(&theirs, &Chosen::read(Some("dashboard.show=shower"))),
+        Some(("shower".to_owned(), false))
+    );
+    assert_eq!(
+        filled_by(&theirs, &Chosen::read(Some("dashboard.show=index"))),
+        None
+    );
+}

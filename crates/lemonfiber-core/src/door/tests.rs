@@ -1,5 +1,5 @@
 use super::fixtures::{asking, brought, fronted, installed, service, serving, watching};
-use super::{begins_at, facing, Facing, NAMED};
+use super::{begins_at, facing, Facing};
 use crate::plugin::Installed;
 use lemonfiber_manifest::Bind;
 
@@ -42,8 +42,14 @@ fn a_stack_publishing_nothing_to_the_household_has_no_door_at_all() {
 
 #[test]
 fn the_operators_index_is_never_offered_as_a_way_in() {
-    let homepage = service("homepage", Some(Bind::Lan));
-    assert_eq!(facing(&homepage), Some(Facing::Operators));
+    let mut index = service("index", Some(Bind::Lan));
+    index.provides = vec!["dashboard.show".to_owned()];
+    assert_eq!(facing(&index), Some(Facing::Operators));
+    assert_eq!(
+        facing(&service("homepage", Some(Bind::Lan))),
+        Some(Facing::Unstated),
+        "no service is the index by its name"
+    );
     assert!(!Facing::Operators.begins());
     assert!(Facing::Operators.because().contains("never a way in"));
 }
@@ -103,13 +109,6 @@ fn every_facing_says_why_it_is_or_is_not_a_way_in() {
     assert_eq!(unique.len(), said.len(), "each says something of its own");
 }
 
-#[test]
-fn the_register_names_no_place_to_begin() {
-    // Where to begin is the contracts' to say, so an entry naming one here would be a
-    // second opinion about what they already decide.
-    assert!(!NAMED.iter().any(|(_, facing)| facing.begins()));
-}
-
 /// What the plugin's first service is to the household, judged among `installed` alone.
 fn judged(plugin: &Installed) -> Option<Facing> {
     let placed = plugin.services.first()?;
@@ -142,6 +141,10 @@ fn a_plugins_service_is_judged_by_the_contract_in_front_of_it() {
         (
             fronted("curator", Some("library.curate@1"), Some("curate")),
             Some(Facing::Unstated),
+        ),
+        (
+            fronted("index", Some("dashboard.show@1"), Some("home")),
+            Some(Facing::Operators),
         ),
         (
             fronted("homepage", None, Some("home")),
@@ -329,10 +332,10 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
 }
 
 /// A first-party part moved in place of one of the stack's services, published to the
-/// household with no contract in front of it that says what it is, is what the register
-/// says of the service it stands in for.
+/// household with no contract in front of it that says what it is, is unstated whatever
+/// service it stands in for.
 #[test]
-fn a_moved_part_no_contract_settles_is_what_the_register_says() {
+fn a_moved_part_no_contract_settles_is_unstated() {
     let mut parts = crate::test_support::adapted::installed_parts();
     let moved = "homepage";
     for placed in parts
@@ -357,7 +360,7 @@ fn a_moved_part_no_contract_settles_is_what_the_register_says() {
                 .map(|placed| super::brought(&parts, plugin, placed))
         })
         .next();
-    assert_eq!(facing, Some(Some(Facing::Operators)));
+    assert_eq!(facing, Some(Some(Facing::Unstated)));
 }
 
 /// The stack's guard whose ask for `media.serve` two media servers contest, with nothing

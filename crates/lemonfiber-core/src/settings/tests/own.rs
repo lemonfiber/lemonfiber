@@ -171,3 +171,57 @@ fn the_household_domain_is_the_one_recorded_or_the_default_where_none_or_no_doma
     assert!(record("home..example"));
     assert_eq!(crate::settings::household_domain(&ctx), DEFAULT_DOMAIN);
 }
+
+#[tokio::test]
+async fn changing_the_dashboards_search_address_applies_the_dashboard_again() {
+    use crate::test_support::{contracted, CONTRACTED_KEY, CONTRACTED_PORT};
+    use lemonfiber_fixtures::http::{Answer, Fake};
+
+    const SHOWER: &str = "shower";
+    const APPLY: &str = "/lemonfiber/dashboard.show/v1/apply";
+    let machine = super::changing::machine(
+        "dashboard-search",
+        super::changing::running(&[SHOWER]).publishing(&[(SHOWER, "127.0.0.1", CONTRACTED_PORT)]),
+    );
+    let project = crate::app::targets::project_directory(
+        &machine.ctx.stack,
+        machine.ctx.settings.stack_dir.as_deref(),
+    )
+    .unwrap_or_default();
+    let key = crate::plugin::key_file(&project, SHOWER);
+    let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
+    let _ = std::fs::write(&key, CONTRACTED_KEY);
+    let env = machine.ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(
+        crate::config::store::set(&env, crate::wiring::FILLS_KEY, "dashboard.show=shower").is_ok()
+    );
+    let mut register = crate::app::plugins::read(&machine.ctx)
+        .unwrap_or_else(|_| crate::plugin::Register::empty());
+    assert!(register
+        .record(contracted(SHOWER, SHOWER, "dashboard.show"))
+        .is_ok());
+    let kept = crate::app::targets::beside_env(&machine.ctx, crate::config::paths::PLUGINS);
+    assert!(crate::app::record::keep(kept.as_deref(), &register).is_ok());
+    let http = Fake::by_path_in_turn(vec![
+        (
+            "/lemonfiber/dashboard.show/v1/panels",
+            vec![Answer::reply(200, r#"{"groups":[],"widgets":[]}"#)],
+        ),
+        (APPLY, vec![Answer::reply(204, "")]),
+    ]);
+    let ctx = machine.ctx.clone().with_http(http.clone());
+    let search = "https://www.ecosia.org/search?q=";
+
+    let set =
+        super::changing::agreed(&ctx, crate::settings::own::DASHBOARD_SEARCH, Some(search)).await;
+
+    assert!(set.is_ok(), "{set:?}");
+    let told: Vec<String> = http
+        .requests()
+        .into_iter()
+        .filter(|one| one.url.ends_with(APPLY))
+        .filter_map(|one| one.body)
+        .collect();
+    assert_eq!(told.len(), 1, "{told:?}");
+    assert!(told.iter().all(|body| body.contains(search)), "{told:?}");
+}

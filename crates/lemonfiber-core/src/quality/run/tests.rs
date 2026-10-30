@@ -1,16 +1,11 @@
 use std::path::PathBuf;
 
-use include_dir::{include_dir, Dir};
-
 use super::{quality, straining, Ctx, QualityAction};
 use crate::config::{store, Settings, MEDIA_SERVER_MODE_KEY};
 use crate::model::{Disposition, PresetChoice, QualityReport};
 use crate::platform::Environment;
 use crate::quality::Preset;
-use crate::stack::Source;
 use crate::test_support::a_context;
-
-static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 /// A scratch env-file path unique to this process and test, its directory
 /// cleared so a run starts from nothing.
@@ -314,19 +309,6 @@ async fn a_set_that_cannot_be_written_is_reported() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// A context operating the embedded fixture stack, materialised under `into`.
-fn embedded_ctx(env: Option<PathBuf>, into: Option<PathBuf>) -> Ctx {
-    a_context()
-        .over(Source::Embedded(&STACKLET))
-        .settings(Settings {
-            env_file: env,
-            stack_dir: into,
-            ..Settings::default()
-        })
-        .environment(Environment::LinuxNative)
-        .build()
-}
-
 #[tokio::test]
 async fn reapply_on_an_external_stack_changes_nothing() {
     // An external stack is the operator's; there is nothing lemonfiber wrote to
@@ -341,68 +323,6 @@ async fn a_rehearsed_reapply_reports_it_would_reapply() {
     let context = ctx(None, Environment::LinuxNative).rehearsing();
     let report = run(&context, QualityAction::Reapply).await;
     assert_eq!(report.disposition, Disposition::WouldReapply);
-}
-
-#[tokio::test]
-async fn reapply_overwrites_a_customised_config_through_the_command() {
-    let env = scratch("reapply-overwrite");
-    let into = env.with_file_name("stack");
-    let context = embedded_ctx(Some(env.to_path_buf()), Some(into.clone()));
-
-    // Choose a preset and bring it onto disk, then hand-edit the config.
-    let _ = quality(&context, set(Preset::Maximum, None, true)).await;
-    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
-    // The set records the choice but does not materialise; bring it on disk via a
-    // reapply, then the operator edits it by hand.
-    let _ = quality(&context, QualityAction::Reapply).await;
-    let _ = std::fs::write(&quality_sync, "# mine\n");
-
-    // The command sees the customisation and, being the explicit consent,
-    // overwrites it with the recorded preset.
-    let report = run(&context, QualityAction::Reapply).await;
-    assert_eq!(report.disposition, Disposition::Reapplied);
-    assert!(report.customised, "it reports that it overwrote an edit");
-    // And says which lines went, rather than only that some did.
-    let lost = report
-        .overwritten
-        .as_ref()
-        .map(|edit| edit.diff.clone())
-        .unwrap_or_default();
-    assert!(lost.contains("- # mine"), "{lost}");
-    assert!(std::fs::read_to_string(&quality_sync)
-        .unwrap_or_default()
-        .contains("sonarr-web-2160p.yml"));
-}
-
-/// Nothing of the operator's to lose is nothing to show, which keeps the word and
-/// the diff from coming apart.
-#[tokio::test]
-async fn a_reapply_over_a_config_nobody_edited_shows_no_diff() {
-    let env = scratch("reapply-unedited");
-    let into = env.with_file_name("stack");
-    let context = embedded_ctx(Some(env.to_path_buf()), Some(into));
-
-    let _ = quality(&context, set(Preset::Maximum, None, true)).await;
-    let _ = quality(&context, QualityAction::Reapply).await;
-
-    let report = run(&context, QualityAction::Reapply).await;
-    assert!(!report.customised);
-    assert!(report.overwritten.is_none(), "{:?}", report.overwritten);
-}
-
-#[tokio::test]
-async fn a_reapply_with_nowhere_to_write_is_reported() {
-    // The embedded stack has a quality sync config to re-assert, but no directory it
-    // is materialised into, so the reapply is refused rather than guessing.
-    let refused = quality(
-        &embedded_ctx(Some(scratch("reapply-nowhere").to_path_buf()), None),
-        QualityAction::Reapply,
-    )
-    .await;
-    assert!(
-        refused.is_err(),
-        "a reapply with nowhere to write is refused"
-    );
 }
 
 #[tokio::test]

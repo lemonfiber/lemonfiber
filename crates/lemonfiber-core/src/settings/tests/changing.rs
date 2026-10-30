@@ -737,33 +737,6 @@ async fn a_change_that_writes_the_project_journals_the_overlay() {
     );
 }
 
-#[tokio::test]
-async fn changing_the_dashboards_search_address_applies_the_dashboard_again() {
-    let machine = machine("dashboard-search", running(&[]));
-    let homepage = crate::app::targets::project_directory(
-        &machine.ctx.stack,
-        machine.ctx.settings.stack_dir.as_deref(),
-    )
-    .unwrap_or_default()
-    .join("config/homepage");
-    let _ = std::fs::create_dir_all(&homepage);
-    for file in ["services.yaml", "widgets.yaml"] {
-        let _ = std::fs::write(homepage.join(file), "[]\n");
-    }
-    let search = "https://www.ecosia.org/search?q=";
-
-    let set = agreed(
-        &machine.ctx,
-        crate::settings::own::DASHBOARD_SEARCH,
-        Some(search),
-    )
-    .await;
-
-    assert!(set.is_ok());
-    let widgets = std::fs::read_to_string(homepage.join("widgets.yaml")).unwrap_or_default();
-    assert!(widgets.contains(search), "{widgets}");
-}
-
 #[cfg(unix)]
 #[tokio::test]
 async fn a_change_over_a_linked_directory_recreates_nothing_and_says_why() {

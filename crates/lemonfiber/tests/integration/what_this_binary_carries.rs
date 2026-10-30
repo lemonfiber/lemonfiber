@@ -112,9 +112,14 @@ fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
     let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
     let copies = assets.join("plugins").join(lemonfiber_bundle::COPIES);
     let parts: Vec<String> = lemonfiber_bundle::read(&assets.join("plugins"))
-        .map(|(_, held)| held.into_iter().map(|one| one.pin.id).collect())
+        .map(|(_, held)| {
+            held.into_iter()
+                .filter(|one| one.pin.stage != Some(lemonfiber_bundle::Stage::Installed))
+                .map(|one| one.pin.id)
+                .collect()
+        })
         .unwrap_or_default();
-    assert!(!parts.is_empty(), "the bundle reads no part");
+    assert!(!parts.is_empty(), "the bundle reads no assembled part");
     let held = |path: &str| {
         path.split('/')
             .nth(1)
@@ -180,9 +185,10 @@ fn carried_under(under: &str) -> std::collections::BTreeSet<String> {
         .collect()
 }
 
-/// Every part's starting configuration is its copy's in the bundle, file for file and
-/// byte for byte, and nothing beside it: a file a run left in a checkout, a key or an
-/// invitation among them, never travels.
+/// Every assembled part's starting configuration is its copy's in the bundle, file for
+/// file and byte for byte, and nothing beside it: a file a run left in a checkout, a key or
+/// an invitation among them, never travels. A part the bundle installs carries none: the
+/// plugin path writes its starting files.
 #[test]
 fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
     let copies = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -197,7 +203,12 @@ fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
             std::path::Path::new(&format!("config/{id}")),
             &mut held,
         );
-        let held: std::collections::BTreeSet<String> = held.into_iter().collect();
+        let held: std::collections::BTreeSet<String> =
+            if pinned.stage == Some(lemonfiber_bundled::Stage::Installed) {
+                std::collections::BTreeSet::new()
+            } else {
+                held.into_iter().collect()
+            };
         assert_eq!(carried_under(&format!("config/{id}")), held, "{id}");
         for file in &held {
             assert_eq!(

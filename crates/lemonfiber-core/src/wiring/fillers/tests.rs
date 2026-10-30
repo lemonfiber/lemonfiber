@@ -97,13 +97,13 @@ fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
 
     assert!(asks > 0, "the shipped stack asks for something");
     assert_eq!(fillers.asks().len(), asks);
-    let shown: Vec<&str> = fillers
+    let unanswered: Vec<(&str, &str)> = fillers
         .asks()
         .iter()
-        .filter(|ask| ask.by == "homepage" && ask.capability == "proxy.front")
-        .flat_map(|ask| ask.fillers.iter().map(|one| one.id.as_str()))
+        .filter(|ask| ask.fillers.is_empty())
+        .map(|ask| (ask.by.as_str(), ask.capability.as_str()))
         .collect();
-    assert_eq!(shown, vec!["caddy"]);
+    assert_eq!(unanswered, Vec::new());
 }
 
 /// A plugin's service is reached at its own id, carries the plugin it came from, and
@@ -469,10 +469,7 @@ impl super::Fillers {
     pub(crate) fn holding(services: Vec<super::Filler>) -> Self {
         Self {
             services,
-            asks: Vec::new(),
-            named: Vec::new(),
-            ordinals: crate::config::credentials::Ordinals::default(),
-            declared: std::collections::BTreeMap::new(),
+            ..Self::default()
         }
     }
 

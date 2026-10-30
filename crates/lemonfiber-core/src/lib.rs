@@ -109,7 +109,6 @@ pub mod queue;
 pub mod rating;
 pub mod reconfigure;
 pub mod recording;
-pub mod recyclarr;
 pub mod region;
 pub mod repair;
 pub use crate::error::retry;

@@ -1,6 +1,5 @@
-//! What installing a plugin writes: its own directories, keys and secrets files, its
-//! regions in the stack's files, and the project generated with it beside everything
-//! else installed here.
+//! What installing a plugin writes: its own directories, keys, secrets and starting files,
+//! and the project generated with it beside everything else installed here.
 
 use std::path::Path;
 

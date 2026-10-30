@@ -225,12 +225,10 @@ fn an_assembled_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
         .is_some_and(|manifest| super::super::secrets_written(&ctx, manifest, &[]).is_ok()));
 
     assert!(file_of(&ctx, "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-key"));
-    assert!(file_of(&ctx, "recyclarr").contains("SONARR_API_KEY=sonarrs-key"));
     let filed = crate::settings::secrets_at(&ctx)
         .and_then(|at| std::fs::read_to_string(at).ok())
         .unwrap_or_default();
     assert!(!filed.contains("unpackerr:"), "{filed}");
-    assert!(!filed.contains("recyclarr:"), "{filed}");
 
     assert!(recorded("sonarrs-new-key"));
     let reread = crate::settings::files::reread(
@@ -241,9 +239,7 @@ fn an_assembled_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
         &crate::plugin::Holding::Crossing("LIBRARY_CURATE_TV_API_KEY".to_owned()),
     );
 
-    let rewritten = reread.unwrap_or_default();
-    assert!(rewritten.contains(&"unpackerr".to_owned()), "{rewritten:?}");
-    assert!(rewritten.contains(&"recyclarr".to_owned()), "{rewritten:?}");
+    assert_eq!(reread.unwrap_or_default(), vec!["unpackerr".to_owned()]);
     assert!(file_of(&ctx, "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-new-key"));
 }
 

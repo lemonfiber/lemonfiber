@@ -12,11 +12,10 @@
 //! fronted by one speaking `media.serve` is a library, or a shelf where the adapter
 //! declares [`SHELF_MEDIA`] alone, so any service speaking the same contract resolves the
 //! same way. The stack's guard in front of the media server is
-//! met as the library it guards, under that library's name. The rest speak no such
-//! contract, so each of the stack's is written down below with what it is to the
-//! household — and one nobody has written down, another plugin's among them, is not
-//! offered, for the reason [`crate::config::display`] withholds a setting nobody vouched
-//! for.
+//! met as the library it guards, under that library's name. The household's proxy and
+//! the dashboard are told apart the same way, by the contract they fill, and are never a
+//! door. One no contract settles is not offered, for the reason
+//! [`crate::config::display`] withholds a setting nobody vouched for.
 //!
 //! All of which is a default rather than a decree. An operator who disagrees about
 //! their own stack names the service they want, and [`chosen`] is where that name
@@ -29,6 +28,7 @@ pub(crate) mod run;
 
 use serde::Serialize;
 
+use lemonfiber_contract::capabilities::dashboard::show;
 use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::request::intake;
@@ -106,8 +106,7 @@ impl Facing {
     /// every service exists for the operator and includes the ones nobody in the
     /// house should learn exist; the carriage is how the others are reached rather
     /// than one of them; and a service nothing has said anything about is offered to
-    /// nobody, which is the register's own default and the safe direction to be
-    /// wrong in. Naming one of those and handing over the way to it are different
+    /// nobody, which is the safe direction to be wrong in. Naming one of those and handing over the way to it are different
     /// acts, and only the first is what standing beside the door means.
     #[must_use]
     pub const fn handed_over(self) -> bool {
@@ -120,16 +119,6 @@ impl Facing {
 /// library rather than instead of it.
 pub const SHELF_MEDIA: [&str; 5] = ["music", "books", "comics", "audiobooks", "podcasts"];
 
-/// The services published to the household that a contract does not settle.
-///
-/// A register rather than a rule read off a name, for the reason
-/// [`crate::config::display::SHOWN`] is one: a guess is wrong in whichever direction
-/// nobody chose, and the service that ends up wrongly offered to a household is by
-/// definition the one nobody thought about. So an entry is a decision somebody made
-/// and can be reviewed on; anything else is [`Facing::Unstated`] and is offered to
-/// nobody. It names no place to begin: those two are the contracts'.
-const NAMED: &[(&str, Facing)] = &[("homepage", Facing::Operators)];
-
 /// What one of the stack's own services is to the household, or nothing where it is not
 /// published to them at all.
 ///
@@ -137,8 +126,9 @@ const NAMED: &[(&str, Facing)] = &[("homepage", Facing::Operators)];
 /// machine is not a candidate for anything here — which is the same fact the admin
 /// tier's loopback binding rests on, read from the same field rather than from a
 /// second list that could disagree with it. A service guarding the media stream is how
-/// the household reaches the library, and the household's proxy is how the others are
-/// reached; anything else is what the register says.
+/// the household reaches the library, the household's proxy is how the others are
+/// reached, and the dashboard is the operator's; anything a contract does not settle is
+/// unstated, and offered to nobody.
 #[must_use]
 pub fn facing(service: &Service) -> Option<Facing> {
     if service.bind != Some(Bind::Lan) {
@@ -151,7 +141,10 @@ pub fn facing(service: &Service) -> Option<Facing> {
     if provides(front::CAPABILITY) {
         return Some(Facing::Carriage);
     }
-    Some(named(&service.id))
+    if provides(show::CAPABILITY) {
+        return Some(Facing::Operators);
+    }
+    Some(Facing::Unstated)
 }
 
 /// What a plugin's service is to the household, or nothing where it is not published to
@@ -160,23 +153,14 @@ pub fn facing(service: &Service) -> Option<Facing> {
 /// A first-party part moved in place of the stack's guard of the media stream is how the
 /// household reaches the library, as the stack's own is; a plugin declaring that it
 /// guards the stream is not thereby the way in. Anything else is judged by the contract
-/// the adapter of `installed` in front of it speaks. Where none settles it, a first-party
-/// part moved in place of one of the stack's services is what the register says of the
-/// service it stands in for, and any other plugin's service is unstated: a plugin's
-/// service choosing an id the register names is not thereby what the register says.
+/// the adapter of `installed` in front of it speaks, and one none settles is unstated.
 #[must_use]
 pub fn brought(installed: &[Installed], plugin: &Installed, placed: &Placed) -> Option<Facing> {
     placed.reached.as_ref()?.hostname()?;
     if guards_in_place(installed, placed) {
         return Some(Facing::Watching);
     }
-    Some(by_contract(plugin, placed).unwrap_or_else(|| {
-        if crate::project::moved_in_place(installed, &placed.service) {
-            named(&placed.service)
-        } else {
-            Facing::Unstated
-        }
-    }))
+    Some(by_contract(plugin, placed).unwrap_or(Facing::Unstated))
 }
 
 /// Whether `placed` guards the media stream as a first-party part moved in place of one of
@@ -202,6 +186,9 @@ fn by_contract(plugin: &Installed, placed: &Placed) -> Option<Facing> {
     }
     if speaking(front::CAPABILITY, front::MAJOR).is_some() {
         return Some(Facing::Carriage);
+    }
+    if speaking(show::CAPABILITY, show::MAJOR).is_some() {
+        return Some(Facing::Operators);
     }
     speaking(serve::CAPABILITY, serve::MAJOR).map(|adapter| served(&adapter.media_types))
 }
@@ -328,14 +315,6 @@ fn guarded<'a>(
                 .find(|service| service.id == library)
                 .map(|service| service.name.as_str())
         })
-}
-
-/// What the register says this service is, or that nobody has said.
-fn named(id: &str) -> Facing {
-    NAMED
-        .iter()
-        .find(|(named, _)| *named == id)
-        .map_or(Facing::Unstated, |(_, facing)| *facing)
 }
 
 /// The one service the household begins at, from everything the stack declares and
