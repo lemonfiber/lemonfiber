@@ -14,7 +14,8 @@ const GUARD: &str = "network.egress-guard";
 fn torrent(service: &str, via: bool) -> crate::plugin::Placed {
     let mut placed = a_placed(service, &["download.torrent"], Some(9091));
     placed.fields.network = via.then(|| Network {
-        via: GUARD.to_owned(),
+        via: Some(GUARD.to_owned()),
+        fenced: false,
     });
     placed
 }
@@ -62,7 +63,8 @@ async fn a_torrent_adapter_is_inside_the_guard_its_upstream_takes() {
     adapter.fronts = Some("back".to_owned());
     let mut upstream = a_placed("back", &[], Some(9000));
     upstream.fields.network = Some(Network {
-        via: GUARD.to_owned(),
+        via: Some(GUARD.to_owned()),
+        fenced: false,
     });
     let installed = [an_installed("fronted", vec![adapter, upstream])];
     let ctx = ctx("adapter");

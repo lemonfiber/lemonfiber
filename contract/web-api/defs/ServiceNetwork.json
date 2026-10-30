@@ -1,15 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "The network a service runs inside instead of its own.",
+  "description": "The network a service runs inside instead of its own: its filler's, or a fence's.",
   "type": "object",
   "properties": {
+    "fenced": {
+      "description": "Whether it fetches whatever address it is handed, and so runs inside a fence that\nrefuses every private address.",
+      "type": "boolean"
+    },
     "via": {
       "description": "The capability whose filler's network it runs inside.",
-      "type": "string"
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
-  "additionalProperties": false,
-  "required": [
-    "via"
-  ]
+  "additionalProperties": false
 }

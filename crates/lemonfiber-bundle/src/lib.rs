@@ -64,7 +64,25 @@ pub struct Bundle {
     /// Every first-party plugin, ordered by id.
     #[serde(default)]
     pub plugin: Vec<Pin>,
+    /// The image a fenced service runs behind, at schema 2, where the bundle pins one.
+    #[serde(default)]
+    pub fence: Option<Image>,
 }
+
+/// An image the bundle pins apart from its parts, which no plugin declares.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Image {
+    /// Its registry path, without tag or digest.
+    pub image: String,
+    /// The version the release train tagged it at, without the `v`.
+    pub tag: String,
+    /// The digest of its multi-architecture index, written `sha256:<64 hex>`.
+    pub digest: String,
+}
+
+/// Where the fence's image is published.
+pub const FENCE_IMAGE: &str = "ghcr.io/lemonfiber/fence";
 
 /// Whether the bundle assembles a part into the stack it ships or installs it through the
 /// plugin path.

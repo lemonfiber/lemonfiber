@@ -672,3 +672,72 @@ fn a_choice_needs_an_ask_made_once_by_a_known_asker() {
 
 mod assembled;
 mod reading;
+
+/// The fence's image as the bundle pins it, before the pins.
+fn fence(image: &str, tag: &str, digest: &str) -> String {
+    format!("[fence]\nimage = \"{image}\"\ntag = \"{tag}\"\ndigest = \"{digest}\"\n\n")
+}
+
+/// A part with a fenced service is read only where the bundle pins the fence's image, and
+/// that pin is held to where the fence is published, a release and a digest.
+#[test]
+fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
+    let fenced = PART.replace(
+        "asks_for = \"The articles each download is made of\"",
+        "asks_for = \"The articles each download is made of\"\nnetwork = { fenced = true }",
+    );
+    let files = files();
+    let digest = format!("sha256:{}", "a".repeat(64));
+    let with = |pinned: &str| format!("{TABLES}\n{pinned}");
+    let catalogued = |name: &str, tables: &str| {
+        catalogue(
+            name,
+            &bundle(&fenced, &files, &[], tables),
+            "sabnzbd",
+            &fenced,
+            &files,
+        )
+    };
+
+    let unpinned = refused(&catalogued("fence-unpinned", TABLES));
+    assert!(
+        unpinned
+            .iter()
+            .any(|line| line.contains("service sabnzbd is fenced") && line.contains("[fence]")),
+        "{unpinned:?}"
+    );
+    let pinned = read(&catalogued(
+        "fence-pinned",
+        &with(&fence("ghcr.io/lemonfiber/fence", "0.18.0", &digest)),
+    ));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let pre = read(&catalogued(
+        "fence-pre",
+        &with(&fence("ghcr.io/lemonfiber/fence", "0.18.0-beta.1", &digest)),
+    ));
+    assert!(pre.is_ok(), "{pre:?}");
+
+    for (name, pinned, said) in [
+        (
+            "fence-elsewhere",
+            fence("ghcr.io/else/fence", "0.18.0", &digest),
+            "fence.image is ghcr.io/else/fence",
+        ),
+        (
+            "fence-tag",
+            fence("ghcr.io/lemonfiber/fence", "v0.18.0", &digest),
+            "fence.tag v0.18.0 is not a release",
+        ),
+        (
+            "fence-digest",
+            fence("ghcr.io/lemonfiber/fence", "0.18.0", "sha256:abc"),
+            "fence.digest is not written",
+        ),
+    ] {
+        let broken = refused(&catalogued(name, &with(&pinned)));
+        assert!(
+            broken.iter().any(|line| line.contains(said)),
+            "{name}: {broken:?}"
+        );
+    }
+}

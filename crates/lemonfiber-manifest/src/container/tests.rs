@@ -277,10 +277,12 @@ fn an_adapter_or_a_confined_service_runs_as_the_operator() {
 fn only_the_egress_guard_is_a_network_to_run_inside_and_never_ones_own() {
     let none = NONE;
     let guard = Network {
-        via: "network.egress-guard".to_owned(),
+        via: Some("network.egress-guard".to_owned()),
+        fenced: false,
     };
     let other = Network {
-        via: "media.serve".to_owned(),
+        via: Some("media.serve".to_owned()),
+        fenced: false,
     };
     let provides = ["network.egress-guard".to_owned()];
     let mut inside = plain(&none);
@@ -291,6 +293,35 @@ fn only_the_egress_guard_is_a_network_to_run_inside_and_never_ones_own() {
     let mut elsewhere = plain(&none);
     elsewhere.network = Some(&other);
     assert_eq!(wrong(&elsewhere).len(), 1);
+}
+
+/// A service may run inside a fence, or inside its filler's network, but not both and not
+/// neither: each is a network namespace of its own.
+#[test]
+fn a_network_is_fenced_or_via_and_never_both_or_neither() {
+    let none = NONE;
+    let fenced = Network {
+        via: None,
+        fenced: true,
+    };
+    let both = Network {
+        via: Some("network.egress-guard".to_owned()),
+        fenced: true,
+    };
+    let neither = Network::default();
+    let mut behind = plain(&none);
+    behind.network = Some(&fenced);
+    assert!(wrong(&behind).is_empty());
+    behind.network = Some(&both);
+    assert!(wrong(&behind)
+        .iter()
+        .any(|said| said.contains("network: says both via and fenced")));
+    behind.network = Some(&neither);
+    assert!(wrong(&behind)
+        .iter()
+        .any(|said| said.contains("network: says neither via nor fenced")));
+    let read: Result<Network, _> = toml::from_str("fenced = true");
+    assert_eq!(read.ok(), Some(fenced));
 }
 
 #[test]
@@ -411,7 +442,7 @@ fn each_field_is_read_as_written_and_defaulted_where_left_out() {
     let network: Result<Network, _> = toml::from_str("via = \"network.egress-guard\"");
     assert_eq!(
         network.ok().map(|read| read.via),
-        Some("network.egress-guard".to_owned())
+        Some(Some("network.egress-guard".to_owned()))
     );
     let modes: Result<BTreeMap<String, UserMode>, _> =
         toml::from_str("a = \"image\"\nb = \"puid-env\"\nc = \"uid\"");

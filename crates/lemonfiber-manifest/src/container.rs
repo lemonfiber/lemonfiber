@@ -204,13 +204,26 @@ pub enum Posture {
     Confined,
 }
 
-/// The network a service runs inside instead of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+/// The network a service runs inside instead of its own: its filler's, or a fence's.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "ServiceNetwork")]
 pub struct Network {
     /// The capability whose filler's network it runs inside.
-    pub via: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
+    /// Whether it fetches whatever address it is handed, and so runs inside a fence that
+    /// refuses every private address.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fenced: bool,
+}
+
+impl Network {
+    /// The capability whose filler's network it runs inside, where it takes one.
+    #[must_use]
+    pub fn via(&self) -> Option<&str> {
+        self.via.as_deref()
+    }
 }
 
 impl Posture {
@@ -494,19 +507,31 @@ impl Container<'_> {
         let Some(network) = self.network else {
             return;
         };
-        if !VIA.contains(&network.via.as_str()) {
+        let Some(via) = network.via() else {
+            if !network.fenced {
+                found.push((
+                    self.at("network"),
+                    "says neither via nor fenced, and a network is one or the other".to_owned(),
+                ));
+            }
+            return;
+        };
+        if network.fenced {
             found.push((
-                self.at("network.via"),
-                format!(
-                    "names {}, which no service may run inside the network of",
-                    network.via
-                ),
+                self.at("network"),
+                "says both via and fenced, and each is a network namespace of its own".to_owned(),
             ));
         }
-        if self.provides.contains(&network.via) {
+        if !VIA.contains(&via) {
             found.push((
                 self.at("network.via"),
-                format!("names {}, which the service provides itself", network.via),
+                format!("names {via}, which no service may run inside the network of"),
+            ));
+        }
+        if self.provides.iter().any(|provided| provided == via) {
+            found.push((
+                self.at("network.via"),
+                format!("names {via}, which the service provides itself"),
             ));
         }
     }

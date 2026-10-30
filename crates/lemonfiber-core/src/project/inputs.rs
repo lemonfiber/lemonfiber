@@ -86,7 +86,7 @@ pub(super) fn read(
             inside: service
                 .network
                 .as_ref()
-                .and_then(|network| fill(&network.via)),
+                .and_then(|network| fill(network.via()?)),
             fronts: None,
         })
         .chain(
@@ -103,7 +103,7 @@ pub(super) fn read(
                         .fields
                         .network
                         .as_ref()
-                        .and_then(|network| fill(&network.via)),
+                        .and_then(|network| fill(network.via()?)),
                     fronts: placed.fronts.clone(),
                 }),
         )

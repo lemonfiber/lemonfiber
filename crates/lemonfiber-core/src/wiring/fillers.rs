@@ -459,7 +459,10 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         upstream: BTreeMap::new(),
         native: None,
         replaces: None,
-        via: service.network.as_ref().map(|network| network.via.clone()),
+        via: service
+            .network
+            .as_ref()
+            .and_then(|network| network.via.clone()),
     }
 }
 
@@ -508,7 +511,7 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .fields
             .network
             .as_ref()
-            .map(|network| network.via.clone()),
+            .and_then(|network| network.via.clone()),
     }
 }
 
