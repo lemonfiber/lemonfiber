@@ -73,7 +73,15 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
         Asking::Reveal {
             credential,
             confirmed,
-        } => showing(ctx, held, &credential, confirmed).await,
+        } => {
+            showing(
+                ctx,
+                held,
+                (&credential, confirmed),
+                (&fillers, project.as_deref()),
+            )
+            .await
+        }
         Asking::Revoke {
             plugin,
             credential,
@@ -116,9 +124,14 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
 }
 
 /// The inventory with one value printed, or with the reason there is nothing to print.
-async fn showing(ctx: &Ctx, held: Vec<Held>, credential: &str, confirmed: bool) -> Inventory {
+async fn showing(
+    ctx: &Ctx,
+    held: Vec<Held>,
+    (credential, confirmed): (&str, bool),
+    reaching: (&crate::wiring::Fillers, Option<&std::path::Path>),
+) -> Inventory {
     let revealed = match named(&held, credential) {
-        Some(found) => revealing::reveal(ctx, found, confirmed).await,
+        Some(found) => revealing::reveal(ctx, found, confirmed, reaching).await,
         None => revealing::nothing_by_that_name(credential, &named_ones(&held)),
     };
     Inventory::of(held).showing(revealed)

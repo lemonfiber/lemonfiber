@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_sidecar::decline::{File, Key};
+use lemonfiber_sidecar::decline::File;
 
-use super::{held, rotate, value, SETTING};
+use super::{held, rotate, value, LOCATION, SETTING};
 use crate::app::Ctx;
 use crate::config::{store, Settings};
 use crate::credential::{Held, Reach, Settled, State};
@@ -66,7 +66,9 @@ fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
     media_server.listens = Some(8096);
     let mut services = vec![media_server];
     if declining {
-        services.push(service("decline", 5056));
+        let mut decline = service("decline", 5056);
+        decline.provides = vec!["invite.decline".to_owned()];
+        services.push(decline);
     }
     services
 }
@@ -134,45 +136,27 @@ fn on_disk(project: &Path) -> Option<String> {
         .map(|text| text.trim().to_owned())
 }
 
-/// The fingerprint the service reports for `key`.
-fn fingerprint(key: &str) -> String {
-    Key::read(key)
-        .map(|key| key.fingerprint())
-        .unwrap_or_default()
+/// `ctx` reading the service's key back as `key` whatever is written, so the service
+/// answers holding it.
+fn still_holding(ctx: Ctx, project: &Path, key: &str) -> Ctx {
+    ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![(
+        key_file(project),
+        &format!("{key}\n"),
+    )]))
 }
 
-/// The media server and the decline service: the media server answers a mint with
-/// `minted`'s status and key, lists each of `filed` in turn as the keys filed under the
-/// decline service's name, and answers a revocation with `revoked` and a key's proof with
-/// `proved`, and the service says it holds `holding`.
-fn serving(
-    minted: (u16, &str),
-    filed: &[&[&str]],
-    revoked: u16,
-    proved: u16,
-    holding: &str,
-) -> Arc<Fake> {
+/// The media server: it answers a mint with `minted`'s status and key, lists `filed` as
+/// the keys filed under the decline service's name, and answers a revocation with
+/// `revoked` and a key's proof with `proved`.
+fn serving(minted: (u16, &str), filed: &[&str], revoked: u16, proved: u16) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         (
             serve("mint"),
             vec![Answer::reply(minted.0, json(&minted.1))],
         ),
-        (
-            serve("filed_as"),
-            filed
-                .iter()
-                .map(|keys| Answer::reply(200, json(&keys)))
-                .collect(),
-        ),
+        (serve("filed_as"), vec![Answer::reply(200, json(&filed))]),
         (serve("revoke"), vec![Answer::reply(revoked, "")]),
         (serve("answers_to"), vec![Answer::reply(proved, "")]),
-        (
-            "5056/health",
-            vec![Answer::reply(
-                200,
-                serde_json::json!({ "key": fingerprint(holding) }).to_string(),
-            )],
-        ),
     ])
 }
 
@@ -191,9 +175,22 @@ fn revoked(http: &Fake) -> Vec<String> {
     named_in(http, "revoke")
 }
 
+/// Whether a run asked the media server to mint.
+fn minted(http: &Fake) -> bool {
+    http.requests()
+        .iter()
+        .any(|asked| asked.url.ends_with(serve("mint")))
+}
+
 /// The line, for a stack that runs the service.
 async fn line(ctx: &Ctx, project: &Path) -> Option<Held> {
-    held(ctx, &stack(true), Some(project)).await
+    held(
+        ctx,
+        &stack(true),
+        &fillers(&stack(true), project),
+        Some(project),
+    )
+    .await
 }
 
 /// The line, or an empty one the assertions after it then fail on.
@@ -211,6 +208,11 @@ async fn listed(ctx: &Ctx, project: &Path) -> Held {
     })
 }
 
+/// A rotation of the line under `project`.
+async fn rotated(ctx: &Ctx, listed: &Held, project: &Path) -> crate::credential::Rotation {
+    rotate(ctx, listed, &fillers(&stack(true), project), Some(project)).await
+}
+
 fn unproven(settled: &Settled) -> Option<&str> {
     match settled {
         Settled::Unproven { detail } => Some(detail),
@@ -219,9 +221,13 @@ fn unproven(settled: &Settled) -> Option<&str> {
 }
 
 #[tokio::test]
-async fn the_key_is_listed_where_the_stack_runs_the_service() {
-    let http = serving((200, "fresh"), &[], 204, 204, "");
-    let (ctx, at) = scene("decline-held-present", true, Some("kept"), http);
+async fn the_key_is_listed_by_the_core_copy_of_what_the_service_holds() {
+    let (ctx, at) = scene(
+        "decline-held-present",
+        true,
+        Some("kept"),
+        serving((200, "fresh"), &["stray", "kept"], 204, 204),
+    );
 
     let listed = line(&ctx, &at).await;
 
@@ -235,49 +241,79 @@ async fn the_key_is_listed_where_the_stack_runs_the_service() {
         Some(crate::credential::fingerprint("kept"))
     );
     assert_eq!(
-        listed.as_ref().map(|one| one.location.clone()),
-        Some(key_file(&at).display().to_string())
+        listed.as_ref().map(|one| one.location.as_str()),
+        Some(LOCATION)
     );
     assert!(listed.is_some_and(|one| one.advisory.is_none()));
 }
 
 #[tokio::test]
-async fn a_key_not_there_yet_is_absent_and_says_how_to_get_one() {
-    let http = serving((200, "fresh"), &[], 204, 204, "");
-    let (ctx, at) = scene("decline-held-absent", true, None, http);
+async fn a_key_not_there_yet_or_not_filed_is_absent_and_says_how_to_get_one() {
+    for (name, key, filed) in [
+        ("decline-held-absent", None, &["kept"][..]),
+        ("decline-held-unfiled", Some("kept"), &["other"][..]),
+    ] {
+        let (ctx, at) = scene(name, true, key, serving((200, "fresh"), filed, 204, 204));
 
-    let listed = line(&ctx, &at).await;
+        let listed = line(&ctx, &at).await;
 
-    assert_eq!(listed.as_ref().map(|one| one.state), Some(State::Absent));
-    assert!(listed
-        .and_then(|one| one.advisory)
-        .is_some_and(|said| said.contains("lemonfiber seed")));
+        assert_eq!(
+            listed.as_ref().map(|one| one.state),
+            Some(State::Absent),
+            "{name}"
+        );
+        assert!(
+            listed
+                .and_then(|one| one.advisory)
+                .is_some_and(|said| said.contains("lemonfiber seed")),
+            "{name}"
+        );
+    }
 }
 
 #[tokio::test]
 async fn without_the_service_or_a_stack_directory_there_is_no_line() {
-    let http = serving((200, "fresh"), &[], 204, 204, "");
-    let (ctx, at) = scene("decline-held-none", true, Some("kept"), http);
+    let (ctx, at) = scene(
+        "decline-held-none",
+        true,
+        Some("kept"),
+        serving((200, "fresh"), &["kept"], 204, 204),
+    );
 
-    assert!(held(&ctx, &stack(false), Some(&at)).await.is_none());
-    assert!(held(&ctx, &stack(true), None).await.is_none());
+    assert!(
+        held(&ctx, &stack(false), &fillers(&stack(false), &at), Some(&at))
+            .await
+            .is_none()
+    );
+    assert!(held(&ctx, &stack(true), &fillers(&stack(true), &at), None)
+        .await
+        .is_none());
 }
 
 #[tokio::test]
-async fn a_confirmed_ask_prints_the_key_from_its_file() {
-    let http = serving((200, "fresh"), &[], 204, 204, "");
-    let (ctx, at) = scene("decline-reveal", true, Some("kept"), http);
+async fn a_confirmed_ask_prints_the_core_copy_of_the_key() {
+    let (ctx, at) = scene(
+        "decline-reveal",
+        true,
+        Some("kept"),
+        serving((200, "fresh"), &["kept"], 204, 204),
+    );
+    let reaching = fillers(&stack(true), &at);
 
     let listed = listed(&ctx, &at).await;
-    let shown = super::super::revealing::reveal(&ctx, &listed, true).await;
+    let shown = super::super::revealing::reveal(&ctx, &listed, true, (&reaching, Some(&at))).await;
 
     assert_eq!(shown.value.as_deref(), Some("kept"));
-    assert_eq!(value(&ctx, &listed).await.as_deref(), Some("kept"));
+    assert_eq!(
+        value(&ctx, &reaching, Some(&at)).await.as_deref(),
+        Some("kept")
+    );
+    assert!(value(&ctx, &reaching, None).await.is_none());
 }
 
 #[tokio::test]
-async fn a_rotation_lands_only_once_the_media_server_takes_the_key_and_the_service_holds_it() {
-    let http = serving((200, "fresh"), &[&["old", "fresh"]], 204, 204, "fresh");
+async fn a_rotation_lands_only_once_the_service_holds_the_key_and_the_media_server_takes_it() {
+    let http = serving((200, "fresh"), &["old"], 204, 204);
     let (ctx, at) = scene("decline-rotate-landed", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
 
@@ -308,12 +344,12 @@ async fn a_rotation_lands_only_once_the_media_server_takes_the_key_and_the_servi
 }
 
 #[tokio::test]
-async fn a_new_key_the_media_server_refuses_is_revoked_and_the_old_one_put_back() {
-    let http = serving((200, "fresh"), &[&["old", "fresh"]], 204, 401, "fresh");
+async fn a_new_key_the_media_server_refuses_is_revoked_and_the_old_one_handed_back() {
+    let http = serving((200, "fresh"), &["old"], 204, 401);
     let (ctx, at) = scene("decline-rotate-untaken", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
 
-    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true), &at)).await;
+    let rotation = rotated(&ctx, &listed, &at).await;
 
     assert!(unproven(&rotation.settled)
         .is_some_and(|said| said.starts_with("The media server did not take")));
@@ -322,72 +358,89 @@ async fn a_new_key_the_media_server_refuses_is_revoked_and_the_old_one_put_back(
 }
 
 #[tokio::test]
-async fn a_new_key_the_service_does_not_hold_is_revoked_and_nothing_left_where_there_was_nothing() {
-    let http = serving((200, "fresh"), &[&["fresh"]], 204, 204, "something else");
-    let (ctx, at) = scene("decline-rotate-unheld", true, None, http.clone());
+async fn a_new_key_the_service_does_not_answer_holding_is_revoked_and_the_old_one_handed_back() {
+    let http = serving((200, "fresh"), &["old"], 204, 204);
+    let (ctx, at) = scene("decline-rotate-unheld", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
+    let ctx = still_holding(ctx, &at, "old");
 
-    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true), &at)).await;
-
-    assert!(unproven(&rotation.settled)
-        .is_some_and(|said| said.starts_with("the decline service did not")));
-    assert_eq!(on_disk(&at), None);
-    assert_eq!(revoked(&http), vec!["fresh".to_owned()]);
-}
-
-#[tokio::test]
-async fn a_service_with_no_port_to_ask_is_one_that_does_not_hold_the_key() {
-    let http = serving((200, "fresh"), &[&["old", "fresh"]], 204, 204, "fresh");
-    let (ctx, at) = scene("decline-rotate-portless", true, Some("old"), http.clone());
-    let listed = listed(&ctx, &at).await;
-    let mut services = stack(true);
-    for one in &mut services {
-        if one.id == "decline" {
-            one.port = None;
-        }
-    }
-
-    let rotation = rotate(&ctx, &listed, &services, &fillers(&services, &at)).await;
-
-    assert!(unproven(&rotation.settled)
-        .is_some_and(|said| said.starts_with("the decline service did not")));
-    assert_eq!(on_disk(&at).as_deref(), Some("old"));
-}
-
-#[tokio::test]
-async fn a_new_key_that_cannot_be_written_is_revoked_again() {
-    let http = serving((200, "fresh"), &[&["old", "fresh"]], 204, 204, "fresh");
-    let (ctx, at) = scene("decline-rotate-unwritten", true, None, http.clone());
-    let mut listed = listed(&ctx, &at).await;
-    // A file where the service's directory should be leaves nowhere to write.
-    let _ = std::fs::create_dir_all(at.join("config"));
-    let _ = std::fs::write(at.join("config").join("decline"), "");
-    listed.location = key_file(&at).display().to_string();
-
-    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true), &at)).await;
+    let rotation = rotated(&ctx, &listed, &at).await;
 
     assert!(
-        unproven(&rotation.settled).is_some_and(|said| said.starts_with("the new key could not"))
+        unproven(&rotation.settled)
+            .is_some_and(|said| said.starts_with("the decline service did not")),
+        "{rotation:?}"
     );
+    assert_eq!(on_disk(&at).as_deref(), Some("old"));
     assert_eq!(revoked(&http), vec!["fresh".to_owned()]);
+    assert!(named_in(&http, "answers_to").is_empty());
 }
 
 #[tokio::test]
-async fn a_mint_the_media_server_refuses_changes_nothing() {
-    let http = serving((500, ""), &[&["old"]], 204, 204, "fresh");
+async fn a_new_key_that_cannot_be_handed_over_is_revoked_again() {
+    for (name, minted, blocked) in [
+        ("decline-rotate-unwritten", "fresh", true),
+        ("decline-rotate-two-words", "two words", false),
+    ] {
+        let http = serving((200, minted), &["old"], 204, 204);
+        let (ctx, at) = scene(name, true, Some("old"), http.clone());
+        let listed = listed(&ctx, &at).await;
+        let ctx = if blocked {
+            let _ = std::fs::remove_dir_all(at.join("config").join("decline"));
+            let _ = std::fs::write(at.join("config").join("decline"), "");
+            still_holding(ctx, &at, "old")
+        } else {
+            ctx
+        };
+
+        let rotation = rotated(&ctx, &listed, &at).await;
+
+        assert!(
+            unproven(&rotation.settled)
+                .is_some_and(|said| said.starts_with("the new key could not")),
+            "{name}: {rotation:?}"
+        );
+        assert_eq!(revoked(&http), vec![minted.to_owned()], "{name}");
+    }
+}
+
+#[tokio::test]
+async fn a_mint_refused_or_no_key_to_replace_or_no_service_to_ask_changes_nothing() {
+    let http = serving((500, ""), &["old"], 204, 204);
     let (ctx, at) = scene("decline-rotate-unminted", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
-
-    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true), &at)).await;
-
+    let rotation = rotated(&ctx, &listed, &at).await;
     assert!(unproven(&rotation.settled).is_some(), "{rotation:?}");
     assert_eq!(on_disk(&at).as_deref(), Some("old"));
     assert!(revoked(&http).is_empty());
+
+    for (name, key) in [
+        ("decline-rotate-unheld-before", None),
+        ("decline-rotate-unfiled", Some("unfiled")),
+    ] {
+        let http = serving((200, "fresh"), &["old"], 204, 204);
+        let (ctx, at) = scene(name, true, key, http.clone());
+        let rotation = rotated(&ctx, &listed, &at).await;
+        assert!(
+            unproven(&rotation.settled).is_some_and(|said| said.contains("lemonfiber seed")),
+            "{name}: {rotation:?}"
+        );
+        assert!(!minted(&http), "{name}");
+    }
+
+    let http = serving((200, "fresh"), &["old"], 204, 204);
+    let (ctx, at) = scene("decline-rotate-unasked", true, Some("old"), http.clone());
+    let unasked = rotate(&ctx, &listed, &fillers(&stack(true), &at), None).await;
+    assert!(
+        unproven(&unasked.settled).is_some_and(|said| said.contains("cannot be asked")),
+        "{unasked:?}"
+    );
+    assert!(!minted(&http));
 }
 
 #[tokio::test]
 async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
-    let http = serving((200, "fresh"), &[&["old"]], 204, 204, "fresh");
+    let http = serving((200, "fresh"), &["old"], 204, 204);
     let (ctx, at) = scene(
         "decline-rotate-unadministered",
         false,
@@ -396,28 +449,16 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
     );
     let listed = listed(&ctx, &at).await;
 
-    let unadministered = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true), &at)).await;
+    let unadministered = rotated(&ctx, &listed, &at).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
     let declined_alone = vec![service("decline", 5056)];
-    let serverless = rotate(
-        &ctx,
-        &listed,
-        &declined_alone,
-        &unserved(&declined_alone, &at),
-    )
-    .await;
+    let serverless = rotate(&ctx, &listed, &unserved(&declined_alone, &at), Some(&at)).await;
     assert!(unproven(&serverless.settled).is_some_and(|said| said == super::NO_ADMINISTRATOR));
 
     let (mut rehearsing, keyed) =
         scene("decline-rotate-rehearsed", true, Some("old"), http.clone());
     rehearsing.dry_run = true;
-    let rehearsed = rotate(
-        &rehearsing,
-        &listed,
-        &stack(true),
-        &fillers(&stack(true), &keyed),
-    )
-    .await;
+    let rehearsed = rotated(&rehearsing, &listed, &keyed).await;
     assert!(
         matches!(rehearsed.settled, Settled::Rehearsed { .. }),
         "{rehearsed:?}"

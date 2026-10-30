@@ -13,12 +13,8 @@ use lemonfiber_sidecar::gate::PORT;
 
 use super::Ctx;
 use crate::app::gating;
-use crate::app::targets::MediaServer;
-use crate::app_keys::GATE_APP;
 use crate::ports::digest::sha256;
-use crate::ports::service::{
-    Admitted, Endpoint, FulfilmentTarget, Gated, Gating, RegisteredTarget,
-};
+use crate::ports::service::{Admitted, Endpoint, FulfilmentTarget, Gating, RegisteredTarget};
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
@@ -38,46 +34,21 @@ pub(crate) fn through_the_gate(route: &str) -> Endpoint {
 
 /// The routes the gate admits now, with the tokens it admits on each.
 ///
-/// Handing it tokens hands it every route again, each with the credential it presents
-/// there, so those are found only when tokens are handed over: reading what it admits
-/// asks nothing of any other service.
-pub(crate) struct Kept<'a> {
-    ctx: &'a Ctx,
-    fillers: &'a Fillers,
+/// Tokens are handed over a route at a time, leaving every credential the gate holds as
+/// it is, so reading what it admits and replacing its tokens asks nothing of any other
+/// service.
+pub(crate) struct Kept {
     gate: Arc<dyn Gating>,
     accepted: Vec<Admitted>,
 }
 
-impl<'a> Kept<'a> {
+impl Kept {
     /// What the gate under `project` admits now: nothing, where it cannot say, which every
     /// token then fails and is replaced. Nothing at all where the gate cannot be asked.
-    pub(crate) async fn read(
-        ctx: &'a Ctx,
-        fillers: &'a Fillers,
-        project: &Path,
-    ) -> Option<Kept<'a>> {
+    pub(crate) async fn read(ctx: &Ctx, fillers: &Fillers, project: &Path) -> Option<Kept> {
         let gate = gating::asked(ctx, fillers, project).await?;
         let accepted = gate.admitted().await.unwrap_or_default();
-        Some(Self {
-            ctx,
-            fillers,
-            gate,
-            accepted,
-        })
-    }
-
-    /// Every credential lemonfiber knows a route of the gate's presents: each curator's own
-    /// key, and the media server key filed under the gate's name that it presents.
-    async fn credentials(&self) -> Vec<(String, String)> {
-        let mut credentials: Vec<(String, String)> =
-            super::gate::curator_routes(self.ctx, self.fillers)
-                .into_iter()
-                .map(|route| (route.path, route.credential))
-                .collect();
-        if let Some(server) = MediaServer::of(self.fillers) {
-            credentials.extend(media_credential(self.ctx, &server, &self.accepted).await);
-        }
-        credentials
+        Some(Self { gate, accepted })
     }
 
     /// Each of `wanted` reached through the gate, presenting the token the request
@@ -138,9 +109,7 @@ impl<'a> Kept<'a> {
                 route.tokens.push(hash);
             }
         }
-        if beside != self.accepted {
-            self.admit(&beside).await?;
-        }
+        self.changed(&self.accepted, &beside).await?;
         Ok(beside)
     }
 
@@ -162,10 +131,7 @@ impl<'a> Kept<'a> {
                 kept.tokens = vec![sha256(&one.token)];
             }
         }
-        if only == beside {
-            return Ok(());
-        }
-        self.admit(&only).await
+        self.changed(beside, &only).await
     }
 
     /// Every route the gate admits now.
@@ -188,7 +154,10 @@ impl<'a> Kept<'a> {
     ///
     /// Why the gate could not be handed them.
     pub(crate) async fn restore(&self) -> Result<(), String> {
-        self.admit(&self.accepted).await
+        for route in &self.accepted {
+            self.admit(route).await?;
+        }
+        Ok(())
     }
 
     /// Why the tokens could not be handed to the gate, for the report.
@@ -196,49 +165,21 @@ impl<'a> Kept<'a> {
         format!("the tokens could not be handed to the request gate: {reason}")
     }
 
-    /// Hand the gate `routes`, each presenting the credential lemonfiber knows it does.
-    async fn admit(&self, routes: &[Admitted]) -> Result<(), String> {
-        let credentials = self.credentials().await;
-        let gated = routes
-            .iter()
-            .map(|route| {
-                let credential = credentials
-                    .iter()
-                    .find(|(path, value)| *path == route.path && sha256(value) == route.credential)
-                    .map(|(_, value)| value.clone())
-                    .ok_or_else(|| {
-                        format!(
-                            "lemonfiber does not hold the credential it presents on its route {}",
-                            route.path
-                        )
-                    })?;
-                Ok(Gated {
-                    target: route.target.clone(),
-                    path: route.path.clone(),
-                    address: route.address.clone(),
-                    majors: route.majors.clone(),
-                    credential,
-                    tokens: route.tokens.clone(),
-                })
-            })
-            .collect::<Result<Vec<_>, String>>()?;
+    /// Hand the gate the tokens of every route of `now` that differ from `was`.
+    async fn changed(&self, was: &[Admitted], now: &[Admitted]) -> Result<(), String> {
+        for route in now.iter().filter(|route| !was.contains(route)) {
+            self.admit(route).await?;
+        }
+        Ok(())
+    }
+
+    /// Hand the gate the tokens `route` admits, leaving every credential it holds as it is.
+    async fn admit(&self, route: &Admitted) -> Result<(), String> {
         self.gate
-            .admit(&gated)
+            .admit_tokens(&route.path, &route.tokens)
             .await
             .map_err(|failure| failure.to_string())
     }
-}
-
-/// The key the gate presents on its route to `server`, where it presents one filed under
-/// its name there.
-async fn media_credential(
-    ctx: &Ctx,
-    server: &MediaServer,
-    accepted: &[Admitted],
-) -> Option<(String, String)> {
-    let client = server.administering(ctx).await?;
-    let filed = client.filed_as(GATE_APP).await.ok()?;
-    super::gate::held(accepted, &filed).map(|key| (server.id().to_owned(), key))
 }
 
 /// A token the request service is to present on a route.

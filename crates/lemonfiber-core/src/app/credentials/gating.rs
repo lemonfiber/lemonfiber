@@ -1,20 +1,22 @@
 //! The request gate's own media server key, as the inventory lists it, prints it and
 //! replaces it.
 //!
-//! It is held in one place, the media server route of the gate's routes file, which the
-//! gate reads on every call. So this line is read from that file, and a replacement is
-//! written there.
+//! It is held by the gate on its media server route, and asked of it only over
+//! `request.gate`: the gate answers the key's SHA-256 alone, and the key itself is the
+//! core's own copy, the one filed under the gate's name in the media server that hashes to
+//! it.
 //!
-//! **A replacement keeps a working key at every moment.** A new key is minted, written into
-//! the routes and proven against the media server, and only then is the old one revoked.
-//! Where any step fails the new key is revoked and the old routes put back. A revocation of
-//! the old key that the media server refuses leaves it filed under the gate's name and held
-//! by nothing, which the next seed revokes.
+//! **A replacement keeps a working key at every moment.** A new key is minted, handed to
+//! the gate with every route it admits, proven by the SHA-256 the gate answers and against
+//! the media server, and only then is the old one revoked. Where any step fails the new key
+//! is revoked and the old routes handed back. A revocation of the old key that the media
+//! server refuses leaves it filed under the gate's name and held by nothing, which the next
+//! seed revokes.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
 
 use lemonfiber_manifest::Service;
-use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstreams};
 
 use super::declining::{NO_ADMINISTRATOR, UNTAKEN};
 use super::rotating::{said, unproven, would_rotate};
@@ -23,12 +25,18 @@ use crate::app::targets::MediaServer;
 use crate::app::Ctx;
 use crate::app_keys::GATE_APP;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
+use crate::ports::digest::sha256;
+use crate::ports::service::{Admitted, AppKeys, Gated, Gating, Target};
+use crate::wiring::Fillers;
 
-/// What the key is recorded as: where it lives inside the stack's configuration.
+/// What the key is recorded as.
 pub(super) const SETTING: &str = "request-gate/upstreams.json#jellyfin";
 
 /// What the inventory calls it.
 const NAME: &str = "Jellyfin request-gate key";
+
+/// Where it lives.
+const LOCATION: &str = "held by the request gate on its media server route";
 
 /// The one thing that authenticates with it.
 const CONSUMER: &str =
@@ -39,35 +47,44 @@ const ABSENT: &str = "The media server's request-gate key is not there yet, so t
                       gate cannot read the media server for the request service. Run \
                       lemonfiber seed.";
 
+/// What is said where the gate cannot be asked, or may not be handed the key.
+const UNASKED: &str = "the request gate cannot be asked over its contract, or is not one the \
+                       media server's key may be handed to, so nothing was minted";
+
 /// What a rehearsal says a replacement would take.
-const ROTATING: &str = "a real run would mint a new key on the media server, write it into the \
-                        request gate's routes, prove the media server takes it, and only then \
-                        revoke the old one. Nothing was minted here, and nothing was written.";
+const ROTATING: &str = "a real run would mint a new key on the media server, hand it to the \
+                        request gate with every route it admits, prove the gate holds it and \
+                        the media server takes it, and only then revoke the old one. Nothing \
+                        was minted here, and nothing was handed over.";
 
 /// What a landed replacement says.
-const LANDED: &str = "The media server took the new key, and the request gate's routes hold it";
+const LANDED: &str = "The media server took the new key, and the request gate holds it";
 
 /// Why a new key was revoked before it was ever used.
 const UNWRITTEN: &str =
-    "the new key could not be written into the request gate's routes, so it was revoked again";
+    "the new key could not be handed to the request gate, so it was revoked again";
+
+/// Why a new key was revoked once the gate did not answer holding it.
+const UNHELD: &str = "the request gate did not answer holding the new key, so it was revoked \
+                      and the old routes handed back";
 
 /// The key's line in the inventory, where the stack runs the gate beside a media server
 /// it answers for.
 pub(super) async fn held(
     ctx: &Ctx,
     services: &[Service],
-    fillers: &crate::wiring::Fillers,
+    fillers: &Fillers,
     project: Option<&Path>,
 ) -> Option<Held> {
     gating::service(services)?;
     MediaServer::of(fillers)?.gate_kind()?;
-    let path = gating::path(project?, File::Upstreams);
-    let key = read(ctx, &path).await.and_then(|routes| key_in(&routes));
+    let project = project?;
+    let key = value(ctx, fillers, Some(project)).await;
     Some(Held {
         name: NAME.to_owned(),
         setting: SETTING.to_owned(),
         consumers: vec![CONSUMER.to_owned()],
-        location: path.display().to_string(),
+        location: LOCATION.to_owned(),
         origin: Origin::Lemonfiber,
         from: crate::origin::Origin::Bundled,
         state: if key.is_some() {
@@ -80,15 +97,22 @@ pub(super) async fn held(
     })
 }
 
-/// The key itself, for the one confirmed ask that prints it.
-pub(super) async fn value(ctx: &Ctx, held: &Held) -> Option<String> {
-    read(ctx, Path::new(&held.location))
-        .await
-        .and_then(|routes| key_in(&routes))
+/// The core's own copy of the key the gate presents to the media server.
+pub(super) async fn value(ctx: &Ctx, fillers: &Fillers, project: Option<&Path>) -> Option<String> {
+    let gate = gating::asked(ctx, fillers, project?).await?;
+    let admitted = gate.admitted().await.ok()?;
+    let client = MediaServer::of(fillers)?.administering(ctx).await?;
+    let filed = client.filed_as(GATE_APP).await.ok()?;
+    crate::seed::run::gate::held(&admitted, &filed)
 }
 
 /// Replace the key, keeping a working one at every moment.
-pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fillers) -> Rotation {
+pub(super) async fn rotate(
+    ctx: &Ctx,
+    held: &Held,
+    fillers: &Fillers,
+    project: Option<&Path>,
+) -> Rotation {
     let Some(server) = MediaServer::of(fillers).filter(|server| server.gate_kind().is_some())
     else {
         return unproven(held, NO_ADMINISTRATOR);
@@ -99,35 +123,40 @@ pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fill
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
-    let path = PathBuf::from(&held.location);
-    // Routes the seed has not written yet have no key to replace, and nothing is minted.
-    let Some(old) = read(ctx, &path).await else {
+    let Some(gate) = asked(ctx, fillers, (&server, project)).await else {
+        return unproven(held, UNASKED);
+    };
+    let admitted = match gate.admitted().await {
+        Ok(admitted) => admitted,
+        Err(failure) => return unproven(held, &said(&failure)),
+    };
+    let filed = client.filed_as(GATE_APP).await.unwrap_or_default();
+    let Some(old) = crate::seed::run::gate::held(&admitted, &filed) else {
         return unproven(held, ABSENT);
+    };
+    let before = match restated(ctx, fillers, &admitted, &old) {
+        Ok(before) => before,
+        Err(why) => return unproven(held, &why),
     };
     let minted = match client.mint(GATE_APP).await {
         Ok(minted) => minted,
         Err(failure) => return unproven(held, &said(&failure)),
     };
-    let rewritten = (minted.split_whitespace().count() == 1)
-        .then(|| holding(&old, &minted))
-        .flatten()
-        .filter(|routes| crate::config::store::write(&path, &routes.written()).is_ok());
-    if rewritten.is_none() {
+    let after = presenting(&before, &minted);
+    let handed = minted.split_whitespace().count() == 1 && gate.admit(&after).await.is_ok();
+    if !handed {
         let _ = client.revoke(&minted).await;
         return unproven(held, UNWRITTEN);
     }
+    if !holds(gate.as_ref(), &minted).await {
+        put_back(gate.as_ref(), client.as_ref(), &before, &minted).await;
+        return unproven(held, UNHELD);
+    }
     if client.answers_to(&minted).await.is_err() {
-        let _ = crate::config::store::write(&path, &old.written());
-        let _ = client.revoke(&minted).await;
+        put_back(gate.as_ref(), client.as_ref(), &before, &minted).await;
         return unproven(held, UNTAKEN);
     }
-    for other in client
-        .filed_as(GATE_APP)
-        .await
-        .unwrap_or_default()
-        .iter()
-        .filter(|other| **other != minted)
-    {
+    for other in &filed {
         let _ = client.revoke(other).await;
     }
     Rotation::landed(
@@ -140,34 +169,90 @@ pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fill
     )
 }
 
-/// `routes` with the route to the media server presenting `key`, where they have one.
-fn holding(routes: &Upstreams, key: &str) -> Option<Upstreams> {
-    let mut upstreams = routes.upstreams.clone();
-    let route = upstreams
-        .iter_mut()
-        .find(|one| one.kind == Kind::Jellyfin)?;
-    route.credential = Credential::new(key);
-    Some(Upstreams::of(upstreams))
+/// The gate under `project`, where it can be asked and may be handed a key `server`
+/// holds.
+async fn asked(
+    ctx: &Ctx,
+    fillers: &Fillers,
+    (server, project): (&MediaServer, Option<&Path>),
+) -> Option<Arc<dyn Gating>> {
+    gating::may_hold(fillers, server.filler.holder()).then_some(())?;
+    gating::asked(ctx, fillers, project?).await
 }
 
-/// The key the route to the media server presents, where `routes` have one.
-fn key_in(routes: &Upstreams) -> Option<String> {
-    routes
-        .upstreams
+/// Every route of `admitted` as it is applied, each presenting the credential the core
+/// holds for it: `key` on the media server's, and the key minted for each curator on its.
+///
+/// # Errors
+///
+/// The route whose credential the core holds no copy of.
+fn restated(
+    ctx: &Ctx,
+    fillers: &Fillers,
+    admitted: &[Admitted],
+    key: &str,
+) -> Result<Vec<Gated>, String> {
+    let curators = crate::seed::run::gate::curator_routes(ctx, fillers);
+    admitted
         .iter()
-        .find(|one| one.kind == Kind::Jellyfin)
-        .map(|route| route.credential.reveal().to_owned())
+        .map(|route| {
+            let credential = match route.target {
+                Target::MediaServer { .. } => Some(key),
+                Target::Curator { .. } => curators
+                    .iter()
+                    .find(|curator| {
+                        curator.path == route.path
+                            && sha256(&curator.credential) == route.credential
+                    })
+                    .map(|curator| curator.credential.as_str()),
+            }
+            .ok_or_else(|| {
+                format!(
+                    "lemonfiber holds no copy of the credential the request gate presents on its \
+                     route {}, so nothing was minted",
+                    route.path
+                )
+            })?;
+            Ok(Gated {
+                target: route.target.clone(),
+                path: route.path.clone(),
+                address: route.address.clone(),
+                majors: route.majors.clone(),
+                credential: credential.to_owned(),
+                tokens: route.tokens.clone(),
+            })
+        })
+        .collect()
 }
 
-/// The routes the file at `path` holds, where it reads.
-async fn read(ctx: &Ctx, path: &Path) -> Option<Upstreams> {
-    crate::app::targets::read_owned(
-        ctx.seams.filesystem.as_ref(),
-        path,
-        crate::within::directory_of(path),
-    )
-    .await
-    .and_then(|text| Upstreams::read(&text).ok())
+/// `routes`, the media server's presenting `key`.
+fn presenting(routes: &[Gated], key: &str) -> Vec<Gated> {
+    routes
+        .iter()
+        .map(|route| match route.target {
+            Target::MediaServer { .. } => Gated {
+                credential: key.to_owned(),
+                ..route.clone()
+            },
+            Target::Curator { .. } => route.clone(),
+        })
+        .collect()
+}
+
+/// Whether the gate answers presenting `key` on its media server route.
+async fn holds(gate: &dyn Gating, key: &str) -> bool {
+    let hash = sha256(key);
+    gate.admitted().await.is_ok_and(|admitted| {
+        admitted.iter().any(|route| {
+            matches!(route.target, Target::MediaServer { .. }) && route.credential == hash
+        })
+    })
+}
+
+/// Hand the gate `before` again and revoke `minted`.
+async fn put_back(gate: &dyn Gating, client: &dyn AppKeys, before: &[Gated], minted: &str) {
+    let _ = gate.admit(before).await;
+    let _ = client.revoke(minted).await;
 }
 
 #[cfg(test)]
