@@ -71,12 +71,8 @@ pub(crate) async fn update(
     let granting =
         super::granting::asked(ctx, &stack_manifest, without.installed(), &would, trusted);
     would.granted = super::granting::approved(&granting, &stamp);
-    let changes = crate::plugin::changes(&super::planned::writes(
-        ctx,
-        &would,
-        stack,
-        Some(&crate::plugin::root(path)),
-    )?);
+    let planned = super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?;
+    let changes = crate::plugin::changes(&planned);
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
     let (acting, taking) =
         super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;

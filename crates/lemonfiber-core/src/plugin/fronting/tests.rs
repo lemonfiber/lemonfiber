@@ -160,7 +160,7 @@ fn a_label_another_plugin_answers_on_is_taken_and_one_nobody_does_is_not() {
 }
 
 #[test]
-fn no_route_is_made_to_the_port_a_service_speaks_its_contracts_on() {
+fn no_route_is_written_to_the_port_a_service_speaks_its_contracts_on() {
     let routed = |contract: u16| {
         let mut door = placed(
             "door",

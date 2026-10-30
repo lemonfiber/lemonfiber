@@ -130,6 +130,33 @@ fn undoing_a_rewritten_file_puts_back_what_it_held() {
     );
 }
 
+/// A region an earlier release wrote into one of the stack's files is taken back out of
+/// exactly that file, as the region that was written.
+#[test]
+fn undoing_a_region_takes_it_back_out() {
+    let region = Change {
+        at: "t".to_owned(),
+        operation: "plugin komga".to_owned(),
+        target: "/srv/stack/config/caddy/Caddyfile".to_owned(),
+        kind: Kind::Region {
+            path: "/srv/stack/config/caddy/Caddyfile".to_owned(),
+            key: "config/caddy/Caddyfile".to_owned(),
+            owner: "plugin komga".to_owned(),
+            written: 7,
+        },
+    };
+
+    assert_eq!(
+        region.undo().action,
+        Action::Withdraw {
+            path: "/srv/stack/config/caddy/Caddyfile".to_owned(),
+            key: "config/caddy/Caddyfile".to_owned(),
+            owner: "plugin komga".to_owned(),
+            written: 7,
+        },
+    );
+}
+
 /// State moved into a mount tree goes back where it was; a volume copied out is kept,
 /// since the volume it came from was never touched.
 #[test]
