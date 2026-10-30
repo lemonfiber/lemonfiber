@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::Answer;
 
-use super::{secured, secured_by, securing_installed, would_restart, Secured, UNANSWERED, UNTAKEN};
+use super::{
+    secured, secured_as, secured_by, securing_installed, would_restart, Secured, UNANSWERED,
+    UNTAKEN,
+};
 use crate::journal::Kind;
 use crate::test_support::egress::{
     answering, asked, fillers, guard, machine, ran, restarts, GUARD, PLUGIN,
@@ -162,4 +165,27 @@ async fn a_rehearsal_says_the_guards_upstream_may_restart_and_nothing_of_anythin
     );
     assert_eq!(would_restart(&ctx, &silent), None);
     assert_eq!(would_restart(&unread, &guard()), None);
+}
+
+#[test]
+fn a_guard_skipped_or_offering_nothing_is_said_not_to_have_taken_it_up() {
+    let untaken = |why: &str| {
+        Some(Secured::Untaken {
+            why: why.to_owned(),
+        })
+    };
+
+    assert_eq!(
+        secured_as(crate::seed::State::Skipped {
+            reason: "it is not answering".to_owned()
+        }),
+        untaken("it is not answering")
+    );
+    assert_eq!(
+        secured_as(crate::seed::State::Unmatched {
+            reason: "it does not offer this".to_owned()
+        }),
+        untaken("it does not offer this")
+    );
+    assert_eq!(secured_as(crate::seed::State::AlreadyWired), None);
 }
