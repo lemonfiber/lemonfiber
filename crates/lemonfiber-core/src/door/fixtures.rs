@@ -98,3 +98,17 @@ pub(crate) fn brought(id: &str, label: Option<&str>) -> crate::plugin::Placed {
 pub(crate) fn installed(services: Vec<crate::plugin::Placed>) -> crate::plugin::Installed {
     crate::test_support::an_installed("brought", services)
 }
+
+/// A plugin bringing `id` behind an adapter speaking `media.serve` and declaring `media`,
+/// published to the household at the label `id`.
+pub(crate) fn serving(id: &str, media: &[&str]) -> crate::plugin::Installed {
+    let mut plugin = fronted(id, Some("media.serve@1"), Some(id));
+    for adapter in plugin
+        .services
+        .iter_mut()
+        .filter(|one| one.fronts.is_some())
+    {
+        adapter.media_types = media.iter().map(|one| (*one).to_owned()).collect();
+    }
+    plugin
+}

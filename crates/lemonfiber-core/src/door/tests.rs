@@ -1,4 +1,4 @@
-use super::fixtures::{asking, brought, fronted, installed, service, watching};
+use super::fixtures::{asking, brought, fronted, installed, service, serving, watching};
 use super::{begins_at, facing, Facing, NAMED};
 use crate::plugin::Installed;
 use lemonfiber_manifest::Bind;
@@ -54,13 +54,6 @@ fn a_service_reachable_only_from_this_machine_is_no_part_of_this() {
     assert_eq!(facing(&admin), None);
     let unpublished = service("recyclarr", None);
     assert_eq!(facing(&unpublished), None);
-}
-
-#[test]
-fn a_shelf_is_reached_from_the_library_rather_than_instead_of_it() {
-    let shelf = service("calibre-web-automated", Some(Bind::Lan));
-    assert_eq!(facing(&shelf), Some(Facing::Shelf));
-    assert!(!Facing::Shelf.begins());
 }
 
 #[test]
@@ -194,20 +187,6 @@ fn a_plugins_service_can_be_the_door_by_the_same_rule() {
         begins(&[], &[server]),
         Some((Facing::Watching, "server".to_owned()))
     );
-}
-
-/// A plugin bringing `id` behind an adapter speaking `media.serve` and declaring `media`,
-/// published to the household at the label `id`.
-fn serving(id: &str, media: &[&str]) -> Installed {
-    let mut plugin = fronted(id, Some("media.serve@1"), Some(id));
-    for adapter in plugin
-        .services
-        .iter_mut()
-        .filter(|one| one.fronts.is_some())
-    {
-        adapter.media_types = media.iter().map(|one| (*one).to_owned()).collect();
-    }
-    plugin
 }
 
 /// A media server declaring shelf media alone is a shelf, one declaring anything else
@@ -350,7 +329,7 @@ fn the_carried_stack_begins_at_its_moved_request_service() {
 #[test]
 fn a_moved_part_no_contract_settles_is_what_the_register_says() {
     let mut parts = crate::test_support::adapted::installed_parts();
-    let moved = "calibre-web-automated";
+    let moved = "homepage";
     for placed in parts
         .iter_mut()
         .filter(|one| one.plugin == "audiobookshelf")
@@ -373,7 +352,7 @@ fn a_moved_part_no_contract_settles_is_what_the_register_says() {
                 .map(|placed| super::brought(&parts, plugin, placed))
         })
         .next();
-    assert_eq!(facing, Some(Some(Facing::Shelf)));
+    assert_eq!(facing, Some(Some(Facing::Operators)));
 }
 
 /// The stack's guard whose ask for `media.serve` two media servers contest, with nothing
@@ -408,4 +387,26 @@ fn a_guard_no_one_library_fills_is_met_under_its_own_name() {
         .map(|one| (one.name, one.facing));
 
     assert_eq!(guard, Some(("Door", Some(Facing::Watching))));
+}
+
+/// A plugin declaring that it guards the media stream is neither the way to the library
+/// nor named after it; the first-party door moved in place of the stack's is both.
+#[test]
+fn only_the_door_moved_in_place_is_the_way_to_the_library_and_named_after_it() {
+    let mut stranger = crate::test_support::a_placed("guard", &["media.guard"], Some(8443));
+    stranger.reached = brought("guard", Some("guard")).reached;
+    let plugin = crate::test_support::an_installed("strangers-guard", vec![stranger]);
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let services = manifest.map(|one| one.services).unwrap_or_default();
+    let candidates = super::candidates(
+        &services,
+        std::slice::from_ref(&plugin),
+        &crate::wiring::Fillers::default(),
+    );
+    let met = candidates
+        .iter()
+        .find(|one| one.id == "guard")
+        .map(|one| (one.name, one.facing));
+
+    assert_eq!(met, Some(("guard the stand-in", Some(Facing::Unstated))));
 }

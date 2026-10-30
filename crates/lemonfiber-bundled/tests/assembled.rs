@@ -11,7 +11,7 @@ use toml::{Table, Value};
 const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugins");
 
 /// The fields of an installed part's upstream service its stack service does not carry.
-const PLUGIN_ONLY: [&str; 3] = ["replaces", "native", "env"];
+const PLUGIN_ONLY: [&str; 5] = ["replaces", "native", "env", "speaks", "contract"];
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's own services declare none of them.
@@ -134,7 +134,7 @@ fn an_installed_part_is_embedded_as_its_copy_declares_the_service_it_takes_the_p
             }
             assert_eq!(embedded.get(field), Some(value), "{} {field}", one.pin.id);
         }
-        for field in ["replaces", "native", "api", "claim"] {
+        for field in ["replaces", "native", "api", "claim", "speaks", "contract"] {
             assert!(embedded.get(field).is_none(), "{} {field}", one.pin.id);
         }
         let copied = services(&one.copy);

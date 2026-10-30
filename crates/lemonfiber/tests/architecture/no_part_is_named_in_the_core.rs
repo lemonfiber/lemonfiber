@@ -285,12 +285,6 @@ const NAMED: &[Named] = &[
     },
     Named {
         file: "crates/lemonfiber-core/src/door.rs",
-        part: "calibre-web-automated",
-        count: 1,
-        until: Until::Moves("calibre-web-automated"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/door.rs",
         part: "homepage",
         count: 1,
         until: Until::Moves("homepage"),

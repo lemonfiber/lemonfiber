@@ -6,9 +6,10 @@ use toml::{Table, Value};
 use crate::assembly::{services, stacked};
 use crate::{Held, Stage};
 
-/// The fields of an installed part's upstream service its stack service does not carry:
-/// the API its adapter speaks to it in, which only the plugin's adapter reads.
-const PLUGIN_ONLY: [&str; 1] = ["native"];
+/// The fields of an installed part's service its stack service does not carry: the API its
+/// adapter speaks to it in, which only the plugin's adapter reads, and the contracts it
+/// speaks itself and the port it speaks them on, which only the plugin's install reaches.
+const PLUGIN_ONLY: [&str; 3] = ["native", "speaks", "contract"];
 
 /// The stack `assembled` with each part `held` installs kept as its copy declares the
 /// service of its id: that one service, providing what any service of the part provides,
