@@ -71,7 +71,16 @@ async fn a_pull_that_failed_stops_before_starting_against_images_that_never_came
 
 /// A stack with no services of its own — enough for a real `up` to run and
 /// settle, without the fifteen containers the shipped one would wait on.
-static QUIET: include_dir::Dir<'_> =
+static QUIET: lemonfiber_core::stack::Carried = lemonfiber_core::stack::Carried {
+    manifest: include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/quiet-stack.toml"
+    )),
+    files: &QUIET_FILES,
+};
+
+/// What [`QUIET`] writes beside its manifest.
+static QUIET_FILES: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/quiet-stack");
 
 #[test]

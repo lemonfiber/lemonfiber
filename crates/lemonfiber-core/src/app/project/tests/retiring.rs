@@ -52,3 +52,38 @@ fn nothing_is_taken_from_a_stack_directory_the_operator_named() {
 
     assert!(project.join("compose.yml").is_file());
 }
+
+/// The manifest an earlier release wrote out for the embedded stack, which nothing reads
+/// once the stack is read where it is carried.
+const MANIFEST: &str = "schema_version = 1\n";
+
+#[test]
+fn the_manifest_files_an_earlier_release_wrote_go_where_nobody_changed_them() {
+    let (ctx, project) = machine("retired-manifest");
+    let services = project.join("services");
+    let _ = std::fs::create_dir_all(&services);
+    let _ = std::fs::write(project.join("stack.toml"), MANIFEST);
+    let _ = std::fs::write(services.join("sonarr.toml"), MANIFEST);
+    let _ = std::fs::write(
+        services.join("radarr.toml"),
+        "[[service]]\nid = \"theirs\"\n",
+    );
+    let at = super::super::record_path(&ctx);
+    let mut record = Materialised::default();
+    record.record("stack.toml", checksum(MANIFEST.as_bytes()));
+    record.record("services/sonarr.toml", checksum(MANIFEST.as_bytes()));
+    record.record("services/radarr.toml", checksum(MANIFEST.as_bytes()));
+    assert!(crate::app::record::keep(at.as_deref(), &record).is_ok());
+
+    super::super::retired(&ctx, &[]);
+
+    assert!(!project.join("stack.toml").exists());
+    assert!(!services.join("sonarr.toml").exists());
+    assert!(
+        services.join("radarr.toml").is_file(),
+        "a changed file stays"
+    );
+    let kept: Materialised = crate::app::record::kept(at.as_deref());
+    assert_eq!(kept.checksum("stack.toml"), None);
+    assert!(kept.checksum("services/radarr.toml").is_some());
+}

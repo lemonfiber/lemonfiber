@@ -28,7 +28,6 @@ mod remembered;
 pub mod schema;
 pub mod standing;
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use include_dir::{Dir, DirEntry};
@@ -37,15 +36,29 @@ use lemonfiber_manifest::{validate, Date, Manifest};
 use failure::refused;
 pub use failure::{Failure, FAILURES};
 
-/// The manifest's filename, at the root of any stack directory.
-const MANIFEST: &str = lemonfiber_manifest::assembly::ROOT;
-
 /// The version of lemonfiber running, which a stack's `min_cli_version` is held to.
 pub(crate) const RUNNING: &str = env!("CARGO_PKG_VERSION");
 
 /// One file a stack would write: its path within the stack directory, and its
 /// content.
 pub type StackFile = (PathBuf, &'static [u8]);
+
+/// A stack compiled into a binary: its manifest, whole, and the files a run writes
+/// for its services, which never hold the manifest itself.
+#[derive(Debug)]
+pub struct Carried {
+    /// The manifest, assembled.
+    pub manifest: &'static str,
+    /// Each service's starting configuration and every recording a claim names, as a
+    /// stack directory holds them.
+    pub files: &'static Dir<'static>,
+}
+
+/// The stack this build carries, as its bundle assembles it.
+pub static BUNDLED: Carried = Carried {
+    manifest: lemonfiber_bundled::STACK,
+    files: &lemonfiber_bundled::CARRIED,
+};
 
 /// Where the stack lemonfiber operates is read from.
 #[derive(Debug, Clone, Copy)]
@@ -55,28 +68,22 @@ pub enum Source {
     /// The build refuses a stack it cannot read, so reaching this variant means
     /// the manifest already parsed once, on a machine that is not the
     /// operator's.
-    Embedded(&'static Dir<'static>),
+    Embedded(&'static Carried),
     /// A stack directory on disk, named by the operator.
     External(&'static Path),
 }
 
 impl Source {
-    /// The manifest text, however this stack is stored: its root and each service's
-    /// file, assembled into one.
+    /// The manifest text, however this stack is stored: whole where it is carried, and
+    /// a stack directory's root and each service's file assembled into one.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when there is no manifest, it cannot be read, or its files
-    /// break the rules about them.
+    /// Returns [`Failure`] when a stack directory holds no manifest, it cannot be read,
+    /// or its files break the rules about them.
     pub(crate) fn manifest_text(self) -> Result<String, Failure> {
         match self {
-            Self::Embedded(dir) => {
-                let root = dir
-                    .get_file(MANIFEST)
-                    .and_then(include_dir::File::contents_utf8)
-                    .ok_or(Failure::NotEmbedded)?;
-                lemonfiber_manifest::assemble(root, &embedded_services(dir)).map_err(refused)
-            }
+            Self::Embedded(carried) => Ok(carried.manifest.to_owned()),
             Self::External(path) => lemonfiber_manifest::read(path).map_err(refused),
         }
     }
@@ -110,13 +117,12 @@ impl Source {
         Err(Failure::Invalid { violations })
     }
 
-    /// Write the stack somewhere Compose can read it, and say where that is.
+    /// Write what a run of the stack reads beside its project, and say where that is.
     ///
-    /// Compose reads files. An embedded stack has to reach the filesystem before
-    /// it can be run, and it is written out on every invocation rather than
-    /// cached: the cost is a few kilobytes, and the alternative is a stale copy
-    /// surviving an upgrade, which is the failure mode embedding was chosen to
-    /// avoid in the first place.
+    /// A carried stack's services start from files on disk, so they are written out
+    /// on every invocation rather than cached: the cost is a few kilobytes, and the
+    /// alternative is a stale copy surviving an upgrade. Its manifest is never
+    /// written: it is read where it is carried.
     ///
     /// An external stack is already on disk and is left exactly as it is.
     ///
@@ -127,7 +133,7 @@ impl Source {
     pub fn materialise(self, into: Option<&Path>) -> Result<PathBuf, Failure> {
         match self {
             Self::External(path) => Ok(path.to_path_buf()),
-            Self::Embedded(dir) => {
+            Self::Embedded(carried) => {
                 let Some(into) = into else {
                     return Err(Failure::NowhereToWrite);
                 };
@@ -136,7 +142,7 @@ impl Source {
                     reason: err.to_string(),
                 };
                 std::fs::create_dir_all(into).map_err(unwritable)?;
-                dir.extract(into).map_err(unwritable)?;
+                carried.files.extract(into).map_err(unwritable)?;
                 Ok(into.to_path_buf())
             }
         }
@@ -150,8 +156,8 @@ impl Source {
     #[must_use]
     pub fn files(self) -> Vec<StackFile> {
         let mut files = Vec::new();
-        if let Self::Embedded(dir) = self {
-            collect(dir, &mut files);
+        if let Self::Embedded(carried) = self {
+            collect(carried.files, &mut files);
         }
         files
     }
@@ -168,19 +174,6 @@ impl Source {
         manifest.admits(RUNNING).map_err(refused)?;
         Ok(manifest)
     }
-}
-
-/// Every service file the embedded stack carries, by name, with its text.
-fn embedded_services(dir: &Dir<'_>) -> BTreeMap<String, String> {
-    dir.get_dir(lemonfiber_manifest::assembly::SERVICES)
-        .into_iter()
-        .flat_map(Dir::files)
-        .filter_map(|file| {
-            let name = file.path().file_name()?.to_str()?;
-            let text = file.contents_utf8()?;
-            Some((name.to_owned(), text.to_owned()))
-        })
-        .collect()
 }
 
 /// Gather every file in an embedded directory — its path within the stack and its

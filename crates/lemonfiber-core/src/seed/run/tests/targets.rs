@@ -4,12 +4,6 @@ use super::*;
 
 #[test]
 fn the_project_directory_is_the_external_path_or_the_materialise_target() {
-    // Any directory does: what is under test is which path is chosen, not what is
-    // in it. `adapters` is named because the crate cannot compile without it — the
-    // previous choice was a directory that later moved to its own crate, which broke
-    // this at a distance with an error naming neither.
-    static EMBEDDED: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/config");
     assert_eq!(
         project_directory(&Source::External(std::path::Path::new("/srv/stack")), None).as_deref(),
         Some(std::path::Path::new("/srv/stack")),
@@ -17,7 +11,7 @@ fn the_project_directory_is_the_external_path_or_the_materialise_target() {
     );
     assert_eq!(
         project_directory(
-            &Source::Embedded(&EMBEDDED),
+            &Source::Embedded(&crate::stack::BUNDLED),
             Some(std::path::Path::new("/opt/lemonfiber/stack"))
         )
         .as_deref(),
@@ -25,7 +19,7 @@ fn the_project_directory_is_the_external_path_or_the_materialise_target() {
         "an embedded stack's root is wherever it was materialised"
     );
     assert_eq!(
-        project_directory(&Source::Embedded(&EMBEDDED), None),
+        project_directory(&Source::Embedded(&crate::stack::BUNDLED), None),
         None,
         "an embedded stack materialised nowhere has no root to read from"
     );

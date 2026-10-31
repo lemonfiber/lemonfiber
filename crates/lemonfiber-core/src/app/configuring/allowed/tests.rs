@@ -4,10 +4,6 @@ use super::{declared, identity, refusal};
 use crate::config::env::EnvFile;
 use crate::test_support::a_context;
 
-/// A stack compiled in that declares nothing.
-static STACKLET: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
-
 /// A context over the stack this build carries, whose settings file sits in `config`,
 /// with its data in `data`.
 fn ctx_in(config: &Path, data: &Path) -> crate::app::Ctx {
@@ -52,8 +48,11 @@ async fn a_name_nothing_reads_is_refused() {
 #[tokio::test]
 async fn the_embedded_stack_declares_what_it_reads_and_one_on_disk_its_own_file() {
     for embedded in [
-        declared(crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED)).await,
-        declared(crate::stack::Source::Embedded(&STACKLET)).await,
+        declared(crate::stack::Source::Embedded(&crate::stack::BUNDLED)).await,
+        declared(crate::stack::Source::Embedded(
+            &crate::test_support::STACKLET,
+        ))
+        .await,
     ] {
         for key in [
             "DATA_ROOT",

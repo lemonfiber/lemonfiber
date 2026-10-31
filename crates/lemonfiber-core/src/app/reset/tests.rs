@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use include_dir::{include_dir, Dir};
-
 use super::reset;
 use crate::app::Ctx;
 use crate::config::Settings;
@@ -15,8 +13,6 @@ async fn confirmed(ctx: &Ctx) -> Result<crate::model::ResetReport, Box<crate::er
     reset(ctx, Some(offer)).await
 }
 
-static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
-
 /// A directory of this test's own, and the env-file path within it.
 fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, PathBuf) {
     let into = lemonfiber_fixtures::scratch::Scratch::new(name).within("stack");
@@ -27,7 +23,7 @@ fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, PathBuf) {
 /// A context operating the embedded fixture stack, materialised under `into`.
 fn ctx(into: Option<PathBuf>, env: Option<PathBuf>) -> Ctx {
     a_context()
-        .over(Source::Embedded(&STACKLET))
+        .over(Source::Embedded(&crate::test_support::STACKLET))
         .settings(Settings {
             stack_dir: into,
             env_file: env,
@@ -54,7 +50,7 @@ fn carried(into: &Path, env: &Path) -> Ctx {
 /// `into`.
 fn bundled(into: &Path, env: &Path) -> Ctx {
     a_context()
-        .over(crate::test_support::carried_stack())
+        .over(crate::test_support::embedded())
         .settings(Settings {
             stack_dir: Some(into.to_path_buf()),
             env_file: Some(env.to_path_buf()),

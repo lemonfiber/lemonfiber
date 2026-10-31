@@ -1,8 +1,9 @@
 //! A file left exactly as it was written is known to be current from how it stands.
 
-use super::{read, scratch, DISK, STACKLET};
+use super::{read, scratch, DISK};
 use crate::app::materialise::materialise;
 use crate::stack::Source;
+use crate::test_support::STACKLET;
 
 /// Put `text` in `path`, leaving it the size it was and dated when it was.
 fn swapped_in_place(path: &std::path::Path, text: &str) {
@@ -24,7 +25,7 @@ fn a_file_written_since_is_read_however_it_is_dated() {
     let (into, record) = scratch("freshness");
     let source = Source::Embedded(&STACKLET);
     let _ = materialise(&DISK, source, Some(&into), Some(&record), &[]);
-    let file = into.join("stack.toml");
+    let file = into.join("compose.yaml");
     let written = read(&file);
 
     let untouched =
@@ -43,7 +44,7 @@ fn a_file_written_since_is_read_however_it_is_dated() {
         .unwrap_or_default();
     assert_eq!(
         edited,
-        vec!["stack.toml".to_owned()],
+        vec!["compose.yaml".to_owned()],
         "written since, so read"
     );
 }

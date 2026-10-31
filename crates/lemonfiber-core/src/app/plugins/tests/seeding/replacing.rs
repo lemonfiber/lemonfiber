@@ -229,7 +229,7 @@ async fn a_rehearsed_replacement_says_what_it_would_write_and_replaces_nothing()
 #[tokio::test]
 async fn a_replacement_with_no_stack_directory_is_refused_and_keeps_the_old_key() {
     let (mut ctx, before) = installed("seeded-replaced-stackless").await;
-    ctx.stack = crate::test_support::carried_stack();
+    ctx.stack = crate::test_support::embedded();
     ctx.settings.stack_dir = None;
 
     let rotated = rotating(&ctx).await;

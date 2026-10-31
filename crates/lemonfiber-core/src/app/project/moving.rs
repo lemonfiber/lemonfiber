@@ -39,7 +39,7 @@ pub(crate) fn moved(ctx: &Ctx, manifest: &Manifest) -> Result<(), Box<Problem>> 
     };
     let stamp = ctx.stamp();
     let confined = ctx.seams.confined.as_ref();
-    for (from, to) in pending(confined, &directory, manifest, carried) {
+    for (from, to) in pending(confined, &directory, manifest, carried.files) {
         let mut changes: Vec<Change> = missing(&to)
             .into_iter()
             .map(|path| change(&stamp, Kind::Made { path: shown(&path) }, &path))

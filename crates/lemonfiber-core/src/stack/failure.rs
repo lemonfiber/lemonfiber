@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::error::codes::stack::{
-    STACK_INVALID, STACK_MALFORMED, STACK_NEEDS_NEWER, STACK_NOT_EMBEDDED, STACK_NOT_SET_UP,
-    STACK_NOT_WRITTEN, STACK_UNASSEMBLED, STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
+    STACK_INVALID, STACK_MALFORMED, STACK_NEEDS_NEWER, STACK_NOT_SET_UP, STACK_NOT_WRITTEN,
+    STACK_UNASSEMBLED, STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
 };
 use crate::error::{Code, Diagnose, Problem, Remedy, State};
 
@@ -15,7 +15,7 @@ use crate::error::{Code, Diagnose, Problem, Remedy, State};
 /// Listed so that what publishes a refusal before one is raised can name them: a read
 /// built on the manifest answers one of these where it could not read it, and a client
 /// told that has been told something different from an empty answer.
-pub const FAILURES: [Code; 10] = [
+pub const FAILURES: [Code; 9] = [
     STACK_UNREADABLE,
     STACK_UNUSABLE,
     STACK_NEEDS_NEWER,
@@ -25,7 +25,6 @@ pub const FAILURES: [Code; 10] = [
     STACK_UNASSEMBLED,
     STACK_NOT_SET_UP,
     STACK_NOT_WRITTEN,
-    STACK_NOT_EMBEDDED,
 ];
 
 /// The stack could not be read.
@@ -71,9 +70,6 @@ pub enum Failure {
         /// Every one of them, each naming what declared it.
         names: Vec<String>,
     },
-    /// The embedded stack is not intact, which the build should have prevented.
-    #[error("this build has no embedded stack manifest")]
-    NotEmbedded,
     /// The embedded stack has to be written somewhere, and nowhere was named.
     #[error("no directory was named to write the stack into")]
     NowhereToWrite,
@@ -192,11 +188,6 @@ impl Diagnose for Failure {
             )
             .in_state(State::Guided)
             .with_detail(reason.clone()),
-            Self::NotEmbedded => Problem::unknown(
-                STACK_NOT_EMBEDDED,
-                "This build of lemonfiber is not intact",
-                "The stack that ships inside the binary is missing, which the build is supposed to make impossible.",
-            ),
         }
     }
 }

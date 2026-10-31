@@ -383,7 +383,6 @@
     {"code":"SPACE-7","exit":1,"family":"SPACE","meaning":"The client could not be reached, or would not let the download go. It is still being seeded and the room is still spent, which is the honest reading.","name":"STILL_HELD","remedy":"Check the download client is answering, then answer the offer again.","severity":"error","since":"0.12.0","status":500,"summary":"Raised when the client could not be reached, or would not let a download go."},
     {"code":"STACK-1","exit":5,"family":"STACK","meaning":"No readable manifest was found where a stack was expected. A stack directory holds a stack.toml describing its services.","name":"STACK_UNREADABLE","remedy":"Point at a directory containing stack.toml, with lemonfiber --stack-dir <path>.","severity":"error","since":"0.1.0","status":500,"summary":"Raised when a stack directory holds no readable manifest."},
     {"code":"STACK-2","exit":1,"family":"STACK","meaning":"The manifest is readable and was written for a different version of lemonfiber.","name":"STACK_UNUSABLE","remedy":"Update lemonfiber, or point at a stack this version reads.","severity":"error","since":"0.1.0","status":500,"summary":"Raised when a manifest is readable and this build cannot use it."},
-    {"code":"STACK-3","exit":1,"family":"STACK","meaning":"This build of lemonfiber is not intact: the stack that ships inside the binary is missing. The build is supposed to make this impossible.","name":"STACK_NOT_EMBEDDED","remedy":"Nothing is known to fix this. Send a [support bundle](https://docs.lemonfiber.app/fixing/the-support-bundle/).","severity":"critical","since":"0.1.0","status":500,"summary":"Raised when the embedded stack is not intact."},
     {"code":"STACK-4","exit":1,"family":"STACK","meaning":"There is nowhere to write the stack, because no location has been chosen.","name":"STACK_NOT_SET_UP","remedy":"Run lemonfiber setup.","severity":"error","since":"0.1.0","status":500,"summary":"Raised when lemonfiber has nowhere to write the stack."},
     {"code":"STACK-5","exit":1,"family":"STACK","meaning":"The stack could not be written to disk, so nothing can start. Usually a permission problem or a full disk.","name":"STACK_NOT_WRITTEN","remedy":"Check the location is writable and has space.","severity":"error","since":"0.1.0","status":500,"summary":"Raised when the stack could not be written to disk."},
     {"code":"STACK-6","exit":5,"family":"STACK","meaning":"The manifest parses and contradicts itself: it says things about itself that cannot all be true.","name":"STACK_INVALID","remedy":"Fix the faults listed under the message. All of them were found in one pass.","severity":"error","since":"0.1.0","status":500,"summary":"Raised when a manifest parses and breaks the contract."},
@@ -451,6 +450,7 @@
   ],
   "retired": [
     "CONFIG-7",
-    "QUOTA-3"
+    "QUOTA-3",
+    "STACK-3"
   ]
 }

@@ -269,10 +269,6 @@ async fn a_record_that_does_not_read_declines_and_removed_nobody() {
     }
 }
 
-/// A stack compiled in, which is written out nowhere until a directory is chosen for it.
-static STACKLET: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
-
 /// With no record on disk, or no stack written out to hold one, there is nothing to read,
 /// and nobody is declined or removed.
 #[tokio::test]
@@ -286,7 +282,9 @@ async fn without_a_stack_on_disk_nobody_is_declined() {
     assert!(super::removed_at_lapse(&ctx, &offers).await.is_empty());
 
     let unwritten = crate::test_support::a_context()
-        .over(crate::stack::Source::Embedded(&STACKLET))
+        .over(crate::stack::Source::Embedded(
+            &crate::test_support::STACKLET,
+        ))
         .build();
     assert!(super::declined(&unwritten, &offers).await.is_empty());
     assert!(super::removed_at_lapse(&unwritten, &offers)

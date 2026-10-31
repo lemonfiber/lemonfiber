@@ -17,14 +17,12 @@ fn machine(name: &str) -> (Scratch, PathBuf) {
     (dir, stack)
 }
 
-/// A stack with nothing in it, compiled in, whose directory is wherever the settings say.
-static STACKLET: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
-
 /// A context with `home` and the stack in `stack`, on `environment`.
 fn ctx(home: Option<&Path>, stack: &Path, environment: Environment) -> crate::app::Ctx {
     a_context()
-        .over(crate::stack::Source::Embedded(&STACKLET))
+        .over(crate::stack::Source::Embedded(
+            &crate::test_support::STACKLET,
+        ))
         .environment(environment)
         .settings(crate::config::Settings {
             home: home.map(Path::to_path_buf),
@@ -335,7 +333,9 @@ async fn a_container_with_the_stack_at_the_hosts_path_judges_the_same() {
 #[tokio::test]
 async fn with_no_stack_a_relative_path_is_refused() {
     let stackless = a_context()
-        .over(crate::stack::Source::Embedded(&STACKLET))
+        .over(crate::stack::Source::Embedded(
+            &crate::test_support::STACKLET,
+        ))
         .settings(crate::config::Settings {
             home: Some(Path::new(HOME).to_path_buf()),
             ..crate::config::Settings::default()

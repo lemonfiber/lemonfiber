@@ -19,16 +19,6 @@ codes! {
             lemonfiber.",
         remedy: "Update lemonfiber, or point at a stack this version reads.",
     }
-    /// Raised when the embedded stack is not intact.
-    STACK_NOT_EMBEDDED = "STACK-3" {
-        severity: Critical,
-        status: 500,
-        since: "0.1.0",
-        meaning: "This build of lemonfiber is not intact: the stack that ships inside the binary \
-            is missing. The build is supposed to make this impossible.",
-        remedy: "Nothing is known to fix this. Send a [support \
-            bundle](https://docs.lemonfiber.app/fixing/the-support-bundle/).",
-    }
     /// Raised when lemonfiber has nowhere to write the stack.
     STACK_NOT_SET_UP = "STACK-4" {
         severity: Error,

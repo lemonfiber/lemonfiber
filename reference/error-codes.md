@@ -553,7 +553,6 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | ---- | ---- | -------- | ---- | ------ | ----- | ------- |
 | `STACK-1` | `STACK_UNREADABLE` | error | 5 | 500 | 0.1.0 | Raised when a stack directory holds no readable manifest. |
 | `STACK-2` | `STACK_UNUSABLE` | error | 1 | 500 | 0.1.0 | Raised when a manifest is readable and this build cannot use it. |
-| `STACK-3` | `STACK_NOT_EMBEDDED` | critical | 1 | 500 | 0.1.0 | Raised when the embedded stack is not intact. |
 | `STACK-4` | `STACK_NOT_SET_UP` | error | 1 | 500 | 0.1.0 | Raised when lemonfiber has nowhere to write the stack. |
 | `STACK-5` | `STACK_NOT_WRITTEN` | error | 1 | 500 | 0.1.0 | Raised when the stack could not be written to disk. |
 | `STACK-6` | `STACK_INVALID` | error | 5 | 500 | 0.1.0 | Raised when a manifest parses and breaks the contract. |
@@ -676,4 +675,4 @@ what to do about it, is in `contract/codes.json` and written for operators at
 
 ## Retired
 
-Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`.
+Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`, `STACK-3`.

@@ -1,4 +1,6 @@
-//! The stack's own Compose files, which nothing reads once the project is generated.
+//! The stack's own Compose files, which nothing reads once the project is generated, and
+//! the manifest an earlier release wrote out for the embedded stack, which nothing reads
+//! once that stack is read where it is carried.
 //!
 //! Each one lemonfiber wrote and nobody changed since is taken away, and so is every
 //! document it wrote for a plugin and the file standing beside an existing setup was
@@ -28,12 +30,15 @@ const PLUGIN_DOCUMENTS: &str = "plugins";
 /// settings.
 const BESIDE: &str = "beside.yml";
 
+/// What a manifest file is named with.
+const MANIFESTED: &str = "toml";
+
 /// What a file Compose reads is named with.
 const COMPOSED: [&str; 2] = ["yml", "yaml"];
 
-/// Take away every static Compose file lemonfiber wrote into the embedded stack and
-/// nobody changed, every plugin's document, and the file standing beside was layered
-/// with. Best effort: a file that will not go is one nothing reads.
+/// Take away every static Compose file and manifest file lemonfiber wrote into the
+/// embedded stack and nobody changed, every plugin's document, and the file standing
+/// beside was layered with. Best effort: a file that will not go is one nothing reads.
 pub(crate) fn retired(ctx: &Ctx, installed: &[crate::plugin::Installed]) {
     let ours = !ctx.dry_run && !matches!(ctx.stack, crate::stack::Source::External(_));
     let Some(directory) = super::directory(ctx).filter(|_| ours) else {
@@ -43,7 +48,7 @@ pub(crate) fn retired(ctx: &Ctx, installed: &[crate::plugin::Installed]) {
     let mut record: Materialised = super::super::record::kept(at.as_deref());
     let keys: Vec<String> = record
         .paths()
-        .filter(|key| is_static(Path::new(key)))
+        .filter(|key| is_static(Path::new(key)) || is_manifest(Path::new(key)))
         .map(str::to_owned)
         .collect();
     for key in &keys {
@@ -69,6 +74,7 @@ pub(crate) fn retired(ctx: &Ctx, installed: &[crate::plugin::Installed]) {
         documents,
         directory.join(FRAGMENTS),
         directory.join(VARIANTS),
+        directory.join(lemonfiber_manifest::assembly::SERVICES),
     ] {
         let _ = std::fs::remove_dir(emptied);
     }
@@ -105,6 +111,16 @@ pub(crate) fn still_there(directory: &Path) -> Vec<PathBuf> {
 /// Compose file.
 fn is_static(relative: &Path) -> bool {
     STATIC.iter().any(|one| relative.starts_with(one)) && composed(relative)
+}
+
+/// Whether a path beneath the project directory is where an earlier release wrote the
+/// embedded stack's manifest: its root, or a file of one of its services.
+fn is_manifest(relative: &Path) -> bool {
+    relative == Path::new(lemonfiber_manifest::assembly::ROOT)
+        || (relative.starts_with(lemonfiber_manifest::assembly::SERVICES)
+            && relative
+                .extension()
+                .is_some_and(|extension| extension == MANIFESTED))
 }
 
 /// Whether a path is a file Compose reads.

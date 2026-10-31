@@ -5,8 +5,8 @@
 //! carried is chosen here and written beside this build's other outputs, and that copy
 //! is what is embedded and what every test of the shipped stack reads:
 //!
-//! - **The manifest:** the stack the bundle declares, written apart as a root and a
-//!   file per service, as a stack directory holds it.
+//! - **Never the manifest:** the stack the bundle declares is handed over whole, beside
+//!   this tree, and no root or service file of a stack directory is carried.
 //! - **Each assembled part's starting configuration:** from its copy in the bundle, which
 //!   holds its tree and nothing beside it. A part the bundle installs is not carried: the
 //!   plugin path writes its starting files where none is yet, and its adapter owns them
@@ -28,16 +28,9 @@ pub const LICENCE: &str = "LICENSE";
 /// Where a part's starting configuration is, relative to a stack's root or its copy's.
 const CONFIG: &str = "config";
 
-/// Where a carried file's bytes come from.
-enum Carried {
-    /// A file on disk, in full.
-    File(PathBuf),
-    /// Text this build wrote.
-    Text(String),
-}
-
 /// Write what runs of the stack `text` the bundle declares into `out/stack`: the copies
-/// of the parts `held` from `copies`, and the licence from the catalogue at `catalogue`.
+/// of the parts `held` from `copies`, and the licence from the catalogue at `catalogue`,
+/// and never the manifest, which the crate hands over whole as `STACK`.
 pub fn stack(catalogue: &Path, copies: &Path, text: &str, held: &[Held], out: &Path) {
     let into = out.join(super::CARRIED);
     let _ = std::fs::remove_dir_all(&into);
@@ -46,10 +39,7 @@ pub fn stack(catalogue: &Path, copies: &Path, text: &str, held: &[Held], out: &P
         let made = target
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| match &from {
-                Carried::File(path) => std::fs::copy(path, &target).map(|_| ()),
-                Carried::Text(text) => std::fs::write(&target, text),
-            });
+            .and_then(|()| std::fs::copy(&from, &target).map(|_| ()));
         if let Err(error) = made {
             super::refuse(
                 &format!("{} could not be carried", relative.display()),
@@ -67,13 +57,10 @@ fn runtime(
     copies: &Path,
     text: &str,
     held: &[Held],
-) -> BTreeMap<PathBuf, Carried> {
-    let mut carried = manifest(text, copies);
+) -> BTreeMap<PathBuf, PathBuf> {
+    let mut carried = BTreeMap::new();
     if catalogue.join(LICENCE).is_file() {
-        carried.insert(
-            PathBuf::from(LICENCE),
-            Carried::File(catalogue.join(LICENCE)),
-        );
+        carried.insert(PathBuf::from(LICENCE), catalogue.join(LICENCE));
     }
     for one in held
         .iter()
@@ -83,28 +70,6 @@ fn runtime(
         from(&copies.join(id), &Path::new(CONFIG).join(id), &mut carried);
     }
     carried.extend(proven(copies, text));
-    carried
-}
-
-/// The stack `text` the bundle declares, written apart as a stack directory holds it.
-fn manifest(text: &str, copies: &Path) -> BTreeMap<PathBuf, Carried> {
-    let Ok((root, services)) = lemonfiber_manifest::assembly::split(text) else {
-        super::refuse(
-            "the stack the bundle declares cannot be written apart",
-            "",
-            copies,
-        );
-    };
-    let mut carried = BTreeMap::from([(
-        PathBuf::from(lemonfiber_manifest::assembly::ROOT),
-        Carried::Text(root),
-    )]);
-    for (file, text) in services {
-        carried.insert(
-            Path::new(lemonfiber_manifest::assembly::SERVICES).join(file),
-            Carried::Text(text),
-        );
-    }
     carried
 }
 
@@ -118,7 +83,7 @@ fn beneath(relative: &Path) -> bool {
 
 /// Every file beneath `directory` of the tree at `root`, by its path relative to the
 /// root, carried from there.
-fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, Carried>) {
+fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, PathBuf>) {
     let Ok(entries) = std::fs::read_dir(root.join(directory)) else {
         return;
     };
@@ -127,7 +92,7 @@ fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, Carried>) {
         match entry.file_type() {
             Ok(kind) if kind.is_dir() => from(root, &relative, into),
             Ok(kind) if kind.is_file() => {
-                into.insert(relative.clone(), Carried::File(root.join(relative)));
+                into.insert(relative.clone(), root.join(relative));
             }
             _ => {}
         }
@@ -136,7 +101,7 @@ fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, Carried>) {
 
 /// Every recording the manifest's claims are proven against, by its path in a stack
 /// directory, from the copy of the part whose recordings it is.
-fn proven(copies: &Path, text: &str) -> BTreeMap<PathBuf, Carried> {
+fn proven(copies: &Path, text: &str) -> BTreeMap<PathBuf, PathBuf> {
     let mut named = Vec::new();
     if let Ok(document) = text.parse::<toml::Table>() {
         fixtures(&toml::Value::Table(document), &mut named);
@@ -153,7 +118,7 @@ fn proven(copies: &Path, text: &str) -> BTreeMap<PathBuf, Carried> {
             .filter(|path| beneath(&relative) && path.is_file());
         match held {
             Some(path) => {
-                proven.insert(relative, Carried::File(path));
+                proven.insert(relative, path);
             }
             None => missing.push(fixture),
         }

@@ -5,10 +5,6 @@ use crate::config::Settings;
 use crate::ports::docker::Failure;
 use crate::stack::Source;
 
-/// Any embedded stack: what is asked about is where it is written, not what it holds.
-static EMBEDDED: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/frontend");
-
 /// An embedded stack is asked about where it is written, an operator's own where it
 /// is, and the data root beside either; a path not chosen yet is not asked about.
 #[test]
@@ -20,7 +16,7 @@ fn the_paths_asked_about_are_the_stacks_directory_and_the_data_root() {
     };
 
     assert_eq!(
-        mounted(Source::Embedded(&EMBEDDED), &settings),
+        mounted(Source::Embedded(&crate::stack::BUNDLED), &settings),
         vec![
             PathBuf::from("/srv/lemonfiber/stack"),
             PathBuf::from("/srv/media")
@@ -30,7 +26,11 @@ fn the_paths_asked_about_are_the_stacks_directory_and_the_data_root() {
         mounted(Source::External(Path::new("/srv/own")), &settings),
         vec![PathBuf::from("/srv/own"), PathBuf::from("/srv/media")]
     );
-    assert!(mounted(Source::Embedded(&EMBEDDED), &Settings::default()).is_empty());
+    assert!(mounted(
+        Source::Embedded(&crate::stack::BUNDLED),
+        &Settings::default()
+    )
+    .is_empty());
 }
 
 /// A path the machine keeps elsewhere is refused naming both, and the remedy mounts

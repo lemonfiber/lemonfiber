@@ -30,18 +30,21 @@ fn the_binary_carries_the_app_a_browser_is_served() {
     );
 }
 
-/// The stack is carried too, held the same way for the same reason.
+/// The stack is carried too, held the same way for the same reason: its manifest whole,
+/// and beside it no stack directory's manifest or service files.
 #[test]
 fn the_binary_carries_the_stack_it_operates() {
+    let services = lemonfiber_manifest::Manifest::from_toml(STACK.manifest)
+        .map(|manifest| manifest.services.len())
+        .unwrap_or_default();
+    assert!(services > 0, "the carried manifest describes no services");
     assert!(
-        STACK.get_file("stack.toml").is_some(),
-        "the stack has no manifest, so this binary has nothing to operate"
+        STACK.files.get_file("stack.toml").is_none(),
+        "a stack directory's manifest is carried beside the manifest"
     );
     assert!(
-        STACK
-            .get_dir("services")
-            .is_some_and(|services| services.files().count() > 0),
-        "the stack carries no service files, so its manifest describes no services"
+        STACK.files.get_dir("services").is_none(),
+        "a stack directory's service files are carried beside the manifest"
     );
 }
 
@@ -133,50 +136,33 @@ fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
     );
     for path in mounted.iter().filter(|path| held(path)) {
         assert!(
-            STACK.get_dir(path).is_some() || STACK.get_file(path).is_some(),
+            STACK.files.get_dir(path).is_some() || STACK.files.get_file(path).is_some(),
             "{path} is mounted by the project and not carried"
         );
     }
     assert!(
-        STACK.get_dir(".github").is_none(),
+        STACK.files.get_dir(".github").is_none(),
         "the stack's CI is carried"
     );
     assert!(
-        STACK.get_file("scripts/validate_manifest.py").is_none(),
+        STACK
+            .files
+            .get_file("scripts/validate_manifest.py")
+            .is_none(),
         "the stack's own tooling is carried"
     );
 }
 
-/// The manifest carried is the stack the bundle declares, written apart as a stack
-/// directory holds it, and read back as the same stack.
+/// The manifest carried is the stack the bundle declares, whole.
 #[test]
 fn the_carried_manifest_is_the_stack_the_bundle_declares() {
-    let root = STACK
-        .get_file("stack.toml")
-        .and_then(include_dir::File::contents_utf8)
-        .unwrap_or_default();
-    let services: std::collections::BTreeMap<String, String> = STACK
-        .get_dir("services")
-        .into_iter()
-        .flat_map(include_dir::Dir::files)
-        .filter_map(|file| {
-            let name = file.path().file_name()?.to_str()?.to_owned();
-            Some((name, file.contents_utf8()?.to_owned()))
-        })
-        .collect();
-    let Ok(joined) = lemonfiber_manifest::assemble(root, &services) else {
-        unreachable!("the carried manifest assembles");
-    };
-    let mut read_back: toml::Table = toml::from_str(&joined).unwrap_or_default();
-    read_back.remove("include");
-    let declared: toml::Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
-    assert_eq!(read_back, declared);
+    assert_eq!(STACK.manifest, lemonfiber_bundled::STACK);
 }
 
 /// Every file carried beneath `under` of the stack, by its path beneath it.
 fn carried_under(under: &str) -> std::collections::BTreeSet<String> {
     let mut carried = Vec::new();
-    if let Some(dir) = STACK.get_dir(under) {
+    if let Some(dir) = STACK.files.get_dir(under) {
         every_file(dir, &mut carried);
     }
     carried
@@ -212,7 +198,7 @@ fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
         assert_eq!(carried_under(&format!("config/{id}")), held, "{id}");
         for file in &held {
             assert_eq!(
-                STACK.get_file(file).map(include_dir::File::contents),
+                STACK.files.get_file(file).map(include_dir::File::contents),
                 std::fs::read(copy.join(file)).ok().as_deref(),
                 "{file}"
             );
