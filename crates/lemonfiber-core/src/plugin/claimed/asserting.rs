@@ -414,6 +414,11 @@ pub(in crate::plugin) fn pinned_to(
         (Of::Request { request, response }, Asks::Request(asked))
             if recorded::records(request, asked) =>
         {
+            if let Some(unheld) = unvaried(named, asked, response) {
+                let why = unheld.to_string();
+                refusals.push(unheld);
+                return Err(why);
+            }
             Ok(faults(expect, response))
         }
         (Of::Run { run, result }, Asks::Run(asked)) if run.args == asked.args => {
@@ -425,6 +430,25 @@ pub(in crate::plugin) fn pinned_to(
             asks.said()
         )),
     }
+}
+
+/// The first place `asked` says varies at which `response`, the recording `named`, holds
+/// no string its shape matches whole.
+fn unvaried(
+    named: &str,
+    asked: &lemonfiber_plugin::Request,
+    response: &recorded::Answer,
+) -> Option<lemonfiber_plugin::Violation> {
+    asked.varies.iter().find_map(|(place, shape)| {
+        let at = response.json.as_ref().and_then(|json| json.pointer(place));
+        (!lemonfiber_plugin::varying::held(shape, at)).then(|| lemonfiber_plugin::Violation {
+            location: named.to_owned(),
+            message: format!(
+                "holds no string at {place} the shape {shape} matches whole, and a place a \
+                 request says varies is one its recording holds a value of that shape at"
+            ),
+        })
+    })
 }
 
 /// A recording taken from an image this manifest does not install.

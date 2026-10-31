@@ -17,6 +17,12 @@
         "string"
       ],
       "required": true
+    },
+    "varies": {
+      "type": [
+        "object{string}"
+      ],
+      "required": false
     }
   },
   "variants": []

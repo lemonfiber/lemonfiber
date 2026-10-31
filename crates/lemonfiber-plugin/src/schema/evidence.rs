@@ -237,6 +237,11 @@ pub struct Request {
     /// Absent where the service needs no asking, which is most of them.
     #[serde(default)]
     pub accept: Option<String>,
+    /// Each place in the answer whose value the service makes afresh on every run, a JSON
+    /// Pointer into its JSON, to the RE2 shape the whole value there is held to wherever a
+    /// recording is taken again. Never sent.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub varies: BTreeMap<String, String>,
 }
 
 /// What the answer has to be.
