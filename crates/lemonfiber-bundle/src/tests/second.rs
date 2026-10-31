@@ -679,7 +679,8 @@ fn fence(image: &str, tag: &str, digest: &str) -> String {
 }
 
 /// A part with a fenced service is read only where the bundle pins the fence's image, and
-/// that pin is held to where the fence is published, a release and a digest.
+/// that pin is held to where the fence is published, a release or a commit image, and a
+/// digest.
 #[test]
 fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
     let fenced = PART.replace(
@@ -722,6 +723,15 @@ fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
         &with(&fence("ghcr.io/lemonfiber/fence", "0.18.0-beta.1", &digest)),
     ));
     assert!(pre.is_ok(), "{pre:?}");
+    let commit = read(&catalogued(
+        "fence-commit",
+        &with(&fence(
+            "ghcr.io/lemonfiber/fence",
+            "main-8de8b3aa2b24",
+            &digest,
+        )),
+    ));
+    assert!(commit.is_ok(), "{commit:?}");
 
     for (name, pinned, said) in [
         (
@@ -733,6 +743,21 @@ fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
             "fence-tag",
             fence("ghcr.io/lemonfiber/fence", "v0.18.0", &digest),
             "fence.tag v0.18.0 is not a release",
+        ),
+        (
+            "fence-short-commit",
+            fence("ghcr.io/lemonfiber/fence", "main-8de8b3aa2b2", &digest),
+            "fence.tag main-8de8b3aa2b2 is not a release",
+        ),
+        (
+            "fence-upper-commit",
+            fence("ghcr.io/lemonfiber/fence", "main-8DE8B3AA2B24", &digest),
+            "fence.tag main-8DE8B3AA2B24 is not a release",
+        ),
+        (
+            "fence-branch",
+            fence("ghcr.io/lemonfiber/fence", "next-8de8b3aa2b24", &digest),
+            "fence.tag next-8de8b3aa2b24 is not a release",
         ),
         (
             "fence-digest",

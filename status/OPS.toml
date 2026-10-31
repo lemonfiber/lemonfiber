@@ -6,4 +6,5 @@ requirement = [
   { id = "OPS-R35", state = "open" },
   { id = "OPS-R44", state = "open" },
   { id = "OPS-R54", state = "open" },
+  { id = "OPS-R94", state = "partial" },
 ]
