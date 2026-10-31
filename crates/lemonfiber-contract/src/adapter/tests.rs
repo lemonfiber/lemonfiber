@@ -22,3 +22,27 @@ async fn a_served_capability_dispatches_to_what_fills_it_and_says_what_it_speaks
     let refused = served.dispatch("nothing", b"{}".to_vec()).await;
     assert!(refused.is_err());
 }
+
+#[test]
+fn an_email_lemonfiber_mints_is_its_key_at_the_plugins_own_unreachable_domain() {
+    let key: String = (0..super::MINTED_HEX)
+        .filter_map(|at| char::from_digit(u32::try_from(at % 16).ok()?, 16))
+        .collect();
+    assert!(super::minted_email(&format!("{key}@komga.invalid")));
+    assert!(super::minted_email(&format!("{key}@plugin-2.invalid")));
+    for not_minted in [
+        format!("{key}@komga.example"),
+        format!("{key}@.invalid"),
+        format!("{key}@Komga.invalid"),
+        format!("{key}@ko_mga.invalid"),
+        format!("{key}@komga.invalid@komga.invalid"),
+        format!("{}@komga.invalid", &key[1..]),
+        format!("{key}0@komga.invalid"),
+        format!("{}@komga.invalid", key.to_uppercase()),
+        format!("{}g@komga.invalid", &key[1..]),
+        key.clone(),
+        String::new(),
+    ] {
+        assert!(!super::minted_email(&not_minted), "{not_minted:?}");
+    }
+}
