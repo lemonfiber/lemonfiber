@@ -77,9 +77,9 @@ async fn a_torrent_adapter_is_inside_the_guard_its_upstream_takes() {
 }
 
 #[tokio::test]
-async fn the_stacks_own_guard_is_asked_in_process_and_a_strangers_uncontracted_one_not_at_all() {
+async fn a_guard_speaking_no_contract_is_asked_not_at_all_the_stacks_own_included() {
     let ctx = ctx("own");
-    assert!(guard(&ctx, &fillers(&[])).await.is_some());
+    assert!(guard(&ctx, &fillers(&[])).await.is_none());
 
     let stranger = [an_installed(
         "wireguard",

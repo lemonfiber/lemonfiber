@@ -51,3 +51,44 @@ pub(crate) fn a_trusted_crossing_reader() -> crate::plugin::Installed {
     }
     embedded
 }
+
+/// The stack this build carries, with its unpacker taking a key of each curator from that
+/// curator, as an assembled part whose credentials cross to it declares them.
+pub(crate) fn crossing_stack() -> Option<lemonfiber_manifest::Manifest> {
+    const CROSSING: &str = r#"
+[[secret]]
+id = "tv-key"
+of = "sonarr"
+why = "w"
+
+[[secret]]
+id = "music-key"
+of = "lidarr"
+why = "w"
+"#;
+    #[derive(serde::Deserialize)]
+    struct Declared {
+        secret: Vec<lemonfiber_manifest::container::Secret>,
+    }
+    let declared: Declared = toml::from_str(CROSSING).ok()?;
+    let mut manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok()?;
+    let unpackerr = manifest
+        .services
+        .iter_mut()
+        .find(|service| service.id == "unpackerr")?;
+    for (variable, secret) in [
+        ("UN_SONARR_0_API_KEY", "tv-key"),
+        ("UN_LIDARR_0_API_KEY", "music-key"),
+    ] {
+        unpackerr.env.insert(
+            variable.to_owned(),
+            lemonfiber_manifest::container::Value::Secret(
+                lemonfiber_manifest::container::SecretOf {
+                    secret: secret.to_owned(),
+                },
+            ),
+        );
+    }
+    unpackerr.secret = declared.secret;
+    Some(manifest)
+}

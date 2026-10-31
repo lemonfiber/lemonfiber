@@ -16,6 +16,14 @@ pub(crate) fn offered(moves: &[MoveOffered]) -> Lines {
              `lemonfiber update stack` shows the move, and confirming the update takes it.",
             one.plugin
         ));
+        if let Some(adapter) = &one.configured_by {
+            lines.put(format!(
+                "Until it moves, {} runs without {adapter}, which writes the configuration it \
+                 reads, so it starts without what that holds, the credentials it reaches other \
+                 services with included.",
+                one.service
+            ));
+        }
     }
     lines
 }

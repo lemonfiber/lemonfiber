@@ -137,6 +137,7 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
             "caddy".to_owned(),
             "calibre-web-automated".to_owned(),
             "door".to_owned(),
+            "gluetun".to_owned(),
             "homepage".to_owned(),
             BUNDLED.to_owned(),
             "lidarr".to_owned(),
@@ -148,7 +149,8 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
             "recyclarr".to_owned(),
             "sabnzbd".to_owned(),
             "seerr".to_owned(),
-            "sonarr".to_owned()
+            "sonarr".to_owned(),
+            "unpackerr".to_owned()
         ]
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
@@ -167,7 +169,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((18, 0))
+        Some((20, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -193,6 +195,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
             "caddy",
             "calibre-web-automated",
             "door",
+            "gluetun",
             "homepage",
             "lidarr",
             "navidrome",
@@ -203,7 +206,8 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
             "recyclarr",
             "sabnzbd",
             "seerr",
-            "sonarr"
+            "sonarr",
+            "unpackerr"
         ])
     );
     assert_eq!(counted(reading(&ctx).await), Some(1));
@@ -216,14 +220,14 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
     let ctx = unmoved("embedded-narrowed", &serving);
 
-    let confirmed = crate::update::run::update(&ctx, updating(Some("unpackerr"), true)).await;
+    let confirmed = crate::update::run::update(&ctx, updating(Some("request-gate"), true)).await;
 
     assert_eq!(
         confirmed
             .as_ref()
             .ok()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((18, 0)),
+        Some((20, 0)),
         "{confirmed:?}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));

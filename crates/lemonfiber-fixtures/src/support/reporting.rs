@@ -54,8 +54,6 @@ pub struct Reporting {
     /// means `exec` has nothing to say and fails, as an engine asked for a
     /// container it does not know would.
     tunnel: Option<Tunnel>,
-    /// The program of every command run inside a container, in the order they were run.
-    ran: std::sync::Mutex<Vec<String>>,
 }
 
 /// What a [`Reporting`] engine answers a VPN exec with: a public address for the
@@ -106,7 +104,6 @@ impl Reporting {
             answers: None,
             answered: std::sync::atomic::AtomicUsize::new(0),
             tunnel: None,
-            ran: std::sync::Mutex::default(),
         }
     }
 
@@ -254,15 +251,6 @@ impl Reporting {
         self
     }
 
-    /// How many commands running `program` were run inside a container.
-    #[must_use]
-    pub fn ran(&self, program: &str) -> usize {
-        self.ran
-            .lock()
-            .map(|ran| ran.iter().filter(|one| *one == program).count())
-            .unwrap_or_default()
-    }
-
     /// An engine that is not there.
     #[must_use]
     pub fn absent() -> Self {
@@ -277,7 +265,6 @@ impl Reporting {
             answers: None,
             answered: std::sync::atomic::AtomicUsize::new(0),
             tunnel: None,
-            ran: std::sync::Mutex::default(),
         }
     }
 }
@@ -389,11 +376,6 @@ fn executed(
     container: &str,
     argv: &[String],
 ) -> Result<ExecOutput, EngineFailure> {
-    reporting
-        .ran
-        .lock()
-        .iter_mut()
-        .for_each(|ran| ran.extend(argv.first().cloned()));
     let Some(tunnel) = &reporting.tunnel else {
         return Err(EngineFailure::NoSuchContainer {
             name: container.to_owned(),
@@ -452,3 +434,6 @@ async fn logs(
     }
     Ok(receiver)
 }
+
+#[cfg(test)]
+mod tests;

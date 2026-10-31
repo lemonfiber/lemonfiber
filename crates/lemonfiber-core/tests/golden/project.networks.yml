@@ -40,21 +40,6 @@ networks:
     ipam:
       config:
       - subnet: 10.80.140.168/29
-  ask__unpackerr__library.curate__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.216.160/29
-  ask__unpackerr__library.curate__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.191.208/29
-  ask__unpackerr__library.curate__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.69.248/29
   link__decline__jellyfin:
     internal: true
     ipam:

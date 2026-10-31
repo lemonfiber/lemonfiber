@@ -226,12 +226,12 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
     assert_eq!(listed.len(), 1);
 }
 
-/// An assembled part's key of a curator is listed as the curator's, granted to it, rather
-/// than as a value of the part's own held in the secret store.
+/// A stack part's key of a curator is listed as the curator's, granted to it, rather than
+/// as a value of the part's own held in the secret store.
 #[tokio::test]
-async fn an_assembled_parts_crossing_key_is_listed_as_granted() {
+async fn a_stack_parts_crossing_key_is_listed_as_granted() {
     let (machine, _) = crossed("assembled-granted", running(&[]));
-    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let manifest = crate::test_support::crossing_stack();
     let readers = manifest
         .as_ref()
         .map(|manifest| crate::settings::readers::readers(manifest, &[], &|_| None))

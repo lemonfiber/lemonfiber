@@ -110,12 +110,6 @@ const NAMED: &[Named] = &[
         until: Until::Moves("request-gate"),
     },
     Named {
-        file: "crates/lemonfiber-core/src/app/forwarding/reaching.rs",
-        part: "gluetun",
-        count: 2,
-        until: Until::Moves("gluetun"),
-    },
-    Named {
         file: "crates/lemonfiber-core/src/app/gating.rs",
         part: "jellyfin",
         count: 1,
@@ -244,19 +238,13 @@ const NAMED: &[Named] = &[
     Named {
         file: "crates/lemonfiber-core/src/doctor/vpn.rs",
         part: "gluetun",
-        count: 2,
+        count: 1,
         until: Until::Moves("gluetun"),
     },
     Named {
         file: "crates/lemonfiber-core/src/doctor/vpn/killswitch.rs",
         part: "gluetun",
         count: 1,
-        until: Until::Moves("gluetun"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/doctor/vpn/tunnel.rs",
-        part: "gluetun",
-        count: 5,
         until: Until::Moves("gluetun"),
     },
     Named {

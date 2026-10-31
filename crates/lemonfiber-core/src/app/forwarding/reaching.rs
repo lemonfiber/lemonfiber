@@ -5,26 +5,15 @@ use lemonfiber_contract::capabilities::network::egress;
 
 use crate::app::targets::{declared_downloads, spoken, DownloadTarget, Spoken};
 use crate::app::Ctx;
-use crate::doctor::vpn::Gluetun;
-use crate::origin::Origin;
 use crate::wiring::{Filler, Fillers};
 
-/// The filler of `network.egress-guard`: over its contract where it speaks one, the
-/// bundled Gluetun where it is that, and nothing where none fills it or it cannot be
-/// asked.
+/// The filler of `network.egress-guard` over its contract, and nothing where none fills
+/// it, it speaks no contract or it cannot be asked.
 pub(crate) async fn guard(ctx: &Ctx, fillers: &Fillers) -> Option<Box<dyn egress::Fills>> {
     let (filler, _) = fillers.filling(egress::CAPABILITY)?;
     match spoken(ctx, filler, egress::CAPABILITY, egress::MAJOR).await {
         Spoken::Over(adapter) => Some(Box::new(egress::Adapter(adapter))),
-        Spoken::Unanswered => None,
-        Spoken::Not => (filler.origin == Origin::Bundled).then(|| {
-            Box::new(Gluetun::new(
-                ctx.seams.engine.clone(),
-                ctx.settings.project.clone(),
-                filler.id.clone(),
-                ctx.settings.port_forward.enabled,
-            )) as Box<dyn egress::Fills>
-        }),
+        Spoken::Unanswered | Spoken::Not => None,
     }
 }
 

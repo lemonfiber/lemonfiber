@@ -15,7 +15,7 @@ const PLUGIN_ONLY: [&str; 5] = ["replaces", "native", "env", "speaks", "contract
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's own services declare none of them.
-const FROM_SECRETS: [(&str, &str, &str); 7] = [
+const FROM_SECRETS: [(&str, &str, &str); 4] = [
     ("gluetun", "WIREGUARD_PRIVATE_KEY", "wireguard-key"),
     (
         "gluetun",
@@ -24,9 +24,6 @@ const FROM_SECRETS: [(&str, &str, &str); 7] = [
     ),
     ("gluetun", "OPENVPN_USER", "openvpn-user"),
     ("gluetun", "OPENVPN_PASSWORD", "openvpn-password"),
-    ("unpackerr", "UN_LIDARR_0_API_KEY", "music-key"),
-    ("unpackerr", "UN_RADARR_0_API_KEY", "movies-key"),
-    ("unpackerr", "UN_SONARR_0_API_KEY", "tv-key"),
 ];
 
 fn services(text: &str) -> Vec<Table> {

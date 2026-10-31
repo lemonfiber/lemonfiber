@@ -93,9 +93,14 @@ fn a_key_nothing_holds_yet_is_skipped_until_it_is() {
             .collect()
     };
 
-    let before = sonarr(said(&ctx, |_| ()));
+    let unpacker = |parts: &mut Vec<Installed>| {
+        for part in parts.iter_mut().filter(|part| part.plugin == "unpackerr") {
+            *part = reading(part.clone(), "tv-key", "sonarr");
+        }
+    };
+    let before = sonarr(said(&ctx, unpacker));
     TELEVISION.minted(&ctx, "minted-k3y");
-    let after = sonarr(said(&ctx, |_| ()));
+    let after = sonarr(said(&ctx, unpacker));
 
     assert_eq!(before, vec![skipped("Unpackerr")]);
     assert_eq!(after, Vec::new());

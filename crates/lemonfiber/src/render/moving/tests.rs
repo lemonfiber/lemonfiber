@@ -14,11 +14,28 @@ fn a_move_on_offer_names_the_part_and_the_reading_that_takes_it() {
     let said = offered(&[MoveOffered {
         plugin: "jellyfin".to_owned(),
         service: "jellyfin".to_owned(),
+        configured_by: None,
     }])
     .text();
     assert!(said.contains("runs jellyfin as a plugin"), "{said}");
     assert!(
         said.contains("`lemonfiber update stack` shows the move"),
+        "{said}"
+    );
+}
+
+/// A move whose kept part its adapter configures says what the part starts without.
+#[test]
+fn a_move_whose_adapter_configures_the_part_says_it_starts_without_that() {
+    let said = offered(&[MoveOffered {
+        plugin: "unpackerr".to_owned(),
+        service: "unpackerr".to_owned(),
+        configured_by: Some("unpackerr-adapter".to_owned()),
+    }])
+    .text();
+    assert!(
+        said.contains("Until it moves, unpackerr runs without unpackerr-adapter")
+            && said.contains("the credentials it reaches other services with"),
         "{said}"
     );
 }

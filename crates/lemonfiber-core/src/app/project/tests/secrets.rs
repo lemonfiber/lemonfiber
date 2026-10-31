@@ -200,31 +200,36 @@ fn a_stack_service_moved_in_place_is_no_longer_written_a_secrets_file() {
     assert!(!filed(&installed).contains(&"gluetun".to_owned()));
 }
 
-/// What `service`'s secrets file holds, for the stack this build carries.
-fn file_of(ctx: &crate::app::Ctx, service: &str) -> String {
-    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
-    crate::settings::Resolved::of(ctx, manifest.as_ref(), &[])
+/// What `service`'s secrets file holds, for `manifest`.
+fn file_of(
+    ctx: &crate::app::Ctx,
+    manifest: Option<&lemonfiber_manifest::Manifest>,
+    service: &str,
+) -> String {
+    crate::settings::Resolved::of(ctx, manifest, &[])
         .secrets_file(service)
         .and_then(|file| std::fs::read_to_string(file).ok())
         .unwrap_or_default()
 }
 
-/// An assembled part's key of a curator is that curator's own, read where lemonfiber keeps
-/// it each time the part's file is written, never copied into the secret store, and
-/// written again into every file that reads it once it is replaced.
+/// A part's key of a curator is that curator's own, read where lemonfiber keeps it each
+/// time the part's file is written, never copied into the secret store, and written again
+/// into every file that reads it once it is replaced.
 #[test]
-fn an_assembled_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
+fn a_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
     let (ctx, _) = machine("secrets-crossing");
     let recorded =
         |key: &str| crate::app::targets::record_secret(&ctx, "SONARR_API_KEY", key).is_ok();
     assert!(recorded("sonarrs-key"));
-    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let manifest = crate::test_support::crossing_stack();
     let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
     assert!(manifest
         .as_ref()
         .is_some_and(|manifest| super::super::secrets_written(&ctx, manifest, &[]).is_ok()));
 
-    assert!(file_of(&ctx, "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-key"));
+    assert!(
+        file_of(&ctx, manifest.as_ref(), "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-key")
+    );
     let filed = crate::settings::secrets_at(&ctx)
         .and_then(|at| std::fs::read_to_string(at).ok())
         .unwrap_or_default();
@@ -240,20 +245,19 @@ fn an_assembled_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
     );
 
     assert_eq!(reread.unwrap_or_default(), vec!["unpackerr".to_owned()]);
-    assert!(file_of(&ctx, "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-new-key"));
+    assert!(file_of(&ctx, manifest.as_ref(), "unpackerr")
+        .contains("UN_SONARR_0_API_KEY=sonarrs-new-key"));
 }
 
 /// A curator the stack does not run holds no key to hand over, so the part's variable for
 /// it is withheld rather than read under a name nothing keeps.
 #[test]
-fn an_assembled_parts_key_of_a_service_nothing_here_runs_is_withheld() {
+fn a_parts_key_of_a_service_nothing_here_runs_is_withheld() {
     let (ctx, _) = machine("secrets-withheld");
-    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
-        .ok()
-        .map(|mut manifest| {
-            manifest.services.retain(|service| service.id != "lidarr");
-            manifest
-        });
+    let manifest = crate::test_support::crossing_stack().map(|mut manifest| {
+        manifest.services.retain(|service| service.id != "lidarr");
+        manifest
+    });
     let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
 
     let held = manifest
@@ -264,12 +268,12 @@ fn an_assembled_parts_key_of_a_service_nothing_here_runs_is_withheld() {
     assert_eq!(held, Some(crate::plugin::Holding::Withheld));
 }
 
-/// A stack service's own key, one its secrets hold for no other service, is read under
-/// the stack's name for the service itself.
+/// A stack service's own key, one its secrets hold for no other service and the operator
+/// does not enter, is read under the stack's name for the service itself.
 #[test]
 fn a_stack_services_own_key_is_read_under_its_own_name() {
     let (ctx, _) = machine("secrets-own");
-    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let manifest = crate::test_support::crossing_stack();
     let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
 
     let held = manifest
@@ -289,4 +293,103 @@ fn a_stack_services_own_key_is_read_under_its_own_name() {
             "ARCHIVE_EXTRACT_API_KEY".to_owned()
         ))
     );
+}
+
+/// The kept guard's own secrets, as its secrets file would read them.
+fn kept_guard(ctx: &crate::app::Ctx) -> Vec<(String, crate::plugin::Holding)> {
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let resolved = crate::settings::Resolved::of(ctx, manifest.as_ref(), &[]);
+    manifest
+        .as_ref()
+        .and_then(|manifest| manifest.services.iter().find(|one| one.id == "gluetun"))
+        .map(|gluetun| crate::settings::files::of_stack_service(gluetun, &resolved))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|variable| (variable.name, variable.holding))
+        .collect()
+}
+
+/// A guard the operator has not moved yet keeps the secrets they entered, read under the
+/// names its plugin reads them by once it moves, so the move asks for none again.
+#[test]
+fn a_kept_guard_reads_each_secret_where_its_plugin_reads_it_after_the_move() {
+    let (ctx, _) = machine("secrets-kept-guard");
+    let kept = kept_guard(&ctx);
+    let moved = crate::test_support::guard::moved();
+    assert!(moved.is_some(), "the bundle installs the guard");
+    let Some(moved) = moved else {
+        return;
+    };
+    let resolved = crate::settings::Resolved::of(&ctx, None, std::slice::from_ref(&moved));
+    let after: Vec<(String, crate::plugin::Holding)> = resolved.reading(|reading| {
+        moved
+            .services
+            .iter()
+            .filter(|placed| placed.service == "gluetun")
+            .flat_map(|placed| {
+                placed
+                    .fields
+                    .env
+                    .iter()
+                    .filter_map(|(name, value)| match value {
+                        lemonfiber_manifest::container::Value::Secret(secret) => Some((
+                            name.clone(),
+                            crate::plugin::holding(&moved, &secret.secret, reading),
+                        )),
+                        _ => None,
+                    })
+            })
+            .collect()
+    });
+    let names: Vec<&str> = kept.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "OPENVPN_PASSWORD",
+            "OPENVPN_USER",
+            "WIREGUARD_PRESHARED_KEY",
+            "WIREGUARD_PRIVATE_KEY"
+        ]
+    );
+    assert_eq!(kept, after);
+}
+
+/// The guard's key entered under the stack's earlier name for it is the one the kept guard
+/// reads, through the one name the secret store maps it to.
+#[test]
+fn the_guards_key_entered_under_its_earlier_name_is_read_by_the_kept_guard() {
+    let (ctx, _) = machine("secrets-kept-legacy");
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(
+        crate::settings::legacy::entered(&env, crate::credential::VPN_PRIVATE_KEY, KEY, 0)
+            .is_some_and(|kept| kept.is_ok())
+    );
+    assert_eq!(
+        crate::settings::legacy::keyed(crate::credential::VPN_PRIVATE_KEY).map(|row| row.name),
+        Some("gluetun:wireguard-key")
+    );
+    let key = kept_guard(&ctx)
+        .into_iter()
+        .find(|(name, _)| name == "WIREGUARD_PRIVATE_KEY")
+        .map(|(_, holding)| holding);
+    assert_eq!(
+        key,
+        Some(crate::plugin::Holding::Store(
+            "gluetun:wireguard-key".to_owned()
+        ))
+    );
+    assert!(file_of(
+        &ctx,
+        lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+            .ok()
+            .as_ref(),
+        "gluetun"
+    )
+    .is_empty());
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    assert!(manifest
+        .as_ref()
+        .is_some_and(|manifest| super::super::secrets_written(&ctx, manifest, &[]).is_ok()));
+    assert!(file_of(&ctx, manifest.as_ref(), "gluetun")
+        .contains(&format!("WIREGUARD_PRIVATE_KEY={KEY}")));
 }

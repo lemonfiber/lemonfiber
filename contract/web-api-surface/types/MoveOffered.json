@@ -1,5 +1,11 @@
 {
   "fields": {
+    "configured_by": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "plugin": {
       "type": [
         "string"

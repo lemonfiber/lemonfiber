@@ -49,39 +49,6 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  gluetun:
-    image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
-    profiles:
-    - lemonfiber.waiting
-    restart: unless-stopped
-    environment:
-      SERVER_COUNTRIES: Netherlands
-      TZ: Europe/Amsterdam
-      VPN_PORT_FORWARDING: off
-      VPN_SERVICE_PROVIDER: ''
-      VPN_TYPE: wireguard
-      WIREGUARD_ADDRESSES: ''
-    ports:
-    - 127.0.0.1:8081:8081
-    volumes:
-    - ./config/gluetun:/config
-    networks:
-    - own__gluetun
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    - NET_ADMIN
-    devices:
-    - /dev/net/tun:/dev/net/tun
-    pids_limit: 1024
   request-gate:
     image: ghcr.io/lemonfiber/request-gate:main-b1472d34833c@sha256:fc84286bdac98df045a6df97837ae5134ff5a5c4dc75a8875675988992cec55e
     profiles:
@@ -105,44 +72,6 @@ services:
     pids_limit: 1024
     read_only: true
     mem_limit: 64m
-  unpackerr:
-    image: ghcr.io/hotio/unpackerr:release-0.15.2@sha256:724c702e81727e3d90c42cf2b3d900674203906a6d135ba07416c9a3f9f67fbb
-    profiles:
-    - tuning
-    restart: unless-stopped
-    environment:
-      PGID: '1000'
-      PUID: '1000'
-      TZ: Europe/Amsterdam
-      UMASK: '002'
-      UN_LIDARR_0_URL: http://lidarr:8686
-      UN_RADARR_0_URL: http://radarr:7878
-      UN_SONARR_0_URL: http://sonarr:8989
-      UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
-      UN_WEBSERVER_METRICS: 'true'
-    volumes:
-    - ./data:/data
-    - ./config/unpackerr:/config
-    networks:
-    - ask__unpackerr__library.curate__lidarr
-    - ask__unpackerr__library.curate__radarr
-    - ask__unpackerr__library.curate__sonarr
-    - link__unpackerr__lidarr
-    - link__unpackerr__radarr
-    - link__unpackerr__sonarr
-    - own__unpackerr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
     profiles:
@@ -311,6 +240,40 @@ services:
     - ALL
     pids_limit: 1024
     read_only: true
+  gluetun:
+    image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
+    profiles:
+    - lemonfiber.waiting
+    restart: unless-stopped
+    environment:
+      HEALTH_SERVER_ADDRESS: :9999
+      SERVER_COUNTRIES: Netherlands
+      TZ: Europe/Amsterdam
+      VPN_PORT_FORWARDING: off
+      VPN_SERVICE_PROVIDER: ''
+      VPN_TYPE: wireguard
+      WIREGUARD_ADDRESSES: ''
+    ports:
+    - 127.0.0.1:8081:8081
+    volumes:
+    - ./config/gluetun:/gluetun/auth
+    networks:
+    - own__gluetun
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    - NET_ADMIN
+    devices:
+    - /dev/net/tun:/dev/net/tun
+    pids_limit: 1024
   homepage:
     image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
     profiles:
@@ -388,7 +351,6 @@ services:
     - ./config/lidarr:/config
     networks:
     - ask__request-gate__library.curate__lidarr
-    - ask__unpackerr__library.curate__lidarr
     - link__unpackerr__lidarr
     - own__lidarr
     security_opt:
@@ -535,7 +497,6 @@ services:
     - ./config/radarr:/config
     networks:
     - ask__request-gate__library.curate__radarr
-    - ask__unpackerr__library.curate__radarr
     - link__recyclarr__radarr
     - link__unpackerr__radarr
     - own__radarr
@@ -649,10 +610,41 @@ services:
     - ./config/sonarr:/config
     networks:
     - ask__request-gate__library.curate__sonarr
-    - ask__unpackerr__library.curate__sonarr
     - link__recyclarr__sonarr
     - link__unpackerr__sonarr
     - own__sonarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  unpackerr:
+    image: ghcr.io/hotio/unpackerr:release-0.15.2@sha256:724c702e81727e3d90c42cf2b3d900674203906a6d135ba07416c9a3f9f67fbb
+    profiles:
+    - tuning
+    restart: unless-stopped
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
+      UMASK: '002'
+      UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
+      UN_WEBSERVER_METRICS: 'true'
+    volumes:
+    - ./data:/data
+    - ./config/unpackerr:/config
+    networks:
+    - link__unpackerr__lidarr
+    - link__unpackerr__radarr
+    - link__unpackerr__sonarr
+    - own__unpackerr
     security_opt:
     - no-new-privileges:true
     cap_drop:

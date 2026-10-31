@@ -13,7 +13,10 @@ const PLUGIN_ONLY: [&str; 3] = ["native", "speaks", "contract"];
 
 /// The stack `assembled` with each part `held` installs kept as its copy declares the
 /// service of its id: that one service, providing what any service of the part provides,
-/// without the environment values the plugin's own secrets fill. A choice of filler
+/// with each secret of its environment that only the operator holds declared as the copy
+/// declares it, so it reads the value the plugin reads once it moves, and without the
+/// environment values a secret lemonfiber mints at install fills, since nothing mints
+/// one for it before it moves. A choice of filler
 /// naming any service of an installed part's copy names that one service, which stands
 /// in for every service of the part until it moves.
 ///
@@ -97,13 +100,52 @@ fn standing_in(one: &Held) -> Result<Table, String> {
     if !provided.is_empty() {
         service.insert("provides".into(), Value::Array(provided));
     }
+    let declared: Vec<&Value> = manifest
+        .get("secret")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|secret| !minted(secret))
+        .collect();
+    let held = |id: &str| {
+        declared
+            .iter()
+            .any(|secret| secret.get("id").and_then(Value::as_str) == Some(id))
+    };
     if let Some(Value::Table(env)) = service.get_mut("env") {
-        env.retain(|_, value| value.get("secret").is_none());
+        env.retain(|_, value| value.get("secret").and_then(Value::as_str).is_none_or(held));
         if env.is_empty() {
             service.remove("env");
         }
     }
+    let named: Vec<&str> = service
+        .get("env")
+        .and_then(Value::as_table)
+        .into_iter()
+        .flat_map(Table::values)
+        .filter_map(|value| value.get("secret").and_then(Value::as_str))
+        .collect();
+    let secrets: Vec<Value> = declared
+        .into_iter()
+        .filter(|secret| {
+            secret
+                .get("id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| named.contains(&id))
+        })
+        .cloned()
+        .collect();
+    if !secrets.is_empty() {
+        service.insert("secret".into(), Value::Array(secrets));
+    }
     stacked(one, &manifest, service).map(|(service, _)| service)
+}
+
+/// Whether the declared `secret` is one lemonfiber mints at install.
+fn minted(secret: &Value) -> bool {
+    secret
+        .get("minted")
+        .is_some_and(|minted| minted.as_bool() != Some(false))
 }
 
 /// The id of every service the manifest `copy` declares.
