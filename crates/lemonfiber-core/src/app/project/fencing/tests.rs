@@ -145,7 +145,20 @@ async fn nothing_is_asked_without_a_fenced_service_a_pinned_fence_or_where_a_reh
     let (mut rehearsed, _) = machine("fence-rehearsed", true, &program);
     rehearsed.dry_run = true;
     assert_eq!(readied(&rehearsed, Some(IMAGE)).await, None);
+    let (mut stackless, _) = machine("fence-stackless", true, &program);
+    stackless.settings.stack_dir = None;
+    assert_eq!(readied(&stackless, Some(IMAGE)).await, None);
     assert!(program.asked().is_empty());
+}
+
+#[tokio::test]
+async fn an_answer_that_cannot_be_kept_says_why() {
+    let program = Proving::exiting(0, "192.168.1.20\n");
+    let (ctx, project) = machine("fence-unkept", true, &program);
+    assert!(std::fs::create_dir_all(project.join(HELD)).is_ok());
+
+    assert!(readied(&ctx, Some(IMAGE)).await.is_some());
+    assert_eq!(program.asked().len(), 1);
 }
 
 #[tokio::test]
