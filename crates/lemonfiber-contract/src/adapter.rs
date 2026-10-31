@@ -35,6 +35,32 @@ pub const KEY_MARKS: &[u8] = b"-_.+/=";
 /// them in every password.
 pub const PASSWORD_MARKS: &[u8] = b"-_.~";
 
+/// How many lowercase hexadecimal characters a key lemonfiber mints holds.
+pub const MINTED_HEX: usize = 32;
+
+/// The domain no address can be reached at, which every email address lemonfiber mints
+/// is under, after the plugin's id.
+pub const MINTED_DOMAIN: &str = ".invalid";
+
+/// Whether `value` is spelled as an email address lemonfiber mints: a key of
+/// [`MINTED_HEX`] lowercase hexadecimal characters, `@`, a plugin's id, and
+/// [`MINTED_DOMAIN`].
+#[must_use]
+pub fn minted_email(value: &str) -> bool {
+    let Some((key, domain)) = value.split_once('@') else {
+        return false;
+    };
+    let plugin = domain.strip_suffix(MINTED_DOMAIN).unwrap_or_default();
+    key.len() == MINTED_HEX
+        && key
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && !plugin.is_empty()
+        && plugin
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
 /// What every adapter answers under, beside the capabilities it serves.
 pub const ADAPTER: &str = "adapter";
 
