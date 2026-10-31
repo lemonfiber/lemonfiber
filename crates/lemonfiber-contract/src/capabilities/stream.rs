@@ -29,6 +29,7 @@ fn declared() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/items/(?P<item>[^/]+)/bytes$".to_owned(),
+            query: None,
             item: HEX.to_owned(),
             exempt: vec!["^/items/playing/bytes$".to_owned()],
             naming: vec![

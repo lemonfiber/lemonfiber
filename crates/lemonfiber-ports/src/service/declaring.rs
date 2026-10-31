@@ -32,15 +32,21 @@ pub const ITEM: &str = "{item}";
 /// What a header template names the member's token by.
 pub const TOKEN: &str = "{token}";
 
+/// The question a guard sends the adapter, where the declaration addresses it there.
+pub const MAY: &str = "/lemonfiber/media.serve/v1/may?item={item}";
+
 /// A path the upstream serves an item's bytes under.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[serde(deny_unknown_fields)]
 pub struct BytePath {
-    /// The paths it covers, holding one group named `item` where the item's id sits, every
-    /// match starting at the path's start.
+    /// The paths it covers, holding one group named `item` where the item's id sits, or
+    /// none where [`Self::query`] finds it, every match starting at the path's start.
     pub pattern: String,
+    /// The query parameter whose value holds the item's id, where the path does not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<InQuery>,
     /// The shape an item's id has, matched against what the group holds; a request whose
     /// item has another shape is refused without asking anything.
     pub item: String,
@@ -50,6 +56,19 @@ pub struct BytePath {
     /// in the path, each matched without regard to case, and a parameter on the path
     /// whose name holds anything but ASCII letters, digits, `_`, `-` and `.` refused.
     pub naming: Vec<Naming>,
+}
+
+/// Where in a query value a byte path's item sits.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct InQuery {
+    /// The parameter, carried once under this spelling on every request on the path.
+    pub parameter: String,
+    /// What its value, percent-decoded once, matches whole, holding one group named
+    /// `item` where the item's id sits.
+    pub pattern: String,
 }
 
 /// A path the upstream serves a live stream's bytes under, its playlists and segments
@@ -143,6 +162,47 @@ pub struct Answers {
     pub no_session: Vec<Statuses>,
     /// The member may not be served from where the request came from.
     pub not_from_there: Vec<Statuses>,
+}
+
+impl Answers {
+    /// What each answer of an adapter to the guard's question means: [`Answered`]'s
+    /// statuses, each one alone.
+    #[must_use]
+    pub fn from_adapter() -> Self {
+        Self {
+            may: vec![Statuses::only(Answered::May.status())],
+            may_not: vec![Statuses::only(Answered::MayNot.status())],
+            no_session: vec![Statuses::only(Answered::NoSession.status())],
+            not_from_there: vec![Statuses::only(Answered::NotFromThere.status())],
+        }
+    }
+}
+
+/// What an adapter answers the guard's question with, having asked its upstream with the
+/// member's token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Answered {
+    /// The member may have the item's bytes.
+    May,
+    /// The member may not see the item, or the upstream holds no item by that id.
+    MayNot,
+    /// No token came, or the upstream refused the one that did.
+    NoSession,
+    /// The member may not be served from where the request came from.
+    NotFromThere,
+}
+
+impl Answered {
+    /// The status it is answered with.
+    #[must_use]
+    pub const fn status(self) -> u16 {
+        match self {
+            Self::May => 204,
+            Self::MayNot => 404,
+            Self::NoSession => 401,
+            Self::NotFromThere => 403,
+        }
+    }
 }
 
 /// The request the guard makes to decide a request for an item's bytes.

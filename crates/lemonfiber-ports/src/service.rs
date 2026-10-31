@@ -62,8 +62,9 @@ pub use clients::{
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
 pub use declaring::{
-    joined, Addressee, Answers, BytePath, Declared, Declaring, Held, LivePath, Locations, Naming,
-    Ports, Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, STREAM_NAME, TOKEN,
+    joined, Addressee, Answered, Answers, BytePath, Declared, Declaring, Held, InQuery, LivePath,
+    Locations, Naming, Ports, Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM,
+    MAY, STREAM_NAME, TOKEN,
 };
 pub use declining::{
     Claimed, Declinable, Declined, Declining, Invitations, KeyHeld, Lapsed, LeftBecause, TakenBack,

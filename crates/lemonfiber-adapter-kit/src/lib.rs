@@ -3,10 +3,12 @@
 //! An adapter implements the ports of each capability it fills and hands them to a
 //! [`Kit`]. The kit answers every request the core makes: each operation at its
 //! contract's path, `about` and `ready`, and every one of them only under the plugin's
-//! key, which the core wrote to the adapter's configuration directory before it started.
+//! key, which the core wrote to the adapter's configuration directory before it started,
+//! save the guard's question about an item, which carries the member's token alone.
 
 pub mod credential;
 pub mod endpoint;
+pub mod members;
 pub mod picture;
 pub mod settings;
 pub mod shared;
@@ -39,6 +41,7 @@ pub struct Kit {
     about: About,
     ready: Readiness,
     served: Vec<Served>,
+    members: Option<members::Members>,
 }
 
 impl Kit {
@@ -51,7 +54,21 @@ impl Kit {
             about,
             ready: Arc::new(|| Box::pin(async { true })),
             served: Vec::new(),
+            members: None,
         }
+    }
+
+    /// The same adapter, answering the guard's question about an item at
+    /// [`members::MAY`] by `asking` its upstream with the member's token, presented as
+    /// `presented` says.
+    #[must_use]
+    pub fn asked_by_members(
+        mut self,
+        presented: lemonfiber_ports::service::Presentation,
+        asking: members::Asking,
+    ) -> Self {
+        self.members = Some(members::Members { presented, asking });
+        self
     }
 
     /// The same adapter, saying whether its upstream answers by asking `ready`.
@@ -73,6 +90,7 @@ impl Kit {
         Router::new()
             .route(&about_path(), get(about))
             .route(&ready_path(), get(ready))
+            .route(members::path(), get(members::may))
             .route(
                 "/lemonfiber/{capability}/{major}/{operation}",
                 post(operation),

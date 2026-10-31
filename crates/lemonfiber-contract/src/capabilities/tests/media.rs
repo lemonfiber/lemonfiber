@@ -180,6 +180,7 @@ pub(super) fn declared() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/films/(?P<item>[^/]+)/reel$".to_owned(),
+            query: None,
             item: "^[a-z]{4}$".to_owned(),
             exempt: vec!["^/films/now/reel$".to_owned()],
             naming: vec![

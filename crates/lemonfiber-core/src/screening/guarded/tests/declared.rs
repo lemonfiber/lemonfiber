@@ -111,6 +111,7 @@ fn refusing() -> Vec<Naming> {
 fn byte_path(route: &str, exempt: Vec<String>, naming: Vec<Naming>) -> BytePath {
     BytePath {
         pattern: format!("{PREFIXED}/{route}"),
+        query: None,
         item: ITEM_ID.to_owned(),
         exempt,
         naming,
