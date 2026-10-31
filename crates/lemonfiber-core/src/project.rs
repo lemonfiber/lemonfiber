@@ -175,6 +175,12 @@ pub fn generated(
                 .extend(ports(unit, &values));
         }
     }
+    let mut inside: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for unit in &units {
+        if let Placed::Inside(host) = fencing.placed(unit.id, &topology) {
+            inside.entry(host).or_default().push(unit.id.to_owned());
+        }
+    }
     let entries: Vec<(String, _)> = units
         .iter()
         .map(|unit| {
@@ -182,6 +188,7 @@ pub fn generated(
             let id = literal(unit.id);
             let mut written = entry(unit, &placed, &values);
             written.ports.extend(hosted.remove(&id).unwrap_or_default());
+            written.answer_for(inside.get(unit.id).map_or(&[], Vec::as_slice));
             (id, written)
         })
         .collect();

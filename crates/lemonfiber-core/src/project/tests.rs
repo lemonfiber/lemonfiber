@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lemonfiber_manifest::container::{Network, Publish, UrlOf, Value};
+use lemonfiber_manifest::container::{Network, UrlOf, Value};
 use lemonfiber_manifest::Manifest;
 use serde_norway::Value as Yaml;
 
@@ -125,74 +125,6 @@ fn an_address_in_the_upstreams_own_api_reaches_the_upstream_an_adapter_fronts() 
         environment(&entry(&project, "reader"), "SERVER_URL"),
         format!("http://{MEDIA_UPSTREAM}:9000")
     );
-}
-
-#[test]
-fn a_service_inside_the_egress_guard_activates_the_guards_profile_and_no_other() {
-    let mut inside = a_placed("client", &[], None);
-    inside.fields.network = Some(inside_the_guard());
-    let manifest = carried();
-    let installed = [an_installed("client", vec![inside])];
-    let topology = project(&manifest, &installed).topology;
-    let guard: std::collections::BTreeSet<String> = manifest
-        .services
-        .iter()
-        .filter(|service| service.id == "gluetun")
-        .map(|service| service.profile.clone())
-        .collect();
-
-    let hosting =
-        |service: &str| super::hosting(&manifest, &installed, &topology, &[service.to_owned()]);
-
-    assert!(!guard.is_empty());
-    assert_eq!(hosting("client"), guard);
-    assert!(hosting("gluetun").is_empty());
-}
-
-#[test]
-fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
-    let mut inside = a_placed("client", &[], None);
-    inside.fields.network = Some(inside_the_guard());
-    let mut manifest = carried();
-    manifest.services.retain(|service| {
-        !service
-            .provides
-            .iter()
-            .any(|one| one == "network.egress-guard")
-    });
-    let installed = [
-        an_installed(
-            "tunnel",
-            vec![a_placed("tunnel", &["network.egress-guard"], None)],
-        ),
-        an_installed("client", vec![inside]),
-    ];
-    let topology = project(&manifest, &installed).topology;
-
-    let hosting = super::hosting(&manifest, &installed, &topology, &["client".to_owned()]);
-
-    assert_eq!(
-        hosting,
-        std::iter::once(crate::plugin::profile("tunnel")).collect()
-    );
-}
-
-#[test]
-fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards() {
-    let mut inside = a_placed("client", &[], Some(18999));
-    inside.fields.network = Some(inside_the_guard());
-    inside.fields.publish = vec![Publish {
-        port: 18998,
-        listens: None,
-    }];
-    let project = project(&carried(), &[an_installed("client", vec![inside])]);
-    let client = entry(&project, "client");
-    assert_eq!(text(&client, "network_mode"), "service:gluetun");
-    assert!(ports(&client).is_empty());
-    let guard = ports(&entry(&project, "gluetun"));
-    for port in ["18999", "18998"] {
-        assert!(guard.iter().any(|written| written.contains(port)), "{port}");
-    }
 }
 
 #[test]
@@ -781,6 +713,7 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
 }
 
 mod fenced;
+mod inside;
 mod pass;
 mod replaced;
 mod sources;
