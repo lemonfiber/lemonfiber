@@ -1,5 +1,5 @@
 //! What a plugin's recipes would do, as an operator agrees to it: the calls in order,
-//! the adapter each reaches through, and every value that would leave for somewhere
+//! the API each reaches its service in, and every value that would leave for somewhere
 //! else.
 //!
 //! Read off the manifest at install and kept on the record, for the reason everything
@@ -10,38 +10,12 @@
 //! list out would read the same as one that had nothing in it, and *none* and *not
 //! read* are two different things to tell somebody.
 //!
-//! **An adapter is always lemonfiber's.** A step to a service a plugin's part moved in
-//! place of is reached through the native adapter of the closed set this build
-//! implements, and a plugin can bring none of its own, so every adapter here says so in a
-//! field of its own rather than leaving a client to know it.
+//! **A step's API is its service's declaration.** A call to a service of the stack's
+//! reaches it in the API the installed plugin providing that service declares as its
+//! `native`, read as declared rather than discovered, and in none where it declares none.
 
-use lemonfiber_manifest::ApiKind;
 use lemonfiber_plugin::{Manifest, On, Origin};
 use serde::{Deserialize, Serialize};
-
-/// Whose an adapter is.
-///
-/// One answer, and the field exists so that the answer is on the wire: an adapter a
-/// plugin could bring would be code a stranger wrote running with lemonfiber's
-/// authority, which nothing here can load.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "PluginAdapterOwner")]
-pub enum Owner {
-    /// lemonfiber's own, from the set `contract/adapters.json` publishes.
-    Lemonfiber,
-}
-
-/// The adapter a call reaches its destination through.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginStepAdapter")]
-pub struct Adapter {
-    /// Which of lemonfiber's adapters it is.
-    pub kind: ApiKind,
-    /// Whose it is, which is lemonfiber's.
-    pub owner: Owner,
-}
 
 /// One call a recipe makes, in the order it makes them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -57,9 +31,9 @@ pub struct Step {
     pub to: String,
     /// The path it calls.
     pub path: String,
-    /// The adapter the destination is reached through, or nothing where it is a name
-    /// outside the stack, which no adapter of lemonfiber's speaks to.
-    pub adapter: Option<Adapter>,
+    /// The API the destination is reached in, as the installed plugin providing it
+    /// declares it, or nothing where none does or it is a name outside the stack.
+    pub native: Option<String>,
 }
 
 /// One value a recipe could carry to one destination, as the operator agrees to it.
@@ -146,9 +120,9 @@ pub fn approval(value: &str, to: &str) -> String {
     format!("{value}@{to}")
 }
 
-/// Every recipe this manifest declares, each call yet to be given an adapter.
+/// Every recipe this manifest declares, each call yet to be given its API.
 ///
-/// A call to a service of the stack's is given its adapter by [`reaching`], which has
+/// A call to a service of the stack's is given its API by [`reaching`], which has
 /// the stack to read it from; read here, it would be a call outside the plugin with no
 /// way to tell a bundled service from a host on the internet.
 #[must_use]
@@ -179,7 +153,7 @@ pub fn declared(manifest: &Manifest) -> Vec<Recipe> {
                     method: step.call.method.clone(),
                     to: step.call.to.clone(),
                     path: step.call.path.clone(),
-                    adapter: None,
+                    native: None,
                 })
                 .collect(),
             pairs: recipe
@@ -233,31 +207,30 @@ fn read_from<'a>(recipe: &'a lemonfiber_plugin::Recipe, value: &str) -> Option<&
         .map(|step| step.call.to.as_str())
 }
 
-/// The same recipes, with the adapter of every call to one of the stack's services: the
-/// API the service a first-party part of `installed` moved in place of it answers in.
+/// The same recipes, with the API of every call to one of the stack's services: the one
+/// the plugin of `installed` providing that service declares as its `native`.
 #[must_use]
 pub fn reaching(mut recipes: Vec<Recipe>, installed: &[super::Installed]) -> Vec<Recipe> {
     for step in recipes
         .iter_mut()
         .flat_map(|recipe| recipe.steps.iter_mut())
     {
-        if step.adapter.is_none() {
-            step.adapter = moved_native(installed, &step.to).map(lemonfibers);
+        if step.native.is_none() {
+            step.native = declared_native(installed, &step.to);
         }
     }
     recipes
 }
 
-/// The API the service a first-party part of `installed` moved in place of the stack's
-/// service `service` answers in, where one did and it names one.
-fn moved_native(installed: &[super::Installed], service: &str) -> Option<ApiKind> {
-    crate::project::moving(installed, service, crate::plugin::first_party::EMBEDDED)?
-        .services
+/// The API the service `service` of one of `installed` declares as its `native`, where
+/// one provides it and declares one.
+fn declared_native(installed: &[super::Installed], service: &str) -> Option<String> {
+    installed
         .iter()
+        .flat_map(|one| &one.services)
         .find(|placed| placed.service == service)?
         .native
-        .as_deref()
-        .and_then(ApiKind::named)
+        .clone()
 }
 
 /// Every approval these recipes ask for, once each, in the order they declare them.
@@ -274,14 +247,6 @@ pub fn approvals(recipes: &[Recipe]) -> Vec<&str> {
         }
     }
     asked
-}
-
-/// One of lemonfiber's adapters, said to be lemonfiber's.
-const fn lemonfibers(kind: ApiKind) -> Adapter {
-    Adapter {
-        kind,
-        owner: Owner::Lemonfiber,
-    }
 }
 
 #[cfg(test)]

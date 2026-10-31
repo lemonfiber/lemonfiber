@@ -1,9 +1,8 @@
-use lemonfiber_core::plugin::{Adapter, Owner, Pair, Recipe, Step, Taking};
-use lemonfiber_manifest::ApiKind;
+use lemonfiber_core::plugin::{Pair, Recipe, Step, Taking};
 
 use super::{granting, recipes, taking, unanswered};
 
-/// A recipe with one call through lemonfiber's adapter, one to a host outside, and a
+/// A recipe with one call to a service declaring its API, one to a host outside, and a
 /// value carried there.
 fn recipe() -> Recipe {
     Recipe {
@@ -18,17 +17,14 @@ fn recipe() -> Recipe {
                 method: "GET".to_owned(),
                 to: "sonarr".to_owned(),
                 path: "/api/v3/series".to_owned(),
-                adapter: Some(Adapter {
-                    kind: ApiKind::Servarr,
-                    owner: Owner::Lemonfiber,
-                }),
+                native: Some("servarr".to_owned()),
             },
             Step {
                 id: "tell".to_owned(),
                 method: "POST".to_owned(),
                 to: "metadata.example.org".to_owned(),
                 path: "/v1/series".to_owned(),
-                adapter: None,
+                native: None,
             },
         ],
         pairs: vec![Pair {
@@ -43,14 +39,25 @@ fn recipe() -> Recipe {
 }
 
 #[test]
-fn every_call_is_said_in_order_with_the_adapter_it_reaches_through() {
+fn a_declared_api_is_drawn_plain_whatever_its_plugin_wrote() {
+    let mut drawn = recipe();
+    if let Some(step) = drawn.steps.first_mut() {
+        step.native = Some("servarr\u{1b}[2J\nforged".to_owned());
+    }
+    let said = recipes(&[drawn]).text();
+    assert!(!said.contains('\u{1b}'), "{said}");
+    assert!(!said.contains("\nforged"), "{said}");
+}
+
+#[test]
+fn every_call_is_said_in_order_with_the_api_it_reaches_its_service_in() {
     let said = recipes(&[recipe()]).text();
     assert!(
         said.contains("Recipe adopt: Hand the library over"),
         "{said}"
     );
     assert!(
-        said.contains("1. GET sonarr /api/v3/series, through lemonfiber's servarr adapter"),
+        said.contains("1. GET sonarr /api/v3/series, in its servarr API"),
         "{said}"
     );
     assert!(

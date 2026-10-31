@@ -56,9 +56,9 @@ pub struct Register {
     installed: Vec<Installed>,
 }
 
-/// `written` without the in-process adapters an older record named: each installed
-/// plugin's `adapters`, and each of its services' `api`. No service names one now, and a
-/// record this build writes holds neither.
+/// `written` without the adapters an older record named: each installed plugin's
+/// `adapters`, each of its services' `api`, and each of its recipe steps' `adapter`. No
+/// service or step names one now, and a record this build writes holds none.
 fn forget_adapters(written: &mut serde_json::Value) {
     let installed = written
         .get_mut("installed")
@@ -76,6 +76,18 @@ fn forget_adapters(written: &mut serde_json::Value) {
             .filter_map(serde_json::Value::as_object_mut);
         for service in services {
             service.remove("api");
+        }
+        let steps = plugin
+            .get_mut("recipes")
+            .and_then(serde_json::Value::as_array_mut)
+            .into_iter()
+            .flatten()
+            .filter_map(|recipe| recipe.get_mut("steps"))
+            .filter_map(serde_json::Value::as_array_mut)
+            .flatten()
+            .filter_map(serde_json::Value::as_object_mut);
+        for step in steps {
+            step.remove("adapter");
         }
     }
 }

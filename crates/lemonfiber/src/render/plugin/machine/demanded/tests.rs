@@ -22,7 +22,7 @@ fn rescan() -> Recipe {
             method: "POST".to_owned(),
             to: "komga".to_owned(),
             path: "/api/rescan".to_owned(),
-            adapter: None,
+            native: None,
         }],
         pairs: Vec::new(),
     }

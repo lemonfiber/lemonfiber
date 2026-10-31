@@ -102,7 +102,7 @@ pub(crate) use placing::configuration;
 pub use placing::{key_file, mount_sources, mount_tree, writes, Lands, Write};
 pub use profiled::{profile_of, profiled, Profiled};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
-pub use recipes::{approval, approvals, Adapter, Owner, Pair, Recipe, RecipeInput, Step};
+pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
@@ -141,9 +141,6 @@ pub const SCHEMA_PATH: &str = "contract/plugin-manifest.schema.json";
 
 /// Where the generated capability vocabulary is kept, relative to the workspace root.
 pub const VOCABULARY_PATH: &str = "contract/capability-vocabulary.json";
-
-/// Where the generated set of adapters is kept, relative to the workspace root.
-pub const ADAPTERS_PATH: &str = "contract/adapters.json";
 
 /// Where the generated extension points are kept, relative to the workspace root.
 pub const POINTS_PATH: &str = "contract/extension-points.json";
@@ -198,28 +195,6 @@ pub(crate) fn rendered<T: Serialize>(artefact: &T) -> Option<String> {
 #[must_use]
 pub fn schema() -> Option<String> {
     rendered(&schema_for!(lemonfiber_plugin::Manifest))
-}
-
-/// The adapters a recipe step may be reached through, and where each may read its
-/// credential.
-///
-/// Published rather than discovered: an author reads what this build implements before
-/// writing a manifest against it, rather than learning it from a refusal.
-#[derive(Debug, Serialize)]
-pub struct Adapters {
-    /// Every adapter kind lemonfiber implements.
-    pub kinds: [lemonfiber_manifest::ApiKind; 9],
-    /// Every place an adapter may read a service's credential from.
-    pub key_sources: [lemonfiber_manifest::KeySource; 7],
-}
-
-/// The published set of adapters, as the artefact is committed.
-#[must_use]
-pub fn adapters() -> Option<String> {
-    rendered(&Adapters {
-        kinds: lemonfiber_manifest::ApiKind::ALL,
-        key_sources: lemonfiber_manifest::KeySource::ALL,
-    })
 }
 
 /// The published extension points, against the identities the doctor already holds.

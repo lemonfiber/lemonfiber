@@ -1,7 +1,6 @@
-use lemonfiber_manifest::ApiKind;
 use lemonfiber_plugin::Manifest;
 
-use super::{approvals, declared, reaching, Adapter, Owner, Pair, Step};
+use super::{approvals, declared, reaching, Pair, Step};
 
 /// A plugin with its own service, and one recipe that calls that service, a service of
 /// the stack's, and a host outside both — and carries a value it captured to that host,
@@ -71,7 +70,7 @@ fn manifest() -> Option<Manifest> {
 }
 
 #[test]
-fn every_call_is_kept_in_order_with_no_adapter_until_the_stack_is_read() {
+fn every_call_is_kept_in_order_with_no_api_until_the_stack_is_read() {
     let recipes = manifest().map(|manifest| declared(&manifest));
     let steps: Option<Vec<Step>> = recipes
         .as_ref()
@@ -80,48 +79,57 @@ fn every_call_is_kept_in_order_with_no_adapter_until_the_stack_is_read() {
     assert_eq!(
         steps.as_ref().map(|steps| steps
             .iter()
-            .map(|step| (step.id.as_str(), step.adapter))
+            .map(|step| (step.id.as_str(), step.native.as_deref()))
             .collect::<Vec<_>>()),
         Some(vec![("in", None), ("ask", None), ("tell", None)])
     );
 }
 
-/// The adapter each step of the first recipe names once read beside `installed`.
-fn adapters_against(installed: &[crate::plugin::Installed]) -> Option<Vec<Option<Adapter>>> {
+/// The API each step of the first recipe names once read beside `installed`.
+fn natives_against(installed: &[crate::plugin::Installed]) -> Option<Vec<Option<String>>> {
     manifest()
         .map(|manifest| reaching(declared(&manifest), installed))
         .as_ref()
         .and_then(|recipes| recipes.first())
-        .map(|recipe| recipe.steps.iter().map(|step| step.adapter).collect())
-}
-
-/// What the steps name where sonarr is reached in its servarr API.
-fn through_servarr() -> Vec<Option<Adapter>> {
-    vec![
-        None,
-        Some(Adapter {
-            kind: ApiKind::Servarr,
-            owner: Owner::Lemonfiber,
-        }),
-        None,
-    ]
+        .map(|recipe| {
+            recipe
+                .steps
+                .iter()
+                .map(|step| step.native.clone())
+                .collect()
+        })
 }
 
 #[test]
-fn a_call_to_a_moved_part_names_the_api_the_service_moved_in_its_place_answers_in() {
+fn a_call_names_the_api_the_plugin_providing_its_service_declares() {
     let installed: Vec<_> = crate::test_support::curators::TELEVISION
         .installed()
         .into_iter()
         .collect();
     assert_eq!(
-        adapters_against(&installed),
-        Some(through_servarr()),
-        "sonarr is reached in the servarr API, and a host outside in none"
+        natives_against(&installed),
+        Some(vec![None, Some("servarr".to_owned()), None]),
+        "sonarr is reached in the servarr API its plugin declares, and a host outside in none"
     );
     assert_eq!(
-        adapters_against(&[]),
+        natives_against(&[]),
         Some(vec![None, None, None]),
-        "with nothing moved in its place, the shipped sonarr names no API"
+        "with no plugin providing sonarr, nothing declares its API"
+    );
+}
+
+#[test]
+fn a_declared_api_is_carried_as_declared_whether_or_not_lemonfiber_speaks_it() {
+    let mut installed: Vec<_> = crate::test_support::curators::TELEVISION
+        .installed()
+        .into_iter()
+        .collect();
+    for placed in installed.iter_mut().flat_map(|one| one.services.iter_mut()) {
+        placed.native = Some("sonarr-v5".to_owned());
+    }
+    assert_eq!(
+        natives_against(&installed),
+        Some(vec![None, Some("sonarr-v5".to_owned()), None])
     );
 }
 
@@ -269,16 +277,6 @@ fn a_recipe_lists_what_it_asks_the_operator_for_and_nothing_the_store_answers() 
             },
         ])
     );
-}
-
-#[test]
-fn an_adapter_says_whose_it_is_on_the_wire() {
-    let said = serde_json::to_string(&Adapter {
-        kind: ApiKind::Servarr,
-        owner: Owner::Lemonfiber,
-    })
-    .unwrap_or_default();
-    assert_eq!(said, r#"{"kind":"servarr","owner":"lemonfiber"}"#);
 }
 
 /// A pair to a service in this stack takes nothing off the machine and asks for no

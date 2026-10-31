@@ -138,7 +138,6 @@ jobs:
           for artefact in \
             contract/plugin-manifest.schema.json \
             contract/capability-vocabulary.json \
-            contract/adapters.json \
             contract/extension-points.json \
             contract/stack-manifest.schema.json \
             contract/stack-service.schema.json \
