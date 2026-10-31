@@ -288,6 +288,7 @@ async fn recorded(
                 },
                 recorder.taking,
                 &stood_in,
+                &item.request.varies,
             )
         })
         .collect();
@@ -307,6 +308,7 @@ async fn recorded(
                     },
                     recorder.taking,
                     &stood_in,
+                    &BTreeMap::new(),
                 ),
                 fixture: Some(fixture),
             }

@@ -23,6 +23,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
+# A request's `varies` holds a value to a shape written as an RE2 pattern, compiled once
+# when the manifest is checked and again wherever a recording is held to it.
+regex = { workspace = true }
 # A recipe's call address is built with it, when the manifest is read and when the call
 # is made, so the two are one reading.
 url = { workspace = true }

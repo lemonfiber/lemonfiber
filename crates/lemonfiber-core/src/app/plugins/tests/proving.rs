@@ -659,6 +659,7 @@ async fn a_proof_whose_path_is_not_a_route_on_its_service_is_never_put() {
                     method: String::new(),
                     path: String::new(),
                     accept: None,
+                    varies: std::collections::BTreeMap::new(),
                 }),
             &proof.expect,
             "http://komga:25600",

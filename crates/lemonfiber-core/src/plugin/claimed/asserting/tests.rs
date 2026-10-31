@@ -612,3 +612,50 @@ fn two_verdicts_about_one_assertion_come_to_one() {
 }
 
 mod running;
+
+/// A recording holding no value of its shape at a place its request says varies is
+/// refused and leaves the proof unproven; one holding such a value is run against.
+#[test]
+fn a_recording_is_run_against_only_where_it_holds_each_varying_place_in_its_shape() {
+    let varying = changed(&[(
+        r#"[[proof]]
+id      = "guarded"
+title   = "It refuses a read nobody signed in for"
+request = { method = "GET", path = "/api/series" }"#,
+        r#"[[proof]]
+id      = "guarded"
+title   = "It refuses a read nobody signed in for"
+request = { method = "GET", path = "/api/series", varies = { "/server/id" = "[0-9a-f]{40}" } }"#,
+    )]);
+    for (named, id, passes) in [
+        (
+            "varying-held",
+            "\"946d83ffdbc9067a9ff34de253bff49bec92708f\"",
+            true,
+        ),
+        ("varying-short", "\"946d83ff\"", false),
+        ("varying-number", "40", false),
+    ] {
+        let at = source(named, 401);
+        recorded(
+            &at,
+            "fixtures/guarded.json",
+            401,
+            &format!(r#"{{"server": {{"id": {id}}}}}"#),
+        );
+        let (asserted, refusals) = proofs(&varying, &at);
+        let verdict = asserted.first().map(|one| one.verdict.clone());
+        if passes {
+            assert_eq!(verdict, Some(Verdict::Passed), "{named}: {refusals:?}");
+        } else {
+            assert!(
+                refusals.iter().any(|one| one.contains("/server/id")),
+                "{named}: {refusals:?}"
+            );
+            assert!(
+                matches!(verdict, Some(Verdict::Unproven { .. })),
+                "{named}: {verdict:?}"
+            );
+        }
+    }
+}
