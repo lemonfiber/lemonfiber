@@ -33,6 +33,11 @@ impl Restarting {
         &self.adapter
     }
 
+    /// The upstream started again, by id.
+    pub(super) fn upstream(&self) -> &str {
+        &self.upstream
+    }
+
     /// What a rehearsal of writing `ours` over `yours` says: the write, and that the
     /// upstream may restart to take it up.
     pub(super) fn would(&self, yours: Option<String>, ours: &str) -> State {
@@ -68,13 +73,18 @@ impl Restarting {
 
     /// The upstream started again, journalled first, and its adapter waited on until it
     /// says the upstream answers.
-    async fn restarted(&self, ctx: &Ctx) -> Result<(), String> {
+    pub(super) async fn restarted(&self, ctx: &Ctx) -> Result<(), String> {
         restart(ctx, &self.upstream).await?;
-        let _ = crate::patience::RESTART
-            .until(|| self.adapter.ready(), |ready| matches!(ready, Ok(true)))
-            .await;
+        answering(&self.adapter).await;
         Ok(())
     }
+}
+
+/// `adapter` waited on, within a restart's patience, until it says its upstream answers.
+pub(crate) async fn answering(adapter: &Contracted) {
+    let _ = crate::patience::RESTART
+        .until(|| adapter.ready(), |ready| matches!(ready, Ok(true)))
+        .await;
 }
 
 /// The restart of `service` written down before it is made.

@@ -11,7 +11,7 @@
     },
     {
       "path": "owner.claim/v1/operations/claim.json",
-      "sha256": "9d9169780a9b908e23f3092c96291e299b22f2d7dfec536a89b7ae786445203b"
+      "sha256": "d233e8c60bc186c10472bd4feaa4a1aa81f76270378ecebdcbb96def6597a411"
     },
     {
       "path": "owner.claim/v1/conformance.json",

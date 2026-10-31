@@ -261,7 +261,12 @@
           "default": null
         },
         "method": {"description": "The HTTP method.", "type": "string"},
-        "path": {"description": "The path on the service being asked.", "type": "string"}
+        "path": {"description": "The path on the service being asked.", "type": "string"},
+        "varies": {
+          "description": "Each place in the answer whose value the service makes afresh on every run, a JSON\nPointer into its JSON, to the RE2 shape the whole value there is held to wherever a\nrecording is taken again. Never sent.",
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        }
       },
       "additionalProperties": false,
       "required": ["method", "path"]

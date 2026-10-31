@@ -2,7 +2,10 @@
 //! through no link, keeping the note already there; or, where the run writes nothing,
 //! holding the recording there to what was taken.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+
+use serde_json::Value;
 
 use super::alike::alike;
 use super::{Retaking, Took};
@@ -61,7 +64,8 @@ fn noted(own: &str, stood_in: &[String]) -> String {
 
 /// Write a recording of `of`, taken from `pinned` with stand-ins for each variable
 /// `stood_in` names, at `fixture` beneath `root`, with the note the recording already there
-/// holds, or hold the one there to it where `taking` writes nothing.
+/// holds, or hold the one there to it where `taking` writes nothing, each place `varies`
+/// names held to its shape alone.
 pub(super) fn written(
     root: &Path,
     fixture: &str,
@@ -69,6 +73,7 @@ pub(super) fn written(
     of: Of,
     taking: &Retaking,
     stood_in: &[String],
+    varies: &BTreeMap<String, String>,
 ) -> Took {
     let at = match landing(root, fixture) {
         Ok(at) => at,
@@ -85,7 +90,7 @@ pub(super) fn written(
     };
     let held = std::fs::read_to_string(&at).ok();
     if taking.check {
-        return checked(fixture, held.as_deref(), &recording, unnoted);
+        return checked(fixture, held.as_deref(), &recording, unnoted, varies);
     }
     let made = crate::plugin::rendered(&recording)
         .ok_or(std::io::ErrorKind::InvalidData)
@@ -109,8 +114,15 @@ pub(super) fn written(
     }
 }
 
-/// What holding the recording `held` at `fixture` to `taken` comes to.
-fn checked(fixture: &str, held: Option<&str>, taken: &Recording, unnoted: bool) -> Took {
+/// What holding the recording `held` at `fixture` to `taken` comes to, each place `varies`
+/// names held to its shape alone.
+fn checked(
+    fixture: &str,
+    held: Option<&str>,
+    taken: &Recording,
+    unnoted: bool,
+    varies: &BTreeMap<String, String>,
+) -> Took {
     let Some(held) = held else {
         return Took::Unreproduced {
             why: format!("{fixture} is not there"),
@@ -119,6 +131,7 @@ fn checked(fixture: &str, held: Option<&str>, taken: &Recording, unnoted: bool) 
     let read = |text: &str| serde_json::from_str::<serde_json::Value>(text).ok();
     let same = read(held)
         .zip(crate::plugin::rendered(taken).as_deref().and_then(read))
+        .and_then(|(held, taken)| Some((unvaried(held, varies)?, unvaried(taken, varies)?)))
         .is_some_and(|(held, taken)| alike(&held, &taken));
     match (same, unnoted) {
         (false, _) => Took::Unreproduced {
@@ -128,3 +141,22 @@ fn checked(fixture: &str, held: Option<&str>, taken: &Recording, unnoted: bool) 
         (true, false) => Took::Reproduced,
     }
 }
+
+/// Where a recording keeps the JSON its answer held.
+const ANSWERED: &str = "/response/json";
+
+/// `recording` with the value at each place `varies` names taken out, where each is a
+/// string its shape matches whole; nothing where one is not.
+fn unvaried(mut recording: Value, varies: &BTreeMap<String, String>) -> Option<Value> {
+    for (place, shape) in varies {
+        let at = recording.pointer_mut(&format!("{ANSWERED}{place}"))?;
+        if !lemonfiber_plugin::varying::held(shape, Some(at)) {
+            return None;
+        }
+        *at = Value::Null;
+    }
+    Some(recording)
+}
+
+#[cfg(test)]
+mod tests;

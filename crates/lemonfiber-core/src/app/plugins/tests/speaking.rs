@@ -365,3 +365,51 @@ async fn an_install_whose_part_stays_open_for_want_of_its_code_says_so_naming_th
     assert!(recorded, "{said:?}");
     assert!(!http.asked_for("/lemonfiber/owner.claim/v1/claim"));
 }
+
+#[tokio::test]
+async fn an_install_whose_claim_is_taken_on_restart_starts_the_upstream_again_and_asks_again() {
+    let reply = |status: u16, body: &str| {
+        vec![lemonfiber_fixtures::http::Answer::reply(
+            status,
+            body.to_owned(),
+        )]
+    };
+    let http = Fake::by_path_in_turn(vec![
+        ("/api/v1/libraries", reply(200, "[]")),
+        (
+            "/lemonfiber/adapter/v1/about",
+            reply(
+                200,
+                &about(r#"["media.serve@1","owner.claim@1"]"#, UPSTREAM),
+            ),
+        ),
+        ("/lemonfiber/adapter/v1/ready", reply(200, "true")),
+        (UNKEYED, reply(401, "")),
+        (
+            "/lemonfiber/owner.claim/v1/owner",
+            [reply(401, ""), reply(200, "\"ours\"")].concat(),
+        ),
+        ("/lemonfiber/owner.claim/v1/claim", reply(205, "")),
+    ]);
+    let name = "claimed-on-restart";
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let mut ctx = proving(name, runner.clone(), http.clone());
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+    let said = verdicts(installing(&ctx, &source(name, &claiming())).await);
+    assert!(
+        matches!(said.last().cloned().flatten(), Some(Verdict::Passed)),
+        "{said:?}"
+    );
+    assert!(
+        runner
+            .seen()
+            .iter()
+            .any(|argv| argv.iter().any(|word| word == "restart")
+                && argv.last().is_some_and(|last| last == "komga")),
+        "{:?}",
+        runner.seen()
+    );
+}

@@ -9,7 +9,11 @@ use lemonfiber_contract::capabilities::owner::claim;
 use super::super::served::{allowed, POLL};
 use super::{Asking, Reached, Tapped};
 use crate::ports::http::{Http, Response};
-use crate::ports::service::{Failure, Owner, Ownership as _};
+use crate::ports::service::{Claim, Failure, Owner, Ownership as _};
+
+/// Why a part whose upstream takes its claim only once it restarts is not recorded claimed.
+const RESTARTING: &str =
+    "it takes the claim only once its upstream starts again, which a recording does not do";
 
 /// The facet a part that belongs to whoever claims it first speaks.
 pub(super) fn owning() -> String {
@@ -34,7 +38,11 @@ impl Asking<'_> {
             let held = if settling {
                 part.owner().await
             } else {
-                part.claim().await
+                match part.claim().await {
+                    Ok(Claim::Held(owner)) => Ok(owner),
+                    Ok(Claim::Restarting(_)) => return Err(RESTARTING.to_owned()),
+                    Err(failure) => Err(failure),
+                }
             };
             match held {
                 Ok(Owner::Ours) => return Ok(tapped.heard()),

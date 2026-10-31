@@ -43,6 +43,7 @@ pub fn enforceable() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/media/(?P<item>[^/]+)/bytes$".to_owned(),
+            query: None,
             item: "^[0-9a-f]{32}$".to_owned(),
             exempt: Vec::new(),
             naming: vec![Naming {

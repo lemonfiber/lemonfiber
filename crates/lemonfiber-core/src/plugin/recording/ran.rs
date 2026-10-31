@@ -144,6 +144,7 @@ fn kept(
         },
         taking,
         &[],
+        &std::collections::BTreeMap::new(),
     )
 }
 

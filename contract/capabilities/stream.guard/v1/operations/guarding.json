@@ -100,8 +100,19 @@
                       "type": "array"
                     },
                     "pattern": {
-                      "description": "The paths it covers, holding one group named `item` where the item's id sits, every\nmatch starting at the path's start.",
+                      "description": "The paths it covers, holding one group named `item` where the item's id sits, or\nnone where [`Self::query`] finds it, every match starting at the path's start.",
                       "type": "string"
+                    },
+                    "query": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/InQuery"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The query parameter whose value holds the item's id, where the path does not."
                     }
                   },
                   "required": [
@@ -239,6 +250,25 @@
                       "type": "object"
                     }
                   ]
+                },
+                "InQuery": {
+                  "additionalProperties": false,
+                  "description": "Where in a query value a byte path's item sits.",
+                  "properties": {
+                    "parameter": {
+                      "description": "The parameter, carried once under this spelling on every request on the path.",
+                      "type": "string"
+                    },
+                    "pattern": {
+                      "description": "What its value, percent-decoded once, matches whole, holding one group named\n`item` where the item's id sits.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "parameter",
+                    "pattern"
+                  ],
+                  "type": "object"
                 },
                 "LivePath": {
                   "additionalProperties": false,

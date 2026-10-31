@@ -10,7 +10,10 @@
 //! file is ever opened in place to be written. A read refuses anything but a plain file
 //! with one name before opening it, opens it without following a link and without
 //! blocking, refuses it again through the handle before reading a byte, and is bounded.
-//! A name is a [`SharedName`], one path component, built only by validating it.
+//! A name is a [`SharedName`], one path component, built only by validating it. A file
+//! the upstream keeps in a directory of its own beneath the shared one is reached by
+//! naming each directory on the way, and each is opened through the handle of the one
+//! above it, refusing a link there.
 
 use std::io::{Read as _, Write as _};
 use std::os::fd::OwnedFd;
@@ -98,10 +101,12 @@ impl SharedName {
     }
 }
 
-/// The configuration directory an adapter shares with its upstream.
+/// The configuration directory an adapter shares with its upstream, or a directory
+/// beneath it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shared {
     directory: PathBuf,
+    beneath: Vec<SharedName>,
 }
 
 impl Shared {
@@ -110,7 +115,16 @@ impl Shared {
     pub fn at(directory: &Path) -> Self {
         Self {
             directory: directory.to_path_buf(),
+            beneath: Vec::new(),
         }
+    }
+
+    /// The directory `name` within this one.
+    #[must_use]
+    pub fn beneath(&self, name: SharedName) -> Self {
+        let mut deeper = self.clone();
+        deeper.beneath.push(name);
+        deeper
     }
 
     /// Write `contents` as the whole of the file `name` with `mode`, of which only the
@@ -119,31 +133,34 @@ impl Shared {
     ///
     /// # Errors
     ///
-    /// [`Unshared`] where the directory is a link or a step fails; nothing outside the
-    /// directory is written.
+    /// [`Unshared`] where the directory, or one on the way to it, is a link or is not
+    /// there, or a step fails; nothing outside the directory is written.
     pub async fn write(
         &self,
         name: &SharedName,
         contents: Vec<u8>,
         mode: u32,
     ) -> Result<(), Unshared> {
-        let directory = self.directory.clone();
+        let (directory, beneath) = (self.directory.clone(), self.beneath.clone());
         let owned = name.clone();
-        tokio::task::spawn_blocking(move || written(&directory, owned.as_str(), &contents, mode))
-            .await
-            .map_err(failed(name.as_str()))?
+        tokio::task::spawn_blocking(move || {
+            written(&directory, &beneath, owned.as_str(), &contents, mode)
+        })
+        .await
+        .map_err(failed(name.as_str()))?
     }
 
-    /// What the file `name` holds, or none where nothing is there, following no link.
+    /// What the file `name` holds, or none where nothing is there, or no directory on
+    /// the way to it beneath the shared one, following no link.
     ///
     /// # Errors
     ///
-    /// [`Unshared`] where the directory or the file is a link, the file is not a plain
-    /// file with one name, it is larger than [`LARGEST`], or a step fails.
+    /// [`Unshared`] where a directory on the way or the file is a link, the file is not a
+    /// plain file with one name, it is larger than [`LARGEST`], or a step fails.
     pub async fn read(&self, name: &SharedName) -> Result<Option<Vec<u8>>, Unshared> {
-        let directory = self.directory.clone();
+        let (directory, beneath) = (self.directory.clone(), self.beneath.clone());
         let owned = name.clone();
-        tokio::task::spawn_blocking(move || read(&directory, owned.as_str()))
+        tokio::task::spawn_blocking(move || read(&directory, &beneath, owned.as_str()))
             .await
             .map_err(failed(name.as_str()))?
     }
@@ -154,24 +171,44 @@ fn failed<E: std::fmt::Display>(name: &str) -> impl FnOnce(E) -> Unshared + '_ {
     move |why| Unshared::Failed(name.to_owned(), why.to_string())
 }
 
-/// The directory at `path`, opened once and refused where it is a link.
-fn opened(path: &Path) -> Result<OwnedFd, Unshared> {
-    let shown = path.display().to_string();
-    openat(
-        CWD,
-        path,
-        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-        Mode::empty(),
-    )
-    .map_err(|why| match why {
-        Errno::LOOP | Errno::NOTDIR => Unshared::Linked(shown),
-        other => Unshared::Failed(shown, other.to_string()),
-    })
+/// The directory at `path`, opened once and refused where it is a link, then each
+/// directory `beneath` it in turn through the handle of the one above; none where one
+/// beneath it is not there.
+fn opened(path: &Path, beneath: &[SharedName]) -> Result<Option<OwnedFd>, Unshared> {
+    const DIRECTORY: OFlags = OFlags::RDONLY
+        .union(OFlags::DIRECTORY)
+        .union(OFlags::NOFOLLOW)
+        .union(OFlags::CLOEXEC);
+    let refused = |shown: String| {
+        move |why| match why {
+            Errno::LOOP | Errno::NOTDIR => Unshared::Linked(shown),
+            other => Unshared::Failed(shown, other.to_string()),
+        }
+    };
+    let mut directory =
+        openat(CWD, path, DIRECTORY, Mode::empty()).map_err(refused(path.display().to_string()))?;
+    for name in beneath {
+        directory = match openat(&directory, name.as_str(), DIRECTORY, Mode::empty()) {
+            Ok(within) => within,
+            Err(Errno::NOENT) => return Ok(None),
+            Err(why) => return Err(refused(name.as_str().to_owned())(why)),
+        };
+    }
+    Ok(Some(directory))
 }
 
-/// Write `contents` to `name` in the directory at `path`, through its handle alone.
-fn written(path: &Path, name: &str, contents: &[u8], mode: u32) -> Result<(), Unshared> {
-    let directory = opened(path)?;
+/// Write `contents` to `name` in the directory at `path`, or beneath it, through its
+/// handle alone.
+fn written(
+    path: &Path,
+    beneath: &[SharedName],
+    name: &str,
+    contents: &[u8],
+    mode: u32,
+) -> Result<(), Unshared> {
+    let directory = opened(path, beneath)?.ok_or_else(|| {
+        Unshared::Failed(name.to_owned(), "its directory is not there".to_owned())
+    })?;
     let staging = format!(".{name}{STAGING}");
     match unlinkat(&directory, staging.as_str(), AtFlags::empty()) {
         Ok(()) | Err(Errno::NOENT) => {}
@@ -218,11 +255,14 @@ fn alone(held: &Stat, name: &str) -> Result<(), Unshared> {
     }
 }
 
-/// What `name` in the directory at `path` holds, through its handle alone: looked at
-/// without following a link and refused before it is opened unless it is a plain file
-/// with one name, then looked at again through the handle opened, and read bounded.
-fn read(path: &Path, name: &str) -> Result<Option<Vec<u8>>, Unshared> {
-    let directory = opened(path)?;
+/// What `name` in the directory at `path`, or beneath it, holds, through its handle
+/// alone: looked at without following a link and refused before it is opened unless it
+/// is a plain file with one name, then looked at again through the handle opened, and
+/// read bounded.
+fn read(path: &Path, beneath: &[SharedName], name: &str) -> Result<Option<Vec<u8>>, Unshared> {
+    let Some(directory) = opened(path, beneath)? else {
+        return Ok(None);
+    };
     match statat(&directory, name, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(seen) => alone(&seen, name)?,
         Err(Errno::NOENT) => return Ok(None),

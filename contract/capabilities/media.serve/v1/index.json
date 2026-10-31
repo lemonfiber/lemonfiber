@@ -95,7 +95,7 @@
     },
     {
       "path": "media.serve/v1/operations/declared.json",
-      "sha256": "a92fd668026c77978a3c6754e406a273b4af2468953068aeaacaad725a27d418"
+      "sha256": "037cabf7df36107ad6b597efe7772a64cd270d9bdd3a3fd38f5b5d10bd8c0e01"
     },
     {
       "path": "media.serve/v1/operations/serve_tls.json",

@@ -131,3 +131,34 @@ fn a_recipe_steps_expectation_is_held_to_the_same_places() {
         "got: {said:?}"
     );
 }
+
+/// A request naming a value its service makes afresh, by a plain pointer and a shape that
+/// compiles, is refused nothing; one naming it any other way is refused by name.
+#[test]
+fn a_value_a_request_says_varies_is_named_by_a_plain_place_and_a_shape_that_compiles() {
+    let varying = |varies: &str| {
+        without(
+            r#"request = { method = "GET", path = "/api/v1/series" }
+expect  = { status = 401 }"#,
+            &format!(
+                "request = {{ method = \"GET\", path = \"/api/v1/series\", varies = {{ {varies} }} }}\nexpect  = {{ status = 401 }}"
+            ),
+        )
+    };
+    let said = varying(r#""/content/id" = "[0-9a-f]{40}""#);
+    assert!(said.is_empty(), "{said:?}");
+    for (varies, words) in [
+        (r#"id = "[0-9a-f]{40}""#, "not a JSON Pointer"),
+        (r#""/content/[id=x]" = "[0-9a-f]{40}""#, "picks a list"),
+        (
+            r#""/content/id" = "(""#,
+            "not a pattern this build compiles",
+        ),
+    ] {
+        let said = varying(varies);
+        assert!(
+            names(&said, &["request.varies", words]),
+            "{varies} was not refused for {words}: {said:?}"
+        );
+    }
+}

@@ -141,6 +141,7 @@ fn request(path: &str, accept: Option<&str>) -> Request {
         method: "GET".to_owned(),
         path: path.to_owned(),
         accept: accept.map(str::to_owned),
+        varies: std::collections::BTreeMap::new(),
     }
 }
 
