@@ -81,6 +81,14 @@ pub struct Image {
     pub digest: String,
 }
 
+impl Image {
+    /// The reference an engine runs it by: its path and tag, pinned by its digest.
+    #[must_use]
+    pub fn reference(&self) -> String {
+        format!("{}:{}@{}", self.image, self.tag, self.digest)
+    }
+}
+
 /// Where the fence's image is published.
 pub const FENCE_IMAGE: &str = "ghcr.io/lemonfiber/fence";
 

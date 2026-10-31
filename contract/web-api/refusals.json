@@ -829,6 +829,11 @@
     "status": 400,
     "description": "Raised where the offer a reset answers is not the one a reading of it makes now."
   },
+  "STACK-15": {
+    "name": "SERVICE_UNFENCED",
+    "status": 409,
+    "description": "Raised where a start names a fenced service no fence can be written for."
+  },
   "STACK-2": {
     "name": "STACK_UNUSABLE",
     "status": 500,

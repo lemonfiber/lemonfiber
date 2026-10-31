@@ -268,6 +268,12 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
             lemonfiber_core::pass::SERVICE
         ));
     }
+    for unfenced in &report.unfenced {
+        lines.put(format!("left out: {unfenced}"));
+    }
+    if let Some(fencing) = &report.fencing {
+        lines.put(format!("not asked: {fencing}"));
+    }
 
     if let Some(condition) = report.condition {
         lines.spaced(describe(condition));

@@ -1,8 +1,9 @@
 //! Running an image's own program once, in a container of its own.
 //!
 //! Every container this starts is new, from the image the caller names by digest, with
-//! no network, no mount but the one directory it is handed, never a pulled image, and
-//! removed when the run ends whatever it came to.
+//! no mount but the one directory it is handed, and removed when the run ends whatever it
+//! came to. A proof's run joins no network and pulls no image; the one run that reads the
+//! engine host's own addresses joins the host's network and pulls the image it pins.
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -43,6 +44,21 @@ pub struct Run {
     pub within: Duration,
     /// The most of its standard output that is read.
     pub read_at_most: usize,
+    /// The network it joins.
+    pub network: Joined,
+    /// Whether the engine pulls the image first, where it may reach a registry.
+    pub pull: bool,
+}
+
+/// The network a run's container joins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Joined {
+    /// None at all, as every proof's run.
+    #[default]
+    Nothing,
+    /// The engine host's own, for the run that reads the host's addresses and holds no
+    /// capability.
+    Host,
 }
 
 /// A directory on the engine's machine, mounted at a path inside the container.

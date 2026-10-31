@@ -88,7 +88,7 @@ fn bundle(catalogue: &Path, out: &Path) -> Vec<lemonfiber_bundle::Held> {
         catalogue.join(lemonfiber_bundle::COPIES).display()
     );
 
-    let (_, held) = lemonfiber_bundle::read(catalogue).unwrap_or_else(|refused| {
+    let (declared, held) = lemonfiber_bundle::read(catalogue).unwrap_or_else(|refused| {
         refuse(
             "the embedded bundle cannot be read",
             &refused.to_string(),
@@ -97,16 +97,23 @@ fn bundle(catalogue: &Path, out: &Path) -> Vec<lemonfiber_bundle::Held> {
     });
 
     let copies = catalogue.join(lemonfiber_bundle::COPIES);
-    if let Err(unwritten) = std::fs::write(out.join("bundle.rs"), rust(&held, &copies)) {
+    let fence = declared
+        .fence
+        .as_ref()
+        .map(lemonfiber_bundle::Image::reference);
+    if let Err(unwritten) = std::fs::write(
+        out.join("bundle.rs"),
+        rust(&held, fence.as_deref(), &copies),
+    ) {
         eprintln!("error: the bundle's pins could not be written: {unwritten}");
         exit(1);
     }
     held
 }
 
-/// `held` as the two constants `lib.rs` includes, an installed plugin's tree included
-/// from its copy under `copies`.
-fn rust(held: &[lemonfiber_bundle::Held], copies: &Path) -> String {
+/// `held` and the `fence` the bundle pins as the constants `lib.rs` includes, an installed
+/// plugin's tree included from its copy under `copies`.
+fn rust(held: &[lemonfiber_bundle::Held], fence: Option<&str>, copies: &Path) -> String {
     let mut pinned = String::new();
     let mut first_party = String::new();
     for one in held {
@@ -134,7 +141,9 @@ fn rust(held: &[lemonfiber_bundle::Held], copies: &Path) -> String {
         "/// Every first-party plugin the bundle pins, with the copy of its manifest.\n\
          pub const PINNED: &[Pinned] = &[\n{pinned}];\n\n\
          /// Every first-party plugin this build embeds, by id and manifest digest.\n\
-         pub const FIRST_PARTY: &[FirstParty] = &[\n{first_party}];\n"
+         pub const FIRST_PARTY: &[FirstParty] = &[\n{first_party}];\n\n\
+         /// The image a fence runs, pinned by its digest, where the bundle pins one.\n\
+         pub const FENCE: Option<&str> = {fence:?};\n"
     )
 }
 

@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::fake;
 #[cfg(unix)]
 use lemonfiber_adapters::Daemon;
-use lemonfiber_ports::program::{Ended, Program as _, Run, Unran};
+use lemonfiber_ports::program::{Ended, Joined, Program as _, Run, Unran};
 
 fn run(within: Duration) -> Run {
     Run {
@@ -23,6 +23,8 @@ fn run(within: Duration) -> Run {
         configuration: None,
         within,
         read_at_most: 64 * 1024,
+        network: Joined::Nothing,
+        pull: false,
     }
 }
 
@@ -257,4 +259,78 @@ async fn an_engine_that_will_not_attach_or_say_how_a_run_ended_is_refused_and_st
     assert!(matches!(&ran, Err(Unran::Refused { .. })), "{ran:?}");
     assert_eq!(removed(&unsaid.asked_for()), 1);
     unsaid.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_run_that_may_pull_pulls_an_image_the_engine_has_not_got_and_creates_again() {
+    let mut engine = fake::engine(
+        "program-pulled",
+        vec![
+            ("/containers/json", fake::Reply::Body(200, "[]".to_owned())),
+            (
+                "/containers/create",
+                fake::Reply::Body(404, r#"{"message":"No such image"}"#.to_owned()),
+            ),
+            (
+                "/images/create",
+                fake::Reply::Body(200, r#"{"status":"pulled"}"#.to_owned()),
+            ),
+        ],
+    );
+
+    let ran = Daemon::at(&engine.socket)
+        .run(&Run {
+            pull: true,
+            ..run(Duration::from_secs(5))
+        })
+        .await;
+
+    assert!(matches!(ran, Err(Unran::NoImage { .. })), "{ran:?}");
+    let asked = engine.asked_for();
+    assert!(
+        asked.iter().any(|path| path.contains("/images/create")),
+        "{asked:?}"
+    );
+    assert_eq!(
+        asked
+            .iter()
+            .filter(|path| path.contains("/containers/create"))
+            .count(),
+        2,
+        "{asked:?}"
+    );
+    engine.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_pull_the_registry_refuses_is_the_runs_refusal() {
+    let engine = fake::engine(
+        "program-unpulled",
+        vec![
+            ("/containers/json", fake::Reply::Body(200, "[]".to_owned())),
+            (
+                "/containers/create",
+                fake::Reply::Body(404, r#"{"message":"No such image"}"#.to_owned()),
+            ),
+            (
+                "/images/create",
+                fake::Reply::Body(500, r#"{"message":"registry unreachable"}"#.to_owned()),
+            ),
+        ],
+    );
+
+    let ran = Daemon::at(&engine.socket)
+        .run(&Run {
+            pull: true,
+            ..run(Duration::from_secs(5))
+        })
+        .await;
+
+    assert!(
+        matches!(&ran, Err(Unran::Refused { reason }) if reason.contains("registry unreachable")),
+        "{ran:?}"
+    );
+    engine.stop().await;
 }

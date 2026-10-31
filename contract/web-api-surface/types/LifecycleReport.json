@@ -18,6 +18,12 @@
       ],
       "required": false
     },
+    "fencing": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "forwarding": {
       "type": [
         "null|string"
@@ -99,6 +105,12 @@
     "switched": {
       "type": [
         "anyOf(null,ref:Switched)"
+      ],
+      "required": false
+    },
+    "unfenced": {
+      "type": [
+        "array[string]"
       ],
       "required": false
     },

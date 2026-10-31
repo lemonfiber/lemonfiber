@@ -70,6 +70,8 @@ fn running() -> Vec<Outcome> {
             moves: Vec::new(),
             swept: Vec::new(),
             passing: None,
+            fencing: None,
+            unfenced: Vec::new(),
         }),
         Outcome::Config(ConfigReport {
             settings: Vec::new(),

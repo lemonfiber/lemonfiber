@@ -86,7 +86,7 @@ pub(crate) fn unit<'a>(
         published: published(placed),
         contract: placed.contract_port(),
         takes_data: placed.takes_data,
-        config_path: &placed.config_path,
+        config_path: Some(&placed.config_path),
         config_ro: fields.config_ro,
         mounts: &fields.mount,
         shares: placed
@@ -101,6 +101,7 @@ pub(crate) fn unit<'a>(
         shape: placed.shape,
         secrets_file: secrets_file(placed, reading),
         command: Vec::new(),
+        granted: &[],
     }
 }
 

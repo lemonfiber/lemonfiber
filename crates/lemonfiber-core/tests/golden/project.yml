@@ -469,6 +469,7 @@ services:
     depends_on:
       gluetun:
         condition: service_healthy
+        restart: true
     security_opt:
     - no-new-privileges:true
     cap_drop:

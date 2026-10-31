@@ -15,7 +15,7 @@ use bollard::query_parameters::{
 use bollard::Docker;
 use tokio_stream::StreamExt as _;
 
-use lemonfiber_ports::program::{Ended, Ran, Run, Unran, LEFT_BEHIND};
+use lemonfiber_ports::program::{Ended, Joined, Ran, Run, Unran, LEFT_BEHIND};
 
 use super::{wording, Daemon};
 
@@ -24,6 +24,12 @@ pub(super) const PROOF_LABEL: &str = "app.lemonfiber.proof";
 
 /// The network a proof's container is held to: none.
 const NO_NETWORK: &str = "none";
+
+/// The network of the engine's host, which the run reading its addresses joins.
+const HOST_NETWORK: &str = "host";
+
+/// What the engine answers asked to create a container from an image it does not hold.
+const NOT_HELD: u16 = 404;
 
 /// The logging driver a proof's container is given: none, so nothing it writes is kept.
 const NO_LOGS: &str = "none";
@@ -37,10 +43,19 @@ pub(super) async fn ran(daemon: &Daemon, run: &Run) -> Result<Ran, Unran> {
             reason: failure.to_string(),
         })?;
     swept(docker).await;
-    let created = docker
-        .create_container(None, body(run))
-        .await
-        .map_err(|error| uncreated(&error, &run.image))?;
+    let created = match docker.create_container(None, body(run)).await {
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: NOT_HELD,
+            ..
+        }) if run.pull => {
+            super::volumes::pulled(docker, &run.image)
+                .await
+                .map_err(|error| refused(&error))?;
+            docker.create_container(None, body(run)).await
+        }
+        other => other,
+    }
+    .map_err(|error| uncreated(&error, &run.image))?;
     let id = created.id;
     let outcome = watched(docker, &id, run).await;
     removed(docker, &id).await;
@@ -59,10 +74,16 @@ pub(super) fn body(run: &Run) -> ContainerCreateBody {
         attach_stderr: Some(false),
         tty: Some(false),
         open_stdin: Some(false),
-        network_disabled: Some(true),
+        network_disabled: Some(run.network == Joined::Nothing),
         labels: Some(HashMap::from([(PROOF_LABEL.to_owned(), "run".to_owned())])),
         host_config: Some(HostConfig {
-            network_mode: Some(NO_NETWORK.to_owned()),
+            network_mode: Some(
+                match run.network {
+                    Joined::Nothing => NO_NETWORK,
+                    Joined::Host => HOST_NETWORK,
+                }
+                .to_owned(),
+            ),
             security_opt: Some(run.security_opt.clone()),
             cap_drop: Some(run.cap_drop.clone()),
             cap_add: Some(run.cap_add.clone()),
@@ -96,7 +117,8 @@ pub(super) fn body(run: &Run) -> ContainerCreateBody {
 pub(super) fn uncreated(error: &bollard::errors::Error, image: &str) -> Unran {
     match error {
         bollard::errors::Error::DockerResponseServerError {
-            status_code: 404, ..
+            status_code: NOT_HELD,
+            ..
         } => Unran::NoImage {
             image: image.to_owned(),
         },

@@ -4,6 +4,7 @@
 //! merged over it and nothing else.
 
 mod copying;
+mod fencing;
 mod linking;
 mod mounting;
 mod moving;
@@ -32,6 +33,7 @@ use crate::topology::Topology;
 use crate::wiring::Chosen;
 
 pub(crate) use copying::{pending as copies, Copies};
+pub(crate) use fencing::readied as fence_readied;
 pub(crate) use linking::unlinked;
 pub(crate) use moving::{beneath as moved_beneath, moved};
 pub(crate) use passing::readied as pass_readied;
@@ -194,6 +196,14 @@ pub(crate) fn topology(ctx: &Ctx, manifest: &Manifest) -> Result<Topology, Box<P
 pub(crate) fn pinned(ctx: &Ctx) -> Option<String> {
     held_as(ctx, crate::pass::PINNED)
         .and_then(|held| crate::pass::pinned(&held, crate::stack::RUNNING))
+}
+
+/// The addresses of the engine's host, as the engine last answered them for a fence,
+/// where it answered.
+pub(crate) fn host_addresses(ctx: &Ctx) -> Vec<std::net::IpAddr> {
+    held_as(ctx, crate::fence::HELD)
+        .map(|held| crate::fence::kept(&held))
+        .unwrap_or_default()
 }
 
 /// The profiles of the services `services` run inside, which Compose has to activate for

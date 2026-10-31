@@ -16,7 +16,7 @@ use super::recorded::RunResult;
 use super::Verdict;
 use crate::app::Ctx;
 use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
-use crate::ports::program::{Configuration, Ended, Program, Run, Unran};
+use crate::ports::program::{Configuration, Ended, Joined, Program, Run, Unran};
 use crate::project::entry::{configuration, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY};
 
 pub(crate) use throwaway::{
@@ -189,6 +189,8 @@ pub(crate) fn settled(
         }),
         within: Duration::from_secs(u64::from(limit(run))),
         read_at_most: READ_AT_MOST,
+        network: Joined::Nothing,
+        pull: false,
     }
 }
 

@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use bollard::container::LogOutput;
 use bollard::models::{ContainerSummary, ContainerWaitResponse, MountType};
-use lemonfiber_ports::program::{Configuration, Run, Unran};
+use lemonfiber_ports::program::{Configuration, Joined, Run, Unran};
 
 use lemonfiber_ports::program::LEFT_BEHIND;
 
@@ -28,7 +28,23 @@ fn run() -> Run {
         }),
         within: Duration::from_secs(30),
         read_at_most: 8,
+        network: Joined::Nothing,
+        pull: false,
     }
+}
+
+#[test]
+fn a_run_reading_the_hosts_addresses_joins_the_hosts_network_and_nothing_else_changes() {
+    let host = Run {
+        network: Joined::Host,
+        ..run()
+    };
+    let asked = body(&host);
+    assert_eq!(asked.network_disabled, Some(false));
+    let config = asked.host_config.unwrap_or_default();
+    assert_eq!(config.network_mode.as_deref(), Some("host"));
+    assert_eq!(config.cap_drop, Some(vec!["ALL".to_owned()]));
+    assert_eq!(config.readonly_rootfs, Some(true));
 }
 
 #[test]
