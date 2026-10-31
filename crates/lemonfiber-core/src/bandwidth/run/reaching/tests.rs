@@ -370,6 +370,13 @@ fn a_client_that_would_not_answer_says_so_in_its_own_words() {
         }),
         "too old for this"
     );
+    assert_eq!(
+        said(&Failure::Disallowed {
+            service: "sabnzbd".to_owned(),
+            detail: "never that".to_owned(),
+        }),
+        "never that"
+    );
     assert!(said(&Failure::Unavailable {
         service: "qbittorrent".to_owned(),
     })

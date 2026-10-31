@@ -322,7 +322,7 @@ pub(super) fn unreached(failure: &Failure) -> State {
         Failure::Unauthorised { service } => State::Failed {
             detail: format!("{service} refused the credential"),
         },
-        Failure::Refused { detail, .. } => State::Failed {
+        Failure::Refused { detail, .. } | Failure::Disallowed { detail, .. } => State::Failed {
             detail: detail.clone(),
         },
         Failure::Unsupported { service, detail } => State::Unmatched {

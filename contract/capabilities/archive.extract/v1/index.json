@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "archive.extract/v1/openapi.json",
-      "sha256": "d154a59c60124dc70c5ab6823a87b0d31dc5e293d47c1b2136da5e1722056866"
+      "sha256": "eef2d1edeaf9b8fed471d1fbab915d2cbeacf0a65a10bc593386cc491f04d9e1"
     },
     {
       "path": "archive.extract/v1/operations/watch.json",

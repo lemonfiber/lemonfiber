@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "dashboard.show/v1/openapi.json",
-      "sha256": "0311e4e025182fb4f634e2738b873ccbb1bb2ae8c02b6a04fb23d7496144bb65"
+      "sha256": "f0409be31d380756fbb7c38b624f2cfa5e5b82610e3e3736085f11a043f8cfaf"
     },
     {
       "path": "dashboard.show/v1/operations/apply.json",

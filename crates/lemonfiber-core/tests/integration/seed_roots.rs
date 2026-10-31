@@ -397,6 +397,22 @@ async fn a_service_that_refuses_the_listing_fails() {
 }
 
 #[tokio::test]
+async fn a_service_refusing_the_listing_as_never_done_fails_in_its_own_words() {
+    let (states, recorded) = seed(
+        FakeService::with(Mode::Disallowed, Vec::new()),
+        &[folder("/data/media/tv")],
+    )
+    .await;
+    assert_eq!(
+        states,
+        vec![State::Failed {
+            detail: "never a listing".to_owned(),
+        }]
+    );
+    assert_eq!(recorded, 0);
+}
+
+#[tokio::test]
 async fn a_service_on_an_unsupported_api_version_does_not_offer_its_folders() {
     let (states, recorded) = seed(
         FakeService::with(Mode::Unsupported, Vec::new()),

@@ -33,6 +33,8 @@ pub enum Mode {
     /// Reachable, but does not serve the API version this build speaks — the
     /// listing fails as unsupported, a conflict a re-run cannot lift.
     Unsupported,
+    /// Reachable, but answers the listing as something it never does.
+    Disallowed,
     /// Lists fine, but refuses an in-place update — the failure a reset's revert meets
     /// when the service will not take lemonfiber's category back.
     RefusesUpdate,
@@ -259,6 +261,10 @@ impl Client for FakeService {
             Mode::Unsupported => Err(Failure::Unsupported {
                 service: "sonarr".to_owned(),
                 detail: "there is no /api/v3".to_owned(),
+            }),
+            Mode::Disallowed => Err(Failure::Disallowed {
+                service: "sonarr".to_owned(),
+                detail: "never a listing".to_owned(),
             }),
             Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
             _ => Ok(self

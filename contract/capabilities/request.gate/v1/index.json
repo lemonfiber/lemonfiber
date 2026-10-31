@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "request.gate/v1/openapi.json",
-      "sha256": "c96bbf25a3cc1497ee4a22e2a7acb0dd6e5e573c4def532d987ef62fa2e4a3f4"
+      "sha256": "3c04f360ca7f5fe9d8c5eaa9f44a5be543dac055b0da782994b4d78de0558acc"
     },
     {
       "path": "request.gate/v1/operations/admit.json",

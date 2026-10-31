@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "download.usenet/v1/openapi.json",
-      "sha256": "c4caac8a260f15aa1b89c5bf322e3018d149a6cf453159c65b7afde45fbd99e4"
+      "sha256": "d2c3ef0b53348e27170754a446504bb57508d4bc5867461d9829dadb4d7a59f2"
     },
     {
       "path": "download.usenet/v1/operations/transfers.json",

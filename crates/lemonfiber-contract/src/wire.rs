@@ -2,7 +2,7 @@
 //!
 //! A refusal is a problem document whose `type` is one the contract declares, so the core
 //! turns it into its own answer by that word alone and never by reading the prose an
-//! adapter wrote beside it. The four types are the four ways a port already fails
+//! adapter wrote beside it. The five types are the five ways a port already fails
 //! ([`Failure`]), plus two that only a contract can: a call nobody declared, and one whose
 //! body did not read.
 
@@ -30,6 +30,9 @@ pub enum Kind {
     UnknownOperation,
     /// What was asked did not read as the operation's request.
     NotAsked,
+    /// What was asked read as the operation's request, and is one the operation never
+    /// does, as a challenge solver refuses a page inside the household.
+    Disallowed,
 }
 
 impl Kind {
@@ -41,7 +44,7 @@ impl Kind {
             Self::Unauthorised => 502,
             Self::Refused | Self::Unsupported => 500,
             Self::UnknownOperation => 404,
-            Self::NotAsked => 400,
+            Self::NotAsked | Self::Disallowed => 400,
         }
     }
 }
@@ -85,6 +88,7 @@ impl Refusal {
             Kind::Unavailable => Failure::Unavailable { service },
             Kind::Unauthorised => Failure::Unauthorised { service },
             Kind::Unsupported => Failure::Unsupported { service, detail },
+            Kind::Disallowed => Failure::Disallowed { service, detail },
             Kind::Refused | Kind::UnknownOperation | Kind::NotAsked => {
                 Failure::Refused { service, detail }
             }
@@ -104,6 +108,7 @@ impl From<&Failure> for Refusal {
             ),
             Failure::Refused { detail, .. } => Self::new(Kind::Refused, detail.clone()),
             Failure::Unsupported { detail, .. } => Self::new(Kind::Unsupported, detail.clone()),
+            Failure::Disallowed { detail, .. } => Self::new(Kind::Disallowed, detail.clone()),
         }
     }
 }

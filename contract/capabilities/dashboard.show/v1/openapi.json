@@ -47,6 +47,11 @@
                 "const": "not-asked",
                 "description": "What was asked did not read as the operation's request.",
                 "type": "string"
+              },
+              {
+                "const": "disallowed",
+                "description": "What was asked read as the operation's request, and is one the operation never\ndoes, as a challenge solver refuses a page inside the household.",
+                "type": "string"
               }
             ]
           }

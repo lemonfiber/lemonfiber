@@ -487,6 +487,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SEED-2` | `SERVICE_UNAUTHORISED` | error | 1 | 500 | 0.1.0 | Raised when a service rejects the credential lemonfiber holds. |
 | `SEED-3` | `SERVICE_REFUSED` | error | 1 | 500 | 0.1.0 | Raised when a service answers with something unusable. |
 | `SEED-4` | `SERVICE_UNSUPPORTED` | error | 1 | 500 | 0.4.0 | Raised when a service answers that it does not offer what was asked. |
+| `SEED-5` | `SERVICE_DISALLOWED` | error | 1 | 400 | 0.18.0 | Raised when a service refuses what was asked because it never does what was asked. |
 
 ## `SERVE` — the web surface
 

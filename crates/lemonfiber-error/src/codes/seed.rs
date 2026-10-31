@@ -39,4 +39,13 @@ codes! {
         remedy: "Where the service's release is the cause, match it to the version lemonfiber \
             supports or update lemonfiber, then run lemonfiber seed again.",
     }
+    /// Raised when a service refuses what was asked because it never does what was asked.
+    SERVICE_DISALLOWED = "SEED-5" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "A service answered that what was asked is something it never does, so \
+            asking again would be refused the same way. Nothing failed on its side.",
+        remedy: "Ask it for something it does.",
+    }
 }

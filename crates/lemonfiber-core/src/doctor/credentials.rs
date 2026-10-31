@@ -70,7 +70,9 @@ impl CredentialsCheck {
             },
             Err(Failure::Unauthorised { .. }) => Verdict::Fail(rejected(target)),
             Err(Failure::Unavailable { .. }) => unreachable(target),
-            Err(Failure::Refused { detail, .. }) => unusable(target, &detail),
+            Err(Failure::Refused { detail, .. } | Failure::Disallowed { detail, .. }) => {
+                unusable(target, &detail)
+            }
             Err(Failure::Unsupported { detail, .. }) => unsupported(target, &detail),
         }
     }

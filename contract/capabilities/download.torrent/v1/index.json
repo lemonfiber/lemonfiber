@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "download.torrent/v1/openapi.json",
-      "sha256": "0aceaf4620e209262d9753c3837117fbb74e50eeaf41908444f6f9336c371e11"
+      "sha256": "ceee11370207d4a170178ea072a31090dfdc34375ecfc7314adb588f2ab59ebc"
     },
     {
       "path": "download.torrent/v1/operations/transfers.json",

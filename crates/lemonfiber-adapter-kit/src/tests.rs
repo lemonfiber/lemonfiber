@@ -263,6 +263,33 @@ async fn what_is_in_force_once_the_upstream_restarts_is_answered_205_with_nothin
     );
 }
 
+#[tokio::test]
+async fn what_an_operation_never_does_is_refused_at_400_as_disallowed() {
+    let refusing = lemonfiber_contract::Served::new("indexer.proxy", 1, |_, _| {
+        Box::pin(async {
+            Err(lemonfiber_contract::Refusal::from(&Failure::Disallowed {
+                service: "a solver".to_owned(),
+                detail: "a page inside the household".to_owned(),
+            }))
+        })
+    });
+    let (status, sort, body) = asked(
+        Kit::new(KEY, about()).serving(refusing),
+        "POST",
+        "/lemonfiber/indexer.proxy/v1/solve",
+        Some(KEY),
+    )
+    .await;
+    assert_eq!(
+        (status, sort.as_str(), body.as_str()),
+        (
+            StatusCode::BAD_REQUEST,
+            "application/problem+json",
+            r#"{"type":"disallowed","detail":"a page inside the household"}"#
+        )
+    );
+}
+
 #[test]
 fn a_secret_is_the_same_only_byte_for_byte_and_never_when_empty() {
     assert!(same_secret("abcdef", "abcdef"));

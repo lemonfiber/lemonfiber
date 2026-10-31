@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "media.serve/v1/openapi.json",
-      "sha256": "371814a5805635f6025e093c9950977507ea4a1cbf3c5b618d9ec0486bb36ce0"
+      "sha256": "b5c09559a1b43c4d4dc9021638be3bd60ac0c9dcd499a57fd24093a929f3e545"
     },
     {
       "path": "media.serve/v1/operations/signed_in.json",
