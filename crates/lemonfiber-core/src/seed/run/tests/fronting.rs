@@ -300,7 +300,7 @@ async fn a_part_not_yet_the_households_has_no_route_until_its_claim_is_recorded_
     for (name, recorded, routed) in [
         ("unclaimed", None, false),
         ("claimed", Some("ours"), true),
-        ("reopened", Some("open"), false),
+        ("no longer ours", Some("not-ours"), false),
     ] {
         let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("front-coded-{name}"));
         let http = proxying(

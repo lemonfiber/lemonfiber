@@ -521,3 +521,69 @@ async fn install_says_a_code_it_could_not_drop_after_the_claim_answered() {
     assert!(matches!(claimed, Ok(Err(_))), "{claimed:?}");
     assert_eq!(blocked.claims.load(std::sync::atomic::Ordering::Relaxed), 1);
 }
+
+/// Whether the part is kept off the household after one seed of `ctx` against `baseline`.
+async fn kept_off_after(ctx: &Ctx, project: &Path, baseline: &mut Baseline) -> bool {
+    use super::super::super::owning::{kept_off, owned};
+    let fillers = coded_beside(project);
+    owned(ctx, &fillers, &[coded()], baseline).await;
+    kept_off(&fillers, &[coded()], baseline).contains(SERVICE)
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_part_claimed_before_that_answers_anything_but_ours_is_kept_off_again() {
+    for (name, owner) in [
+        ("theirs", holding("theirs")),
+        ("open", holding("open")),
+        ("settling", holding("settling")),
+        ("failing", Answer::reply(500, "")),
+    ] {
+        let project =
+            lemonfiber_fixtures::scratch::Scratch::new(&format!("owning-coded-off-{name}"));
+        let http = Fake::by_path(vec![(OWNER, owner), (CLAIM, holding("ours"))]);
+        let ctx = coded_ctx(&project, http.clone(), FIRST, Typing::answering(TYPED));
+        let mut baseline = recorded();
+        assert!(!super::super::super::owning::kept_off(
+            &coded_beside(&project),
+            &[coded()],
+            &baseline
+        )
+        .contains(SERVICE));
+
+        assert!(
+            kept_off_after(&ctx, &project, &mut baseline).await,
+            "{name}"
+        );
+        assert_eq!(asked_at(&http, CLAIM), 0, "{name}");
+    }
+}
+
+#[tokio::test]
+async fn a_part_claimed_before_whose_adapter_cannot_be_asked_is_kept_off_again() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-off-unasked");
+    let mut ctx = contracted_ctx(&project, SERVICE, false, Fake::silent())
+        .with_asking(Typing::answering(TYPED));
+    ctx.seams.clock = lemonfiber_fixtures::ports::Stopped::into_today(FIRST);
+    let mut baseline = recorded();
+    assert!(kept_off_after(&ctx, &project, &mut baseline).await);
+}
+
+#[tokio::test]
+async fn a_part_never_claimed_and_left_open_is_asked_for_its_code_again_on_the_next_seed() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-again");
+    let http = Fake::by_path(vec![(OWNER, holding("open")), (CLAIM, holding("ours"))]);
+    let nobody = coded_ctx(
+        &project,
+        http.clone(),
+        FIRST,
+        Arc::new(crate::ports::asking::Nobody),
+    );
+    let mut baseline = Baseline::new();
+    assert!(kept_off_after(&nobody, &project, &mut baseline).await);
+
+    let typing = Typing::answering(TYPED);
+    let later = coded_ctx(&project, http.clone(), FIRST + 10, typing.clone());
+    assert!(!kept_off_after(&later, &project, &mut baseline).await);
+    assert_eq!(typing.asked().len(), 1);
+    assert_eq!(asked_at(&http, CLAIM), 1);
+}

@@ -33,8 +33,9 @@ pub(crate) const FIELD: &str = "claimed";
 const OURS: &str = "ours";
 
 /// What the baseline records a part claimed against an account outside the house as, once
-/// a seed found it open again.
-const REOPENED: &str = "open";
+/// lemonfiber claimed it and a later seed found it anything but held by lemonfiber: open
+/// again, somebody else's, still settling, or not answering at all.
+const NOT_OURS: &str = "not-ours";
 
 /// What a part nobody holds is, where a run says what it would do.
 const NOBODY: &str = "nobody holds it";
@@ -162,26 +163,22 @@ pub(super) async fn owned(
     let mut wirings = Vec::new();
     for (claimable, asked) in parts(ctx, fillers).await {
         let name = claimable.part.name.as_str();
+        let id = claimable.part.id.as_str();
+        let recorded = baseline.expected(id, FIELD).is_some();
         let coded = Coded::of(installed, claimable.speaker);
         let lapsed = coded
             .as_ref()
             .filter(|_| !ctx.dry_run)
             .map(|coded| coded.lapse(ctx));
-        if let Some(Err(detail)) = lapsed {
-            wirings.push(Wiring::settled(connection(name), State::Failed { detail }));
-            continue;
-        }
-        let Some(asked) = asked else {
-            wirings.push(Wiring::settled(connection(name), unasked(name)));
-            continue;
+        let wiring = match (lapsed, asked) {
+            (Some(Err(detail)), _) => Wiring::settled(connection(name), State::Failed { detail }),
+            (_, None) => Wiring::settled(connection(name), unasked(name)),
+            (_, Some(asked)) => owning(ctx, claimable, &asked, recorded, coded.as_ref()).await,
         };
-        let id = claimable.part.id.as_str();
-        let recorded = baseline.expected(id, FIELD).is_some();
-        let wiring = owning(ctx, claimable, &asked, recorded, coded.as_ref()).await;
         if matches!(wiring.state, State::Wired | State::AlreadyWired) {
             baseline.record(id, FIELD, OURS, &at);
-        } else if coded.is_some() && wiring.state == State::Drifted {
-            baseline.record(id, FIELD, REOPENED, &at);
+        } else if coded.is_some() && recorded {
+            baseline.record(id, FIELD, NOT_OURS, &at);
         }
         wirings.push(wiring);
     }
