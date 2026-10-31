@@ -7,6 +7,7 @@
 
 pub mod credential;
 pub mod endpoint;
+pub mod picture;
 pub mod settings;
 pub mod shared;
 pub mod web;
