@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/logo-on-ink.svg">
-    <img alt="lemonfiber" src=".github/logo.svg" height="72">
+    <img alt="lemonfiber" src=".github/logo.svg" height="64">
   </picture>
 </p>
 
