@@ -5,6 +5,10 @@
 
 use std::net::IpAddr;
 
+/// Every refusal a start answers with for a fenced service: one it names that no fence can
+/// be written for.
+pub const REFUSALS: [crate::error::Code; 1] = [crate::error::codes::stack::SERVICE_UNFENCED];
+
 /// What a fence's id is its service's id followed by.
 pub const SUFFIX: &str = "-fence";
 
