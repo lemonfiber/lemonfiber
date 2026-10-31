@@ -129,6 +129,33 @@ fn a_password_lemonfiber_mints_is_spelled_as_a_key_whichever_mark_it_holds() {
 }
 
 #[test]
+fn an_email_lemonfiber_minted_is_read_as_it_was_written() {
+    let dir = directory("minted-email");
+    let email = "0123456789abcdef0123456789abcdef@komga.invalid";
+    let _ = std::fs::write(
+        dir.join(UPSTREAM_FILE),
+        format!(r#"{{"username":"{email}"}}"#),
+    );
+    assert_eq!(
+        Upstream::in_directory(&dir, "username").key(),
+        Ok(email.to_owned())
+    );
+}
+
+#[test]
+fn an_address_lemonfiber_did_not_mint_is_refused_without_quoting_it() {
+    let dir = directory("unminted-email");
+    let _ = std::fs::write(
+        dir.join(UPSTREAM_FILE),
+        r#"{"username":"admin@example.com"}"#,
+    );
+    assert_eq!(
+        Upstream::in_directory(&dir, "username").key(),
+        Err("the username in upstream.json is not spelled as a key is".to_owned())
+    );
+}
+
+#[test]
 fn a_key_held_in_hand_is_that_key() {
     assert_eq!(a_key().key(), Ok(a_key()));
 }

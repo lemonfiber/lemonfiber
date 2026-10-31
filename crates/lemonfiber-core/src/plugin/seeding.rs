@@ -12,6 +12,7 @@ use std::num::NonZeroU32;
 use std::path::Path;
 
 use base64::Engine as _;
+use lemonfiber_contract::adapter::{MINTED_DOMAIN, MINTED_HEX};
 use lemonfiber_manifest::container::Minted;
 use lemonfiber_plugin::seeding::{filled, placeholders, Form, MOST_PLACEHOLDERS};
 use lemonfiber_plugin::{Manifest, Violation};
@@ -20,8 +21,9 @@ use lemonfiber_ports::random::Random;
 use super::placing::{configuration, Lands, Write};
 use super::program::{shipped as held, Starting};
 
-/// How many random bytes a minted secret is made of, written as 32 hexadecimal digits.
-pub(crate) const MINTED_BYTES: usize = 16;
+/// How many random bytes a minted secret is made of, each written as two of its
+/// [`MINTED_HEX`] hexadecimal digits.
+pub(crate) const MINTED_BYTES: usize = MINTED_HEX / 2;
 
 /// How many rounds the hashed form of a secret is derived over.
 const ROUNDS: NonZeroU32 = match NonZeroU32::new(100_000) {
@@ -207,12 +209,9 @@ pub(crate) fn minted_as(random: &dyn Random, shape: Minted, plugin: &str) -> Opt
         Minted::Not => None,
         Minted::Key => mint(random),
         Minted::Password => password(random),
-        Minted::Email => mint(random).map(|key| format!("{key}@{plugin}{INVALID}")),
+        Minted::Email => mint(random).map(|key| format!("{key}@{plugin}{MINTED_DOMAIN}")),
     }
 }
-
-/// The domain no address can be reached at, which every minted email address is under.
-const INVALID: &str = ".invalid";
 
 /// How many characters a minted password holds.
 const PASSWORD_LENGTH: usize = 32;

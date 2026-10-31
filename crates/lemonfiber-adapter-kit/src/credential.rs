@@ -5,7 +5,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 pub use lemonfiber_contract::adapter::KEY_LIMIT;
-use lemonfiber_contract::adapter::{KEY_MARKS, PASSWORD_MARKS, UPSTREAM_FILE};
+use lemonfiber_contract::adapter::{minted_email, KEY_MARKS, PASSWORD_MARKS, UPSTREAM_FILE};
 
 /// Where the key every call presents comes from.
 pub trait Holding: Send + Sync {
@@ -24,7 +24,7 @@ impl Holding for String {
 }
 
 /// The key lemonfiber wrote into one configuration directory, under one field of
-/// `upstream.json`.
+/// `upstream.json`: spelled as a key is, or as an email address lemonfiber mints.
 #[derive(Debug, Clone)]
 pub struct Upstream {
     /// The configuration directory.
@@ -58,7 +58,7 @@ impl Holding for Upstream {
             .remove(field)
             .filter(|key| !key.is_empty())
             .ok_or_else(|| format!("{UPSTREAM_FILE} names no {field}"))?;
-        if spelled_as_a_key(&key) {
+        if spelled_as_a_key(&key) || minted_email(&key) {
             Ok(key)
         } else {
             Err(format!(

@@ -324,6 +324,22 @@ fn a_minted_email_is_a_key_at_the_plugins_own_invalid_domain() {
 }
 
 #[test]
+fn a_minted_email_is_one_an_adapter_reads_from_its_upstream() {
+    for plugin in ["komga", "plugin-2"] {
+        let random = Chance::exactly(Some(
+            (0..MINTED_BYTES)
+                .filter_map(|at| u8::try_from(at * 17).ok())
+                .collect(),
+        ));
+        let minted = minted_as(&random, Minted::Email, plugin).unwrap_or_default();
+        assert!(
+            lemonfiber_contract::adapter::minted_email(&minted),
+            "{plugin}"
+        );
+    }
+}
+
+#[test]
 fn the_shapes_a_manifest_declares_are_read_beside_it_and_a_key_is_the_default() {
     let dir = lemonfiber_fixtures::scratch::Scratch::new("minted-shapes");
     let _ = std::fs::write(
