@@ -8,7 +8,7 @@
 
 use std::any::Any;
 
-use lemonfiber_ports::service::{Applied, Failure};
+use lemonfiber_ports::service::Failure;
 use serde::{Deserialize, Serialize};
 
 pub use lemonfiber_ports::http::{JSON, PROBLEM};
@@ -137,7 +137,7 @@ pub enum Answer {
 /// The refusal a failure crosses as.
 pub fn answered<R: Serialize + 'static>(answer: Result<R, Failure>) -> Result<Answer, Refusal> {
     let answer = answer.map_err(|failure| Refusal::from(&failure))?;
-    if (&answer as &dyn Any).downcast_ref::<Applied>() == Some(&Applied::OnRestart) {
+    if lemonfiber_ports::service::on_restart(&answer as &dyn Any) {
         return Ok(Answer::Reset);
     }
     serde_json::to_vec(&answer)

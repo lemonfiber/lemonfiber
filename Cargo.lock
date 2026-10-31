@@ -1790,6 +1790,7 @@ dependencies = [
  "lemonfiber-bundled",
  "lemonfiber-contract",
  "lemonfiber-manifest",
+ "regex",
  "schemars",
  "serde",
  "serde_json",

@@ -19,7 +19,8 @@ use crate::wire::{self, Refusal};
 
 /// What an answer of [`wire::RESET`] reads as: applied, in force once the upstream
 /// restarts, which an operation answering anything but
-/// [`Applied`](lemonfiber_ports::service::Applied) does not read.
+/// [`Applied`](lemonfiber_ports::service::Applied) or
+/// [`Claim`](lemonfiber_ports::service::Claim) does not read.
 const ON_RESTART: &str = "\"on-restart\"";
 
 /// What an adapter's own account of itself is named in what is witnessed about it.

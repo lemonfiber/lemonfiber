@@ -100,8 +100,26 @@
                       "type": "array"
                     },
                     "pattern": {
-                      "description": "The paths it covers, holding one group named `item` where the item's id sits, every\nmatch starting at the path's start.",
+                      "description": "The paths it covers, holding one group named `item` where the item's id sits, or\nnone where [`Self::query`] finds it, every match starting at the path's start.",
                       "type": "string"
+                    },
+                    "query": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/InQuery"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The query parameter whose value holds the item's id, where the path does not."
+                    },
+                    "space": {
+                      "description": "The kind of id the item's is, which the adapter is asked about it in: named on\nevery byte path of a declaration whose question goes to the adapter, and on none\nof one whose question goes to the upstream.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
@@ -144,6 +162,25 @@
                       "type": "object"
                     }
                   ]
+                },
+                "InQuery": {
+                  "additionalProperties": false,
+                  "description": "Where in a query value a byte path's item sits.",
+                  "properties": {
+                    "parameter": {
+                      "description": "The parameter, carried once under this spelling on every request on the path.",
+                      "type": "string"
+                    },
+                    "pattern": {
+                      "description": "What its value, percent-decoded once, matches whole, holding one group named\n`item` where the item's id sits.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "parameter",
+                    "pattern"
+                  ],
+                  "type": "object"
                 },
                 "LivePath": {
                   "additionalProperties": false,
@@ -393,6 +430,13 @@
                   "additionalProperties": false,
                   "description": "A member's token, as the upstream reads it.",
                   "properties": {
+                    "headers": {
+                      "description": "The request headers the upstream also reads a token from; a request carrying a\ntoken in more than one place the declaration names, or one in another shape, is\nrefused.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "parameters": {
                       "description": "The query parameters the upstream also reads a token from, carried into the\nquestion as it came; a request carrying more than one of them, one under another\nspelling, or one in another shape is refused.",
                       "items": {

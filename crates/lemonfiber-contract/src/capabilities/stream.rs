@@ -29,6 +29,8 @@ fn declared() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/items/(?P<item>[^/]+)/bytes$".to_owned(),
+            query: None,
+            space: None,
             item: HEX.to_owned(),
             exempt: vec!["^/items/playing/bytes$".to_owned()],
             naming: vec![
@@ -64,6 +66,7 @@ fn declared() -> Declared {
             presented: Presentation::AsIs,
             shape: HEX.to_owned(),
             parameters: Vec::new(),
+            headers: Vec::new(),
         },
         locations: Locations {
             stream: "{base}/items/{item}/bytes".to_owned(),

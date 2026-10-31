@@ -43,6 +43,8 @@ pub fn enforceable() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/media/(?P<item>[^/]+)/bytes$".to_owned(),
+            query: None,
+            space: None,
             item: "^[0-9a-f]{32}$".to_owned(),
             exempt: Vec::new(),
             naming: vec![Naming {
@@ -70,6 +72,7 @@ pub fn enforceable() -> Declared {
             presented: Presentation::AsIs,
             shape: "^[0-9a-f]{32}$".to_owned(),
             parameters: vec!["key".to_owned()],
+            headers: Vec::new(),
         },
         locations: Locations {
             stream: "{base}/media/{item}/bytes".to_owned(),

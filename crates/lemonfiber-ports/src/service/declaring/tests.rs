@@ -1,6 +1,6 @@
 use super::{
-    Addressee, Answers, BytePath, Declared, Held, LivePath, Locations, Naming, Ports, Presentation,
-    Question, Statuses, Token, Undeclarable,
+    Addressee, Answered, Answers, BytePath, Declared, Held, InQuery, LivePath, Locations, Naming,
+    Ports, Presentation, Question, Statuses, Token, Undeclarable, MAY,
 };
 use crate::http::Method;
 
@@ -9,6 +9,8 @@ fn declared() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/media/(?P<item>[^/]+)/bytes$".to_owned(),
+            query: None,
+            space: None,
             item: "^[0-9]+$".to_owned(),
             exempt: vec!["^/media/now/bytes$".to_owned()],
             naming: vec![
@@ -44,6 +46,7 @@ fn declared() -> Declared {
             presented: Presentation::AsIs,
             shape: "^[0-9]+$".to_owned(),
             parameters: vec!["key".to_owned()],
+            headers: Vec::new(),
         },
         locations: Locations {
             stream: "{base}/media/{item}/bytes".to_owned(),
@@ -599,3 +602,123 @@ fn a_declaration_naming_no_live_stream_reads_as_serving_none() {
 
     assert_eq!(read.map(|one| one.live), Some(Vec::new()));
 }
+
+/// `declared()` with its byte path finding the item in `parameter`'s value by `pattern`, its
+/// path pattern being `path`.
+fn in_query(path: &str, parameter: &str, pattern: &str) -> Declared {
+    with(|declared| {
+        if let Some(bytes) = declared.bytes.first_mut() {
+            path.clone_into(&mut bytes.pattern);
+            bytes.query = Some(InQuery {
+                parameter: parameter.to_owned(),
+                pattern: pattern.to_owned(),
+            });
+        }
+    })
+}
+
+#[test]
+fn a_byte_path_may_find_its_item_once_in_a_query_value_in_place_of_its_path() {
+    let found = in_query(
+        "^/photo/:/transcode$",
+        "url",
+        "/library/metadata/(?P<item>[0-9]+)/thumb/[0-9]+",
+    );
+    assert_eq!(found.clone().checked(), Ok(found));
+}
+
+#[test]
+fn an_item_found_in_a_query_value_and_its_path_both_or_neither_is_refused() {
+    for (path, pattern) in [
+        ("^/media/(?P<item>[^/]+)/bytes$", "(?P<item>[0-9]+)"),
+        ("^/photo/:/transcode$", "/library/metadata/[0-9]+"),
+        ("^/photo/:/transcode$", "(?P<thing>[0-9]+)"),
+    ] {
+        assert_eq!(
+            in_query(path, "url", pattern).checked(),
+            Err(Undeclarable::Unplaced {
+                pattern: path.to_owned()
+            }),
+            "{path} {pattern}"
+        );
+    }
+    assert_eq!(
+        in_query("^/photo/:/transcode$", "u rl", "(?P<item>[0-9]+)").checked(),
+        Err(Undeclarable::Unspelled {
+            name: "u rl".to_owned()
+        })
+    );
+    assert_eq!(
+        in_query("^/photo/:/transcode$", "url", "(?P<item>[0-9]+").checked(),
+        Err(Undeclarable::Unanchored {
+            pattern: "(?P<item>[0-9]+".to_owned()
+        })
+    );
+}
+
+#[test]
+fn a_question_sent_to_the_adapter_is_the_one_question_an_adapter_is_asked() {
+    let to_adapter = |method: Method, path: &str| {
+        with(|declared| {
+            if let Some(question) = declared.question.as_mut() {
+                question.to = Addressee::Adapter;
+                question.method = method;
+                path.clone_into(&mut question.path);
+                question.answers = Answers::from_adapter();
+            }
+            for byte in &mut declared.bytes {
+                byte.space = Some("part".to_owned());
+            }
+        })
+    };
+    assert!(to_adapter(Method::Get, MAY).checked().is_ok());
+    for (method, path) in [
+        (Method::Get, "/media/{item}"),
+        (Method::Get, "/lemonfiber/media.serve/v1/may/{item}"),
+        (Method::Post, MAY),
+    ] {
+        assert_eq!(
+            to_adapter(method, path).checked(),
+            Err(Undeclarable::Unsent {
+                path: path.to_owned()
+            }),
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn a_question_sent_to_the_adapter_means_what_an_adapter_answers_it_with() {
+    let answering = |answers: Answers| {
+        with(|declared| {
+            if let Some(question) = declared.question.as_mut() {
+                question.to = Addressee::Adapter;
+                MAY.clone_into(&mut question.path);
+                question.answers = answers;
+            }
+            for byte in &mut declared.bytes {
+                byte.space = Some("part".to_owned());
+            }
+        })
+    };
+    assert!(answering(Answers::from_adapter()).checked().is_ok());
+    let mut otherwise = Answers::from_adapter();
+    otherwise.may = vec![Statuses { from: 200, to: 299 }];
+    assert_eq!(
+        answering(otherwise).checked(),
+        Err(Undeclarable::Unanswerable)
+    );
+    assert_eq!(
+        [
+            Answered::May,
+            Answered::MayNot,
+            Answered::NoSession,
+            Answered::NotFromThere
+        ]
+        .map(Answered::status),
+        [204, 404, 401, 403]
+    );
+}
+
+mod spaces;
+mod tokens;

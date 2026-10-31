@@ -272,6 +272,7 @@ fn only_an_operation_saying_when_it_is_in_force_publishes_a_reset() {
             (spoken("proxy.front"), "reload"),
             (spoken("quality.sync"), "apply"),
             (spoken("archive.extract"), "watch"),
+            (spoken("owner.claim"), "claim"),
         ]
     );
 }

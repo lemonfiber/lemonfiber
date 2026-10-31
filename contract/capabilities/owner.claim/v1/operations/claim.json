@@ -20,31 +20,56 @@
         "content": {
           "application/json": {
             "schema": {
+              "$defs": {
+                "Owner": {
+                  "description": "Who holds a part.",
+                  "oneOf": [
+                    {
+                      "const": "open",
+                      "description": "Nobody: anybody may take it, or read what it holds.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "settling",
+                      "description": "A claim was made and the part is still taking it up, such as by restarting.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "ours",
+                      "description": "The credential lemonfiber handed its adapter.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "theirs",
+                      "description": "Somebody else, whose credential is not the one lemonfiber handed its adapter.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "Restart": {
+                  "description": "What an operation applied that is in force only once the upstream restarts says.",
+                  "oneOf": [
+                    {
+                      "const": "on-restart",
+                      "description": "In force once the upstream restarts.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
               "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "description": "Who holds a part.",
-              "oneOf": [
+              "anyOf": [
                 {
-                  "const": "open",
-                  "description": "Nobody: anybody may take it, or read what it holds.",
-                  "type": "string"
+                  "$ref": "#/$defs/Owner",
+                  "description": "Who holds it now."
                 },
                 {
-                  "const": "settling",
-                  "description": "A claim was made and the part is still taking it up, such as by restarting.",
-                  "type": "string"
-                },
-                {
-                  "const": "ours",
-                  "description": "The credential lemonfiber handed its adapter.",
-                  "type": "string"
-                },
-                {
-                  "const": "theirs",
-                  "description": "Somebody else, whose credential is not the one lemonfiber handed its adapter.",
-                  "type": "string"
+                  "$ref": "#/$defs/Restart",
+                  "description": "The upstream takes the claim once it restarts, and who holds it is asked then."
                 }
               ],
-              "title": "Owner"
+              "description": "What claiming a part came to: who holds it then, or that the upstream takes the claim\nonly once it restarts.\n\nIt crosses as who holds it, or as `\"on-restart\"`, which an adapter answers as `205`.",
+              "title": "Claim"
             }
           }
         },
@@ -52,6 +77,9 @@
       },
       "204": {
         "description": "Answered, with nothing to say."
+      },
+      "205": {
+        "description": "Applied, and in force once the upstream restarts."
       },
       "400": {
         "$ref": "../openapi.json#/components/responses/Refused"

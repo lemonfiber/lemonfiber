@@ -120,3 +120,23 @@ async fn a_claim_the_adapter_refuses_fails_the_service_at_it_saying_why() {
         )]
     );
 }
+
+#[tokio::test]
+async fn a_claim_taken_only_once_the_upstream_restarts_fails_the_service_at_it() {
+    let at = source("fronted-restarting", &claimed_first());
+    let http = owned(
+        vec![Answer::reply(205, "")],
+        vec![Answer::served(401, "text/plain", "Unauthorized")],
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "claim".to_owned(),
+            "it takes the claim only once its upstream starts again, which a recording does not do"
+                .to_owned()
+        )]
+    );
+    assert_eq!(posted(&http, "/claim").len(), 1);
+}

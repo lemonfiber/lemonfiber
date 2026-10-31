@@ -659,6 +659,7 @@ async fn a_proof_whose_path_is_not_a_route_on_its_service_is_never_put() {
                     method: String::new(),
                     path: String::new(),
                     accept: None,
+                    varies: std::collections::BTreeMap::new(),
                 }),
             &proof.expect,
             "http://komga:25600",
@@ -703,4 +704,50 @@ async fn only_a_rehearsal_says_an_installed_guard_may_restart() {
 
     assert!(super::super::proving::rehearsed(&ctx, &guard(), false).is_some());
     assert_eq!(super::super::proving::rehearsed(&ctx, &guard(), true), None);
+}
+
+#[tokio::test]
+async fn an_upstream_the_engine_will_not_start_again_fails_a_claim_taken_on_restart() {
+    use crate::seed::run::owning::Restarts as _;
+    let installed = crate::test_support::an_installed(
+        "comics",
+        vec![crate::test_support::a_placed("komga", &[], Some(25600))],
+    );
+    let Some(placed) = installed.services.first() else {
+        unreachable!("the plugin places one service");
+    };
+    let adapter = lemonfiber_contract::Contracted::new(
+        Fake::silent(),
+        "http://127.0.0.1:8080".to_owned(),
+        "komga".to_owned(),
+        "the-key".to_owned(),
+    );
+    let stack = std::path::PathBuf::from("/srv/stack");
+    for (runner, said) in [
+        (
+            Recording::answering(Ok(engine_refused("no such service"))),
+            "refused to start it again: no such service",
+        ),
+        (
+            Recording::answering(Err(crate::ports::process::Failure::NotFound {
+                program: "docker".to_owned(),
+            })),
+            "docker was not found",
+        ),
+    ] {
+        let ctx = a_context().runner(Arc::new(runner)).build();
+        let restarted = super::super::proving::Restarted {
+            ctx: &ctx,
+            stack: &stack,
+            installed: &installed,
+            placed,
+            adapter: &adapter,
+        };
+        let failed = restarted.restarted().await;
+        assert!(
+            matches!(&failed, Err(crate::ports::service::Failure::Refused { service, detail })
+                if service == "komga" && detail.contains(said)),
+            "{failed:?}"
+        );
+    }
 }

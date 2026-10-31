@@ -319,3 +319,81 @@ async fn a_directory_the_adapter_may_not_search_fails_naming_the_file() {
 
     assert!(matches!(unseen, Err(Unshared::Failed(name, _)) if name == "caddy.json"));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_file_in_a_directory_beneath_is_written_and_read_there() {
+    let directories = Directories::new("beneath");
+    let _ = std::fs::create_dir_all(directories.shared.join("Library/Plex Media Server"));
+    let deeper = Shared::at(&directories.shared)
+        .beneath(named("Library"))
+        .beneath(named("Plex Media Server"));
+
+    assert_eq!(
+        deeper
+            .write(&named("Preferences.xml"), b"<P/>".to_vec(), 0o600)
+            .await,
+        Ok(())
+    );
+
+    assert_eq!(
+        std::fs::read(
+            directories
+                .shared
+                .join("Library/Plex Media Server/Preferences.xml")
+        )
+        .unwrap_or_default(),
+        b"<P/>"
+    );
+    assert_eq!(
+        deeper.read(&named("Preferences.xml")).await,
+        Ok(Some(b"<P/>".to_vec()))
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_directory_beneath_that_is_not_there_holds_nothing_and_takes_no_write() {
+    let directories = Directories::new("unmade");
+    let deeper = Shared::at(&directories.shared).beneath(named("Library"));
+
+    assert_eq!(deeper.read(&named("Preferences.xml")).await, Ok(None));
+    assert!(matches!(
+        deeper.write(&named("Preferences.xml"), b"x".to_vec(), 0o600).await,
+        Err(Unshared::Failed(name, _)) if name == "Preferences.xml"
+    ));
+    assert!(!directories.shared.join("Library").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_link_or_a_file_in_place_of_a_directory_beneath_is_refused_naming_it() {
+    let directories = Directories::new("linked-beneath");
+    let _ = std::fs::create_dir_all(directories.shared.join("Library"));
+    let _ = symlink(
+        &directories.outside,
+        directories.shared.join("Library/Plex Media Server"),
+    );
+    let _ = std::fs::write(directories.shared.join("Cache"), "a file");
+    let _ = std::fs::write(directories.outside.join("target"), "theirs");
+    let shared = Shared::at(&directories.shared);
+
+    for (deeper, refused) in [
+        (
+            shared
+                .beneath(named("Library"))
+                .beneath(named("Plex Media Server")),
+            "Plex Media Server",
+        ),
+        (shared.beneath(named("Cache")), "Cache"),
+    ] {
+        assert_eq!(
+            deeper
+                .write(&named("target"), b"ours".to_vec(), 0o600)
+                .await,
+            Err(Unshared::Linked(refused.to_owned()))
+        );
+        assert_eq!(
+            deeper.read(&named("target")).await,
+            Err(Unshared::Linked(refused.to_owned()))
+        );
+    }
+    assert_eq!(directories.outside(), "theirs");
+}

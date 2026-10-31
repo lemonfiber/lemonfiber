@@ -37,6 +37,23 @@ pub(super) fn asking(manifest: &Manifest, found: &mut Vec<Violation>) {
     }
 }
 
+/// Whether each value a request says varies is named by a place it can vary at and held
+/// to a shape this build compiles.
+pub(super) fn varying(manifest: &Manifest, found: &mut Vec<Violation>) {
+    for (at, request) in asked(manifest) {
+        for (place, shape) in &request.varies {
+            let refused = crate::varying::place(place)
+                .and_then(|()| crate::varying::shape(shape).map(|_| ()));
+            if let Err(why) = refused {
+                found.push(Violation {
+                    location: format!("{at}.request.varies"),
+                    message: why,
+                });
+            }
+        }
+    }
+}
+
 /// Whether a value is one media type this build would put on the wire.
 fn negotiable(accept: &str) -> Result<(), String> {
     if accept.contains('*') {
