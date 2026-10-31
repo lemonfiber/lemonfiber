@@ -352,6 +352,12 @@
           "type": ["string", "null"]
         },
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
+        "lapses_s": {
+          "description": "How many seconds the value holds once an outside account issues it, for a code a\npart is claimed with: lemonfiber asks the operator for it only to claim the part, and\nkeeps it no longer than the claim or this.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "minimum": 0
+        },
         "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it, and in what shape.", "$ref": "#/$defs/SecretMinted"},
         "needs": {
           "description": "The values of other settings under which it is asked for and held.",
