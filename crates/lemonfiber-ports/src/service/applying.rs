@@ -43,5 +43,22 @@ impl From<Applied> for Option<Restart> {
     }
 }
 
+/// Whether `answer`, an operation's, says what it applied is in force once the upstream
+/// restarts.
+#[must_use]
+pub fn on_restart(answer: &dyn std::any::Any) -> bool {
+    answer.downcast_ref::<Applied>() == Some(&Applied::OnRestart)
+        || answer.downcast_ref::<super::Claim>() == Some(&super::Claim::ON_RESTART)
+}
+
+/// Whether an operation answering `R` may say what it applied is in force once the upstream
+/// restarts.
+#[must_use]
+pub fn may_restart<R: 'static>() -> bool {
+    let answered = std::any::TypeId::of::<R>();
+    answered == std::any::TypeId::of::<Applied>()
+        || answered == std::any::TypeId::of::<super::Claim>()
+}
+
 #[cfg(test)]
 mod tests;

@@ -109,8 +109,7 @@ impl Operation {
             secret: &[],
             asks: serde_json::Value::Null,
             filed: Vec::new(),
-            restarts: std::any::TypeId::of::<R>()
-                == std::any::TypeId::of::<lemonfiber_ports::service::Applied>(),
+            restarts: lemonfiber_ports::service::may_restart::<R>(),
             refused: None,
             reads: read_as::<R>,
         }

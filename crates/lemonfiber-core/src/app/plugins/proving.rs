@@ -20,6 +20,8 @@
 //! container leaves something Compose will never be asked about again. So the container
 //! comes off first and the rest is somebody else's machinery.
 
+mod restarting;
+
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
@@ -33,6 +35,7 @@ use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
+pub(in crate::app::plugins) use restarting::Restarted;
 
 use super::super::putting_back::Reversal;
 use super::super::Ctx;
@@ -260,7 +263,7 @@ pub(super) async fn spoken(
         };
         match (reached, asked) {
             (Ok(adapter), Ok(about)) => {
-                return held_to(ctx, &adapter, installed, placed, &about).await
+                return held_to(ctx, stack, &adapter, (installed, placed), &about).await
             }
             (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
             _ => tokio::time::sleep(POLL).await,
@@ -274,9 +277,9 @@ pub(super) async fn spoken(
 /// taken from, and each live case of each contract answered as the contract says.
 async fn held_to(
     ctx: &Ctx,
+    stack: &Path,
     adapter: &lemonfiber_contract::Contracted,
-    installed: &Installed,
-    placed: &crate::plugin::Placed,
+    (installed, placed): (&Installed, &crate::plugin::Placed),
     about: &lemonfiber_contract::adapter::About,
 ) -> Verdict {
     let mut faults = Vec::new();
@@ -332,7 +335,14 @@ async fn held_to(
     if !faults.is_empty() {
         return Verdict::Failed { faults };
     }
-    claiming(ctx, adapter, installed, placed).await
+    let restarted = Restarted {
+        ctx,
+        stack,
+        installed,
+        placed,
+        adapter,
+    };
+    claiming(ctx, adapter, (installed, placed), &restarted).await
 }
 
 /// What claiming the part an adapter speaking `owner.claim` stands in front of came to:
@@ -342,8 +352,8 @@ async fn held_to(
 async fn claiming(
     ctx: &Ctx,
     adapter: &lemonfiber_contract::Contracted,
-    installed: &Installed,
-    placed: &crate::plugin::Placed,
+    (installed, placed): (&Installed, &crate::plugin::Placed),
+    restarts: &dyn crate::seed::run::owning::Restarts,
 ) -> Verdict {
     use crate::seed::run::owning::{claimed_as_installed, unclaimed, Installing};
     let spoken = lemonfiber_contract::spoken(claim::CAPABILITY, claim::MAJOR);
@@ -351,7 +361,11 @@ async fn claiming(
         return Verdict::Passed;
     }
     let part = claim::Adapter(adapter.clone());
-    let fault = match claimed_as_installed(ctx, installed, placed, &part).await {
+    let reaching = crate::seed::run::owning::Reaching {
+        part: &part,
+        restarts,
+    };
+    let fault = match claimed_as_installed(ctx, installed, placed, reaching).await {
         Installing::Unentered(why) => return Verdict::Open { why },
         Installing::Answered(Ok(owner)) => unclaimed(
             placed.called(),

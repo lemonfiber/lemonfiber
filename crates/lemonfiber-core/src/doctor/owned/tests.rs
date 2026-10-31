@@ -29,7 +29,7 @@ impl Ownership for Answering {
         })
     }
 
-    async fn claim(&self) -> Result<Owner, Failure> {
+    async fn claim(&self) -> Result<crate::ports::service::Claim, Failure> {
         Err(Failure::Refused {
             service: "part".to_owned(),
             detail: "a diagnosis claims nothing".to_owned(),

@@ -150,7 +150,10 @@ expect  = { status = 401 }"#,
     for (varies, words) in [
         (r#"id = "[0-9a-f]{40}""#, "not a JSON Pointer"),
         (r#""/content/[id=x]" = "[0-9a-f]{40}""#, "picks a list"),
-        (r#""/content/id" = "(""#, "not an RE2 pattern"),
+        (
+            r#""/content/id" = "(""#,
+            "not a pattern this build compiles",
+        ),
     ] {
         let said = varying(varies);
         assert!(
