@@ -8,10 +8,22 @@ fn minted(of: &str) -> String {
     )
 }
 
+/// The contracts an adapter that serves media speaks.
+const SERVES: &str = r#"["media.serve@1"]"#;
+
+/// The contracts an adapter a part is claimed through speaks.
+const CLAIMS: &str = r#"["owner.claim@1"]"#;
+
 /// The fixture's adapter handing its upstream `upstream`, with `secrets` declared.
 fn handing(upstream: &str, secrets: &str) -> String {
+    handing_as(SERVES, upstream, secrets)
+}
+
+/// The fixture's adapter speaking `speaks` and handing its upstream `upstream`, with `secrets`
+/// declared.
+fn handing_as(speaks: &str, upstream: &str, secrets: &str) -> String {
     speaking(
-        r#"["media.serve@1"]"#,
+        speaks,
         &format!("listens     = 8080\nupstream    = {upstream}\n"),
     ) + secrets
 }
@@ -134,4 +146,49 @@ fn a_secret_stood_in_for_by_a_value_holding_a_control_character_is_refused() {
         !kept.iter().any(|one| one.contains("recorded_with")),
         "{kept:?}"
     );
+}
+
+/// The fixture's adapter speaking `speaks` and handing its upstream a claim code declared with
+/// `extra`.
+fn claiming(speaks: &str, extra: &str) -> Vec<String> {
+    said(&handing_as(
+        speaks,
+        r#"{ claim_code = { secret = "claim-code" } }"#,
+        &format!(
+            "\n[[secret]]\nid  = \"claim-code\"\nof  = \"komga-server\"\nwhy = \"Claim it\"\n{extra}"
+        ),
+    ))
+}
+
+/// A claim code that lapses beside its stand-in.
+const LAPSING: &str = "lapses_s = 240\nrecorded_with = \"claim-0000\"\n";
+
+#[test]
+fn a_code_claimed_through_the_adapter_that_lapses_beside_its_stand_in_is_refused_nothing() {
+    let said = claiming(CLAIMS, LAPSING);
+    assert!(!said.iter().any(|one| one.contains("lapses_s")), "{said:?}");
+}
+
+#[test]
+fn a_code_that_lapses_is_refused_without_its_stand_in_at_no_seconds_minted_or_handed_nowhere() {
+    for (speaks, extra, message) in [
+        (CLAIMS, "lapses_s = 240\n", "without recorded_with"),
+        (
+            CLAIMS,
+            "lapses_s = 0\nrecorded_with = \"claim-0000\"\n",
+            "no seconds at all",
+        ),
+        (
+            CLAIMS,
+            "lapses_s = 240\nminted = true\n",
+            "mints or carries",
+        ),
+        (SERVES, LAPSING, "no adapter speaking owner.claim@1"),
+    ] {
+        let said = claiming(speaks, extra);
+        assert!(
+            names(&said, &["secret claim-code.lapses_s", message]),
+            "{extra}: {said:?}"
+        );
+    }
 }

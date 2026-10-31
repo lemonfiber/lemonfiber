@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use lemonfiber_manifest::container::{Minted, Secret, Value};
+use lemonfiber_manifest::container::{Secret, Value};
 
 use lemonfiber_contract::adapter::KEY_FILE;
 
@@ -47,8 +47,8 @@ fn written(copy: &Throwaway, held: Option<&Throwaway>) -> BTreeMap<String, Strin
 struct Minting<'a> {
     /// Where minted values come from.
     random: &'a dyn Random,
-    /// The shape each secret the plugin declares is minted in, by its id.
-    shapes: BTreeMap<String, Minted>,
+    /// The plugin and the shape each secret it declares is minted in.
+    shapes: crate::plugin::seeding::Shapes,
 }
 
 /// The value of `secret` for this run: the one already written for it, or one minted now
@@ -63,11 +63,10 @@ fn valued(
     if let Some(held) = secrets.get(secret) {
         return Ok(held.clone());
     }
-    let fresh = crate::plugin::seeding::minted_as(
-        minting.random,
-        crate::plugin::seeding::shape_of(&minting.shapes, secret),
-    )
-    .ok_or_else(|| crate::plugin::seeding::UNMINTED.to_owned())?;
+    let fresh = minting
+        .shapes
+        .minted(minting.random, secret)
+        .ok_or_else(|| crate::plugin::seeding::UNMINTED.to_owned())?;
     made.push(fresh.clone());
     secrets.insert(secret.to_owned(), fresh.clone());
     Ok(fresh)

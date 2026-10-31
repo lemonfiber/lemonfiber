@@ -97,6 +97,7 @@ OPENVPN_USER = { secret = "openvpn-user" }
         was: None,
         needs: toml::from_str(r#""komga:vpn-type" = ["openvpn"]"#).unwrap_or_default(),
         needed_to_start: false,
+        lapses_s: None,
     }];
     let named = |setting: &dyn Fn(&str, &str) -> Option<String>| -> Vec<String> {
         let reading = super::super::Reading {

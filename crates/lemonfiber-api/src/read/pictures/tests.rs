@@ -64,6 +64,10 @@ fn a_picture_is_shown_as_its_raster_type_and_kept_by_its_asker_alone() {
     assert_eq!(header(header::CONTENT_TYPE), Some("image/webp"));
     assert_eq!(header(header::CACHE_CONTROL), Some("private"));
     assert_eq!(header(header::X_CONTENT_TYPE_OPTIONS), Some("nosniff"));
+    assert_eq!(
+        header(header::CONTENT_SECURITY_POLICY),
+        Some("default-src 'none'")
+    );
 }
 
 #[test]

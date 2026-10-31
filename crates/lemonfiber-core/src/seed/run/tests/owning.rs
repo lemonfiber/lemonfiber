@@ -71,9 +71,13 @@ async fn a_part_nobody_holds_is_claimed_and_recorded() {
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
     let mut baseline = Baseline::new();
 
-    let wirings =
-        super::super::owning::owned(&ctx, &beside(&project, &first_party(PLUGIN)), &mut baseline)
-            .await;
+    let wirings = super::super::owning::owned(
+        &ctx,
+        &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
+        &mut baseline,
+    )
+    .await;
 
     assert_eq!(wirings.len(), 1, "{wirings:?}");
     assert_eq!(
@@ -99,6 +103,7 @@ async fn a_part_taking_up_the_claim_is_waited_out() {
     let wirings = super::super::owning::owned(
         &ctx,
         &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
         &mut Baseline::new(),
     )
     .await;
@@ -118,9 +123,13 @@ async fn a_part_claimed_before_and_open_again_is_drift_and_never_claimed_on_a_se
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
     let mut baseline = recorded();
 
-    let wirings =
-        super::super::owning::owned(&ctx, &beside(&project, &first_party(PLUGIN)), &mut baseline)
-            .await;
+    let wirings = super::super::owning::owned(
+        &ctx,
+        &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
+        &mut baseline,
+    )
+    .await;
 
     assert_eq!(
         wirings.first().map(|one| &one.state),
@@ -141,9 +150,13 @@ async fn a_part_somebody_else_holds_is_refused_naming_the_secret_lemonfiber_hold
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
     let mut baseline = Baseline::new();
 
-    let wirings =
-        super::super::owning::owned(&ctx, &beside(&project, &first_party(PLUGIN)), &mut baseline)
-            .await;
+    let wirings = super::super::owning::owned(
+        &ctx,
+        &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
+        &mut baseline,
+    )
+    .await;
 
     let secret = crate::settings::named(PLUGIN, PASSWORD);
     assert!(
@@ -166,6 +179,7 @@ async fn a_rehearsal_says_it_would_claim_and_claims_nothing() {
     let wirings = super::super::owning::owned(
         &ctx,
         &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
         &mut Baseline::new(),
     )
     .await;
@@ -188,6 +202,7 @@ async fn a_part_that_cannot_be_asked_over_its_contract_is_said_as_unknown() {
     let wirings = super::super::owning::owned(
         &ctx,
         &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
         &mut Baseline::new(),
     )
     .await;
@@ -210,6 +225,7 @@ async fn a_reset_claims_back_a_part_lemonfiber_claimed_once_confirmed() {
         let wirings = super::super::owning::put_back(
             &ctx,
             &beside(&project, &first_party(PLUGIN)),
+            &[claimer()],
             &recorded(),
             confirm,
         )
@@ -238,6 +254,7 @@ async fn a_reset_owes_a_part_lemonfiber_never_claimed_nothing() {
     let wirings = super::super::owning::put_back(
         &ctx,
         &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
         &Baseline::new(),
         true,
     )
@@ -257,6 +274,7 @@ async fn a_part_claimed_before_is_asked_who_holds_it_and_never_claimed_again() {
         let wirings = super::super::owning::owned(
             &ctx,
             &beside(&project, &first_party(PLUGIN)),
+            &[claimer()],
             &mut recorded(),
         )
         .await;
@@ -292,6 +310,7 @@ async fn a_claim_that_leaves_the_part_open_or_goes_unanswered_records_nothing() 
         let wirings = super::super::owning::owned(
             &ctx,
             &beside(&project, &first_party(PLUGIN)),
+            &[claimer()],
             &mut baseline,
         )
         .await;
@@ -330,6 +349,7 @@ async fn a_part_still_taking_up_the_claim_once_patience_runs_out_is_a_failure() 
     let wirings = super::super::owning::owned(
         &ctx,
         &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
         &mut Baseline::new(),
     )
     .await;
@@ -351,6 +371,7 @@ async fn a_reset_leaves_a_part_lemonfiber_holds_and_refuses_one_somebody_else_ho
         let wirings = super::super::owning::put_back(
             &ctx,
             &beside(&project, &first_party(PLUGIN)),
+            &[claimer()],
             &recorded(),
             true,
         )
@@ -433,7 +454,7 @@ async fn every_moved_part_is_claimed_through_its_adapter_and_recorded_as_itself(
     let (ctx, fillers) = three_moved(http.clone());
     let mut baseline = Baseline::new();
 
-    let wirings = super::super::owning::owned(&ctx, &fillers, &mut baseline).await;
+    let wirings = super::super::owning::owned(&ctx, &fillers, &[claimer()], &mut baseline).await;
 
     assert_eq!(
         wirings
@@ -466,7 +487,8 @@ async fn a_moved_part_somebody_else_holds_is_refused_naming_its_minted_account()
     )]);
     let (ctx, fillers) = three_moved(http);
 
-    let wirings = super::super::owning::owned(&ctx, &fillers, &mut Baseline::new()).await;
+    let wirings =
+        super::super::owning::owned(&ctx, &fillers, &[claimer()], &mut Baseline::new()).await;
 
     let aggregator = wirings
         .iter()
@@ -480,3 +502,5 @@ async fn a_moved_part_somebody_else_holds_is_refused_naming_its_minted_account()
         "{wirings:?}"
     );
 }
+
+mod coded;

@@ -71,6 +71,10 @@ impl Secrets {
         self.value(name).map(fingerprint)
     }
 
+    pub(crate) fn entered_at(&self, name: &str) -> Option<u64> {
+        self.held.get(name).map(|kept| kept.at)
+    }
+
     fn keep(&mut self, name: &str, value: &str, from: Source, at: u64) {
         let previous = self.held.remove(name).map(|kept| kept.value);
         self.held.insert(
@@ -124,10 +128,7 @@ pub(crate) fn kept(
     journalled: &dyn Fn(&Replaced) -> Result<(), Failure>,
 ) -> Result<(), Failure> {
     if let Some(spanning) = keeping.iter().find(|one| !is_one_line(one.value)) {
-        return Err(Failure::SpansLines {
-            path: path.to_path_buf(),
-            key: spanning.name.to_owned(),
-        });
+        return Err(spans(path, spanning.name));
     }
     super::kept::changed(path, &mut |secrets: &mut Secrets| {
         let replaced: Vec<(String, Option<String>)> = keeping
@@ -156,6 +157,38 @@ pub(crate) fn filed(
         for one in absent {
             secrets.keep(one.name, one.value, one.from, one.at);
         }
+        Ok(())
+    })
+}
+
+pub(crate) fn lapsing(path: &Path, name: &str, value: &str, at: u64) -> Result<(), Failure> {
+    if !is_one_line(value) {
+        return Err(spans(path, name));
+    }
+    super::kept::changed(path, &mut |secrets: &mut Secrets| {
+        secrets.held.insert(
+            name.to_owned(),
+            Kept {
+                value: value.to_owned(),
+                from: Source::Operator,
+                at,
+                previous: None,
+            },
+        );
+        Ok(())
+    })
+}
+
+fn spans(path: &Path, name: &str) -> Failure {
+    Failure::SpansLines {
+        path: path.to_path_buf(),
+        key: name.to_owned(),
+    }
+}
+
+pub(crate) fn dropped(path: &Path, names: &[String]) -> Result<(), Failure> {
+    super::kept::changed(path, &mut |secrets: &mut Secrets| {
+        secrets.held.retain(|name, _| !names.contains(name));
         Ok(())
     })
 }

@@ -1,7 +1,7 @@
 //! Writing a plugin's starting files and an adapter's `upstream.json`, each secret they
 //! name filled from the secret store, beneath the stack directory through no link.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::error::Problem;
@@ -35,15 +35,15 @@ pub(super) fn starting(
 }
 
 /// Write an adapter's `upstream.json`, each of `fields` with its secret's value as the
-/// secret store holds it for the plugin.
+/// secret store holds it for the plugin, a `lapsing` code it holds none of left out.
 pub(super) fn upstream(
     ctx: &Ctx,
     recording: (&str, &str, &Path),
     stack: &Path,
     path: &Path,
-    fields: &BTreeMap<String, String>,
+    (fields, lapsing): (&BTreeMap<String, String>, &BTreeSet<String>),
 ) -> Result<(), Box<Problem>> {
-    let text = crate::plugin::seeding::upstream(fields, &holding(ctx, recording.0))
+    let text = crate::plugin::seeding::upstream(fields, lapsing, &holding(ctx, recording.0))
         .map_err(|why| Box::new(unwritable(path, &why)))?;
     made_confined(
         ctx,

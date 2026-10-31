@@ -16,8 +16,8 @@ use crate::wishing::tests::{asked_for, ctx_over, ctx_running, house, rated, titl
 /// Where the film's poster is published.
 const POSTER_AT: &str = "https://image.tmdb.org/t/p/w342/film.jpg";
 
-/// What the film's poster is.
-const JPEG: &str = "a picture's bytes";
+/// What the film's poster is: a GIF, whose opening bytes are text.
+const GIF: &str = "GIF89a, a picture's bytes";
 
 /// A film out in Britain, rated `certification`, its poster at `poster` where it has one.
 fn film(certification: Option<&str>, poster: Option<&str>) -> Answer {
@@ -73,7 +73,7 @@ fn code(outcome: &Result<Pictured, Box<crate::error::Problem>>) -> Option<String
 
 #[tokio::test]
 async fn a_member_is_handed_the_poster_fetched_from_the_catalogue_with_nothing_of_theirs() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_outward(&transport, "poster-handed");
 
     let handed = poster(&ctx, "Bea", "movies", "603").await;
@@ -81,8 +81,8 @@ async fn a_member_is_handed_the_poster_fetched_from_the_catalogue_with_nothing_o
     assert_eq!(
         handed.ok(),
         Some(Pictured {
-            media_type: "image/jpeg",
-            bytes: JPEG.as_bytes().to_vec(),
+            media_type: "image/gif",
+            bytes: GIF.as_bytes().to_vec(),
         })
     );
     let fetched: Vec<_> = transport
@@ -109,7 +109,7 @@ async fn a_catalogue_host_standing_for_somewhere_inward_is_never_fetched() {
         (IpAddr::from([10, 0, 0, 7]), "poster-private"),
         (IpAddr::from([169, 254, 169, 254]), "poster-link-local"),
     ] {
-        let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+        let transport = pictured(Answer::served(200, "image/gif", GIF));
         let ctx = ctx_resolving(&transport, tag, Resolving::standing_for(&[inward]));
 
         let refused = poster(&ctx, "Ada", "movies", "603").await;
@@ -121,7 +121,7 @@ async fn a_catalogue_host_standing_for_somewhere_inward_is_never_fetched() {
 
 #[tokio::test]
 async fn a_catalogue_host_that_cannot_be_resolved_is_never_fetched() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_resolving(
         &transport,
         "poster-unresolved",
@@ -136,7 +136,7 @@ async fn a_catalogue_host_that_cannot_be_resolved_is_never_fetched() {
 
 #[tokio::test]
 async fn posters_switched_off_fetch_nothing_and_show_no_picture() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let mut ctx = ctx_outward(&transport, "poster-switched-off");
     ctx.settings.reaching = Reaching::without(REACH_POSTERS_KEY);
 
@@ -148,7 +148,7 @@ async fn posters_switched_off_fetch_nothing_and_show_no_picture() {
 
 #[tokio::test]
 async fn a_title_outside_the_members_limits_is_no_title_and_its_poster_is_never_fetched() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_outward(&transport, "poster-restricted");
 
     let refused = poster(&ctx, "Bea", "movies", "604").await;
@@ -159,7 +159,7 @@ async fn a_title_outside_the_members_limits_is_no_title_and_its_poster_is_never_
 
 #[tokio::test]
 async fn a_kind_that_names_no_kind_is_no_title() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_outward(&transport, "poster-no-kind");
 
     let refused = poster(&ctx, "Ada", "music", "603").await;
@@ -170,7 +170,7 @@ async fn a_kind_that_names_no_kind_is_no_title() {
 
 #[tokio::test]
 async fn a_kind_no_running_curator_fetches_is_refused_before_the_title_is_looked_up() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_running(Arc::clone(&transport), "poster-no-curator", &["sonarr"])
         .with_resolver(Resolving::anywhere());
 
@@ -184,14 +184,14 @@ async fn a_kind_no_running_curator_fetches_is_refused_before_the_title_is_looked
 async fn nothing_that_is_a_small_raster_picture_is_shown() {
     let too_big = "x".repeat(PICTURE_MOST + 1);
     for (served, why) in [
-        (Answer::served(200, "text/html", JPEG), "a page"),
+        (Answer::served(200, "text/html", GIF), "a page"),
         (
-            Answer::served(200, "image/svg+xml", JPEG),
+            Answer::served(200, "image/svg+xml", GIF),
             "a drawing that can run",
         ),
-        (Answer::served(200, "image/jpeg", too_big), "too large"),
-        (Answer::served(404, "image/jpeg", JPEG), "absent"),
-        (Answer::served(302, "image/jpeg", JPEG), "sent elsewhere"),
+        (Answer::served(200, "image/gif", too_big), "too large"),
+        (Answer::served(404, "image/gif", GIF), "absent"),
+        (Answer::served(302, "image/gif", GIF), "sent elsewhere"),
     ] {
         let transport = pictured(served);
         let ctx = ctx_outward(&transport, "poster-not-shown");
@@ -204,8 +204,8 @@ async fn nothing_that_is_a_small_raster_picture_is_shown() {
 
 #[tokio::test]
 async fn a_poster_at_exactly_the_most_a_picture_may_be_is_shown() {
-    let largest = "x".repeat(PICTURE_MOST);
-    let transport = pictured(Answer::served(200, "image/png", largest));
+    let largest = format!("GIF89a{}", "x".repeat(PICTURE_MOST - 6));
+    let transport = pictured(Answer::served(200, "image/gif", largest));
     let ctx = ctx_outward(&transport, "poster-largest");
 
     let handed = poster(&ctx, "Ada", "movies", "603").await;
@@ -218,7 +218,7 @@ async fn a_poster_at_exactly_the_most_a_picture_may_be_is_shown() {
 
 #[tokio::test]
 async fn a_title_with_no_poster_shows_none_and_nothing_is_fetched() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_outward(&transport, "poster-bare");
 
     let refused = poster(&ctx, "Ada", "movies", "605").await;
@@ -229,7 +229,7 @@ async fn a_title_with_no_poster_shows_none_and_nothing_is_fetched() {
 
 #[tokio::test]
 async fn a_location_that_climbs_out_from_beneath_the_catalogue_is_never_fetched() {
-    let transport = pictured(Answer::served(200, "image/jpeg", JPEG));
+    let transport = pictured(Answer::served(200, "image/gif", GIF));
     let ctx = ctx_outward(&transport, "poster-climbing");
 
     let refused = poster(&ctx, "Ada", "movies", "606").await;

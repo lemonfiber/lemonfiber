@@ -41,7 +41,9 @@ pub mod torrent;
 pub mod usenet;
 
 mod crossing;
+mod typing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader, crossing_stack};
+pub(crate) use typing::Typing;
 pub(crate) mod egress;
 mod gating;
 pub(crate) mod syncing;
@@ -296,6 +298,7 @@ pub(crate) fn a_minting_curator() -> crate::plugin::Installed {
         serves: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),
         needed_to_start: false,
+        lapses_s: None,
     }];
     curator
 }

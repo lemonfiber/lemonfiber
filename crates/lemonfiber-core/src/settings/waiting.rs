@@ -45,7 +45,7 @@ pub(crate) fn readings<'a>(manifest: &'a Manifest, installed: &'a [Installed]) -
             .map(|secret| Read {
                 name: super::named(container.namespace, &secret.id),
                 why: &secret.why,
-                needed_to_start: secret.recorded_with.is_some(),
+                needed_to_start: secret.needed_to_start(),
                 needs: &secret.needs,
             })
             .collect::<Vec<_>>();

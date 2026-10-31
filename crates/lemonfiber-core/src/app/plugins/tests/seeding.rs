@@ -295,7 +295,10 @@ fn a_seeded_write_naming_a_secret_nothing_holds_writes_nothing() {
     );
     let upstream = carried(
         &ctx,
-        crate::plugin::Lands::Upstream([("api_key".to_owned(), "nobody".to_owned())].into()),
+        crate::plugin::Lands::Upstream {
+            fields: [("api_key".to_owned(), "nobody".to_owned())].into(),
+            lapsing: std::collections::BTreeSet::new(),
+        },
     );
 
     assert!(

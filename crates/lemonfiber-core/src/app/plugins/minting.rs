@@ -50,7 +50,11 @@ pub(super) fn minted(
                 .then(|| moved(ctx, manifest, secret))
                 .flatten()
                 .or_else(|| {
-                    crate::plugin::seeding::minted_as(ctx.seams.random.as_ref(), secret.minted)
+                    crate::plugin::seeding::minted_as(
+                        ctx.seams.random.as_ref(),
+                        secret.minted,
+                        plugin,
+                    )
                 })
                 .map(|value| (crate::settings::named(plugin, &secret.id), value))
         })

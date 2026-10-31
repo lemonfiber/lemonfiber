@@ -61,6 +61,7 @@ fn reading(mut installed: Installed, id: &str, of: &str) -> Installed {
         serves: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),
         needed_to_start: false,
+        lapses_s: None,
     });
     installed
 }
@@ -168,6 +169,7 @@ fn a_stack_service_reading_a_key_is_said_and_one_of_nothing_here_is_not() {
         minted: lemonfiber_manifest::container::Minted::Not,
         serves: None,
         carried_from: None,
+        lapses_s: None,
         recorded_with: None,
         was: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),

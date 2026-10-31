@@ -216,7 +216,7 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
                 Lands::Key => Puts::Key,
                 Lands::Secrets(_) => Puts::Secrets,
                 Lands::Starting { .. } => Puts::Starting,
-                Lands::Upstream(_) => Puts::Upstream,
+                Lands::Upstream { .. } => Puts::Upstream,
             },
         })
         .collect()

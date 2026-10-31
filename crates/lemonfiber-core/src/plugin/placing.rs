@@ -67,9 +67,14 @@ pub enum Lands {
         /// Whether it names a secret, and so is written with its value.
         seeded: bool,
     },
-    /// The credentials an adapter reads its upstream's with: each field, to the id of the
-    /// plugin's secret it holds.
-    Upstream(std::collections::BTreeMap<String, String>),
+    /// The credentials an adapter reads its upstream's with.
+    Upstream {
+        /// Each field, to the id of the plugin's secret it holds.
+        fields: std::collections::BTreeMap<String, String>,
+        /// The id of each secret among them that is a code that lapses, left out while
+        /// nothing holds it.
+        lapsing: std::collections::BTreeSet<String>,
+    },
 }
 
 impl Write {
@@ -135,9 +140,6 @@ pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<PathBuf> {
 }
 
 /// Where one of a plugin's services keeps its own configuration.
-///
-/// Not published, unlike the document's path: nothing outside this module has had to
-/// ask yet, and a name nothing reads is one that drifts from what it describes.
 pub(crate) fn configuration(stack: &Path, service: &str) -> PathBuf {
     stack.join(CONFIGURATION_TREE).join(service)
 }
@@ -195,7 +197,10 @@ pub fn writes(
             .map(|placed| Write {
                 path: configuration(stack, &placed.service)
                     .join(lemonfiber_contract::adapter::UPSTREAM_FILE),
-                lands: Lands::Upstream(placed.upstream.clone()),
+                lands: Lands::Upstream {
+                    fields: placed.upstream.clone(),
+                    lapsing: installed.declared.lapsing(),
+                },
             }),
     );
     planned.extend(installed.services.iter().filter_map(|placed| {

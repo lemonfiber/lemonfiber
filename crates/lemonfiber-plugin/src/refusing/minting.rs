@@ -1,5 +1,8 @@
 //! The secrets lemonfiber mints for a plugin, and the fields an adapter is handed them in.
 
+use lemonfiber_contract::capabilities::owner::claim;
+use lemonfiber_contract::spoken;
+
 use crate::schema::{Manifest, Service};
 use crate::seeding::owned;
 use crate::Violation;
@@ -56,6 +59,52 @@ pub(super) fn stood_in(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
         if let Some(message) = recorded.unshown() {
             found.push(Violation { location, message });
+        }
+    }
+}
+
+/// Whether each secret declaring `lapses_s` is a code a part is claimed with: a positive
+/// number of seconds, beside `recorded_with`, neither minted nor carried from a moved
+/// service, of a service an adapter speaking `owner.claim@1` fronts and hands it to in its
+/// `upstream`.
+pub(super) fn lapsing(manifest: &Manifest, found: &mut Vec<Violation>) {
+    for secret in &manifest.secrets {
+        let Some(lapses) = secret.lapses_s else {
+            continue;
+        };
+        let location = format!("secret {}.lapses_s", secret.id);
+        let mut refused = |message: &str| {
+            found.push(Violation {
+                location: location.clone(),
+                message: message.to_owned(),
+            });
+        };
+        if lapses == 0 {
+            refused("is no seconds at all, and a code that lapses holds for some");
+        }
+        if secret.recorded_with.is_none() {
+            refused("is declared without recorded_with, the stand-in plugin record hands it");
+        }
+        if secret.minted.is() || secret.carried_from.is_some() {
+            refused(
+                "is declared on a secret lemonfiber mints or carries, and a code that lapses is \
+                 one the operator alone enters",
+            );
+        }
+        let claim = spoken(claim::CAPABILITY, claim::MAJOR);
+        let claimed = manifest.services.iter().any(|service| {
+            service.fronts.as_deref() == Some(secret.of.as_str())
+                && service.speaks.contains(&claim)
+                && service
+                    .upstream
+                    .values()
+                    .any(|handed| handed.secret == secret.id)
+        });
+        if !claimed {
+            refused(&format!(
+                "names {}, which no adapter speaking {claim} fronts and hands it to in its upstream",
+                secret.of
+            ));
         }
     }
 }

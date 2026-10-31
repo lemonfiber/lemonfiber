@@ -333,7 +333,8 @@
     "SecretMintedShape": {
       "description": "A shape a minted value is made in, beyond a key.",
       "oneOf": [
-        {"description": "A password: every character class a password rule asks for.", "type": "string", "const": "password"}
+        {"description": "A password: every character class a password rule asks for.", "type": "string", "const": "password"},
+        {"description": "An email address at the plugin's own `.invalid` domain.", "type": "string", "const": "email"}
       ]
     },
     "Service": {

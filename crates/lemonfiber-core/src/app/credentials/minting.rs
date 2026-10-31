@@ -119,8 +119,9 @@ async fn replaced(
     else {
         return refused("there is no stack directory to find the service's settings in".to_owned());
     };
-    let shape = crate::plugin::seeding::shape_of(&crate::plugin::seeding::shapes(&kept), secret);
-    let Some(value) = crate::plugin::seeding::minted_as(ctx.seams.random.as_ref(), shape) else {
+    let Some(value) =
+        crate::plugin::seeding::shapes(&kept).minted(ctx.seams.random.as_ref(), secret)
+    else {
         return refused(crate::plugin::seeding::UNMINTED.to_owned());
     };
     let files = match rewritten(ctx, installed, &stack, &kept, secret, &value) {
@@ -332,6 +333,31 @@ fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Res
 /// Each adapter of `installed` that hands its upstream `secret`, its `upstream.json`
 /// written again with what the store holds now.
 fn handed(ctx: &Ctx, installed: &Installed, stack: &Path, secret: &str) -> Vec<Propagation> {
+    installed
+        .services
+        .iter()
+        .filter(|placed| hands_it(placed, secret))
+        .map(|placed| {
+            reached(
+                &placed.service,
+                upstream_anew(ctx, installed, stack, placed).err(),
+            )
+        })
+        .collect()
+}
+
+/// `placed`'s `upstream.json` beneath `stack` written again with what the store holds
+/// for `installed` now, a code that lapses it holds none of left out.
+///
+/// # Errors
+///
+/// Why it could not be written, never naming a value.
+pub(crate) fn upstream_anew(
+    ctx: &Ctx,
+    installed: &Installed,
+    stack: &Path,
+    placed: &Placed,
+) -> Result<(), String> {
     let secrets = crate::settings::secrets_at(ctx)
         .and_then(|at| crate::settings::Secrets::at(&at).ok())
         .unwrap_or_default();
@@ -340,25 +366,15 @@ fn handed(ctx: &Ctx, installed: &Installed, stack: &Path, secret: &str) -> Vec<P
             .value(&crate::settings::named(&installed.plugin, id))
             .map(str::to_owned)
     };
-    installed
-        .services
-        .iter()
-        .filter(|placed| hands_it(placed, secret))
-        .map(|placed| {
-            let at = stack
-                .join("config")
-                .join(&placed.service)
-                .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
-            let written =
-                crate::plugin::seeding::upstream(&placed.upstream, &held).and_then(|text| {
-                    ctx.seams
-                        .confined
-                        .written(&at, stack, text.as_bytes(), Readable::Owner)
-                        .map_err(|fault| fault.message)
-                });
-            reached(&placed.service, written.err())
+    let at = crate::plugin::configuration(stack, &placed.service)
+        .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    crate::plugin::seeding::upstream(&placed.upstream, &installed.declared.lapsing(), &held)
+        .and_then(|text| {
+            ctx.seams
+                .confined
+                .written(&at, stack, text.as_bytes(), Readable::Owner)
+                .map_err(|fault| fault.message)
         })
-        .collect()
 }
 
 /// The egress guard among `installed`'s services, asked to hold its control server to

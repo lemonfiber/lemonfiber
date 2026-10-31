@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use base64::Engine as _;
@@ -6,9 +6,7 @@ use lemonfiber_fixtures::ports::Chance;
 
 use lemonfiber_manifest::container::Minted;
 
-use super::{
-    mint, minted_as, shape_of, shapes, starting, upstream, written, Shipped, MINTED_BYTES,
-};
+use super::{mint, minted_as, shapes, starting, upstream, written, Shipped, MINTED_BYTES};
 use crate::plugin::Lands;
 
 /// The value the store holds as `api-key`.
@@ -92,12 +90,29 @@ fn a_secret_nothing_holds_is_named_by_its_placeholder_and_never_by_a_value() {
 fn an_adapter_is_handed_each_field_with_its_secrets_value() {
     let fields = BTreeMap::from([("api_key".to_owned(), "api-key".to_owned())]);
     assert_eq!(
-        upstream(&fields, &held),
+        upstream(&fields, &BTreeSet::new(), &held),
         Ok(format!(r#"{{"api_key":"{HELD}"}}"#))
     );
     let missing = BTreeMap::from([("api_key".to_owned(), "other".to_owned())]);
-    assert!(
-        upstream(&missing, &held).is_err_and(|why| why.contains("api_key names the secret other"))
+    assert!(upstream(&missing, &BTreeSet::new(), &held)
+        .is_err_and(|why| why.contains("api_key names the secret other")));
+}
+
+#[test]
+fn a_code_that_lapses_is_handed_while_it_is_held_and_left_out_once_it_is_not() {
+    let fields = BTreeMap::from([
+        ("api_key".to_owned(), "api-key".to_owned()),
+        ("claim_code".to_owned(), "other".to_owned()),
+    ]);
+    let lapsing = BTreeSet::from(["other".to_owned()]);
+    assert_eq!(
+        upstream(&fields, &lapsing, &held),
+        Ok(format!(r#"{{"api_key":"{HELD}"}}"#))
+    );
+    let entered = |secret: &str| Some(format!("{secret}-value"));
+    assert_eq!(
+        upstream(&fields, &lapsing, &entered),
+        Ok(r#"{"api_key":"api-key-value","claim_code":"other-value"}"#.to_owned())
     );
 }
 
@@ -267,16 +282,23 @@ fn a_minted_password_holds_every_class_however_alike_its_random_bytes() {
         Chance::exactly(Some(vec![0xff; 80])),
         Chance::exactly(Some(vec![0xcd; 80])),
     ] {
-        let value = minted_as(&random, Minted::Password).unwrap_or_default();
+        let value = minted_as(&random, Minted::Password, "plugin").unwrap_or_default();
         assert!(a_password(&value));
     }
 }
 
 #[test]
 fn a_minted_password_is_nothing_without_enough_random_bytes() {
-    assert_eq!(minted_as(&Chance::exactly(None), Minted::Password), None);
     assert_eq!(
-        minted_as(&Chance::exactly(Some(vec![0x10; 79])), Minted::Password),
+        minted_as(&Chance::exactly(None), Minted::Password, "plugin"),
+        None
+    );
+    assert_eq!(
+        minted_as(
+            &Chance::exactly(Some(vec![0x10; 79])),
+            Minted::Password,
+            "plugin"
+        ),
         None
     );
 }
@@ -284,8 +306,21 @@ fn a_minted_password_is_nothing_without_enough_random_bytes() {
 #[test]
 fn a_key_is_minted_as_before_and_an_unminted_secret_is_minted_nothing() {
     let random = Chance::exactly(Some(vec![0xab; MINTED_BYTES]));
-    assert_eq!(minted_as(&random, Minted::Key), mint(&random));
-    assert_eq!(minted_as(&random, Minted::Not), None);
+    assert_eq!(minted_as(&random, Minted::Key, "plugin"), mint(&random));
+    assert_eq!(minted_as(&random, Minted::Not, "plugin"), None);
+}
+
+#[test]
+fn a_minted_email_is_a_key_at_the_plugins_own_invalid_domain() {
+    let random = Chance::exactly(Some(vec![0xab; MINTED_BYTES]));
+    assert_eq!(
+        minted_as(&random, Minted::Email, "komga"),
+        Some(format!("{}@komga.invalid", "ab".repeat(MINTED_BYTES)))
+    );
+    assert_eq!(
+        minted_as(&Chance::exactly(None), Minted::Email, "komga"),
+        None
+    );
 }
 
 #[test]
@@ -298,10 +333,12 @@ fn the_shapes_a_manifest_declares_are_read_beside_it_and_a_key_is_the_default() 
 
     let read = shapes(&dir);
 
-    assert_eq!(read.get("admin-password"), Some(&Minted::Password));
-    assert_eq!(shape_of(&read, "admin-password"), Minted::Password);
-    assert_eq!(shape_of(&read, "never-declared"), Minted::Key);
-    assert!(shapes(Path::new("/lemonfiber/no/such/plugin")).is_empty());
+    assert_eq!(read.of("admin-password"), Minted::Password);
+    assert_eq!(read.of("never-declared"), Minted::Key);
+    assert_eq!(
+        shapes(Path::new("/lemonfiber/no/such/plugin")),
+        super::Shapes::default()
+    );
 }
 
 #[test]

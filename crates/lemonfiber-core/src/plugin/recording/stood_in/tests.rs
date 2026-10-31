@@ -15,6 +15,7 @@ fn secret(id: &str, recorded_with: Option<RecordedWith>) -> Secret {
         minted: Minted::Not,
         serves: None,
         carried_from: None,
+        lapses_s: None,
         recorded_with,
         was: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),
@@ -148,5 +149,23 @@ fn the_variables_a_recording_stands_in_for_are_named_in_order() {
         named(&guard(), &[]),
         vec!["PORT", "PROVIDER", "PUBLIC_KEY"],
         "a secret the plugin does not declare is not stood in for"
+    );
+}
+
+#[test]
+fn a_code_that_lapses_is_stood_in_for_by_its_declared_stand_in() {
+    let code = Secret {
+        lapses_s: Some(240),
+        ..secret(
+            "claim-code",
+            Some(RecordedWith::Constant(Constant::Text(
+                "claim-0000".to_owned(),
+            ))),
+        )
+    };
+    let stand_ins = StandIns::of(&[code], &Chance::exactly(None)).unwrap_or_default();
+    assert_eq!(
+        stand_ins.held().collect::<Vec<_>>(),
+        vec![("claim-code", "claim-0000")]
     );
 }

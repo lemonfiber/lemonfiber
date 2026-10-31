@@ -18,6 +18,7 @@ pub(crate) mod certifying;
 mod declining;
 mod gating;
 mod minting;
+pub(crate) use minting::upstream_anew;
 pub(crate) mod pending;
 mod reading;
 mod revealing;

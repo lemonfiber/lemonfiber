@@ -147,9 +147,23 @@ pub struct Secret {
     /// file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub was: Option<String>,
+    /// How many seconds the value holds once an outside account issues it, for a code a
+    /// part is claimed with: lemonfiber asks the operator for it only to claim the part, and
+    /// keeps it no longer than the claim or this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lapses_s: Option<u32>,
     /// The values of other settings under which it is asked for and held.
     #[serde(default, skip_serializing_if = "Needs::is_empty")]
     pub needs: Needs,
+}
+
+impl Secret {
+    /// Whether only the operator holds the value and the service reading it needs one to
+    /// start: a recording stands in for it, and it is no code a part is claimed with.
+    #[must_use]
+    pub const fn needed_to_start(&self) -> bool {
+        self.recorded_with.is_some() && self.lapses_s.is_none()
+    }
 }
 
 /// Where a service wrote a credential itself: a file inside its container, the format it
@@ -193,6 +207,9 @@ pub enum Minted {
     Key,
     /// 32 characters holding every character class a password rule asks for.
     Password,
+    /// 32 lowercase hexadecimal characters at the plugin's own `.invalid` domain, for a
+    /// service that takes no account name but an email address.
+    Email,
 }
 
 impl Minted {
@@ -227,6 +244,8 @@ pub enum MintedAs {
 pub enum MintedShape {
     /// A password: every character class a password rule asks for.
     Password,
+    /// An email address at the plugin's own `.invalid` domain.
+    Email,
 }
 
 impl From<MintedAs> for Minted {
@@ -235,6 +254,7 @@ impl From<MintedAs> for Minted {
             MintedAs::Flag(false) => Self::Not,
             MintedAs::Flag(true) => Self::Key,
             MintedAs::Shaped(MintedShape::Password) => Self::Password,
+            MintedAs::Shaped(MintedShape::Email) => Self::Email,
         }
     }
 }
@@ -245,6 +265,7 @@ impl From<Minted> for MintedAs {
             Minted::Not => Self::Flag(false),
             Minted::Key => Self::Flag(true),
             Minted::Password => Self::Shaped(MintedShape::Password),
+            Minted::Email => Self::Shaped(MintedShape::Email),
         }
     }
 }

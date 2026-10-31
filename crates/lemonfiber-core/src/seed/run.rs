@@ -234,7 +234,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     published::retire_keys(ctx, &fillers).await;
     wirings.extend(crossing::unhanded(ctx, &manifest, &installed, &fillers));
 
-    wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
+    wirings.extend(owning::owned(ctx, &fillers, &installed, &mut baseline).await);
 
     // The subtitle finder, told which curators to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly

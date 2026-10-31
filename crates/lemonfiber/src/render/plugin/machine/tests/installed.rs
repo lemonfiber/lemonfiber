@@ -458,6 +458,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
             was: None,
             needs: lemonfiber_manifest::container::choices::Needs::new(),
             needed_to_start: false,
+            lapses_s: None,
         }],
     };
     let said = installs(&Installs {

@@ -145,11 +145,17 @@ fn shown(pictured: Pictured) -> Response {
         pictured.media_type,
         Body::from(pictured.bytes),
     );
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static(PRIVATE));
+    let headers = response.headers_mut();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static(PRIVATE));
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(NOTHING_RUNS),
+    );
     response
 }
+
+/// The policy a picture is served under: nothing it holds is loaded or run.
+const NOTHING_RUNS: &str = "default-src 'none'";
 
 #[cfg(test)]
 mod tests;
