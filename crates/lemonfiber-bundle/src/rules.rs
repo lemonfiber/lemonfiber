@@ -14,6 +14,12 @@ const REVISION_DIGITS: usize = 40;
 /// How many hexadecimal digits a SHA-256 is written in.
 const DIGEST_DIGITS: usize = 64;
 
+/// What the tag of an image a commit on `main` published starts with.
+const COMMIT_IMAGE: &str = "main-";
+
+/// How many hexadecimal digits of its commit that tag holds.
+const COMMIT_IMAGE_DIGITS: usize = 12;
+
 /// How many numbers a release is written in.
 const RELEASE_PARTS: usize = 3;
 
@@ -85,7 +91,7 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>) -> Vec<St
 }
 
 /// What the fence's pin breaks: being at schema 1, an image published elsewhere, a tag
-/// that is not a release, or a digest that is not one.
+/// that is neither a release nor a commit image, or a digest that is not one.
 fn fenced(fence: &Image, schema: u32, broken: &mut Vec<String>) {
     if schema == 1 {
         broken.push("[fence] is declared at schema 1, which has none".to_owned());
@@ -100,9 +106,9 @@ fn fenced(fence: &Image, schema: u32, broken: &mut Vec<String>) {
         .tag
         .split_once('-')
         .map_or(fence.tag.as_str(), |(release, _)| release);
-    if !is_release(release) {
+    if !is_release(release) && !is_commit_image(&fence.tag) {
         broken.push(format!(
-            "fence.tag {} is not a release the train tags, without its v",
+            "fence.tag {} is not a release the train tags, without its v, nor {COMMIT_IMAGE}<{COMMIT_IMAGE_DIGITS} lowercase hex>",
             fence.tag
         ));
     }
@@ -235,6 +241,12 @@ fn is_release(text: &str) -> bool {
                 && part.chars().all(|c| c.is_ascii_digit())
                 && (*part == "0" || !part.starts_with('0'))
         })
+}
+
+/// Whether `text` is the tag a commit on `main` publishes an image under.
+fn is_commit_image(text: &str) -> bool {
+    text.strip_prefix(COMMIT_IMAGE)
+        .is_some_and(|commit| is_hex(commit, COMMIT_IMAGE_DIGITS))
 }
 
 /// Whether `text` is written `sha256:<64 lowercase hex>`.
