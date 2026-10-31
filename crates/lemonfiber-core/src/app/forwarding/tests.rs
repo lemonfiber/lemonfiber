@@ -26,6 +26,16 @@ fn holding(
     forwarded: Option<&'static str>,
     routes: Vec<(&'static str, Answer)>,
 ) -> (Ctx, Arc<Fake>) {
+    holding_as(name, forwarded, routes, torrent::keyed)
+}
+
+/// As [`holding`], the torrent client moved in as `client` says.
+fn holding_as(
+    name: &str,
+    forwarded: Option<&'static str>,
+    routes: Vec<(&'static str, Answer)>,
+    client: fn(Ctx) -> Ctx,
+) -> (Ctx, Arc<Fake>) {
     let engine = guard::running()
         .alongside(torrent::running())
         .with_tunnel(Tunnel {
@@ -56,7 +66,7 @@ fn holding(
         })
         .build()
         .with_http(http.clone());
-    (guard::keyed(torrent::keyed(ctx)), http)
+    (guard::keyed(client(ctx)), http)
 }
 
 /// Every request asked of a client inside the guard, the guard's own left out.
@@ -210,6 +220,35 @@ async fn a_guard_that_cannot_tell_passes_nothing() {
         })
         .build();
     assert_eq!(passed(&ctx, Asking::Afresh).await, None);
+}
+
+#[tokio::test]
+async fn a_guard_whose_adapter_fails_to_say_its_port_passes_nothing() {
+    let (ctx, http) = holding(
+        "unsaid",
+        Some("51999"),
+        vec![(guard::operation("forwarded"), Answer::reply(500, ""))],
+    );
+    assert_eq!(passed(&ctx, Asking::Afresh).await, None);
+    assert!(asked_of_clients(&http).is_empty());
+}
+
+#[tokio::test]
+async fn a_client_inside_the_guard_that_cannot_be_reached_is_said_refused() {
+    let (ctx, _) = holding_as("unreached", Some("51999"), Vec::new(), |ctx| {
+        torrent::unkeyed(&ctx);
+        ctx
+    });
+    let pass = passed(&ctx, Asking::Afresh).await;
+    assert_eq!(
+        pass.map(|pass| pass.clients),
+        Some(vec![super::Client {
+            service: torrent::ADAPTER.to_owned(),
+            came_to: CameTo::Refused {
+                reason: "it could not be reached".to_owned(),
+            },
+        }])
+    );
 }
 
 #[tokio::test]

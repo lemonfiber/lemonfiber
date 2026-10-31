@@ -24,7 +24,6 @@ pub mod aggregator;
 pub mod books;
 #[path = "../../lemonfiber-testing/src/curators.rs"]
 pub mod curators;
-#[path = "../../lemonfiber-testing/src/guard.rs"]
 pub mod guard;
 #[path = "../../lemonfiber-testing/src/indexer.rs"]
 pub mod indexer;
@@ -477,25 +476,6 @@ pub(crate) fn in_the_stacks_order(services: &[&str]) -> Option<Vec<String>> {
 /// A value as a contract carries it.
 pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()
-}
-
-/// The stack's egress guard running healthy, its status file reading `port`.
-pub(crate) fn a_guard_forwarding(port: Option<&'static str>) -> std::sync::Arc<Reporting> {
-    std::sync::Arc::new(
-        Reporting::holding(
-            &["gluetun"],
-            crate::ports::docker::Lifecycle::Running,
-            crate::ports::docker::Health::Healthy,
-        )
-        .with_tunnel(Tunnel {
-            gateway: "gluetun",
-            gateway_ip: None,
-            client_ip: None,
-            country: None,
-            port,
-            second_opinion: None,
-        }),
-    )
 }
 
 mod tests;

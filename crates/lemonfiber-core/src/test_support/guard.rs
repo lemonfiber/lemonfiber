@@ -6,9 +6,9 @@
 //! host's loopback, answering `network.egress-guard` over whatever transport the test
 //! scripts.
 
+use crate::app::Ctx;
+use crate::plugin::Installed;
 use lemonfiber_contract::capabilities::network::egress;
-use lemonfiber_core::app::Ctx;
-use lemonfiber_core::plugin::Installed;
 use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 

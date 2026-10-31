@@ -7,6 +7,7 @@ use super::*;
 use crate::dashboard::pace::{PANEL_WITHIN, VPN_EVERY};
 use crate::dashboard::run::paced;
 use crate::ports::docker::{Container, Engine, ExecOutput, Failure, LogLine, LogQuery, Stats};
+use crate::test_support::guard;
 
 /// A context reading the VPN pair through `engine`, its clock stopped `seconds` into
 /// the day the real manifest is checked on.
@@ -201,24 +202,37 @@ async fn a_refresh_that_changed_nothing_writes_nothing() {
 /// screen's own tick.
 #[tokio::test]
 async fn the_forwarded_port_is_passed_on_once_a_minute() {
-    let guard = crate::test_support::a_guard_forwarding(None);
+    let http = Fake::by_path(vec![guard::forwarding(Some(51413))]);
+    let env = env_without_password("pacing-forwarded");
     let at = |seconds: u64| {
-        a_context()
-            .engine(guard.clone())
-            .settings(Settings {
-                port_forward: forwarding(),
-                ..Settings::default()
-            })
-            .clock(lemonfiber_fixtures::ports::Stopped::into_today(seconds))
-            .build()
-            .with_patience(Duration::ZERO)
+        guard::keyed(
+            a_context()
+                .engine(Arc::new(guard::running()))
+                .settings(Settings {
+                    env_file: Some(env.clone()),
+                    stack_dir: env.parent().map(|config| config.join("data").join("stack")),
+                    port_forward: forwarding(),
+                    ..Settings::default()
+                })
+                .clock(lemonfiber_fixtures::ports::Stopped::into_today(seconds))
+                .build()
+                .with_patience(Duration::ZERO)
+                .with_http(http.clone()),
+        )
+    };
+    let forwarded = guard::operation("forwarded");
+    let asked = || {
+        http.requests()
+            .iter()
+            .filter(|request| request.url.contains(forwarded))
+            .count()
     };
     let every = crate::app::forwarding::EVERY.as_secs();
 
     let first = paced(&at(1_000), None).await;
-    assert_eq!(guard.ran("cat"), 1);
+    assert_eq!(asked(), 1);
     let second = paced(&at(1_000 + every - 1), Some(&first)).await;
-    assert_eq!(guard.ran("cat"), 1);
+    assert_eq!(asked(), 1);
     paced(&at(1_000 + every), Some(&second)).await;
-    assert_eq!(guard.ran("cat"), 2);
+    assert_eq!(asked(), 2);
 }
