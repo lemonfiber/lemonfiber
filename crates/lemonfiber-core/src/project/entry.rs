@@ -216,26 +216,42 @@ pub struct Entry {
     mem_limit: Option<String>,
 }
 
-/// The networks a service joins: by name alone where none fixes its address, and each
-/// with the address it holds where one does.
-struct Joined(BTreeMap<String, Option<Ipv4Addr>>);
+impl Entry {
+    /// Answer on each network it joins to the ids of the services running inside its
+    /// network as well as to its own, so whatever reaches those services by name reaches
+    /// them through it.
+    pub(crate) fn answer_for(&mut self, inside: &[String]) {
+        self.networks.aliases = inside.iter().map(|id| literal(id)).collect();
+    }
+}
+
+/// The networks a service joins: by name alone where none fixes its address and nothing
+/// else answers through it, and otherwise each with the address it holds where one does
+/// and the names of the services running inside its network.
+struct Joined {
+    /// Each network, with the address it holds there where fixed.
+    at: BTreeMap<String, Option<Ipv4Addr>>,
+    /// The ids of the services running inside its network, which answer through it.
+    aliases: Vec<String>,
+}
 
 impl Joined {
     /// Whether it joins none.
     fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.at.is_empty()
     }
 }
 
 impl Serialize for Joined {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.0.values().all(Option::is_none) {
-            return serializer.collect_seq(self.0.keys());
+        if self.aliases.is_empty() && self.at.values().all(Option::is_none) {
+            return serializer.collect_seq(self.at.keys());
         }
-        let mut map = serializer.serialize_map(Some(self.0.len()))?;
-        for (name, address) in &self.0 {
+        let mut map = serializer.serialize_map(Some(self.at.len()))?;
+        for (name, address) in &self.at {
             let holds = Holds {
                 ipv4_address: *address,
+                aliases: &self.aliases,
             };
             map.serialize_entry(name, &holds)?;
         }
@@ -243,12 +259,16 @@ impl Serialize for Joined {
     }
 }
 
-/// One network's settings for a service: the address it holds there, where fixed.
+/// One network's settings for a service: the address it holds there, where fixed, and the
+/// names it answers to for the services inside it.
 #[derive(Serialize)]
-struct Holds {
+struct Holds<'a> {
     /// Its fixed address.
     #[serde(skip_serializing_if = "Option::is_none")]
     ipv4_address: Option<Ipv4Addr>,
+    /// The ids of the services running inside its network.
+    #[serde(skip_serializing_if = "<[String]>::is_empty")]
+    aliases: &'a [String],
 }
 
 /// What a service waits for in the one it depends on.
@@ -316,12 +336,13 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         tmpfs: tmpfs(unit.tmpfs, unit.takes_data)
             .map(|path| literal(path))
             .collect(),
-        networks: Joined(
-            networks
+        networks: Joined {
+            at: networks
                 .into_iter()
                 .map(|(name, at)| (literal(&name), at))
                 .collect(),
-        ),
+            aliases: Vec::new(),
+        },
         network_mode,
         depends_on,
         security_opt: SECURITY,

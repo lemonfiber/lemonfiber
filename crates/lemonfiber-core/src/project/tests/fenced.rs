@@ -78,6 +78,23 @@ fn a_fenced_service_runs_inside_its_fence_which_holds_its_networks_and_ports_and
     assert!(project.unfenced.is_empty());
 }
 
+/// Whatever reaches a fenced service by its id reaches it through its fence, which answers
+/// to that id on every network it holds, and nothing else answers to it.
+#[test]
+fn the_fence_answers_to_its_services_id_on_every_network_it_holds() {
+    let project = written(&[fenced("solver")], Some(FENCE), &HOST);
+    let networks = entry(&project, "solver-fence")
+        .get("networks")
+        .and_then(Yaml::as_mapping)
+        .cloned()
+        .unwrap_or_default();
+
+    assert!(!networks.is_empty());
+    for (name, held) in &networks {
+        assert_eq!(sequence(held, "aliases"), ["solver"], "{name:?}");
+    }
+}
+
 /// The reason the fence may run as root: every capability dropped but the one it needs,
 /// no privilege gained after it starts, and nothing it can write.
 #[test]

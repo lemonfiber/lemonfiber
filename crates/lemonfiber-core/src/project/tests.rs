@@ -193,6 +193,20 @@ fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards
     for port in ["18999", "18998"] {
         assert!(guard.iter().any(|written| written.contains(port)), "{port}");
     }
+    let networks = entry(&project, "gluetun")
+        .get("networks")
+        .and_then(Yaml::as_mapping)
+        .cloned()
+        .unwrap_or_default();
+    assert!(!networks.is_empty());
+    for (name, held) in &networks {
+        let aliases = sequence(held, "aliases");
+        assert!(
+            aliases.iter().any(|alias| alias == "client")
+                && !aliases.iter().any(|alias| alias == "gluetun"),
+            "{name:?}: {aliases:?}"
+        );
+    }
 }
 
 #[test]

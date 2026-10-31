@@ -258,7 +258,9 @@ services:
     volumes:
     - ./config/gluetun:/gluetun/auth
     networks:
-    - own__gluetun
+      own__gluetun:
+        aliases:
+        - qbittorrent
     security_opt:
     - no-new-privileges:true
     cap_drop:
