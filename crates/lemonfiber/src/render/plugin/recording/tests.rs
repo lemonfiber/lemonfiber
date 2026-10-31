@@ -42,6 +42,9 @@ fn each_recording_is_said_with_what_taking_it_came_to() {
             }),
             taken(Took::Removed),
             taken(Took::Unasked),
+            taken(Took::Left {
+                host: "plex.tv".to_owned(),
+            }),
         ],
         false,
     );
@@ -57,6 +60,7 @@ fn each_recording_is_said_with_what_taking_it_came_to() {
         "not recorded: [2Jno engine",
         "answers no case, and removed",
         "answers no case, so it is refused and left as it was",
+        "reaches plex.tv, outside the stack, so it is left as recorded",
         "Not every recording is taken.",
     ] {
         assert!(said.contains(words), "{words}: {said}");

@@ -12,7 +12,7 @@ use tokio::time::Instant;
 use super::fronted::{self, Fronting};
 use super::served::{answers, POLL};
 use super::stood_in;
-use super::written::{landing, written};
+use super::written::{before, landing, written};
 use super::{Failed, Recorder, Taken, Took};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::{Installed, Placed};
@@ -294,27 +294,46 @@ async fn recorded(
         .collect();
     let cases = cases
         .into_iter()
-        .map(|case| {
-            let fixture = case.fixture();
-            Taken {
-                named: case.named(),
-                took: written(
-                    root,
-                    &fixture,
-                    &pinned,
-                    Of::Request {
-                        request: case.asked,
-                        response: case.answer,
-                    },
-                    recorder.taking,
-                    &stood_in,
-                    &BTreeMap::new(),
-                ),
-                fixture: Some(fixture),
-            }
-        })
+        .map(|case| case_written(root, &pinned, recorder.taking, &stood_in, case))
         .collect();
     Ok((took, cases))
+}
+
+/// What writing one conformance case came to: its recording left as it is where the case
+/// reaches outside the stack and a run holding recordings left it, refused where that
+/// recording is not there, and written as any other otherwise.
+fn case_written(
+    root: &Path,
+    pinned: &str,
+    taking: &super::Retaking,
+    stood_in: &[String],
+    case: fronted::Case,
+) -> Taken {
+    let fixture = case.fixture();
+    let named = case.named();
+    let took = match case.left {
+        Some(host) if before(root, &fixture).is_some() => Took::Left { host },
+        Some(_) => Took::Unreproduced {
+            why: format!("{fixture} is not there"),
+        },
+        None => written(
+            root,
+            &fixture,
+            pinned,
+            Of::Request {
+                request: case.asked,
+                response: case.answer,
+            },
+            taking,
+            stood_in,
+            &BTreeMap::new(),
+        ),
+    };
+    Taken {
+        named,
+        took,
+        fixture: Some(fixture),
+    }
 }
 
 /// What the served service answered `item` through `http`, on the loopback interface at

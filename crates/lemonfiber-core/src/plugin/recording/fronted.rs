@@ -11,7 +11,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
-use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::container::Secret;
 use lemonfiber_plugin::Health;
@@ -39,6 +38,7 @@ mod claiming;
 mod enveloping;
 mod filling;
 mod preparing;
+mod replaying;
 mod serving;
 mod speaking;
 mod tapped;
@@ -63,6 +63,8 @@ pub(super) struct Case {
     pub(super) asked: Asked,
     /// What the adapter answered, scrubbed.
     pub(super) answer: Answer,
+    /// The host outside the stack it reaches, where it is left as recorded.
+    pub(super) left: Option<String>,
 }
 
 impl Case {
@@ -133,6 +135,8 @@ pub(super) async fn answers(
                 made: &prepared.made,
                 envelope: envelope.as_ref(),
                 certificate: prepared.certificate.as_ref(),
+                root,
+                secrets,
             }
             .asked(items)
             .await
@@ -217,6 +221,8 @@ struct Asking<'a> {
     made: &'a [String],
     envelope: Option<&'a lemonfiber_ports::service::Declared>,
     certificate: Option<&'a (String, String)>,
+    root: &'a Path,
+    secrets: &'a [Secret],
 }
 
 impl Asking<'_> {
@@ -245,6 +251,7 @@ impl Asking<'_> {
         if contracts
             .iter()
             .any(|(spoken, _)| *spoken == claiming::owning())
+            && !self.claim_left()
         {
             heard.extend(
                 self.claimed(&reached)
@@ -275,17 +282,9 @@ impl Asking<'_> {
             hashed: Vec::new(),
             certificate: self.certificate.cloned(),
         };
-        let mut asked = Vec::new();
-        for (spoken, capability) in &contracts {
-            for case in filed(capability, &self.upstream.media_types) {
-                let step = named(spoken, &case.case);
-                let one = self
-                    .case(&reached, &mut filling, spoken, &case, &heard)
-                    .await
-                    .map_err(|why| Faulted::new(&step, why, filling.made.clone()))?;
-                asked.push(one);
-            }
-        }
+        let asked = self
+            .every_case(&reached, &mut filling, &contracts, &heard)
+            .await?;
         self.scrubbed(upstream, asked, filling.made, &filling.hashed)
     }
 
@@ -377,6 +376,7 @@ impl Asking<'_> {
                 accept: Some(JSON.to_owned()),
             },
             answer: kept(&response),
+            left: None,
         })
     }
 

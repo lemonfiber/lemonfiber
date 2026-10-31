@@ -78,6 +78,9 @@ fn took(took: &Took) -> String {
         Took::Unrecorded { why } => format!("not recorded: {why}"),
         Took::Removed => "answers no case, and removed".to_owned(),
         Took::Unasked => "answers no case, so it is refused and left as it was".to_owned(),
+        Took::Left { host } => {
+            format!("reaches {host}, outside the stack, so it is left as recorded")
+        }
     }
 }
 

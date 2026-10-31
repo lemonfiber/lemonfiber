@@ -229,6 +229,11 @@ pub struct Service {
     /// against. Where a service that speaks names none, it is its own upstream.
     #[serde(default)]
     pub fronts: Option<String>,
+    /// Each conformance case it is asked that reaches a host outside the stack, as
+    /// `<capability>@<major>/<case>`, to that host: `plugin record --check` leaves such a
+    /// case as recorded rather than reaching the host, and still requires its recording.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub outside: std::collections::BTreeMap<String, String>,
     /// Each field of the `upstream.json` lemonfiber writes for this adapter, to the secret
     /// it holds.
     #[serde(default)]
