@@ -325,6 +325,36 @@ async fn a_code_whose_upstream_cannot_be_written_again_fails_lapsing_and_droppin
 }
 
 #[tokio::test]
+async fn a_lapsed_code_the_store_cannot_drop_fails_the_claim_before_it_is_asked() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-unkept");
+    let http = Fake::by_path(vec![(OWNER, holding("open")), (CLAIM, holding("ours"))]);
+    let ctx = coded_ctx(
+        &project,
+        http.clone(),
+        FIRST + u64::from(LAPSES_S),
+        Typing::answering(TYPED),
+    );
+    entered(&ctx, FIRST);
+    let directory = crate::settings::secrets_at(&ctx)
+        .and_then(|at| at.parent().map(Path::to_path_buf))
+        .unwrap_or_default();
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500));
+
+    let wirings = seeded(&ctx, &project).await;
+
+    let _ = std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700));
+    assert!(
+        wirings
+            .first()
+            .is_some_and(|one| matches!(one.state, crate::seed::State::Failed { .. })),
+        "{wirings:?}"
+    );
+    assert_eq!(asked_at(&http, CLAIM), 0);
+    assert_eq!(kept(&ctx).as_deref(), Some(TYPED));
+}
+
+#[tokio::test]
 async fn a_rehearsal_leaves_a_code_that_lapsed_where_it_is() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-rehearsed");
     let http = Fake::by_path(vec![(OWNER, holding("open")), (CLAIM, holding("ours"))]);
