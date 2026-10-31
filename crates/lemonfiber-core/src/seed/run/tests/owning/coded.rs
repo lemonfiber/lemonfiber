@@ -344,3 +344,111 @@ async fn a_rehearsal_leaves_a_code_that_lapsed_where_it_is() {
     assert!(typing.asked().is_empty());
     assert_eq!(asked_at(&http, CLAIM), 0);
 }
+
+/// A part answering who holds it as `holder`, and a claim as `claimed`, counting claims.
+struct Part {
+    holder: crate::ports::service::Owner,
+    claimed: crate::ports::service::Owner,
+    claims: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl crate::ports::service::Ownership for Part {
+    async fn owner(&self) -> Result<crate::ports::service::Owner, crate::ports::service::Failure> {
+        Ok(self.holder)
+    }
+
+    async fn claim(&self) -> Result<crate::ports::service::Owner, crate::ports::service::Failure> {
+        self.claims
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(self.claimed)
+    }
+}
+
+/// A part held by `holder` that a claim leaves `claimed`.
+fn part(holder: crate::ports::service::Owner, claimed: crate::ports::service::Owner) -> Part {
+    Part {
+        holder,
+        claimed,
+        claims: std::sync::atomic::AtomicUsize::new(0),
+    }
+}
+
+/// What install's claim of `part` comes to, asking through `asking`, its stack in
+/// `project`.
+async fn installed_claim(
+    project: &Path,
+    part: &Part,
+    asking: Arc<dyn Asking>,
+) -> (Ctx, Option<Result<crate::ports::service::Owner, String>>) {
+    let ctx = coded_ctx(project, Fake::silent(), FIRST, asking);
+    let installed = coded();
+    let placed = installed.services.first().cloned();
+    let claimed = match &placed {
+        Some(placed) => {
+            super::super::super::owning::claimed_as_installed(&ctx, &installed, placed, part).await
+        }
+        None => None,
+    };
+    (
+        ctx,
+        claimed.map(|claimed| claimed.map_err(|failure| failure.to_string())),
+    )
+}
+
+#[tokio::test]
+async fn install_claims_an_open_part_with_the_code_entered_and_drops_it_after() {
+    use crate::ports::service::Owner;
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install");
+    let open = part(Owner::Open, Owner::Ours);
+    let (ctx, claimed) = installed_claim(&project, &open, Typing::answering(TYPED)).await;
+    assert!(matches!(claimed, Some(Ok(Owner::Ours))), "{claimed:?}");
+    assert_eq!(open.claims.load(std::sync::atomic::Ordering::Relaxed), 1);
+    assert_eq!(kept(&ctx), None);
+}
+
+#[tokio::test]
+async fn install_leaves_an_open_part_nobody_enters_a_code_for_to_the_next_seed() {
+    use crate::ports::service::Owner;
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-none");
+    let open = part(Owner::Open, Owner::Ours);
+    let (_, claimed) =
+        installed_claim(&project, &open, Arc::new(crate::ports::asking::Nobody)).await;
+    assert!(claimed.is_none(), "{claimed:?}");
+    assert_eq!(open.claims.load(std::sync::atomic::Ordering::Relaxed), 0);
+}
+
+#[tokio::test]
+async fn install_asks_no_code_for_a_part_already_held_and_fails_one_it_cannot_keep() {
+    use crate::ports::service::Owner;
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-held");
+    let theirs = part(Owner::Theirs, Owner::Ours);
+    let typing = Typing::answering(TYPED);
+    let (_, claimed) = installed_claim(&project, &theirs, typing.clone()).await;
+    assert!(matches!(claimed, Some(Ok(Owner::Theirs))), "{claimed:?}");
+    assert!(typing.asked().is_empty());
+    let spanning = part(Owner::Open, Owner::Ours);
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-spanning");
+    let (_, claimed) = installed_claim(&project, &spanning, Typing::answering("43\n21")).await;
+    assert!(matches!(claimed, Some(Err(_))), "{claimed:?}");
+    assert_eq!(
+        spanning.claims.load(std::sync::atomic::Ordering::Relaxed),
+        0
+    );
+}
+
+#[tokio::test]
+async fn install_claims_a_part_that_takes_no_code_as_it_always_has() {
+    use crate::ports::service::Owner;
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-uncoded");
+    let ctx = coded_ctx(&project, Fake::silent(), FIRST, Typing::answering(TYPED));
+    let installed = claimer();
+    let open = part(Owner::Open, Owner::Ours);
+    let claimed = match installed.services.first() {
+        Some(placed) => {
+            super::super::super::owning::claimed_as_installed(&ctx, &installed, placed, &open).await
+        }
+        None => None,
+    };
+    assert!(matches!(claimed, Some(Ok(Owner::Ours))), "{claimed:?}");
+}

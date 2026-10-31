@@ -259,7 +259,9 @@ pub(super) async fn spoken(
             Err(why) => Err(why.clone()),
         };
         match (reached, asked) {
-            (Ok(adapter), Ok(about)) => return held_to(&adapter, installed, placed, &about).await,
+            (Ok(adapter), Ok(about)) => {
+                return held_to(ctx, &adapter, installed, placed, &about).await
+            }
             (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
             _ => tokio::time::sleep(POLL).await,
         }
@@ -271,6 +273,7 @@ pub(super) async fn spoken(
 /// pinned by and none at any other, since that digest is the one its recordings were
 /// taken from, and each live case of each contract answered as the contract says.
 async fn held_to(
+    ctx: &Ctx,
     adapter: &lemonfiber_contract::Contracted,
     installed: &Installed,
     placed: &crate::plugin::Placed,
@@ -327,7 +330,7 @@ async fn held_to(
         }
     }
     if faults.is_empty() {
-        faults.extend(claiming(adapter, installed, placed).await);
+        faults.extend(claiming(ctx, adapter, installed, placed).await);
     }
     if faults.is_empty() {
         Verdict::Passed
@@ -337,9 +340,11 @@ async fn held_to(
 }
 
 /// Why the part an adapter speaking `owner.claim` stands in front of is not lemonfiber's
-/// once claimed with the credential its plugin minted, where it is not; nothing where the
-/// adapter speaks no such contract.
+/// once claimed with the credential its plugin minted, or the code the operator entered,
+/// where it is not; nothing where the adapter speaks no such contract, or takes a code
+/// nobody entered.
 async fn claiming(
+    ctx: &Ctx,
     adapter: &lemonfiber_contract::Contracted,
     installed: &Installed,
     placed: &crate::plugin::Placed,
@@ -349,7 +354,7 @@ async fn claiming(
         return None;
     }
     let part = claim::Adapter(adapter.clone());
-    match crate::seed::run::owning::claimed(&part).await {
+    match crate::seed::run::owning::claimed_as_installed(ctx, installed, placed, &part).await? {
         Ok(owner) => crate::seed::run::owning::unclaimed(
             placed.called(),
             owner,

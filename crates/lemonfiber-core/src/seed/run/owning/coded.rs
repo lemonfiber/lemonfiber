@@ -38,24 +38,30 @@ impl<'i> Coded<'i> {
                 .services
                 .iter()
                 .find(|placed| placed.service == speaker.id)?;
-            let codes: Vec<Code<'i>> = one
-                .declared
-                .secrets
-                .iter()
-                .filter(|secret| placed.upstream.values().any(|id| *id == secret.id))
-                .filter_map(|secret| {
-                    secret.lapses_s.map(|lapses_s| Code {
-                        setting: crate::settings::named(&one.plugin, &secret.id),
-                        lapses_s,
-                        why: &secret.why,
-                    })
+            Self::placed(one, placed)
+        })
+    }
+
+    /// The codes `placed`, one of `installed`'s services, hands its upstream; nothing where
+    /// it hands none.
+    pub(super) fn placed(installed: &'i Installed, placed: &'i Placed) -> Option<Self> {
+        let codes: Vec<Code<'i>> = installed
+            .declared
+            .secrets
+            .iter()
+            .filter(|secret| placed.upstream.values().any(|id| *id == secret.id))
+            .filter_map(|secret| {
+                secret.lapses_s.map(|lapses_s| Code {
+                    setting: crate::settings::named(&installed.plugin, &secret.id),
+                    lapses_s,
+                    why: &secret.why,
                 })
-                .collect();
-            (!codes.is_empty()).then_some(Self {
-                installed: one,
-                placed,
-                codes,
             })
+            .collect();
+        (!codes.is_empty()).then_some(Self {
+            installed,
+            placed,
+            codes,
         })
     }
 

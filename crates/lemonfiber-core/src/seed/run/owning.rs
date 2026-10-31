@@ -88,6 +88,45 @@ pub(crate) async fn claimed(part: &dyn Ownership) -> Result<Owner, Failure> {
     settled(part, part.claim().await).await
 }
 
+/// Claim `part`, the adapter `placed` of `installed`, as install proves it: with the codes
+/// it takes, asked of the operator while the part is open, where it takes any. Nothing
+/// where it takes a code nobody entered, which leaves the part to the next seed, which
+/// says it is open naming the code.
+///
+/// # Errors
+///
+/// Returns [`Failure`] where it could not be asked, or a code could not be kept or
+/// handed over.
+pub(crate) async fn claimed_as_installed(
+    ctx: &Ctx,
+    installed: &Installed,
+    placed: &crate::plugin::Placed,
+    part: &dyn Ownership,
+) -> Option<Result<Owner, Failure>> {
+    let Some(coded) = Coded::placed(installed, placed) else {
+        return Some(claimed(part).await);
+    };
+    let unkept = |detail: String| Failure::Refused {
+        service: placed.service.clone(),
+        detail,
+    };
+    match held(part).await {
+        Ok(Owner::Open) => {}
+        other => return Some(other),
+    }
+    match coded.lapse(ctx).and_then(|()| coded.entered(ctx)) {
+        Err(detail) => Some(Err(unkept(detail))),
+        Ok(false) => None,
+        Ok(true) => {
+            let owner = claimed(part).await;
+            Some(match owner.as_ref().map(|_| coded.removed(ctx)) {
+                Ok(Err(detail)) => Err(unkept(detail)),
+                _ => owner,
+            })
+        }
+    }
+}
+
 /// Who holds `part` once it has settled, changing nothing.
 ///
 /// # Errors
