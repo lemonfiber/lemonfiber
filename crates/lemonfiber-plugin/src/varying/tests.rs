@@ -23,7 +23,7 @@ fn a_shape_matches_a_whole_string_and_nothing_else() {
 #[test]
 fn a_shape_that_is_too_long_or_not_a_pattern_is_refused() {
     assert!(shape("[0-9a-f]{40}").is_ok());
-    assert!(shape("(").is_err_and(|why| why.contains("not an RE2 pattern")));
+    assert!(shape("(").is_err_and(|why| why.contains("not a pattern this build compiles")));
     assert!(shape(&"a".repeat(SHAPE_MOST + 1)).is_err_and(|why| why.contains("longer than")));
     assert!(shape("a{1000}{1000}").is_err());
 }

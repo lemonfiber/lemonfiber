@@ -226,7 +226,7 @@
       ],
       "openapi": "owner.claim/v1/openapi.json",
       "operations": 2,
-      "sha256": "9bbb4e7ed2d38e47eac0509fbdabb333d81cd6fd319f321d5f3bd8462aa40ab1"
+      "sha256": "c5dbd63747bfd875605fd278954edb399a4e129518554fe68fa57fa6b8da52b7"
     }
   ]
 }

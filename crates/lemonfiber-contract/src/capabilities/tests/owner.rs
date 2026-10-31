@@ -2,7 +2,7 @@
 //! the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Failure, Owner, Ownership};
+use lemonfiber_ports::service::{Claim, Failure, Owner, Ownership};
 
 use super::{claim, crosses_alike, Upstream};
 
@@ -12,9 +12,9 @@ impl Ownership for Upstream {
         self.tell("owner".to_owned());
         Ok(Owner::Open)
     }
-    async fn claim(&self) -> Result<Owner, Failure> {
+    async fn claim(&self) -> Result<Claim, Failure> {
         self.tell("claim".to_owned());
-        Ok(Owner::Settling)
+        Ok(Claim::ON_RESTART)
     }
 }
 

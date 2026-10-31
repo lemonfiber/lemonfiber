@@ -31,7 +31,7 @@ pub fn shape(shape: &str) -> Result<regex::Regex, String> {
         .size_limit(COMPILED_MOST)
         .dfa_size_limit(COMPILED_MOST)
         .build()
-        .map_err(|_| format!("{shape} is not an RE2 pattern this build compiles"))
+        .map_err(|_| format!("{shape} is not a pattern this build compiles"))
 }
 
 /// Whether `place` is a JSON Pointer naming a member at each step.

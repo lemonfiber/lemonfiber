@@ -4,6 +4,19 @@ use super::*;
 use crate::baseline::Baseline;
 use crate::test_support::{contracted, first_party};
 
+/// An upstream nothing is asked to start again.
+struct NeverRestarted;
+
+#[async_trait::async_trait]
+impl super::super::owning::Restarts for NeverRestarted {
+    async fn restarted(&self) -> Result<(), crate::ports::service::Failure> {
+        Err(crate::ports::service::Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: "nothing starts it again here".to_owned(),
+        })
+    }
+}
+
 /// The plugin whose adapter speaks `owner.claim`.
 const PLUGIN: &str = "claimer";
 
@@ -504,3 +517,5 @@ async fn a_moved_part_somebody_else_holds_is_refused_naming_its_minted_account()
 }
 
 mod coded;
+
+mod restarting;

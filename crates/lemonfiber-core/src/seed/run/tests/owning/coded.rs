@@ -389,14 +389,14 @@ impl crate::ports::service::Ownership for Part {
         Ok(self.holder)
     }
 
-    async fn claim(&self) -> Result<crate::ports::service::Owner, crate::ports::service::Failure> {
+    async fn claim(&self) -> Result<crate::ports::service::Claim, crate::ports::service::Failure> {
         self.claims
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if let Some(blocking) = &self.blocking {
             let _ = std::fs::remove_file(blocking);
             let _ = std::fs::create_dir_all(blocking);
         }
-        Ok(self.claimed)
+        Ok(crate::ports::service::Claim::Held(self.claimed))
     }
 }
 
@@ -421,7 +421,11 @@ async fn as_installed(
     let Some(placed) = installed.services.first() else {
         return Err("no service".to_owned());
     };
-    match claimed_as_installed(ctx, installed, placed, part).await {
+    let reaching = super::super::super::owning::Reaching {
+        part,
+        restarts: &super::NeverRestarted,
+    };
+    match claimed_as_installed(ctx, installed, placed, reaching).await {
         Installing::Answered(answered) => Ok(answered.map_err(|failure| failure.to_string())),
         Installing::Unentered(said) => Err(said),
     }

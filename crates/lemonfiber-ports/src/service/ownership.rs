@@ -5,7 +5,7 @@
 //! whoever asks first. lemonfiber claims each before anybody else can, with the
 //! credential its plugin minted, and asks afterwards whether the claim still holds.
 
-use super::Failure;
+use super::{Failure, Restart};
 use async_trait::async_trait;
 
 /// Who holds a part.
@@ -24,6 +24,26 @@ pub enum Owner {
     Theirs,
 }
 
+/// What claiming a part came to: who holds it then, or that the upstream takes the claim
+/// only once it restarts.
+///
+/// It crosses as who holds it, or as `"on-restart"`, which an adapter answers as `205`.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(untagged)]
+pub enum Claim {
+    /// Who holds it now.
+    Held(Owner),
+    /// The upstream takes the claim once it restarts, and who holds it is asked then.
+    Restarting(Restart),
+}
+
+impl Claim {
+    /// What claiming came to where the upstream takes it once it restarts.
+    pub const ON_RESTART: Self = Self::Restarting(Restart::OnRestart);
+}
+
 /// A part that belongs to whoever claims it first.
 #[async_trait]
 pub trait Ownership: Send + Sync {
@@ -35,10 +55,11 @@ pub trait Ownership: Send + Sync {
     async fn owner(&self) -> Result<Owner, Failure>;
 
     /// Claim it with the credential its adapter holds where nobody holds it, changing
-    /// nothing where somebody does, and say who holds it then.
+    /// nothing where somebody does, and say who holds it then, or that the upstream takes
+    /// the claim once it restarts.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn claim(&self) -> Result<Owner, Failure>;
+    async fn claim(&self) -> Result<Claim, Failure>;
 }

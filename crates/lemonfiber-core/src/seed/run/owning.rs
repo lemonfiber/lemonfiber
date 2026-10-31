@@ -12,19 +12,23 @@
 //! what claims it back. A part somebody else holds is never taken from them.
 
 mod coded;
+mod restarts;
 
 use std::collections::BTreeSet;
 
 use lemonfiber_contract::capabilities::owner::claim;
 
+use super::restarting::Restarting;
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::baseline::Baseline;
 use crate::plugin::Installed;
-use crate::ports::service::{Failure, Owner, Ownership};
+use crate::ports::service::{Claim, Failure, Owner, Ownership};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Filler, Fillers};
 use coded::Coded;
+use restarts::Restarted;
+pub(crate) use restarts::{Reaching, Restarts};
 
 /// The field of the baseline that records lemonfiber claimed a part.
 pub(crate) const FIELD: &str = "claimed";
@@ -86,13 +90,20 @@ async fn settled(part: &dyn Ownership, first: Result<Owner, Failure>) -> Result<
         .await
 }
 
-/// Claim `part`, and say who holds it once it has settled.
+/// Claim the part `reaching` reaches, and say who holds it once it has settled: where it
+/// takes the claim only once its upstream restarts, once that has started again.
 ///
 /// # Errors
 ///
-/// Returns [`Failure`] where it could not be asked.
-pub(crate) async fn claimed(part: &dyn Ownership) -> Result<Owner, Failure> {
-    settled(part, part.claim().await).await
+/// Returns [`Failure`] where it could not be asked, or its upstream not started again.
+pub(crate) async fn claimed(reaching: Reaching<'_>) -> Result<Owner, Failure> {
+    match reaching.part.claim().await? {
+        Claim::Held(owner) => settled(reaching.part, Ok(owner)).await,
+        Claim::Restarting(_) => {
+            reaching.restarts.restarted().await?;
+            held(reaching.part).await
+        }
+    }
 }
 
 /// What claiming a part as install proves it came to.
@@ -111,16 +122,16 @@ pub(crate) async fn claimed_as_installed(
     ctx: &Ctx,
     installed: &Installed,
     placed: &crate::plugin::Placed,
-    part: &dyn Ownership,
+    reaching: Reaching<'_>,
 ) -> Installing {
     let Some(coded) = Coded::placed(installed, placed) else {
-        return Installing::Answered(claimed(part).await);
+        return Installing::Answered(claimed(reaching).await);
     };
     let unkept = |detail: String| Failure::Refused {
         service: placed.service.clone(),
         detail,
     };
-    match held(part).await {
+    match held(reaching.part).await {
         Ok(Owner::Open) => {}
         other => return Installing::Answered(other),
     }
@@ -128,7 +139,7 @@ pub(crate) async fn claimed_as_installed(
         Err(detail) => Installing::Answered(Err(unkept(detail))),
         Ok(false) => Installing::Unentered(coded.unentered(placed.called())),
         Ok(true) => {
-            let owner = claimed(part).await;
+            let owner = claimed(reaching).await;
             Installing::Answered(match owner.as_ref().map(|_| coded.removed(ctx)) {
                 Ok(Err(detail)) => Err(unkept(detail)),
                 _ => owner,
@@ -173,7 +184,17 @@ pub(super) async fn owned(
         let wiring = match (lapsed, asked) {
             (Some(Err(detail)), _) => Wiring::settled(connection(name), State::Failed { detail }),
             (_, None) => Wiring::settled(connection(name), unasked(name)),
-            (_, Some(asked)) => owning(ctx, claimable, &asked, recorded, coded.as_ref()).await,
+            (_, Some(asked)) => {
+                let restarted = Restarted {
+                    ctx,
+                    restarting: Restarting::of(fillers, claimable.speaker, asked.0.clone()),
+                };
+                let reaching = Reaching {
+                    part: &asked,
+                    restarts: &restarted,
+                };
+                owning(ctx, claimable, reaching, recorded, coded.as_ref()).await
+            }
         };
         if matches!(wiring.state, State::Wired | State::AlreadyWired) {
             baseline.record(id, FIELD, OURS, &at);
@@ -190,21 +211,24 @@ pub(super) async fn owned(
 async fn owning(
     ctx: &Ctx,
     claimable: Claimable<'_>,
-    part: &dyn Ownership,
+    reaching: Reaching<'_>,
     recorded: bool,
     coded: Option<&Coded<'_>>,
 ) -> Wiring {
     let name = claimable.part.name.as_str();
     if !recorded && !ctx.dry_run {
         let Some(coded) = coded else {
-            return Wiring::settled(connection(name), answered(claimable, claimed(part).await));
+            return Wiring::settled(
+                connection(name),
+                answered(claimable, claimed(reaching).await),
+            );
         };
-        return match held(part).await {
-            Ok(Owner::Open) => claimed_with(ctx, claimable, part, coded).await,
+        return match held(reaching.part).await {
+            Ok(Owner::Open) => claimed_with(ctx, claimable, reaching, coded).await,
             other => Wiring::settled(connection(name), answered(claimable, other)),
         };
     }
-    let state = match held(part).await {
+    let state = match held(reaching.part).await {
         Ok(Owner::Ours) => State::AlreadyWired,
         Ok(Owner::Open) if recorded => return drifted(name),
         Ok(Owner::Open) => State::WouldWire {
@@ -270,14 +294,22 @@ pub(super) async fn put_back(
         else {
             continue;
         };
+        let restarted = Restarted {
+            ctx,
+            restarting: Restarting::of(fillers, claimable.speaker, asked.0.clone()),
+        };
+        let reaching = Reaching {
+            part: &asked,
+            restarts: &restarted,
+        };
         let state = match held(&asked).await {
             Ok(Owner::Ours) => continue,
             Ok(Owner::Open) if confirm => {
                 if let Some(coded) = Coded::of(installed, claimable.speaker) {
-                    wirings.push(claimed_with(ctx, claimable, &asked, &coded).await);
+                    wirings.push(claimed_with(ctx, claimable, reaching, &coded).await);
                     continue;
                 }
-                answered(claimable, claimed(&asked).await)
+                answered(claimable, claimed(reaching).await)
             }
             Ok(Owner::Open) => State::WouldWire {
                 yours: Some(NOBODY.to_owned()),
@@ -295,7 +327,7 @@ pub(super) async fn put_back(
 async fn claimed_with(
     ctx: &Ctx,
     claimable: Claimable<'_>,
-    part: &dyn Ownership,
+    reaching: Reaching<'_>,
     coded: &Coded<'_>,
 ) -> Wiring {
     let name = claimable.part.name.as_str();
@@ -315,7 +347,7 @@ async fn claimed_with(
             return wiring;
         }
         Ok(true) => {
-            let owner = claimed(part).await;
+            let owner = claimed(reaching).await;
             match owner.as_ref().map(|_| coded.removed(ctx)) {
                 Ok(Err(detail)) => State::Failed { detail },
                 _ => answered(claimable, owner),
