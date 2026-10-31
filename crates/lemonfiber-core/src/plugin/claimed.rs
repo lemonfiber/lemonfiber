@@ -108,6 +108,16 @@ pub enum Verdict {
         /// Each declared recording, what it held, and why it is one the assertion fails on.
         declared: Vec<FailingAsDeclared>,
     },
+    /// The part an adapter claims is left open, because nobody entered the code its claim
+    /// takes: whoever reaches it first can claim it.
+    ///
+    /// Apart from passed and from failed, and counted as neither: the adapter holds to its
+    /// contract, and the part is not yet the household's. Only ever reached against the
+    /// live service, by an install's or a re-proof's claim.
+    Open {
+        /// The part, and the code its claim takes.
+        why: String,
+    },
 }
 
 /// One recording an assertion fails on as its manifest declares.

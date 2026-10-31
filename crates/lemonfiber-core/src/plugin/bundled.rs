@@ -170,7 +170,7 @@ pub fn said(report: &Bundled) -> Vec<String> {
                 refuted += 1;
                 lines.push(format!("refuted: {about}: {}", faults.join("; ")));
             }
-            Verdict::Unproven { why } => {
+            Verdict::Unproven { why } | Verdict::Open { why } => {
                 unproven += 1;
                 later.push(format!("unproven: {about}: {why}"));
             }

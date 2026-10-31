@@ -217,7 +217,9 @@ impl Proved {
                 .in_state(State::Guided)
                 .with_detail(faults.join("; ")),
             ),
-            crate::plugin::Verdict::Unproven { why } => self.unrun(why),
+            crate::plugin::Verdict::Unproven { why } | crate::plugin::Verdict::Open { why } => {
+                self.unrun(why)
+            }
         }
     }
 

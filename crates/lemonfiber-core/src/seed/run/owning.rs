@@ -88,23 +88,26 @@ pub(crate) async fn claimed(part: &dyn Ownership) -> Result<Owner, Failure> {
     settled(part, part.claim().await).await
 }
 
+/// What claiming a part as install proves it came to.
+#[derive(Debug)]
+pub(crate) enum Installing {
+    /// Who holds the part once claimed, or why it could not be asked.
+    Answered(Result<Owner, Failure>),
+    /// The part is open and nobody entered the code its claim takes, as said.
+    Unentered(String),
+}
+
 /// Claim `part`, the adapter `placed` of `installed`, as install proves it: with the codes
-/// it takes, asked of the operator while the part is open, where it takes any. Nothing
-/// where it takes a code nobody entered, which leaves the part to the next seed, which
-/// says it is open naming the code.
-///
-/// # Errors
-///
-/// Returns [`Failure`] where it could not be asked, or a code could not be kept or
-/// handed over.
+/// it takes, asked of the operator while the part is open, where it takes any; said open
+/// naming each code where nobody entered one.
 pub(crate) async fn claimed_as_installed(
     ctx: &Ctx,
     installed: &Installed,
     placed: &crate::plugin::Placed,
     part: &dyn Ownership,
-) -> Option<Result<Owner, Failure>> {
+) -> Installing {
     let Some(coded) = Coded::placed(installed, placed) else {
-        return Some(claimed(part).await);
+        return Installing::Answered(claimed(part).await);
     };
     let unkept = |detail: String| Failure::Refused {
         service: placed.service.clone(),
@@ -112,14 +115,14 @@ pub(crate) async fn claimed_as_installed(
     };
     match held(part).await {
         Ok(Owner::Open) => {}
-        other => return Some(other),
+        other => return Installing::Answered(other),
     }
     match coded.lapse(ctx).and_then(|()| coded.entered(ctx)) {
-        Err(detail) => Some(Err(unkept(detail))),
-        Ok(false) => None,
+        Err(detail) => Installing::Answered(Err(unkept(detail))),
+        Ok(false) => Installing::Unentered(coded.unentered(placed.called())),
         Ok(true) => {
             let owner = claimed(part).await;
-            Some(match owner.as_ref().map(|_| coded.removed(ctx)) {
+            Installing::Answered(match owner.as_ref().map(|_| coded.removed(ctx)) {
                 Ok(Err(detail)) => Err(unkept(detail)),
                 _ => owner,
             })

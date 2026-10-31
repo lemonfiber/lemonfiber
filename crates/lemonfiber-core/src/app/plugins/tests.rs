@@ -204,9 +204,12 @@ fn why(verdict: Option<&Verdict>) -> String {
     match verdict {
         Some(Verdict::Unproven { why }) => why.clone(),
         None
-        | Some(Verdict::Passed | Verdict::Failed { .. } | Verdict::FailingAsDeclared { .. }) => {
-            String::new()
-        }
+        | Some(
+            Verdict::Passed
+            | Verdict::Failed { .. }
+            | Verdict::FailingAsDeclared { .. }
+            | Verdict::Open { .. },
+        ) => String::new(),
     }
 }
 
