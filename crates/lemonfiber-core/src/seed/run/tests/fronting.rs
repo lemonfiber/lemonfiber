@@ -97,9 +97,15 @@ fn filled(
 /// What the step settled in, where it ran.
 async fn seeded(ctx: &Ctx, project: &std::path::Path, speaking: bool) -> Option<State> {
     let installed = installed(speaking);
-    seed_routes(ctx, &[], &installed, &filled(project, &installed))
-        .await
-        .map(|wiring| wiring.state)
+    seed_routes(
+        ctx,
+        &[],
+        &installed,
+        &filled(project, &installed),
+        &crate::baseline::Baseline::new(),
+    )
+    .await
+    .map(|wiring| wiring.state)
 }
 
 #[tokio::test]
@@ -182,7 +188,14 @@ async fn nothing_is_said_where_nothing_speaks_proxy_front() {
     assert_eq!(seeded(&ctx, &project, false).await, None);
     let comics = vec![the_comics()];
     assert_eq!(
-        seed_routes(&ctx, &[], &comics, &filled(&project, &comics)).await,
+        seed_routes(
+            &ctx,
+            &[],
+            &comics,
+            &filled(&project, &comics),
+            &crate::baseline::Baseline::new()
+        )
+        .await,
         None
     );
     assert!(http.requests().is_empty());
@@ -239,4 +252,85 @@ async fn nothing_is_applied_or_read_where_the_stack_or_its_proxy_cannot_be() {
     assert_eq!(refront(&stackless).await, None);
     assert!(served(&stackless).await.is_empty());
     assert!(http.requests().is_empty());
+}
+
+/// The comics, claimed against an account outside the house through an adapter handed a
+/// code that lapses.
+fn the_coded_comics() -> crate::plugin::Installed {
+    let mut installed = crate::test_support::contracted("comics", "komga-adapter", "owner.claim");
+    for adapter in &mut installed.services {
+        adapter.provides.clear();
+        adapter.fronts = Some("komga".to_owned());
+        adapter
+            .upstream
+            .insert("claim_code".to_owned(), "claim-code".to_owned());
+    }
+    installed.services.extend(the_comics().services);
+    installed.declared.secrets = vec![crate::plugin::Secret {
+        id: "claim-code".to_owned(),
+        of: "komga".to_owned(),
+        why: "The code the account shows".to_owned(),
+        minted: false,
+        serves: None,
+        was: None,
+        needs: lemonfiber_manifest::container::choices::Needs::new(),
+        needed_to_start: false,
+        lapses_s: Some(240),
+    }];
+    installed
+}
+
+/// A baseline recording a claim of the comics as `claimed`, where it records one.
+fn claimed(claimed: Option<&str>) -> crate::baseline::Baseline {
+    let mut baseline = crate::baseline::Baseline::new();
+    if let Some(claimed) = claimed {
+        baseline.record(
+            "komga",
+            super::super::owning::FIELD,
+            claimed,
+            "2026-10-31T00:00:00Z",
+        );
+    }
+    baseline
+}
+
+#[tokio::test]
+async fn a_part_not_yet_the_households_has_no_route_until_its_claim_is_recorded_and_drift_drops_it()
+{
+    for (name, recorded, routed) in [
+        ("unclaimed", None, false),
+        ("claimed", Some("ours"), true),
+        ("reopened", Some("open"), false),
+    ] {
+        let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("front-coded-{name}"));
+        let http = proxying(
+            vec![Answer::reply(200, table(Vec::new()))],
+            Answer::reply(204, ""),
+        );
+        let ctx = contracted_ctx(&project, "proxy", true, http.clone());
+        let installed = vec![the_proxy(true), the_coded_comics()];
+        let trusted: Vec<_> = first_party("routed")
+            .into_iter()
+            .chain(first_party("comics"))
+            .collect();
+        let fillers = fillers_trusting(
+            Vec::new(),
+            &installed,
+            &project,
+            &beside_the_bundle(&trusted),
+        );
+
+        let state = seed_routes(&ctx, &[], &installed, &fillers, &claimed(recorded)).await;
+
+        let routes: Vec<Route> = applied(&http)
+            .into_iter()
+            .flat_map(|table| table.routes)
+            .collect();
+        let expected = if routed {
+            vec![comics_route()]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(routes, expected, "{name}: {state:?}");
+    }
 }

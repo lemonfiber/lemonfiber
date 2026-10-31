@@ -183,3 +183,69 @@ async fn an_answer_outside_the_contract_is_kept_and_the_plugin_is_asked_no_more(
     assert!(identified(&ctx, &fillers).await.is_none());
     assert!(served(&ctx, &fillers).await.is_some());
 }
+
+/// `ctx`'s moved media server claimed against an account outside the house: its adapter
+/// speaking `owner.claim` and handed a code that lapses.
+fn coded(ctx: &Ctx) {
+    let register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let mut rewritten = crate::plugin::Register::empty();
+    for one in register.installed() {
+        let mut one = one.clone();
+        if one
+            .services
+            .iter()
+            .any(|placed| placed.service == moved_in::ADAPTER)
+        {
+            for placed in &mut one.services {
+                if placed.service == moved_in::ADAPTER {
+                    placed.speaks.push("owner.claim@1".to_owned());
+                    placed
+                        .upstream
+                        .insert("claim_code".to_owned(), "claim-code".to_owned());
+                }
+            }
+            one.declared.secrets.push(crate::plugin::Secret {
+                id: "claim-code".to_owned(),
+                of: "jellyfin".to_owned(),
+                why: "The code the account shows".to_owned(),
+                minted: false,
+                serves: None,
+                was: None,
+                needs: lemonfiber_manifest::container::choices::Needs::new(),
+                needed_to_start: false,
+                lapses_s: Some(240),
+            });
+        }
+        let _ = rewritten.record(one);
+    }
+    let _ = crate::app::record::keep(crate::app::plugins::kept_at(ctx).as_deref(), &rewritten);
+}
+
+#[tokio::test]
+async fn members_reach_a_media_server_claimed_against_an_outside_account_only_once_it_is_ours() {
+    let ctx = moved("kept-off", true);
+    coded(&ctx);
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        unreachable!("the repository's stack reads")
+    };
+    assert!(media(&ctx, &manifest).await.is_none());
+    assert!(serving(&ctx, &manifest).await.is_some());
+
+    let fillers = super::fillers_here(&ctx, &manifest);
+    let part = super::provider(
+        &fillers,
+        lemonfiber_contract::capabilities::media::serve::CAPABILITY,
+    )
+    .map(|served| fillers.fronted_by(served).unwrap_or(served).id.clone())
+    .unwrap_or_default();
+    let mut baseline = crate::baseline::Baseline::new();
+    baseline.record(
+        &part,
+        crate::seed::run::owning::FIELD,
+        "ours",
+        "2026-10-31T00:00:00Z",
+    );
+    crate::seed::run::save_baseline(&ctx, &baseline);
+    assert!(media(&ctx, &manifest).await.is_some());
+}

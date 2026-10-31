@@ -28,9 +28,16 @@ pub(crate) struct Media {
     pub serve: Arc<dyn serve::Fills>,
 }
 
-/// Both of the media server's capabilities, or nothing where either cannot be asked.
+/// Both of the media server's capabilities, as members reach them: nothing where either
+/// cannot be asked, or the media server is a part claimed against an account outside the
+/// house that is not yet the household's.
 pub(crate) async fn media(ctx: &Ctx, manifest: &Manifest) -> Option<Media> {
     let fillers = fillers_here(ctx, manifest);
+    let server = provider(&fillers, serve::CAPABILITY)?;
+    let kept_off = crate::seed::run::owning::kept_off_here(ctx, &fillers);
+    if crate::seed::run::owning::off(&fillers, server, &kept_off) {
+        return None;
+    }
     Some(Media {
         identity: identified(ctx, &fillers).await?,
         serve: served(ctx, &fillers).await?,

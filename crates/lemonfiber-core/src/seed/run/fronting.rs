@@ -12,6 +12,7 @@ use lemonfiber_manifest::Service;
 use super::restarting::Restarting;
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
+use crate::baseline::Baseline;
 use crate::plugin::Installed;
 use crate::ports::service::{Proxying, Route, Routing};
 use crate::seed::{State, Wiring};
@@ -21,19 +22,22 @@ use crate::wiring::Fillers;
 pub(super) const CONNECTION: &str = "The proxy's routes";
 
 /// Hold the filler of `proxy.front` to a route for every household service of the stack's
-/// `services` and the `installed` plugins, where it speaks the contract.
+/// `services` and the `installed` plugins, where it speaks the contract, save each one
+/// kept off the household while `baseline` records no claim of it.
 pub(super) async fn seed_routes(
     ctx: &Ctx,
     services: &[Service],
     installed: &[Installed],
     fillers: &Fillers,
+    baseline: &Baseline,
 ) -> Option<Wiring> {
     let (proxy, itself) = asked(ctx, fillers).await?;
     let domain = crate::settings::household_domain(ctx);
+    let kept_off = super::owning::kept_off(fillers, installed, baseline);
     let routes = crate::plugin::stack_routes(services, installed, &domain)
         .into_iter()
         .chain(crate::plugin::household_routes(installed, &domain))
-        .filter(|route| route.host != itself)
+        .filter(|route| route.host != itself && !kept_off.contains(&route.host))
         .collect();
     Some(settled(routed(ctx, &proxy, routes).await))
 }
@@ -76,7 +80,8 @@ async fn asked(ctx: &Ctx, fillers: &Fillers) -> Option<(Restarting, String)> {
 /// the record of what is installed cannot be read, or nothing speaks `proxy.front`.
 pub(crate) async fn refront(ctx: &Ctx) -> Option<State> {
     let (services, installed, fillers) = super::managed(ctx)?;
-    seed_routes(ctx, &services, &installed, &fillers)
+    let (baseline, _) = super::load_baseline(ctx).starting();
+    seed_routes(ctx, &services, &installed, &fillers, &baseline)
         .await
         .map(|wiring| wiring.state)
 }

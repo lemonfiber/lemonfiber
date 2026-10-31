@@ -16,6 +16,7 @@
       "type": [
         "const:\"failed\"",
         "const:\"failing-as-declared\"",
+        "const:\"open\"",
         "const:\"passed\"",
         "const:\"unproven\""
       ],
@@ -31,6 +32,7 @@
   "variants": [
     "\"failed\"",
     "\"failing-as-declared\"",
+    "\"open\"",
     "\"passed\"",
     "\"unproven\""
   ]

@@ -74,6 +74,24 @@
         "outcome",
         "declared"
       ]
+    },
+    {
+      "description": "The part an adapter claims is left open, because nobody entered the code its claim\ntakes: whoever reaches it first can claim it.\n\nApart from passed and from failed, and counted as neither: the adapter holds to its\ncontract, and the part is not yet the household's. Only ever reached against the\nlive service, by an install's or a re-proof's claim.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "open"
+        },
+        "why": {
+          "description": "The part, and the code its claim takes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "why"
+      ]
     }
   ]
 }

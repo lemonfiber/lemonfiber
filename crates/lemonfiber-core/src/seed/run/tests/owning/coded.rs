@@ -350,6 +350,7 @@ struct Part {
     holder: crate::ports::service::Owner,
     claimed: crate::ports::service::Owner,
     claims: std::sync::atomic::AtomicUsize,
+    blocking: Option<PathBuf>,
 }
 
 #[async_trait::async_trait]
@@ -361,6 +362,10 @@ impl crate::ports::service::Ownership for Part {
     async fn claim(&self) -> Result<crate::ports::service::Owner, crate::ports::service::Failure> {
         self.claims
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if let Some(blocking) = &self.blocking {
+            let _ = std::fs::remove_file(blocking);
+            let _ = std::fs::create_dir_all(blocking);
+        }
         Ok(self.claimed)
     }
 }
@@ -371,6 +376,7 @@ fn part(holder: crate::ports::service::Owner, claimed: crate::ports::service::Ow
         holder,
         claimed,
         claims: std::sync::atomic::AtomicUsize::new(0),
+        blocking: None,
     }
 }
 
@@ -458,4 +464,60 @@ async fn install_claims_a_part_that_takes_no_code_as_it_always_has() {
     let open = part(Owner::Open, Owner::Ours);
     let claimed = as_installed(&ctx, &claimer(), &open).await;
     assert!(matches!(claimed, Ok(Ok(Owner::Ours))), "{claimed:?}");
+}
+
+#[tokio::test]
+async fn a_claim_brings_the_part_onto_the_household_and_finding_it_open_again_takes_it_off() {
+    use super::super::super::owning::{kept_off, owned};
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-kept-off");
+    let fillers = coded_beside(&project);
+    let off = |baseline: &Baseline| kept_off(&fillers, &[coded()], baseline);
+    let mut baseline = Baseline::new();
+    assert_eq!(off(&baseline), [SERVICE.to_owned()].into());
+
+    let http = Fake::by_path(vec![(OWNER, holding("open")), (CLAIM, holding("ours"))]);
+    let ctx = coded_ctx(&project, http, FIRST, Typing::answering(TYPED));
+    owned(&ctx, &fillers, &[coded()], &mut baseline).await;
+    assert!(off(&baseline).is_empty(), "{:?}", off(&baseline));
+
+    let reopened = Fake::by_path(vec![(OWNER, holding("open")), (CLAIM, holding("ours"))]);
+    let later = coded_ctx(
+        &project,
+        reopened.clone(),
+        FIRST + 10,
+        Typing::answering(TYPED),
+    );
+    let wirings = owned(&later, &fillers, &[coded()], &mut baseline).await;
+    assert_eq!(
+        wirings.first().map(|one| &one.state),
+        Some(&crate::seed::State::Drifted),
+        "{wirings:?}"
+    );
+    assert_eq!(off(&baseline), [SERVICE.to_owned()].into());
+    assert_eq!(asked_at(&reopened, CLAIM), 0);
+}
+
+#[test]
+fn a_part_that_takes_no_code_is_never_kept_off_the_household() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-uncoded-kept-off");
+    let kept = super::super::super::owning::kept_off(
+        &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
+        &Baseline::new(),
+    );
+    assert!(kept.is_empty(), "{kept:?}");
+}
+
+#[tokio::test]
+async fn install_says_a_code_it_could_not_drop_after_the_claim_answered() {
+    use crate::ports::service::Owner;
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-undropped");
+    let ctx = coded_ctx(&project, Fake::silent(), FIRST, Typing::answering(TYPED));
+    let blocked = Part {
+        blocking: Some(upstream_json(&ctx)),
+        ..part(Owner::Open, Owner::Ours)
+    };
+    let claimed = as_installed(&ctx, &coded(), &blocked).await;
+    assert!(matches!(claimed, Ok(Err(_))), "{claimed:?}");
+    assert_eq!(blocked.claims.load(std::sync::atomic::Ordering::Relaxed), 1);
 }

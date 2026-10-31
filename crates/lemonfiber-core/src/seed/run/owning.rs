@@ -13,6 +13,8 @@
 
 mod coded;
 
+use std::collections::BTreeSet;
+
 use lemonfiber_contract::capabilities::owner::claim;
 
 use super::Ctx;
@@ -29,6 +31,10 @@ pub(crate) const FIELD: &str = "claimed";
 
 /// What the baseline records a claimed part as.
 const OURS: &str = "ours";
+
+/// What the baseline records a part claimed against an account outside the house as, once
+/// a seed found it open again.
+const REOPENED: &str = "open";
 
 /// What a part nobody holds is, where a run says what it would do.
 const NOBODY: &str = "nobody holds it";
@@ -174,6 +180,8 @@ pub(super) async fn owned(
         let wiring = owning(ctx, claimable, &asked, recorded, coded.as_ref()).await;
         if matches!(wiring.state, State::Wired | State::AlreadyWired) {
             baseline.record(id, FIELD, OURS, &at);
+        } else if coded.is_some() && wiring.state == State::Drifted {
+            baseline.record(id, FIELD, REOPENED, &at);
         }
         wirings.push(wiring);
     }
@@ -209,6 +217,44 @@ async fn owning(
         other => answered(claimable, other),
     };
     Wiring::settled(connection(name), state)
+}
+
+/// Every service kept off the household among `fillers`: each part claimed against an
+/// account outside the house, one of `installed`'s, that `baseline` does not record
+/// lemonfiber holding, and the adapter handed its code, whether or not that adapter can be
+/// asked over `owner.claim` now.
+pub(crate) fn kept_off(
+    fillers: &Fillers,
+    installed: &[Installed],
+    baseline: &Baseline,
+) -> BTreeSet<String> {
+    fillers
+        .services()
+        .filter(|speaker| Coded::of(installed, speaker).is_some())
+        .flat_map(|speaker| {
+            let part = fillers.fronted_by(speaker).unwrap_or(speaker);
+            let ours = baseline.expected(&part.id, FIELD) == Some(OURS);
+            [part.id.clone(), speaker.id.clone()]
+                .into_iter()
+                .filter(move |_| !ours)
+        })
+        .collect()
+}
+
+/// Whether `filler`, among `fillers`, or the part it fronts is `kept_off` the household.
+pub(crate) fn off(fillers: &Fillers, filler: &Filler, kept_off: &BTreeSet<String>) -> bool {
+    std::iter::once(filler)
+        .chain(fillers.fronted_by(filler))
+        .any(|one| kept_off.contains(&one.id))
+}
+
+/// [`kept_off`] for the stack as it stands: the plugins the register holds, and the
+/// baseline the last seed left, an absent or unreadable one recording nothing held.
+pub(crate) fn kept_off_here(ctx: &Ctx, fillers: &Fillers) -> BTreeSet<String> {
+    let register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let (baseline, _) = super::load_baseline(ctx).starting();
+    kept_off(fillers, register.installed(), &baseline)
 }
 
 /// Claim back every part lemonfiber claimed that is open again, among the stack's
