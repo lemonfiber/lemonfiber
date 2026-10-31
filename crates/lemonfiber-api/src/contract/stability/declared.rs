@@ -112,6 +112,13 @@ pub const DECLARED: &[Declared] = &[
     },
     Declared {
         under: 1,
+        what: "ApiKind",
+        moved: Moved::Gone,
+        because: "it was the type of PluginStepAdapter.kind alone, which is gone, so nothing \
+                  names it",
+    },
+    Declared {
+        under: 1,
         what: "SettingChange.setting",
         moved: Moved::Gone,
         because: ONE_ACT,

@@ -3,17 +3,6 @@
   "description": "One call a recipe makes, in the order it makes them.",
   "type": "object",
   "properties": {
-    "adapter": {
-      "description": "The adapter the destination is reached through, or nothing where it is a name\noutside the stack, which no adapter of lemonfiber's speaks to.",
-      "anyOf": [
-        {
-          "$ref": "PluginStepAdapter.json"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "id": {
       "description": "The step's id within its recipe.",
       "type": "string"
@@ -21,6 +10,13 @@
     "method": {
       "description": "The HTTP method it calls with.",
       "type": "string"
+    },
+    "native": {
+      "description": "The API the destination is reached in, as the installed plugin providing it\ndeclares it, or nothing where none does or it is a name outside the stack.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "path": {
       "description": "The path it calls.",

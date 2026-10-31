@@ -1,11 +1,5 @@
 {
   "fields": {
-    "adapter": {
-      "type": [
-        "anyOf(null,ref:PluginStepAdapter)"
-      ],
-      "required": false
-    },
     "id": {
       "type": [
         "string"
@@ -17,6 +11,12 @@
         "string"
       ],
       "required": true
+    },
+    "native": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     },
     "path": {
       "type": [

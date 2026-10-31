@@ -41,7 +41,9 @@ fn recipe() -> Recipe {
 #[test]
 fn a_declared_api_is_drawn_plain_whatever_its_plugin_wrote() {
     let mut drawn = recipe();
-    drawn.steps[0].native = Some("servarr\u{1b}[2J\nforged".to_owned());
+    if let Some(step) = drawn.steps.first_mut() {
+        step.native = Some("servarr\u{1b}[2J\nforged".to_owned());
+    }
     let said = recipes(&[drawn]).text();
     assert!(!said.contains('\u{1b}'), "{said}");
     assert!(!said.contains("\nforged"), "{said}");
