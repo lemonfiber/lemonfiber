@@ -22,7 +22,6 @@ mod pair;
 mod port_forward;
 mod probe;
 mod reading;
-mod tunnel;
 
 use std::sync::Arc;
 
@@ -48,7 +47,6 @@ use probe::{addresses, exit_country, find, public_address, read_grant};
 pub use crate::error::codes::vpn::CLIENT_ISOLATED;
 pub use crate::error::codes::vpn::KILLSWITCH_LEAKS;
 pub(crate) use reading::{read_vpn, VpnReading};
-pub(crate) use tunnel::Gluetun;
 
 /// Gluetun's own record of the port its provider forwarded, written inside the
 /// container when port forwarding is on. Read from there rather than from the

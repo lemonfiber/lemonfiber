@@ -31,10 +31,10 @@ fn a_part_the_bundle_installs_that_the_stack_runs_itself_is_offered_a_move() {
     let expected: Vec<MoveOffered> = installs()
         .into_iter()
         .filter(|plugin| stack.iter().any(|service| service.id == *plugin))
-        .map(|plugin| MoveOffered {
-            plugin: plugin.to_owned(),
-            service: plugin.to_owned(),
-        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|plugin| (plugin, offered(PINNED, &stack, &[])))
+        .filter_map(|(plugin, all)| all.into_iter().find(|one| one.plugin == plugin))
         .collect();
 
     assert!(
@@ -42,6 +42,30 @@ fn a_part_the_bundle_installs_that_the_stack_runs_itself_is_offered_a_move() {
         "the carried stack runs no part the bundle installs"
     );
     assert_eq!(offered(PINNED, &stack, &[]), expected);
+    assert!(expected.iter().all(|one| one.service == one.plugin));
+}
+
+/// A kept part whose adapter writes the configuration it reads starts without what that
+/// holds until it moves, its curator keys among it, and the offer names the adapter; a
+/// part whose adapter writes nothing of it names none.
+#[test]
+fn a_kept_part_configured_by_its_adapter_is_offered_naming_that_adapter() {
+    let stack = carried();
+    let configured = |plugin: &str| {
+        offered(PINNED, &stack, &[])
+            .into_iter()
+            .find(|one| one.plugin == plugin)
+            .map(|one| one.configured_by)
+    };
+    assert_eq!(
+        configured("unpackerr"),
+        Some(Some("unpackerr-adapter".to_owned()))
+    );
+    assert_eq!(configured("jellyfin"), Some(None));
+    let unpackerr = stack.iter().find(|service| service.id == "unpackerr");
+    assert!(unpackerr.is_some_and(
+        |service| service.secret.is_empty() && !crate::project::names_a_secret(&service.env)
+    ));
 }
 
 /// A part whose plugin is installed already has moved, so nothing is offered for it.

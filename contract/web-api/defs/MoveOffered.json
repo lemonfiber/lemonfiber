@@ -3,6 +3,13 @@
   "description": "A move in place the bundle offers: the plugin and the stack's own service of its id it\nwould take the place of.",
   "type": "object",
   "properties": {
+    "configured_by": {
+      "description": "The part's adapter that writes the configuration the service reads, where one does:\nit runs only once the move is taken, so until then the service starts without what\nthat configuration holds, the credentials it reaches other services with included.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "plugin": {
       "description": "The plugin the bundle installs.",
       "type": "string"

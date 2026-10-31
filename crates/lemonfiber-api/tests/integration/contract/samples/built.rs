@@ -49,6 +49,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
         moves: vec![lemonfiber_core::app::plugins::MoveOffered {
             plugin: "jellyfin".to_owned(),
             service: "jellyfin".to_owned(),
+            configured_by: None,
         }],
     }
 }

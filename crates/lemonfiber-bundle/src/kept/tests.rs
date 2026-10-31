@@ -156,13 +156,39 @@ fn what_only_the_plugin_reads_stays_out_of_the_kept_service() {
 }
 
 #[test]
-fn an_installed_part_whose_environment_is_only_secrets_keeps_none() {
+fn a_secret_only_the_operator_holds_is_kept_as_declared_and_a_minted_one_is_not() {
+    let copy = PLAYER
+        .replace(
+            "PLAYER_KEY = { secret = \"upstream-key\" }\n",
+            "PLAYER_KEY = { secret = \"upstream-key\" }\nPLAYER_PASSWORD = { secret = \"password\" }\n",
+        )
+        + "\n[[secret]]\nid = \"password\"\nof = \"player\"\nrecorded_with = \"minted\"\nwhy = \"w\"\n";
+    let player = player(&stack(&[held("player", Stage::Installed, &copy)]));
+    let declared: Vec<Option<&str>> = player
+        .get("secret")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|secret| secret.get("id").and_then(Value::as_str))
+        .collect();
+    assert_eq!(declared, vec![Some("password")]);
+    let env: Vec<&String> = player
+        .get("env")
+        .and_then(Value::as_table)
+        .map(|env| env.keys().collect())
+        .unwrap_or_default();
+    assert_eq!(env, vec!["PLAYER_LOG", "PLAYER_PASSWORD"]);
+}
+
+#[test]
+fn an_installed_part_whose_environment_is_only_minted_secrets_keeps_none() {
     let copy = PLAYER.replace(
         "PLAYER_LOG = { setting = \"player:log\", default = \"info\" }\n",
         "",
     );
     let player = player(&stack(&[held("player", Stage::Installed, &copy)]));
     assert!(player.get("env").is_none(), "{player:?}");
+    assert!(player.get("secret").is_none(), "{player:?}");
 }
 
 #[test]

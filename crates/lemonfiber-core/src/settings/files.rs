@@ -184,10 +184,11 @@ pub(crate) fn of_stack_service(service: &Service, resolved: &Resolved) -> Vec<Va
         .collect()
 }
 
-/// Where a stack service's secret is read from: the secret store, where the operator
-/// enters it; the credential lemonfiber keeps for the service itself, under the stack's
-/// own name for it; and a credential that crosses from another service, where its holder
-/// keeps it, read there each time and never copied.
+/// Where a stack service's secret is read from: the secret store, under the service's own
+/// namespace, where it is its own and only the operator holds it, which is where the
+/// plugin it moves into reads it too; a credential that crosses from another service,
+/// where its holder keeps it, read there each time and never copied; and the credential
+/// lemonfiber keeps for the service itself, under the stack's own name for it.
 pub(crate) fn stack_holding(service: &Service, id: &str, resolved: &Resolved) -> Holding {
     let named = crate::settings::named(&service.id, id);
     if crate::settings::legacy::named(&named).is_some_and(|row| row.secret) {
@@ -195,6 +196,7 @@ pub(crate) fn stack_holding(service: &Service, id: &str, resolved: &Resolved) ->
     }
     match service.secret.iter().find(|secret| secret.id == id) {
         Some(secret) if secret.of != service.id => resolved.crossing_into(&service.id, &secret.of),
+        Some(secret) if secret.recorded_with.is_some() => Holding::Store(named),
         _ => resolved.own_key(&service.id),
     }
 }

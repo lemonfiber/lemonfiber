@@ -21,6 +21,11 @@ pub struct MoveOffered {
     /// The stack's own service it would take the place of, under the same container name,
     /// configuration directory, data and names.
     pub service: String,
+    /// The part's adapter that writes the configuration the service reads, where one does:
+    /// it runs only once the move is taken, so until then the service starts without what
+    /// that configuration holds, the credentials it reaches other services with included.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configured_by: Option<String>,
 }
 
 /// Every part `pinned` installs whose plugin is not among `installed` while `stack` still
@@ -30,14 +35,33 @@ pub fn offered(pinned: &[Pinned], stack: &[Service], installed: &[Installed]) ->
     pinned
         .iter()
         .filter(|one| one.stage == Some(Stage::Installed))
-        .map(|one| one.first_party.plugin)
-        .filter(|plugin| !installed.iter().any(|held| held.plugin == *plugin))
-        .filter(|plugin| stack.iter().any(|service| service.id == *plugin))
-        .map(|plugin| MoveOffered {
-            plugin: plugin.to_owned(),
-            service: plugin.to_owned(),
+        .filter(|one| {
+            !installed
+                .iter()
+                .any(|held| held.plugin == one.first_party.plugin)
+        })
+        .filter(|one| {
+            stack
+                .iter()
+                .any(|service| service.id == one.first_party.plugin)
+        })
+        .map(|one| MoveOffered {
+            plugin: one.first_party.plugin.to_owned(),
+            service: one.first_party.plugin.to_owned(),
+            configured_by: configuring(one.copy, one.first_party.plugin),
         })
         .collect()
+}
+
+/// The service of the manifest `copy` that fronts `service` and shares its configuration
+/// directory, where one does.
+fn configuring(copy: &str, service: &str) -> Option<String> {
+    lemonfiber_plugin::Manifest::from_toml(copy)
+        .ok()?
+        .services
+        .into_iter()
+        .find(|one| one.fronts.as_deref() == Some(service) && one.shares_config.is_some())
+        .map(|one| one.id)
 }
 
 /// The moves on offer on this machine, against the stack `manifest` declares: nothing

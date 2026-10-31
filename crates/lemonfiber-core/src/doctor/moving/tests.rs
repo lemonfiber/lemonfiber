@@ -25,6 +25,7 @@ fn jellyfin() -> MoveOffered {
     MoveOffered {
         plugin: "jellyfin".to_owned(),
         service: "jellyfin".to_owned(),
+        configured_by: None,
     }
 }
 

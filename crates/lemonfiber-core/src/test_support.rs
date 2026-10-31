@@ -24,6 +24,8 @@ pub mod aggregator;
 pub mod books;
 #[path = "../../lemonfiber-testing/src/curators.rs"]
 pub mod curators;
+#[path = "../../lemonfiber-testing/src/guard.rs"]
+pub mod guard;
 #[path = "../../lemonfiber-testing/src/indexer.rs"]
 pub mod indexer;
 #[path = "../../lemonfiber-testing/src/listening.rs"]
@@ -40,7 +42,7 @@ pub mod torrent;
 pub mod usenet;
 
 mod crossing;
-pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader};
+pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader, crossing_stack};
 pub(crate) mod egress;
 mod gating;
 pub(crate) mod syncing;

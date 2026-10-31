@@ -7,8 +7,7 @@ use super::{after_start, listening_port, pass, Asking, CameTo, Last, CHECK, RECO
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::journal::{Change, Kind};
-use crate::ports::docker::{Health, Lifecycle};
-use crate::test_support::{a_context, env_without_password, torrent};
+use crate::test_support::{a_context, env_without_password, guard, torrent};
 
 /// The route answering the torrent client's adapter's `peer_port` with `port`.
 fn holds(port: Option<u16>) -> (&'static str, Answer) {
@@ -20,14 +19,14 @@ fn sets(answer: Answer) -> (&'static str, Answer) {
     (torrent::operation("set_peer_port"), answer)
 }
 
-/// The stack's guard forwarding `forwarded`, and its torrent client, moved into its
-/// plugin, answering over its contract as `routes` say.
+/// The stack's guard forwarding `forwarded`, and its torrent client, each moved into its
+/// plugin, answering over their contracts as `routes` say.
 fn holding(
     name: &str,
     forwarded: Option<&'static str>,
     routes: Vec<(&'static str, Answer)>,
 ) -> (Ctx, Arc<Fake>) {
-    let engine = Reporting::holding(&["gluetun"], Lifecycle::Running, Health::Healthy)
+    let engine = guard::running()
         .alongside(torrent::running())
         .with_tunnel(Tunnel {
             gateway: "gluetun",
@@ -37,7 +36,15 @@ fn holding(
             port: forwarded,
             second_opinion: None,
         });
-    let http = Fake::by_path(routes);
+    let port = forwarded
+        .and_then(|port| port.parse::<u16>().ok())
+        .filter(|port| *port != 0);
+    let http = Fake::by_path(
+        routes
+            .into_iter()
+            .chain(std::iter::once(guard::forwarding(port)))
+            .collect(),
+    );
     let env = env_without_password(&format!("forwarding-{name}"));
     let ctx = a_context()
         .engine(Arc::new(engine))
@@ -49,7 +56,16 @@ fn holding(
         })
         .build()
         .with_http(http.clone());
-    (torrent::keyed(ctx), http)
+    (guard::keyed(torrent::keyed(ctx)), http)
+}
+
+/// Every request asked of a client inside the guard, the guard's own left out.
+fn asked_of_clients(http: &Fake) -> Vec<crate::ports::http::Request> {
+    let guard = guard::operation("");
+    http.requests()
+        .into_iter()
+        .filter(|request| !request.url.contains(guard))
+        .collect()
 }
 
 fn forwarding() -> crate::config::PortForward {
@@ -124,7 +140,7 @@ async fn an_unchanged_answer_on_the_cadence_asks_no_client() {
         pass.map(|pass| (pass.answer, pass.clients.len())),
         Some((Some(51413), 0))
     );
-    assert!(http.requests().is_empty());
+    assert!(asked_of_clients(&http).is_empty());
     assert!(journal(&ctx).is_empty());
 }
 
@@ -152,7 +168,7 @@ async fn starting_the_stack_compares_the_client_afresh_and_leaves_one_already_on
     let (ctx, http) = holding("afresh", Some("51413"), vec![holds(Some(51413))]);
     remember(&ctx, Some(51413));
     assert_eq!(started(&ctx).await, Some(None));
-    assert_eq!(http.requests().len(), 1);
+    assert_eq!(asked_of_clients(&http).len(), 1);
     assert!(journal(&ctx).is_empty());
 }
 
@@ -160,7 +176,7 @@ async fn starting_the_stack_compares_the_client_afresh_and_leaves_one_already_on
 async fn starting_the_stack_with_nothing_ever_forwarded_leaves_the_client_alone() {
     let (ctx, http) = holding("never", None, Vec::new());
     assert_eq!(started(&ctx).await, Some(None));
-    assert!(http.requests().is_empty());
+    assert!(asked_of_clients(&http).is_empty());
 }
 
 #[tokio::test]
@@ -201,7 +217,7 @@ async fn a_rehearsal_passes_nothing() {
     let (ctx, http) = holding("rehearsed", Some("51999"), Vec::new());
     let ctx = ctx.rehearsing();
     assert_eq!(passed(&ctx, Asking::Afresh).await, None);
-    assert!(http.requests().is_empty());
+    assert!(asked_of_clients(&http).is_empty());
 }
 
 #[test]
@@ -273,7 +289,7 @@ async fn a_diagnosis_whose_vpn_check_did_not_run_asks_nothing() {
         reason: "the stack is not running".to_owned(),
     });
     assert_eq!(diagnosed(&ctx, &[skipped]).await, Some(Vec::new()));
-    assert!(http.requests().is_empty());
+    assert!(asked_of_clients(&http).is_empty());
 }
 
 #[tokio::test]
