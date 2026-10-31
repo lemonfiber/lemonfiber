@@ -92,6 +92,26 @@ pub const DECLARED: &[Declared] = &[
     },
     Declared {
         under: 1,
+        what: "PluginStep.adapter",
+        moved: Moved::Gone,
+        because: "a step's call is said to reach its service in the API that service declares \
+                  as its native, carried as PluginStep.native",
+    },
+    Declared {
+        under: 1,
+        what: "PluginStepAdapter",
+        moved: Moved::Gone,
+        because: "it was the type of PluginStep.adapter alone, which is gone, so nothing names it",
+    },
+    Declared {
+        under: 1,
+        what: "PluginAdapterOwner",
+        moved: Moved::Gone,
+        because: "it was the type of PluginStepAdapter.owner alone, which is gone, so nothing \
+                  names it",
+    },
+    Declared {
+        under: 1,
         what: "SettingChange.setting",
         moved: Moved::Gone,
         because: ONE_ACT,

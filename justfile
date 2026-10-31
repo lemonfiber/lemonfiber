@@ -179,16 +179,6 @@ capabilities:
     cargo run --quiet --example capabilities -p lemonfiber-core > contract/capability-vocabulary.json.next
     mv contract/capability-vocabulary.json.next contract/capability-vocabulary.json
 
-# Rewrite the set of adapters a recipe step may be reached through.
-#
-# From the adapter kinds and key sources lemonfiber implements, never written, so the
-# set an author reads is the set this build implements.
-adapters:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cargo run --quiet --example adapters -p lemonfiber-core > contract/adapters.json.next
-    mv contract/adapters.json.next contract/adapters.json
-
 # Rewrite the extension points from the registers they name.
 #
 # The identities the bundled rows already hold come out of the doctor's own register,

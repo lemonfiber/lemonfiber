@@ -527,5 +527,5 @@ mod contained;
 #[cfg(test)]
 mod tests;
 
-pub use api::{ApiKind, KeySource};
+pub use api::ApiKind;
 pub use claimed::{Claimed, CLAIM};

@@ -1,4 +1,4 @@
-//! The APIs lemonfiber speaks, and where a credential for one may come from.
+//! The APIs lemonfiber speaks.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,26 +36,6 @@ pub enum ApiKind {
     Nzbhydra2,
 }
 
-/// Where a service's credential comes from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum KeySource {
-    /// The service writes it to an XML file lemonfiber reads.
-    ConfigXml,
-    /// The service writes it to an INI file lemonfiber reads.
-    ConfigIni,
-    /// The service writes it to a JSON file lemonfiber reads.
-    ConfigJson,
-    /// The service writes it to a YAML file lemonfiber reads.
-    ConfigYaml,
-    /// Retrieved over the service's own API once authenticated.
-    ApiSettings,
-    /// The service offers nothing durable, so lemonfiber mints and records one.
-    Generated,
-    /// The API needs no credential.
-    None,
-}
-
 impl ApiKind {
     /// The name the manifest writes this adapter under.
     #[must_use]
@@ -79,8 +59,7 @@ impl ApiKind {
         Self::ALL.into_iter().find(|kind| kind.name() == name)
     }
 
-    /// Every adapter lemonfiber implements, which is the whole of what a recipe step may
-    /// be reached through.
+    /// Every API lemonfiber speaks.
     pub const ALL: [Self; 9] = [
         Self::Servarr,
         Self::Sabnzbd,
@@ -91,18 +70,5 @@ impl ApiKind {
         Self::Bazarr,
         Self::Audiobookshelf,
         Self::Nzbhydra2,
-    ];
-}
-
-impl KeySource {
-    /// Every place a credential may come from.
-    pub const ALL: [Self; 7] = [
-        Self::ConfigXml,
-        Self::ConfigIni,
-        Self::ConfigJson,
-        Self::ConfigYaml,
-        Self::ApiSettings,
-        Self::Generated,
-        Self::None,
     ];
 }
