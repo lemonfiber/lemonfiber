@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "quality.sync/v1/openapi.json",
-      "sha256": "0338282f3d38cee64841de690c9db05ff155ee7421b3dfda47c622925cdfc124"
+      "sha256": "e014aaa146806e2c6a2c90beb0b7b428a7a4874803c25229d80339626f650da6"
     },
     {
       "path": "quality.sync/v1/operations/apply.json",

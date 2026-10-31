@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "owner.claim/v1/openapi.json",
-      "sha256": "d579c0d523bbed74bf0d294547ba9bd91aed832975a09eaa0a0c6e8aabb6ecf8"
+      "sha256": "491702273d0db26095b1a6762b7431b4ff8d8ec362165c74680c7f8212b124cf"
     },
     {
       "path": "owner.claim/v1/operations/owner.json",

@@ -169,7 +169,9 @@ fn answer(wanted: &Wanted, held: &Throttled, moving: &Rates) -> Answer {
 /// rather than an interpretation of it; the failure's own sentence otherwise.
 pub(super) fn said(failure: &Failure) -> String {
     match failure {
-        Failure::Refused { detail, .. } | Failure::Unsupported { detail, .. } => detail.clone(),
+        Failure::Refused { detail, .. }
+        | Failure::Unsupported { detail, .. }
+        | Failure::Disallowed { detail, .. } => detail.clone(),
         Failure::Unavailable { .. } | Failure::Unauthorised { .. } => failure.to_string(),
     }
 }

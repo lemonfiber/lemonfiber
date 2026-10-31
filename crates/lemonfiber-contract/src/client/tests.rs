@@ -408,3 +408,21 @@ async fn an_operation_declaring_a_longer_deadline_is_awaited_that_long() {
         declared.map(|bounds| bounds.deadline)
     );
 }
+
+#[tokio::test]
+async fn a_refusal_of_what_was_asked_is_read_only_at_its_own_status() {
+    let refusal = r#"{"type":"disallowed","detail":"a page inside the household"}"#;
+    let (_, client, told) = adapter(Answer::served(400, "application/problem+json", refusal));
+    assert!(matches!(
+        asked::<u32>(&client).await,
+        Err(Failure::Disallowed { service, detail })
+            if service == "plex-adapter" && detail == "a page inside the household"
+    ));
+    assert_eq!(told.count(), 0);
+    let (_, client, told) = adapter(Answer::served(500, "application/problem+json", refusal));
+    assert!(matches!(
+        asked::<u32>(&client).await,
+        Err(Failure::Refused { .. })
+    ));
+    assert_eq!(told.count(), 1);
+}

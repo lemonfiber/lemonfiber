@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "indexer.proxy/v1/openapi.json",
-      "sha256": "78b0f7c937898a8390eecf92709070b57a4ce233f6893fc86a5a7f54a30d2f67"
+      "sha256": "bb403ddf53d2efa96c7ea7e6bc6a1fce55f5b7c2c7f09c0be414b825af974dda"
     },
     {
       "path": "indexer.proxy/v1/operations/solve.json",

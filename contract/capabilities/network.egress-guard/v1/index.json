@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "network.egress-guard/v1/openapi.json",
-      "sha256": "cdf9e8de59cf3600cc10e3ffc2f03c8f9d3b83979ebbd092d933f9de73f62d83"
+      "sha256": "50d46a842a97a7b7f32518f406c8a2b80d31328fc09eae743c89acf8084e9298"
     },
     {
       "path": "network.egress-guard/v1/operations/up.json",

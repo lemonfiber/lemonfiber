@@ -20,6 +20,10 @@ fn a_failure_crosses_and_is_read_back_as_itself() {
             service: "upstream".to_owned(),
             detail: "too new".to_owned(),
         },
+        Failure::Disallowed {
+            service: "upstream".to_owned(),
+            detail: "a closed path".to_owned(),
+        },
     ];
     for failure in failures {
         let read = Refusal::from(&failure).failure("adapter");
@@ -54,6 +58,7 @@ fn every_refusal_has_a_status_of_its_own_kind() {
         (Kind::Unsupported, 500),
         (Kind::UnknownOperation, 404),
         (Kind::NotAsked, 400),
+        (Kind::Disallowed, 400),
     ];
     for (kind, status) in statuses {
         assert_eq!(kind.status(), status);
@@ -87,6 +92,9 @@ fn a_refusal_reads_only_as_the_contract_writes_it() {
     assert!(strict.is_err());
     let written = serde_json::to_string(&Refusal::new(Kind::NotAsked, "x")).unwrap_or_default();
     assert_eq!(written, r#"{"type":"not-asked","detail":"x"}"#);
+    let disallowed =
+        serde_json::to_string(&Refusal::new(Kind::Disallowed, "x")).unwrap_or_default();
+    assert_eq!(disallowed, r#"{"type":"disallowed","detail":"x"}"#);
 }
 
 /// What cannot be written down.

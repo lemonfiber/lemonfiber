@@ -51,6 +51,21 @@ fn an_unsupported_api_version_is_reported_with_a_remedy() {
 }
 
 #[test]
+fn a_refusal_of_what_was_asked_is_its_own_error_and_keeps_the_services_words() {
+    let problem = Failure::Disallowed {
+        service: "flaresolverr".to_owned(),
+        detail: "a page inside the household".to_owned(),
+    }
+    .problem();
+    assert_eq!(problem.code.as_str(), "SEED-5");
+    assert_eq!(problem.severity, Severity::Error);
+    assert_eq!(
+        problem.detail.as_deref(),
+        Some("a page inside the household")
+    );
+}
+
+#[test]
 fn every_failure_names_the_service_it_is_about() {
     let failures = [
         Failure::Unavailable {
@@ -64,6 +79,10 @@ fn every_failure_names_the_service_it_is_about() {
             detail: "boom".to_owned(),
         },
         Failure::Unsupported {
+            service: "sonarr".to_owned(),
+            detail: "boom".to_owned(),
+        },
+        Failure::Disallowed {
             service: "sonarr".to_owned(),
             detail: "boom".to_owned(),
         },

@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "indexer.search/v1/openapi.json",
-      "sha256": "cc71b0d567aa2659194a8cf643f86a7c0a655c85e3163fab7a41e386e2a807a2"
+      "sha256": "6c3bc0ba74ed26faf1e4bd196efb9d28f0e07111c54a79a8bb6de8780a6345e2"
     },
     {
       "path": "indexer.search/v1/operations/register_application.json",

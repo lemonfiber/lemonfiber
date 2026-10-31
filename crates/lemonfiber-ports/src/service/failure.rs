@@ -1,7 +1,8 @@
 //! Why a service would not answer, and what that means for the operator.
 //!
-//! Four causes told apart because their remedies differ — a wrong key, a service that is
-//! not up, one that refused, and one speaking a version this build does not.
+//! Five causes told apart because their remedies differ — a wrong key, a service that is
+//! not up, one that refused, one speaking a version this build does not, and one refusing
+//! what was asked because what was asked is one it never does.
 
 /// What an operator types to be offered the repairs.
 ///
@@ -17,7 +18,8 @@ pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
 
 use super::{Diagnose, Problem, Remedy, State};
 use lemonfiber_error::codes::seed::{
-    SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,
+    SERVICE_DISALLOWED, SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE,
+    SERVICE_UNSUPPORTED,
 };
 use thiserror::Error;
 
@@ -54,6 +56,16 @@ pub enum Failure {
         /// Which version is missing, in lemonfiber's words.
         detail: String,
     },
+    /// The service refused what was asked because the operation never does what was
+    /// asked, as a challenge solver refuses a page inside the household. Nothing failed on
+    /// its side, and asking again is refused the same way.
+    #[error("{service} refused what was asked: {detail}")]
+    Disallowed {
+        /// The service that refused.
+        service: String,
+        /// Why, in the service's words.
+        detail: String,
+    },
 }
 
 impl Diagnose for Failure {
@@ -85,6 +97,13 @@ impl Diagnose for Failure {
                 "The service answered that it does not offer what was asked: it speaks a release lemonfiber does not, or cannot do this at all. Nothing was changed for it.",
                 Remedy::new("Where the service's release is the cause, match it to the version lemonfiber supports or update lemonfiber, then run seed again")
                     .with_detail("lemonfiber seed"),
+            )
+            .with_detail(detail.clone()),
+            Self::Disallowed { service, detail } => Problem::new(
+                SERVICE_DISALLOWED,
+                format!("{service} refused what was asked"),
+                "The service answered that what was asked is something it never does, so asking again would be refused the same way. Nothing failed on its side.",
+                Remedy::new("Ask it for something it does"),
             )
             .with_detail(detail.clone()),
         }

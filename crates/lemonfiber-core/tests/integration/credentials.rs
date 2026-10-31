@@ -96,21 +96,23 @@ async fn a_service_that_does_not_answer_is_unverified_rather_than_failed() {
 
 #[tokio::test]
 async fn a_service_answering_unusably_carries_its_own_words() {
-    let refusal = lemonfiber_contract::wire::Refusal::new(Kind::Refused, "database is locked");
-    let (target, _) = television(Answer::served(
-        Kind::Refused.status(),
-        lemonfiber_contract::wire::PROBLEM,
-        serde_json::to_string(&refusal).unwrap_or_default(),
-    ));
+    for kind in [Kind::Refused, Kind::Disallowed] {
+        let refusal = lemonfiber_contract::wire::Refusal::new(kind, "database is locked");
+        let (target, _) = television(Answer::served(
+            kind.status(),
+            lemonfiber_contract::wire::PROBLEM,
+            serde_json::to_string(&refusal).unwrap_or_default(),
+        ));
 
-    let reason = match only(target).await {
-        Verdict::Unverified { reason, .. } => Some(reason),
-        _ => None,
-    };
-    assert!(
-        reason.is_some_and(|reason| reason.contains("database is locked")),
-        "an unusable answer is unverified, carrying the service's own words"
-    );
+        let reason = match only(target).await {
+            Verdict::Unverified { reason, .. } => Some(reason),
+            _ => None,
+        };
+        assert!(
+            reason.is_some_and(|reason| reason.contains("database is locked")),
+            "an unusable answer is unverified, carrying the service's own words"
+        );
+    }
 }
 
 #[tokio::test]
