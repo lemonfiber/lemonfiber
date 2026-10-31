@@ -243,3 +243,20 @@ async fn a_part_claimed_with_a_code_that_never_answers_fails_at_its_health_limit
     );
     assert!(posted(&http, "/claim").len() > 1);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_part_claimed_with_a_code_taken_only_once_its_upstream_restarts_fails_at_its_claim() {
+    let at = source("fronted-coded-restarting", &coded(None));
+    let http = claiming(vec![Answer::reply(205, "")]);
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "claim".to_owned(),
+            "it takes the claim only once its upstream starts again, which a recording does not do"
+                .to_owned()
+        )]
+    );
+    assert_eq!(posted(&http, "/claim").len(), 1);
+}
