@@ -113,7 +113,7 @@ requirement = [
   { id = "ARCH-R140", state = "done", evidence = ["crates/lemonfiber-core/src/news.rs", "crates/lemonfiber-api/src/events/dashboard.rs"] },
   { id = "ARCH-R141", state = "done", evidence = ["crates/lemonfiber-core/src/news.rs", "crates/lemonfiber-api/src/events/dashboard.rs"] },
   { id = "ARCH-R142", state = "done", evidence = ["crates/lemonfiber-core/src/agreement.rs", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-api/src/contract.rs"] },
-  { id = "ARCH-R143", state = "done", evidence = ["crates/lemonfiber-core/src/plugin.rs", "contract/adapters.json", "crates/lemonfiber-core/src/plugin/recipes.rs"] },
+  { id = "ARCH-R143", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recipes.rs", "crates/lemonfiber-core/src/plugin/recipes/tests.rs"] },
   { id = "ARCH-R144", state = "done", evidence = ["crates/lemonfiber-manifest/src/validate.rs", "crates/lemonfiber-plugin/src/refusing/speaking.rs", "crates/lemonfiber-core/src/wiring/fillers.rs"] },
   { id = "ARCH-R145", state = "done", evidence = ["crates/lemonfiber-api/src/read/table.rs", "crates/lemonfiber-core/src/wiring.rs", "crates/lemonfiber-core/src/stack.rs"] },
   { id = "ARCH-R146", state = "done", evidence = ["crates/lemonfiber-api/src/actions/named/extending.rs", "crates/lemonfiber-core/src/app/plugins/refusals.rs"] },

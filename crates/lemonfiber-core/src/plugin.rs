@@ -102,7 +102,7 @@ pub(crate) use placing::configuration;
 pub use placing::{key_file, mount_sources, mount_tree, writes, Lands, Write};
 pub use profiled::{profile_of, profiled, Profiled};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
-pub use recipes::{approval, approvals, Adapter, Owner, Pair, Recipe, RecipeInput, Step};
+pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};

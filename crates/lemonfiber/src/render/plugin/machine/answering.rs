@@ -9,12 +9,12 @@
 //! The manifest's own rules refuse such a word before an install reads it; this is the
 //! second wall, not the first.
 
-use lemonfiber_core::plugin::{Adapter, Installed, Recipe, Sharing, Taking};
+use lemonfiber_core::plugin::{Installed, Recipe, Sharing, Taking};
 use lemonfiber_core::text::plain;
 
 use super::super::super::Lines;
 
-/// Every recipe, each call in order with the adapter it reaches through, and every
+/// Every recipe, each call in order with the API it reaches its service in, and every
 /// value it would send elsewhere with what approving it is written as.
 ///
 /// Nothing at all for a plugin that declares none, which is most of them: a heading
@@ -50,7 +50,7 @@ pub(super) fn recipes(declared: &[Recipe]) -> Lines {
                 plain(&step.method),
                 plain(&step.to),
                 plain(&step.path),
-                through(step.adapter.as_ref())
+                speaking(step.native.as_deref())
             ));
         }
         for pair in &recipe.pairs {
@@ -129,20 +129,10 @@ pub(super) fn sharing(shared: &[Sharing], acted: bool) -> Lines {
     lines
 }
 
-/// The adapter a call reaches through, said to be lemonfiber's, or nothing for a call
-/// to a name outside the stack.
-fn through(adapter: Option<&Adapter>) -> String {
-    adapter.map_or_else(String::new, |one| {
-        format!(", through lemonfiber's {} adapter", word(*one))
-    })
-}
-
-/// The adapter's own word, as the published set spells it.
-fn word(adapter: Adapter) -> String {
-    serde_json::to_value(adapter.kind)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_default()
+/// The API a call reaches its service in, in the declaring plugin's word, or nothing
+/// where none is declared.
+fn speaking(native: Option<&str>) -> String {
+    native.map_or_else(String::new, |api| format!(", in its {} API", plain(api)))
 }
 
 /// Every credential of another service the plugin is granted, with the capability it is
