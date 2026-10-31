@@ -20,7 +20,12 @@ const MOVED: Adapted = Adapted {
     port: PORT,
 };
 
-static NO_STACK: include_dir::Dir<'static> = include_dir::Dir::new("", &[]);
+static NO_STACK: lemonfiber_core::stack::Carried = lemonfiber_core::stack::Carried {
+    manifest: "",
+    files: &NOTHING,
+};
+
+static NOTHING: include_dir::Dir<'static> = include_dir::Dir::new("", &[]);
 
 fn embedded(stack_dir: Option<&Path>) -> lemonfiber_core::app::Ctx {
     a_context()

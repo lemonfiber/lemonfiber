@@ -1,25 +1,27 @@
 use std::path::Path;
 
-use include_dir::{include_dir, Dir};
+use include_dir::Dir;
 
-use super::{Failure, Source};
+use super::{Carried, Failure, Source};
 use crate::error::Diagnose;
-use crate::error::{Severity, State};
+use crate::error::State;
 use crate::test_support::frozen_day as today;
 
 /// The same stack the binary embeds, so both variants are exercised against
 /// the real thing rather than against a fixture that could drift from it.
-use lemonfiber_bundled::CARRIED as EMBEDDED;
-
-/// A directory that is certainly not a stack.
-///
-/// `adapters` because the crate cannot compile without it. The previous choice was a
-/// directory that later moved out to its own crate, and an emptied directory fails
-/// here rather than where it was emptied.
-static NOT_A_STACK: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/config");
+use super::BUNDLED as EMBEDDED;
 
 /// A stack naming a lemonfiber far newer than any this build could be.
-static NEEDS_NEWER: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stack-needs-newer");
+static NEEDS_NEWER: Carried = Carried {
+    manifest: include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/stack-needs-newer/stack.toml"
+    )),
+    files: &NOTHING,
+};
+
+/// No file beside a manifest.
+static NOTHING: Dir<'_> = Dir::new("", &[]);
 
 /// The stack this build carries, written as a stack directory holds it.
 fn checked_out() -> Source {
@@ -47,12 +49,6 @@ fn a_stack_directory_reads_as_the_embedded_stack_but_for_the_secrets_it_holds_no
         "a directory names its service files"
     );
     assert_eq!(read, lemonfiber_fixtures::stack::carried());
-}
-
-#[test]
-fn an_embedded_directory_with_no_manifest_is_a_broken_build() {
-    let refusal = Source::Embedded(&NOT_A_STACK).manifest().err();
-    assert!(matches!(refusal, Some(Failure::NotEmbedded)));
 }
 
 #[test]
@@ -97,12 +93,20 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 }
 
 #[test]
-fn an_embedded_stack_is_written_where_compose_can_read_it() {
+fn an_embedded_stack_writes_its_starting_files_and_never_its_manifest() {
     let dir = scratch("materialise");
     let written = Source::Embedded(&EMBEDDED).materialise(Some(&dir));
 
     assert_eq!(written.ok().as_deref(), Some(dir.path()));
-    assert!(dir.join("stack.toml").is_file(), "the manifest is written");
+    assert!(
+        dir.join("config").is_dir(),
+        "the starting files are written"
+    );
+    assert!(
+        !dir.join("stack.toml").exists(),
+        "the manifest is never written"
+    );
+    assert!(!dir.join("services").exists(), "no service file is written");
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -234,16 +238,8 @@ fn a_stack_asking_for_a_newer_binary_is_refused_naming_it() {
     );
 }
 
-#[test]
-fn a_build_that_lost_its_stack_admits_it_rather_than_guessing() {
-    let problem = Failure::NotEmbedded.problem();
-    assert_eq!(problem.severity, Severity::Critical);
-    assert_eq!(problem.state, State::Unknown);
-    assert!(!problem.remedies.is_empty(), "escalation is still offered");
-}
-
 /// One of every way a stack fails to be read.
-fn every_failure() -> [Failure; 10] {
+fn every_failure() -> [Failure; 9] {
     [
         Failure::Unreadable {
             path: "/tmp/x/stack.toml".into(),
@@ -262,7 +258,6 @@ fn every_failure() -> [Failure; 10] {
         Failure::Unrecognised {
             names: vec!["service jellyfin: health.kind: unknown variant plex".to_owned()],
         },
-        Failure::NotEmbedded,
         Failure::NowhereToWrite,
         Failure::NotWritten {
             path: "/tmp/x".into(),
@@ -413,14 +408,14 @@ fn a_stack_whose_files_break_the_layout_names_each_one() {
     );
 }
 
-/// The embedded stack's service files are read from where the build put them.
+/// The embedded stack's manifest is read whole, as the bundle assembles it, and its files
+/// hold no manifest of their own.
 #[test]
-fn the_embedded_stack_assembles_from_its_own_files() {
+fn the_embedded_stack_reads_its_manifest_whole() {
     let text = Source::Embedded(&EMBEDDED)
         .manifest_text()
         .unwrap_or_default();
-    assert!(
-        text.contains("\n# services/"),
-        "the service files were not joined"
-    );
+    assert_eq!(text, lemonfiber_bundled::STACK);
+    assert!(EMBEDDED.files.get_file("stack.toml").is_none());
+    assert!(EMBEDDED.files.get_dir("services").is_none());
 }

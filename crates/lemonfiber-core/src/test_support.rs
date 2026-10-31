@@ -483,41 +483,6 @@ pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
 
 mod tests;
 
-/// The stack this build carries, assembled from its bundle and written apart as the
-/// binary embeds it.
-pub(crate) fn carried_stack() -> crate::stack::Source {
-    use include_dir::{Dir, DirEntry, File};
-    let leaked = |text: String| -> &'static str { Box::leak(text.into_boxed_str()) };
-    let (root, files) =
-        lemonfiber_manifest::assembly::split(lemonfiber_bundled::STACK).unwrap_or_default();
-    let services: Vec<DirEntry<'static>> = files
-        .into_iter()
-        .map(|(file, text)| {
-            DirEntry::File(File::new(
-                leaked(format!(
-                    "{}/{file}",
-                    lemonfiber_manifest::assembly::SERVICES
-                )),
-                leaked(text).as_bytes(),
-            ))
-        })
-        .collect();
-    let entries: Vec<DirEntry<'static>> = vec![
-        DirEntry::File(File::new(
-            lemonfiber_manifest::assembly::ROOT,
-            leaked(root).as_bytes(),
-        )),
-        DirEntry::Dir(Dir::new(
-            lemonfiber_manifest::assembly::SERVICES,
-            Box::leak(services.into_boxed_slice()),
-        )),
-    ];
-    crate::stack::Source::Embedded(Box::leak(Box::new(Dir::new(
-        "",
-        Box::leak(entries.into_boxed_slice()),
-    ))))
-}
-
 /// The version of the stack this build ships.
 pub(crate) fn shipped_stack_version() -> String {
     lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
@@ -528,5 +493,19 @@ pub(crate) fn shipped_stack_version() -> String {
 /// The stack this build carries inside it, as a machine that
 /// has chosen no stack directory yet holds it.
 pub(crate) fn embedded() -> crate::stack::Source {
-    crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED)
+    crate::stack::Source::Embedded(&crate::stack::BUNDLED)
 }
+
+/// A small stack with a service of each kind a test needs: its manifest and the files it
+/// writes beside it.
+pub(crate) static STACKLET: crate::stack::Carried = crate::stack::Carried {
+    manifest: include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/stacklet.toml"
+    )),
+    files: &STACKLET_FILES,
+};
+
+/// What [`STACKLET`] writes beside its manifest.
+static STACKLET_FILES: include_dir::Dir<'_> =
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");

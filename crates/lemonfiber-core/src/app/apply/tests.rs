@@ -339,16 +339,21 @@ fn the_embedded_stack_is_written_where_compose_reads_it_but_not_journalled() {
 
     assert!(apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
     )
     .is_ok());
 
-    // The stack is on disk where Compose reads it — its manifest among the
-    // files. It is lemonfiber's regenerable output, so it is not recorded in the
-    // journal: its undo is the next apply rewriting it, not a reversal.
+    // The stack's starting files are on disk where its services read them, and
+    // never its manifest, which is read where it is carried. They are lemonfiber's
+    // regenerable output, so they are not recorded in the journal: their undo is the
+    // next apply rewriting them, not a reversal.
     assert!(
-        paths.stack().join("stack.toml").is_file(),
+        paths.stack().join("config").is_dir(),
         "the stack was materialised"
+    );
+    assert!(
+        !paths.stack().join("stack.toml").exists(),
+        "the manifest was written out"
     );
     let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
     let stack_line = journal_text(&[made_dir(&paths.stack())]);
@@ -383,12 +388,12 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     let mut first = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut first,
-        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
     )
     .is_ok());
 
-    let edited = paths.stack().join("services/bazarr.toml");
-    let theirs = "# a service description of my own\n";
+    let edited = paths.stack().join("LICENSE");
+    let theirs = "my own words\n";
     assert!(
         std::fs::write(&edited, theirs).is_ok(),
         "the operator's edit"
@@ -397,7 +402,7 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     let mut again = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut again,
-        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
     )
     .is_ok());
 
@@ -408,7 +413,7 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     );
     // And the rest of the stack is still lemonfiber's own: preserving one file is
     // not declining to write the others.
-    assert!(paths.stack().join("stack.toml").is_file());
+    assert!(paths.stack().join("config").is_dir());
 }
 
 /// What makes the comparison above possible: a record of what was written, kept
@@ -422,13 +427,14 @@ fn an_apply_records_the_checksums_of_what_it_wrote() {
     let mut wizard = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
     )
     .is_ok());
 
     let recorded = std::fs::read_to_string(paths.materialised()).unwrap_or_default();
-    assert!(recorded.contains("services/bazarr.toml"), "{recorded}");
-    assert!(recorded.contains("stack.toml"), "{recorded}");
+    assert!(recorded.contains("config/"), "{recorded}");
+    assert!(!recorded.contains("stack.toml"), "{recorded}");
+    assert!(!recorded.contains("services/"), "{recorded}");
 }
 
 #[test]
@@ -449,7 +455,7 @@ fn a_stack_that_cannot_be_written_stops_the_apply() {
 
     let stopped = apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&lemonfiber_bundled::CARRIED), "t"),
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t"),
     );
 
     assert!(stopped.is_err(), "the stack could not be written");

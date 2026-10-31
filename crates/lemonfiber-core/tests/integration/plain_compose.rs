@@ -11,7 +11,6 @@ use std::process::Command as Program;
 use std::sync::Arc;
 use std::time::Duration;
 
-use include_dir::{Dir, DirEntry, File};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -83,44 +82,9 @@ fn machine(name: &str, overlay: Option<&str>) -> (Ctx, PathBuf) {
     (ctx, directory)
 }
 
-/// The stack the bundle declares, carried the way this binary carries it: its manifest
-/// written apart as a root and a file per service.
+/// The stack the bundle declares, carried the way this binary carries it.
 fn carried() -> Source {
-    let Ok((root, services)) = lemonfiber_manifest::assembly::split(lemonfiber_bundled::STACK)
-    else {
-        unreachable!("the stack the bundle declares is written apart")
-    };
-    let held: Vec<DirEntry<'static>> = services
-        .into_iter()
-        .map(|(file, text)| {
-            DirEntry::File(File::new(
-                leaked(format!(
-                    "{}/{file}",
-                    lemonfiber_manifest::assembly::SERVICES
-                )),
-                leaked(text).as_bytes(),
-            ))
-        })
-        .collect();
-    let entries = vec![
-        DirEntry::File(File::new(
-            lemonfiber_manifest::assembly::ROOT,
-            leaked(root).as_bytes(),
-        )),
-        DirEntry::Dir(Dir::new(
-            lemonfiber_manifest::assembly::SERVICES,
-            Box::leak(held.into_boxed_slice()),
-        )),
-    ];
-    Source::Embedded(Box::leak(Box::new(Dir::new(
-        "",
-        Box::leak(entries.into_boxed_slice()),
-    ))))
-}
-
-/// `text`, held for as long as the tests run.
-fn leaked(text: String) -> &'static str {
-    Box::leak(text.into_boxed_str())
+    Source::Embedded(&lemonfiber_core::stack::BUNDLED)
 }
 
 /// What `docker compose` resolves `arguments` to, run in `at`.

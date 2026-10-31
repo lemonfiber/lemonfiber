@@ -10,9 +10,6 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 const ID: &str = "0123456789abcdef0123456789abcdef";
 
-static STACKLET: include_dir::Dir<'_> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
-
 fn held(medium: Medium, holds: Holds) -> Item {
     Item {
         id: ID.to_owned(),
@@ -195,7 +192,9 @@ fn the_household_reaches_the_media_server_at_the_doors_port_where_there_is_one()
 #[tokio::test]
 async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
     let ctx = crate::test_support::a_context()
-        .over(crate::stack::Source::Embedded(&STACKLET))
+        .over(crate::stack::Source::Embedded(
+            &crate::test_support::STACKLET,
+        ))
         .build();
     assert_eq!(
         super::standing(&ctx, &Declares::declaring(enforceable())).await,
@@ -215,7 +214,9 @@ async fn a_standing_door_locates_where_the_server_behind_it_declared() {
         .ok();
     let standing_at = |household_host: Option<&str>| {
         crate::test_support::a_context()
-            .over(crate::stack::Source::Embedded(&STACKLET))
+            .over(crate::stack::Source::Embedded(
+                &crate::test_support::STACKLET,
+            ))
             .settings(crate::config::Settings {
                 stack_dir: Some(project.path().to_path_buf()),
                 household_host: household_host.map(str::to_owned),

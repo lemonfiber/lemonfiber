@@ -8,9 +8,9 @@ use include_dir::{include_dir, Dir};
 /// Embedding it means the common install has one thing to fetch rather than
 /// two, and `lemonfiber-bundled` has already refused to build if the manifest is one
 /// it could not read. What is embedded is what runs of it, so an operator's stack
-/// directory is written with the stack and not with the CI, scripts and hooks of the
-/// repositories it comes from.
-pub use lemonfiber_bundled::CARRIED as STACK;
+/// directory is written with the stack's starting files and not with the CI, scripts and
+/// hooks of the repositories it comes from, and never with its manifest.
+pub use lemonfiber_core::stack::BUNDLED as STACK;
 
 /// The app this binary serves a browser.
 ///

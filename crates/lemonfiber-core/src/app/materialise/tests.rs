@@ -1,11 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use include_dir::{include_dir, Dir};
-
 use super::{materialise, pending_reverts, reset_stack};
 use crate::stack::{Failure, Source};
-
-static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 /// The real disk, which every file here is written to.
 const DISK: lemonfiber_adapters::Disk = lemonfiber_adapters::Disk;
@@ -24,7 +20,7 @@ fn read(path: &Path) -> String {
 #[test]
 fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
     let (into, record) = scratch("write-and-leave");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
 
     let first = materialise(&DISK, source, Some(&into), Some(&record), &[]);
     let (path, edits) = first.unwrap_or((PathBuf::new(), Vec::new()));
@@ -32,7 +28,10 @@ fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
     assert!(edits.is_empty(), "a fresh materialise reports no edits");
     // Every file, including the nested one, is written with the embedded content.
     assert!(read(&into.join("compose.yaml")).contains("image: sonarr"));
-    assert!(read(&into.join("stack.toml")).contains("stacklet"));
+    assert!(
+        !into.join("stack.toml").exists(),
+        "the manifest is never written"
+    );
     assert!(read(&into.join("fragments/tv.yaml")).contains("profiles"));
     assert!(
         read(&record).contains("compose.yaml"),
@@ -50,7 +49,7 @@ fn every_file_is_written_and_recorded_then_left_on_a_second_run() {
 #[test]
 fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
     let (into, record) = scratch("region-kept");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let _ = materialise(&DISK, source, Some(&into), Some(&record), &[]);
     let file = into.join("compose.yaml");
     let with = crate::region::put(&read(&file), "plugin komga", "# komga\n");
@@ -79,7 +78,7 @@ fn a_region_written_since_is_kept_by_the_next_pass_and_not_reported() {
 #[test]
 fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
     let (into, record) = scratch("region-reset");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let _ = materialise(&DISK, source, Some(&into), Some(&record), &[]);
     let file = into.join("compose.yaml");
     let shipped = read(&file);
@@ -104,7 +103,7 @@ fn a_reset_puts_back_the_operators_edit_and_keeps_the_region() {
 #[test]
 fn an_edited_file_is_preserved_and_reported_with_a_diff() {
     let (into, record) = scratch("preserve-edit");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let _ = materialise(&DISK, source, Some(&into), Some(&record), &[]);
 
     // The operator edits a materialised file by hand.
@@ -127,7 +126,7 @@ fn an_edited_file_is_preserved_and_reported_with_a_diff() {
 #[test]
 fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
     let (into, record) = scratch("reset-revert");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let (_, _) = materialise(&DISK, source, Some(&into), Some(&record), &[])
         .unwrap_or((PathBuf::new(), Vec::new()));
     let shipped = read(&into.join("compose.yaml"));
@@ -156,7 +155,7 @@ fn a_reset_reverts_an_edited_file_to_lemonfibers_and_names_it() {
 #[test]
 fn a_preview_names_the_reverts_but_writes_nothing() {
     let (into, record) = scratch("reset-preview");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let _ = materialise(&DISK, source, Some(&into), Some(&record), &[]);
 
     let edited = "services:\n  sonarr:\n    image: my-own-sonarr\n";
@@ -174,7 +173,7 @@ fn a_preview_names_the_reverts_but_writes_nothing() {
 #[test]
 fn a_preview_of_a_stack_never_written_writes_nothing() {
     let (into, record) = scratch("unwritten-preview");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
 
     let pending =
         pending_reverts(&DISK, source, Some(&into), Some(&record), &[]).unwrap_or_default();
@@ -203,7 +202,13 @@ fn an_external_stack_is_returned_and_nothing_is_written() {
 
 #[test]
 fn an_embedded_stack_with_nowhere_to_write_is_refused() {
-    let refusal = materialise(&DISK, Source::Embedded(&STACKLET), None, None, &[]);
+    let refusal = materialise(
+        &DISK,
+        Source::Embedded(&crate::test_support::STACKLET),
+        None,
+        None,
+        &[],
+    );
     assert!(matches!(refusal, Err(Failure::NowhereToWrite)));
 }
 
@@ -218,7 +223,7 @@ fn a_file_where_a_directory_must_go_is_a_write_failure() {
     }
     let failure = materialise(
         &DISK,
-        Source::Embedded(&STACKLET),
+        Source::Embedded(&crate::test_support::STACKLET),
         Some(&into),
         Some(&record),
         &[],
@@ -229,10 +234,16 @@ fn a_file_where_a_directory_must_go_is_a_write_failure() {
 #[test]
 fn without_a_record_path_the_stack_is_still_written() {
     let (into, _) = scratch("no-record");
-    let (_, edits) = materialise(&DISK, Source::Embedded(&STACKLET), Some(&into), None, &[])
-        .unwrap_or((PathBuf::new(), vec![]));
+    let (_, edits) = materialise(
+        &DISK,
+        Source::Embedded(&crate::test_support::STACKLET),
+        Some(&into),
+        None,
+        &[],
+    )
+    .unwrap_or((PathBuf::new(), vec![]));
     assert!(edits.is_empty());
-    assert!(read(&into.join("stack.toml")).contains("stacklet"));
+    assert!(read(&into.join("compose.yaml")).contains("image: sonarr"));
 }
 
 /// A declaration is a name and the reason somebody gave for writing it down.
@@ -248,7 +259,7 @@ fn declared(area: &str) -> Vec<(String, String)> {
 #[test]
 fn a_file_beneath_a_declared_area_is_never_written() {
     let (into, record) = scratch("unmanaged-file");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let theirs = declared("config/recyclarr");
 
     let (_, edits) = materialise(&DISK, source, Some(&into), Some(&record), &theirs)
@@ -276,7 +287,7 @@ fn a_file_beneath_a_declared_area_is_never_written() {
 #[test]
 fn a_reset_does_not_revert_a_file_the_operator_declared_unmanaged() {
     let (into, record) = scratch("unmanaged-reset");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let theirs = declared("compose.yaml");
     let _ = materialise(&DISK, source, Some(&into), Some(&record), &[]);
 
@@ -301,7 +312,7 @@ fn a_reset_does_not_revert_a_file_the_operator_declared_unmanaged() {
 #[test]
 fn a_link_planted_where_a_stack_file_goes_is_neither_read_nor_written() {
     let (into, record) = scratch("planted-link");
-    let source = Source::Embedded(&STACKLET);
+    let source = Source::Embedded(&crate::test_support::STACKLET);
     let operator = into.with_file_name("authorized_keys");
     assert!(std::fs::create_dir_all(into.parent().unwrap_or(&into)).is_ok());
     assert!(std::fs::write(&operator, "ssh-ed25519 theirs\n").is_ok());

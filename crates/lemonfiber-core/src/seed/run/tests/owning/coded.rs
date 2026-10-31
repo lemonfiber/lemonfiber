@@ -273,7 +273,7 @@ type Breaking = fn(&mut Ctx);
 #[tokio::test]
 async fn a_code_that_cannot_be_kept_or_handed_over_fails_the_claim_before_it_is_asked() {
     let unstored: Breaking = |ctx| ctx.settings.env_file = None;
-    let stackless: Breaking = |ctx| ctx.stack = crate::test_support::carried_stack();
+    let stackless: Breaking = |ctx| ctx.stack = crate::test_support::embedded();
     for (name, typed, broken) in [
         ("unstored", TYPED, unstored),
         ("stackless", TYPED, stackless),

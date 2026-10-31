@@ -14,10 +14,10 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-use lemonfiber_manifest::assembly::SERVICES;
+use lemonfiber_manifest::assembly::{ROOT as MANIFEST, SERVICES};
 use lemonfiber_manifest::{Date, Manifest};
 
-use super::{Failure, Source, MANIFEST};
+use super::{Failure, Source};
 
 /// What a checked manifest was read from, and on which day it was checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,7 +71,7 @@ fn kept(read: &Read) -> Option<Manifest> {
 /// at — which is then checked afresh, and its refusal says why.
 fn read(source: Source, today: Date) -> Option<Read> {
     let from = match source {
-        Source::Embedded(dir) => From::Embedded(std::ptr::from_ref(dir).addr()),
+        Source::Embedded(carried) => From::Embedded(std::ptr::from_ref(carried).addr()),
         Source::External(path) => {
             let mut files = vec![path.join(MANIFEST)];
             files.extend(

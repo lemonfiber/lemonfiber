@@ -267,7 +267,7 @@ async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
         ),
     ]);
     let ctx = contracted_context(&project, "fetcher", true)
-        .over(crate::stack::Source::Embedded(&lemonfiber_bundled::CARRIED))
+        .over(crate::stack::Source::Embedded(&crate::stack::BUNDLED))
         .settings(Settings {
             data_root: Some(PathBuf::from("/srv/media")),
             env_file: Some(env_without_password("letting-contracted")),

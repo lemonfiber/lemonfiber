@@ -278,7 +278,7 @@ async fn an_embedded_stack_with_nowhere_to_go_stops_before_starting_anything() {
     };
     let ctx = a_context()
         .engine(Arc::new(Reporting::default()))
-        .over(Source::Embedded(&lemonfiber_bundled::CARRIED))
+        .over(Source::Embedded(&crate::stack::BUNDLED))
         .settings(settings)
         .build();
     let command = Command::Up {
