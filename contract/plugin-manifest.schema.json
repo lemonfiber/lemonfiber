@@ -649,6 +649,11 @@
           ],
           "default": null
         },
+        "outside": {
+          "description": "Each conformance case it is asked that reaches a host outside the stack, as\n`<capability>@<major>/<case>`, to that host: `plugin record --check` leaves such a\ncase as recorded rather than reaching the host, and still requires its recording.",
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
         "port": {
           "description": "Where it is published on the host, absent for a service that publishes nothing.",
           "type": ["integer", "null"],

@@ -109,6 +109,12 @@ pub enum Took {
     /// The recording answers no case that was asked, and is left as it was because the
     /// run writes nothing.
     Unasked,
+    /// The recording is of a case reaching a host outside the stack, which a run holding
+    /// recordings to what it takes again leaves as recorded rather than reaching.
+    Left {
+        /// The host the case reaches.
+        host: String,
+    },
 }
 
 /// One recording a manifest names, and what taking it came to.
@@ -177,9 +183,12 @@ pub async fn record(path: &Path, recorder: Recorder<'_>) -> Result<Recorded, Unr
     }
     let holds = refusals.is_empty()
         && failed.is_empty()
-        && recordings
-            .iter()
-            .all(|one| matches!(one.took, Took::Written | Took::Reproduced | Took::Removed));
+        && recordings.iter().all(|one| {
+            matches!(
+                one.took,
+                Took::Written | Took::Reproduced | Took::Removed | Took::Left { .. }
+            )
+        });
     Ok(Recorded {
         id: manifest.plugin.id.clone(),
         refusals,

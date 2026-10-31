@@ -198,6 +198,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         shaping::critical(service, found);
         leaving::stated(service, found);
         fronting::native(service, &manifest.services, found);
+        fronting::outside(service, found);
         replacing::replaced(service, found);
         minting::handed(manifest, service, found);
     }

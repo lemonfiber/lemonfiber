@@ -33,6 +33,9 @@ impl Asking<'_> {
         let part =
             claim::Adapter(self.contracted(Arc::clone(&tapped) as Arc<dyn Http>, &reached.base));
         let until = tokio::time::Instant::now() + allowed(self.health);
+        if self.coded() {
+            return self.coded_claim(&part, until, tapped).await;
+        }
         let mut settling = false;
         loop {
             let held = if settling {
@@ -53,6 +56,38 @@ impl Asking<'_> {
             }
             if tokio::time::Instant::now() >= until {
                 return Err("it was not claimed within its health's limit".to_owned());
+            }
+            tokio::time::sleep(POLL).await;
+        }
+    }
+
+    /// Whether the part is claimed with a code an account outside the house shows, which
+    /// its adapter is handed as a secret that lapses.
+    fn coded(&self) -> bool {
+        self.adapter.service.upstream.values().any(|of| {
+            self.secrets
+                .iter()
+                .any(|secret| secret.id == of.secret && secret.lapses_s.is_some())
+        })
+    }
+
+    /// The part claimed once with the stand-in its code is recorded with, asked again only
+    /// while the upstream is not answering within its health's limit; whatever the adapter
+    /// answered, the account outside refusing the stand-in included, is what is recorded.
+    async fn coded_claim(
+        &self,
+        part: &claim::Adapter,
+        until: tokio::time::Instant,
+        tapped: Arc<Tapped>,
+    ) -> Result<BTreeMap<String, Response>, String> {
+        loop {
+            match part.claim().await {
+                Err(Failure::Unavailable { .. }) => {}
+                Ok(Claim::Restarting(_)) => return Err(RESTARTING.to_owned()),
+                Ok(Claim::Held(_)) | Err(_) => return Ok(tapped.heard()),
+            }
+            if tokio::time::Instant::now() >= until {
+                return Err("it did not answer the claim within its health's limit".to_owned());
             }
             tokio::time::sleep(POLL).await;
         }
