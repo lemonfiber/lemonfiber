@@ -12,7 +12,7 @@ use tokio::time::Instant;
 use super::fronted::{self, Fronting};
 use super::served::{answers, POLL};
 use super::stood_in;
-use super::written::{before, landing, written};
+use super::written::{answered_before, landing, written};
 use super::{Failed, Recorder, Taken, Took};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::{Installed, Placed};
@@ -312,9 +312,9 @@ fn case_written(
     let fixture = case.fixture();
     let named = case.named();
     let took = match case.left {
-        Some(host) if before(root, &fixture).is_some() => Took::Left { host },
+        Some(host) if answered_before(root, &fixture).is_some() => Took::Left { host },
         Some(_) => Took::Unreproduced {
-            why: format!("{fixture} is not there"),
+            why: format!("{fixture} holds no recorded answer"),
         },
         None => written(
             root,

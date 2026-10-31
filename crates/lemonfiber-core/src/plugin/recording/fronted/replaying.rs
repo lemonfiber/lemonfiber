@@ -8,10 +8,10 @@ use std::collections::BTreeMap;
 use lemonfiber_contract::conformance::{cases, filed, Case as Asks};
 use serde_json::Value;
 
-use super::super::written::before;
+use super::super::written::answered_before;
 use super::speaking::{fixture, named};
 use super::{Asking, Case, Faulted, Filling, Reached, Response, ASKED_WITH, JSON};
-use crate::plugin::recorded::{Answer, Asked, Of};
+use crate::plugin::recorded::{Answer, Asked};
 
 /// The operation of `owner.claim` that claims a part.
 const CLAIMING: &str = "claim";
@@ -71,7 +71,7 @@ impl Asking<'_> {
     }
 
     /// `case` of `spoken` as its recording holds it, left as recorded because it reaches
-    /// `host`; an answer of nothing where no recording is there, which the run refuses.
+    /// `host`; an answer of nothing where no recorded answer is there, which the run refuses.
     pub(super) fn as_recorded(
         &self,
         filling: &mut Filling<'_>,
@@ -79,12 +79,7 @@ impl Asking<'_> {
         case: &Asks<'_>,
         host: String,
     ) -> Case {
-        let answer = before(self.root, &fixture(spoken, &case.case))
-            .and_then(|recording| match recording.of {
-                Of::Request { response, .. } => Some(response),
-                Of::Run { .. } => None,
-            })
-            .unwrap_or_default();
+        let answer = answered_before(self.root, &fixture(spoken, &case.case)).unwrap_or_default();
         filling.answers.insert(
             format!("{spoken}/{}", case.case),
             answer.json.clone().unwrap_or(Value::Null),

@@ -34,6 +34,11 @@ fn coded(host: Option<&str>) -> String {
 /// The adapter refusing the stand-in code, as the account outside refuses a lapsed one,
 /// and saying nobody holds the part.
 fn refusing(claim: Answer) -> Arc<Fake> {
+    claiming(vec![claim])
+}
+
+/// The adapter answering the claim with each of `claims` in turn, then as [`refusing`].
+fn claiming(claims: Vec<Answer>) -> Arc<Fake> {
     let json = |body: &str| Answer::served(200, "application/json", body);
     Fake::by_path_in_turn(vec![
         ("/health", vec![Answer::reply(200, "ok")]),
@@ -53,7 +58,7 @@ fn refusing(claim: Answer) -> Arc<Fake> {
             ],
         ),
         ("/watch", vec![json("null")]),
-        ("/claim", vec![claim]),
+        ("/claim", claims),
         (
             "/owner",
             vec![
@@ -62,6 +67,14 @@ fn refusing(claim: Answer) -> Arc<Fake> {
             ],
         ),
     ])
+}
+
+fn unavailable() -> Answer {
+    Answer::served(
+        503,
+        PROBLEM,
+        r#"{"type": "unavailable", "detail": "the account is not answering"}"#,
+    )
 }
 
 fn refused() -> Answer {
@@ -176,8 +189,57 @@ async fn a_check_refuses_a_case_reaching_outside_the_stack_whose_recording_is_ab
     assert_eq!(
         took(&read, CLAIM),
         Some(Took::Unreproduced {
-            why: format!("{CLAIM} is not there")
+            why: format!("{CLAIM} holds no recorded answer")
         })
     );
     assert!(!read.holds);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_check_refuses_a_case_reaching_outside_the_stack_whose_recording_is_of_a_run() {
+    let at = source("fronted-outside-run", &coded(Some("plex.tv")));
+    let _ = recorded(&at, &engine(), &refusing(refused()), Some(7)).await;
+    let _ = std::fs::write(
+        at.join(CLAIM),
+        r#"{"recorded_from": "jellyfin@sha256:abc", "note": "Why.", "run": {"args": ["--version"]}, "result": {"exit": 0, "stdout_starts_with": "1"}}"#,
+    );
+
+    let read = checked(&at, &refusing(refused())).await;
+
+    assert_eq!(
+        took(&read, CLAIM),
+        Some(Took::Unreproduced {
+            why: format!("{CLAIM} holds no recorded answer")
+        })
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_part_claimed_with_a_code_is_asked_again_only_while_it_is_not_answering() {
+    let at = source("fronted-coded-waiting", &coded(None));
+    let http = claiming(vec![unavailable(), refused()]);
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(failed_at(&read), Vec::new());
+    assert_eq!(posted(&http, "/claim").len(), 2);
+    assert_eq!(
+        json_at(&at, CLAIM).pointer("/response/json/type"),
+        Some(&json!("refused"))
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_part_claimed_with_a_code_that_never_answers_fails_at_its_health_limit() {
+    let at = source("fronted-coded-silent", &coded(None));
+    let http = claiming(vec![unavailable()]);
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "claim".to_owned(),
+            "it did not answer the claim within its health's limit".to_owned()
+        )]
+    );
+    assert!(posted(&http, "/claim").len() > 1);
 }

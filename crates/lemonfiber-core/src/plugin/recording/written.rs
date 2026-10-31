@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use super::alike::alike;
 use super::{Retaking, Took};
-use crate::plugin::recorded::{self, Of, Recording};
+use crate::plugin::recorded::{self, Answer, Of, Recording};
 
 /// Where `fixture` lands beneath `root`, refused where it leads outside the source or
 /// a link stands on the way to it or at its name.
@@ -33,6 +33,14 @@ pub(super) fn landing(root: &Path, fixture: &str) -> Result<PathBuf, String> {
 /// The recording already at `fixture`, where one this build reads is there.
 pub(super) fn before(root: &Path, fixture: &str) -> Option<Recording> {
     recorded::read(root, fixture).ok()
+}
+
+/// The answer the recording already at `fixture` holds, where it is one of a request.
+pub(super) fn answered_before(root: &Path, fixture: &str) -> Option<Answer> {
+    before(root, fixture).and_then(|recording| match recording.of {
+        Of::Request { response, .. } => Some(response),
+        Of::Run { .. } => None,
+    })
 }
 
 /// How the sentence a recording's note ends with where it was taken with stand-ins begins.
