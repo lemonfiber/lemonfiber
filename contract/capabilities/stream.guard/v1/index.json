@@ -7,11 +7,11 @@
     },
     {
       "path": "stream.guard/v1/operations/guard.json",
-      "sha256": "ed1dc28d1e7bee9420421671c8429450e2fa59bd65a0485ab62a52fd0156a005"
+      "sha256": "151d2e726b5d805247296d66902a893902f7e607f5841c25e0aced28ec44fb5c"
     },
     {
       "path": "stream.guard/v1/operations/guarding.json",
-      "sha256": "0b0b3b530070e8a233abd71ac24707016d3dbd86071cc7347efc1d6457b0d7c0"
+      "sha256": "51f52ab7d341b94c9a0cc7118593b1ec50c703cf196512483bb399f6d9a46230"
     },
     {
       "path": "stream.guard/v1/operations/certificate.json",

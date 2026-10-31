@@ -3,7 +3,9 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use super::{guard, Unguarded};
-use crate::ports::service::{Addressee, Failure, Guarded, Guarding, Presented, Undeclarable};
+use crate::ports::service::{
+    Addressee, Answers, Failure, Guarded, Guarding, Presented, Undeclarable, MAY,
+};
 
 /// A guard that keeps every envelope it is handed, and refuses one where told to.
 #[derive(Default)]
@@ -64,11 +66,16 @@ fn envelope() -> Guarded {
     }
 }
 
-/// `envelope()` with its question sent to the adapter.
+/// `envelope()` with its question the one a guard sends the adapter.
 fn asking_the_adapter(adapter: Option<&str>) -> Guarded {
     let mut guarded = envelope();
     if let Some(question) = guarded.declared.question.as_mut() {
         question.to = Addressee::Adapter;
+        MAY.clone_into(&mut question.path);
+        question.answers = Answers::from_adapter();
+    }
+    for path in &mut guarded.declared.bytes {
+        path.space = Some("item".to_owned());
     }
     guarded.adapter = adapter.map(str::to_owned);
     guarded

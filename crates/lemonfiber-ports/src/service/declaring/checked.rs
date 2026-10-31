@@ -11,9 +11,10 @@ use regex_syntax::hir::Look;
 
 use super::joined::joined;
 use super::{
-    Answers, BytePath, Declared, Held, LivePath, Locations, Presentation, Question, Statuses,
-    Token, BASE, ITEM, TOKEN,
+    Addressee, Answers, BytePath, Declared, Held, LivePath, Locations, Presentation, Question,
+    Statuses, Token, BASE, ITEM, MAY, TOKEN,
 };
+use crate::http::Method;
 
 /// The longest pattern a declaration may hold, in bytes.
 const PATTERN_MOST: usize = 1024;
@@ -23,6 +24,19 @@ const COMPILED_MOST: usize = 1 << 20;
 
 /// The longest parameter or header name, in bytes.
 const NAME_MOST: usize = 64;
+
+/// The longest space a byte path names, in bytes.
+pub const SPACE_MOST: usize = 32;
+
+/// Whether `space` is spelled as a byte path names one: lowercase letters, digits and
+/// `-`, no longer than [`SPACE_MOST`].
+#[must_use]
+pub fn spelled_as_a_space(space: &str) -> bool {
+    (1..=SPACE_MOST).contains(&space.len())
+        && space
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
 
 /// The group a byte path names its item with.
 const ITEM_NAME: &str = "item";
@@ -57,7 +71,8 @@ pub enum Undeclarable {
         /// The byte path's pattern.
         pattern: String,
     },
-    /// A byte path does not say where the item's id sits.
+    /// A byte path does not say where the item's id sits, or says it in its path and in
+    /// a query value both.
     #[error("its byte path {pattern} does not hold exactly one group named item")]
     Unplaced {
         /// The byte path's pattern.
@@ -112,6 +127,21 @@ pub enum Undeclarable {
     /// The question's answers are not statuses, or one means two things.
     #[error("the question's answers overlap or are not statuses")]
     Unanswerable,
+    /// A byte path of a declaration asking its adapter names no space to ask in.
+    #[error("its byte path {pattern} names no space, which its question to the adapter asks in")]
+    Unspaced {
+        /// The byte path's pattern.
+        pattern: String,
+    },
+    /// A byte path of a declaration asking its upstream names a space, which nothing asks
+    /// in.
+    #[error(
+        "its byte path {pattern} names a space, which its question to the upstream never asks in"
+    )]
+    Spaced {
+        /// The byte path's pattern.
+        pattern: String,
+    },
 }
 
 impl Declared {
@@ -138,7 +168,10 @@ impl Declared {
                     pattern: path.pattern.clone(),
                 })
             }
-            (Some(question), _) => asked(question)?,
+            (Some(question), _) => {
+                asked(question)?;
+                spaced(&self.bytes, question.to)?;
+            }
             (None, None) => {}
         }
         token(&self.token)?;
@@ -193,14 +226,26 @@ fn shape(shape: &str) -> Result<(), Undeclarable> {
     }
 }
 
-/// Whether a byte path says once where its item sits, and is anchored throughout.
-fn byte_path(path: &BytePath) -> Result<(), Undeclarable> {
-    let engine = path_pattern(&path.pattern)?;
-    let items = engine
+/// How many groups named `item` `engine` holds.
+fn items(engine: &regex::Regex) -> usize {
+    engine
         .capture_names()
         .filter(|name| *name == Some(ITEM_NAME))
-        .count();
-    if items != 1 {
+        .count()
+}
+
+/// Whether a byte path says once where its item sits, in its path or in a query value,
+/// and is anchored throughout.
+fn byte_path(path: &BytePath) -> Result<(), Undeclarable> {
+    let engine = path_pattern(&path.pattern)?;
+    let placed = match &path.query {
+        Some(query) => {
+            plain(&query.parameter)?;
+            items(&engine) == 0 && items(&compiled(&query.pattern)?.0) == 1
+        }
+        None => items(&engine) == 1,
+    };
+    if !placed {
         return Err(Undeclarable::Unplaced {
             pattern: path.pattern.clone(),
         });
@@ -234,6 +279,49 @@ fn live_path(path: &LivePath) -> Result<(), Undeclarable> {
     shape(&path.stream)
 }
 
+/// Whether every byte path names a space where the question goes to the adapter, spelled
+/// as one is, and none where it goes to the upstream.
+fn spaced(bytes: &[BytePath], to: Addressee) -> Result<(), Undeclarable> {
+    for path in bytes {
+        match (to, &path.space) {
+            (Addressee::Adapter, Some(space)) => {
+                if !spelled_as_a_space(space) {
+                    return Err(Undeclarable::Unspelled {
+                        name: space.clone(),
+                    });
+                }
+            }
+            (Addressee::Adapter, None) => {
+                return Err(Undeclarable::Unspaced {
+                    pattern: path.pattern.clone(),
+                })
+            }
+            (Addressee::Upstream, Some(_)) => {
+                return Err(Undeclarable::Spaced {
+                    pattern: path.pattern.clone(),
+                })
+            }
+            (Addressee::Upstream, None) => {}
+        }
+    }
+    Ok(())
+}
+
+/// Whether `name` is a header name of letters, digits and `-`.
+fn header_name(name: &str) -> Result<(), Undeclarable> {
+    let spelled = (1..=NAME_MOST).contains(&name.len())
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-');
+    if spelled {
+        Ok(())
+    } else {
+        Err(Undeclarable::Unspelled {
+            name: name.to_owned(),
+        })
+    }
+}
+
 /// Whether `name` is a plain parameter name.
 fn plain(name: &str) -> Result<(), Undeclarable> {
     let spelled = (1..=NAME_MOST).contains(&name.len())
@@ -250,11 +338,22 @@ fn plain(name: &str) -> Result<(), Undeclarable> {
 }
 
 /// Whether the question is a plain path naming the item as a whole segment, read the way
-/// the guard reads it, and its answers mean one thing each.
+/// the guard reads it, or where it is sent to the adapter the one question an adapter is
+/// asked, and its answers mean one thing each.
 fn asked(question: &Question) -> Result<(), Undeclarable> {
     let unsent = || Undeclarable::Unsent {
         path: question.path.clone(),
     };
+    if question.to == Addressee::Adapter {
+        if question.method != Method::Get || question.path != MAY {
+            return Err(unsent());
+        }
+        return if question.answers == Answers::from_adapter() {
+            Ok(())
+        } else {
+            Err(Undeclarable::Unanswerable)
+        };
+    }
     let rest = question.path.strip_prefix('/').ok_or_else(unsent)?;
     let mut named = false;
     for segment in rest.split('/') {
@@ -314,6 +413,9 @@ fn token(token: &Token) -> Result<(), Undeclarable> {
     shape(&token.shape)?;
     for parameter in &token.parameters {
         plain(parameter)?;
+    }
+    for header in &token.headers {
+        header_name(header)?;
     }
     match &token.presented {
         Presentation::AsIs => Ok(()),

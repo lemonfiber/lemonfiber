@@ -180,6 +180,8 @@ pub(super) fn declared() -> Declared {
     Declared {
         bytes: vec![BytePath {
             pattern: "^/films/(?P<item>[^/]+)/reel$".to_owned(),
+            query: None,
+            space: None,
             item: "^[a-z]{4}$".to_owned(),
             exempt: vec!["^/films/now/reel$".to_owned()],
             naming: vec![
@@ -217,6 +219,7 @@ pub(super) fn declared() -> Declared {
             },
             shape: "^[A-Z]{8}$".to_owned(),
             parameters: vec!["pass".to_owned()],
+            headers: Vec::new(),
         },
         locations: Locations {
             stream: "{base}/films/{item}/reel".to_owned(),
