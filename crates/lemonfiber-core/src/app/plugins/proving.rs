@@ -259,7 +259,9 @@ pub(super) async fn spoken(
             Err(why) => Err(why.clone()),
         };
         match (reached, asked) {
-            (Ok(adapter), Ok(about)) => return held_to(&adapter, installed, placed, &about).await,
+            (Ok(adapter), Ok(about)) => {
+                return held_to(ctx, &adapter, installed, placed, &about).await
+            }
             (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
             _ => tokio::time::sleep(POLL).await,
         }
@@ -271,6 +273,7 @@ pub(super) async fn spoken(
 /// pinned by and none at any other, since that digest is the one its recordings were
 /// taken from, and each live case of each contract answered as the contract says.
 async fn held_to(
+    ctx: &Ctx,
     adapter: &lemonfiber_contract::Contracted,
     installed: &Installed,
     placed: &crate::plugin::Placed,
@@ -326,37 +329,40 @@ async fn held_to(
             }
         }
     }
-    if faults.is_empty() {
-        faults.extend(claiming(adapter, installed, placed).await);
+    if !faults.is_empty() {
+        return Verdict::Failed { faults };
     }
-    if faults.is_empty() {
-        Verdict::Passed
-    } else {
-        Verdict::Failed { faults }
-    }
+    claiming(ctx, adapter, installed, placed).await
 }
 
-/// Why the part an adapter speaking `owner.claim` stands in front of is not lemonfiber's
-/// once claimed with the credential its plugin minted, where it is not; nothing where the
-/// adapter speaks no such contract.
+/// What claiming the part an adapter speaking `owner.claim` stands in front of came to:
+/// passed where it is lemonfiber's once claimed with the credential its plugin minted or
+/// the code the operator entered, or the adapter speaks no such contract; open where it
+/// takes a code nobody entered; failed otherwise.
 async fn claiming(
+    ctx: &Ctx,
     adapter: &lemonfiber_contract::Contracted,
     installed: &Installed,
     placed: &crate::plugin::Placed,
-) -> Option<String> {
+) -> Verdict {
+    use crate::seed::run::owning::{claimed_as_installed, unclaimed, Installing};
     let spoken = lemonfiber_contract::spoken(claim::CAPABILITY, claim::MAJOR);
     if !placed.speaks.contains(&spoken) {
-        return None;
+        return Verdict::Passed;
     }
     let part = claim::Adapter(adapter.clone());
-    match crate::seed::run::owning::claimed(&part).await {
-        Ok(owner) => crate::seed::run::owning::unclaimed(
+    let fault = match claimed_as_installed(ctx, installed, placed, &part).await {
+        Installing::Unentered(why) => return Verdict::Open { why },
+        Installing::Answered(Ok(owner)) => unclaimed(
             placed.called(),
             owner,
             &placed.upstream_settings(&installed.plugin),
         ),
-        Err(failure) => Some(format!("{spoken}: claim: {failure}")),
-    }
+        Installing::Answered(Err(failure)) => Some(format!("{spoken}: claim: {failure}")),
+    };
+    fault.map_or(Verdict::Passed, |fault| Verdict::Failed {
+        faults: vec![fault],
+    })
 }
 
 /// What asking one proof of one service came to.
@@ -473,7 +479,7 @@ pub(super) async fn running(
 pub(crate) fn held(proofs: &[Proving]) -> bool {
     proofs
         .iter()
-        .all(|one| matches!(one.came_to, Some(Verdict::Passed)))
+        .all(|one| matches!(one.came_to, Some(Verdict::Passed | Verdict::Open { .. })))
 }
 
 /// What the verdicts on this run were reached against.

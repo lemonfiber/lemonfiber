@@ -42,27 +42,52 @@ pub const REFUSALS: [Code; 9] = [
 /// How many titles a member's part-way list answers with.
 pub const A_FEW: u32 = 24;
 
-/// The media types a picture is passed on as: raster images, which carry nothing a
-/// browser runs.
-pub const RASTER: [&str; 5] = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-    "image/avif",
+/// The raster images a picture is passed on as, which carry nothing a browser runs.
+pub const RASTER: [Raster; 5] = [
+    Raster {
+        media_type: "image/jpeg",
+        opens: |bytes| bytes.starts_with(&[0xFF, 0xD8, 0xFF]),
+    },
+    Raster {
+        media_type: "image/png",
+        opens: |bytes| bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+    },
+    Raster {
+        media_type: "image/webp",
+        opens: |bytes| bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"),
+    },
+    Raster {
+        media_type: "image/gif",
+        opens: |bytes| bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+    },
+    Raster {
+        media_type: "image/avif",
+        opens: |bytes| {
+            bytes.get(4..8) == Some(b"ftyp") && matches!(bytes.get(8..12), Some(b"avif" | b"avis"))
+        },
+    },
 ];
+
+/// One raster image a picture may be passed on as.
+#[derive(Debug, Clone, Copy)]
+pub struct Raster {
+    /// Its media type.
+    pub media_type: &'static str,
+    /// Whether bytes open as one.
+    pub opens: fn(&[u8]) -> bool,
+}
 
 /// A picture as the core passes it on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pictured {
-    /// Its media type, one of [`RASTER`].
+    /// Its media type, one of [`RASTER`]'s.
     pub media_type: &'static str,
     /// Its bytes, at most [`PICTURE_MOST`] of them.
     pub bytes: Vec<u8>,
 }
 
-/// The picture as the core passes it on, where it is a raster image of at most
-/// [`PICTURE_MOST`] bytes.
+/// The picture as the core passes it on, where it is answered as a raster image, its
+/// bytes open as that image does, and it is at most [`PICTURE_MOST`] bytes.
 pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
     let declared = image
         .media_type
@@ -70,11 +95,11 @@ pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
         .next()
         .unwrap_or_default()
         .trim();
-    let media_type = RASTER
+    let raster = RASTER
         .into_iter()
-        .find(|raster| raster.eq_ignore_ascii_case(declared))?;
-    (image.bytes.len() <= PICTURE_MOST).then_some(Pictured {
-        media_type,
+        .find(|raster| raster.media_type.eq_ignore_ascii_case(declared))?;
+    (image.bytes.len() <= PICTURE_MOST && (raster.opens)(&image.bytes)).then_some(Pictured {
+        media_type: raster.media_type,
         bytes: image.bytes,
     })
 }

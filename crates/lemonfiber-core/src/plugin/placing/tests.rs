@@ -106,7 +106,7 @@ fn document(planned: &[Write]) -> Option<String> {
         | Lands::Key
         | Lands::Secrets(_)
         | Lands::Starting { .. }
-        | Lands::Upstream(_) => None,
+        | Lands::Upstream { .. } => None,
     })
 }
 

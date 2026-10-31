@@ -179,7 +179,7 @@ fn an_upstream_json_that_is_not_an_object_is_not_written_over() {
 fn keyed(random: &Chance) -> Minting<'_> {
     Minting {
         random,
-        shapes: BTreeMap::new(),
+        shapes: crate::plugin::seeding::Shapes::default(),
     }
 }
 
@@ -188,10 +188,13 @@ fn a_secret_declared_a_password_is_minted_as_one_and_handed_on_as_it_was_written
     let random = Chance::exactly(Some((0..=255).collect()));
     let minting = Minting {
         random: &random,
-        shapes: BTreeMap::from([(
-            "upstream-key".to_owned(),
-            lemonfiber_manifest::container::Minted::Password,
-        )]),
+        shapes: crate::plugin::seeding::Shapes::declaring(
+            "jellyfin",
+            &[(
+                "upstream-key",
+                lemonfiber_manifest::container::Minted::Password,
+            )],
+        ),
     };
     let mut secrets = BTreeMap::new();
     let mut made = Vec::new();

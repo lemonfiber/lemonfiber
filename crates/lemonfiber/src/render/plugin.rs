@@ -393,7 +393,7 @@ fn came_to(verdict: &Verdict) -> String {
     match verdict {
         Verdict::Passed => "the recording answers it".to_owned(),
         Verdict::Failed { faults } => format!("refuted: {}", faults.join("; ")),
-        Verdict::Unproven { why } => format!("unproven: {why}"),
+        Verdict::Unproven { why } | Verdict::Open { why } => format!("unproven: {why}"),
         Verdict::FailingAsDeclared { declared } => format!(
             "failing as declared, and not counted as passed: {}",
             as_declared(declared)

@@ -112,6 +112,13 @@ fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
                     }),
                     ..proof()
                 },
+                Proving {
+                    proof: "claimed".to_owned(),
+                    came_to: Some(Verdict::Open {
+                        why: "nobody holds Plex, and claiming it takes plex:claim-code".to_owned(),
+                    }),
+                    ..proof()
+                },
             ],
             against: Some(Evidence::Service),
             ..install(one, false)
@@ -134,6 +141,12 @@ fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
         said.contains(
             "did not hold, as its manifest declares: fixtures/unclaimed.json fails json at \
              /claimed, holding false: nobody has claimed it"
+        ),
+        "{said}"
+    );
+    assert!(
+        said.contains(
+            "held, and left open: nobody holds Plex, and claiming it takes plex:claim-code"
         ),
         "{said}"
     );

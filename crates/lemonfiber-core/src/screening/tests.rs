@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{a_device, an_item, lapsed, picture, viewed, Pictured, PICTURE_MOST};
+use super::{a_device, an_item, lapsed, picture, viewed, Pictured, PICTURE_MOST, RASTER};
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play;
 use crate::ports::service::{
@@ -635,6 +635,12 @@ fn a_picture(media_type: &str, bytes: &[u8]) -> Answer {
     }))
 }
 
+/// A backdrop's bytes, opening as a JPEG does.
+const BACKDROP: &[u8] = b"\xFF\xD8\xFF\xE0the-backdrop";
+
+/// A poster's bytes, opening as a PNG does.
+const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nthe-poster";
+
 /// A backdrop asked for as Ada, with the media server answering `answer`, and the code it
 /// was refused with.
 async fn pictured(tag: &str, answer: Answer) -> Result<Pictured, String> {
@@ -654,7 +660,7 @@ async fn pictured(tag: &str, answer: Answer) -> Result<Pictured, String> {
 async fn a_picture_is_asked_as_the_member_and_passed_on_as_a_raster() {
     let transport = server(vec![(
         media::serve("picture"),
-        a_picture("IMAGE/JPEG; q=1", b"the-backdrop"),
+        a_picture("IMAGE/JPEG; q=1", BACKDROP),
     )]);
     let ctx = ctx_over(Arc::clone(&transport), "picture");
     let shown = picture(
@@ -668,7 +674,7 @@ async fn a_picture_is_asked_as_the_member_and_passed_on_as_a_raster() {
         shown.ok(),
         Some(Pictured {
             media_type: "image/jpeg",
-            bytes: b"the-backdrop".to_vec(),
+            bytes: BACKDROP.to_vec(),
         })
     );
     assert!(asked(&transport).contains(&(
@@ -682,6 +688,11 @@ async fn a_picture_off_the_shelf_missing_or_not_a_raster_is_absent() {
     for (tag, answer) in [
         ("none", media::answered(&None::<Image>)),
         ("vector", a_picture("image/svg+xml", b"<svg/>")),
+        (
+            "vector-as-raster",
+            a_picture("image/png", b"<svg onload=\"alert(1)\"/>"),
+        ),
+        ("jpeg-as-png", a_picture("image/png", BACKDROP)),
         ("untyped", a_picture("", b"x")),
         (
             "oversized",
@@ -725,7 +736,7 @@ async fn a_picture_the_server_will_not_answer_is_unanswered_and_a_bad_id_is_neve
 async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
     let transport = server(vec![(
         media::serve("picture"),
-        a_picture("image/png", b"the-poster"),
+        a_picture("image/png", POSTER),
     )]);
     let ctx = ctx_over(Arc::clone(&transport), "picture-defaults");
     let shown = picture(&ctx, &Whom::Defaults, FILM, Picture::Poster).await;
@@ -733,7 +744,7 @@ async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
         shown.ok(),
         Some(Pictured {
             media_type: "image/png",
-            bytes: b"the-poster".to_vec(),
+            bytes: POSTER.to_vec(),
         })
     );
     assert_eq!(
@@ -743,4 +754,30 @@ async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
             serde_json::json!({ "member": null, "id": FILM, "which": "poster" })
         )]
     );
+}
+
+#[test]
+fn each_raster_opens_only_as_its_own_image_and_never_as_a_drawing() {
+    let opening: [(&str, &[u8]); 7] = [
+        ("image/jpeg", b"\xFF\xD8\xFF\xDB"),
+        ("image/png", b"\x89PNG\r\n\x1a\n"),
+        ("image/webp", b"RIFF\0\0\0\0WEBPVP8 "),
+        ("image/gif", b"GIF87a"),
+        ("image/gif", b"GIF89a"),
+        ("image/avif", b"\0\0\0\x1cftypavif"),
+        ("image/avif", b"\0\0\0\x1cftypavis"),
+    ];
+    for raster in RASTER {
+        for (media_type, bytes) in opening {
+            assert_eq!(
+                (raster.opens)(bytes),
+                raster.media_type == media_type,
+                "{} {bytes:?}",
+                raster.media_type
+            );
+        }
+        assert!(!(raster.opens)(
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\"/>"
+        ));
+    }
 }

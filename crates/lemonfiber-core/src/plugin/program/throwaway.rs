@@ -124,10 +124,7 @@ impl Throwaway {
             if let Some(held) = minted.get(secret) {
                 return Some(String::clone(held));
             }
-            let fresh = crate::plugin::seeding::minted_as(
-                random,
-                crate::plugin::seeding::shape_of(&shapes, secret),
-            )?;
+            let fresh = shapes.minted(random, secret)?;
             minted.insert(secret.to_owned(), fresh.clone());
             Some(fresh)
         };

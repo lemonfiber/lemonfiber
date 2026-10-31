@@ -324,9 +324,8 @@ fn both(first: Verdict, second: Verdict) -> Verdict {
                 why: format!("{first}; {second}"),
             }
         }
-        (unproven @ Verdict::Unproven { .. }, _) | (_, unproven @ Verdict::Unproven { .. }) => {
-            unproven
-        }
+        (unproven @ (Verdict::Unproven { .. } | Verdict::Open { .. }), _)
+        | (_, unproven @ (Verdict::Unproven { .. } | Verdict::Open { .. })) => unproven,
         (
             Verdict::FailingAsDeclared { declared: mut all },
             Verdict::FailingAsDeclared { declared },

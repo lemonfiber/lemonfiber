@@ -169,7 +169,13 @@ async fn a_guard_speaking_the_contract_is_handed_the_envelope_and_then_holds_it(
     let http = answering(&[Answer::reply(200, "null")]);
     let (ctx, project) = machine("envelope-handed", Arc::clone(&http), false);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert_eq!(
         state(&wirings, ENVELOPE),
@@ -206,7 +212,13 @@ async fn a_guard_speaking_the_contract_is_handed_the_envelope_and_then_holds_it(
     let held = envelope.clone();
     let again = answering(&[media::answered(&held)]);
     let (ctx, _) = machine("envelope-held", Arc::clone(&again), false);
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
     assert_eq!(
         state(&wirings, ENVELOPE),
         Some(&State::AlreadyWired),
@@ -222,11 +234,23 @@ async fn the_pass_service_is_told_the_declared_live_stream_paths_where_it_runs()
     passing(&project);
     let live = live_at(&project);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert_eq!(state(&wirings, LIVE), Some(&State::Wired), "{wirings:?}");
     assert_eq!(std::fs::read_to_string(&live).ok(), Some(declared_live()));
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
     assert_eq!(
         state(&wirings, LIVE),
         Some(&State::AlreadyWired),
@@ -239,7 +263,13 @@ async fn a_rehearsal_says_what_it_would_hand_and_hands_nothing() {
     let http = answering(&[Answer::reply(200, "null")]);
     let (ctx, project) = machine("envelope-rehearsed", Arc::clone(&http), true);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(state(&wirings, ENVELOPE), Some(State::WouldWire { yours: None, ours: Some(ours) })
@@ -263,7 +293,13 @@ async fn a_guard_refusing_the_envelope_fails_saying_so() {
     ]);
     let (ctx, project) = machine("envelope-refused", http, false);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(state(&wirings, ENVELOPE), Some(State::Failed { detail }) if detail.contains("did not take")),
@@ -280,7 +316,13 @@ async fn a_media_server_that_cannot_be_asked_what_it_serves_is_said_and_nothing_
     ]);
     let (ctx, project) = machine("envelope-undeclared", Arc::clone(&http), false);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(
@@ -304,12 +346,22 @@ async fn nothing_is_said_where_nothing_guards_or_nothing_serves() {
     );
     let unserved = unspoken(&project, None, false);
 
-    assert!(seed_envelope(&ctx, &unguarded, Some(&project))
-        .await
-        .is_empty());
-    assert!(seed_envelope(&ctx, &unserved, Some(&project))
-        .await
-        .is_empty());
+    assert!(seed_envelope(
+        &ctx,
+        &unguarded,
+        Some(&project),
+        &std::collections::BTreeSet::new()
+    )
+    .await
+    .is_empty());
+    assert!(seed_envelope(
+        &ctx,
+        &unserved,
+        Some(&project),
+        &std::collections::BTreeSet::new()
+    )
+    .await
+    .is_empty());
     assert!(http.requests().is_empty());
 }
 
@@ -319,9 +371,14 @@ async fn a_guard_speaking_no_contract_beside_no_pass_service_needs_no_declaratio
     let (ctx, project) = machine("envelope-unneeded", Arc::clone(&http), false);
     let fillers = unspoken(&project, media::moved(), true);
 
-    assert!(seed_envelope(&ctx, &fillers, Some(&project))
-        .await
-        .is_empty());
+    assert!(seed_envelope(
+        &ctx,
+        &fillers,
+        Some(&project),
+        &std::collections::BTreeSet::new()
+    )
+    .await
+    .is_empty());
     assert!(http.requests().is_empty());
 
     let unanswered =
@@ -329,7 +386,13 @@ async fn a_guard_speaking_no_contract_beside_no_pass_service_needs_no_declaratio
     let (ctx, project) = machine("envelope-unneeded-live", unanswered, false);
     passing(&project);
     let fillers = unspoken(&project, media::moved(), true);
-    let wirings = seed_envelope(&ctx, &fillers, Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers,
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
     assert!(
         matches!(
             state(&wirings, LIVE),
@@ -350,6 +413,7 @@ async fn a_guard_speaking_no_contract_leaves_the_pass_service_told_alone() {
         &ctx,
         &unspoken(&project, media::moved(), true),
         Some(&project),
+        &std::collections::BTreeSet::new(),
     )
     .await;
 
@@ -375,7 +439,13 @@ async fn a_rehearsal_says_what_is_held_beside_what_it_would_hand_and_writes_noth
     let (ctx, project) = machine("envelope-rehearsed-held", Arc::clone(&http), true);
     passing(&project);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(state(&wirings, ENVELOPE), Some(State::WouldWire { yours: Some(yours), ours: Some(ours) })
@@ -401,11 +471,18 @@ async fn a_media_server_out_of_reach_of_its_contract_is_skipped_saying_why() {
     let (ctx, project) = machine("envelope-unkeyed", Arc::clone(&http), false);
     let _ = std::fs::remove_file(crate::plugin::key_file(&project, media::ADAPTER));
 
-    let unkeyed = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let unkeyed = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
     let unspeaking = seed_envelope(
         &ctx,
         &unspoken(&project, media::moved().map(silenced), false),
         Some(&project),
+        &std::collections::BTreeSet::new(),
     )
     .await;
 
@@ -430,7 +507,13 @@ async fn a_declaration_failing_its_check_is_neither_handed_nor_written() {
     let (ctx, project) = machine("envelope-undeclarable", Arc::clone(&http), false);
     passing(&project);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(wirings.as_slice(), [one] if one.connection == ENVELOPE
@@ -448,7 +531,13 @@ async fn a_guard_that_cannot_say_what_it_holds_is_handed_nothing() {
     let http = answering(&[media::unavailable()]);
     let (ctx, project) = machine("envelope-unheld", Arc::clone(&http), false);
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(state(&wirings, ENVELOPE), Some(State::Skipped { reason })
@@ -470,7 +559,13 @@ async fn live_stream_paths_that_cannot_be_written_fail_saying_where() {
     )
     .is_ok());
 
-    let wirings = seed_envelope(&ctx, &fillers(&project), Some(&project)).await;
+    let wirings = seed_envelope(
+        &ctx,
+        &fillers(&project),
+        Some(&project),
+        &std::collections::BTreeSet::new(),
+    )
+    .await;
 
     assert!(
         matches!(state(&wirings, LIVE), Some(State::Failed { detail })
@@ -559,4 +654,32 @@ async fn nothing_is_handed_where_the_stack_cannot_be_read_and_the_register_is_re
         matches!(&handed, Some(State::Skipped { reason }) if reason.contains("media.serve")),
         "the media server's plugin is not read from a register that will not read: {handed:?}"
     );
+}
+
+#[tokio::test]
+async fn a_media_server_kept_off_the_household_has_the_guard_pass_nothing_to_it() {
+    let http = answering(&[Answer::reply(200, "null")]);
+    let (ctx, project) = machine("envelope-kept-off", Arc::clone(&http), false);
+    let fillers = fillers(&project);
+    let served = fillers
+        .filling(lemonfiber_contract::capabilities::media::serve::CAPABILITY)
+        .map(|(served, _)| served.id.clone())
+        .unwrap_or_default();
+
+    let wirings = seed_envelope(&ctx, &fillers, Some(&project), &[served].into()).await;
+
+    assert_eq!(
+        state(&wirings, ENVELOPE),
+        Some(&State::Wired),
+        "{wirings:?}"
+    );
+    let sent = envelopes(&http);
+    let declared: Option<crate::ports::service::Declared> = sent
+        .first()
+        .and_then(|envelope| serde_json::from_value(envelope.get("declared")?.clone()).ok());
+    let declared = declared.unwrap_or_else(lemonfiber_fixtures::declaring::enforceable);
+    assert!(declared.bytes.is_empty() && declared.live.is_empty());
+    assert!(declared.question.is_none());
+    assert_eq!(declared.refused, vec!["^/".to_owned()]);
+    assert!(declared.clone().checked().is_ok());
 }

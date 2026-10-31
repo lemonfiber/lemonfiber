@@ -202,6 +202,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // aggregators and pulls from them, so it is told where one is instead.
     wirings.extend(aggregators::seed_aggregators(ctx, &fillers).await);
 
+    wirings.extend(owning::owned(ctx, &fillers, &installed, &mut baseline).await);
+    let kept_off = owning::kept_off(&fillers, &installed, &baseline);
+
     // The media server and everything that signs in to it as its administrator.
     wirings.extend(
         seed_media_server(
@@ -209,14 +212,22 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
             &manifest.services,
             &fillers,
             project.as_deref(),
-            &mut baseline,
+            (&mut baseline, &kept_off),
         )
         .await,
     );
 
     // What the stream guard enforces and the live-stream paths the pass service confirms,
     // from the declaration the media server answers once its administrator is set up.
-    wirings.extend(Box::pin(enveloping::seed_envelope(ctx, &fillers, project.as_deref())).await);
+    wirings.extend(
+        Box::pin(enveloping::seed_envelope(
+            ctx,
+            &fillers,
+            project.as_deref(),
+            &kept_off,
+        ))
+        .await,
+    );
 
     // The curators the request service hands a request to, and the credentials it held
     // before the gate taken back.
@@ -234,15 +245,15 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     published::retire_keys(ctx, &fillers).await;
     wirings.extend(crossing::unhanded(ctx, &manifest, &installed, &fillers));
 
-    wirings.extend(owning::owned(ctx, &fillers, &mut baseline).await);
-
     // The subtitle finder, told which curators to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly
     // like releases that happen to have none.
     wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
     wirings.extend(quality::seed_quality(ctx, &fillers).await);
 
-    wirings.extend(fronting::seed_routes(ctx, &manifest.services, &installed, &fillers).await);
+    wirings.extend(
+        fronting::seed_routes(ctx, &manifest.services, &installed, &fillers, &baseline).await,
+    );
     wirings.extend(showing::seed_dashboard(ctx, &manifest.services, &installed, &fillers).await);
 
     // Persist what this pass recorded as the baseline a later run compares against —
@@ -395,10 +406,15 @@ async fn seed_media_server(
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
-    baseline: &mut crate::baseline::Baseline,
+    (baseline, kept_off): (
+        &mut crate::baseline::Baseline,
+        &std::collections::BTreeSet<String>,
+    ),
 ) -> Vec<crate::seed::Wiring> {
     // Boxed, because it is carried across every await of the passes below.
-    let server = crate::app::targets::MediaServer::of(fillers).map(Box::new);
+    let server = crate::app::targets::MediaServer::of(fillers)
+        .filter(|server| !owning::off(fillers, &server.filler, kept_off))
+        .map(Box::new);
     let server = server.as_deref();
 
     // The media server as the request service's identity source: one household account,
@@ -465,6 +481,14 @@ fn installed_beside(
     ctx: &Ctx,
     installed: &crate::plugin::Installed,
 ) -> Option<crate::wiring::Fillers> {
+    every_beside(ctx, installed).map(|(fillers, _)| fillers)
+}
+
+/// [`installed_beside`], with every plugin it takes as installed.
+fn every_beside(
+    ctx: &Ctx,
+    installed: &crate::plugin::Installed,
+) -> Option<(crate::wiring::Fillers, Vec<crate::plugin::Installed>)> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let register =
         crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
@@ -476,12 +500,13 @@ fn installed_beside(
         .cloned()
         .collect();
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    Some(crate::wiring::Fillers::of(
+    let fillers = crate::wiring::Fillers::of(
         &manifest,
         &every,
         &crate::app::targets::chosen_fillers(ctx),
         project.as_deref(),
-    ))
+    );
+    Some((fillers, every))
 }
 
 #[cfg(test)]

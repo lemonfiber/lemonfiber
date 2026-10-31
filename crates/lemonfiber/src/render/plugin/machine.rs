@@ -240,6 +240,7 @@ fn came_to(verdict: &Verdict) -> String {
         Verdict::Passed => "held".to_owned(),
         Verdict::Failed { faults } => format!("did not hold: {}", faults.join("; ")),
         Verdict::Unproven { why } => format!("established nothing: {why}"),
+        Verdict::Open { why } => format!("held, and left open: {why}"),
         Verdict::FailingAsDeclared { declared } => format!(
             "did not hold, as its manifest declares: {}",
             super::as_declared(declared)

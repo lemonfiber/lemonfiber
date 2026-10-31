@@ -15,7 +15,7 @@ use lemonfiber_core::ports::service::{Holds, Image, Item, ItemDetail, Medium};
 const FILM: &str = "0123456789abcdef0123456789abcdef";
 
 /// What the media server holds as the film's every picture.
-const A_PICTURE: &str = "a-picture";
+const A_PICTURE: &str = "GIF89a, a picture";
 
 /// The film, as the media server details it, holding both its pictures.
 fn the_film() -> ItemDetail {
@@ -83,7 +83,7 @@ fn over_a_picture(named: &str) -> (axum::Router, Arc<Token>, Arc<Fake>) {
         (
             media::serve("picture"),
             media::answered(&Some(Image {
-                media_type: "image/png".to_owned(),
+                media_type: "image/gif".to_owned(),
                 bytes: A_PICTURE.as_bytes().to_vec(),
             })),
         ),

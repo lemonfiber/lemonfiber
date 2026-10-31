@@ -79,6 +79,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     reaching::beyond(manifest, &mut found);
     minting::minted(manifest, &mut found);
     minting::stood_in(manifest, &mut found);
+    minting::lapsing(manifest, &mut found);
     granting::aimed(manifest, &mut found);
     naming::wired(manifest, &mut found);
     asking::asked(manifest, &mut found);

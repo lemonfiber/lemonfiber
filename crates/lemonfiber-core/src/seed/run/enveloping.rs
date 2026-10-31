@@ -2,6 +2,7 @@
 //! server's live-stream paths, both from the declaration the media server's filler
 //! answers over `media.serve`.
 
+use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
@@ -29,25 +30,29 @@ pub(super) const LIVE: &str = "The pass service's live-stream paths";
 
 /// Apply the stream guard the envelope it enforces where it speaks the contract, and write
 /// the pass service the media server's live-stream paths where it runs, each said as a
-/// connection of its own.
+/// connection of its own: one passing nothing where the media server is `kept_off` the
+/// household.
 pub(super) async fn seed_envelope(
     ctx: &Ctx,
     fillers: &Fillers,
     project: Option<&Path>,
+    kept_off: &BTreeSet<String>,
 ) -> Vec<Wiring> {
     let Some((guarding, _)) = fillers.filling(guard::CAPABILITY) else {
         return Vec::new();
     };
-    Box::pin(envelope_through(ctx, fillers, guarding, project)).await
+    Box::pin(envelope_through(ctx, fillers, guarding, project, kept_off)).await
 }
 
 /// Apply `guarding` the envelope it enforces where it speaks the contract, and write the
-/// pass service the media server's live-stream paths where it runs.
+/// pass service the media server's live-stream paths where it runs: none of either where
+/// the media server is `kept_off` the household, so the guard passes it nothing.
 async fn envelope_through(
     ctx: &Ctx,
     fillers: &Fillers,
     guarding: &Filler,
     project: Option<&Path>,
+    kept_off: &BTreeSet<String>,
 ) -> Vec<Wiring> {
     let Some((served, _)) = fillers.filling(serve::CAPABILITY) else {
         return Vec::new();
@@ -61,6 +66,7 @@ async fn envelope_through(
         return Vec::new();
     }
     let declared = match declared(ctx, served).await {
+        Ok(declared) if super::owning::off(fillers, served, kept_off) => closed(declared),
         Ok(declared) => declared,
         Err(state) => {
             let needing = if guard.is_some() { ENVELOPE } else { LIVE };
@@ -78,6 +84,21 @@ async fn envelope_through(
     wirings
 }
 
+/// `declared` passing nothing: no byte path, no live stream and no question, and every path
+/// refused, for a media server kept off the household.
+fn closed(declared: Declared) -> Declared {
+    Declared {
+        bytes: Vec::new(),
+        live: Vec::new(),
+        refused: vec![EVERY_PATH.to_owned()],
+        question: None,
+        ..declared
+    }
+}
+
+/// The pattern refusing every path.
+const EVERY_PATH: &str = "^/";
+
 /// How often a guard that does not answer yet is asked again.
 pub(super) const POLL: Duration = Duration::from_millis(500);
 
@@ -90,13 +111,15 @@ pub(crate) async fn guarding_installed(
     installed: &crate::plugin::Installed,
     until: SystemTime,
 ) -> Option<State> {
-    let fillers = super::installed_beside(ctx, installed)?;
+    let (fillers, every) = super::every_beside(ctx, installed)?;
+    let (baseline, _) = super::load_baseline(ctx).starting();
+    let kept_off = super::owning::kept_off(&fillers, &every, &baseline);
     let guarding = fillers.services().find(|one| {
         one.brought_by() == Some(installed.plugin.as_str())
             && one.provides.iter().any(|name| name == guard::CAPABILITY)
     })?;
     loop {
-        let wirings = Box::pin(envelope_through(ctx, &fillers, guarding, None)).await;
+        let wirings = Box::pin(envelope_through(ctx, &fillers, guarding, None, &kept_off)).await;
         let state = wirings
             .into_iter()
             .find(|wiring| wiring.connection == ENVELOPE)

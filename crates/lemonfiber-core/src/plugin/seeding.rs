@@ -7,7 +7,7 @@
 //! is written there is decided when it is written, from the secret store, which is why a
 //! plan carries the file as shipped.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 use std::path::Path;
 
@@ -197,17 +197,22 @@ pub(crate) fn mint(random: &dyn Random) -> Option<String> {
         .map(|bytes| crate::secret::render(&bytes))
 }
 
-/// A secret lemonfiber mints in `shape`: a key as [`mint`] makes one, or a password of
-/// [`PASSWORD_LENGTH`] characters holding one of each of [`CLASSES`]; nothing where it is
-/// not minted or `random` supplies no bytes.
+/// A secret the plugin `plugin` has lemonfiber mint in `shape`: a key as [`mint`] makes
+/// one, a password of [`PASSWORD_LENGTH`] characters holding one of each of [`CLASSES`], or
+/// a key at `<plugin>.invalid` as an email address; nothing where it is not minted or
+/// `random` supplies no bytes.
 #[must_use]
-pub(crate) fn minted_as(random: &dyn Random, shape: Minted) -> Option<String> {
+pub(crate) fn minted_as(random: &dyn Random, shape: Minted, plugin: &str) -> Option<String> {
     match shape {
         Minted::Not => None,
         Minted::Key => mint(random),
         Minted::Password => password(random),
+        Minted::Email => mint(random).map(|key| format!("{key}@{plugin}{INVALID}")),
     }
 }
+
+/// The domain no address can be reached at, which every minted email address is under.
+const INVALID: &str = ".invalid";
 
 /// How many characters a minted password holds.
 const PASSWORD_LENGTH: usize = 32;
@@ -245,31 +250,61 @@ fn password(random: &dyn Random) -> Option<String> {
     String::from_utf8(chars).ok()
 }
 
-/// The shape each secret the manifest at `root` declares is minted in, by its id: nothing
-/// where no manifest is there or it does not read.
+/// The plugin a manifest declares and the shape each secret it declares is minted in.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Shapes {
+    /// The plugin's id.
+    plugin: String,
+    /// Each secret's shape, by its id.
+    of: BTreeMap<String, Minted>,
+}
+
+impl Shapes {
+    /// The shape of `secret`, a key where it names none.
+    #[must_use]
+    pub(crate) fn of(&self, secret: &str) -> Minted {
+        self.of
+            .get(secret)
+            .copied()
+            .filter(|shape| shape.is())
+            .unwrap_or(Minted::Key)
+    }
+
+    /// A value of `secret` minted in its shape from `random`.
+    #[must_use]
+    pub(crate) fn minted(&self, random: &dyn Random, secret: &str) -> Option<String> {
+        minted_as(random, self.of(secret), &self.plugin)
+    }
+
+    /// The plugin `plugin` declaring each secret of `of` in its shape.
+    #[cfg(test)]
+    pub(crate) fn declaring(plugin: &str, of: &[(&str, Minted)]) -> Self {
+        Self {
+            plugin: plugin.to_owned(),
+            of: of
+                .iter()
+                .map(|(id, shape)| ((*id).to_owned(), *shape))
+                .collect(),
+        }
+    }
+}
+
+/// The plugin the manifest at `root` declares and the shape of each secret it declares:
+/// nothing where no manifest is there or it does not read.
 #[must_use]
-pub(crate) fn shapes(root: &Path) -> BTreeMap<String, Minted> {
+pub(crate) fn shapes(root: &Path) -> Shapes {
     std::fs::read_to_string(root.join(lemonfiber_bundle::MANIFEST))
         .ok()
         .and_then(|text| Manifest::from_toml(&text).ok())
-        .map(|manifest| {
-            manifest
+        .map(|manifest| Shapes {
+            plugin: manifest.plugin.id,
+            of: manifest
                 .secrets
                 .into_iter()
                 .map(|secret| (secret.id, secret.minted))
-                .collect()
+                .collect(),
         })
         .unwrap_or_default()
-}
-
-/// The shape `shapes` names for `secret`, a key where it names none.
-#[must_use]
-pub(crate) fn shape_of(shapes: &BTreeMap<String, Minted>, secret: &str) -> Minted {
-    shapes
-        .get(secret)
-        .copied()
-        .filter(|shape| shape.is())
-        .unwrap_or(Minted::Key)
 }
 
 /// `value` as a service keeping only a hash of its password reads it: PBKDF2-HMAC-SHA512
@@ -397,21 +432,26 @@ fn anchored(text: &str, before: &str, after: &str, written: &str) -> Option<Stri
 /// What is said of a starting file that is not text where a secret is to be written in it.
 const NOT_TEXT: &str = "it is not text, so where a secret stands in it cannot be read";
 
-/// The `upstream.json` an adapter reads: each of `fields` with its secret's value.
+/// The `upstream.json` an adapter reads: each of `fields` with its secret's value, a
+/// field whose secret is among the `lapsing` codes left out while nothing holds it.
 ///
 /// # Errors
 ///
-/// A field whose secret `value` holds nothing for, named by the field.
+/// A field whose secret `value` holds nothing for and that is no lapsing code, named by
+/// the field.
 pub(crate) fn upstream(
     fields: &BTreeMap<String, String>,
+    lapsing: &BTreeSet<String>,
     value: &dyn Fn(&str) -> Option<String>,
 ) -> Result<String, String> {
     let held: Result<serde_json::Map<String, serde_json::Value>, String> = fields
         .iter()
-        .map(|(field, secret)| {
-            value(secret)
-                .map(|held| (field.clone(), serde_json::Value::String(held)))
-                .ok_or_else(|| format!("{field} names the secret {secret}, which nothing holds"))
+        .filter_map(|(field, secret)| match value(secret) {
+            Some(held) => Some(Ok((field.clone(), serde_json::Value::String(held)))),
+            None if lapsing.contains(secret) => None,
+            None => Some(Err(format!(
+                "{field} names the secret {secret}, which nothing holds"
+            ))),
         })
         .collect();
     held.map(|held| serde_json::Value::Object(held).to_string())

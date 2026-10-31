@@ -299,3 +299,69 @@ async fn an_adapter_speaking_owner_claim_is_installed_only_where_its_part_is_cla
         }
     }
 }
+
+/// The claiming manifest, its adapter handing its part a claim code that lapses.
+fn coded() -> String {
+    claiming().replace(
+        r#"fronts      = "komga""#,
+        r#"fronts      = "komga"
+upstream    = { claim_code = { secret = "claim-code" } }"#,
+    ) + r#"
+[[secret]]
+id            = "claim-code"
+of            = "komga"
+why           = "The code the account shows"
+lapses_s      = 240
+recorded_with = "claim-0000"
+"#
+}
+
+#[tokio::test]
+async fn an_install_whose_part_stays_open_for_want_of_its_code_says_so_naming_the_code() {
+    let reply = |status: u16, body: &str| {
+        vec![lemonfiber_fixtures::http::Answer::reply(
+            status,
+            body.to_owned(),
+        )]
+    };
+    let http = Fake::by_path_in_turn(vec![
+        ("/api/v1/libraries", reply(200, "[]")),
+        (
+            "/lemonfiber/adapter/v1/about",
+            reply(
+                200,
+                &about(r#"["media.serve@1","owner.claim@1"]"#, UPSTREAM),
+            ),
+        ),
+        (UNKEYED, reply(401, "")),
+        (
+            "/lemonfiber/owner.claim/v1/owner",
+            [reply(401, ""), reply(200, "\"open\"")].concat(),
+        ),
+        ("/lemonfiber/owner.claim/v1/claim", reply(200, "\"ours\"")),
+    ]);
+    let name = "claimed-uncoded";
+    let mut ctx = proving(
+        name,
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        http.clone(),
+    );
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+    let installed = installing(&ctx, &source(name, &coded())).await;
+    let recorded = installed
+        .as_ref()
+        .ok()
+        .and_then(|installs| installs.install.as_ref())
+        .is_some_and(|install| install.recorded);
+    let said = verdicts(installed);
+    let last = said.last().cloned().flatten();
+    assert!(
+        matches!(&last, Some(Verdict::Open { why }) if why.contains("komga:claim-code")),
+        "{said:?}"
+    );
+    assert!(recorded, "{said:?}");
+    assert!(!http.asked_for("/lemonfiber/owner.claim/v1/claim"));
+}

@@ -438,6 +438,7 @@ fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
                 was: None,
                 needs: lemonfiber_manifest::container::choices::Needs::new(),
                 needed_to_start: false,
+                lapses_s: None,
             }],
             ..crate::plugin::Declaration::default()
         },
@@ -484,6 +485,7 @@ fn a_crossing_secret_whose_holder_nothing_here_names_is_withheld_and_an_own_one_
                     was: None,
                     needs: lemonfiber_manifest::container::choices::Needs::new(),
                     needed_to_start: false,
+                    lapses_s: None,
                 }],
                 ..crate::plugin::Declaration::default()
             },

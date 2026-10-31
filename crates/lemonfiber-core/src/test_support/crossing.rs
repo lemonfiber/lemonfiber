@@ -27,6 +27,7 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
         was: None,
         needs: lemonfiber_manifest::container::choices::Needs::new(),
         needed_to_start: false,
+        lapses_s: None,
     }];
     reader
 }

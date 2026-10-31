@@ -52,7 +52,9 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
             .await,
         );
     }
-    wirings.extend(super::owning::put_back(ctx, &fillers, &baseline, confirm).await);
+    wirings.extend(
+        super::owning::put_back(ctx, &fillers, register.installed(), &baseline, confirm).await,
+    );
     if confirm {
         save_baseline(ctx, &records);
     }

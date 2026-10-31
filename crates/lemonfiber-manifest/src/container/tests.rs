@@ -16,6 +16,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
         why: "Mint keys for the stack's services".to_owned(),
         minted: Minted::Not,
         carried_from: None,
+        lapses_s: None,
         recorded_with: None,
         was: None,
         needs: crate::container::choices::Needs::new(),
@@ -555,6 +556,7 @@ fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
         (Minted::Not, None),
         (Minted::Key, Some("minted = true")),
         (Minted::Password, Some("minted = \"password\"")),
+        (Minted::Email, Some("minted = \"email\"")),
     ] {
         let declared = Secret {
             serves: None,
@@ -563,6 +565,7 @@ fn a_minted_secret_is_written_back_as_the_manifest_said_it() {
             why: "Its administrator's password".to_owned(),
             minted,
             carried_from: None,
+            lapses_s: None,
             recorded_with: None,
             was: None,
             needs: crate::container::choices::Needs::new(),
@@ -582,6 +585,7 @@ fn a_minted_shape_reads_back_as_it_is_written_false_included() {
         (Minted::Not, serde_json::json!(false)),
         (Minted::Key, serde_json::json!(true)),
         (Minted::Password, serde_json::json!("password")),
+        (Minted::Email, serde_json::json!("email")),
     ] {
         assert_eq!(serde_json::to_value(minted).ok(), Some(written.clone()));
         assert_eq!(serde_json::from_value::<Minted>(written).ok(), Some(minted));
@@ -730,4 +734,17 @@ fn a_certificate_is_held_to_its_rules_under_the_field_it_is_declared_in() {
             "../key.pem is not a relative path beneath its configuration directory".to_owned()
         )]
     );
+}
+
+#[test]
+fn a_secret_a_recording_stands_in_for_is_needed_to_start_unless_it_is_a_code_that_lapses() {
+    let [declared] = &*DECLARED;
+    let secret = |recorded_with: Option<RecordedWith>, lapses_s: Option<u32>| Secret {
+        recorded_with,
+        lapses_s,
+        ..declared.clone()
+    };
+    assert!(!secret(None, None).needed_to_start());
+    assert!(secret(Some(RecordedWith::Minted), None).needed_to_start());
+    assert!(!secret(Some(RecordedWith::Minted), Some(240)).needed_to_start());
 }

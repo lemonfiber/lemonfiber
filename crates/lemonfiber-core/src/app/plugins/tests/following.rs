@@ -1,13 +1,12 @@
 //! Following a plugin's install recipes: what is asked for, what runs, what is kept,
 //! and what a recipe that does not hold ends the act with.
 
-use std::sync::Mutex;
-
 use super::*;
 use crate::error::Diagnose as _;
 use crate::error::{Came, Problem};
 use crate::plugin::running::{Ran, StepRan};
-use crate::ports::asking::{Asking, Nobody};
+use crate::ports::asking::Nobody;
+use crate::test_support::Typing;
 
 /// The proving manifest, with a captured secret declared and an install recipe that
 /// claims the library with a code the operator types, capturing the token it answers
@@ -52,51 +51,6 @@ to    = "komga"
 [requires]
 capabilities = ["recipe.run"]
 "#;
-
-/// Somebody at a keyboard answering every question with one answer, noting each
-/// question and whether it was asked as a secret.
-struct Typing {
-    /// What is typed for every question.
-    answer: &'static str,
-    /// Every question, and whether it was asked without showing what is typed.
-    asked: Mutex<Vec<(String, bool)>>,
-}
-
-impl Typing {
-    fn answering(answer: &'static str) -> Arc<Self> {
-        Arc::new(Self {
-            answer,
-            asked: Mutex::new(Vec::new()),
-        })
-    }
-
-    fn asked(&self) -> Vec<(String, bool)> {
-        self.asked
-            .lock()
-            .map(|asked| asked.clone())
-            .unwrap_or_default()
-    }
-}
-
-impl Asking for Typing {
-    fn present(&self) -> bool {
-        true
-    }
-
-    fn ask(&self, question: &str) -> String {
-        if let Ok(mut asked) = self.asked.lock() {
-            asked.push((question.to_owned(), false));
-        }
-        self.answer.to_owned()
-    }
-
-    fn secret(&self, question: &str) -> String {
-        if let Ok(mut asked) = self.asked.lock() {
-            asked.push((question.to_owned(), true));
-        }
-        self.answer.to_owned()
-    }
-}
 
 /// A transport answering the proof, and the claim with this status and body.
 fn claiming(status: u16, body: &'static str) -> Arc<dyn Http> {

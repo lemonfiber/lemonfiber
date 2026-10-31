@@ -392,6 +392,7 @@ fn keeping(plugin: &str, was: &str) -> crate::plugin::Installed {
         was: Some(format!("{was}_KEY")),
         needs: lemonfiber_manifest::container::choices::Needs::new(),
         needed_to_start: false,
+        lapses_s: None,
     }];
     installed
 }
