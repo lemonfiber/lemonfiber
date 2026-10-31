@@ -85,6 +85,13 @@ pub const DECLARED: &[Declared] = &[
     },
     Declared {
         under: 1,
+        what: "STACK-3",
+        moved: Moved::Gone,
+        because: "it refused a build carrying no stack, and every build carries the stack the \
+                  bundle declares, so nothing answers with it",
+    },
+    Declared {
+        under: 1,
         what: "SettingChange.setting",
         moved: Moved::Gone,
         because: ONE_ACT,
