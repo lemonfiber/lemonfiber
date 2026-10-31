@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use lemonfiber_contract::client::Witness;
-use lemonfiber_contract::conformance::{filed, Case, Expect};
-use lemonfiber_contract::{Contracted, Failure};
+use lemonfiber_contract::conformance::{filed, Case, Expect, UNKEYED};
+use lemonfiber_contract::Contracted;
 use lemonfiber_plugin::{Manifest, Service, Violation};
 
 use super::claimed::{sourced, Unreadable, Verdict};
@@ -166,6 +166,9 @@ impl Asked<'_> {
                     response.status
                 )],
             },
+            Expect::Conforms if UNKEYED.contains(&response.status) => Verdict::Failed {
+                faults: vec!["refused the plugin's own key".to_owned()],
+            },
             Expect::Conforms => {
                 let told = Arc::new(Told::default());
                 let client = Contracted::new(
@@ -175,25 +178,23 @@ impl Asked<'_> {
                     "recorded",
                 )
                 .witnessed_by(told.clone());
-                let read = operation.judged(&client).await;
-                verdict(&read, told.said())
+                let _ = operation.judged(&client).await;
+                verdict(told.said())
             }
         }
     }
 }
 
-/// A case's verdict from what reading its answer came to and what was told of it.
+/// A case's verdict from what was told of reading its answer.
 ///
-/// An answer the contract declares passes, a refusal it declares included. One outside
-/// the contract fails with what was outside it, and so does an adapter refusing the
-/// plugin's own key, which is no answer to the operation at all.
-fn verdict(read: &Result<(), Failure>, told: Vec<String>) -> Verdict {
-    match read {
-        Err(Failure::Unauthorised { .. }) => Verdict::Failed {
-            faults: vec!["refused the plugin's own key".to_owned()],
-        },
-        _ if !told.is_empty() => Verdict::Failed { faults: told },
-        _ => Verdict::Passed,
+/// An answer the contract declares passes, a refusal it declares included, as an upstream
+/// refusing the credential the adapter holds for it. One outside the contract fails with
+/// what was outside it.
+fn verdict(told: Vec<String>) -> Verdict {
+    if told.is_empty() {
+        Verdict::Passed
+    } else {
+        Verdict::Failed { faults: told }
     }
 }
 

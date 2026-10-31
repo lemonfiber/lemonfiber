@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::{Capability, Operation};
 
 /// The statuses an adapter refuses a call without its key with.
-const UNKEYED: &[u16] = &[401];
+pub const UNKEYED: &[u16] = &[401];
 
 /// The name of the case that refuses a call made without the key.
 pub const REFUSES_WITHOUT_THE_KEY: &str = "refuses-without-the-key";
