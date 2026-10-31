@@ -258,3 +258,27 @@ async fn a_case_recorded_as_a_run_is_unproven_naming_the_run() {
         verdicts(&read)
     );
 }
+
+/// An upstream refusing the credential the adapter holds for it is a refusal the contract
+/// declares, as an unclaimed media server refuses an adapter holding no token; only a
+/// bare refusal of the plugin's own key is no answer to the operation.
+#[tokio::test]
+async fn an_upstream_refusing_the_adapters_credential_passes_as_a_declared_refusal() {
+    let recorded: Vec<(&str, String)> = conforming()
+        .into_iter()
+        .map(|(case, text)| match case {
+            "watching-answers" => (
+                case,
+                recording(
+                    PINNED,
+                    WATCHING,
+                    r#"{"status": 502, "headers": {"content-type": "application/problem+json"}, "json": {"type": "unauthorised", "detail": "the finder rejected the credential"}}"#,
+                ),
+            ),
+            _ => (case, text),
+        })
+        .collect();
+    let read = judged(&source("upstream-unauthorised", MANIFEST, &recorded)).await;
+
+    assert!(read.conforms, "{read:?}");
+}
