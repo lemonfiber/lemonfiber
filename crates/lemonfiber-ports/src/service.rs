@@ -26,6 +26,7 @@ mod failure;
 mod fetching;
 mod filing;
 mod fronting;
+mod furnishing;
 mod gating;
 mod guarding;
 mod household;
@@ -75,6 +76,7 @@ pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use filing::{Filed, Filing};
 pub use fronting::{AppKeys, Dated, Fronted};
+pub use furnishing::{FiledAt, Furnished, Furnishing};
 pub use gating::{Admitted, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target};
 pub use guarding::{Guarded, Guarding, Presented};
 pub use household::{

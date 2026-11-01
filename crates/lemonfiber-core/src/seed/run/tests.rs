@@ -691,6 +691,7 @@ mod decline;
 mod enveloping;
 mod extraction;
 mod fronting;
+mod furnishing;
 mod gate;
 mod identity;
 mod intake;

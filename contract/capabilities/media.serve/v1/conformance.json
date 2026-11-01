@@ -293,6 +293,132 @@
     },
     {
       "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "tv"
+          }
+        ]
+      },
+      "case": "furnish-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "movies"
+          }
+        ]
+      },
+      "case": "furnish-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "music"
+          }
+        ]
+      },
+      "case": "furnish-answers-music",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "music",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "books"
+          }
+        ]
+      },
+      "case": "furnish-answers-books",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "books",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "comics"
+          }
+        ]
+      },
+      "case": "furnish-answers-comics",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "comics",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "audiobooks"
+          }
+        ]
+      },
+      "case": "furnish-answers-audiobooks",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "audiobooks",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
+        "filed": [
+          {
+            "folder": "/data/conformance",
+            "media_type": "podcasts"
+          }
+        ]
+      },
+      "case": "furnish-answers-podcasts",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "podcasts",
+      "operation": "furnish"
+    },
+    {
+      "asked": {
         "path": "{certificate}",
         "pin": "{certificate:sha256}"
       },

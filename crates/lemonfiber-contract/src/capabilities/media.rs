@@ -6,17 +6,18 @@
 //! session; whether
 //! the library holds something yet; how each series it holds is filed, and reading one
 //! item afresh; standing behind the front door, with the keys it holds for the stack's
-//! own services; what a guard in front of it enforces; and the certificate its internal
-//! TLS port presents.
+//! own services; what a guard in front of it enforces; the certificate its internal
+//! TLS port presents; and a library for each media type the stack files.
 
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::{Kind, MEDIA};
 use lemonfiber_ports::service::{
-    AppKeys, Applied, Dated, Declared, Declaring, Encrypting, Fronted, HowFar, Image, Item,
-    ItemDetail, ItemProgress, Library, Picture, Playback, Screening, SeriesHeld, Upkeep,
-    PICTURE_MOST, SERIES_MOST,
+    AppKeys, Applied, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
+    Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture, Playback,
+    Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
+use serde_json::Value;
 
-use super::{NOWHERE, PROXY};
+use super::{FOLDER, NOWHERE, PROXY};
 use crate::conformance::Placeholder;
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
@@ -150,6 +151,12 @@ crate::contract! {
             /// What a guard in front of it enforces, and where it serves each item.
             fn declared() -> Declared where asks = Asked {};
         }
+        impl Furnishing {
+            /// Add a library for each media type whose folder exists and no library reads, and say which a library reads.
+            fn furnish(slice filed: &[FiledAt] as FiledAt) -> Vec<Furnished> where asks = Asked {
+                filed: vec![FiledAt { media_type: MEDIA[0].to_owned(), folder: FOLDER.to_owned() }],
+            };
+        }
         impl Encrypting {
             /// Serve the internal TLS port with the PKCS#12 at this path inside the upstream's container, whose certificate has this SHA-256.
             fn serve_tls(str path: &str, str pin: &str) -> Applied where asks = Asked {
@@ -158,4 +165,31 @@ crate::contract! {
             };
         }
     }
+}
+
+/// The operation each media type is given a library by.
+const FURNISH: &str = "furnish";
+
+/// `media.serve`, the operation giving a library asked once for each media type, with
+/// the folder the conformance cases file into.
+#[must_use]
+pub fn capability() -> crate::Capability {
+    let mut served = serve::capability();
+    for operation in served
+        .operations
+        .iter_mut()
+        .filter(|operation| operation.name == FURNISH)
+    {
+        operation.filed = MEDIA
+            .iter()
+            .map(|media_type| {
+                let mut asked = operation.asks.clone();
+                if let Some(at) = asked.pointer_mut("/filed/0/media_type") {
+                    *at = Value::String((*media_type).to_owned());
+                }
+                (*media_type, asked)
+            })
+            .collect();
+    }
+    served
 }

@@ -28,6 +28,7 @@ mod crossing;
 mod proxies;
 // The household's routes through the proxy.
 mod fronting;
+mod furnishing;
 // The decline service's own media-server key, minted for it alone.
 pub(crate) mod decline;
 pub(crate) mod encrypting;
@@ -205,6 +206,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     wirings.extend(owning::owned(ctx, &fillers, &installed, &mut baseline).await);
     let kept_off = owning::kept_off(&fillers, &installed, &baseline);
+    wirings.extend(furnishing::seed_furnishing(ctx, &fillers, &baseline, &kept_off).await);
 
     // The media server and everything that signs in to it as its administrator.
     wirings.extend(

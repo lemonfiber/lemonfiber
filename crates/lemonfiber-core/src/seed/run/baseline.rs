@@ -147,8 +147,13 @@ pub(super) fn wanted_roots(media_types: &[String]) -> Vec<crate::ports::service:
     media_types
         .iter()
         .map(|media| crate::ports::service::RootFolder {
-            path: format!("{DATA_ROOT}/media/{media}"),
+            path: media_folder(media),
             media_type: media.clone(),
         })
         .collect()
+}
+
+/// The folder of the mounted data root a media type is filed in.
+pub(super) fn media_folder(media: &str) -> String {
+    format!("{DATA_ROOT}/media/{media}")
 }
