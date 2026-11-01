@@ -122,7 +122,7 @@ pub(crate) fn record_secret(
     operation: &str,
 ) -> Result<(), store::Failure> {
     let (secrets, journal) = held_where(ctx)?;
-    let name = held_as(key).unwrap_or_else(|| key.to_owned());
+    let name = stored_as(&secrets, key)?;
     let stamp = ctx.stamp();
     let keeping = [Keeping {
         name: &name,
@@ -166,9 +166,9 @@ fn unfiled_where(ctx: &Ctx, key: &str) -> Result<(), store::Failure> {
 /// Returns the [`store::Failure`] that stopped it being forgotten, or
 /// [`store::Failure::Nowhere`] where there is no store.
 pub(crate) fn forget_secret(ctx: &Ctx, key: &str, operation: &str) -> Result<(), store::Failure> {
-    unfiled_where(ctx, key)?;
     let (secrets, journal) = held_where(ctx)?;
-    let name = held_as(key).unwrap_or_else(|| key.to_owned());
+    let name = stored_as(&secrets, key)?;
+    unfiled_where(ctx, key)?;
     if crate::settings::Secrets::at(&secrets)?
         .value(&name)
         .is_none()
@@ -180,6 +180,18 @@ pub(crate) fn forget_secret(ctx: &Ctx, key: &str, operation: &str) -> Result<(),
     let change = secret_changed(&name, previous, None, operation, &ctx.stamp());
     crate::app::recover::journalled(&journal, &[change])?;
     crate::settings::dropped(&secrets, &[name])
+}
+
+/// The name the secret store at `secrets` holds the credential `key` as.
+///
+/// # Errors
+///
+/// Where `key` names no credential, so nothing reading it would look in the store.
+fn stored_as(secrets: &std::path::Path, key: &str) -> Result<String, store::Failure> {
+    held_as(key).ok_or_else(|| store::Failure::NotWritten {
+        path: secrets.to_path_buf(),
+        reason: format!("{key} names no credential the secret store holds"),
+    })
 }
 
 /// The secret store and the journal beside the environment file.

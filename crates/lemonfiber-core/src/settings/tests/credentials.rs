@@ -184,6 +184,29 @@ fn a_recorded_credential_is_held_in_the_store_and_journalled_keyed() {
     ));
 }
 
+/// A name that is no credential is neither recorded in the secret store nor forgotten from
+/// it, since nothing reading that name would look there.
+#[test]
+fn a_name_that_is_no_credential_is_not_recorded_as_a_secret() {
+    let ctx = machine("uncredentialed", &[("TZ", "UTC")]);
+
+    let recorded = crate::app::targets::record_secret(&ctx, "TZ", "UTC", crate::seed::OPERATION);
+    let forgotten = crate::app::targets::forget_secret(&ctx, "TZ", crate::seed::OPERATION);
+
+    for refused in [recorded, forgotten] {
+        assert!(matches!(
+            refused,
+            Err(store::Failure::NotWritten { reason, .. }) if reason.contains("TZ")
+        ));
+    }
+    assert_eq!(store_of(&ctx).value("TZ"), None);
+    assert_eq!(
+        line(&ctx, "TZ").as_deref(),
+        Some("UTC"),
+        "the setting stays"
+    );
+}
+
 #[test]
 fn only_a_credential_is_held_as_a_secret() {
     use crate::settings::legacy::held_as;
