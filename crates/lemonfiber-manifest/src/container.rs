@@ -13,6 +13,7 @@ pub mod earlier;
 mod paths;
 mod ports;
 mod record;
+mod user;
 mod values;
 mod words;
 
@@ -21,6 +22,7 @@ use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside};
 pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
 pub use record::Fields;
+pub use user::{IdVariables, UserMode, UserModeName, UserModeWritten};
 use values::{narrowed, unshown};
 pub use values::{
     CarriedFrom, Constant, Format, Minted, MintedAs, RecordedWith, Secret, SecretOf, Setting,
@@ -38,8 +40,19 @@ pub const DATA: &str = "/data";
 /// The host's render devices, which the `render` shape adds where the host has them.
 pub const RENDER_DEVICE: &str = "/dev/dri";
 
+/// The variable lemonfiber writes the operator's time zone into.
+pub const ZONE: &str = "TZ";
+
+/// The variable an image following the LinuxServer.io convention reads the operator's uid
+/// from.
+pub const PUID: &str = "PUID";
+
+/// The variable an image following the LinuxServer.io convention reads the operator's gid
+/// from.
+pub const PGID: &str = "PGID";
+
 /// The variables lemonfiber writes itself, which no manifest may name.
-pub const RESERVED: [&str; 3] = ["TZ", "PUID", "PGID"];
+pub const RESERVED: [&str; 3] = [ZONE, PUID, PGID];
 
 /// The core-published setting holding the operator's domain.
 pub const DOMAIN: &str = "domain";
@@ -164,32 +177,6 @@ pub struct Mount {
     pub ro: bool,
 }
 
-/// Who the container runs as.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "ServiceUserMode")]
-pub enum UserMode {
-    /// No user: the image decides.
-    Image,
-    /// `PUID` and `PGID` set to the operator's.
-    PuidEnv,
-    /// The operator's uid and gid as the container's user.
-    Uid,
-}
-
-impl UserMode {
-    /// Who a service runs as: the mode it declares, or else `uid` where it speaks a
-    /// contract or is confined, and the image's choice otherwise.
-    #[must_use]
-    pub const fn of(declared: Option<Self>, speaks: bool, posture: Posture) -> Self {
-        match declared {
-            Some(mode) => mode,
-            None if speaks || matches!(posture, Posture::Confined) => Self::Uid,
-            None => Self::Image,
-        }
-    }
-}
-
 /// How tightly the container is held.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema,
@@ -268,7 +255,7 @@ pub struct Container<'a> {
     /// The secrets its manifest declares.
     pub secrets: &'a [Secret],
     /// Who it runs as, where declared.
-    pub user_mode: Option<UserMode>,
+    pub user_mode: Option<&'a UserMode>,
     /// How tightly it is held.
     pub posture: Posture,
     /// Its memory ceiling.
@@ -294,7 +281,7 @@ impl Container<'_> {
 
     /// Who it runs as, the declared mode or the one its kind requires.
     #[must_use]
-    pub const fn user(&self) -> UserMode {
+    pub fn user(&self) -> UserMode {
         UserMode::of(self.user_mode, self.speaks, self.posture)
     }
 
@@ -483,6 +470,9 @@ impl Container<'_> {
     }
 
     fn held(&self, found: &mut Vec<(String, String)>) {
+        if let Some(variables) = self.user_mode.and_then(UserMode::ids_in) {
+            self.named_ids(variables, found);
+        }
         if (self.speaks || self.posture == Posture::Confined) && self.user() != UserMode::Uid {
             found.push((
                 self.at("user_mode"),

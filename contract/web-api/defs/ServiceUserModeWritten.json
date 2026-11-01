@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a manifest writes [`UserMode`]: a mode by name, or the variables an image reads\nthe operator's ids from.",
+  "anyOf": [
+    {
+      "description": "A mode by name.",
+      "$ref": "ServiceUserMode.json"
+    },
+    {
+      "description": "The variables its image reads the operator's uid and gid from.",
+      "$ref": "ServiceIdVariables.json"
+    }
+  ]
+}

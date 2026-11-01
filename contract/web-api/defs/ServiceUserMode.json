@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Who the container runs as.",
+  "description": "A user mode a manifest writes by name.",
   "oneOf": [
     {
       "description": "No user: the image decides.",

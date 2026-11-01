@@ -88,7 +88,7 @@
       "description": "Who it runs as, where declared.",
       "anyOf": [
         {
-          "$ref": "ServiceUserMode.json"
+          "$ref": "ServiceUserModeWritten.json"
         },
         {
           "type": "null"

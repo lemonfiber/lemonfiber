@@ -151,7 +151,7 @@ impl Placed {
                 rebuilt: service.rebuilt.clone(),
                 tmpfs: service.tmpfs.clone(),
                 env: service.env.clone(),
-                user_mode: service.user_mode,
+                user_mode: service.user_mode.clone(),
                 posture: service.posture,
                 mem_limit_mib: service.mem_limit_mib,
                 network: service.network.clone(),

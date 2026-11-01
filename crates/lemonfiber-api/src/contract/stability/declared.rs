@@ -161,6 +161,14 @@ pub const DECLARED: &[Declared] = &[
         moved: Moved::MayBeAbsent,
         because: FENCED,
     },
+    Declared {
+        under: 1,
+        what: "ServiceFields.user_mode",
+        moved: Moved::Retyped,
+        because: "a service whose image reads the operator's ids under names of its own is \
+                  described by the table of those two names; every other service's mode is \
+                  the same string, in the same closed set, as before",
+    },
 ];
 
 /// Why a network may name no capability: a fenced service runs inside its fence, whose

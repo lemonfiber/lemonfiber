@@ -532,7 +532,7 @@
         "user_mode": {
           "description": "Who the container runs as.",
           "anyOf": [
-            {"$ref": "#/$defs/ServiceUserMode"},
+            {"$ref": "#/$defs/ServiceUserModeWritten"},
             {"type": "null"}
           ],
           "default": null
@@ -564,6 +564,16 @@
         {"description": "An integer.", "type": "integer", "format": "int64"},
         {"description": "A boolean.", "type": "boolean"}
       ]
+    },
+    "ServiceIdVariables": {
+      "description": "The two variables an image reads the operator's uid and gid from.",
+      "type": "object",
+      "properties": {
+        "gid_env": {"description": "The variable it reads the operator's gid from.", "type": "string"},
+        "uid_env": {"description": "The variable it reads the operator's uid from.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["uid_env", "gid_env"]
     },
     "ServiceMount": {
       "description": "A further path mounted from the service's own mount tree.",
@@ -675,11 +685,18 @@
       "required": ["url_of"]
     },
     "ServiceUserMode": {
-      "description": "Who the container runs as.",
+      "description": "A user mode a manifest writes by name.",
       "oneOf": [
         {"description": "No user: the image decides.", "type": "string", "const": "image"},
         {"description": "`PUID` and `PGID` set to the operator's.", "type": "string", "const": "puid-env"},
         {"description": "The operator's uid and gid as the container's user.", "type": "string", "const": "uid"}
+      ]
+    },
+    "ServiceUserModeWritten": {
+      "description": "How a manifest writes [`UserMode`]: a mode by name, or the variables an image reads\nthe operator's ids from.",
+      "anyOf": [
+        {"description": "A mode by name.", "$ref": "#/$defs/ServiceUserMode"},
+        {"description": "The variables its image reads the operator's uid and gid from.", "$ref": "#/$defs/ServiceIdVariables"}
       ]
     },
     "ServiceValue": {

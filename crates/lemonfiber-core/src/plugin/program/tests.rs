@@ -203,6 +203,31 @@ fn a_render_shape_passes_no_device_the_host_is_not_asked_about() {
 }
 
 #[test]
+fn an_image_naming_its_own_id_variables_is_handed_the_operators_ids_in_them() {
+    let named = RUNNING.replace(
+        "user_mode     = \"uid\"",
+        "user_mode     = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }",
+    );
+    let asked = placed(&named).map(|placed| {
+        settled(
+            &placed,
+            &pinned(&placed),
+            &run_of(&["-v"], None),
+            &operator(),
+            None,
+        )
+    });
+    assert_eq!(asked.as_ref().and_then(|asked| asked.user.clone()), None);
+    assert!(
+        asked.as_ref().is_some_and(|asked| asked
+            .env
+            .ends_with(&["PLEX_UID=501".to_owned(), "PLEX_GID=20".to_owned()])
+            && !asked.env.iter().any(|one| one.starts_with("PUID"))),
+        "{asked:?}"
+    );
+}
+
+#[test]
 fn who_a_run_is_follows_the_services_user_mode() {
     let as_env = RUNNING.replace("user_mode     = \"uid\"", "user_mode     = \"puid-env\"");
     let env = placed(&as_env).map(|placed| {

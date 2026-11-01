@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
-use super::{is_plain, UrlOf, UserMode, Value};
+use super::{is_plain, IdVariables, UrlOf, UserMode, Value};
 use super::{
     Constant, Container, Minted, Mount, Network, Posture, Publish, RecordedWith, Secret, SecretOf,
     Setting, Shape,
 };
 
-const NONE: BTreeMap<String, Value> = BTreeMap::new();
+pub(super) const NONE: BTreeMap<String, Value> = BTreeMap::new();
 
 static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| {
     [Secret {
@@ -23,7 +23,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
     }]
 });
 
-fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
+pub(super) fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
     Container {
         id: "jellyfin",
         namespace: "jellyfin",
@@ -51,7 +51,7 @@ fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
     }
 }
 
-fn wrong(container: &Container<'_>) -> Vec<String> {
+pub(super) fn wrong(container: &Container<'_>) -> Vec<String> {
     container
         .broken()
         .into_iter()
@@ -264,7 +264,8 @@ fn an_adapter_or_a_confined_service_runs_as_the_operator() {
     let mut adapter = plain(&none);
     adapter.speaks = true;
     assert_eq!(adapter.user(), UserMode::Uid);
-    adapter.user_mode = Some(UserMode::Image);
+    let image = UserMode::Image;
+    adapter.user_mode = Some(&image);
     assert_eq!(wrong(&adapter).len(), 1);
     let mut confined = plain(&none);
     confined.posture = Posture::Confined;
@@ -445,14 +446,26 @@ fn each_field_is_read_as_written_and_defaulted_where_left_out() {
         network.ok().map(|read| read.via),
         Some(Some("network.egress-guard".to_owned()))
     );
-    let modes: Result<BTreeMap<String, UserMode>, _> =
-        toml::from_str("a = \"image\"\nb = \"puid-env\"\nc = \"uid\"");
+    let modes: Result<BTreeMap<String, UserMode>, _> = toml::from_str(
+        "a = \"image\"\nb = \"puid-env\"\nc = \"uid\"\nd = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }",
+    );
     assert_eq!(
         modes
             .ok()
             .map(|read| read.into_values().collect::<Vec<_>>()),
-        Some(vec![UserMode::Image, UserMode::PuidEnv, UserMode::Uid])
+        Some(vec![
+            UserMode::Image,
+            UserMode::IdsIn(IdVariables::puid()),
+            UserMode::Uid,
+            UserMode::IdsIn(IdVariables {
+                uid_env: "PLEX_UID".to_owned(),
+                gid_env: "PLEX_GID".to_owned(),
+            }),
+        ])
     );
+    let unknown: Result<UserMode, _> =
+        toml::from_str("uid_env = \"A\"\ngid_env = \"B\"\nhome = \"C\"");
+    assert!(unknown.is_err());
     let postures: Result<BTreeMap<String, Posture>, _> =
         toml::from_str("a = \"standard\"\nb = \"confined\"");
     assert_eq!(
