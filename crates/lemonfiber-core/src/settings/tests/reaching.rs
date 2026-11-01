@@ -268,11 +268,11 @@ async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
     ));
 }
 
-/// A secret an undo puts back is written into every file that reads it, so no reader keeps
-/// the value the undone change gave it.
-#[tokio::test]
-async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
-    let machine = machine("reheld", Reporting::absent());
+/// A machine holding `komga:token` as `put-back`, read by a secrets file still holding the
+/// value an undone change gave it and handed to an adapter in its `upstream.json`, with
+/// the undo that put it back carried out.
+fn put_back(name: &str) -> (Machine, crate::app::recover::Carried) {
+    let machine = machine(name, Reporting::absent());
     let mut holder = crate::test_support::a_placed("holder", &[], None);
     holder.fields.env.insert(
         "TOKEN".to_owned(),
@@ -280,9 +280,13 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
             secret: "token".to_owned(),
         }),
     );
+    let mut adapter = crate::test_support::a_placed("komga-adapter", &[], None);
+    adapter
+        .upstream
+        .insert("api_token".to_owned(), "token".to_owned());
     registered(
         &machine,
-        crate::test_support::an_installed("komga", vec![holder]),
+        crate::test_support::an_installed("komga", vec![holder, adapter]),
     );
     let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
     let keeping = [crate::settings::Keeping {
@@ -298,8 +302,7 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
         &|_| Ok(())
     )
     .is_ok());
-    let file = machine.env.with_file_name("env").join("holder.env");
-    assert!(store::write(&file, "TOKEN=undone\n").is_ok());
+    assert!(store::write(&holder_file(&machine), "TOKEN=undone\n").is_ok());
     let carried = crate::app::recover::Carried {
         done: vec![crate::journal::Undo {
             target: "komga:token".to_owned(),
@@ -312,12 +315,53 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
         }],
         ..crate::app::recover::Carried::default()
     };
+    (machine, carried)
+}
+
+/// The secrets file the holder reads beneath `machine`.
+fn holder_file(machine: &Machine) -> std::path::PathBuf {
+    machine.env.with_file_name("env").join("holder.env")
+}
+
+/// The adapter's `upstream.json` beneath `machine`.
+fn handed(machine: &Machine) -> std::path::PathBuf {
+    crate::plugin::configuration(&stack_of(machine), "komga-adapter")
+        .join(lemonfiber_contract::adapter::UPSTREAM_FILE)
+}
+
+/// A secret an undo puts back is written into every file that reads it, so no reader keeps
+/// the value the undone change gave it.
+#[tokio::test]
+async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
+    let (machine, carried) = put_back("reheld");
 
     let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
 
     assert!(reheld.is_ok(), "{reheld:?}");
-    assert!(std::fs::read_to_string(&file)
+    assert!(std::fs::read_to_string(holder_file(&machine))
         .is_ok_and(|text| text.contains("TOKEN=put-back") && !text.contains("undone")));
+    assert!(
+        std::fs::read_to_string(handed(&machine))
+            .is_ok_and(|text| text == r#"{"api_token":"put-back"}"#),
+        "and the adapter is handed it in its upstream.json"
+    );
+}
+
+/// A secret an undo puts back that cannot reach the adapter handed it is refused, saying
+/// the value changed all the same.
+#[tokio::test]
+async fn a_secret_put_back_that_cannot_reach_its_adapter_is_refused() {
+    let (machine, carried) = put_back("reheld-unhanded");
+    assert!(std::fs::create_dir_all(handed(&machine).join("in-the-way")).is_ok());
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(refused_as_unreached(reheld.err()));
+}
+
+/// Where `machine` writes its stack.
+fn stack_of(machine: &Machine) -> std::path::PathBuf {
+    crate::app::project::directory(&machine.ctx).unwrap_or_default()
 }
 
 /// A secret the operator enters by hand is written into the file that reads it at once,

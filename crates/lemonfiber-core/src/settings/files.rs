@@ -7,7 +7,7 @@ use crate::app::Ctx;
 use crate::config::env::quoted;
 use crate::config::store::{self, Failure};
 use crate::error::{Diagnose as _, Problem};
-use crate::plugin::{Holding, Installed, Variable};
+use crate::plugin::{Holding, Installed, Placed, Variable};
 
 use super::{Resolved, Secrets};
 
@@ -140,13 +140,59 @@ pub(crate) fn reread(
     Ok(rewritten)
 }
 
+/// Every adapter of `installed` whose `upstream.json` hands a secret the store holds as one
+/// of `names`, its `upstream.json` written again with what the store holds now: what a
+/// change to one of those values owes the adapter. Answers each service whose file was
+/// written.
+///
+/// # Errors
+///
+/// Where there is no stack to write in, or a file cannot be written.
+pub(crate) fn handed(
+    ctx: &Ctx,
+    installed: &[Installed],
+    names: &[&str],
+) -> Result<Vec<String>, Failure> {
+    let handing: Vec<(&Installed, &Placed)> = installed
+        .iter()
+        .flat_map(|plugin| {
+            plugin
+                .services
+                .iter()
+                .filter(|placed| {
+                    placed
+                        .upstream
+                        .values()
+                        .any(|id| names.contains(&super::named(&plugin.plugin, id).as_str()))
+                })
+                .map(move |placed| (plugin, placed))
+        })
+        .collect();
+    if handing.is_empty() {
+        return Ok(Vec::new());
+    }
+    let stack = crate::app::project::directory(ctx).ok_or(Failure::Nowhere)?;
+    handing
+        .into_iter()
+        .map(|(plugin, placed)| {
+            crate::app::credentials::upstream_anew(ctx, plugin, &stack, placed)
+                .map(|()| placed.service.clone())
+                .map_err(|reason| Failure::NotWritten {
+                    path: crate::plugin::configuration(&stack, &placed.service)
+                        .join(lemonfiber_contract::adapter::UPSTREAM_FILE),
+                    reason,
+                })
+        })
+        .collect()
+}
+
 /// What is said where a value that changed could not be written into a file that reads it.
 pub(crate) const UNREACHED: &str = "The value itself changed. A service reading it from this \
                                     file still holds the one it replaced until the file is \
                                     written again.";
 
 /// [`reread`] over the stack and everything installed as they stand, once the value
-/// `holding` names has changed.
+/// `holding` names has changed, and [`handed`] where the secret store holds it.
 ///
 /// # Errors
 ///
@@ -158,14 +204,17 @@ pub(crate) fn reread_now(ctx: &Ctx, holding: &Holding) -> Result<(), Box<Problem
         .map(|register| register.installed().to_vec())
         .unwrap_or_default();
     let resolved = Resolved::of(ctx, manifest.as_ref(), &installed);
-    reread(ctx, manifest.as_ref(), &installed, &resolved, holding)
-        .map(drop)
-        .map_err(|failure| {
-            Box::new(Problem {
-                meaning: UNREACHED.to_owned(),
-                ..failure.problem()
-            })
+    let read = reread(ctx, manifest.as_ref(), &installed, &resolved, holding);
+    let handed = match holding {
+        Holding::Store(name) => handed(ctx, &installed, &[name.as_str()]),
+        Holding::Crossing(_) | Holding::Withheld => Ok(Vec::new()),
+    };
+    read.and(handed).map(drop).map_err(|failure| {
+        Box::new(Problem {
+            meaning: UNREACHED.to_owned(),
+            ..failure.problem()
         })
+    })
 }
 
 /// Every variable of a stack service's secrets file, each with where its value is read

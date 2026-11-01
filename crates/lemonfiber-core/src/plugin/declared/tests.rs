@@ -41,8 +41,9 @@ title = "t"
 why   = "w"
 
 [[recipe.step]]
-id   = "in"
-call = { method = "POST", to = "komga", path = "/api/v1/login" }
+id      = "in"
+call    = { method = "POST", to = "komga", path = "/api/v1/login" }
+capture = [{ name = "api-key", from = "key", origin = "stack-service" }]
 
 [[recipe.step]]
 id   = "tell"
@@ -96,8 +97,22 @@ fn what_a_plugin_declared_is_kept_as_it_declared_it() {
                 needs: lemonfiber_manifest::container::choices::Needs::new(),
                 needed_to_start: false,
                 lapses_s: None,
+                captured: true,
             }],
         })
+    );
+}
+
+/// A value a recipe captures is awaited, as a code that lapses is: an `upstream.json`
+/// leaves it out while nothing holds it.
+#[test]
+fn a_captured_secret_is_awaited() {
+    let declared = Manifest::from_toml(DECLARING)
+        .ok()
+        .map(|manifest| Declaration::of(&manifest).awaited());
+    assert_eq!(
+        declared,
+        Some(std::collections::BTreeSet::from(["api-key".to_owned()]))
     );
 }
 

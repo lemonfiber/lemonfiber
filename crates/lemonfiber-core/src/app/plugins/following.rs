@@ -451,8 +451,8 @@ pub(super) fn keeping<'a>(
 }
 
 /// Keep every value the recipes captured in the secret store, journalled first, and write
-/// its services' secrets files.
-fn kept(
+/// its services' secrets files and every `upstream.json` that hands one.
+pub(super) fn kept(
     ctx: &Ctx,
     would: &Installed,
     manifest: &Manifest,
@@ -499,6 +499,10 @@ fn kept(
     .as_ref()
     .map_err(diagnosed)?;
     crate::settings::written(ctx, &[would])
+        .as_ref()
+        .map_err(diagnosed)?;
+    let names: Vec<&str> = keeping.iter().map(|(name, _)| name.as_str()).collect();
+    crate::settings::files::handed(ctx, std::slice::from_ref(would), &names)
         .as_ref()
         .map_err(diagnosed)?;
     Ok(())

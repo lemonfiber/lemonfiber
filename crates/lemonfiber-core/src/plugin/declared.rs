@@ -52,6 +52,9 @@ pub struct Secret {
     /// one: asked for only to claim the part, and held no longer than the claim or this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lapses_s: Option<u32>,
+    /// Whether a recipe of the plugin's captures the value.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub captured: bool,
 }
 
 /// What a plugin declared about itself, as its install read it.
@@ -97,12 +100,14 @@ pub struct Declaration {
 }
 
 impl Declaration {
-    /// The id of every secret that is a code a part is claimed with, which lapses.
+    /// The id of every secret an `upstream.json` leaves out while nothing holds it: a code
+    /// a part is claimed with, which lapses, and a value a recipe captures, which nothing
+    /// holds until the recipe has run.
     #[must_use]
-    pub fn lapsing(&self) -> BTreeSet<String> {
+    pub fn awaited(&self) -> BTreeSet<String> {
         self.secrets
             .iter()
-            .filter(|secret| secret.lapses_s.is_some())
+            .filter(|secret| secret.lapses_s.is_some() || secret.captured)
             .map(|secret| secret.id.clone())
             .collect()
     }
@@ -111,6 +116,14 @@ impl Declaration {
     #[must_use]
     pub fn of(manifest: &Manifest) -> Self {
         let own = |to: &str| manifest.services.iter().any(|service| service.id == to);
+        let captured = |id: &str| {
+            manifest
+                .recipes
+                .iter()
+                .flat_map(|recipe| &recipe.steps)
+                .flat_map(|step| &step.capture)
+                .any(|capture| capture.name == id)
+        };
         let mut reaches: Vec<String> = Vec::new();
         for to in manifest.recipes.iter().flat_map(|recipe| {
             recipe
@@ -147,6 +160,7 @@ impl Declaration {
                     needs: secret.needs.clone(),
                     needed_to_start: secret.needed_to_start(),
                     lapses_s: secret.lapses_s,
+                    captured: captured(&secret.id),
                 })
                 .collect(),
         }

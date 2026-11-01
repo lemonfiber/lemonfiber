@@ -27,6 +27,7 @@ fn keeping(plugin: &str, setting: &str, was: &str, secret: Option<&str>) -> supe
             needs: lemonfiber_manifest::container::choices::Needs::new(),
             needed_to_start: false,
             lapses_s: None,
+            captured: false,
         })
         .into_iter()
         .collect();

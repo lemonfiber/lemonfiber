@@ -35,15 +35,15 @@ pub(super) fn starting(
 }
 
 /// Write an adapter's `upstream.json`, each of `fields` with its secret's value as the
-/// secret store holds it for the plugin, a `lapsing` code it holds none of left out.
+/// secret store holds it for the plugin, an `awaited` secret it holds none of left out.
 pub(super) fn upstream(
     ctx: &Ctx,
     recording: (&str, &str, &Path),
     stack: &Path,
     path: &Path,
-    (fields, lapsing): (&BTreeMap<String, String>, &BTreeSet<String>),
+    (fields, awaited): (&BTreeMap<String, String>, &BTreeSet<String>),
 ) -> Result<(), Box<Problem>> {
-    let text = crate::plugin::seeding::upstream(fields, lapsing, &holding(ctx, recording.0))
+    let text = crate::plugin::seeding::upstream(fields, awaited, &holding(ctx, recording.0))
         .map_err(|why| Box::new(unwritable(path, &why)))?;
     made_confined(
         ctx,

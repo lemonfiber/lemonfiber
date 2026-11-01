@@ -71,9 +71,9 @@ pub enum Lands {
     Upstream {
         /// Each field, to the id of the plugin's secret it holds.
         fields: std::collections::BTreeMap<String, String>,
-        /// The id of each secret among them that is a code that lapses, left out while
-        /// nothing holds it.
-        lapsing: std::collections::BTreeSet<String>,
+        /// The id of each secret among them left out while nothing holds it: a code that
+        /// lapses, and a value a recipe captures.
+        awaited: std::collections::BTreeSet<String>,
     },
 }
 
@@ -199,7 +199,7 @@ pub fn writes(
                     .join(lemonfiber_contract::adapter::UPSTREAM_FILE),
                 lands: Lands::Upstream {
                     fields: placed.upstream.clone(),
-                    lapsing: installed.declared.lapsing(),
+                    awaited: installed.declared.awaited(),
                 },
             }),
     );

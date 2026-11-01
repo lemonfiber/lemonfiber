@@ -21,7 +21,7 @@ fn with_recipe(manifest: &str) -> String {
 }
 
 /// The secret and the recipe [`reciped`] adds.
-const RECIPE: &str = r#"
+pub(super) const RECIPE: &str = r#"
 [[secret]]
 id  = "token"
 of  = "komga"
@@ -468,6 +468,34 @@ fn only_a_declared_capture_is_kept() {
         .unwrap_or_default();
     assert_eq!(kept.len(), 1, "{kept:?}");
     assert_eq!(kept, ["komga:token=t"]);
+}
+
+/// A recipe's capture an adapter hands its upstream is written into the adapter's
+/// `upstream.json` as it is kept, so the adapter reads the value the recipe came by.
+#[test]
+fn a_captured_secret_an_adapter_hands_its_upstream_is_written_into_upstream_json() {
+    let ctx = proving(
+        "captured-upstream",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        claiming(200, "{}"),
+    );
+    let mut adapter = crate::test_support::a_placed("komga-adapter", &[], None);
+    adapter
+        .upstream
+        .insert("api_token".to_owned(), "token".to_owned());
+    let would = crate::test_support::an_installed("komga", vec![adapter]);
+    let captured = std::collections::BTreeMap::from([("token".to_owned(), "t0k3n".to_owned())]);
+    let manifest = lemonfiber_plugin::Manifest::from_toml(&reciped());
+    assert!(manifest.is_ok());
+
+    let kept = manifest.map(|manifest| {
+        super::super::following::kept(&ctx, &would, &manifest, &captured, "1").is_ok()
+    });
+
+    assert_eq!(kept.ok(), Some(true));
+    let handed = crate::plugin::configuration(&stack_of(&ctx), "komga-adapter")
+        .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    assert_eq!(read(&handed), r#"{"api_token":"t0k3n"}"#);
 }
 
 /// A capture a secret of another service's declares is that service's credential, which
