@@ -196,6 +196,20 @@ fn an_image_named_by_tag_alone_is_refused() {
 }
 
 #[test]
+fn a_media_type_outside_the_vocabulary_is_refused() {
+    for named in ["../escaped", "/etc", "%2e%2e", "shows"] {
+        let said = without(
+            r#"media_types = ["comics"]"#,
+            &format!("media_types = [\"comics\", {named:?}]"),
+        );
+        assert!(
+            names(&said, &["service komga.media_types", &format!("{named:?}")]),
+            "{named}: {said:?}"
+        );
+    }
+}
+
+#[test]
 fn a_digest_of_the_wrong_length_is_not_a_digest() {
     let said = without(
         "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",

@@ -547,3 +547,43 @@ async fn each_managed_wiring_carries_what_was_last_recorded_for_its_client() {
     assert_eq!(recorded, vec![("gluetun:8081".to_owned(), Some("tv"))]);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_media_type_the_vocabulary_names_is_filed_one_folder_beneath_the_media_directory() {
+    assert_eq!(
+        super::super::baseline::media_folder("tv").as_deref(),
+        Some("/data/media/tv")
+    );
+}
+
+#[test]
+fn a_media_type_outside_the_vocabulary_or_leaving_the_media_directory_has_no_folder() {
+    for refused in [
+        "..",
+        "../escaped",
+        "tv/../../escaped",
+        "/etc",
+        "%2e%2e",
+        "%2e%2e%2fescaped",
+        "tv/extra",
+        "",
+        "shows",
+    ] {
+        assert_eq!(
+            super::super::baseline::media_folder(refused),
+            None,
+            "{refused:?}"
+        );
+    }
+}
+
+#[test]
+fn a_curator_wants_no_root_folder_for_a_media_type_outside_the_vocabulary() {
+    let wanted = super::super::baseline::wanted_roots(&[
+        "tv".to_owned(),
+        "../escaped".to_owned(),
+        "/etc".to_owned(),
+    ]);
+
+    assert_eq!(wanted, vec![root("tv")]);
+}

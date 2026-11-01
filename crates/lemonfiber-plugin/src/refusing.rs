@@ -53,6 +53,8 @@ pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outsid
 
 use std::collections::BTreeSet;
 
+use lemonfiber_manifest::container::MEDIA;
+
 use crate::offering;
 use crate::schema::{Manifest, Plugin, Service};
 use crate::{claiming, Violation};
@@ -192,6 +194,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
             });
         }
         pinned(service, found);
+        filing(service, found);
         contained(manifest, service, found);
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
@@ -202,6 +205,25 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         replacing::replaced(service, found);
         minting::handed(manifest, service, found);
     }
+}
+
+/// Each media type the service files, held to the stack manifest's vocabulary: the
+/// core builds a folder beneath the data root's media directory from each, so a name
+/// outside it could reach a folder no service of the stack files into.
+fn filing(service: &Service, found: &mut Vec<Violation>) {
+    found.extend(
+        service
+            .media_types
+            .iter()
+            .filter(|media_type| !MEDIA.contains(&media_type.as_str()))
+            .map(|media_type| Violation {
+                location: format!("service {}.media_types", service.id),
+                message: format!(
+                    "names {media_type:?}, which is not one of {}",
+                    MEDIA.join(", ")
+                ),
+            }),
+    );
 }
 
 /// Whether the image reviewed and the image run are the same one.

@@ -238,7 +238,7 @@ pub fn all() -> Vec<crate::Capability> {
         subtitles::fetch::capability(),
         request::intake::capability(),
         identity::source::capability(),
-        media::serve::capability(),
+        media::capability(),
         proxy::front::capability(),
         quality::sync::capability(),
         dashboard::show::capability(),

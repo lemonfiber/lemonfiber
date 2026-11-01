@@ -1,0 +1,118 @@
+{
+  "post": {
+    "operationId": "furnish",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "FiledAt": {
+                "additionalProperties": false,
+                "description": "One media type the stack files, and the folder the media server reads it at.",
+                "properties": {
+                  "folder": {
+                    "description": "The folder holding it, as a path inside the media server's container.",
+                    "type": "string"
+                  },
+                  "media_type": {
+                    "description": "The media type, in the stack manifest's vocabulary.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "media_type",
+                  "folder"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "filed": {
+                "description": "The port's `filed`.",
+                "items": {
+                  "$ref": "#/$defs/FiledAt"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "filed"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Furnished": {
+                  "additionalProperties": false,
+                  "description": "Whether a library of the media server now reads one media type.",
+                  "properties": {
+                    "held": {
+                      "description": "Whether a library reads its folder.",
+                      "type": "boolean"
+                    },
+                    "media_type": {
+                      "description": "The media type, as it was asked.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "media_type",
+                    "held"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Furnished"
+              },
+              "title": "Array_of_Furnished",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576
+  }
+}

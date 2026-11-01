@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "media.serve/v1/openapi.json",
-      "sha256": "b5c09559a1b43c4d4dc9021638be3bd60ac0c9dcd499a57fd24093a929f3e545"
+      "sha256": "c90664af56ca97f825a356fe76cf92fb5307ce0f64311da341ca471131b618c7"
     },
     {
       "path": "media.serve/v1/operations/signed_in.json",
@@ -98,12 +98,16 @@
       "sha256": "4e24a324eeece959e7da7d73286d0baeafedd4e5ec504e6d123d9b34fff8ff90"
     },
     {
+      "path": "media.serve/v1/operations/furnish.json",
+      "sha256": "d5e5490aa10cff44b97745720574de9e9f45a4f435d23ecdf49faad4793b4740"
+    },
+    {
       "path": "media.serve/v1/operations/serve_tls.json",
       "sha256": "7ebdd28ddef0401f4b9f633d702f47d9aefadbf113bb225bd9c1310b6b608c8c"
     },
     {
       "path": "media.serve/v1/conformance.json",
-      "sha256": "7092df1c85a971af486f3cc37d03a70e28ba074cafaa5767c1752a2e78d8b438"
+      "sha256": "045c630326b1165a6f8fb6445db6eacc7a0a82f4189bca8e3eba8eeaa846ade1"
     },
     {
       "path": "media.serve/v1/holds.json",

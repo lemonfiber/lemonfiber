@@ -35,6 +35,9 @@ pub enum Kind {
     Movies,
 }
 
+/// Every media type a service files, in the stack manifest's vocabulary.
+pub use lemonfiber_manifest::container::MEDIA;
+
 /// The media type a service declares for music.
 pub const MUSIC: &str = "music";
 

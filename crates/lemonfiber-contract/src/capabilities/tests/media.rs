@@ -6,9 +6,10 @@ use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     Addressee, Answers, AppKeys, Applied, BytePath, Dated, Declared, Declaring, Encrypting,
-    EpisodeDetail, Failure, Fronted, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress,
-    Library, LivePath, Locations, Medium, Naming, Picture, Playback, Ports, Presentation, Question,
-    Screening, SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
+    EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
+    Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, Picture,
+    Playback, Ports, Presentation, Question, Screening, SeasonDetail, SeriesHeld, Statuses, Token,
+    Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -259,8 +260,31 @@ impl Encrypting for Upstream {
     }
 }
 
+#[async_trait]
+impl Furnishing for Upstream {
+    async fn furnish(&self, filed: &[FiledAt]) -> Result<Vec<Furnished>, Failure> {
+        self.tell(format!(
+            "furnish {}",
+            filed
+                .iter()
+                .map(|one| format!("{}={}", one.media_type, one.folder))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+        Ok(filed
+            .iter()
+            .map(|one| Furnished {
+                media_type: one.media_type.clone(),
+                held: one.media_type != "podcasts",
+            })
+            .collect())
+    }
+}
+
 /// Every operation of the capability, once, each answer written down.
-async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring + Encrypting>(
+async fn script<
+    M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring + Encrypting + Furnishing,
+>(
     server: &M,
 ) -> Vec<String> {
     let how_far = HowFar {
@@ -299,6 +323,21 @@ async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring 
         format!("{:?}", server.declared().await),
         format!("{:?}", server.serve_tls(READ_AT_START, PIN).await),
         format!("{:?}", server.serve_tls("/config/tls.p12", PIN).await),
+        format!(
+            "{:?}",
+            server
+                .furnish(&[
+                    FiledAt {
+                        media_type: "movies".to_owned(),
+                        folder: "/data/media/movies".to_owned(),
+                    },
+                    FiledAt {
+                        media_type: "podcasts".to_owned(),
+                        folder: "/data/media/podcasts".to_owned(),
+                    },
+                ])
+                .await
+        ),
     ]
 }
 
@@ -318,7 +357,8 @@ async fn a_media_server_answers_and_is_told_through_its_contract_as_it_is_in_pro
             "answers",
             "revoke",
             "serve_tls",
-            "serve_tls"
+            "serve_tls",
+            "furnish"
         ]
     );
 }

@@ -254,12 +254,17 @@ pub(crate) fn kept_off(
         .filter(|speaker| Coded::of(installed, speaker).is_some())
         .flat_map(|speaker| {
             let part = fillers.fronted_by(speaker).unwrap_or(speaker);
-            let ours = baseline.expected(&part.id, FIELD) == Some(OURS);
+            let held = ours(baseline, &part.id);
             [part.id.clone(), speaker.id.clone()]
                 .into_iter()
-                .filter(move |_| !ours)
+                .filter(move |_| !held)
         })
         .collect()
+}
+
+/// Whether the baseline records lemonfiber holding the part `id`.
+pub(crate) fn ours(baseline: &Baseline, id: &str) -> bool {
+    baseline.expected(id, FIELD) == Some(OURS)
 }
 
 /// Whether `filler`, among `fillers`, or the part it fronts is `kept_off` the household.

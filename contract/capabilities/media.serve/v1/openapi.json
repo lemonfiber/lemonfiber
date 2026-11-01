@@ -108,6 +108,9 @@
     "/lemonfiber/media.serve/v1/filed_as": {
       "$ref": "operations/filed_as.json"
     },
+    "/lemonfiber/media.serve/v1/furnish": {
+      "$ref": "operations/furnish.json"
+    },
     "/lemonfiber/media.serve/v1/has_item": {
       "$ref": "operations/has_item.json"
     },
