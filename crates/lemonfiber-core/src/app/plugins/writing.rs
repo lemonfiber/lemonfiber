@@ -115,13 +115,13 @@ pub(crate) fn carry_out(
                     *seeded,
                 )?;
             }
-            crate::plugin::Lands::Upstream { fields, lapsing } => {
+            crate::plugin::Lands::Upstream { fields, awaited } => {
                 seeding::upstream(
                     ctx,
                     (plugin, stamp, &journal),
                     &stack,
                     &write.path,
-                    (fields, lapsing),
+                    (fields, awaited),
                 )?;
             }
         }

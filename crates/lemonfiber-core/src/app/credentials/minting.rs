@@ -368,7 +368,7 @@ pub(crate) fn upstream_anew(
     };
     let at = crate::plugin::configuration(stack, &placed.service)
         .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
-    crate::plugin::seeding::upstream(&placed.upstream, &installed.declared.lapsing(), &held)
+    crate::plugin::seeding::upstream(&placed.upstream, &installed.declared.awaited(), &held)
         .and_then(|text| {
             ctx.seams
                 .confined

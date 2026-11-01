@@ -168,6 +168,7 @@ OPENVPN_USER = { secret = "openvpn-user" }
         needs: toml::from_str(r#""guard:vpn-type" = ["openvpn"]"#).unwrap_or_default(),
         needed_to_start: false,
         lapses_s: None,
+        captured: false,
     }];
     let installed = [installed];
     let named = |resolved: &crate::settings::Resolved| -> Vec<String> {

@@ -432,22 +432,22 @@ fn anchored(text: &str, before: &str, after: &str, written: &str) -> Option<Stri
 const NOT_TEXT: &str = "it is not text, so where a secret stands in it cannot be read";
 
 /// The `upstream.json` an adapter reads: each of `fields` with its secret's value, a
-/// field whose secret is among the `lapsing` codes left out while nothing holds it.
+/// field whose secret is among the `awaited` ones left out while nothing holds it.
 ///
 /// # Errors
 ///
-/// A field whose secret `value` holds nothing for and that is no lapsing code, named by
+/// A field whose secret `value` holds nothing for and that is not awaited, named by
 /// the field.
 pub(crate) fn upstream(
     fields: &BTreeMap<String, String>,
-    lapsing: &BTreeSet<String>,
+    awaited: &BTreeSet<String>,
     value: &dyn Fn(&str) -> Option<String>,
 ) -> Result<String, String> {
     let held: Result<serde_json::Map<String, serde_json::Value>, String> = fields
         .iter()
         .filter_map(|(field, secret)| match value(secret) {
             Some(held) => Some(Ok((field.clone(), serde_json::Value::String(held)))),
-            None if lapsing.contains(secret) => None,
+            None if awaited.contains(secret) => None,
             None => Some(Err(format!(
                 "{field} names the secret {secret}, which nothing holds"
             ))),

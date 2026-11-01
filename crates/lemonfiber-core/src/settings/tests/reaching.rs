@@ -280,9 +280,13 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
             secret: "token".to_owned(),
         }),
     );
+    let mut adapter = crate::test_support::a_placed("komga-adapter", &[], None);
+    adapter
+        .upstream
+        .insert("api_token".to_owned(), "token".to_owned());
     registered(
         &machine,
-        crate::test_support::an_installed("komga", vec![holder]),
+        crate::test_support::an_installed("komga", vec![holder, adapter]),
     );
     let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
     let keeping = [crate::settings::Keeping {
@@ -318,6 +322,17 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
     assert!(reheld.is_ok(), "{reheld:?}");
     assert!(std::fs::read_to_string(&file)
         .is_ok_and(|text| text.contains("TOKEN=put-back") && !text.contains("undone")));
+    let handed = crate::plugin::configuration(&stack_of(&machine), "komga-adapter")
+        .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    assert!(
+        std::fs::read_to_string(handed).is_ok_and(|text| text == r#"{"api_token":"put-back"}"#),
+        "and the adapter is handed it in its upstream.json"
+    );
+}
+
+/// Where `machine` writes its stack.
+fn stack_of(machine: &Machine) -> std::path::PathBuf {
+    crate::app::project::directory(&machine.ctx).unwrap_or_default()
 }
 
 /// A secret the operator enters by hand is written into the file that reads it at once,

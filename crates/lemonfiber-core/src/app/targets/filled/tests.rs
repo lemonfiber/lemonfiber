@@ -215,6 +215,7 @@ fn coded(ctx: &Ctx) {
                 needs: lemonfiber_manifest::container::choices::Needs::new(),
                 needed_to_start: false,
                 lapses_s: Some(240),
+                captured: false,
             });
         }
         let _ = rewritten.record(one);

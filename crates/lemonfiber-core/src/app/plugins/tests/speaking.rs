@@ -413,3 +413,60 @@ async fn an_install_whose_claim_is_taken_on_restart_starts_the_upstream_again_an
         runner.seen()
     );
 }
+
+/// An adapter handed a value an install recipe captures is installed, its `upstream.json`
+/// written without the value until the recipe captures it and with it once it has.
+#[tokio::test]
+async fn an_adapter_handed_a_captured_secret_is_given_it_once_the_recipe_captures_it() {
+    let manifest = speaking().replace(
+        "fronts      = \"komga\"\n",
+        "fronts      = \"komga\"\nupstream    = { api_token = { secret = \"token\" } }\n",
+    ) + super::following::RECIPE;
+    let ctx = answering_as(
+        "adapter-captured",
+        &[("komga-adapter", "127.0.0.1", 8080)],
+        &about(r#"["media.serve@1"]"#, UPSTREAM),
+        lemonfiber_fixtures::http::Answer::reply(401, ""),
+    )
+    .with_http(Fake::by_path(vec![
+        (
+            "/api/v1/libraries",
+            lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+        ),
+        (
+            "/lemonfiber/adapter/v1/about",
+            lemonfiber_fixtures::http::Answer::reply(200, about(r#"["media.serve@1"]"#, UPSTREAM)),
+        ),
+        (UNKEYED, lemonfiber_fixtures::http::Answer::reply(401, "")),
+        (
+            "/api/claim",
+            lemonfiber_fixtures::http::Answer::reply(200, r#"{"token":"t0k3n"}"#),
+        ),
+    ]));
+    let source = crate::plugin::Source::Path(source("adapter-captured", &manifest));
+    let reading = plugins(
+        &ctx,
+        &Asked::Install {
+            source: source.clone(),
+            consent: super::super::Consent::default(),
+        },
+    )
+    .await;
+    let consent = super::super::Consent {
+        agreement: reading.ok().and_then(|one| one.agreement),
+        approved: Vec::new(),
+        inputs: super::super::Inputs::of([("claim".to_owned(), "1234".to_owned())].into()),
+    };
+
+    let installed = plugins(&ctx, &Asked::Install { source, consent }).await;
+
+    assert_eq!(
+        installed
+            .ok()
+            .and_then(|one| one.install)
+            .map(|one| one.recorded),
+        Some(true)
+    );
+    let handed = stack_of(&ctx).join("config/komga-adapter/upstream.json");
+    assert_eq!(read(&handed), r#"{"api_token":"t0k3n"}"#);
+}
