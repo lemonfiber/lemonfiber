@@ -84,7 +84,7 @@ async fn a_media_server_is_handed_each_media_type_the_stack_files_with_its_folde
     let bodies = asked(&http);
     assert_eq!(bodies.len(), 1, "{bodies:?}");
     for media in ["tv", "movies"] {
-        let folder = super::super::baseline::media_folder(media);
+        let folder = super::super::baseline::media_folder(media).unwrap_or_default();
         assert!(
             bodies
                 .iter()
@@ -231,4 +231,55 @@ async fn a_media_server_whose_adapter_cannot_be_reached_is_skipped_and_asked_not
         "{wirings:?}"
     );
     assert!(asked(&http).is_empty(), "{:?}", http.requests());
+}
+
+#[tokio::test]
+async fn a_media_type_outside_the_vocabulary_is_never_handed_to_a_media_server() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-outside");
+    let http = answering(r#"[{"media_type":"tv","held":true}]"#);
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+    let refused = ["../escaped", "/etc", "%2e%2e%2fescaped", "shows"];
+    let mut media = vec!["tv"];
+    media.extend(refused);
+    let fillers = stack(&project, &[server(&[]), curating(&media)]);
+
+    let wirings = furnished(&ctx, &fillers, &Baseline::new(), &BTreeSet::new()).await;
+
+    for one in refused {
+        assert!(
+            wirings.iter().any(|wiring| matches!(&wiring.state,
+                crate::seed::State::Unmatched { reason } if reason.contains(&format!("{one:?}")))),
+            "{one} not reported in {wirings:?}"
+        );
+    }
+    assert!(
+        wirings
+            .iter()
+            .any(|wiring| wiring.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    let bodies = asked(&http);
+    assert_eq!(bodies.len(), 1, "{bodies:?}");
+    for leaked in ["escaped", "/etc", "%2e", "shows"] {
+        assert!(
+            bodies.iter().all(|body| !body.contains(leaked)),
+            "{leaked} reached the media server in {bodies:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_stack_filing_only_media_types_outside_the_vocabulary_asks_nothing() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-only-outside");
+    let http = answering("[]");
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+    let fillers = stack(&project, &[server(&[]), curating(&["../escaped"])]);
+
+    let wirings = furnished(&ctx, &fillers, &Baseline::new(), &BTreeSet::new()).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if matches!(one.state, crate::seed::State::Unmatched { .. })),
+        "{wirings:?}"
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

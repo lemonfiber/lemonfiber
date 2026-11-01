@@ -3,7 +3,9 @@
 //! Every service speaking `media.serve` is handed each media type the stack's curators
 //! file, with the folder of the data root it is filed in, and adds a library for each
 //! whose folder exists and that none reads. It never changes one the operator arranged.
-//! A part claimed over `owner.claim` is asked only once lemonfiber holds it.
+//! A part claimed over `owner.claim` is asked only once lemonfiber holds it. A media type
+//! outside the stack manifest's vocabulary forms no folder and is reported, never handed
+//! over.
 
 use std::collections::BTreeSet;
 
@@ -15,6 +17,7 @@ use super::curating::curators;
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::baseline::Baseline;
+use crate::ports::media::MEDIA;
 use crate::ports::service::{Failure, FiledAt, Furnished, Furnishing};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Filler, Fillers};
@@ -24,18 +27,36 @@ fn connection(name: &str) -> String {
     format!("{name} given a library for each media type the stack files")
 }
 
-/// Each media type the stack's curators file, with the folder it is filed in.
-fn filed(fillers: &Fillers) -> Vec<FiledAt> {
-    curators(fillers)
+/// Each media type the stack's curators file, with the folder it is filed in, and each
+/// curator's media type outside the stack manifest's vocabulary, which no folder is built
+/// for.
+fn filed(fillers: &Fillers) -> (Vec<FiledAt>, Vec<Wiring>) {
+    let mut folders = BTreeSet::new();
+    let mut refused = Vec::new();
+    for curator in curators(fillers) {
+        for media_type in curator.media_types() {
+            match media_folder(media_type) {
+                Some(folder) => {
+                    folders.insert((media_type.clone(), folder));
+                }
+                None => refused.push(Wiring::settled(
+                    format!("{} filing {media_type:?}", curator.name()),
+                    State::Unmatched {
+                        reason: format!(
+                            "{media_type:?} is not one of {}, so no media server is handed a \
+                             folder for it",
+                            MEDIA.join(", ")
+                        ),
+                    },
+                )),
+            }
+        }
+    }
+    let filed = folders
         .into_iter()
-        .flat_map(|curator| curator.media_types().iter().cloned())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .map(|media_type| FiledAt {
-            folder: media_folder(&media_type),
-            media_type,
-        })
-        .collect()
+        .map(|(media_type, folder)| FiledAt { media_type, folder })
+        .collect();
+    (filed, refused)
 }
 
 /// Give every media server here a library for each media type the stack files.
@@ -45,11 +66,10 @@ pub(super) async fn seed_furnishing(
     baseline: &Baseline,
     kept_off: &BTreeSet<String>,
 ) -> Vec<Wiring> {
-    let filed = filed(fillers);
+    let (filed, mut wirings) = filed(fillers);
     if filed.is_empty() {
-        return Vec::new();
+        return wirings;
     }
-    let mut wirings = Vec::new();
     for speaker in fillers
         .services()
         .filter(|one| one.contracted(serve::CAPABILITY, serve::MAJOR))

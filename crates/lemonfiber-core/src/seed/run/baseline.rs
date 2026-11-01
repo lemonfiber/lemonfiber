@@ -140,20 +140,35 @@ pub(super) async fn escalate_broken_roots(
 /// change out from under.
 pub(super) use crate::reconfigure::relocating::MOUNT as DATA_ROOT;
 
-/// The root folders a curator wants, one per media type it manages, each under the
-/// media directory of the mounted data root. Shared by the seed pass and the
-/// up-front contested-path check, so both reason about the same set.
+/// The root folders a curator wants, one per media type it manages that the stack
+/// manifest's vocabulary names, each under the media directory of the mounted data root.
+/// Shared by the seed pass and the up-front contested-path check, so both reason about the
+/// same set.
 pub(super) fn wanted_roots(media_types: &[String]) -> Vec<crate::ports::service::RootFolder> {
     media_types
         .iter()
-        .map(|media| crate::ports::service::RootFolder {
-            path: media_folder(media),
-            media_type: media.clone(),
+        .filter_map(|media| {
+            media_folder(media).map(|path| crate::ports::service::RootFolder {
+                path,
+                media_type: media.clone(),
+            })
         })
         .collect()
 }
 
-/// The folder of the mounted data root a media type is filed in.
-pub(super) fn media_folder(media: &str) -> String {
-    format!("{DATA_ROOT}/media/{media}")
+/// The folder of the mounted data root the media type `media` is filed in, one folder
+/// directly beneath its media directory; none where the stack manifest's vocabulary does
+/// not name `media`, so no declaration reaches a folder outside that directory.
+pub(super) fn media_folder(media: &str) -> Option<String> {
+    let media_root = format!("{DATA_ROOT}/media");
+    let folder = format!("{media_root}/{media}");
+    let beneath = std::path::Path::new(&folder)
+        .strip_prefix(&media_root)
+        .ok()
+        .map(|rest| rest.components().collect::<Vec<_>>());
+    let one_folder = matches!(
+        beneath.as_deref(),
+        Some([std::path::Component::Normal(name)]) if *name == std::ffi::OsStr::new(media)
+    );
+    (lemonfiber_manifest::container::MEDIA.contains(&media) && one_folder).then_some(folder)
 }
