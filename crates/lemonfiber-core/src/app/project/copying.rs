@@ -116,7 +116,7 @@ impl Copies {
                     to,
                 },
             };
-            crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
+            crate::app::recover::journalled(&paths.journal(), &[change])
                 .map_err(|failure| Box::new(failure.problem()))?;
             ctx.seams
                 .engine_volumes

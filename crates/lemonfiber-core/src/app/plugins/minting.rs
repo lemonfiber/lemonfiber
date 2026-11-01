@@ -75,10 +75,10 @@ pub(super) fn minted(
             at,
         })
         .collect();
-    crate::settings::filed(secrets, &keeping, &|absent| {
+    crate::settings::filed(secrets, &keeping, ctx.seams.random.as_ref(), &|absent| {
         let changes: Vec<Change> = absent
             .iter()
-            .map(|one| Change {
+            .map(|(one, current)| Change {
                 at: stamp.to_owned(),
                 operation: crate::plugin::owner(plugin),
                 target: one.name.to_owned(),
@@ -86,12 +86,12 @@ pub(super) fn minted(
                     name: one.name.to_owned(),
                     from: one.from.as_str().to_owned(),
                     previous: None,
-                    current: Some(crate::credential::fingerprint(one.value)),
+                    current: current.clone(),
                     filed: None,
                 },
             })
             .collect();
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        crate::app::recover::journalled(&paths.journal(), &changes)
     })
     .map_err(|failure| diagnosed(&failure))
 }

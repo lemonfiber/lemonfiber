@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::secrets::Keeping;
@@ -11,6 +12,7 @@ use crate::credential::fingerprint;
 
 mod changing;
 mod choosing;
+mod credentials;
 mod files;
 mod filing;
 mod granting;
@@ -33,7 +35,17 @@ fn keeping<'a>(name: &'a str, value: &'a str) -> Keeping<'a> {
 }
 
 fn kept_now(path: &Path, name: &str, value: &str) -> Result<(), Failure> {
-    kept(path, &[keeping(name, value)], &|_| Ok(()))
+    kept(path, &[keeping(name, value)], &Chance::cycling(), &|_| {
+        Ok(())
+    })
+}
+
+/// The fingerprint the store at `path` keys `value` with.
+fn keyed(path: &Path, value: &str) -> String {
+    Secrets::at(path)
+        .ok()
+        .and_then(|secrets| secrets.keyed(value))
+        .unwrap_or_default()
 }
 
 fn value(path: &Path, name: &str) -> Option<String> {
@@ -54,7 +66,7 @@ fn a_secret_kept_reads_back_and_its_name_is_namespaced() {
         Secrets::at(&path)
             .ok()
             .and_then(|one| one.fingerprint(&name)),
-        Some(fingerprint("t0k3n"))
+        Some(keyed(&path, "t0k3n"))
     );
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     let read: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
@@ -77,15 +89,32 @@ fn what_is_journalled_is_read_before_the_store_is_written() {
     let path = secrets_in(&scratch);
     assert!(kept_now(&path, "komga:token", "first").is_ok());
     let told = std::cell::RefCell::new(Vec::new());
-    let refused = kept(&path, &[keeping("komga:token", "second")], &|replaced| {
-        told.borrow_mut().extend(replaced.iter().cloned());
-        Err(Failure::Nowhere)
-    });
+    let refused = kept(
+        &path,
+        &[keeping("komga:token", "second")],
+        &Chance::cycling(),
+        &|replaced| {
+            told.borrow_mut().extend(
+                replaced
+                    .iter()
+                    .map(|one| (one.name.clone(), one.previous.clone(), one.current.clone())),
+            );
+            Err(Failure::Nowhere)
+        },
+    );
     assert!(refused.is_err());
+    let held = Secrets::at(&path).unwrap_or_default();
     assert_eq!(
         told.into_inner(),
-        [("komga:token".to_owned(), Some(fingerprint("first")))]
+        [(
+            "komga:token".to_owned(),
+            held.keyed("first"),
+            held.keyed("second")
+        )]
     );
+    assert!(held
+        .keyed("first")
+        .is_some_and(|keyed| keyed != fingerprint("first")));
     assert_eq!(value(&path, "komga:token").as_deref(), Some("first"));
 }
 
@@ -187,7 +216,7 @@ fn undoing_a_replacement_puts_the_one_earlier_value_back_while_it_matches() {
     let path = secrets_in(&scratch);
     assert!(kept_now(&path, "komga:token", "first").is_ok());
     assert!(kept_now(&path, "komga:token", "second").is_ok());
-    let (first, second) = (fingerprint("first"), fingerprint("second"));
+    let (first, second) = (keyed(&path, "first"), keyed(&path, "second"));
     let undone = super::secrets::reheld(&path, "komga:token", Some(&first), Some(&second), &|_| {
         Ok(())
     });
@@ -208,8 +237,8 @@ fn a_replacement_with_no_earlier_copy_is_left_and_said_to_be_entered_again() {
     let undone = super::secrets::reheld(
         &path,
         "komga:token",
-        Some(&fingerprint("first")),
-        Some(&fingerprint("second")),
+        Some(&keyed(&path, "first")),
+        Some(&keyed(&path, "second")),
         &|_| Ok(()),
     );
     assert!(matches!(undone, Ok(Undone::Unkept)));
@@ -218,8 +247,8 @@ fn a_replacement_with_no_earlier_copy_is_left_and_said_to_be_entered_again() {
     let other = super::secrets::reheld(
         &path,
         "komga:token",
-        Some(&fingerprint("first")),
-        Some(&fingerprint("third")),
+        Some(&keyed(&path, "first")),
+        Some(&keyed(&path, "third")),
         &|_| Ok(()),
     );
     assert!(
@@ -238,7 +267,7 @@ fn a_secret_set_since_is_left_as_it_is() {
         &path,
         "komga:token",
         None,
-        Some(&fingerprint("ours")),
+        Some(&keyed(&path, "ours")),
         &|_| Ok(()),
     );
     assert!(matches!(undone, Ok(Undone::TheirsNow)));
@@ -255,7 +284,7 @@ fn undoing_a_filed_secret_puts_its_line_back_and_forgets_it() {
         &env,
         "komga:token",
         None,
-        Some(&fingerprint("t0k3n")),
+        Some(&keyed(&config.join("secrets.json"), "t0k3n")),
         Some("PLUGIN_KOMGA_TOKEN_SECRET"),
     );
     assert!(matches!(undone, Ok(Undone::Done)));

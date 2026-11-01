@@ -60,8 +60,9 @@ fn env_at(name: &str, settings: &[(&str, &str)]) -> PathBuf {
     path
 }
 
-/// Leave the settings file as a later lemonfiber wrote it, which this one reads and
-/// refuses to write over: a record that will not be written, from here on.
+/// Leave the settings file and the secret store as a later lemonfiber wrote them, which
+/// this one reads and refuses to write over: a record that will not be written, from here
+/// on.
 fn sealed(path: &Path) {
     let text = std::fs::read_to_string(path).unwrap_or_default();
     let mut kept: String = text
@@ -74,9 +75,22 @@ fn sealed(path: &Path) {
         std::fs::write(path, format!("{kept}LEMONFIBER_CONFIG_VERSION=999.0.0\n")).is_ok(),
         "the scratch settings file is sealed"
     );
+    let secrets = path.with_file_name("secrets.json");
+    let mut store = std::fs::read_to_string(&secrets)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .unwrap_or_else(|| serde_json::json!({"schema": 1, "held": {}}));
+    if let Some(stamped) = store.as_object_mut() {
+        stamped.insert("written_by".to_owned(), serde_json::json!("999.0.0"));
+    }
+    assert!(
+        std::fs::write(&secrets, store.to_string()).is_ok(),
+        "the scratch secret store is sealed"
+    );
 }
 
-/// A transport that seals the settings file once it has carried a request for `at`:
+/// A transport that seals the settings file and the secret store once it has carried a
+/// request for `at`:
 /// a record that was written before that request and will not be written after it.
 struct Sealing {
     inner: Arc<Fake>,
@@ -95,11 +109,23 @@ impl Http for Sealing {
     }
 }
 
-/// What one setting reads as now, straight off the file rather than off a report.
+/// What one credential or setting reads as now, straight off the secret store or the file
+/// rather than off a report.
 fn recorded(path: &Path, key: &str) -> Option<String> {
-    store::read(path)
+    let held = std::fs::read_to_string(path.with_file_name("secrets.json"))
         .ok()
-        .and_then(|file| file.get(key).map(ToOwned::to_owned))
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|store| {
+            store
+                .pointer(&format!("/held/{key}/value"))
+                .and_then(serde_json::Value::as_str)
+                .map(ToOwned::to_owned)
+        });
+    held.or_else(|| {
+        store::read(path)
+            .ok()
+            .and_then(|file| file.get(key).map(ToOwned::to_owned))
+    })
 }
 
 /// A run over the stack this repository carries, with the given settings file, the

@@ -13,10 +13,13 @@ fn a_secret_is_written_only_into_its_services_own_file_and_never_into_the_projec
 
     let (ctx, project) = machine("secrets");
     let env = ctx.settings.env_file.clone().unwrap_or_default();
-    assert!(
-        crate::settings::legacy::entered(&env, crate::credential::VPN_PRIVATE_KEY, KEY, 0)
-            .is_some_and(|kept| kept.is_ok())
-    );
+    assert!(crate::settings::legacy::entered(
+        &env,
+        (crate::credential::VPN_PRIVATE_KEY, KEY),
+        &entering(),
+        &|_| Ok(())
+    )
+    .is_some_and(|kept| kept.is_ok()));
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
     let manifest = manifest.as_ref().ok();
 
@@ -69,10 +72,13 @@ fn the_operators_values_are_written_in_and_no_secret_reaches_the_project_or_its_
         assert!(crate::config::store::set(&env, key, value).is_ok());
     }
     assert!(crate::config::store::set(&env, "WIREGUARD_PRIVATE_KEY", KEY).is_ok());
-    assert!(
-        crate::settings::legacy::entered(&env, crate::credential::VPN_PRIVATE_KEY, KEY, 0)
-            .is_some_and(|kept| kept.is_ok())
-    );
+    assert!(crate::settings::legacy::entered(
+        &env,
+        (crate::credential::VPN_PRIVATE_KEY, KEY),
+        &entering(),
+        &|_| Ok(())
+    )
+    .is_some_and(|kept| kept.is_ok()));
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
     let manifest = manifest.as_ref().ok();
     let text = manifest
@@ -131,8 +137,13 @@ fn a_replaced_key_is_written_into_every_file_that_reads_it() {
     let (ctx, _) = machine("secrets-replaced");
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let entered = |key: &str| {
-        crate::settings::legacy::entered(&env, crate::credential::VPN_PRIVATE_KEY, key, 0)
-            .is_some_and(|kept| kept.is_ok())
+        crate::settings::legacy::entered(
+            &env,
+            (crate::credential::VPN_PRIVATE_KEY, key),
+            &entering(),
+            &|_| Ok(()),
+        )
+        .is_some_and(|kept| kept.is_ok())
     };
     assert!(entered(KEY));
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
@@ -218,8 +229,15 @@ fn file_of(
 #[test]
 fn a_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
     let (ctx, _) = machine("secrets-crossing");
-    let recorded =
-        |key: &str| crate::app::targets::record_secret(&ctx, "SONARR_API_KEY", key).is_ok();
+    let recorded = |key: &str| {
+        crate::app::targets::record_secret(
+            &ctx,
+            "SONARR_API_KEY",
+            key,
+            crate::app::credentials::OPERATION,
+        )
+        .is_ok()
+    };
     assert!(recorded("sonarrs-key"));
     let manifest = crate::test_support::crossing_stack();
     let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
@@ -360,10 +378,13 @@ fn a_kept_guard_reads_each_secret_where_its_plugin_reads_it_after_the_move() {
 fn the_guards_key_entered_under_its_earlier_name_is_read_by_the_kept_guard() {
     let (ctx, _) = machine("secrets-kept-legacy");
     let env = ctx.settings.env_file.clone().unwrap_or_default();
-    assert!(
-        crate::settings::legacy::entered(&env, crate::credential::VPN_PRIVATE_KEY, KEY, 0)
-            .is_some_and(|kept| kept.is_ok())
-    );
+    assert!(crate::settings::legacy::entered(
+        &env,
+        (crate::credential::VPN_PRIVATE_KEY, KEY),
+        &entering(),
+        &|_| Ok(())
+    )
+    .is_some_and(|kept| kept.is_ok()));
     assert_eq!(
         crate::settings::legacy::keyed(crate::credential::VPN_PRIVATE_KEY).map(|row| row.name),
         Some("gluetun:wireguard-key")
@@ -393,3 +414,16 @@ fn the_guards_key_entered_under_its_earlier_name_is_read_by_the_kept_guard() {
     assert!(file_of(&ctx, manifest.as_ref(), "gluetun")
         .contains(&format!("WIREGUARD_PRIVATE_KEY={KEY}")));
 }
+
+/// How a test enters a secret: under the settings operation, at no particular time.
+fn entering() -> crate::settings::legacy::Entering<'static> {
+    crate::settings::legacy::Entering {
+        operation: crate::settings::OPERATION,
+        stamp: "0",
+        at: 0,
+        random: &RANDOM,
+    }
+}
+
+/// The randomness a test's secret store key is drawn from.
+static RANDOM: lemonfiber_fixtures::ports::Chance = lemonfiber_fixtures::ports::Chance::cycling();

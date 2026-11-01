@@ -309,23 +309,23 @@ fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Res
         from: crate::settings::Source::Minted,
         at: ctx.seconds(),
     }];
-    crate::settings::kept(&secrets, &keeping, &|replaced| {
+    crate::settings::kept(&secrets, &keeping, ctx.seams.random.as_ref(), &|replaced| {
         let changes: Vec<Change> = replaced
             .iter()
-            .map(|(name, previous)| Change {
+            .map(|one| Change {
                 at: stamp.clone(),
                 operation: crate::plugin::owner(&installed.plugin),
-                target: name.clone(),
+                target: one.name.clone(),
                 kind: Kind::Secret {
-                    name: name.clone(),
+                    name: one.name.clone(),
                     from: crate::settings::Source::Minted.as_str().to_owned(),
-                    previous: previous.clone(),
-                    current: Some(fingerprint(value)),
+                    previous: one.previous.clone(),
+                    current: one.current.clone(),
                     filed: None,
                 },
             })
             .collect();
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        crate::app::recover::journalled(&paths.journal(), &changes)
     })
     .map_err(|failure| failure.to_string())
 }

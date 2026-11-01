@@ -63,7 +63,7 @@ fn a_value_set_over_the_operators_answer_carries_both_and_says_whose_the_first_w
     ];
 
     assert_eq!(
-        of_journalled("TZ", "UTC", &journal, Some(&komga())),
+        of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None),
         Some(overridden(replaced(
             Some("Europe/Amsterdam"),
             false,
@@ -78,7 +78,7 @@ fn a_value_set_where_nothing_was_replaced_the_default() {
     let journal = [installed("komga"), set("plugin komga", "TZ", None, "UTC")];
 
     assert_eq!(
-        of_journalled("TZ", "UTC", &journal, Some(&komga())),
+        of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None),
         Some(overridden(replaced(None, false, Origin::Bundled)))
     );
 }
@@ -94,7 +94,7 @@ fn a_value_set_over_another_plugins_names_that_plugin() {
     ];
 
     assert_eq!(
-        of_journalled("TZ", "UTC", &journal, Some(&komga())),
+        of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None),
         Some(overridden(replaced(
             Some("Asia/Tokyo"),
             false,
@@ -116,7 +116,7 @@ fn a_plugin_that_wrote_it_twice_replaced_what_was_there_before_the_first() {
     ];
 
     assert_eq!(
-        of_journalled("TZ", "Etc/GMT", &journal, Some(&komga())),
+        of_journalled("TZ", "Etc/GMT", &journal, Some(&komga()), &|_| None),
         Some(overridden(replaced(
             Some("Europe/Amsterdam"),
             false,
@@ -133,7 +133,7 @@ fn a_replaced_value_nothing_recorded_is_unknown_and_never_bundled() {
         set("plugin komga", "TZ", Some("Asia/Tokyo"), "UTC"),
     ];
 
-    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
+    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None);
 
     assert!(
         matches!(&read, Some(Origin::Overridden { replaced, .. }) if matches!(*replaced.from, Origin::Unknown { .. })),
@@ -151,7 +151,7 @@ fn a_replaced_value_edited_after_its_last_recorded_write_is_unknown() {
         set("plugin komga", "TZ", Some("Europe/Paris"), "UTC"),
     ];
 
-    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
+    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None);
 
     assert!(
         matches!(&read, Some(Origin::Overridden { replaced, .. }) if replaced.from.why().is_some_and(|why| why.contains("changed after"))),
@@ -169,7 +169,7 @@ fn a_replaced_value_an_undo_put_back_is_unknown() {
         set("plugin komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
     ];
 
-    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
+    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None);
 
     assert!(
         matches!(&read, Some(Origin::Overridden { replaced, .. }) if replaced.from.why().is_some_and(|why| why.contains("undo"))),
@@ -192,8 +192,59 @@ fn a_replaced_credential_is_withheld_and_never_shown() {
     ];
 
     assert_eq!(
-        of_journalled("INDEXER_APIKEY", "the-new-one", &journal, Some(&komga())),
+        of_journalled(
+            "INDEXER_APIKEY",
+            "the-new-one",
+            &journal,
+            Some(&komga()),
+            &|_| None
+        ),
         Some(overridden(replaced(None, true, Origin::Operator)))
+    );
+}
+
+/// A credential's change journalled as a change to its secret, by fingerprints, is the
+/// plugin's while the store keys what it holds now to what that change left.
+#[test]
+fn a_credential_journalled_by_fingerprint_is_traced_to_its_plugin() {
+    let secret = |operation: &str, previous: Option<&str>, current: &str| Change {
+        at: "1".to_owned(),
+        operation: operation.to_owned(),
+        target: ".env".to_owned(),
+        kind: Kind::Secret {
+            name: "INDEXER_APIKEY".to_owned(),
+            from: "operator".to_owned(),
+            previous: previous.map(str::to_owned),
+            current: Some(current.to_owned()),
+            filed: None,
+        },
+    };
+    let journal = [
+        secret("setup", None, "#old"),
+        installed("komga"),
+        secret("plugin komga", Some("#old"), "#new"),
+    ];
+    let keyed = |value: &str| (value == "the-new-one").then(|| "#new".to_owned());
+
+    assert_eq!(
+        of_journalled(
+            "INDEXER_APIKEY",
+            "the-new-one",
+            &journal,
+            Some(&komga()),
+            &keyed
+        ),
+        Some(overridden(replaced(None, true, Origin::Operator)))
+    );
+    assert_eq!(
+        of_journalled(
+            "INDEXER_APIKEY",
+            "another",
+            &journal,
+            Some(&komga()),
+            &keyed
+        ),
+        None
     );
 }
 
@@ -206,7 +257,7 @@ fn a_replaced_value_still_sealed_is_withheld_and_unknown() {
         set("plugin komga", "TZ", Some("sealed:1:00"), "UTC"),
     ];
 
-    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
+    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None);
 
     assert!(
         matches!(&read, Some(Origin::Overridden { replaced, .. })
@@ -224,7 +275,7 @@ fn a_write_whose_record_will_not_open_is_unknown_and_names_the_plugin() {
         set("plugin komga", "TZ", None, "sealed:1:00"),
     ];
 
-    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
+    let read = of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None);
 
     assert!(
         read.as_ref()
@@ -241,7 +292,7 @@ fn a_value_a_removed_plugin_left_in_force_is_orphaned_and_named() {
     let journal = [installed("komga"), set("plugin komga", "TZ", None, "UTC")];
 
     assert_eq!(
-        of_journalled("TZ", "UTC", &journal, Some(&[])),
+        of_journalled("TZ", "UTC", &journal, Some(&[]), &|_| None),
         Some(Origin::Orphaned {
             named: "komga".to_owned()
         })
@@ -253,7 +304,7 @@ fn a_value_a_removed_plugin_left_in_force_is_orphaned_and_named() {
 fn a_plugin_missing_from_a_record_that_would_not_read_is_not_called_orphaned() {
     let journal = [installed("komga"), set("plugin komga", "TZ", None, "UTC")];
 
-    let read = of_journalled("TZ", "UTC", &journal, None);
+    let read = of_journalled("TZ", "UTC", &journal, None, &|_| None);
 
     assert!(
         read.as_ref()
@@ -274,15 +325,15 @@ fn nothing_is_said_where_a_plugin_is_not_what_put_the_value_in_force() {
     ];
 
     assert_eq!(
-        of_journalled("TZ", "Europe/Paris", &journal, Some(&komga())),
+        of_journalled("TZ", "Europe/Paris", &journal, Some(&komga()), &|_| None),
         None
     );
     assert_eq!(
-        of_journalled("PUID", "1000", &journal, Some(&komga())),
+        of_journalled("PUID", "1000", &journal, Some(&komga()), &|_| None),
         None
     );
     assert_eq!(
-        of_journalled("PGID", "1000", &journal, Some(&komga())),
+        of_journalled("PGID", "1000", &journal, Some(&komga()), &|_| None),
         None
     );
 }
@@ -303,7 +354,10 @@ fn only_an_operation_that_made_its_own_document_is_a_plugin() {
         set("apply", "TZ", None, "UTC"),
     ];
 
-    assert_eq!(of_journalled("TZ", "UTC", &journal, Some(&komga())), None);
+    assert_eq!(
+        of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None),
+        None
+    );
 }
 
 /// A plugin's document made under its bare id marks that id as the plugin, so a value
@@ -316,7 +370,7 @@ fn a_plugin_recorded_under_its_bare_id_is_still_named() {
     ];
 
     assert_eq!(
-        of_journalled("TZ", "UTC", &journal, Some(&komga())),
+        of_journalled("TZ", "UTC", &journal, Some(&komga()), &|_| None),
         Some(overridden(replaced(None, false, Origin::Bundled)))
     );
 }
@@ -329,6 +383,9 @@ fn a_plugin_named_after_an_operation_claims_none_of_its_settings() {
     for document in [installed("apply"), made_under("apply", "apply")] {
         let journal = [document, set("apply", "TZ", None, "UTC")];
 
-        assert_eq!(of_journalled("TZ", "UTC", &journal, Some(&apply)), None);
+        assert_eq!(
+            of_journalled("TZ", "UTC", &journal, Some(&apply), &|_| None),
+            None
+        );
     }
 }

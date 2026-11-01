@@ -12,7 +12,7 @@
 //! which one the service takes is then a question for the service: [`settled`] asks it
 //! at the start of the next command, before anything signs in with either.
 
-use crate::app::targets::{hosted, record_secret, recorded_secret, MediaServer};
+use crate::app::targets::{forget_secret, hosted, record_secret, recorded_secret, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 
@@ -28,7 +28,7 @@ pub(crate) fn pending(setting: &str) -> String {
 /// What the operator is owed where the move would not write: the replacement is in
 /// force and is still kept under its pending name, which the next command settles.
 pub(super) fn promoted(ctx: &Ctx, setting: &str, replacement: &str) -> Result<(), String> {
-    record_secret(ctx, setting, replacement).map_err(|failure| {
+    record_secret(ctx, setting, replacement, super::OPERATION).map_err(|failure| {
         config::store::withheld_text(&format!(
             "the service took the replacement, but it could not be moved into place in the \
              record: {failure}. It is kept under {}, and the next command signs in with it \
@@ -50,17 +50,15 @@ pub(super) fn promoted(ctx: &Ctx, setting: &str, replacement: &str) -> Result<()
 /// file that would not take it a moment ago will not take it now either, and what is
 /// owed the operator is already said by the failure that brought the rotation here.
 pub(super) fn kept(ctx: &Ctx, setting: &str, replacement: &str) {
-    let _ = record_secret(ctx, &pending(setting), replacement);
+    let _ = record_secret(ctx, &pending(setting), replacement, super::OPERATION);
 }
 
-/// Take a replacement's pending copy away, where there is a file to take it from.
+/// Take a replacement's pending copy away, where the store holds one.
 ///
 /// Best effort: a copy left behind is only ever read where the credential beside it
 /// is refused, and [`settled`] takes it away the next time it is asked.
 pub(super) fn forgotten(ctx: &Ctx, setting: &str) {
-    if let Some(env) = ctx.settings.env_file.as_deref() {
-        let _ = config::store::unset(env, &pending(setting));
-    }
+    let _ = forget_secret(ctx, &pending(setting), super::OPERATION);
 }
 
 /// Settle every replacement a run left pending: whichever of the two the service takes
@@ -77,15 +75,7 @@ pub(crate) async fn settled(ctx: &Ctx) {
     // Only what is asked about is carried across the questions below: the settings file
     // and the stack are read to find it and let go.
     let asked = {
-        let Some(env) = ctx.settings.env_file.as_deref() else {
-            return;
-        };
-        let file = config::store::read(env).unwrap_or_default();
-        if !file
-            .keys()
-            .iter()
-            .any(|key| key.ends_with(config::PENDING_SUFFIX))
-        {
+        if !is_any_pending(ctx) {
             return;
         }
         // A stack that cannot be read has no service to ask, which leaves both for later.
@@ -97,6 +87,22 @@ pub(crate) async fn settled(ctx: &Ctx) {
     if let Some(server) = asked {
         settle(ctx, &server).await;
     }
+}
+
+/// Whether a replacement is left pending: held in the secret store, or still in the
+/// environment file where an earlier release left it and no run has filed it yet.
+fn is_any_pending(ctx: &Ctx) -> bool {
+    let pending = |name: &str| name.ends_with(config::PENDING_SUFFIX);
+    let held = crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .is_some_and(|secrets| secrets.names().any(pending));
+    held || ctx.settings.env_file.as_deref().is_some_and(|env| {
+        config::store::read(env)
+            .unwrap_or_default()
+            .keys()
+            .iter()
+            .any(|key| pending(key))
+    })
 }
 
 /// Settle the administrator's password of whatever media server fills the identity

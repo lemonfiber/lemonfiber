@@ -87,7 +87,7 @@ pub(crate) fn a_value() -> String {
 
 /// Two settings: one ordinary, and one whose name reads as a credential.
 pub(crate) fn kept() -> String {
-    format!("LEMONFIBER_USENET=on\nSONARR_API_KEY={}\n", a_value())
+    format!("LEMONFIBER_USENET=on\nPROXY_TOKEN={}\n", a_value())
 }
 
 /// A world whose settings are these, written to a scratch file this test owns.

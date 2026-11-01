@@ -130,11 +130,7 @@ fn said(failure: &crate::ports::service::Failure) -> String {
 fn journalled(ctx: &Ctx, change: Option<crate::journal::Change>) -> Option<String> {
     let change = change?;
     let written = super::targets::layout(ctx).map_or(Err(store::Failure::Nowhere), |paths| {
-        super::recover::journalled(
-            &paths.journal(),
-            std::slice::from_ref(&change),
-            ctx.seams.random.as_ref(),
-        )
+        super::recover::journalled(&paths.journal(), std::slice::from_ref(&change))
     });
     written
         .err()

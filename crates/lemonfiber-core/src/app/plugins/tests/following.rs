@@ -124,14 +124,12 @@ async fn an_install_recipe_runs_once_the_install_holds_and_what_it_captures_is_k
             _ => None,
         })
         .collect();
-    assert_eq!(
-        kept,
-        [(
-            "komga:token".to_owned(),
-            Some(crate::credential::fingerprint("t0k3n"))
-        )]
-    );
     let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let keyed = crate::settings::Secrets::at(&env.with_file_name(crate::config::paths::SECRETS))
+        .ok()
+        .and_then(|held| held.keyed("t0k3n"));
+    assert!(keyed.is_some());
+    assert_eq!(kept, [("komga:token".to_owned(), keyed)]);
     assert!(!read(&env).contains("t0k3n"), "nothing goes into .env");
     assert!(
         !read(&env.with_file_name(crate::config::paths::JOURNAL)).contains("t0k3n"),

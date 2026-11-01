@@ -45,7 +45,7 @@ pub(crate) fn made(
             .chain(std::iter::once(source.clone()))
             .map(|path| change(&stamp, Kind::Made { path: shown(&path) }, &path))
             .collect();
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        crate::app::recover::journalled(&paths.journal(), &changes)
             .map_err(|failure| Box::new(failure.problem()))?;
         ctx.seams
             .confined

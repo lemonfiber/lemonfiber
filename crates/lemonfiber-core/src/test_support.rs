@@ -136,15 +136,38 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     let _ = std::fs::remove_dir_all(&dir);
     let path = dir.join(".env");
     assert!(
-        crate::config::store::set(
-            &path,
-            "DOWNLOAD_TORRENT_PASSWORD",
-            password.unwrap_or_default(),
-        )
-        .is_ok(),
+        crate::config::store::write(&path, "").is_ok(),
         "the scratch env file is written"
     );
+    if let Some(password) = password.filter(|password| !password.is_empty()) {
+        held_secret(&path, "DOWNLOAD_TORRENT_PASSWORD", password);
+    }
     path
+}
+
+/// `value` held in the secret store beside the environment file `env`, under the name the
+/// store holds the credential `key` as, the way lemonfiber records one.
+#[track_caller]
+pub(crate) fn held_secret(env: &std::path::Path, key: &str, value: &str) {
+    let name = crate::settings::legacy::held_as(key);
+    assert!(name.is_some(), "{key} is a credential the store holds");
+    let name = name.unwrap_or_default();
+    let keeping = [crate::settings::Keeping {
+        name: &name,
+        value,
+        from: crate::settings::Source::Minted,
+        at: 1,
+    }];
+    assert!(
+        crate::settings::kept(
+            &env.with_file_name(crate::config::paths::SECRETS),
+            &keeping,
+            &lemonfiber_fixtures::ports::Chance::cycling(),
+            &|_| Ok(()),
+        )
+        .is_ok(),
+        "the scratch secret store holds {name}"
+    );
 }
 
 /// One installed plugin's service, filling `provides` and answering on `listens` where it
@@ -233,6 +256,7 @@ pub(crate) fn beside_contracted_requests(
         &ctx,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
+        crate::seed::OPERATION,
     );
     let mut placed = a_placed(CONTRACTED_REQUESTS, &["request.intake"], Some(8080));
     placed.speaks = vec!["request.intake@1".to_owned()];

@@ -162,7 +162,14 @@ fn a_credential_under_its_services_name_moves_to_the_capability_it_reaches() {
 
 #[test]
 fn a_rehearsal_reads_a_credential_under_its_earlier_name_and_moves_nothing() {
-    let ctx = holding("credentials-rehearsed", &[("SONARR_API_KEY", "series-key")]).rehearsing();
+    let ctx = holding(
+        "credentials-rehearsed",
+        &[
+            ("SONARR_API_KEY", "series-key"),
+            ("SONARR_API_KEY_PENDING", "series-replacement"),
+        ],
+    )
+    .rehearsing();
 
     assert!(super::renamed(&ctx).is_ok());
 
@@ -173,6 +180,11 @@ fn a_rehearsal_reads_a_credential_under_its_earlier_name_and_moves_nothing() {
     assert_eq!(
         crate::app::targets::recorded_secret(&ctx, "LIBRARY_CURATE_TV_API_KEY").as_deref(),
         Some("series-key")
+    );
+    assert_eq!(
+        crate::app::targets::recorded_secret(&ctx, "LIBRARY_CURATE_TV_API_KEY_PENDING").as_deref(),
+        Some("series-replacement"),
+        "and a replacement left pending under its earlier name"
     );
     assert_eq!(
         crate::app::targets::recorded_credential(&ctx, "sonarr", crate::config::API_KEY_SUFFIX)

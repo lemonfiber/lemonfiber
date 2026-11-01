@@ -86,6 +86,20 @@ fn a_credential_was_set() -> Change {
     }
 }
 
+/// A repair that changed a setting in lemonfiber's own environment file.
+fn a_setting_was_set() -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: OPERATION.to_owned(),
+        target: ".env".to_owned(),
+        kind: Kind::Set {
+            key: "TZ".to_owned(),
+            previous: Some("UTC".to_owned()),
+            current: "Europe/Amsterdam".to_owned(),
+        },
+    }
+}
+
 /// A repair that changed a field inside a service whose name reads as a credential.
 ///
 /// Nothing journals one today — the one producer records a download-client category —
@@ -271,7 +285,7 @@ async fn nothing_repaired_puts_nothing_back() {
 #[tokio::test]
 async fn an_environment_file_that_cannot_be_read_stops_the_reversal() {
     let root = scratch("env-unwritable");
-    journalled(&root, &[a_credential_was_set()]);
+    journalled(&root, &[a_setting_was_set()]);
     let _ = std::fs::create_dir_all(paths(&root).env_file().join("held"));
 
     let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
@@ -321,45 +335,79 @@ async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_bac
     assert!(json.contains(r#""value":"8080""#), "{json}");
 }
 
-/// What a reversal says it put back must not be the credential it put back.
-///
-/// The values are needed to *do* the reversal and must not survive the doing of it:
-/// this list is what `Outcome::Undo` carries, which a terminal prints and `/api/undo`
-/// serves. A record the journal seals and a report that hands the same value to any
-/// caller is the file locked and the door left open.
+/// A credential an earlier release journalled as a setting is not put back: the journal
+/// holds its fingerprints alone and the store holds nothing they match, so the reversal
+/// refuses, naming the secret to replace at the terminal and never its value, and writes
+/// nothing into the environment file.
 #[tokio::test]
-async fn what_a_reversal_reports_carries_no_credential_it_put_back() {
+async fn a_credential_an_earlier_release_journalled_is_named_to_replace_and_never_shown() {
     let root = scratch("credential-reported");
     journalled(&root, &[a_credential_was_set()]);
-    // Holding what the repair wrote, so the undo is not refused for drift — a setting
-    // somebody has since changed by hand is left alone, which is a different test.
     let env = paths(&root).env_file();
     if let Some(dir) = env.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let _ = std::fs::write(
-        &env,
-        format!("INDEXER_APIKEY={}\n", ["new", "-s3cret"].concat()),
+    let holding = format!("INDEXER_APIKEY={}\n", ["new", "-s3cret"].concat());
+    let _ = std::fs::write(&env, &holding);
+
+    let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
+
+    let refused = put_back.err();
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code),
+        Some(lemonfiber_core::error::codes::setup::REPLACE_AT_THE_TERMINAL)
     );
+    assert_eq!(
+        refused
+            .as_ref()
+            .and_then(|problem| problem.detail.as_deref()),
+        Some("INDEXER_APIKEY")
+    );
+    assert!(!format!("{refused:?}").contains("s3cret"));
+    assert_eq!(std::fs::read_to_string(&env).ok(), Some(holding));
+}
+
+/// What a reversal says it put back withholds a setting whose name reads as a credential,
+/// though the setting is no secret the store holds: the values are what it was carried out
+/// with, and this list is what a terminal prints and `/api/undo` serves.
+#[tokio::test]
+async fn what_a_reversal_reports_withholds_a_setting_named_like_a_credential() {
+    let root = scratch("account-reported");
+    let (was, now) = (["old", "-acc0unt"].concat(), ["new", "-acc0unt"].concat());
+    journalled(
+        &root,
+        &[Change {
+            at: "2000".to_owned(),
+            operation: OPERATION.to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: "USENET_USER".to_owned(),
+                previous: Some(was.clone()),
+                current: now.clone(),
+            },
+        }],
+    );
+    let env = paths(&root).env_file();
+    if let Some(dir) = env.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&env, format!("USENET_USER={now}\n"));
 
     let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
 
     let said = put_back
         .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
         .unwrap_or_default();
-
     assert!(
-        !said.contains("s3cret"),
-        "the reversal reports the credential it restored"
+        said.contains("USENET_USER"),
+        "which setting went back is said"
     );
+    assert!(said.contains(REDACTED), "and that a value was put back");
     assert!(
-        said.contains("INDEXER_APIKEY"),
-        "the reversal does not say which setting went back"
+        !said.contains(&was) && !said.contains(&now),
+        "but never the value"
     );
-    assert!(
-        said.contains(REDACTED),
-        "the reversal drops the fact that a value was put back"
-    );
+    assert!(std::fs::read_to_string(&env).is_ok_and(|text| text.contains(&was)));
 }
 
 /// The same withholding, for the half of it nothing produces yet.

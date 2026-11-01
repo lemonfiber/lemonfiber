@@ -143,7 +143,7 @@ pub(crate) fn journalled(
     }
     let paths = crate::app::targets::layout(ctx)
         .ok_or_else(|| diagnosed(&crate::config::store::Failure::Nowhere))?;
-    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), &changes)
         .map_err(|failure| diagnosed(&failure))
 }
 

@@ -256,7 +256,13 @@ async fn a_service_held_back_is_written_apart_and_started_by_the_act_giving_its_
         from: crate::settings::Source::Operator,
         at: 1,
     }];
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
 
     let given = [("guard:account", Some("me"))];
     let offer = super::changing::change(super::changing::asking(&machine.ctx, &given, None).await)

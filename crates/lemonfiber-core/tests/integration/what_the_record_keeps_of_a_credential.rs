@@ -1,25 +1,26 @@
-//! What the change journal leaves on disk where a setting held a credential.
+//! What the change journal leaves on disk where a change held a credential.
 //!
 //! Beside the crate rather than inside it because this is about the file, not about the
 //! function that wrote it: the assertion is made by reading `journal.jsonl` back as bytes
 //! and looking for a password in it, which is what somebody who walked off with the file
-//! would do. A test that inspected the `Change` the writer was handed would pass over the
-//! one thing that matters here.
+//! would do.
 //!
-//! The record has to keep these values — putting a change back writes what the setting
-//! held before it — so the answer is neither to leave them out nor to leave them in
-//! clear. What is asserted is all three halves of that: the file carries nothing a
-//! credential can be read out of, a read of the same file still hands the value back so a
-//! reversal has something to put back, and a setting that is not a credential is still
-//! recorded as itself so the record stays browsable.
+//! The record keeps a credential's fingerprints and never its value: the secret store
+//! keeps the one earlier value a reversal puts back, so what is asserted is that the file
+//! carries nothing a credential can be read out of, that a journal an earlier release
+//! wrote with values in it stops holding them, and that putting such a change back puts
+//! back what the store kept or says the secret must be replaced at the terminal.
 
+use std::fmt::Write as _;
 use std::path::Path;
 
+use chacha20poly1305::aead::{Aead as _, KeyInit as _};
+use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
 use lemonfiber_core::app::recover::{journal_at, journalled, undo};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::error::codes::setup::NOT_OPENED;
+use lemonfiber_core::credential::fingerprint;
+use lemonfiber_core::error::codes::setup::{NOT_OPENED, REPLACE_AT_THE_TERMINAL};
 use lemonfiber_core::journal::{Change, Journal, Kind};
-use lemonfiber_fixtures::ports::Chance;
 
 /// Where this test's records live, in a scratch directory of its own.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -28,11 +29,6 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 
 fn paths(root: &Path) -> Paths {
     Paths::rooted(&root.join("config"), &root.join("data"))
-}
-
-/// The randomness a real machine supplies.
-fn a_machine() -> Chance {
-    Chance::cycling()
 }
 
 /// One setting written by an operation.
@@ -50,11 +46,36 @@ fn set(key: &str, previous: Option<&str>, current: &str) -> Change {
 }
 
 /// The record as it stands in memory, which is what a reversal reads it from.
-///
-/// Serialised whole rather than picked apart, so an assertion about what came back is
-/// about every field of every entry and not about the one the test remembered to name.
 fn as_read(journal: &Journal) -> String {
     serde_json::to_string(journal.changes()).unwrap_or_default()
+}
+
+/// The journal at `journal` holding exactly these lines, as an earlier release wrote it.
+fn written_earlier(journal: &Path, lines: &[String]) {
+    if let Some(dir) = journal.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    assert!(std::fs::write(journal, format!("{}\n", lines.join("\n"))).is_ok());
+}
+
+/// `clear` sealed as an earlier release sealed a value, under a key it kept beside
+/// `journal`.
+fn sealed_beside(journal: &Path, clear: &str) -> String {
+    let (key, nonce) = ([9_u8; 32], [1_u8; 24]);
+    if let Some(dir) = journal.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let hex = |bytes: &[u8]| {
+        bytes.iter().fold(String::new(), |mut text, byte| {
+            let _ = write!(text, "{byte:02x}");
+            text
+        })
+    };
+    let _ = std::fs::write(journal.with_file_name("journal.key"), hex(&key));
+    let sealed = XChaCha20Poly1305::new(&Key::from(key))
+        .encrypt(&XNonce::from(nonce), clear.as_bytes())
+        .unwrap_or_default();
+    format!("sealed:1:{}{}", hex(&nonce), hex(&sealed))
 }
 
 /// A credential setting, and the two values one has held.
@@ -70,13 +91,8 @@ fn now() -> String {
     format!("new-{}", "s3cret")
 }
 
-/// The defect this exists to catch: the journal is the one file here that keeps a
-/// credential nothing reads, and it kept it as itself.
-///
-/// Both values, because both are recorded and either one is the whole leak. The value a
-/// setting was changed *from* is the worse of the two: it is the credential the operator
-/// has since rotated away from, and a file that goes on holding it has undone the point
-/// of rotating it.
+/// Both values, because either one is the whole leak, and the one a setting was changed
+/// from is the credential the operator has since rotated away from.
 #[test]
 fn no_credential_is_left_in_the_file_the_record_is_kept_in() {
     let root = scratch("in-the-clear");
@@ -84,8 +100,7 @@ fn no_credential_is_left_in_the_file_the_record_is_kept_in() {
 
     assert!(journalled(
         &journal,
-        &[set(KEY, Some(&was()), &now()), set(KEY, None, &now())],
-        &a_machine(),
+        &[set(KEY, Some(&was()), &now()), set(KEY, None, &now())]
     )
     .is_ok());
 
@@ -93,130 +108,103 @@ fn no_credential_is_left_in_the_file_the_record_is_kept_in() {
     assert!(!written.is_empty(), "the record was written");
     assert!(
         !written.contains(&was()) && !written.contains(&now()),
-        "the file carries neither value: {written}"
+        "the file carries neither value"
+    );
+    assert!(written.contains(KEY), "and records which secret changed");
+    assert!(
+        !written.contains(&fingerprint(&was())) && !written.contains(&fingerprint(&now())),
+        "never by a fingerprint anybody without the secret store's key could take"
     );
     assert!(
-        written.contains(KEY),
-        "and still names the setting, because which one changed is the useful half"
+        !journal.with_file_name("journal.key").exists(),
+        "and no key is made"
     );
 }
 
-/// The other half of the same rule: what is not a credential is recorded as itself.
-///
-/// A journal nobody can read is a journal nobody consults, and this is what an operator
-/// reads to answer "why is this different from last week?". Sealing everything would be
-/// the cheap way to pass the test above and would cost the whole feature.
+/// What is not a credential is recorded as itself, so the record stays browsable.
 #[test]
 fn a_setting_that_is_not_a_credential_is_recorded_as_what_it_is() {
     let root = scratch("in-the-open");
     let journal = paths(&root).journal();
 
-    assert!(journalled(
-        &journal,
-        &[set("TZ", Some("UTC"), "Europe/Amsterdam")],
-        &a_machine(),
-    )
-    .is_ok());
+    assert!(journalled(&journal, &[set("TZ", Some("UTC"), "Europe/Amsterdam")]).is_ok());
 
     let written = std::fs::read_to_string(&journal).unwrap_or_default();
     assert!(written.contains("Europe/Amsterdam"), "{written}");
     assert!(written.contains("UTC"), "{written}");
 }
 
-/// Sealed, not left out — which is the difference between a reversal and an apology.
-///
-/// The value is read back through the same path a rollback reads it through, so what is
-/// asserted is that the record still holds what putting the change back would write.
+/// A journal an earlier release left a credential in, in clear or sealed, reads as a
+/// change to the secret by its fingerprints, and loses the value the next time anything
+/// is added to it.
 #[test]
-fn the_record_still_hands_back_what_a_reversal_would_put_there() {
-    let root = scratch("read-back");
-    let journal = paths(&root).journal();
-
-    assert!(journalled(&journal, &[set(KEY, Some(&was()), &now())], &a_machine()).is_ok());
-
-    let held = as_read(&journal_at(&journal).unwrap_or_default());
-
-    assert!(
-        held.contains(&was()) && held.contains(&now()),
-        "both values come back to the one caller entitled to them: {held}"
-    );
-}
-
-/// A journal an older version left in clear still reads, and stops being one.
-///
-/// The upgrade path, and it is not an optional nicety: a machine that has been running
-/// since before this has a file full of credentials, and a fix that only applied to
-/// records written afterwards would leave every one of them exactly where it was.
-#[test]
-fn a_record_written_in_clear_reads_and_is_sealed_the_next_time_anything_is_added() {
+fn a_credential_an_earlier_release_recorded_is_fingerprinted_when_the_record_is_written() {
     let root = scratch("upgrading");
     let journal = paths(&root).journal();
-    let older = serde_json::to_string(&set(KEY, None, &was())).unwrap_or_default();
-    if let Some(dir) = journal.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    assert!(std::fs::write(&journal, format!("{older}\n")).is_ok());
-
-    // It reads as it always did, before anything has been written over it.
-    let before = as_read(&journal_at(&journal).unwrap_or_default());
-    assert!(
-        before.contains(&was()),
-        "the old record still reads: {before}"
+    let sealed = sealed_beside(&journal, &now());
+    let line = |change: &Change| serde_json::to_string(change).unwrap_or_default();
+    written_earlier(
+        &journal,
+        &[
+            line(&set(KEY, None, &was())),
+            line(&set("USENET_PASS", Some(&was()), &sealed)),
+        ],
     );
 
-    assert!(journalled(
-        &journal,
-        &[set("TZ", None, "Europe/Amsterdam")],
-        &a_machine(),
-    )
-    .is_ok());
+    let read = as_read(&journal_at(&journal).unwrap_or_default());
+    assert!(!read.contains(&was()) && !read.contains(&now()) && !read.contains("sealed:"));
+    assert!(!read.contains(&fingerprint(&was())) && !read.contains(&fingerprint(&now())));
+
+    assert!(journalled(&journal, &[set("TZ", None, "Europe/Amsterdam")]).is_ok());
 
     let written = std::fs::read_to_string(&journal).unwrap_or_default();
     assert!(
-        !written.contains(&was()),
-        "the credential the older version wrote is gone from the file: {written}"
-    );
-    let after = as_read(&journal_at(&journal).unwrap_or_default());
-    assert!(
-        after.contains(&was()),
-        "and is still there to put back: {after}"
+        !written.contains(&was()) && !written.contains("sealed:"),
+        "neither value an earlier release wrote is left in the file"
     );
 }
 
-/// The key is kept beside the record, and is as private as the record is.
-///
-/// Only on unix: the guarantee is a file mode, which is the platform's own notion.
-#[cfg(unix)]
+/// Putting back a credential an earlier release recorded puts back the value the store
+/// kept where it still holds what the change left, and otherwise says the secret must be
+/// replaced at the terminal, writing nothing into the environment file.
 #[test]
-fn the_key_is_written_owner_only_where_the_platform_has_the_notion() {
-    use std::os::unix::fs::PermissionsExt as _;
-
-    let root = scratch("private");
+fn putting_back_an_earlier_credential_turns_on_what_the_store_holds() {
+    let root = scratch("earlier-undo");
     let layout = paths(&root);
-    assert!(journalled(&layout.journal(), &[set(KEY, None, &now())], &a_machine()).is_ok());
+    let line = serde_json::to_string(&set(KEY, Some(&was()), &now())).unwrap_or_default();
+    written_earlier(&layout.journal(), &[line]);
 
-    let mode =
-        std::fs::metadata(layout.journal_key()).map(|kept| kept.permissions().mode() & 0o777);
-    assert_eq!(mode.ok(), Some(0o600), "readable only by its owner");
+    let undos = journal_at(&layout.journal()).unwrap_or_default().rewind();
+    let refused = undo(
+        &lemonfiber_adapters::Disk,
+        &undos,
+        &layout.env_file(),
+        Vec::new(),
+    );
+
+    let problem = refused.err();
+    assert_eq!(
+        problem.as_ref().map(|refusal| refusal.code),
+        Some(REPLACE_AT_THE_TERMINAL)
+    );
+    assert_eq!(
+        problem.and_then(|refusal| refusal.detail.clone()),
+        Some(KEY.to_owned())
+    );
+    let file = std::fs::read_to_string(layout.env_file()).unwrap_or_default();
+    assert!(!file.contains(&was()) && !file.contains(&now()));
 }
 
-/// Without the key, a reversal refuses rather than writing the sealed text into the
-/// environment file.
-///
-/// The state a machine restored from a backup that took the records and left the key is
-/// in. Putting the sealed text back would report the setting restored and leave the
-/// operator authenticating with a line of hexadecimal — worse than not reversing, because
-/// it reads as having worked.
+/// A setting an earlier release sealed for a name that only read like a credential, with
+/// its key gone, is refused rather than its sealed text written into the environment
+/// file.
 #[test]
-fn a_record_whose_key_is_gone_is_refused_rather_than_put_back_as_it_reads() {
+fn a_sealed_setting_whose_key_is_gone_is_refused_rather_than_put_back_as_it_reads() {
     let root = scratch("no-key");
     let layout = paths(&root);
-    assert!(journalled(
-        &layout.journal(),
-        &[set(KEY, Some(&was()), &now())],
-        &a_machine(),
-    )
-    .is_ok());
+    let sealed = sealed_beside(&layout.journal(), "on");
+    let line = serde_json::to_string(&set("MEMBER_KEYS", None, &sealed)).unwrap_or_default();
+    written_earlier(&layout.journal(), &[line]);
     assert!(std::fs::remove_file(layout.journal_key()).is_ok());
 
     let undos = journal_at(&layout.journal()).unwrap_or_default().rewind();
@@ -230,17 +218,36 @@ fn a_record_whose_key_is_gone_is_refused_rather_than_put_back_as_it_reads() {
     let problem = refused.err();
     assert_eq!(
         problem.as_ref().map(|refusal| refusal.code),
-        Some(NOT_OPENED),
-        "refused for the reason it was, not for the one a missing setting would give"
-    );
-    assert_eq!(
-        problem.and_then(|refusal| refusal.detail.clone()),
-        Some(KEY.to_owned()),
-        "the setting is named, so the operator knows which credential to set again"
+        Some(NOT_OPENED)
     );
     let file = std::fs::read_to_string(layout.env_file()).unwrap_or_default();
-    assert!(
-        !file.contains("sealed:"),
-        "and nothing sealed was written into the settings: {file}"
+    assert!(!file.contains("sealed:"), "{file}");
+}
+
+/// A journal line that does not read is refused without repeating what the line holds,
+/// since what a broken line holds may be a credential an earlier release wrote there.
+#[test]
+fn a_line_that_does_not_read_is_refused_without_what_it_holds() {
+    let root = scratch("unreadable-line");
+    let journal = paths(&root).journal();
+    let tz = serde_json::to_string(&set("TZ", None, "UTC")).unwrap_or_default();
+    written_earlier(
+        &journal,
+        &[
+            format!(
+                r#"{{"at":"1","operation":"x","target":".env","kind":"{}"}}"#,
+                now()
+            ),
+            tz,
+        ],
     );
+
+    let refused = journal_at(&journal)
+        .err()
+        .map(|failure| failure.to_string());
+
+    assert!(refused
+        .as_ref()
+        .is_some_and(|said| said.contains("entry 1")));
+    assert!(refused.is_some_and(|said| !said.contains(&now())));
 }

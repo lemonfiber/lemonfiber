@@ -206,12 +206,11 @@ const MINTING: &[(&str, &str)] = &[
          the next mint is handed another",
     ),
     (
-        "crates/lemonfiber-core/src/journal/sealing.rs",
-        "the key the change journal's credentials are sealed under, and a fresh nonce for each \
-         value sealed with it. The key outlives the run and has to — a key made afresh opens \
-         nothing written before it — and it is written to one file beside the journal and read \
-         from nowhere else: it reaches no request, no report and no bundle, so there is nobody \
-         it could identify this installation to",
+        "crates/lemonfiber-core/src/settings/secrets/keyed.rs",
+        "the secret store's key, which every fingerprint of a secret in the change journal is \
+         keyed under. It is drawn once, written into the owner-only secret store and read \
+         nowhere else: it reaches no request, no report and no bundle, so there is nobody it \
+         could identify this installation to",
     ),
 ];
 

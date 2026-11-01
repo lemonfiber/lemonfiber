@@ -86,17 +86,17 @@ codes! {
             names the ones it left alone.",
         remedy: "Set them back by hand if the earlier value is the one you want.",
     }
-    /// Raised when a reversal meets a credential whose sealed record will not open.
+    /// Raised when a reversal meets a setting whose sealed record will not open.
     NOT_OPENED = "SETUP-10" {
         severity: Warning,
         status: 500,
         since: "0.14.0",
-        meaning: "Reversing a change met a credential the journal had sealed and this machine \
-            can no longer open — the key kept beside the journal is missing, or the record was \
-            changed after it was written. What those settings held is not something to put back, \
-            so they were left exactly as they are and the message names them. Everything else \
-            was put back.",
-        remedy: "Set them yourself, from wherever the earlier credential came from.",
+        meaning: "Reversing a change met a setting a journal an earlier release wrote had \
+            sealed, which this machine can no longer open: the key kept beside the journal is \
+            missing, or the record was changed after it was written. What those settings held \
+            is not something to put back, so they were left exactly as they are and the \
+            message names them. Everything else was put back.",
+        remedy: "Set them yourself, to the value you want.",
     }
     /// Raised when a directory a reversal would remove still holds something else's files.
     STILL_HOLDING = "SETUP-11" {
@@ -129,16 +129,18 @@ codes! {
             the message names it.",
         remedy: "Run the reversal again once the file can be written.",
     }
-    /// Raised when a reversal meets a secret whose earlier value lemonfiber kept no copy of.
-    UNKEPT = "SETUP-14" {
+    /// Raised when a reversal meets a secret it cannot put back, which must be replaced at
+    /// the terminal.
+    REPLACE_AT_THE_TERMINAL = "SETUP-14" {
         severity: Warning,
         status: 500,
         since: "0.18.0",
-        meaning: "Reversing a change met secrets whose earlier value lemonfiber did not keep. \
-            The secret store keeps one earlier value of each, and only while what the secret \
-            holds now is what the change left, so these were left exactly as they are and the \
-            message names them. Everything else was put back.",
-        remedy: "Enter the earlier value again at the terminal if it is the one you want.",
+        meaning: "Reversing a change met secrets it could not put back. The secret store keeps \
+            one earlier value of each and puts it back only while the values it holds match \
+            the fingerprints the change recorded; these hold something else, or the earlier \
+            value is not kept. They were left exactly as they are, and the message names them. \
+            Everything else was put back.",
+        remedy: "Replace each secret the message names at the terminal.",
     }
     /// Raised when a service's state lemonfiber moved could not be moved back.
     NOT_MOVED_BACK = "SETUP-15" {

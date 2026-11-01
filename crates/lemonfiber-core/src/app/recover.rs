@@ -22,11 +22,14 @@ use crate::settings::undoing;
 
 use super::Ctx;
 
+mod carried;
 mod journal;
 mod refusing;
 
-use refusing::{left_holding, needs_service, not_opened, not_put_back, unkept, Fault};
+use refusing::Fault;
 
+pub(crate) use carried::refused_over;
+pub use carried::Carried;
 pub use journal::{journal_at, journalled, unrecorded};
 
 /// Put back the changes that live inside a service, answering with the ones left for
@@ -138,62 +141,6 @@ pub fn undo(
     refused_over(&carrying_out(confined, undos, env_file, already)?)
 }
 
-/// What a reversal came to, refused over the first change it left standing.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] naming the changes of the first kind left standing: the
-/// unopened, the operator's, the still holding, the unkept, then the beyond reach.
-pub(crate) fn refused_over(carried: &Carried) -> Result<(), Box<Problem>> {
-    if !carried.unread.is_empty() {
-        return Err(Box::new(not_opened(&carried.unread)));
-    }
-    if !carried.theirs.is_empty() {
-        return Err(Box::new(not_put_back(&carried.theirs)));
-    }
-    if !carried.still_holding.is_empty() {
-        return Err(Box::new(left_holding(&carried.still_holding)));
-    }
-    if !carried.unkept.is_empty() {
-        return Err(Box::new(unkept(&carried.unkept)));
-    }
-    if carried.beyond_reach.is_empty() {
-        Ok(())
-    } else {
-        Err(Box::new(needs_service(&carried.beyond_reach)))
-    }
-}
-
-/// What a reversal came to, kept apart from whether it is worth refusing over.
-///
-/// The three ways a change can be left standing, each naming what was left. A reversal
-/// asked for by name has to *report* them — an operator who asked for five things back
-/// and got three needs to know which three — where the one a repair earns refuses over
-/// the first of them it meets. Same work, two readings, so the reading is the caller's.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Carried {
-    /// The undos carried out, kept rather than counted so the report can name them.
-    pub done: Vec<Undo>,
-    /// Resources whose change only the service that made it can undo, where that
-    /// service did not answer.
-    pub beyond_reach: Vec<String>,
-    /// Settings holding neither what the change wrote nor what putting it back would,
-    /// so somebody has chosen them since and they were left exactly as they are.
-    pub theirs: Vec<String>,
-    /// Settings whose sealed record would not open, so there is nothing to put back.
-    pub unread: Vec<String>,
-    /// Directories still holding something this run did not put there.
-    ///
-    /// A directory lemonfiber made and something else has since filled is not one this
-    /// reversal may take. Two plugins share the directory their documents sit in, and
-    /// the first of them made it — so removing the first would take the second's
-    /// document with it, or, once the operating system refuses, would stop the whole
-    /// reversal over a directory whose only fault is that somebody else is using it.
-    pub still_holding: Vec<String>,
-    /// Secrets whose earlier value lemonfiber kept no copy of.
-    pub unkept: Vec<String>,
-}
-
 /// Carry out every undo that can be, answering with what was left standing.
 ///
 /// A real I/O failure still stops it — a setting or a directory that will not budge is
@@ -225,7 +172,7 @@ pub(crate) fn carrying_out(
             Step::TheirsNow(key) => carried.theirs.push(key),
             Step::StillSealed(key) => carried.unread.push(key),
             Step::StillHolding(path) => carried.still_holding.push(path),
-            Step::Unkept(name) => carried.unkept.push(name),
+            Step::ToReplace(name) => carried.to_replace.push(name),
         }
     }
     Ok(carried)
@@ -270,7 +217,9 @@ enum Step {
     /// The path is a directory holding something this run did not put there, so it is
     /// left exactly as it is and named.
     StillHolding(String),
-    Unkept(String),
+    /// The secret holds something other than the change left, or its earlier value is not
+    /// kept, so it is left exactly as it is and must be replaced at the terminal.
+    ToReplace(String),
 }
 
 /// Carry out one undo against the filesystem or the environment file.
@@ -349,6 +298,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
                 recorded.as_deref(),
                 filed.as_deref(),
             ),
+            Step::TheirsNow,
         ),
         Action::Regrant {
             plugin,
@@ -369,6 +319,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
                 kept.as_deref(),
                 filed.as_deref(),
             ),
+            Step::ToReplace,
         ),
     }
 }
@@ -384,12 +335,17 @@ fn regranted(env_file: &Path, plugin: &str, grant: &Grant, give: bool) -> Result
     Ok(Step::Done)
 }
 
-fn settled(name: &str, undone: Result<undoing::Undone, store::Failure>) -> Result<Step, Fault> {
-    match undone.map_err(Fault::Store)? {
-        undoing::Undone::Done => Ok(Step::Done),
-        undoing::Undone::TheirsNow => Ok(Step::TheirsNow(name.to_owned())),
-        undoing::Undone::Unkept => Ok(Step::Unkept(name.to_owned())),
-    }
+/// What undoing the setting or secret `name` came to, as `left` where it was left as it is.
+fn settled(
+    name: &str,
+    undone: Result<undoing::Undone, store::Failure>,
+    left: fn(String) -> Step,
+) -> Result<Step, Fault> {
+    Ok(if undone.map_err(Fault::Store)? == undoing::Undone::Done {
+        Step::Done
+    } else {
+        left(name.to_owned())
+    })
 }
 
 /// Write a file back to what it held, where what lemonfiber wrote over it is still there.

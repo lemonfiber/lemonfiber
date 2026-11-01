@@ -273,12 +273,8 @@ async fn carried_out(
     // Recorded before the report is built, so a reversal that is reported is a reversal
     // that is in the record. The changes it writes are the inverse of the ones it put
     // back, which is what makes this run answerable to the same command.
-    super::recover::journalled(
-        &paths.journal(),
-        &recording(run, &reversed, &ctx.stamp()),
-        ctx.seams.random.as_ref(),
-    )
-    .map_err(|failure| Box::new(super::recover::unrecorded("The reversal", &failure)))?;
+    super::recover::journalled(&paths.journal(), &recording(run, &reversed, &ctx.stamp()))
+        .map_err(|failure| Box::new(super::recover::unrecorded("The reversal", &failure)))?;
 
     let mut left = standing_after(&reached.unreached, &carried);
     left.extend(unran);
@@ -445,9 +441,9 @@ fn standing_after(unreached: &[String], carried: &super::recover::Carried) -> Ve
             "it still holds something this run did not put there",
         ),
         (
-            carried.unkept.as_slice(),
-            "lemonfiber kept no copy of what it held before, so enter that again at the \
-             terminal if it is the one you want",
+            carried.to_replace.as_slice(),
+            "it is a secret that must be replaced at the terminal: it holds something other \
+             than the change left, or its earlier value is not kept",
         ),
     ]
     .into_iter()

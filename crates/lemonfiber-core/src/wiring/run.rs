@@ -190,7 +190,7 @@ async fn substituting(
             .iter()
             .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
     );
-    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), &changes)
         .map_err(|failure| Box::new(failure.problem()))?;
     for (key, value) in writes {
         kept(path, key, value)?;

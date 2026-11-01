@@ -358,14 +358,12 @@ fn journalled(
             current: current.to_owned(),
         },
     };
-    crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref()).map_err(
-        |failure| {
-            format!(
-                "the replacement could not be journalled, so the certificate in force is still \
+    crate::app::recover::journalled(&paths.journal(), &[change]).map_err(|failure| {
+        format!(
+            "the replacement could not be journalled, so the certificate in force is still \
                  served: {failure}"
-            )
-        },
-    )
+        )
+    })
 }
 
 /// What a replacement would do, as a rehearsal says it: who is handed the new SHA-256 and

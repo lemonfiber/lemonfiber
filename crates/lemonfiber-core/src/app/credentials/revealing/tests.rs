@@ -53,9 +53,14 @@ fn a_value() -> String {
 async fn asking_once_prints_the_warning_and_not_the_value() {
     let ctx = keeping("once");
     let secret = a_value();
-    let _ = record_secret(&ctx, "A_TEST_PASS", &secret);
+    let _ = record_secret(
+        &ctx,
+        "A_TEST_PASSWORD",
+        &secret,
+        crate::app::credentials::OPERATION,
+    );
 
-    let revealed = reveal(&ctx, &line("A_TEST_PASS"), false, nowhere()).await;
+    let revealed = reveal(&ctx, &line("A_TEST_PASSWORD"), false, nowhere()).await;
 
     assert_eq!(revealed.value, None);
     assert_eq!(revealed.warning, SHOULDER);
@@ -65,9 +70,14 @@ async fn asking_once_prints_the_warning_and_not_the_value() {
 async fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
     let ctx = keeping("again");
     let secret = a_value();
-    let _ = record_secret(&ctx, "A_TEST_PASS", &secret);
+    let _ = record_secret(
+        &ctx,
+        "A_TEST_PASSWORD",
+        &secret,
+        crate::app::credentials::OPERATION,
+    );
 
-    let revealed = reveal(&ctx, &line("A_TEST_PASS"), true, nowhere()).await;
+    let revealed = reveal(&ctx, &line("A_TEST_PASSWORD"), true, nowhere()).await;
 
     assert_eq!(revealed.value.as_deref(), Some(secret.as_str()));
     assert_eq!(revealed.warning, REVEALED);
@@ -78,7 +88,8 @@ async fn asking_again_prints_the_value_with_the_warning_still_beside_it() {
 #[tokio::test]
 async fn a_plugins_secret_says_nothing_holds_it_rather_than_showing_anything() {
     let ctx = keeping("plugin");
-    let _ = record_secret(&ctx, "comics/api_key", &a_value());
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let _ = crate::config::store::set(&env, "comics/api_key", &a_value());
     let mut held = line("comics/api_key");
     held.from = crate::origin::Origin::Plugin {
         named: "comics".to_owned(),
@@ -119,7 +130,13 @@ async fn a_plugins_secret_the_store_holds_is_printed_and_one_it_does_not_is_not(
         from: crate::settings::Source::Recipe,
         at: 1,
     }];
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
     let plugin = |setting: &str, state: State| Held {
         name: "comics token".to_owned(),
         setting: setting.to_owned(),

@@ -1,264 +1,225 @@
+use chacha20poly1305::aead::{Aead as _, KeyInit as _};
+use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
+
 use lemonfiber_fixtures::ports::Chance;
 
-use super::{beside, is_sealed, store, unhex, Change, Kind, Seal, MARKER};
+use super::{beside, is_sealed, scrubbed, unhex, Change, Kind, Seal, MARKER, NONCE_BYTES};
+use crate::credential::fingerprint;
+use crate::settings::{Secrets, UNMATCHED};
 
 /// A scratch directory unique to this process and case, cleared first.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     lemonfiber_fixtures::scratch::Scratch::unmade(name).within("journal.jsonl")
 }
 
-/// The randomness a real machine supplies.
-fn a_machine() -> Chance {
-    Chance::cycling()
+/// `clear` sealed the way an earlier release sealed a value, under a key of `byte`
+/// repeated, which is written beside `journal`.
+fn sealed_beside(journal: &std::path::Path, byte: u8, clear: &str) -> String {
+    let key = [byte; 32];
+    let nonce = [7; NONCE_BYTES];
+    if let Some(parent) = journal.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(beside(journal), crate::secret::render(&key));
+    let cipher = XChaCha20Poly1305::new(&Key::from(key));
+    let sealed = cipher
+        .encrypt(&XNonce::from(nonce), clear.as_bytes())
+        .unwrap_or_default();
+    format!(
+        "{MARKER}{}{}",
+        crate::secret::render(&nonce),
+        crate::secret::render(&sealed)
+    )
 }
 
-/// A machine that answers with exactly these bytes, however many were asked for.
-fn answering(bytes: Option<Vec<u8>>) -> Chance {
-    Chance::exactly(bytes)
-}
-
-/// One credential setting, changed from something to something else.
-fn credential(previous: Option<&str>) -> Change {
+/// The setting `key` changed from `previous` to `current`.
+fn set(key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
         at: "t".to_owned(),
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
-            key: "INDEXER_APIKEY".to_owned(),
+            key: key.to_owned(),
             previous: previous.map(str::to_owned),
-            current: "what-it-holds-now".to_owned(),
+            current: current.to_owned(),
         },
     }
 }
 
-/// The change as it reaches the file, which is where an assertion about what is on
-/// disk has to be made.
-fn as_written(change: &Change) -> String {
-    serde_json::to_string(change).unwrap_or_default()
-}
-
-/// What a credential setting that replaced nothing is written as where nothing could
-/// be sealed: the marker, and nothing after it, in place of the value.
-fn unsealable() -> Change {
-    Change {
-        kind: Kind::Set {
-            key: "INDEXER_APIKEY".to_owned(),
-            previous: None,
-            current: MARKER.to_owned(),
-        },
-        ..credential(None)
-    }
-}
-
 #[test]
-fn a_credential_is_sealed_on_the_way_out_and_opened_on_the_way_back() {
-    let journal = scratch("round-trip");
-    let seal = Seal::minted(&journal, &a_machine());
-    let change = credential(Some("what-it-held-before"));
+fn a_value_an_earlier_release_sealed_opens_with_the_key_beside_the_journal() {
+    let journal = scratch("opens");
+    let was = sealed_beside(&journal, 3, "what-it-held-before");
+    let now = sealed_beside(&journal, 3, "what-it-holds-now");
 
-    let written = as_written(&seal.sealing(&change, &a_machine()));
-    assert!(
-        !written.contains("what-it-held-before") && !written.contains("what-it-holds-now"),
-        "neither value reaches the file: {written}"
-    );
-    assert_eq!(written.matches(MARKER).count(), 2, "both halves: {written}");
+    let opened = Seal::kept(&journal).opening(&set("TZ", Some(&was), &now));
 
     assert_eq!(
-        seal.opening(&seal.sealing(&change, &a_machine())),
-        change,
-        "and both come back"
-    );
-    // A journal an older version wrote holds the value itself, which is not sealed
-    // and so is handed back as it stands rather than opened.
-    assert_eq!(
-        seal.opening(&change),
-        change,
-        "and a clear one is left alone"
+        opened,
+        set("TZ", Some("what-it-held-before"), "what-it-holds-now")
     );
 }
 
-/// The key is made once and kept. A second run that minted a fresh one would hold a
-/// key that opens nothing already written, which is losing the record without
-/// anything saying so.
-#[test]
-fn the_key_is_made_once_and_read_back_afterwards() {
-    let journal = scratch("kept");
-    let sealed = Seal::minted(&journal, &a_machine()).sealing(&credential(None), &a_machine());
-
-    let later = Seal::minted(&journal, &a_machine());
-    assert_eq!(later.opening(&sealed), credential(None));
-    assert_eq!(Seal::kept(&journal).opening(&sealed), credential(None));
-}
-
-/// A machine whose randomness will not answer writes no key, and so seals nothing —
-/// which must not become "writes the credential as itself".
-#[test]
-fn a_machine_that_will_not_draw_marks_the_value_rather_than_writing_it() {
-    let journal = scratch("no-randomness");
-    let seal = Seal::minted(&journal, &answering(None));
-
-    let written = seal.sealing(&credential(None), &answering(None));
-
-    assert_eq!(written, unsealable());
-    assert!(!journal.with_file_name(super::KEY_FILE).exists());
-}
-
-/// A machine that made a key and then stopped answering seals nothing under it.
-///
-/// Apart from the machine that would not draw at all, because the key is there and
-/// the failure is later: what a value is sealed under is a nonce of its own, and one
-/// that cannot be drawn is not something to do without.
-#[test]
-fn a_machine_that_stops_drawing_after_the_key_seals_nothing_under_it() {
-    let journal = scratch("no-nonce");
-    let seal = Seal::minted(&journal, &a_machine());
-
-    let written = seal.sealing(&credential(None), &answering(None));
-
-    assert_eq!(written, unsealable());
-}
-
-/// Bytes that are not a key are not a key. The port answers with whatever it
-/// answers with, and a seal built from a short answer would be a weaker seal
-/// invisible in everything it produced.
-#[test]
-fn randomness_of_the_wrong_length_makes_no_key() {
-    let journal = scratch("short-key");
-    let seal = Seal::minted(&journal, &answering(Some(vec![9; 8])));
-
-    assert_eq!(seal.sealing(&credential(None), &a_machine()), unsealable());
-}
-
-/// A key with nowhere to be written is a key nothing may be sealed under: the
-/// alternative is a run that seals against a key the next run cannot find.
-#[test]
-fn a_key_that_cannot_be_written_down_seals_nothing() {
-    let blocker_dir = scratch("unwritable");
-    let blocker = blocker_dir.with_file_name("blocker");
-    // Written through the store, which makes the directory it needs — so there is no
-    // branch here on a parent that is always there.
-    assert!(store::write(&blocker, "a file where a directory would go").is_ok());
-    let journal = blocker.join("journal.jsonl");
-
-    let seal = Seal::minted(&journal, &a_machine());
-
-    assert_eq!(seal.sealing(&credential(None), &a_machine()), unsealable());
-}
-
-/// A nonce of the wrong length seals nothing, for the reason a short key makes none.
-#[test]
-fn a_nonce_of_the_wrong_length_seals_nothing() {
-    let journal = scratch("short-nonce");
-    // Thirty-two bytes: enough for the key, and not what a nonce is.
-    let machine = answering(Some(vec![3; 32]));
-    let seal = Seal::minted(&journal, &machine);
-
-    assert_eq!(seal.sealing(&credential(None), &machine), unsealable());
-}
-
-/// A key that is there and will not read is left where it is.
-///
-/// Writing a fresh one over it would orphan every value already sealed under it, and
-/// silently: nothing would fail, and every earlier record would stop opening. The
-/// file being briefly unreadable is the likelier explanation, and it is the one that
-/// can still be recovered from.
-#[test]
-fn a_key_that_will_not_read_is_not_written_over() {
-    let journal = scratch("unreadable-key");
-    let sealed = Seal::minted(&journal, &a_machine()).sealing(&credential(None), &a_machine());
-    let kept = beside(&journal);
-    let original = std::fs::read_to_string(&kept).unwrap_or_default();
-    assert!(std::fs::write(&kept, "not a key at all").is_ok());
-
-    let seal = Seal::minted(&journal, &a_machine());
-
-    assert_eq!(
-        std::fs::read_to_string(&kept).unwrap_or_default(),
-        "not a key at all",
-        "left exactly as it was"
-    );
-    assert_eq!(seal.opening(&sealed), sealed, "and it opens nothing");
-    assert!(!original.is_empty(), "there was a key before");
-}
-
-/// A value this machine has no key for is handed back as it was read, still marked,
-/// rather than dropped or guessed at.
+/// A value this machine has no key for, one sealed under another key and one somebody
+/// edited are each handed back as they were read, still marked.
 #[test]
 fn a_value_that_will_not_open_is_left_exactly_as_it_reads() {
-    let journal = scratch("lost-key");
-    let sealed = Seal::minted(&journal, &a_machine()).sealing(&credential(None), &a_machine());
-    assert!(std::fs::remove_file(beside(&journal)).is_ok());
-
-    let opened = Seal::kept(&journal).opening(&sealed);
-
-    assert_eq!(opened, sealed, "unchanged, and still marked");
-    assert!(as_written(&opened).contains(MARKER), "{opened:?}");
-}
-
-/// Sealed under one key, opened under another: authenticated, so it does not open.
-#[test]
-fn a_value_sealed_under_another_key_does_not_open() {
-    let mine = scratch("mine");
-    let theirs = scratch("theirs");
-    let sealed = Seal::minted(&mine, &a_machine()).sealing(&credential(None), &a_machine());
-    let other = Seal::minted(&theirs, &answering(Some(vec![5; 32])));
-
-    assert_eq!(other.opening(&sealed), sealed, "it does not open");
-    assert_eq!(
-        other.sealing(&sealed, &a_machine()),
-        sealed,
-        "and writing it back does not bury it under a second key"
-    );
-}
-
-/// A record somebody edited is a record that will not open, rather than one that
-/// opens to something else.
-#[test]
-fn a_record_changed_since_it_was_written_does_not_open() {
-    let journal = scratch("tampered");
-    let seal = Seal::minted(&journal, &a_machine());
-    let sealed = seal
-        .seal("what-it-holds-now", &a_machine())
-        .unwrap_or_default();
-
-    // A byte appended: still hexadecimal, still marked, and no longer the record that
-    // was written. Appended rather than altered in place, so this is one edit rather
-    // than a search through the value for something to edit.
+    let journal = scratch("unopened");
+    let sealed = sealed_beside(&journal, 3, "what-it-holds-now");
     let edited = format!("{sealed}00");
+    let change = set("TZ", None, &edited);
+    assert_eq!(Seal::kept(&journal).opening(&change), change);
 
-    assert!(is_sealed(&sealed), "there was a sealed value to change");
-    assert!(
-        seal.open(&sealed).is_some(),
-        "and it opened before the change"
-    );
-    assert!(seal.open(&edited).is_none(), "{edited}");
-}
+    let theirs = scratch("theirs");
+    let _ = sealed_beside(&theirs, 4, "another");
+    let change = set("TZ", None, &sealed);
+    assert_eq!(Seal::kept(&theirs).opening(&change), change);
 
-/// Only a setting whose name says it holds a credential is sealed. A journal that
-/// sealed everything would be a journal nobody could read.
-#[test]
-fn nothing_but_a_credential_setting_is_touched() {
-    let journal = scratch("untouched");
-    let seal = Seal::minted(&journal, &a_machine());
-    let plain = Change {
-        kind: Kind::Set {
-            key: "TZ".to_owned(),
-            previous: None,
-            current: "Europe/Amsterdam".to_owned(),
-        },
-        ..credential(None)
-    };
+    assert!(std::fs::remove_file(beside(&journal)).is_ok());
+    assert_eq!(Seal::kept(&journal).opening(&change), change);
     let made = Change {
         kind: Kind::Made {
             path: "/srv/media".to_owned(),
         },
-        ..credential(None)
+        ..change
+    };
+    assert_eq!(Seal::kept(&journal).opening(&made), made);
+}
+
+/// The secret store beside `journal`, holding `held` under `name` after `earlier`, with a
+/// key drawn for it.
+fn store_beside(journal: &std::path::Path, name: &str, earlier: &str, held: &str) -> Secrets {
+    let at = journal.with_file_name(crate::config::paths::SECRETS);
+    for value in [earlier, held] {
+        let keeping = [crate::settings::Keeping {
+            name,
+            value,
+            from: crate::settings::Source::Operator,
+            at: 1,
+        }];
+        let _ = crate::settings::kept(&at, &keeping, &Chance::cycling(), &|_| Ok(()));
+    }
+    Secrets::at(&at).unwrap_or_default()
+}
+
+/// A credential set in the environment file is written down as a change to the secret
+/// the store holds it as, by the fingerprints its key gives, from where it came.
+#[test]
+fn a_credential_is_written_down_by_its_keyed_fingerprints_alone() {
+    let journal = scratch("keyed");
+    let store = store_beside(&journal, "INDEXER_APIKEY", "was", "now");
+    let keyed = |value: &str| store.keyed(value);
+    let secret = |name: &str, from: &str, previous: Option<&str>| Change {
+        target: ".env".to_owned(),
+        kind: Kind::Secret {
+            name: name.to_owned(),
+            from: from.to_owned(),
+            previous: previous.and_then(keyed),
+            current: keyed("now"),
+            filed: None,
+        },
+        ..set(name, None, "now")
+    };
+    let scrubbed_of =
+        |key: &str, previous: Option<&str>| scrubbed(&set(key, previous, "now"), &store);
+
+    assert_eq!(
+        scrubbed_of("INDEXER_APIKEY", Some("was")),
+        secret("INDEXER_APIKEY", "operator", Some("was"))
+    );
+    assert_eq!(
+        scrubbed_of(crate::credential::VPN_PRIVATE_KEY, None),
+        secret("gluetun:wireguard-key", "operator", None)
+    );
+    assert_eq!(
+        scrubbed_of("IDENTITY_SOURCE_ADMIN_PASSWORD_PENDING", Some("was")),
+        secret(
+            "IDENTITY_SOURCE_ADMIN_PASSWORD_PENDING",
+            "minted",
+            Some("was")
+        )
+    );
+    assert_eq!(
+        scrubbed_of("KOMGA_TOKEN_SECRET", Some("was")),
+        secret("KOMGA_TOKEN_SECRET", "recipe", Some("was"))
+    );
+    assert!(keyed("now").is_some_and(|keyed| keyed != fingerprint("now")));
+}
+
+/// A change to a secret an earlier release fingerprinted unkeyed is keyed from the value
+/// or the earlier value the store holds that it fingerprints; one the store holds nothing
+/// for, and every value a store with no key is asked of, is the mark no value matches.
+#[test]
+fn an_unkeyed_fingerprint_is_keyed_from_the_store_or_marked() {
+    let journal = scratch("rekeyed");
+    let store = store_beside(&journal, "komga:token", "was", "now");
+    let earlier = |previous: &str, current: &str| Change {
+        kind: Kind::Secret {
+            name: "komga:token".to_owned(),
+            from: "recipe".to_owned(),
+            previous: Some(previous.to_owned()),
+            current: Some(current.to_owned()),
+            filed: None,
+        },
+        ..set("TZ", None, "x")
     };
 
+    let rekeyed = scrubbed(&earlier(&fingerprint("was"), &fingerprint("now")), &store);
+    assert_eq!(
+        rekeyed.kind,
+        earlier(
+            &store.keyed("was").unwrap_or_default(),
+            &store.keyed("now").unwrap_or_default()
+        )
+        .kind
+    );
+    assert_eq!(
+        scrubbed(&rekeyed, &store),
+        rekeyed,
+        "a keyed one stays as it is"
+    );
+
+    let unmatched = scrubbed(&earlier(&fingerprint("gone"), &fingerprint("now")), &store);
+    assert!(
+        matches!(&unmatched.kind, Kind::Secret { previous: Some(mark), .. } if mark == UNMATCHED)
+    );
+
+    let keyless = Secrets::default();
+    let set_scrubbed = scrubbed(&set("USENET_PASS", None, "now"), &keyless);
+    assert!(
+        matches!(&set_scrubbed.kind, Kind::Secret { current: Some(mark), .. } if mark == UNMATCHED)
+    );
+}
+
+/// A setting that is not a credential, and every change that is not a setting or a
+/// secret, is written down exactly as it was made.
+#[test]
+fn nothing_but_a_credential_is_written_down_by_its_fingerprints() {
+    let store = Secrets::default();
+    let plain = set("MEMBER_KEYS", Some("off"), "on");
+    let made = Change {
+        kind: Kind::Made {
+            path: "/srv/media".to_owned(),
+        },
+        ..set("TZ", None, "x")
+    };
     for change in [plain, made] {
-        assert_eq!(seal.sealing(&change, &a_machine()), change);
-        assert_eq!(seal.opening(&change), change);
+        assert_eq!(scrubbed(&change, &store), change);
     }
+}
+
+/// The key a journal an earlier release wrote sealed values under is taken away once the
+/// journal is written again, and one that does not read as a key is left where it is.
+#[test]
+fn a_key_that_reads_is_retired_and_one_that_does_not_is_left() {
+    let journal = scratch("retired");
+    let _ = sealed_beside(&journal, 3, "x");
+    Seal::retired(&journal);
+    assert!(!beside(&journal).exists());
+
+    assert!(std::fs::write(beside(&journal), "not a key").is_ok());
+    Seal::retired(&journal);
+    assert!(beside(&journal).exists());
 }
 
 /// A value that is not written the way a sealed one is, is not one.

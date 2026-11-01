@@ -21,7 +21,8 @@ pub(crate) mod waiting;
 pub(crate) use files::{text, written};
 pub(crate) use resolved::{holding, Resolved, OPERATOR_KEYS};
 pub(crate) use restarting::{restarted, running};
-pub(crate) use secrets::{dropped, filed, kept, lapsing, Keeping, Secrets, Source};
+pub(crate) use secrets::keyed::UNMATCHED;
+pub(crate) use secrets::{dropped, filed, kept, keyed_at, lapsing, Keeping, Secrets, Source};
 pub(crate) use store::Settings;
 pub(crate) use waiting::held_back;
 

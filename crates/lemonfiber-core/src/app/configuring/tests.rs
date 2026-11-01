@@ -73,9 +73,11 @@ fn stance(outcome: &Result<ConfigReport, Box<crate::error::Problem>>) -> Option<
 }
 
 /// What a setting holds on disk now.
+/// What `key` reads as at `path`, a credential from the secret store it is held in.
 fn on_disk(path: &std::path::Path, key: &str) -> Option<String> {
     store::read(path)
         .ok()
+        .map(|file| crate::settings::legacy::overlaid(path, file))
         .and_then(|file| file.get(key).map(str::to_owned))
 }
 
@@ -575,9 +577,8 @@ fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, curr
             },
         },
     ];
-    let recorded = crate::app::targets::layout(ctx).map(|paths| {
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
-    });
+    let recorded = crate::app::targets::layout(ctx)
+        .map(|paths| crate::app::recover::journalled(&paths.journal(), &changes));
     assert!(
         recorded.is_some_and(|written| written.is_ok()),
         "the journal was written"
@@ -651,6 +652,7 @@ async fn a_value_a_plugin_set_is_overridden_while_it_is_installed_and_orphaned_a
 #[tokio::test]
 async fn a_credential_a_plugin_replaced_is_never_shown() {
     let env = env_at("origin-credential-replaced", "INDEXER_APIKEY=the-new-one\n");
+    crate::test_support::held_secret(&env, "INDEXER_APIKEY", "the-new-one");
     let ctx = set_up(&env);
     a_plugin_set(
         &ctx,

@@ -291,7 +291,13 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
         from: crate::settings::Source::Recipe,
         at: 1,
     }];
-    assert!(crate::settings::kept(&secrets, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &secrets,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
     let file = machine.env.with_file_name("env").join("holder.env");
     assert!(store::write(&file, "TOKEN=undone\n").is_ok());
     let carried = crate::app::recover::Carried {
@@ -348,7 +354,13 @@ async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
         from: crate::settings::Source::Recipe,
         at: 1,
     }];
-    assert!(crate::settings::kept(&secrets, &recipe, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &secrets,
+        &recipe,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
 
     assert!(entered("entered-key").await.is_ok());
     assert!(holds("entered-key"));

@@ -8,8 +8,7 @@ use std::path::Path;
 
 use crate::config::store;
 use crate::error::{Diagnose as _, Problem, Remedy};
-use crate::journal::{kept, Change, Journal, Seal};
-use crate::ports::random::Random;
+use crate::journal::{kept, scrubbed, store_of, Change, Journal, Seal};
 
 /// The change journal saved at `path`, empty where none is there.
 ///
@@ -21,11 +20,12 @@ use crate::ports::random::Random;
 /// from it, and the next record written from that reading would take the line off the
 /// disk as well.
 ///
-/// Credentials are opened here, with the key kept beside the file, because the
-/// record is sealed on disk and clear in memory — see [`crate::journal::sealing`].
-/// A value this machine has no key for is left sealed rather than dropped: which
-/// setting changed is still worth reading where what it changed to is not, and
-/// every reader that could act on the value asks whether it opened first.
+/// A value an earlier release sealed is opened here, with the key kept beside the file,
+/// and a credential's value is replaced by its fingerprints, so what is held in memory
+/// is what is written back. A value this machine has no key for is left sealed rather
+/// than dropped where it is not a credential: which setting changed is still worth
+/// reading where what it changed to is not, and every reader that could act on the
+/// value asks whether it opened first.
 ///
 /// # Errors
 ///
@@ -43,6 +43,7 @@ pub fn journal_at(path: &Path) -> Result<Journal, store::Failure> {
         }
     };
     let seal = Seal::kept(path);
+    let store = store_of(path)?;
     let lines: Vec<&str> = text
         .lines()
         .filter(|line| !line.trim().is_empty())
@@ -51,15 +52,16 @@ pub fn journal_at(path: &Path) -> Result<Journal, store::Failure> {
     let mut changes = Vec::new();
     for (at, line) in lines.iter().enumerate() {
         match serde_json::from_str::<Change>(line) {
-            Ok(change) => changes.push(seal.opening(&change)),
+            Ok(change) => changes.push(scrubbed(&seal.opening(&change), &store)),
             Err(_) if at == last => {}
             Err(why) => {
                 return Err(store::Failure::Unreadable {
                     path: path.to_path_buf(),
                     reason: format!(
-                        "entry {} is not a change this build can read ({why}), so the journal \
-                         is left as it is rather than read without it",
-                        at + 1
+                        "entry {} is not a change this build can read (column {}), so the \
+                         journal is left as it is rather than read without it",
+                        at + 1,
+                        why.column()
                     ),
                 })
             }
@@ -86,10 +88,9 @@ pub fn journal_at(path: &Path) -> Result<Journal, store::Failure> {
 /// before it changed, and a record of an operator's configuration is not something to
 /// leave world-readable because this one caller wrote it a different way.
 ///
-/// `random` is what a credential is sealed under: the key where this machine has yet to
-/// make one, and a fresh nonce for every value. Every change goes out through the seal,
-/// the ones read back included — which is what takes the clear values out of a journal an
-/// older version wrote, on the first change recorded after the upgrade.
+/// Every change goes out with each credential's value replaced by its fingerprints, the
+/// ones read back included, which is what takes the values out of a journal an earlier
+/// release wrote, on the first change recorded after the upgrade.
 ///
 /// # Errors
 ///
@@ -97,26 +98,24 @@ pub fn journal_at(path: &Path) -> Result<Journal, store::Failure> {
 /// caller does about it depends on whether its change is made yet: one recorded before
 /// it acts does not act, and one recorded after says the change stands unrecorded
 /// ([`unrecorded`]).
-pub fn journalled(
-    path: &Path,
-    changes: &[Change],
-    random: &dyn Random,
-) -> Result<(), store::Failure> {
+pub fn journalled(path: &Path, changes: &[Change]) -> Result<(), store::Failure> {
     if changes.is_empty() {
         return Ok(());
     }
     let mut held: Vec<Change> = journal_at(path)?.changes().to_vec();
     held.extend(changes.iter().cloned());
-    let seal = Seal::minted(path, random);
+    let store = store_of(path)?;
     let written = kept(&held)
         .iter()
-        .filter_map(|change| serde_json::to_string(&seal.sealing(change, random)).ok())
+        .filter_map(|change| serde_json::to_string(&scrubbed(change, &store)).ok())
         .fold(String::new(), |mut lines, line| {
             lines.push_str(&line);
             lines.push('\n');
             lines
         });
-    store::write(path, &written)
+    store::write(path, &written)?;
+    Seal::retired(path);
+    Ok(())
 }
 
 /// What a change that was made and could not be recorded amounts to.

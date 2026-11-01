@@ -168,14 +168,11 @@ async fn one_run_goes_back_as_a_unit_and_the_others_stand() {
     );
 }
 
-/// A reversal reports what it put back and never the value it put back — on this road
-/// to `Outcome::Undo` as much as on the one `doctor --undo` takes.
-///
-/// The list is printed at a terminal and served at `/api/undo`, so a credential left in
-/// it is the record sealed and the door held open. The undo itself still carries the
-/// value, because that is what the reversal is carried out *with*.
+/// A credential an earlier release journalled as a setting is not written back into the
+/// environment file: the journal holds its fingerprints alone, so the reversal leaves it
+/// and names it as one to replace at the terminal, never its value.
 #[tokio::test]
-async fn a_reversal_reports_a_credential_without_reporting_its_value() {
+async fn a_reversal_names_a_credential_to_replace_without_reporting_its_value() {
     let root = scratch("withheld");
     env_holds(&root, "DOWNLOAD_TORRENT_PASSWORD=after\n");
     journalled(
@@ -194,8 +191,12 @@ async fn a_reversal_reports_a_credential_without_reporting_its_value() {
     let env = reading(&root);
 
     assert!(
-        env.contains("DOWNLOAD_TORRENT_PASSWORD=before"),
-        "the value still went back: {env}"
+        !env.contains("before"),
+        "the earlier value is not written back"
+    );
+    assert!(
+        said.contains("DOWNLOAD_TORRENT_PASSWORD") && said.contains("replaced at the terminal"),
+        "the credential is named as one to replace: {said}"
     );
     assert!(
         !said.contains("before") && !said.contains("after"),

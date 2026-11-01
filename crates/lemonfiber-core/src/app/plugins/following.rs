@@ -477,24 +477,24 @@ fn kept(
             at,
         })
         .collect();
-    crate::settings::kept(secrets, &kept, &|replaced| {
+    crate::settings::kept(secrets, &kept, ctx.seams.random.as_ref(), &|replaced| {
         let changes: Vec<Change> = kept
             .iter()
             .zip(replaced)
-            .map(|(one, (_, previous))| Change {
+            .map(|(one, replacing)| Change {
                 at: stamp.to_owned(),
                 operation: crate::plugin::owner(&would.plugin),
                 target: one.name.to_owned(),
                 kind: Kind::Secret {
                     name: one.name.to_owned(),
                     from: one.from.as_str().to_owned(),
-                    previous: previous.clone(),
-                    current: Some(crate::credential::fingerprint(one.value)),
+                    previous: replacing.previous.clone(),
+                    current: replacing.current.clone(),
                     filed: None,
                 },
             })
             .collect();
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        crate::app::recover::journalled(&paths.journal(), &changes)
     })
     .as_ref()
     .map_err(diagnosed)?;
