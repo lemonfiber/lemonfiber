@@ -383,9 +383,8 @@ fn journal_a_made(ctx: &Ctx, operation: &str, path: &Path) {
 
 /// Put one change on the record.
 fn journal(ctx: &Ctx, change: Change) {
-    let recorded = crate::app::targets::layout(ctx).map(|paths| {
-        crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
-    });
+    let recorded = crate::app::targets::layout(ctx)
+        .map(|paths| crate::app::recover::journalled(&paths.journal(), &[change]));
     assert!(
         recorded.is_some_and(|written| written.is_ok()),
         "the journal was written"

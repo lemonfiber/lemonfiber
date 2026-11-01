@@ -52,7 +52,7 @@ pub(crate) fn moved(ctx: &Ctx, manifest: &Manifest) -> Result<(), Box<Problem>> 
             },
             &from,
         ));
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        crate::app::recover::journalled(&paths.journal(), &changes)
             .map_err(|failure| Box::new(failure.problem()))?;
         let _ = confined.moved(&from, &to, &directory);
     }

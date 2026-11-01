@@ -46,9 +46,18 @@ async fn a_pasted_key_is_trimmed_before_it_is_proven_and_before_it_is_kept() {
     );
 
     // ...and the same string is what was written down.
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("INDEXER_APIKEY"), Some("the-key"));
     assert_eq!(file.get("INDEXER_URL"), Some("http://indexer.test/api"));
+    let written = store::read(&paths.env_file()).unwrap_or_default();
+    assert_eq!(
+        written.get("INDEXER_APIKEY"),
+        None,
+        "the key is held in the secret store and never in the environment file"
+    );
 }
 
 #[tokio::test]
@@ -71,7 +80,10 @@ async fn a_credential_proven_is_kept_and_recorded_as_validated() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("INDEXER_APIKEY"), Some("the-key"));
     assert_eq!(file.get("INDEXER_VALIDATED"), Some("on"));
     // The operator was shown what the test observed, not a bare pass.
@@ -110,7 +122,10 @@ async fn a_credential_that_fails_then_passes_on_retry_is_kept() {
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
     assert_eq!(prompt.failures.borrow().len(), 1, "one refusal was shown");
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("INDEXER_VALIDATED"), Some("on"));
 }
 
@@ -134,7 +149,10 @@ async fn a_credential_kept_unverified_records_that_it_was_not_proven() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     // Kept, so it is not lost — but recorded as unverified so a later diagnosis
     // can point at it rather than trusting it.
     assert_eq!(file.get("INDEXER_APIKEY"), Some("the-key"));
@@ -161,7 +179,10 @@ async fn a_credential_skipped_leaves_the_indexer_unset() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("INDEXER_URL"), None, "nothing was written for it");
 }
 
@@ -185,7 +206,10 @@ async fn no_indexer_is_a_supported_end_and_persists_nothing_before_a_test() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("INDEXER_URL"), None);
 }
 
@@ -225,7 +249,10 @@ async fn a_usenet_provider_proven_is_kept_and_recorded_as_validated() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("USENET_HOST"), Some("news.provider.test"));
     assert_eq!(file.get("USENET_USER"), Some("person"));
     assert_eq!(file.get("USENET_VALIDATED"), Some("on"));
@@ -262,7 +289,10 @@ async fn a_provider_that_fails_then_passes_on_retry_is_kept() {
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
     assert_eq!(prompt.failures.borrow().len(), 1);
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("USENET_VALIDATED"), Some("on"));
 }
 
@@ -286,7 +316,10 @@ async fn a_provider_kept_unverified_records_that_it_was_not_proven() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("USENET_HOST"), Some("news.provider.test"));
     assert_eq!(file.get("USENET_VALIDATED"), Some("off"));
 }
@@ -311,7 +344,10 @@ async fn a_provider_skipped_leaves_usenet_unset() {
     .await;
 
     assert!(matches!(outcome, Ok(Outcome::Applied)));
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("USENET_HOST"), None);
 }
 
@@ -347,6 +383,9 @@ async fn a_library_only_run_is_never_asked_for_a_credential() {
         prompt.failures.borrow().is_empty(),
         "no credential was tested"
     );
-    let file = store::read(&paths.env_file()).unwrap_or_default();
+    let file = crate::settings::legacy::overlaid(
+        &paths.env_file(),
+        store::read(&paths.env_file()).unwrap_or_default(),
+    );
     assert_eq!(file.get("INDEXER_URL"), None);
 }

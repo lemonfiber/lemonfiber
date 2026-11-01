@@ -305,6 +305,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
         &context,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
+        crate::seed::OPERATION,
     );
     let mut context = crate::test_support::adapted::reaching(context, &PARTS);
     context.seams.engine =

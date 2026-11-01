@@ -490,7 +490,7 @@ fn journalled(ctx: &Ctx, name: &str, kind: Kind) -> Result<(), Box<Problem>> {
         target: name.to_owned(),
         kind,
     };
-    crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), &[change])
         .map_err(|failure| Box::new(failure.problem()))
 }
 

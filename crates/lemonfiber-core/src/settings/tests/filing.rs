@@ -4,7 +4,6 @@ use lemonfiber_plugin::Manifest;
 
 use crate::app::Ctx;
 use crate::config::store;
-use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::plugin::{Installed, Register};
 use crate::test_support::{a_context, env_without_password};
@@ -135,7 +134,9 @@ fn a_plugins_secret_in_the_environment_file_is_filed_once_and_journalled() {
                 name: "comics:komga".to_owned(),
                 from: "recipe".to_owned(),
                 previous: None,
-                current: Some(fingerprint("s3cr$t")),
+                current: crate::settings::secrets_at(&ctx)
+                    .and_then(|at| crate::settings::Secrets::at(&at).ok())
+                    .and_then(|kept| kept.keyed("s3cr$t")),
                 filed: Some(key()),
             }
         ))
@@ -182,7 +183,13 @@ fn a_value_already_held_is_never_overwritten() {
         from: crate::settings::Source::Operator,
         at: 1,
     }];
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
     super::super::filing::filed(&ctx);
     assert_eq!(held(&ctx).as_deref(), Some("kept"));
     assert_eq!(line(&ctx), None);

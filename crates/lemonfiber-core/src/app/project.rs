@@ -481,7 +481,6 @@ pub(crate) fn rewritten(
     crate::app::recover::journalled(
         &paths.journal(),
         &[change(&at, previous, &text, operation, stamp)],
-        ctx.seams.random.as_ref(),
     )
     .map_err(|failure| Box::new(failure.problem()))?;
     kept(ctx, &text).map_err(|failure| Box::new(failure.problem()))?;

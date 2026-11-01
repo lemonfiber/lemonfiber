@@ -99,7 +99,7 @@ fn journalled(ctx: &Ctx, service: &str) -> Result<(), String> {
             service: service.to_owned(),
         },
     };
-    crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), &[change])
         .map_err(|failure| format!("the restart could not be journalled: {failure}"))
 }
 

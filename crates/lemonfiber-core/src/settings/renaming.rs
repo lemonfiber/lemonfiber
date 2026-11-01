@@ -211,7 +211,7 @@ fn moved(env: &std::path::Path, was: &str, now: &str, value: &str) -> Result<(),
 /// Write `changes` to the journal.
 fn journalled(ctx: &Ctx, changes: &[Change]) -> Result<(), Failure> {
     let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
-    crate::app::recover::journalled(&paths.journal(), changes, ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), changes)
 }
 
 #[cfg(test)]

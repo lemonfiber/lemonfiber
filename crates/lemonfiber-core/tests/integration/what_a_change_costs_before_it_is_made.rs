@@ -61,9 +61,11 @@ async fn changing(ctx: &Ctx, key: &str, value: &str, confirmed: bool) -> Option<
 }
 
 /// What a setting holds on disk now.
+/// What `key` reads as at `path`, a credential from the secret store it is held in.
 fn on_disk(path: &Path, key: &str) -> Option<String> {
     store::read(path)
         .ok()
+        .map(|file| lemonfiber_core::stored_over(path, file))
         .and_then(|file| file.get(key).map(str::to_owned))
 }
 

@@ -1,16 +1,19 @@
 use super::super::{carrying_out, undo};
 use super::scratch;
-use crate::credential::fingerprint;
-use crate::error::codes::setup::UNKEPT;
+use crate::error::codes::setup::REPLACE_AT_THE_TERMINAL;
 use crate::journal::{Action, Undo};
 
-fn rehold(previous: Option<&str>, wrote: Option<&str>) -> Undo {
+/// Putting back the change to `komga:token` from `previous` to `wrote`, fingerprinted by
+/// the store at `secrets`.
+fn rehold(secrets: &std::path::Path, previous: Option<&str>, wrote: Option<&str>) -> Undo {
+    let held = crate::settings::Secrets::at(secrets).unwrap_or_default();
+    let keyed = |value: &str| held.keyed(value);
     Undo {
         target: "komga:token".to_owned(),
         action: Action::Rehold {
             name: "komga:token".to_owned(),
-            earlier: previous.map(fingerprint),
-            kept: wrote.map(fingerprint),
+            earlier: previous.and_then(keyed),
+            kept: wrote.and_then(keyed),
             filed: None,
         },
     }
@@ -23,7 +26,13 @@ fn keep(secrets: &std::path::Path, value: &str) {
         from: crate::settings::Source::Recipe,
         at: 1,
     }];
-    assert!(crate::settings::kept(secrets, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        secrets,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
 }
 
 #[test]
@@ -33,7 +42,7 @@ fn a_secret_kept_by_a_change_is_forgotten_when_it_goes_back() {
     keep(&dir.join("secrets.json"), "t0k3n");
     let carried = carrying_out(
         &lemonfiber_adapters::Disk,
-        &[rehold(None, Some("t0k3n"))],
+        &[rehold(&dir.join("secrets.json"), None, Some("t0k3n"))],
         &env,
         Vec::new(),
     );
@@ -42,22 +51,52 @@ fn a_secret_kept_by_a_change_is_forgotten_when_it_goes_back() {
     assert_eq!(held.value("komga:token"), None);
 }
 
+/// Whether `refused` says the secret `komga:token` must be replaced at the terminal.
+fn to_replace(refused: &Result<(), Box<crate::error::Problem>>) -> bool {
+    matches!(refused, Err(problem) if problem.code == REPLACE_AT_THE_TERMINAL
+        && problem.summary.contains("must be replaced at the terminal")
+        && problem.detail.as_deref() == Some("komga:token"))
+}
+
 #[test]
-fn a_secret_whose_earlier_value_was_not_kept_is_named_and_left() {
+fn a_secret_whose_earlier_value_was_not_kept_must_be_replaced_at_the_terminal() {
     let dir = scratch("rehold-unkept");
     let env = dir.join(".env");
     keep(&dir.join("secrets.json"), "second");
     let refused = undo(
         &lemonfiber_adapters::Disk,
-        &[rehold(Some("first"), Some("second"))],
+        &[rehold(
+            &dir.join("secrets.json"),
+            Some("first"),
+            Some("second"),
+        )],
         &env,
         Vec::new(),
     );
-    assert!(
-        matches!(&refused, Err(problem) if problem.code == UNKEPT
-            && problem.detail.as_deref() == Some("komga:token")),
-        "{refused:?}"
+    assert!(to_replace(&refused), "{refused:?}");
+}
+
+#[test]
+fn a_secret_replaced_since_must_be_replaced_at_the_terminal_and_is_left() {
+    let dir = scratch("rehold-replaced");
+    let env = dir.join(".env");
+    keep(&dir.join("secrets.json"), "first");
+    keep(&dir.join("secrets.json"), "second");
+    keep(&dir.join("secrets.json"), "third");
+    let undos = [rehold(
+        &dir.join("secrets.json"),
+        Some("first"),
+        Some("second"),
+    )];
+    let refused = undo(&lemonfiber_adapters::Disk, &undos, &env, Vec::new());
+    assert!(to_replace(&refused), "{refused:?}");
+    let carried = carrying_out(&lemonfiber_adapters::Disk, &undos, &env, Vec::new());
+    assert_eq!(
+        carried.map(|one| (one.theirs, one.to_replace)).ok(),
+        Some((Vec::new(), vec!["komga:token".to_owned()]))
     );
+    let held = crate::settings::Secrets::at(&dir.join("secrets.json")).unwrap_or_default();
+    assert_eq!(held.value("komga:token"), Some("third"));
 }
 
 #[test]

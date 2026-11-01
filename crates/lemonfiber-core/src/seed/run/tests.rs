@@ -153,7 +153,13 @@ fn keeping_minted(
         })
         .collect();
     let at = crate::settings::secrets_at(ctx).unwrap_or_default();
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
 }
 
 /// A context as [`seed_ctx`] reaching every service builds it, its settings beside a

@@ -4,6 +4,7 @@
 //! a plan is reviewable before anything touches disk.
 
 use super::{Change, EnvFile, Kind};
+use crate::settings::legacy::held_as;
 
 /// The environment settings a reviewed wizard will write.
 ///
@@ -21,18 +22,33 @@ impl Plan {
         &self.settings
     }
 
+    /// The settings that are not credentials, as ordered key/value pairs the environment
+    /// file is written with.
+    pub(crate) fn written(&self) -> impl Iterator<Item = &(String, String)> {
+        self.settings
+            .iter()
+            .filter(|(key, _)| held_as(key).is_none())
+    }
+
+    /// The credentials, each by the name the secret store holds it as, with its value.
+    pub(crate) fn secrets(&self) -> impl Iterator<Item = (String, &str)> {
+        self.settings
+            .iter()
+            .filter_map(|(key, value)| Some((held_as(key)?, value.as_str())))
+    }
+
     /// The journal changes that applying this plan makes to the environment file,
     /// against what that file holds now.
     ///
-    /// One `Set` per setting, each carrying the value the file held for that key
-    /// before — read from `current`, `None` where the key is new — so applying is
-    /// a recorded, reversible act rather than a blind overwrite, and an interrupted
-    /// apply can be unwound to exactly what was there. The plan has no clock, so
-    /// the caller stamps the time.
+    /// One `Set` per setting that is not a credential, each carrying the value the file
+    /// held for that key before — read from `current`, `None` where the key is new — so
+    /// applying is a recorded, reversible act rather than a blind overwrite, and an
+    /// interrupted apply can be unwound to exactly what was there. A credential is held
+    /// in the secret store and journalled by its fingerprints instead. The plan has no
+    /// clock, so the caller stamps the time.
     #[must_use]
     pub fn changes(&self, current: &EnvFile, stamp: &str) -> Vec<Change> {
-        self.settings
-            .iter()
+        self.written()
             .map(|(key, value)| Change {
                 at: stamp.to_owned(),
                 operation: APPLY.to_owned(),

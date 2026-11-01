@@ -5,7 +5,6 @@ use crate::config::paths::{SECRETS, SETTINGS};
 use crate::config::storage::{self, Storage};
 use crate::config::store::{self, Failure};
 use crate::config::{DATA_ROOT_KEY, NAS_EXPORT_KEY, NAS_HOST_KEY};
-use crate::credential::fingerprint;
 use crate::journal::{Change, Kind};
 use crate::plugin::first_party::{holds, EMBEDDED};
 use crate::plugin::Installed;
@@ -40,13 +39,69 @@ pub(crate) async fn everything(ctx: &Ctx) {
             .await;
     }
     filed(ctx);
-    if let Err(failure) = stack(ctx) {
+    if let Err(failure) = stack(ctx).and_then(|()| credentials(ctx)) {
         ctx.narrator
             .say(&format!(
                 "the stack's settings could not be moved into lemonfiber's own stores yet: {failure}"
             ))
             .await;
     }
+}
+
+/// File every credential the environment file still holds into the secret store, under
+/// the name the store holds it as, journalled by its keyed fingerprint, and take it out of the
+/// file: one the store already holds a value for leaves the file without being kept.
+///
+/// Asked on every run rather than once, so a credential an earlier release wrote to the
+/// file after its settings were filed is filed too, and the file is never read for one.
+pub(crate) fn credentials(ctx: &Ctx) -> Result<(), Failure> {
+    if ctx.dry_run {
+        return Ok(());
+    }
+    let Some(env) = ctx.settings.env_file.as_deref() else {
+        return Ok(());
+    };
+    let file = store::read(env)?;
+    let held: Vec<(String, String, &str)> = file
+        .keys()
+        .into_iter()
+        .filter_map(|key| {
+            let value = file.get(key).filter(|value| !value.is_empty())?;
+            Some((key.to_owned(), legacy::held_as(key)?, value))
+        })
+        .collect();
+    if held.is_empty() {
+        return Ok(());
+    }
+    let journal = env.with_file_name(crate::config::paths::JOURNAL);
+    let (at, stamp) = (ctx.seconds(), ctx.stamp());
+    let keeping: Vec<Keeping<'_>> = held
+        .iter()
+        .map(|(key, name, value)| Keeping {
+            name,
+            value,
+            from: legacy::source_of(key),
+            at,
+        })
+        .collect();
+    let random = ctx.seams.random.as_ref();
+    super::secrets::filed(&env.with_file_name(SECRETS), &keeping, random, &|absent| {
+        let changes: Vec<Change> = absent
+            .iter()
+            .map(|(one, current)| {
+                let key = held
+                    .iter()
+                    .find(|(_, name, _)| name == one.name)
+                    .map(|(key, _, _)| key.clone());
+                filed_secret(one, current.clone(), key, &stamp)
+            })
+            .collect();
+        crate::app::recover::journalled(&journal, &changes)
+    })?;
+    for (key, _, _) in &held {
+        store::unset(env, key)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn filed(ctx: &Ctx) {
@@ -82,12 +137,13 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
             at,
         })
         .collect();
-    super::secrets::filed(&env.with_file_name(SECRETS), &keeping, &|absent| {
+    let random = ctx.seams.random.as_ref();
+    super::secrets::filed(&env.with_file_name(SECRETS), &keeping, random, &|absent| {
         let changes: Vec<Change> = absent
             .iter()
-            .map(|one| change(one, &filings, &stamp))
+            .map(|(one, current)| change(one, current.clone(), &filings, &stamp))
             .collect();
-        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+        crate::app::recover::journalled(&paths.journal(), &changes)
     })?;
     for filing in &filings {
         store::unset(env, &filing.key)?;
@@ -131,7 +187,7 @@ fn candidates(ctx: &Ctx, installed: &[Installed]) -> Vec<Filing> {
         .collect()
 }
 
-fn change(one: &Keeping<'_>, filings: &[Filing], stamp: &str) -> Change {
+fn change(one: &Keeping<'_>, current: Option<String>, filings: &[Filing], stamp: &str) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
@@ -140,7 +196,7 @@ fn change(one: &Keeping<'_>, filings: &[Filing], stamp: &str) -> Change {
             name: one.name.to_owned(),
             from: one.from.as_str().to_owned(),
             previous: None,
-            current: Some(fingerprint(one.value)),
+            current,
             filed: filings
                 .iter()
                 .find(|filing| filing.name == one.name)
@@ -196,12 +252,13 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
                 at,
             })
             .collect();
-        super::secrets::filed(&env.with_file_name(SECRETS), &keeping, &|absent| {
+        let random = ctx.seams.random.as_ref();
+        super::secrets::filed(&env.with_file_name(SECRETS), &keeping, random, &|absent| {
             let changes: Vec<Change> = absent
                 .iter()
-                .map(|one| filed_secret(one, key_of(one.name), &stamp))
+                .map(|(one, current)| filed_secret(one, current.clone(), key_of(one.name), &stamp))
                 .collect();
-            crate::app::recover::journalled(&journal, &changes, ctx.seams.random.as_ref())
+            crate::app::recover::journalled(&journal, &changes)
         })?;
         let filing: Vec<super::store::Filing<'_>> = rows
             .iter()
@@ -213,7 +270,7 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
                 .iter()
                 .map(|(name, value)| filed_setting(name, value, key_of(name), &stamp))
                 .collect();
-            crate::app::recover::journalled(&journal, &changes, ctx.seams.random.as_ref())
+            crate::app::recover::journalled(&journal, &changes)
         })?;
         for (row, _) in &rows {
             store::unset(env, &row.key)?;
@@ -310,13 +367,18 @@ fn nas_folded(
         set(NAS_EXPORT_KEY, Some(path), ""),
     ];
     let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
-    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())?;
+    crate::app::recover::journalled(&paths.journal(), &changes)?;
     store::set(env, DATA_ROOT_KEY, &folded)?;
     store::set(env, NAS_HOST_KEY, "")?;
     store::set(env, NAS_EXPORT_KEY, "")
 }
 
-fn filed_secret(one: &Keeping<'_>, key: Option<String>, stamp: &str) -> Change {
+fn filed_secret(
+    one: &Keeping<'_>,
+    current: Option<String>,
+    key: Option<String>,
+    stamp: &str,
+) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
@@ -325,7 +387,7 @@ fn filed_secret(one: &Keeping<'_>, key: Option<String>, stamp: &str) -> Change {
             name: one.name.to_owned(),
             from: one.from.as_str().to_owned(),
             previous: None,
-            current: Some(fingerprint(one.value)),
+            current,
             filed: key,
         },
     }

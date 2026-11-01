@@ -98,7 +98,6 @@ pub(super) async fn apply(
         crate::app::recover::journalled(
             &paths.journal(),
             &recorded(&applied, &backup, &ctx.stamp()),
-            ctx.seams.random.as_ref(),
         )
         .map_err(|failure| Box::new(crate::app::recover::unrecorded("The update", &failure)))?;
     }

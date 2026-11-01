@@ -61,7 +61,7 @@ pub fn stand(
             current: moves.clone(),
         },
     };
-    crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), &[change])
         .map_err(|failure| Box::new(failure.problem()))?;
     store::set(&recorded, BESIDE_KEY, &moves).map_err(|failure| Box::new(failure.problem()))?;
 

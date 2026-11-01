@@ -79,7 +79,7 @@ fn made_confined(
     content: &[u8],
     readable: Readable,
 ) -> Result<(), Box<Problem>> {
-    recorded_making(ctx, recording, path, false)?;
+    recorded_making(recording, path, false)?;
     ctx.seams
         .confined
         .written(path, stack, content, readable)

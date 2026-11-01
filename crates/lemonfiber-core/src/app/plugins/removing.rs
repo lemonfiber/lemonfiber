@@ -163,14 +163,10 @@ pub(crate) async fn remove(
         &ctx.stamp(),
     )?;
 
-    // The credentials lemonfiber minted for its services and kept beside the settings,
-    // which no journal entry covers because seeding keeps them rather than an install.
-    // They go with the plugin: a later plugin is somebody else, and the next service to
-    // take one of these ids would otherwise be handed this one's password.
-    ctx.settings
-        .env_file
-        .iter()
-        .for_each(|file| forget_credentials(ctx, file, &kept));
+    // The credentials lemonfiber minted for its services, which go with the plugin: a
+    // later plugin is somebody else, and the next service to take one of these ids would
+    // otherwise be handed this one's password.
+    forget_credentials(ctx, &going.plugin, &kept);
     crate::settings::forgotten(ctx, &going);
     super::kept::forgotten(ctx, &going.plugin);
 
@@ -189,16 +185,16 @@ pub(crate) async fn remove(
     ))
 }
 
-/// Take each of these settings out of the environment file.
+/// Forget each of these credentials of `plugin` from the secret store, journalled under
+/// the plugin's removal by the fingerprint of what each held.
 ///
 /// Best effort, as keeping them is: the plugin is already off the record by here, and a
-/// setting that would not go is one nothing reads until a plugin of the same id arrives.
-fn forget_credentials(ctx: &Ctx, file: &std::path::Path, kept: &[String]) {
-    let held = kept
-        .iter()
-        .filter(|setting| super::super::targets::recorded_secret(ctx, setting).is_some());
-    for setting in held {
-        let _ = crate::config::store::unset(file, setting);
+/// credential that would not go is one nothing reads until a plugin of the same id
+/// arrives.
+fn forget_credentials(ctx: &Ctx, plugin: &str, kept: &[String]) {
+    let operation = crate::plugin::owner(plugin);
+    for setting in kept {
+        let _ = super::super::targets::forget_secret(ctx, setting, &operation);
     }
 }
 

@@ -171,11 +171,10 @@ pub fn standing(
         if is_sealed(left) || replaced.is_some_and(is_sealed) {
             return Standing::refused(
                 &format!(
-                    "{key} holds a credential, and the record of what it held is sealed \
-                     under a key this machine no longer has — so there is nothing here it \
-                     can put back"
+                    "the record of what {key} held is sealed under a key this machine no \
+                     longer has — so there is nothing here it can put back"
                 ),
-                Some("set it yourself, from wherever the earlier credential came from"),
+                Some("set it yourself, to the value you want"),
             );
         }
         if let Some(edited) = drifted(change, holds) {

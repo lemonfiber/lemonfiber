@@ -59,10 +59,12 @@ pub const EVERY: &[Entry] = &[
     },
     Entry {
         accessor: "secrets",
-        what: "the secrets lemonfiber holds for plugins",
-        why: "Each value a plugin's recipe captured or you entered for it, by its name, with \
-              the one earlier value of each that undoing a change puts back. It is never \
-              written into the stack, and nothing records it anywhere else.",
+        what: "the secrets lemonfiber holds",
+        why: "Every credential lemonfiber holds, its own included: each value a plugin's \
+              recipe captured, lemonfiber minted or you entered, by its name, with the one \
+              earlier value of each that undoing a change puts back, and the key the change \
+              journal's fingerprints of them are taken under. It is never written into the \
+              stack, and nothing records it anywhere else.",
         secret: true,
         at: Paths::secrets,
     },
@@ -136,20 +138,17 @@ pub const EVERY: &[Entry] = &[
         accessor: "journal",
         what: "the change journal",
         why: "What the last run wrote, so a repair can be put back. The fields that changed and \
-              what they were — nothing about you and nothing about what you watch. Where a \
-              setting held a credential, what it held is sealed rather than written down, and \
-              the key it is sealed with is the file below.",
+              what they were — nothing about you and nothing about what you watch. A change to \
+              a credential is recorded by the fingerprints of its values, never by a value.",
         secret: false,
         at: Paths::journal,
     },
     Entry {
         accessor: "journal_key",
         what: "the change journal's key",
-        why: "What the credentials in the change journal are sealed with. It is kept beside the \
-              journal and read nowhere else, so a copy of the journal taken without it says \
-              which settings changed and cannot say what they were changed to — which is the \
-              whole reason it is a file of its own. Anything that can read both can read the \
-              journal, so this protects the journal from travelling, not from this machine.",
+        why: "What a change journal an earlier release wrote sealed its credentials with. It is \
+              read only to open them, so they are recorded by their fingerprints, and it is \
+              taken away the next time the journal is written.",
         secret: true,
         at: Paths::journal_key,
     },

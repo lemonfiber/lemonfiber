@@ -62,5 +62,11 @@ pub(crate) fn minted_for_every_part(ctx: &Ctx, key: &str) {
         })
         .collect();
     let at = crate::settings::secrets_at(ctx).unwrap_or_default();
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
 }

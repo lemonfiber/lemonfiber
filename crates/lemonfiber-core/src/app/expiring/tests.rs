@@ -371,6 +371,7 @@ fn listing(name: &str, closes: Answer, lists: Answer) -> (Ctx, Arc<Transport>) {
         &ctx,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         &a_password(),
+        crate::app::credentials::OPERATION,
     );
     crate::test_support::media::moved_in(&ctx);
     REQUESTS.moved_in(&ctx);

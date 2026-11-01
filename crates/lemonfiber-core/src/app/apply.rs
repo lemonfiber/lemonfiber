@@ -29,10 +29,9 @@ use crate::autostart::Returning;
 use crate::baseline::Baseline;
 use crate::config::paths::{Paths, SECRETS};
 use crate::config::store::{self, is_secret};
-use crate::credential::fingerprint;
 use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
 use crate::error::{Diagnose, Problem, Remedy};
-use crate::journal::{Change, Journal, Kind, Seal};
+use crate::journal::{scrubbed, store_of, Change, Journal, Kind, Seal};
 use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
 use crate::settings::Keeping;
@@ -41,13 +40,13 @@ use crate::wizard::{Guarded, Phase, Plan, Vpn, Wizard};
 
 /// Everything an apply writes *with*, as against the answers it writes.
 ///
-/// A bundle rather than four more arguments, and it is the same argument the seams
-/// bundle makes: these four are always supplied together, they are handed unchanged
-/// down through review and recovery to the writes themselves, and named one at a time
-/// they turn every function they pass through into a longer signature than the thing
-/// it does. They are not seams — nothing here reaches the world — they are where this
-/// machine keeps its files, where its stack comes from, what time it is, and what a
-/// credential is sealed under.
+/// A bundle rather than more arguments, and it is the same argument the seams bundle
+/// makes: these are always supplied together, they are handed unchanged down through
+/// review and recovery to the writes themselves, and named one at a time they turn every
+/// function they pass through into a longer signature than the thing it does. They are
+/// not seams — nothing here reaches the world — they are where this machine keeps its
+/// files, where its stack comes from, what time it is and what the secret store's key is
+/// drawn from.
 pub struct Applying<'a> {
     /// Where lemonfiber's own files live.
     pub paths: &'a Paths,
@@ -55,7 +54,7 @@ pub struct Applying<'a> {
     pub source: Source,
     /// The time to stamp the journal with, which the wizard has no clock to do itself.
     pub stamp: &'a str,
-    /// Where the key the journal's credentials are sealed under is drawn from.
+    /// Where the secret store's key is drawn from, where the store has none yet.
     pub random: &'a dyn Random,
     /// How the stack's files are written into directories containers can write.
     pub confined: &'a dyn Confined,
@@ -75,9 +74,8 @@ pub struct Applying<'a> {
 /// lands before the write it describes, so a stop at any point leaves a state the
 /// next run can recover rather than one it must guess at.
 ///
-/// A setting whose name says it holds a credential is journalled sealed rather than as
-/// itself, under a key made from the randomness the bundle carries — see
-/// [`crate::journal::sealing`] for what that does and does not protect against.
+/// A credential is held in the secret store and journalled by its fingerprints, never by
+/// its value — see [`crate::journal::sealing`].
 ///
 /// # Errors
 ///
@@ -141,9 +139,8 @@ impl Fault {
 /// journalled before it is written, and the applied marker is persisted last — so
 /// a stop at any point leaves the marker and journal a later run reads.
 fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<(), Fault> {
-    let (paths, stamp, random) = (applying.paths, applying.stamp, applying.random);
+    let (paths, stamp) = (applying.paths, applying.stamp);
     let (progress, env_file, journal) = (paths.setup_progress(), paths.env_file(), paths.journal());
-    let seal = Seal::minted(&journal, random);
 
     store::write(&progress, &rendered(wizard)).map_err(Fault::Store)?;
 
@@ -174,7 +171,7 @@ fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<()
         for ancestor in made_by(&root) {
             log.record(made(&ancestor, stamp));
         }
-        store::write(&journal, &lines(&log, &seal, random)).map_err(Fault::Store)?;
+        kept_journal(&journal, &log).map_err(Fault::Store)?;
         std::fs::create_dir_all(&root).map_err(|err| Fault::DirNotMade {
             path: root,
             reason: err.to_string(),
@@ -209,19 +206,23 @@ fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<()
     )
     .map_err(Fault::Stack)?;
 
-    // `changes` is one entry per setting in the same order, so each pairs with the
-    // key and value it was built from; they are two views of the same list, walked
+    // `changes` is one entry per setting written in the same order, so each pairs with
+    // the key and value it was built from; they are two views of the same list, walked
     // together.
-    for (change, (key, value)) in changes.into_iter().zip(plan.settings()) {
+    for (change, (key, value)) in changes.into_iter().zip(plan.written()) {
         // Journalled before it is written: a run that dies between the two leaves a
         // record of a change that may not have landed, and undoing that restores
         // what was already there — harmless. The reverse would leave a real write
         // with nothing to unwind it.
         log.record(change);
-        store::write(&journal, &lines(&log, &seal, random)).map_err(Fault::Store)?;
+        kept_journal(&journal, &log).map_err(Fault::Store)?;
         store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
-    guarded(taken, applying, &mut log, &seal).map_err(Fault::Store)?;
+    let mut taken = taken.clone();
+    taken
+        .secrets
+        .extend(plan.secrets().map(|(name, value)| (name, value.to_owned())));
+    guarded(&taken, applying, &mut log).map_err(Fault::Store)?;
 
     // What lemonfiber wrote, recorded as the expected state a later change compares
     // against. Without it, the first change made to a setting cannot tell an
@@ -272,15 +273,10 @@ fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<()
     store::write(&progress, &rendered(wizard)).map_err(Fault::Store)
 }
 
-/// What the egress guard took of the VPN answer, written where every setting and secret
-/// of a service is kept: each journalled before it is written, a secret by the
-/// fingerprints of what it replaces and of itself.
-fn guarded(
-    taken: &Guarded,
-    applying: &Applying,
-    log: &mut Journal,
-    seal: &Seal,
-) -> Result<(), store::Failure> {
+/// What the egress guard took of the VPN answer and the credentials setup was given,
+/// written where every setting and secret is kept: each journalled before it is written,
+/// a secret by the fingerprints of what it replaces and of itself.
+fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<(), store::Failure> {
     if taken == &Guarded::default() {
         return Ok(());
     }
@@ -291,7 +287,7 @@ fn guarded(
         env.with_file_name(SECRETS),
     );
     let held = crate::settings::Settings::at(&settings_at)?;
-    let kept = crate::settings::Secrets::at(&secrets_at)?;
+    let kept = crate::settings::keyed_at(&secrets_at, applying.random)?;
     let changed = |target: &str, kind: Kind| Change {
         at: applying.stamp.to_owned(),
         operation: crate::wizard::APPLY.to_owned(),
@@ -316,12 +312,12 @@ fn guarded(
                 name: name.clone(),
                 from: crate::settings::Source::Operator.as_str().to_owned(),
                 previous: kept.fingerprint(name),
-                current: Some(fingerprint(value)),
+                current: kept.keyed(value),
                 filed: None,
             },
         ));
     }
-    store::write(&journal, &lines(log, seal, applying.random))?;
+    kept_journal(&journal, log)?;
     let changing: BTreeMap<&str, Option<&str>> = settings
         .iter()
         .map(|(name, value)| (name.as_str(), Some(value.as_str())))
@@ -337,7 +333,7 @@ fn guarded(
             at,
         })
         .collect();
-    crate::settings::kept(&secrets_at, &keeping, &|_| Ok(()))
+    crate::settings::kept(&secrets_at, &keeping, applying.random, &|_| Ok(()))
 }
 
 /// Record the settings this apply wrote, as what lemonfiber last put in the file.
@@ -414,15 +410,20 @@ fn rendered(wizard: &Wizard) -> String {
 /// As with the progress, a `Change` cannot fail to serialise, so no line is ever
 /// the empty-string fallback.
 ///
-/// Sealed on the way out rather than where the change was made, so the record this run
-/// holds in memory is exact and only the file is not: an apply that stops part-way
-/// reverses its own writes from what it is holding, credentials and all, and what
-/// outlives the run is what has them taken out of it.
-fn lines(journal: &Journal, seal: &Seal, random: &dyn Random) -> String {
+/// The journal written to `path`, each credential's value replaced by its fingerprints,
+/// and the key a journal an earlier release wrote sealed values under taken away.
+fn kept_journal(path: &Path, journal: &Journal) -> Result<(), store::Failure> {
+    store::write(path, &lines(journal, &store_of(path)?))?;
+    Seal::retired(path);
+    Ok(())
+}
+
+/// Each credential's value replaced by its fingerprints on the way out.
+fn lines(journal: &Journal, store: &crate::settings::Secrets) -> String {
     journal
         .changes()
         .iter()
-        .map(|change| serde_json::to_string(&seal.sealing(change, random)).unwrap_or_default())
+        .map(|change| serde_json::to_string(&scrubbed(change, store)).unwrap_or_default())
         .collect::<Vec<_>>()
         .join("\n")
 }

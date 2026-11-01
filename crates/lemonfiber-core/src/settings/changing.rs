@@ -154,7 +154,7 @@ async fn written(
             .iter()
             .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
     );
-    crate::app::recover::journalled(&paths.journal(), &journal, ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&paths.journal(), &journal)
         .map_err(|failure| Box::new(failure.problem()))?;
     super::store::recorded(&env.with_file_name(SETTINGS), changing)
         .map_err(|failure| Box::new(failure.problem()))?;

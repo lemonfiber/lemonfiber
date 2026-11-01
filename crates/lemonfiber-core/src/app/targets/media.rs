@@ -186,7 +186,8 @@ impl MediaServer {
     ///
     /// Why the record would not take it, in words.
     pub(crate) fn record_password(&self, ctx: &Ctx, password: &str) -> Result<(), String> {
-        record_secret(ctx, &self.setting, password).map_err(|failure| failure.to_string())?;
+        record_secret(ctx, &self.setting, password, crate::seed::OPERATION)
+            .map_err(|failure| failure.to_string())?;
         self.hand_upstream(password)
     }
 

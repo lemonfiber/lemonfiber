@@ -107,7 +107,7 @@ async fn settings(
     // operator is shown is the difference between this file and the one proposed, and a
     // file read afterwards is already the answer to the question.
     let held = match store::read(path) {
-        Ok(file) => crate::settings::legacy::listed(path, file),
+        Ok(file) => crate::settings::legacy::overlaid(path, file),
         Err(err) => return Err(Box::new(err.problem())),
     };
 
@@ -144,13 +144,16 @@ async fn settings(
             .map(|one| one.plugin.clone())
             .collect()
     });
+    let kept = crate::settings::Secrets::at(&path.with_file_name(crate::config::paths::SECRETS))
+        .unwrap_or_default();
+    let keyed = |value: &str| kept.keyed(value);
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
         .map(|shown| {
             let holds = file.get(&shown.key).unwrap_or_default();
             let origin =
-                origin::of_journalled(&shown.key, holds, &journalled, installed.as_deref())
+                origin::of_journalled(&shown.key, holds, &journalled, installed.as_deref(), &keyed)
                     .unwrap_or_else(|| {
                         origin::of_setting(
                             &shown.key,
@@ -217,20 +220,19 @@ async fn applying(
     let consequence = stated(ctx, &review, &held, key, value);
     let mut file = held;
     if review.writes() {
-        if let Some(change) = crate::settings::legacy::entering(
-            path,
-            key,
-            value,
-            crate::settings::OPERATION,
-            &ctx.stamp(),
-        ) {
-            let journal = path.with_file_name(crate::config::paths::JOURNAL);
-            super::recover::journalled(&journal, &[change], ctx.seams.random.as_ref())
-                .and_then(|()| {
-                    crate::settings::legacy::entered(path, key, value, ctx.seconds())
-                        .unwrap_or(Ok(()))
-                })
-                .map_err(|err| Box::new(err.problem()))?;
+        let journal = path.with_file_name(crate::config::paths::JOURNAL);
+        let entering = crate::settings::legacy::Entering {
+            operation: crate::settings::OPERATION,
+            stamp: &ctx.stamp(),
+            at: ctx.seconds(),
+            random: ctx.seams.random.as_ref(),
+        };
+        if let Some(entered) =
+            crate::settings::legacy::entered(path, (key, value), &entering, &|changes| {
+                super::recover::journalled(&journal, changes)
+            })
+        {
+            entered.map_err(|err| Box::new(err.problem()))?;
             file.set(key, value);
             reread(ctx, key)?;
             return Ok(Proposal {

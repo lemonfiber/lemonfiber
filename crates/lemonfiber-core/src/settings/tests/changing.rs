@@ -462,7 +462,13 @@ async fn a_secret_is_listed_without_its_value_and_never_written_here() {
         from: crate::settings::Source::Recipe,
         at: 1,
     }];
-    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
 
     for name in [
         "comics:token",
@@ -500,7 +506,13 @@ async fn a_secret_is_listed_without_its_value_and_never_written_here() {
         from: crate::settings::Source::Operator,
         at: 2,
     }];
-    assert!(crate::settings::kept(&at, &entered, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &entered,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
     let again = crate::settings::run::settings(&machine.ctx, &crate::app::Settling::Read).await;
     assert!(matches!(again, Ok(crate::app::Outcome::Settings(report))
         if report.secrets.iter().any(|one| one.name == "comics:token"
@@ -511,7 +523,13 @@ async fn a_secret_is_listed_without_its_value_and_never_written_here() {
         from: crate::settings::Source::Minted,
         at: 3,
     }];
-    assert!(crate::settings::kept(&at, &minted, &|_| Ok(())).is_ok());
+    assert!(crate::settings::kept(
+        &at,
+        &minted,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
     let made = crate::settings::run::settings(&machine.ctx, &crate::app::Settling::Read).await;
     assert!(matches!(made, Ok(crate::app::Outcome::Settings(report))
         if report.secrets.iter().any(|one| one.name == "comics:token"

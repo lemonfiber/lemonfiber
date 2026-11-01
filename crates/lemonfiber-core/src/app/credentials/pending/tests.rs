@@ -48,8 +48,18 @@ async fn settled_over_its_contract(name: &str, signs_in: Vec<Answer>) -> Settled
         unreachable!("the contracted media server fills the identity source");
     };
     let setting = server.setting.clone();
-    let _ = record_secret(&ctx, &setting, "in-force");
-    let _ = record_secret(&ctx, &pending(&setting), "replacement");
+    let _ = record_secret(
+        &ctx,
+        &setting,
+        "in-force",
+        crate::app::credentials::OPERATION,
+    );
+    let _ = record_secret(
+        &ctx,
+        &pending(&setting),
+        "replacement",
+        crate::app::credentials::OPERATION,
+    );
 
     settle(&ctx, &server).await;
 
@@ -116,7 +126,12 @@ async fn a_contracted_server_that_will_not_answer_leaves_both_for_later() {
 /// What [`settled`] leaves pending under `setting`, where `ctx`'s settings file holds a
 /// replacement for it.
 async fn left_pending(ctx: &crate::app::Ctx, setting: &str) -> Option<String> {
-    let _ = record_secret(ctx, &pending(setting), "replacement");
+    let _ = record_secret(
+        ctx,
+        &pending(setting),
+        "replacement",
+        crate::app::credentials::OPERATION,
+    );
     settled(ctx).await;
     recorded_secret(ctx, &pending(setting))
 }

@@ -442,6 +442,10 @@ fn minted_account(
     let ctx = seeding(name);
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let _ = crate::config::store::unset(&env, "DOWNLOAD_TORRENT_PASSWORD");
+    let _ = crate::settings::dropped(
+        &env.with_file_name(crate::config::paths::SECRETS),
+        &["DOWNLOAD_TORRENT_PASSWORD".to_owned()],
+    );
     let _ = match recorded {
         Some(password) => crate::config::store::set(&env, "QBITTORRENT_PASSWORD", password),
         None => crate::config::store::unset(&env, "QBITTORRENT_PASSWORD"),

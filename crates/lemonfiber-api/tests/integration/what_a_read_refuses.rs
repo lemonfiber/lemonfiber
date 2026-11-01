@@ -177,7 +177,7 @@ async fn a_setting_asked_for_under_a_name_this_read_does_not_take_is_refused() {
         "and refused under the code that says which mistake it was: {seen:?}"
     );
     assert!(
-        seen.is_some_and(|(_, body)| !body.contains("SONARR_API_KEY")),
+        seen.is_some_and(|(_, body)| !body.contains("PROXY_TOKEN")),
         "and nothing about the settings is answered on the way past"
     );
 }

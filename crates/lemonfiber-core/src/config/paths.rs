@@ -156,7 +156,8 @@ impl Paths {
         self.config.join(JOURNAL)
     }
 
-    /// The key the journal's credentials are sealed under, beside the journal itself.
+    /// The key a journal an earlier release wrote sealed its credentials under, beside the
+    /// journal itself.
     ///
     /// Named here as well as derived there, for the reason the update check's memory is:
     /// both readers of the journal are handed a path to it rather than this layout, so

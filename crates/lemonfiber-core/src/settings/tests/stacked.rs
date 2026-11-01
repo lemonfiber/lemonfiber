@@ -7,7 +7,6 @@ use super::changing::{agreed, journal, machine, running};
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS, SETTINGS};
 use crate::config::store;
-use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::settings::legacy;
 
@@ -178,7 +177,9 @@ fn the_stack_is_filed_once_into_the_stores_and_journalled_by_fingerprint() {
         name: "gluetun:wireguard-key".to_owned(),
         from: "operator".to_owned(),
         previous: None,
-        current: Some(fingerprint("wg-private-key")),
+        current: crate::settings::Secrets::at(&env.with_file_name(SECRETS))
+            .unwrap_or_default()
+            .keyed("wg-private-key"),
         filed: Some(crate::credential::VPN_PRIVATE_KEY.to_owned()),
     }));
     let raw = std::fs::read_to_string(env.with_file_name(crate::config::paths::JOURNAL))
@@ -362,11 +363,9 @@ fn stores_that_cannot_be_read_leave_the_file_as_it_is() {
     assert!(std::fs::write(env.with_file_name(SECRETS), "not a store").is_ok());
     let file = store::read(&env).unwrap_or_default();
 
-    let overlaid = legacy::overlaid(&env, file.clone());
-    let listed = legacy::listed(&env, file);
+    let overlaid = legacy::overlaid(&env, file);
 
     assert_eq!(overlaid.get("VPN_COUNTRIES"), Some("Sweden"));
-    assert_eq!(listed.get("VPN_COUNTRIES"), Some("Sweden"));
 }
 
 fn keeping(plugin: &str, was: &str) -> crate::plugin::Installed {

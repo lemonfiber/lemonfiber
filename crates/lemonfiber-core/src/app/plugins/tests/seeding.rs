@@ -325,6 +325,7 @@ fn nothing_is_minted_where_the_secret_store_cannot_be_written() {
     };
     let unfiled = seeding("seeded-unfiled");
     let store = crate::settings::secrets_at(&unfiled).unwrap_or_default();
+    let _ = std::fs::remove_file(&store);
     let _ = std::fs::create_dir_all(store.join("in-the-way"));
     let mut storeless = seeding("seeded-storeless");
     storeless.settings.env_file = None;

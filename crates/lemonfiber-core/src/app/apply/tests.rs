@@ -596,7 +596,6 @@ fn an_apply_keeps_what_the_journal_already_held() {
     let earlier = crate::app::recover::journalled(
         &paths.journal(),
         &[crate::test_support::a_fresh_write("EARLIER", "kept")],
-        &lemonfiber_fixtures::ports::Chance::cycling(),
     );
     assert!(earlier.is_ok(), "{earlier:?}");
     let mut wizard = reviewed(&dir.join("library"));

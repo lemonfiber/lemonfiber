@@ -25,6 +25,10 @@ mod revealing;
 mod rotating;
 mod tokening;
 
+/// The operation a credential lemonfiber minted is journalled under when a rotation or the
+/// settling of one records it.
+pub(crate) const OPERATION: &str = "credentials";
+
 use super::targets::project_directory;
 use super::{Ctx, Problem};
 use crate::app::command::Asking;

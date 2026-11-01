@@ -93,7 +93,7 @@ pub(crate) fn journalled(ctx: &Ctx) -> Result<(), Failure> {
             current,
         },
     };
-    crate::app::recover::journalled(&journal, &[change], ctx.seams.random.as_ref())
+    crate::app::recover::journalled(&journal, &[change])
 }
 
 #[cfg(test)]

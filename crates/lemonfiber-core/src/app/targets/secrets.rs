@@ -6,22 +6,31 @@
 
 use crate::app::Ctx;
 use crate::config::store;
+use crate::journal::{Change, Kind};
+use crate::settings::legacy::held_as;
+use crate::settings::{Keeping, Source};
 
-/// A secret lemonfiber minted and recorded in the environment file, read back by
-/// its key, or nothing where none is recorded yet — an unreadable or absent file
-/// reads the same as an empty value. The one reader for every credential lemonfiber
-/// mints and records rather than reads from a service (the torrent client's password,
-/// the media server's admin password), so the read-back stays identical across them.
+/// What lemonfiber recorded under `key`, or nothing where nothing is recorded yet: a
+/// credential from the secret store, under the name it holds it as, and anything else
+/// from the environment file. The one reader for every credential lemonfiber records
+/// rather than reads from a service, so the read-back stays identical across them.
 ///
-/// A credential named for what it reaches is read under the name an earlier release
-/// gave it while it has not moved yet.
+/// A credential still in the environment file, where a run has not filed it yet, as on a
+/// rehearsal before the first run that does, is read there until it is. A credential
+/// named for what it reaches is read under the name an earlier release gave it while it
+/// has not moved yet.
 pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
-    let path = ctx.settings.env_file.as_deref()?;
-    let file = store::read(path).unwrap_or_default();
+    let file = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .map(|path| store::read(path).unwrap_or_default())
+        .unwrap_or_default();
     let held = |key: &str| {
-        file.get(key)
+        held_as(key)
+            .and_then(|name| stored_secret(ctx, &name))
+            .or_else(|| file.get(key).map(str::to_owned))
             .filter(|value| !value.is_empty())
-            .map(str::to_owned)
     };
     held(key).or_else(|| earlier_credential(ctx, key).and_then(|earlier| held(&earlier)))
 }
@@ -92,26 +101,118 @@ pub(crate) fn ordinals(ctx: &Ctx) -> crate::config::credentials::Ordinals {
     )
 }
 
-/// The write side of [`recorded_secret`]: record a credential where a later run — and
-/// the dashboard — reads it back.
+/// The write side of [`recorded_secret`]: the credential lemonfiber minted for `key`, held
+/// in the secret store under the name it holds it as, and journalled under `operation` by
+/// the fingerprints of the value it replaces and of itself.
 ///
 /// A failure is the caller's to act on rather than this one's to swallow. A secret
 /// lemonfiber mints is recorded *before* any service is given it, because the record
 /// is the only copy lemonfiber will ever have: a service holding a password nothing
-/// recorded is a service lemonfiber is locked out of. So a machine with no file to
+/// recorded is a service lemonfiber is locked out of. So a machine with no store to
 /// keep it in is a failure too.
 ///
 /// # Errors
 ///
 /// Returns the [`store::Failure`] that stopped it being recorded, or
-/// [`store::Failure::Nowhere`] where there is no environment file.
-pub(crate) fn record_secret(ctx: &Ctx, key: &str, value: &str) -> Result<(), store::Failure> {
-    let path = ctx
-        .settings
+/// [`store::Failure::Nowhere`] where there is no store.
+pub(crate) fn record_secret(
+    ctx: &Ctx,
+    key: &str,
+    value: &str,
+    operation: &str,
+) -> Result<(), store::Failure> {
+    let (secrets, journal) = held_where(ctx)?;
+    let name = held_as(key).unwrap_or_else(|| key.to_owned());
+    let stamp = ctx.stamp();
+    let keeping = [Keeping {
+        name: &name,
+        value,
+        from: Source::Minted,
+        at: ctx.seconds(),
+    }];
+    crate::settings::kept(&secrets, &keeping, ctx.seams.random.as_ref(), &|replaced| {
+        let changes: Vec<Change> = replaced
+            .iter()
+            .map(|one| {
+                secret_changed(
+                    &one.name,
+                    one.previous.clone(),
+                    one.current.clone(),
+                    operation,
+                    &stamp,
+                )
+            })
+            .collect();
+        crate::app::recover::journalled(&journal, &changes)
+    })?;
+    unfiled_where(ctx, key)
+}
+
+/// The line an earlier release wrote for the credential `key` taken out of the
+/// environment file, where there is one.
+fn unfiled_where(ctx: &Ctx, key: &str) -> Result<(), store::Failure> {
+    ctx.settings
         .env_file
         .as_deref()
-        .ok_or(store::Failure::Nowhere)?;
-    store::set(path, key, value)
+        .map_or(Ok(()), |env| crate::settings::legacy::unfiled(env, key))
+}
+
+/// The credential recorded for `key` forgotten from the secret store, journalled under
+/// `operation` by the fingerprint of the value it held, and from the environment file
+/// where an earlier release left it there.
+///
+/// # Errors
+///
+/// Returns the [`store::Failure`] that stopped it being forgotten, or
+/// [`store::Failure::Nowhere`] where there is no store.
+pub(crate) fn forget_secret(ctx: &Ctx, key: &str, operation: &str) -> Result<(), store::Failure> {
+    unfiled_where(ctx, key)?;
+    let (secrets, journal) = held_where(ctx)?;
+    let name = held_as(key).unwrap_or_else(|| key.to_owned());
+    if crate::settings::Secrets::at(&secrets)?
+        .value(&name)
+        .is_none()
+    {
+        return Ok(());
+    }
+    let Some(previous) =
+        crate::settings::keyed_at(&secrets, ctx.seams.random.as_ref())?.fingerprint(&name)
+    else {
+        return Ok(());
+    };
+    let change = secret_changed(&name, Some(previous), None, operation, &ctx.stamp());
+    crate::app::recover::journalled(&journal, &[change])?;
+    crate::settings::dropped(&secrets, &[name])
+}
+
+/// The secret store and the journal beside the environment file.
+fn held_where(ctx: &Ctx) -> Result<(std::path::PathBuf, std::path::PathBuf), store::Failure> {
+    let secrets = crate::settings::secrets_at(ctx).ok_or(store::Failure::Nowhere)?;
+    let journal = secrets.with_file_name(crate::config::paths::JOURNAL);
+    Ok((secrets, journal))
+}
+
+/// The journal entry for the secret `name` going from the value fingerprinted `previous`
+/// to the one fingerprinted `current`, minted by lemonfiber.
+fn secret_changed(
+    name: &str,
+    previous: Option<String>,
+    current: Option<String>,
+    operation: &str,
+    stamp: &str,
+) -> Change {
+    Change {
+        at: stamp.to_owned(),
+        operation: operation.to_owned(),
+        target: name.to_owned(),
+        kind: Kind::Secret {
+            name: name.to_owned(),
+            from: Source::Minted.as_str().to_owned(),
+            previous,
+            current,
+            filed: None,
+        },
+    }
 }
 
 /// What the secret store holds under `name`, where it holds a value.

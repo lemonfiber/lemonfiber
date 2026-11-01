@@ -84,7 +84,6 @@ pub(crate) fn carry_out(
                         &crate::plugin::owner(plugin),
                         stamp,
                     )],
-                    ctx.seams.random.as_ref(),
                 )
                 .map_err(|failure| Box::new(failure.problem()))?;
                 super::super::project::kept(ctx, text)
@@ -156,7 +155,7 @@ fn made_whole(
     (path, within): (&Path, &Path),
     content: Option<&[u8]>,
 ) -> Result<(), Box<Problem>> {
-    recorded_making(ctx, (plugin, stamp, journal), path, content.is_none())?;
+    recorded_making((plugin, stamp, journal), path, content.is_none())?;
     let confined = ctx.seams.confined.as_ref();
     match content {
         None => confined.made(path, within, Readable::Shared),
@@ -171,7 +170,6 @@ fn made_whole(
 /// reversal has to remove. Recorded parent-first and so unwound child-first, exactly as an
 /// apply records the data root it makes.
 pub(super) fn recorded_making(
-    ctx: &Ctx,
     (plugin, stamp, journal): (&str, &str, &Path),
     path: &Path,
     directory: bool,
@@ -180,7 +178,7 @@ pub(super) fn recorded_making(
         .iter()
         .map(|made_here| made(plugin, made_here, stamp))
         .collect();
-    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref())
+    crate::app::recover::journalled(journal, &changes)
         .map_err(|failure| Box::new(failure.problem()))
 }
 

@@ -1,5 +1,4 @@
 use crate::test_support::a_fresh_write;
-use lemonfiber_fixtures::ports::Chance;
 use std::path::Path;
 
 use super::undo;
@@ -8,12 +7,6 @@ use crate::error::codes::setup::{
     NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_WITHDRAWN, STILL_HOLDING,
 };
 use crate::journal::{Action, Change, Journal, Kind, Undo};
-
-/// The randomness a real machine supplies, for the key the journal's credentials
-/// are sealed under.
-fn a_machine() -> Chance {
-    Chance::cycling()
-}
 
 /// A scratch directory unique to this process and case, cleared first.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -78,7 +71,7 @@ fn a_change_added_to_a_journal_keeps_what_was_already_in_it() {
     // anybody wrote to it would be.
     assert!(std::fs::write(&path, first).is_ok());
 
-    assert!(super::journalled(&path, &[a_fresh_write("TORRENT", "on")], &a_machine()).is_ok());
+    assert!(super::journalled(&path, &[a_fresh_write("TORRENT", "on")]).is_ok());
 
     assert_eq!(
         super::journal_at(&path).unwrap_or_default().changes(),
@@ -106,7 +99,6 @@ fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
                 at: stamp.to_string(),
                 ..a_fresh_write("PUID", "1000")
             }],
-            &a_machine(),
         );
         assert!(recorded.is_ok(), "{recorded:?}");
     }
@@ -131,7 +123,7 @@ fn a_repair_that_changed_nothing_writes_no_journal() {
     let path_dir = scratch("journal-none");
     let path = path_dir.join("journal.jsonl");
 
-    assert!(super::journalled(&path, &[], &a_machine()).is_ok());
+    assert!(super::journalled(&path, &[]).is_ok());
 
     assert!(!path.exists());
 }
@@ -143,7 +135,7 @@ fn a_journal_is_written_where_no_directory_has_been_made_yet() {
     let path_dir = scratch("journal-fresh");
     let path = path_dir.join("journal.jsonl");
 
-    assert!(super::journalled(&path, &[a_fresh_write("USENET", "on")], &a_machine()).is_ok());
+    assert!(super::journalled(&path, &[a_fresh_write("USENET", "on")]).is_ok());
 
     assert_eq!(
         super::journal_at(&path).unwrap_or_default().changes(),
@@ -672,7 +664,7 @@ fn a_journal_that_cannot_be_read_is_not_written_over() {
     let written = format!("{{ not a change }}\n{good}\n");
     assert!(std::fs::write(&path, &written).is_ok());
 
-    let refused = super::journalled(&path, &[a_fresh_write("TORRENT", "on")], &a_machine());
+    let refused = super::journalled(&path, &[a_fresh_write("TORRENT", "on")]);
     assert!(refused.is_err(), "the record was refused");
     assert_eq!(
         std::fs::read_to_string(&path).ok(),

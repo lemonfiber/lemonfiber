@@ -29,7 +29,13 @@ fn a_minted_key_is_read_from_the_secret_store_and_absent_until_kept() {
     let mut read = Vec::new();
     if let Some(upstream) = fillers.service("series-upstream") {
         read.push(minted_key(&ctx, upstream));
-        assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+        assert!(crate::settings::kept(
+            &at,
+            &keeping,
+            &lemonfiber_fixtures::ports::Chance::cycling(),
+            &|_| Ok(())
+        )
+        .is_ok());
         read.push(minted_key(&ctx, upstream));
     }
 

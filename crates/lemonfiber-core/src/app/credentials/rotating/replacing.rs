@@ -32,7 +32,12 @@ pub(crate) async fn replace_admin_password(
     let replacement = crate::secret::generate(ctx.seams.random.as_ref())
         .ok_or_else(|| Replacing::Unproven(UNMINTED.to_owned()))?;
     let setting = server.setting.as_str();
-    if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
+    if let Err(failure) = record_secret(
+        ctx,
+        &pending(setting),
+        &replacement,
+        crate::app::credentials::OPERATION,
+    ) {
         return Err(Replacing::Unproven(unrecorded(&failure)));
     }
     match client.replace_admin_password(&replacement).await {

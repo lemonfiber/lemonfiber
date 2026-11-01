@@ -303,10 +303,9 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         Some(crate::seed::said(&crate::seed::wanted_telling()).as_str()),
         "what was written down is not what was written to the service"
     );
-    let written = std::fs::read_to_string(&env).unwrap_or_default();
     assert!(
-        written.contains("IDENTITY_SOURCE_ADMIN_PASSWORD="),
-        "the minted password is recorded: {written}"
+        held(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD"),
+        "the minted password is recorded"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
@@ -369,7 +368,7 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answe
     )
     .await;
     let changed = wirings.get(1);
-    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let recorded = held(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD");
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(
@@ -389,10 +388,7 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answe
         ),
         "{changed:?}"
     );
-    assert!(
-        written.contains("IDENTITY_SOURCE_ADMIN_PASSWORD="),
-        "{written}"
-    );
+    assert!(recorded, "the administrator's password is recorded");
 }
 
 /// A plugin's media server that will not take its changed password is said the same way,
@@ -423,7 +419,8 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
     )
     .await;
     let changed = wirings.get(1).map(|one| format!("{one:?}"));
-    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let recorded = held(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD");
+    let plugins = held(&env, "PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD");
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(
@@ -432,14 +429,8 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
         )),
         "{changed:?}"
     );
-    assert!(
-        written.contains("PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD="),
-        "{written}"
-    );
-    assert!(
-        !written.contains("IDENTITY_SOURCE_ADMIN_PASSWORD="),
-        "{written}"
-    );
+    assert!(plugins, "the plugin's server's password is recorded");
+    assert!(!recorded, "the stack's administrator's password is not");
 }
 
 /// What the request service answers holding a telling, on where `enabled` says, for
@@ -637,4 +628,10 @@ async fn a_contracted_server_unanswered_over_its_contract_is_not_set_up() {
             .any(|one| one.url.contains(":8080") || one.url.contains(":9000")),
         "{asked:?}"
     );
+}
+
+/// Whether the secret store beside `env` holds a credential under `name`.
+fn held(env: &std::path::Path, name: &str) -> bool {
+    crate::settings::Secrets::at(&env.with_file_name(crate::config::paths::SECRETS))
+        .is_ok_and(|kept| kept.value(name).is_some())
 }

@@ -40,7 +40,7 @@ async fn naming_a_setting_reads_that_one_rather_than_all_of_them() {
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::OK
             && body.contains(r#""key":"LEMONFIBER_USENET""#)
-            && !body.contains("SONARR_API_KEY")),
+            && !body.contains("PROXY_TOKEN")),
         "a named setting is the setting reported on"
     );
 }
@@ -67,14 +67,14 @@ async fn a_setting_given_and_left_empty_named_no_setting() {
 async fn naming_a_credential_reads_it_withheld_as_the_listing_withholds_it() {
     let seen = asked(
         configured("named-credential", &kept()),
-        "/api/config?key=SONARR_API_KEY",
+        "/api/config?key=PROXY_TOKEN",
     )
     .await;
     assert!(
         seen.is_some_and(|(status, body)| status == StatusCode::OK
             && !body.contains(&a_value())
             && body.contains(&format!(
-                r#""key":"SONARR_API_KEY","value":"{REDACTED}","secret":true"#
+                r#""key":"PROXY_TOKEN","value":"{REDACTED}","secret":true"#
             ))),
         "a credential named on its own is withheld the way it is in the listing"
     );

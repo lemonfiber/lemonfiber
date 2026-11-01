@@ -36,15 +36,19 @@ const UNDO: &str = crate::app::putting_back::OPERATION;
 /// Nothing otherwise, which leaves the ordinary answer to be given. `installed` is the
 /// record of what is installed, or nothing where it would not read: a plugin missing
 /// from a record that was read is gone, and one missing from a record that was not is
-/// not known to be.
+/// not known to be. A credential's change is journalled as a change to the secret the
+/// store holds it as, by fingerprints, so what it holds is told by `keyed`, the
+/// fingerprint the secret store gives a value.
 #[must_use]
 pub fn of_journalled(
     key: &str,
     holds: &str,
     changes: &[Change],
     installed: Option<&[String]>,
+    keyed: &dyn Fn(&str) -> Option<String>,
 ) -> Option<Origin> {
     let plugins = plugins(changes);
+    let secret = crate::settings::legacy::held_as(key);
     let sets: Vec<(&str, Option<&str>, &str)> = changes
         .iter()
         .filter_map(|change| match &change.kind {
@@ -53,6 +57,16 @@ pub fn of_journalled(
                 previous,
                 current,
             } if set == key => Some((
+                change.operation.as_str(),
+                previous.as_deref(),
+                current.as_str(),
+            )),
+            Kind::Secret {
+                name,
+                previous,
+                current: Some(current),
+                ..
+            } if secret.as_ref() == Some(name) => Some((
                 change.operation.as_str(),
                 previous.as_deref(),
                 current.as_str(),
@@ -71,7 +85,7 @@ pub fn of_journalled(
             ),
         });
     }
-    if current != holds {
+    if current != holds && keyed(holds).as_deref() != Some(current) {
         return None;
     }
     let Some(installed) = installed else {

@@ -528,11 +528,11 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETUP-7` | `ALREADY_SET_UP` | error | 1 | 400 | 0.9.0 | Raised when setup is answered on a machine that is already set up. |
 | `SETUP-8` | `NOTHING_TO_RECOVER` | error | 1 | 400 | 0.9.0 | Raised when a recovery is asked for and no apply stopped part-way. |
 | `SETUP-9` | `NOT_PUT_BACK` | warning | 1 | 500 | 0.9.0 | Raised when a reversal would write over a setting the operator has since chosen. |
-| `SETUP-10` | `NOT_OPENED` | warning | 1 | 500 | 0.14.0 | Raised when a reversal meets a credential whose sealed record will not open. |
+| `SETUP-10` | `NOT_OPENED` | warning | 1 | 500 | 0.14.0 | Raised when a reversal meets a setting whose sealed record will not open. |
 | `SETUP-11` | `STILL_HOLDING` | warning | 1 | 500 | 0.16.0 | Raised when a directory a reversal would remove still holds something else's files. |
 | `SETUP-12` | `NOT_WITHDRAWN` | error | 1 | 500 | 0.16.0 | Raised when a region a reversal would take out of a stack file cannot be. |
 | `SETUP-13` | `NOT_REWOUND` | error | 1 | 500 | 0.17.0 | Raised when a file a reversal would write back to what it held cannot be. |
-| `SETUP-14` | `UNKEPT` | warning | 1 | 500 | 0.18.0 | Raised when a reversal meets a secret whose earlier value lemonfiber kept no copy of. |
+| `SETUP-14` | `REPLACE_AT_THE_TERMINAL` | warning | 1 | 500 | 0.18.0 | Raised when a reversal meets a secret it cannot put back, which must be replaced at the terminal. |
 | `SETUP-15` | `NOT_MOVED_BACK` | error | 1 | 500 | 0.18.0 | Raised when a service's state lemonfiber moved could not be moved back. |
 | `SETUP-16` | `GUARD_UNANSWERED` | error | 1 | 400 | 0.18.0 | Raised when a VPN answer leaves the egress guard without what it needs to start. |
 

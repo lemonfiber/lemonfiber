@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::config::store;
 use crate::error::codes::setup::{
     NEEDS_SERVICE, NOT_MOVED_BACK, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_REWOUND,
-    NOT_WITHDRAWN, STILL_HOLDING, UNKEPT,
+    NOT_WITHDRAWN, REPLACE_AT_THE_TERMINAL, STILL_HOLDING,
 };
 use crate::error::{Diagnose as _, Problem, Remedy};
 
@@ -131,12 +131,12 @@ pub(super) fn not_put_back(settings: &[String]) -> Problem {
 pub(super) fn not_opened(settings: &[String]) -> Problem {
     Problem::new(
         NOT_OPENED,
-        "Some settings hold credentials this machine can no longer read back",
-        "The journal keeps a credential sealed, under a key kept beside it. These entries \
-         would not open — the key is missing, or the record was changed after it was \
-         written — so what they held is not something to put back, and they were left \
-         exactly as they are. Everything else was put back.",
-        Remedy::new("Set them yourself, from wherever the earlier credential came from"),
+        "Some settings hold values this machine can no longer read back",
+        "A journal an earlier release wrote kept these sealed, under a key kept beside it. \
+         These entries would not open — the key is missing, or the record was changed after \
+         it was written — so what they held is not something to put back, and they were \
+         left exactly as they are. Everything else was put back.",
+        Remedy::new("Set them yourself, to the value you want"),
     )
     .with_detail(settings.join(", "))
 }
@@ -164,14 +164,16 @@ pub(super) fn left_holding(paths: &[String]) -> Problem {
     .with_detail(paths.join(", "))
 }
 
-pub(super) fn unkept(secrets: &[String]) -> Problem {
+pub(super) fn to_replace(secrets: &[String]) -> Problem {
     Problem::new(
-        UNKEPT,
-        "Some secrets hold a value lemonfiber kept no earlier copy of",
-        "Undoing a change to a secret puts back the one value lemonfiber kept before it, and \
-         only while what it holds now is what the change left. For these that value is not \
-         kept, so they were left exactly as they are. Everything else was put back.",
-        Remedy::new("Enter the earlier value again at the terminal if it is the one you want"),
+        REPLACE_AT_THE_TERMINAL,
+        "Some secrets must be replaced at the terminal",
+        "Undoing a change to a secret puts back the one earlier value lemonfiber kept, and only \
+         while the values held match the fingerprints the change recorded. These hold something \
+         else, or the earlier value is not kept, so they were left exactly as they are. \
+         Everything else was put back.",
+        Remedy::new("Replace each of them at the terminal")
+            .with_detail("lemonfiber credentials --rotate <name>"),
     )
     .with_detail(secrets.join(", "))
 }
