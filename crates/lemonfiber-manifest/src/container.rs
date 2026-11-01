@@ -13,6 +13,7 @@ pub mod earlier;
 mod paths;
 mod ports;
 mod record;
+mod user;
 mod values;
 mod words;
 
@@ -21,6 +22,7 @@ use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside};
 pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
 pub use record::Fields;
+pub use user::{IdVariables, UserMode, UserModeName, UserModeWritten};
 use values::{narrowed, unshown};
 pub use values::{
     CarriedFrom, Constant, Format, Minted, MintedAs, RecordedWith, Secret, SecretOf, Setting,
@@ -173,149 +175,6 @@ pub struct Mount {
     /// Whether it is mounted read-only.
     #[serde(default)]
     pub ro: bool,
-}
-
-/// Who the container runs as.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(from = "UserModeAs", into = "UserModeAs")]
-pub enum UserMode {
-    /// No user: the image decides.
-    Image,
-    /// The operator's uid and gid in the two variables named, for an image that drops to
-    /// them itself.
-    IdsIn(IdVariables),
-    /// The operator's uid and gid as the container's user.
-    Uid,
-}
-
-/// The two variables an image reads the operator's uid and gid from.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "ServiceIdVariables")]
-pub struct IdVariables {
-    /// The variable it reads the operator's uid from.
-    pub uid_env: String,
-    /// The variable it reads the operator's gid from.
-    pub gid_env: String,
-}
-
-impl IdVariables {
-    /// `PUID` and `PGID`, the pair `puid-env` names.
-    #[must_use]
-    pub fn puid() -> Self {
-        Self {
-            uid_env: PUID.to_owned(),
-            gid_env: PGID.to_owned(),
-        }
-    }
-}
-
-/// How a manifest writes [`UserMode`]: a mode by name, or the variables an image reads
-/// the operator's ids from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(untagged)]
-#[schemars(rename = "ServiceUserMode")]
-pub enum UserModeAs {
-    /// A mode by name.
-    Named(UserModeName),
-    /// The variables its image reads the operator's uid and gid from.
-    Variables(IdVariables),
-}
-
-impl<'de> Deserialize<'de> for UserModeAs {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_any(UserModeVisitor)
-    }
-}
-
-/// Reads [`UserModeAs`], naming the modes an unknown name is not one of.
-struct UserModeVisitor;
-
-impl<'de> serde::de::Visitor<'de> for UserModeVisitor {
-    type Value = UserModeAs;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("image, puid-env, uid, or a table of uid_env and gid_env")
-    }
-
-    fn visit_str<E: serde::de::Error>(self, name: &str) -> Result<UserModeAs, E> {
-        UserModeName::deserialize(serde::de::value::StrDeserializer::<E>::new(name))
-            .map(UserModeAs::Named)
-    }
-
-    fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<UserModeAs, A::Error> {
-        IdVariables::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-            .map(UserModeAs::Variables)
-    }
-}
-
-/// A user mode a manifest writes by name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "ServiceUserModeName")]
-pub enum UserModeName {
-    /// No user: the image decides.
-    Image,
-    /// `PUID` and `PGID` set to the operator's.
-    PuidEnv,
-    /// The operator's uid and gid as the container's user.
-    Uid,
-}
-
-impl From<UserModeAs> for UserMode {
-    fn from(written: UserModeAs) -> Self {
-        match written {
-            UserModeAs::Named(UserModeName::Image) => Self::Image,
-            UserModeAs::Named(UserModeName::PuidEnv) => Self::IdsIn(IdVariables::puid()),
-            UserModeAs::Named(UserModeName::Uid) => Self::Uid,
-            UserModeAs::Variables(variables) => Self::IdsIn(variables),
-        }
-    }
-}
-
-impl From<UserMode> for UserModeAs {
-    fn from(mode: UserMode) -> Self {
-        match mode {
-            UserMode::Image => Self::Named(UserModeName::Image),
-            UserMode::IdsIn(variables) if variables == IdVariables::puid() => {
-                Self::Named(UserModeName::PuidEnv)
-            }
-            UserMode::IdsIn(variables) => Self::Variables(variables),
-            UserMode::Uid => Self::Named(UserModeName::Uid),
-        }
-    }
-}
-
-impl schemars::JsonSchema for UserMode {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        UserModeAs::schema_name()
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        UserModeAs::json_schema(generator)
-    }
-}
-
-impl UserMode {
-    /// Who a service runs as: the mode it declares, or else `uid` where it speaks a
-    /// contract or is confined, and the image's choice otherwise.
-    #[must_use]
-    pub fn of(declared: Option<&Self>, speaks: bool, posture: Posture) -> Self {
-        match declared {
-            Some(mode) => mode.clone(),
-            None if speaks || matches!(posture, Posture::Confined) => Self::Uid,
-            None => Self::Image,
-        }
-    }
-
-    /// The variables the operator's uid and gid are written into, where it names any.
-    #[must_use]
-    pub const fn ids_in(&self) -> Option<&IdVariables> {
-        match self {
-            Self::IdsIn(variables) => Some(variables),
-            Self::Image | Self::Uid => None,
-        }
-    }
 }
 
 /// How tightly the container is held.
@@ -608,39 +467,6 @@ impl Container<'_> {
             || setting
                 .split_once(NAMESPACED)
                 .is_some_and(|(space, name)| space == self.namespace && !name.is_empty())
-    }
-
-    fn named_ids(&self, variables: &IdVariables, found: &mut Vec<(String, String)>) {
-        for (field, name) in [
-            ("uid_env", &variables.uid_env),
-            ("gid_env", &variables.gid_env),
-        ] {
-            let at = self.at(&format!("user_mode.{field}"));
-            if !is_variable(name) {
-                found.push((
-                    at.clone(),
-                    "is not upper-case letters, digits and \"_\", starting with a letter or \"_\""
-                        .to_owned(),
-                ));
-            }
-            if name == ZONE {
-                found.push((at.clone(), format!("{name} is lemonfiber's to write")));
-            }
-            if self.env.contains_key(name) {
-                found.push((
-                    at,
-                    format!(
-                        "{name} is declared in env too, where lemonfiber writes the operator's id"
-                    ),
-                ));
-            }
-        }
-        if variables.uid_env == variables.gid_env {
-            found.push((
-                self.at("user_mode"),
-                format!("names {} for both the uid and the gid", variables.uid_env),
-            ));
-        }
     }
 
     fn held(&self, found: &mut Vec<(String, String)>) {

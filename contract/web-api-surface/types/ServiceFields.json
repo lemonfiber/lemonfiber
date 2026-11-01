@@ -68,7 +68,7 @@
     },
     "user_mode": {
       "type": [
-        "anyOf(null,ref:ServiceUserMode)"
+        "anyOf(null,ref:ServiceUserModeWritten)"
       ],
       "required": false
     }

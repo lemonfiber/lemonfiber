@@ -6,7 +6,7 @@ use super::{
     Setting, Shape,
 };
 
-const NONE: BTreeMap<String, Value> = BTreeMap::new();
+pub(super) const NONE: BTreeMap<String, Value> = BTreeMap::new();
 
 static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| {
     [Secret {
@@ -23,7 +23,7 @@ static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| 
     }]
 });
 
-fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
+pub(super) fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
     Container {
         id: "jellyfin",
         namespace: "jellyfin",
@@ -51,7 +51,7 @@ fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
     }
 }
 
-fn wrong(container: &Container<'_>) -> Vec<String> {
+pub(super) fn wrong(container: &Container<'_>) -> Vec<String> {
     container
         .broken()
         .into_iter()
@@ -760,44 +760,4 @@ fn a_secret_a_recording_stands_in_for_is_needed_to_start_unless_it_is_a_code_tha
     assert!(!secret(None, None).needed_to_start());
     assert!(secret(Some(RecordedWith::Minted), None).needed_to_start());
     assert!(!secret(Some(RecordedWith::Minted), Some(240)).needed_to_start());
-}
-
-#[test]
-fn puid_env_is_the_pair_of_named_variables_and_is_written_back_by_its_name() {
-    let named: Result<BTreeMap<String, UserMode>, _> = toml::from_str(
-        "a = { uid_env = \"PUID\", gid_env = \"PGID\" }\nb = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }",
-    );
-    let written = named.ok().and_then(|read| toml::to_string(&read).ok());
-    assert_eq!(
-        written.as_deref(),
-        Some("a = \"puid-env\"\n\n[b]\nuid_env = \"PLEX_UID\"\ngid_env = \"PLEX_GID\"\n")
-    );
-}
-
-#[test]
-fn named_id_variables_are_two_different_variables_lemonfiber_alone_writes() {
-    let none = NONE;
-    let declared = BTreeMap::from([(
-        "PLEX_UID".to_owned(),
-        Value::Secret(SecretOf {
-            secret: "admin-key".to_owned(),
-        }),
-    )]);
-    let cases = [
-        (("PLEX_UID", "PLEX_GID"), &none, 0),
-        (("plex_uid", "PLEX_GID"), &none, 1),
-        (("TZ", "PLEX_GID"), &none, 1),
-        (("PLEX_ID", "PLEX_ID"), &none, 1),
-        (("PLEX_UID", "PLEX_GID"), &declared, 1),
-    ];
-    for ((uid_env, gid_env), declared, refused) in cases {
-        let mode = UserMode::IdsIn(IdVariables {
-            uid_env: uid_env.to_owned(),
-            gid_env: gid_env.to_owned(),
-        });
-        let mut service = plain(declared);
-        service.user_mode = Some(&mode);
-        let said = wrong(&service);
-        assert_eq!(said.len(), refused, "{uid_env} {gid_env}: {said:#?}");
-    }
 }

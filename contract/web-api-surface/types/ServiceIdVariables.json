@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "gid_env": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "uid_env": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
