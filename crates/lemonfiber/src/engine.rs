@@ -25,7 +25,10 @@ use lemonfiber_core::ports::process::Progress as PullEvent;
 use lemonfiber_core::ports::Narrator;
 use lemonfiber_core::stack::compose::Action;
 
+use lemonfiber::cli::RawSwitch;
+
 use crate::exit::{complain, settled, FAILURE};
+use crate::installing::Agreed;
 use crate::keyboard::{Console, Keyboard};
 use crate::prompt::Answers as _;
 use crate::render::downloads::interrupting;
@@ -239,6 +242,7 @@ pub(crate) async fn start(
     ctx: &Ctx,
     forms: &[String],
     services: &[String],
+    offer: Option<&str>,
     json: bool,
 ) -> ExitCode {
     // A streamed start does not go through the dispatcher, so it claims the stack
@@ -259,7 +263,7 @@ pub(crate) async fn start(
     let status = if ctx.dry_run {
         None
     } else {
-        match narrated(ctx, forms, services, json).await {
+        match narrated(ctx, (forms, services), offer, json).await {
             Ok(status) => status,
             Err(code) => {
                 released(claim).await;
@@ -289,11 +293,11 @@ pub(crate) async fn start(
 /// with where the command could not be spawned at all.
 async fn narrated(
     ctx: &Ctx,
-    forms: &[String],
-    services: &[String],
+    (forms, services): (&[String], &[String]),
+    offer: Option<&str>,
     json: bool,
 ) -> Result<Option<i32>, ExitCode> {
-    let mut progress = start_progress(ctx, forms, services)
+    let mut progress = start_progress(ctx, forms, services, offer)
         .await
         .map_err(|problem| complain(&problem))?;
     let mut status = None;
@@ -315,15 +319,25 @@ pub(crate) async fn starting(
     ctx: &Ctx,
     forms: &[String],
     services: &[String],
+    offer: Option<String>,
     json: bool,
 ) -> ExitCode {
     // Not announced where services are named. The announcement is about what a form
     // holds, and saying "starts eight services" before starting two of them would be
     // a sentence about a set the operator did not ask for.
+    let mut answered = None;
     if services.is_empty() {
+        let unanswered = Command::Up {
+            forms: forms.to_vec(),
+            offer: None,
+        };
+        answered = match answered_installs(ctx, forms, offer, json, unanswered).await {
+            Ok(answered) => answered,
+            Err(code) => return code,
+        };
         announce(ctx, forms, json, Doing::Starting).await;
     }
-    start(ctx, forms, services, json).await
+    start(ctx, forms, services, answered.as_deref(), json).await
 }
 
 /// Announce what stopping would affect, put the question about anything still coming
@@ -359,6 +373,65 @@ pub(crate) async fn halting(
         forms,
         wait: Waiting::from(waiting),
     })
+}
+
+/// The switch to `forms`, answering what it offers to install with the offer typed or the
+/// one the operator agrees to at a terminal.
+///
+/// # Errors
+///
+/// The code to exit with where an install is on offer and nobody agreed to it, once the
+/// report saying so is printed, or where the forms cannot be resolved.
+pub(crate) async fn switching(
+    ctx: &Ctx,
+    asked: RawSwitch,
+    json: bool,
+) -> Result<Command, ExitCode> {
+    let RawSwitch { forms, offer } = asked;
+    let unanswered = Command::Switch {
+        forms: forms.clone(),
+        offer: None,
+    };
+    let offer = answered_installs(ctx, &forms, offer, json, unanswered).await?;
+    Ok(Command::Switch { forms, offer })
+}
+
+/// The offer a start of `forms` answers: the one typed, or the one the operator agrees to
+/// at a terminal, or none where nothing is on offer. Where nobody agrees, `unanswered`
+/// is what is run instead: the start answering nothing, which says what is on offer.
+///
+/// # Errors
+///
+/// The code to exit with where an install is on offer and nobody agreed to it, once the
+/// report saying so is printed, or where the forms cannot be resolved.
+async fn answered_installs(
+    ctx: &Ctx,
+    forms: &[String],
+    offer: Option<String>,
+    json: bool,
+    unanswered: Command,
+) -> Result<Option<String>, ExitCode> {
+    if offer.is_some() || ctx.dry_run {
+        return Ok(offer);
+    }
+    let interactive = !json && Console.interactive();
+    match crate::installing::agreed(ctx, forms, interactive, &|asked| Keyboard.ask(asked)).await {
+        Ok(Agreed::Nothing) => Ok(None),
+        Ok(Agreed::Yes(offer)) => Ok(Some(offer)),
+        Ok(Agreed::No) => Err(unstarted(ctx, unanswered, json).await),
+        Err(problem) => Err(complain(&problem)),
+    }
+}
+
+/// A start answering nothing, which writes and starts nothing and says what is on offer.
+async fn unstarted(ctx: &Ctx, unanswered: Command, json: bool) -> ExitCode {
+    match dispatch(unanswered, ctx).await {
+        Ok(outcome) => {
+            render(&outcome, json);
+            settled(&outcome)
+        }
+        Err(problem) => complain(&problem),
+    }
 }
 
 async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {

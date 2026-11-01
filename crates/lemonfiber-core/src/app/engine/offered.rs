@@ -31,6 +31,36 @@ pub(crate) async fn restarted(ctx: &Ctx, restart: Restarting) -> Result<Outcome,
         .map(Outcome::Lifecycle)
 }
 
+/// Bring forms up, answering what the start offers to install with `offer`.
+///
+/// # Errors
+///
+/// What [`answering`] returns.
+pub(crate) async fn up(
+    ctx: &Ctx,
+    forms: &[String],
+    offer: Option<String>,
+) -> Result<Outcome, Box<Problem>> {
+    answering(ctx, forms, &Action::Up, offer.as_deref())
+        .await
+        .map(Outcome::Lifecycle)
+}
+
+/// Switch to forms, answering what the start offers to install with `offer`.
+///
+/// # Errors
+///
+/// What [`super::switch`] returns.
+pub(crate) async fn switched(
+    ctx: &Ctx,
+    forms: &[String],
+    offer: Option<String>,
+) -> Result<Outcome, Box<Problem>> {
+    super::switch(ctx, forms, offer.as_deref())
+        .await
+        .map(Outcome::Lifecycle)
+}
+
 /// A lifecycle action, answering the offer a rehearsal of it made where one is carried
 /// back: refused, before anything runs, where the offer built now is another.
 ///

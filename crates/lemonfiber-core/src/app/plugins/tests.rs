@@ -559,6 +559,7 @@ mod fetching;
 mod following;
 mod fronting;
 mod installing;
+mod offline;
 mod proving;
 mod reaching;
 mod regenerating;

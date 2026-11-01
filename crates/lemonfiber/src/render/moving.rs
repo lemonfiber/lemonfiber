@@ -1,6 +1,8 @@
 //! A move in place on offer, named wherever a run would start or update the stack.
 
 use lemonfiber_core::app::plugins::MoveOffered;
+use lemonfiber_core::app::InstallOffered;
+use lemonfiber_core::model::LifecycleReport;
 use lemonfiber_core::update::run::Moved;
 
 use super::Lines;
@@ -26,6 +28,67 @@ pub(crate) fn offered(moves: &[MoveOffered]) -> Lines {
         }
     }
     lines
+}
+
+/// Each part this build carries that a start would install, offline, because its forms
+/// hold it and this machine has never run it, and the offer that takes them all where it
+/// is named, with the command `answering` it.
+pub(crate) fn installing(installs: &[InstallOffered], answering: Option<(&str, &str)>) -> Lines {
+    let mut lines = Lines::default();
+    for one in installs {
+        lines.spaced(match &one.why {
+            None => format!(
+                "On offer: this release runs {} as a plugin, and this machine has never run \
+                 it. Starting installs it from this build, offline, before anything else of \
+                 the form is written or started.",
+                one.plugin
+            ),
+            Some(why) => format!(
+                "On offer: this release runs {} as a plugin, and its install could not be \
+                 read: {why}",
+                one.plugin
+            ),
+        });
+    }
+    if let Some((action, offer)) = answering.filter(|_| !installs.is_empty()) {
+        lines.put(format!(
+            "Run the same `lemonfiber {action}` with `--offer {offer}` to install and start."
+        ));
+    }
+    lines
+}
+
+/// What a start that answered none of the installs it offers says: that it wrote and
+/// started nothing, and what is on offer, which is the whole of what it has to say.
+/// Nothing for any other report.
+pub(crate) fn unanswered(report: &LifecycleReport) -> Option<Lines> {
+    if report.rehearsed || !report.command.is_empty() || report.installing.is_empty() {
+        return None;
+    }
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "{}: nothing was written or started — an install is on offer",
+        report.action
+    ));
+    lines.extend(installing(&report.installing, answering(report)));
+    Some(lines)
+}
+
+/// What a rehearsed start offers to install, and the offer that takes it.
+pub(crate) fn rehearsed(report: &LifecycleReport) -> Lines {
+    if report.rehearsed {
+        installing(&report.installing, answering(report))
+    } else {
+        Lines::default()
+    }
+}
+
+/// The command a report's offer answers, and the offer.
+fn answering(report: &LifecycleReport) -> Option<(&str, &str)> {
+    report
+        .offer
+        .as_deref()
+        .map(|offer| (report.action.as_str(), offer))
 }
 
 /// Each move in place a confirmed update took, or could not, with why.

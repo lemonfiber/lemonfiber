@@ -1,5 +1,7 @@
 //! The parts the bundle installs that this stack still runs as its own service: each a
-//! move in place on offer.
+//! move in place on offer, where the service has run on this machine.
+
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use lemonfiber_bundled::{Pinned, Stage, PINNED};
@@ -29,9 +31,32 @@ pub struct MoveOffered {
 }
 
 /// Every part `pinned` installs whose plugin is not among `installed` while `stack` still
-/// runs a service of its id.
+/// runs a service of its id that `ran` says has run on this machine.
 #[must_use]
-pub fn offered(pinned: &[Pinned], stack: &[Service], installed: &[Installed]) -> Vec<MoveOffered> {
+pub fn offered(
+    pinned: &[Pinned],
+    stack: &[Service],
+    installed: &[Installed],
+    ran: &Ran,
+) -> Vec<MoveOffered> {
+    uninstalled(pinned, installed)
+        .into_iter()
+        .filter(|one| {
+            stack
+                .iter()
+                .any(|service| service.id == one.first_party.plugin)
+        })
+        .filter(|one| ran.has_run(one.first_party.plugin))
+        .map(|one| MoveOffered {
+            plugin: one.first_party.plugin.to_owned(),
+            service: one.first_party.plugin.to_owned(),
+            configured_by: configuring(one.copy, one.first_party.plugin),
+        })
+        .collect()
+}
+
+/// Every part `pinned` installs whose plugin is not among `installed`.
+pub(crate) fn uninstalled<'a>(pinned: &'a [Pinned], installed: &[Installed]) -> Vec<&'a Pinned> {
     pinned
         .iter()
         .filter(|one| one.stage == Some(Stage::Installed))
@@ -40,17 +65,49 @@ pub fn offered(pinned: &[Pinned], stack: &[Service], installed: &[Installed]) ->
                 .iter()
                 .any(|held| held.plugin == one.first_party.plugin)
         })
-        .filter(|one| {
-            stack
-                .iter()
-                .any(|service| service.id == one.first_party.plugin)
-        })
-        .map(|one| MoveOffered {
-            plugin: one.first_party.plugin.to_owned(),
-            service: one.first_party.plugin.to_owned(),
-            configured_by: configuring(one.copy, one.first_party.plugin),
-        })
         .collect()
+}
+
+/// What says whether the stack's own service of an id has run on this machine: the
+/// configuration directories beneath the stack, and every container the engine holds
+/// for the project.
+#[derive(Debug, Clone, Default)]
+pub struct Ran {
+    /// Where the stack is written, where it is.
+    stack: Option<PathBuf>,
+    /// The service of every container the engine holds for the project.
+    containers: Vec<String>,
+}
+
+impl Ran {
+    /// What `stack` and the engine's `containers` say has run.
+    #[must_use]
+    pub fn of(stack: Option<PathBuf>, containers: Vec<String>) -> Self {
+        Self { stack, containers }
+    }
+
+    /// What this machine says has run: nothing the engine holds where it cannot be asked.
+    pub(crate) async fn here(ctx: &Ctx) -> Self {
+        let containers = ctx
+            .seams
+            .engine
+            .list(&ctx.settings.project)
+            .await
+            .map(|held| held.into_iter().map(|one| one.service).collect())
+            .unwrap_or_default();
+        Self::of(crate::app::project::directory(ctx), containers)
+    }
+
+    /// Whether the stack's own service `service` has run here: its configuration
+    /// directory beneath the stack holds anything, or the engine holds a container for it.
+    #[must_use]
+    pub fn has_run(&self, service: &str) -> bool {
+        self.containers.iter().any(|held| held == service)
+            || self.stack.as_deref().is_some_and(|stack| {
+                std::fs::read_dir(crate::plugin::configuration(stack, service))
+                    .is_ok_and(|mut entries| entries.next().is_some())
+            })
+    }
 }
 
 /// The service of the manifest `copy` that fronts `service` and shares its configuration
@@ -70,24 +127,25 @@ fn configuring(copy: &str, service: &str) -> Option<String> {
 ///
 /// lemonfiber's own guards are not among them: they move with the next act that keeps
 /// the stack running ([`super::guarding`]), never with an update's yes.
-#[must_use]
-pub(crate) fn on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
+pub(crate) async fn on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
     all_on_offer(ctx, manifest)
+        .await
         .into_iter()
         .filter(|offered| !super::guarding::guards(&offered.plugin))
         .collect()
 }
 
 /// Every move on offer on this machine against `manifest`, the guards' included.
-#[must_use]
-pub(crate) fn all_on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
-    here(ctx, &manifest.services).unwrap_or_default()
+pub(crate) async fn all_on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
+    here(ctx, &manifest.services).await.unwrap_or_default()
 }
 
 /// The moves on offer on this machine against `services`, or why its record of what is
 /// installed cannot be read.
-fn here(ctx: &Ctx, services: &[Service]) -> Result<Vec<MoveOffered>, Box<Problem>> {
-    super::read(ctx).map(|register| offered(PINNED, services, register.installed()))
+async fn here(ctx: &Ctx, services: &[Service]) -> Result<Vec<MoveOffered>, Box<Problem>> {
+    let register = super::read(ctx)?;
+    let ran = Ran::here(ctx).await;
+    Ok(offered(PINNED, services, register.installed(), &ran))
 }
 
 /// This machine's moves on offer against a stack's services, read each time it is asked.
@@ -112,7 +170,7 @@ impl Offering {
 #[async_trait]
 impl Offers for Offering {
     async fn moves(&self) -> Result<Vec<MoveOffered>, ()> {
-        here(&self.ctx, &self.services).map_err(|_| ())
+        here(&self.ctx, &self.services).await.map_err(|_| ())
     }
 }
 

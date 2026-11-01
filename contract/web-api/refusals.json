@@ -274,6 +274,21 @@
     "status": 409,
     "description": "Raised when a start finds a service's mount source reached through a link."
   },
+  "LIFE-12": {
+    "name": "OFFLINE_INSTALL_MOVED",
+    "status": 400,
+    "description": "Raised where an `up` or a `switch` names an offer that is not the install a fresh look at the stack offers."
+  },
+  "LIFE-13": {
+    "name": "OFFLINE_INSTALL_UNANSWERED",
+    "status": 409,
+    "description": "Raised where a start would install a part this build carries and nobody said yes."
+  },
+  "LIFE-14": {
+    "name": "OFFLINE_INSTALL_UNHELD",
+    "status": 409,
+    "description": "Raised where an install a start was agreed to did not hold."
+  },
   "LIFE-3": {
     "name": "ALREADY_WORKING",
     "status": 409,

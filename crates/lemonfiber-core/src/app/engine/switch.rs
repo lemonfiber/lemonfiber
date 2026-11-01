@@ -47,7 +47,11 @@ const SWITCH: &str = "switch";
 /// Returns the [`Problem`] a surface should render when the stack cannot be read,
 /// the forms cannot be resolved, the engine cannot be reached, or the services that
 /// were started never became usable.
-pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Problem>> {
+pub(crate) async fn switch(
+    ctx: &Ctx,
+    forms: &[String],
+    offer: Option<&str>,
+) -> Result<LifecycleReport, Box<Problem>> {
     // Claimed for the same reason `lifecycle` claims: a switch stops services and
     // starts others, and two of them against one stack interleave a teardown with a
     // start. Given back whether it worked or not — an early return between the two
@@ -57,9 +61,38 @@ pub(crate) async fn switch(ctx: &Ctx, forms: &[String]) -> Result<LifecycleRepor
     // invocations it runs, because a run waiting behind it is shown that word and
     // "down" would be half of what is in the way.
     let claim = lock::claimed(ctx, SWITCH).await?;
-    let outcome = moving(ctx, forms).await;
+    let outcome = answered(ctx, forms, offer).await;
     lock::released(claim).await;
     outcome
+}
+
+/// The switch, once what it offers to install is answered: nothing of the forms written,
+/// stopped or started where it offers an install nobody answered.
+async fn answered(
+    ctx: &Ctx,
+    forms: &[String],
+    offer: Option<&str>,
+) -> Result<LifecycleReport, Box<Problem>> {
+    if !ctx.dry_run {
+        if let Some(offline) = Box::pin(super::installing::pending(ctx, forms)).await {
+            let rehearsed = Box::pin(moving(&ctx.clone().rehearsing(), forms)).await?;
+            if let Some(offline) = Box::pin(super::installing::answer(ctx, offline, offer)).await? {
+                return Ok(super::installing::unstarted(
+                    SWITCH,
+                    rehearsed.plan,
+                    offline,
+                ));
+            }
+        }
+    }
+    let mut report = Box::pin(moving(ctx, forms)).await?;
+    if ctx.dry_run {
+        if let Some(offline) = Box::pin(super::installing::offered(ctx, &report.plan)).await {
+            report.installing = offline.installs;
+            report.offer = Some(offline.offer);
+        }
+    }
+    Ok(report)
 }
 
 /// The switch itself, with the stack already claimed for it.
@@ -138,6 +171,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         unvetted: crate::overlay::unvetted(ctx),
         moves: Vec::new(),
         guards,
+        installing: Vec::new(),
         swept: sweep.networks.clone(),
         passing,
         fencing,
@@ -178,7 +212,8 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
 
     // Waited for last rather than inside a branch, because what a switch started is
     // the same thing bringing a form up starts, and it is owed the same wait.
-    settled_into(ctx, &manifest, &mut report).await?;
+    let addressed = report.plan.services.clone();
+    settled_into(ctx, &manifest, &mut report, &addressed).await?;
     Ok(report)
 }
 

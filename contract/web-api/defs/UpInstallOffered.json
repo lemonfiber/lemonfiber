@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An install of a part the bundle installs that a start offers, by the plugin and the\noffer its install reads as.",
+  "type": "object",
+  "properties": {
+    "offer": {
+      "description": "The name its install's offer goes by, where it could be read.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plugin": {
+      "description": "The plugin the bundle installs, in place of the stack's own service of its id.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why its install could not be read, where it could not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "plugin"
+  ]
+}

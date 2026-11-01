@@ -70,6 +70,7 @@ fn a_choice(name: &str, about: &str) -> Choice {
         marked: Some(false),
         command: Command::Up {
             forms: vec![name.to_owned()],
+            offer: None,
         },
     }
 }
@@ -80,6 +81,7 @@ fn a_taking(name: &str, about: &str) -> Taken {
     Taken {
         command: Command::Up {
             forms: vec![name.to_owned()],
+            offer: None,
         },
         covers: vec![a_choice(name, about)],
         each: "form",
@@ -92,6 +94,7 @@ fn several() -> Taken {
     Taken {
         command: Command::Up {
             forms: vec!["full".to_owned(), "lean".to_owned()],
+            offer: None,
         },
         covers: vec![
             a_choice("Full stack", "everything, behind the tunnel"),

@@ -9,6 +9,7 @@ async fn starting_waits_until_the_services_are_usable() {
     let ctx = watching(engine);
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
 
     let produced = report(dispatch(command, &ctx).await);
@@ -37,6 +38,7 @@ async fn starting_keeps_asking_until_the_services_are_ready() {
     let ctx = watching(engine);
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
 
     let produced = report(dispatch(command, &ctx).await);
@@ -72,6 +74,7 @@ async fn one_service_failing_to_start_never_takes_down_the_rest() {
     let refused = dispatch(
         Command::Up {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &ctx,
     )
@@ -102,6 +105,7 @@ async fn a_service_that_will_not_start_says_what_its_absence_costs() {
     let refused = dispatch(
         Command::Up {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &watching(engine).with_patience(Duration::ZERO),
     )
@@ -133,6 +137,7 @@ async fn a_service_that_never_becomes_usable_stops_the_start_and_says_which() {
     let ctx = watching(engine).with_patience(Duration::ZERO);
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
 
     let refused = dispatch(command, &ctx).await.err();
@@ -162,6 +167,7 @@ async fn a_service_that_will_not_start_and_says_nothing_still_reports_which() {
     let ctx = watching(engine).with_patience(Duration::ZERO);
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
 
     let refused = dispatch(command, &ctx).await.err();
@@ -178,6 +184,7 @@ async fn a_crash_loop_is_not_something_starting_waits_out() {
     let ctx = watching(engine).with_patience(Duration::from_secs(3600));
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
 
     // Patience of an hour, and this must still return at once: a loop has
@@ -354,6 +361,7 @@ async fn a_compose_invocation_that_failed_is_not_then_waited_on() {
 
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
     let produced = report(dispatch(command, &ctx).await);
     // Read once and reported as found. With no patience at all, a start that waited
@@ -370,6 +378,7 @@ async fn starting_reports_an_engine_it_cannot_see() {
     let ctx = watching(Reporting::absent());
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
     assert_eq!(
         dispatch(command, &ctx).await.err().map(|p| p.code),

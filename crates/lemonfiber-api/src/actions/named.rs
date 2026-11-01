@@ -315,11 +315,11 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // Starting named services and bringing a form up are different requests
         // rather than one request with an argument, exactly as stopping them and
         // tearing a form down are, and Compose spells both pairs differently.
-        "up" if services.is_empty() => Ok(Command::Up { forms }),
+        "up" if services.is_empty() => Ok(Command::Up { forms, offer }),
         "up" => Ok(Command::Start { forms, services }),
         "down" if services.is_empty() => Ok(Command::Down(Teardown { forms, wait })),
         "down" => Ok(Command::Halt { forms, services }),
-        "switch" => Ok(Command::Switch { forms }),
+        "switch" => Ok(Command::Switch { forms, offer }),
         "restart" => Ok(Command::Restart(Restarting {
             forms,
             services,

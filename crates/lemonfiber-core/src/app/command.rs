@@ -76,6 +76,9 @@ pub enum Command {
     Up {
         /// The forms to start, resolved to the union of their closures.
         forms: Vec<String>,
+        /// The offer a rehearsal named to install the parts this build carries that the
+        /// forms hold and this machine has never run, which is the yes to installing them.
+        offer: Option<String>,
     },
     /// Bring back what this machine was running, because it has just restarted.
     ///
@@ -113,6 +116,9 @@ pub enum Command {
     Switch {
         /// The forms to switch to, resolved to the union of their closures.
         forms: Vec<String>,
+        /// The offer a rehearsal named to install the parts this build carries that the
+        /// forms hold and this machine has never run, which is the yes to installing them.
+        offer: Option<String>,
     },
     /// Restart services without touching the rest.
     Restart(Restarting),

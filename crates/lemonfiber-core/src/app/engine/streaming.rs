@@ -142,16 +142,29 @@ pub async fn pull_progress(
 /// The images come down here too, where a start needs any: Compose pulls what is
 /// missing before it starts anything, and that is the part that takes the minutes.
 ///
+/// A start of whole forms answers what it offers to install with `offer` first, as the
+/// waited-on path does, and writes and starts nothing where it answers none.
+///
 /// # Errors
 ///
-/// Returns the [`Problem`] a surface should render when the stack cannot be resolved
-/// or the program cannot be spawned.
+/// Returns the [`Problem`] a surface should render when the stack cannot be resolved,
+/// an install it offers is not answered, moved or does not hold, or the program cannot
+/// be spawned.
 pub async fn start_progress(
     ctx: &Ctx,
     forms: &[String],
     services: &[String],
+    offer: Option<&str>,
 ) -> Result<Receiver<Progress>, Box<Problem>> {
     let action = aimed(services);
+    if matches!(action, Action::Up) && !ctx.dry_run {
+        if let Some(offline) = Box::pin(super::installing::pending(ctx, forms)).await {
+            Box::pin(readied(&ctx.clone().rehearsing(), forms, &action)).await?;
+            if let Some(offline) = Box::pin(super::installing::answer(ctx, offline, offer)).await? {
+                return Err(Box::new(super::installing::unanswered(&offline)));
+            }
+        }
+    }
     let super::Readied {
         manifest,
         command,
@@ -211,7 +224,8 @@ pub async fn started(
     // last start through the *other* path named, which is worse than nothing.
     super::super::autostart::noted(ctx, &action, forms, &report);
     if status == Some(0) {
-        settled_into(ctx, &manifest, &mut report).await?;
+        let addressed = super::addressed(&action, &report.plan);
+        settled_into(ctx, &manifest, &mut report, &addressed).await?;
     } else {
         fell_short_into(ctx, &manifest, &mut report).await;
     }

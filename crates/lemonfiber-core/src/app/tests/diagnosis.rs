@@ -107,6 +107,7 @@ async fn asking_twice_is_not_an_error_the_second_time() {
     for command in [
         Command::Up {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         Command::Down(Teardown {
             forms: vec!["library".to_owned()],
@@ -114,6 +115,7 @@ async fn asking_twice_is_not_an_error_the_second_time() {
         }),
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
     ] {
         let once = report(dispatch(command.clone(), &ctx).await)

@@ -18,10 +18,11 @@ mod fetching;
 mod grounded;
 pub(crate) mod halted;
 mod inflight;
+mod installing;
 mod lock;
 mod offered;
 mod parting;
-pub(crate) use offered::{answering, restarted};
+pub(crate) use offered::{answering, restarted, switched, up};
 pub(crate) use parting::ran;
 mod preview;
 pub(crate) use preview::preview;
@@ -40,6 +41,10 @@ pub(crate) use diagnosis::{assembled, assembling, examined, Stack};
 pub(crate) use inflight::drained;
 pub(crate) use inflight::teardown;
 pub use inflight::{in_flight, Interrupted, Waiting};
+#[cfg(test)]
+pub(crate) use installing::left_out;
+pub use installing::{offline, unstarted, InstallOffered, Offline, REFUSALS as INSTALL_REFUSALS};
+pub(crate) use installing::{plugins as plugins_of, without_waiting};
 pub use lock::{claimed, released, Claim};
 pub use streaming::{logs, pull_progress, start_progress, started};
 // Reached only by the tests that drive the decision directly rather than through a
@@ -315,6 +320,11 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         )
     };
 
+    let (installing, offer) = match action {
+        Action::Up => Box::pin(installing::offered(ctx, &plan)).await,
+        _ => None,
+    }
+    .map_or_else(Default::default, |one| (one.installs, Some(one.offer)));
     let report = LifecycleReport {
         action: action.name().to_owned(),
         plan,
@@ -329,14 +339,15 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         secured: None,
         switched: None,
         held: None,
-        offer: None,
+        offer,
         unvetted: crate::overlay::unvetted(ctx),
         moves: if starts(action) {
-            crate::app::plugins::moving_in::on_offer(ctx, &manifest)
+            crate::app::plugins::moving_in::on_offer(ctx, &manifest).await
         } else {
             Vec::new()
         },
         guards,
+        installing,
         swept: sweep.networks.clone(),
         passing,
         fencing,
@@ -412,6 +423,15 @@ async fn worked(
     action: &Action,
     offer: Option<&str>,
 ) -> Result<LifecycleReport, Box<Problem>> {
+    if matches!(action, Action::Up) && !ctx.dry_run {
+        if let Some(offline) = Box::pin(installing::pending(ctx, forms)).await {
+            let Readied { report, .. } =
+                Box::pin(readied(&ctx.clone().rehearsing(), forms, action)).await?;
+            if let Some(offline) = Box::pin(installing::answer(ctx, offline, offer)).await? {
+                return Ok(installing::unstarted(action.name(), report.plan, offline));
+            }
+        }
+    }
     let Readied {
         manifest,
         command,
@@ -467,7 +487,7 @@ async fn worked(
     // that failed is not waited on, and still says where what it addressed stands.
     if starts(action) {
         if output.succeeded() {
-            settled_into(ctx, &manifest, &mut report).await?;
+            settled_into(ctx, &manifest, &mut report, &addressed).await?;
         } else {
             fell_short_into(ctx, &manifest, &mut report).await;
         }

@@ -519,3 +519,21 @@ pub(crate) static STACKLET: crate::stack::Carried = crate::stack::Carried {
 /// What [`STACKLET`] writes beside its manifest.
 static STACKLET_FILES: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
+
+/// Every part the bundle installs as having run as the stack's own service where `ctx`
+/// writes its stack, so no start offers to install one: the machine a test of something
+/// else stands on.
+pub(crate) fn every_part_has_run(ctx: &crate::app::Ctx) {
+    let stack = crate::app::project::directory(ctx);
+    let parts = lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|one| one.stage == Some(lemonfiber_bundled::Stage::Installed));
+    for at in parts.filter_map(|pinned| {
+        stack
+            .as_deref()
+            .map(|stack| crate::plugin::configuration(stack, pinned.first_party.plugin))
+    }) {
+        let _ = std::fs::create_dir_all(&at);
+        let _ = std::fs::write(at.join("ran"), "");
+    }
+}

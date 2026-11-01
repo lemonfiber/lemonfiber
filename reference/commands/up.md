@@ -32,6 +32,11 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it: the yes to installing the parts this build carries that the forms hold and this machine has never run.
+
+          Without it, a start that would install one asks at a terminal and otherwise starts nothing, saying what is on offer.
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 

@@ -129,4 +129,35 @@ codes! {
         remedy: "Look at what put a link at the path named, take the link away, and start \
             again.",
     }
+    /// Raised where an `up` or a `switch` names an offer that is not the install a fresh
+    /// look at the stack offers.
+    OFFLINE_INSTALL_MOVED = "LIFE-12" {
+        severity: Warning,
+        status: 400,
+        since: "0.18.0",
+        meaning: "What was agreed to is not what a start would install now. A fresh look offers \
+            another install of a part this build carries — one installed, run or changed since \
+            the offer was made — so nothing was installed, written or started.",
+        remedy: "Rehearse the start again, and answer the offer it gives now.",
+    }
+    /// Raised where a start would install a part this build carries and nobody said yes.
+    OFFLINE_INSTALL_UNANSWERED = "LIFE-13" {
+        severity: Warning,
+        status: 409,
+        since: "0.18.0",
+        meaning: "The form holds a part this build carries that this machine has never run, \
+            and starting it installs that part from the build. Nobody agreed to the install, so \
+            nothing of the form was written or started; the message names the part.",
+        remedy: "Rehearse the start, and answer the install it offers.",
+    }
+    /// Raised where an install a start was agreed to did not hold.
+    OFFLINE_INSTALL_UNHELD = "LIFE-14" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "The install of a part this build carries did not hold, so it was put back, \
+            and nothing of the form was started; the message names the part.",
+        remedy: "Run lemonfiber plugin install with the part's name to see what its proofs \
+            found, then start the form again.",
+    }
 }

@@ -362,7 +362,7 @@ async fn drive(
                 &["\nSetup is done — bringing your stack up.".to_owned()],
                 crate::say::for_a_parser(),
             );
-            start(&ctx, surface).await
+            Box::pin(start(&ctx, surface)).await
         }
         Ok(core_setup::Outcome::Abandoned) => {
             concluded(

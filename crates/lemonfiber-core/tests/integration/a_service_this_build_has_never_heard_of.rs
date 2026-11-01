@@ -118,6 +118,7 @@ async fn an_unknown_service_is_in_the_closure_and_in_the_command_that_starts_it(
     let started = dispatch(
         Command::Up {
             forms: vec!["tv".to_owned()],
+            offer: None,
         },
         &ctx(&[]),
     )

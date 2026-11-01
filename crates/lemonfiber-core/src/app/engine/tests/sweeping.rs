@@ -79,6 +79,7 @@ async fn started(ctx: &Ctx) -> Option<LifecycleReport> {
     match crate::app::dispatch(
         Command::Up {
             forms: vec!["search".to_owned()],
+            offer: None,
         },
         ctx,
     )
