@@ -118,30 +118,42 @@ impl Filling<'_> {
         }
     }
 
-    /// Why a case posting `asks` is not offered by an adapter speaking `speaks`: a
-    /// placeholder in it reads a case of a contract the adapter does not speak, or one it
-    /// answered `unsupported`. Nothing where every placeholder reads an answer it may.
-    pub(super) fn unoffered(&self, asks: &Value, speaks: &[String]) -> Option<String> {
+    /// What a case posting `asks` is recorded as answering without being asked, where it
+    /// is not asked of an adapter speaking `speaks`: `unsupported` where a placeholder in it
+    /// reads a case of a contract the adapter does not speak or one it answered
+    /// `unsupported`, and the refusal an earlier case gave where a placeholder reads one
+    /// that refused, the same refusal and status, saying which case it was. Nothing where
+    /// every placeholder reads an answer it may, or one no refusal explains, which then
+    /// fails filling.
+    pub(super) fn unasked(&self, asks: &Value, speaks: &[String]) -> Option<Response> {
         match asks {
             Value::String(text) => match Placeholder::read(text) {
                 Some(Placeholder::Answered { case, .. }) => {
                     let contract = case.split_once('/').map_or(case.as_str(), |(of, _)| of);
                     if !speaks.iter().any(|spoken| spoken == contract) {
-                        Some(format!(
+                        return Some(unsupported(format!(
                             "it speaks no {contract}, which {case} is a case of"
-                        ))
-                    } else if self.answers.get(&case).is_some_and(refused_unsupported) {
-                        Some(format!("{case} was answered unsupported"))
-                    } else {
-                        None
+                        )));
                     }
+                    let refusal = self
+                        .answers
+                        .get(&case)
+                        .and_then(|answer| Refusal::deserialize(answer).ok())?;
+                    Some(if refusal.kind == Kind::Unsupported {
+                        unsupported(format!("{case} was answered unsupported"))
+                    } else {
+                        refused(&Refusal::new(
+                            refusal.kind,
+                            format!("{case} was refused: {}", refusal.detail),
+                        ))
+                    })
                 }
                 _ => None,
             },
-            Value::Array(items) => items.iter().find_map(|item| self.unoffered(item, speaks)),
+            Value::Array(items) => items.iter().find_map(|item| self.unasked(item, speaks)),
             Value::Object(members) => members
                 .values()
-                .find_map(|member| self.unoffered(member, speaks)),
+                .find_map(|member| self.unasked(member, speaks)),
             _ => None,
         }
     }
@@ -171,14 +183,13 @@ impl Filling<'_> {
     }
 }
 
-/// Whether `answer` is the refusal an adapter answers an operation it cannot perform with.
-fn refused_unsupported(answer: &Value) -> bool {
-    Refusal::deserialize(answer).is_ok_and(|refusal| refusal.kind == Kind::Unsupported)
+/// What a case that is not offered is recorded as answering: `unsupported`, saying why.
+fn unsupported(why: String) -> Response {
+    refused(&Refusal::new(Kind::Unsupported, why))
 }
 
-/// What a case that is not offered is recorded as answering: `unsupported`, saying why.
-pub(super) fn unsupported(why: String) -> Response {
-    let refusal = Refusal::new(Kind::Unsupported, why);
+/// `refusal` as the adapter answers it, at the status its kind is answered with.
+fn refused(refusal: &Refusal) -> Response {
     Response {
         status: refusal.kind.status(),
         headers: vec![("Content-Type".to_owned(), PROBLEM.to_owned())],

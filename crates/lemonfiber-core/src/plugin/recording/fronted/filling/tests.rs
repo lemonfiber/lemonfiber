@@ -45,6 +45,14 @@ impl Filler {
                     "identity.source@1/revoke-answers".to_owned(),
                     json!({"type": "unsupported", "detail": "it revokes nothing"}),
                 ),
+                (
+                    "identity.source@1/claim-answers".to_owned(),
+                    json!({"type": "unauthorised", "detail": "the upstream rejected the credential"}),
+                ),
+                (
+                    "identity.source@1/sessions-answers".to_owned(),
+                    json!({"oops": true}),
+                ),
             ]
             .into_iter()
             .collect(),
@@ -149,35 +157,92 @@ fn a_placeholder_with_nothing_to_fill_it_names_itself_and_why() {
     );
 }
 
+/// The status and the refusal a case is recorded as answering without being asked.
+fn unasked(filling: &Filling<'_>, asks: &Value, speaks: &[String]) -> Option<(u16, Value)> {
+    filling.unasked(asks, speaks).map(|response| {
+        (
+            response.status,
+            serde_json::from_str(&response.body).unwrap_or(Value::Null),
+        )
+    })
+}
+
 #[test]
-fn a_case_reading_an_unspoken_contract_or_an_unsupported_answer_is_not_offered() {
+fn a_case_reading_an_unspoken_contract_or_an_unsupported_answer_is_recorded_unsupported() {
     let Some(filler) = Filler::new(None) else {
         return;
     };
     let filling = filler.filling();
     let speaks = ["identity.source@1".to_owned()];
     assert_eq!(
-        filling.unoffered(
+        unasked(
+            &filling,
             &json!({"by": ["plain", "{media.serve@1/mint-answers#/key}"]}),
             &speaks
         ),
-        Some(
-            "it speaks no media.serve@1, which media.serve@1/mint-answers is a case of".to_owned()
-        )
+        Some((
+            500,
+            json!({"type": "unsupported", "detail": "it speaks no media.serve@1, which media.serve@1/mint-answers is a case of"})
+        ))
     );
     assert_eq!(
-        filling.unoffered(
+        unasked(
+            &filling,
             &json!({"x": {"id": "{identity.source@1/revoke-answers#/id}"}}),
             &speaks
         ),
-        Some("identity.source@1/revoke-answers was answered unsupported".to_owned())
+        Some((
+            500,
+            json!({"type": "unsupported", "detail": "identity.source@1/revoke-answers was answered unsupported"})
+        ))
     );
     assert_eq!(
-        filling.unoffered(
+        unasked(
+            &filling,
             &json!({"signed": ["{identity.source@1/whoever-answers#/token}", "{upstream:username}", 12]}),
             &speaks
         ),
         None
+    );
+}
+
+#[test]
+fn a_case_reading_a_refused_answer_is_recorded_with_that_refusal_at_its_status() {
+    let Some(filler) = Filler::new(None) else {
+        return;
+    };
+    let filling = filler.filling();
+    let speaks = ["identity.source@1".to_owned()];
+    assert_eq!(
+        unasked(
+            &filling,
+            &json!({"id": "{identity.source@1/claim-answers#/id}"}),
+            &speaks
+        ),
+        Some((
+            502,
+            json!({"type": "unauthorised", "detail": "identity.source@1/claim-answers was refused: the upstream rejected the credential"})
+        ))
+    );
+}
+
+#[test]
+fn a_case_reading_an_answer_no_refusal_explains_is_asked_and_cannot_be_filled() {
+    let Some(filler) = Filler::new(None) else {
+        return;
+    };
+    let mut filling = filler.filling();
+    let asks = json!({"member": "{identity.source@1/sessions-answers#/0}"});
+    assert_eq!(
+        unasked(&filling, &asks, &["identity.source@1".to_owned()]),
+        None
+    );
+    assert_eq!(
+        filling.filled(&asks).err(),
+        Some(
+            "{identity.source@1/sessions-answers#/0} cannot be filled: identity.source@1/sessions-answers answered no string at \"/0\""
+                .to_owned()
+        )
     );
 }
 

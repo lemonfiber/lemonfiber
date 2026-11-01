@@ -27,6 +27,10 @@ fn unsupported() -> Answer {
 }
 
 fn serving() -> Arc<Fake> {
+    minting(unsupported())
+}
+
+fn minting(mint: Answer) -> Arc<Fake> {
     let json = |body: &str| Answer::served(200, "application/json", body);
     Fake::by_path_in_turn(vec![
         ("/health", vec![Answer::reply(200, "ok")]),
@@ -38,7 +42,7 @@ fn serving() -> Arc<Fake> {
             "/System/Info/Public",
             vec![json("{\"ProductName\": \"Jellyfin Server\"}")],
         ),
-        ("/mint", vec![unsupported()]),
+        ("/mint", vec![mint]),
         ("/lemonfiber/media.serve/v1/", vec![json("null")]),
     ])
 }
@@ -74,4 +78,57 @@ async fn a_case_reading_what_was_not_offered_is_recorded_unsupported_and_never_a
     }
     assert_eq!(answered_type(&at, "mint"), Some(json!("unsupported")));
     assert_eq!(posted(&http, "/mint").len(), 1);
+}
+
+#[tokio::test]
+async fn a_case_reading_a_refused_answer_is_recorded_with_that_refusal_and_never_asked() {
+    let at = source("fronted-refused", &serving_alone());
+    let http = minting(Answer::served(
+        502,
+        PROBLEM,
+        r#"{"type": "unauthorised", "detail": "the upstream rejected the credential"}"#,
+    ));
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(failed_at(&read), Vec::new());
+    for case in ["answers_to", "revoke"] {
+        let recording = json_at(
+            &at,
+            &format!("conformance/media.serve@1/{case}-answers.json"),
+        );
+        assert_eq!(
+            recording.pointer("/response/status"),
+            Some(&json!(502)),
+            "{case}"
+        );
+        assert_eq!(
+            recording.pointer("/response/json/type"),
+            Some(&json!("unauthorised")),
+            "{case}"
+        );
+        assert_eq!(
+            recording.pointer("/response/json/detail"),
+            Some(&json!(
+                "media.serve@1/mint-answers was refused: the upstream rejected the credential"
+            )),
+            "{case}"
+        );
+        assert!(
+            posted(&http, &format!("/{case}")).is_empty(),
+            "{case} was asked"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_case_reading_an_answer_no_refusal_explains_fails_the_run() {
+    let at = source("fronted-undeclared", &serving_alone());
+    let http = minting(Answer::served(500, "text/plain", "it fell over"));
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert!(
+        !failed_at(&read).is_empty(),
+        "the run went on past an answer nothing declares"
+    );
+    assert!(posted(&http, "/answers_to").is_empty());
 }
