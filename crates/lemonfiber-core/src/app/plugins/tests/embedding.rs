@@ -254,3 +254,76 @@ async fn a_tree_that_cannot_be_written_out_installs_nothing() {
     assert_eq!(refusal(from_git(&ctx, BUNDLED).await), "PLUGIN-16");
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
+
+/// Every setting, secret and credential name the stack held for a part, each with its
+/// value, as the secret store, the settings store and the environment file hold them.
+fn names_held(ctx: &Ctx) -> Vec<(String, Option<String>)> {
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let secrets = crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .unwrap_or_default();
+    let file = crate::config::store::read(&env).unwrap_or_default();
+    let mut held: Vec<(String, Option<String>)> = secrets
+        .names()
+        .map(|name| (name.to_owned(), secrets.value(name).map(str::to_owned)))
+        .chain(
+            file.keys()
+                .into_iter()
+                .map(|key| (key.to_owned(), file.get(key).map(str::to_owned))),
+        )
+        .collect();
+    held.sort();
+    held
+}
+
+/// Moving a part in place renames and migrates nothing: every name the stack held for it
+/// is held after the move under the same name with the same value, and the move journals
+/// no value moved from one name to another.
+#[tokio::test]
+async fn moving_a_part_in_place_renames_and_migrates_nothing() {
+    let serving = Arc::new(Serving::listing(""));
+    let ctx = unmoved("embedded-names", &serving);
+    assert!(crate::app::targets::record_secret(
+        &ctx,
+        crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
+        "the-admins-password",
+        crate::seed::OPERATION,
+    )
+    .is_ok());
+    let credential = |ctx: &Ctx| {
+        crate::app::targets::recorded_credential(ctx, BUNDLED, crate::config::ADMIN_PASSWORD_SUFFIX)
+    };
+    let before = names_held(&ctx);
+    let journalled_before = journalled(&ctx).len();
+    assert_eq!(credential(&ctx).as_deref(), Some("the-admins-password"));
+
+    let confirmed = crate::update::run::update(&ctx, updating(Some(BUNDLED), true)).await;
+
+    assert!(
+        confirmed
+            .as_ref()
+            .is_ok_and(|report| report.moved.iter().all(|one| one.taken)),
+        "{confirmed:?}"
+    );
+    let after = names_held(&ctx);
+    assert!(
+        before.iter().all(|one| after.contains(one)),
+        "every name is held as it was"
+    );
+    assert_eq!(credential(&ctx).as_deref(), Some("the-admins-password"));
+    let migrated: Vec<crate::journal::Kind> = journalled(&ctx)
+        .into_iter()
+        .skip(journalled_before)
+        .map(|change| change.kind)
+        .filter(|kind| {
+            matches!(
+                kind,
+                crate::journal::Kind::Renamed { .. }
+                    | crate::journal::Kind::Moved { .. }
+                    | crate::journal::Kind::Setting { filed: Some(_), .. }
+                    | crate::journal::Kind::Secret { filed: Some(_), .. }
+            )
+        })
+        .collect();
+    assert!(migrated.is_empty(), "{migrated:?}");
+}
