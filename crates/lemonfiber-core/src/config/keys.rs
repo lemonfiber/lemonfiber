@@ -85,7 +85,7 @@ pub(crate) const QUIET_HOURS_KEY: &str = "LEMONFIBER_QUIET_HOURS";
 ///
 /// Not lemonfiber's own setting — it is the stack's, handed to every container by the
 /// project, and read here so a window means the same hour inside and out.
-pub(crate) const ZONE_KEY: &str = "TZ";
+pub(crate) const ZONE_KEY: &str = lemonfiber_manifest::container::ZONE;
 
 /// The zone the project hands every container when nothing names one.
 ///
@@ -155,10 +155,10 @@ pub(crate) const NAS_HOST_KEY: &str = "NAS_HOST";
 pub(crate) const NAS_EXPORT_KEY: &str = "NAS_EXPORT";
 
 /// The user id the service containers run as.
-pub(crate) const PUID_KEY: &str = "PUID";
+pub(crate) const PUID_KEY: &str = lemonfiber_manifest::container::PUID;
 
 /// The group id the service containers run as.
-pub(crate) const PGID_KEY: &str = "PGID";
+pub(crate) const PGID_KEY: &str = lemonfiber_manifest::container::PGID;
 
 /// The interface the household tier is published on.
 pub(crate) const LAN_BIND_KEY: &str = "LAN_BIND";

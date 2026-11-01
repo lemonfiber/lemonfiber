@@ -412,9 +412,12 @@ fn environment(unit: &Unit<'_>, values: &Values<'_>) -> BTreeMap<String, String>
         ZONE_KEY.to_owned(),
         operated(values, ZONE_KEY, DEFAULT_ZONE),
     );
-    if unit.user == UserMode::PuidEnv {
-        for key in [PUID_KEY, PGID_KEY] {
-            written.insert(key.to_owned(), operated(values, key, OPERATOR_FALLBACK));
+    if let Some(variables) = unit.user.ids_in() {
+        for (variable, key) in [
+            (&variables.uid_env, PUID_KEY),
+            (&variables.gid_env, PGID_KEY),
+        ] {
+            written.insert(variable.clone(), operated(values, key, OPERATOR_FALLBACK));
         }
     }
     written

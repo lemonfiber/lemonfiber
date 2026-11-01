@@ -393,7 +393,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
         shares: None,
         tmpfs: &service.tmpfs,
         env: &service.env,
-        user: UserMode::of(service.user_mode, false, service.posture),
+        user: UserMode::of(service.user_mode.as_ref(), false, service.posture),
         posture: service.posture,
         mem_limit_mib: service.mem_limit_mib,
         shape: service.shape,

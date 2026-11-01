@@ -201,9 +201,33 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
 }
 
 #[test]
+fn an_image_that_drops_to_the_operator_under_its_own_names_is_told_them() {
+    let entry = entry_of(&document(with(Fields {
+        user_mode: Some(UserMode::IdsIn(
+            lemonfiber_manifest::container::IdVariables {
+                uid_env: "PLEX_UID".to_owned(),
+                gid_env: "PLEX_GID".to_owned(),
+            },
+        )),
+        ..Fields::default()
+    })));
+    assert_eq!(
+        text(&entry, &["environment", "PLEX_UID"]).as_deref(),
+        Some("1000")
+    );
+    assert_eq!(
+        text(&entry, &["environment", "PLEX_GID"]).as_deref(),
+        Some("1000")
+    );
+    assert_eq!(text(&entry, &["environment", "PUID"]), None);
+}
+
+#[test]
 fn an_image_that_drops_to_the_operators_pair_is_told_it() {
     let entry = entry_of(&document(with(Fields {
-        user_mode: Some(UserMode::PuidEnv),
+        user_mode: Some(UserMode::IdsIn(
+            lemonfiber_manifest::container::IdVariables::puid(),
+        )),
         ..Fields::default()
     })));
     assert_eq!(
@@ -307,7 +331,9 @@ fn a_record_whose_paths_the_model_refuses_writes_none_of_them() {
 #[test]
 fn a_record_naming_lemonfibers_own_variables_does_not_override_them() {
     let entry = entry_of(&document(with(Fields {
-        user_mode: Some(UserMode::PuidEnv),
+        user_mode: Some(UserMode::IdsIn(
+            lemonfiber_manifest::container::IdVariables::puid(),
+        )),
         env: ["TZ", "PUID", "PGID"]
             .map(|name| {
                 (

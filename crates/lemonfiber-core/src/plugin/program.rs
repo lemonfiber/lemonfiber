@@ -15,7 +15,7 @@ use super::judging::ran;
 use super::recorded::RunResult;
 use super::Verdict;
 use crate::app::Ctx;
-use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
+use crate::config::{DEFAULT_ZONE, ZONE_KEY};
 use crate::ports::program::{Configuration, Ended, Joined, Program, Run, Unran};
 use crate::project::entry::{configuration, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY};
 
@@ -126,9 +126,9 @@ pub(crate) fn contained(placed: &Placed, operator: &Operator) -> Contained {
         })
         .collect();
     env.push(format!("{ZONE_KEY}={}", operator.zone));
-    if user == UserMode::PuidEnv {
-        env.push(format!("{PUID_KEY}={}", operator.ids.0));
-        env.push(format!("{PGID_KEY}={}", operator.ids.1));
+    if let Some(variables) = user.ids_in() {
+        env.push(format!("{}={}", variables.uid_env, operator.ids.0));
+        env.push(format!("{}={}", variables.gid_env, operator.ids.1));
     }
     let confined = fields.posture == Posture::Confined;
     Contained {

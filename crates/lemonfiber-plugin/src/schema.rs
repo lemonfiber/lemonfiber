@@ -291,7 +291,7 @@ impl Service {
             tmpfs: &self.tmpfs,
             env: &self.env,
             secrets,
-            user_mode: self.user_mode,
+            user_mode: self.user_mode.as_ref(),
             posture: self.posture,
             mem_limit_mib: self.mem_limit_mib,
             network: self.network.as_ref(),

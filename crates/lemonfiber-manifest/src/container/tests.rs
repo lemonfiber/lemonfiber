@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{is_plain, UrlOf, UserMode, Value};
+use super::{is_plain, IdVariables, UrlOf, UserMode, Value};
 use super::{
     Constant, Container, Minted, Mount, Network, Posture, Publish, RecordedWith, Secret, SecretOf,
     Setting, Shape,
@@ -264,7 +264,8 @@ fn an_adapter_or_a_confined_service_runs_as_the_operator() {
     let mut adapter = plain(&none);
     adapter.speaks = true;
     assert_eq!(adapter.user(), UserMode::Uid);
-    adapter.user_mode = Some(UserMode::Image);
+    let image = UserMode::Image;
+    adapter.user_mode = Some(&image);
     assert_eq!(wrong(&adapter).len(), 1);
     let mut confined = plain(&none);
     confined.posture = Posture::Confined;
@@ -445,14 +446,26 @@ fn each_field_is_read_as_written_and_defaulted_where_left_out() {
         network.ok().map(|read| read.via),
         Some(Some("network.egress-guard".to_owned()))
     );
-    let modes: Result<BTreeMap<String, UserMode>, _> =
-        toml::from_str("a = \"image\"\nb = \"puid-env\"\nc = \"uid\"");
+    let modes: Result<BTreeMap<String, UserMode>, _> = toml::from_str(
+        "a = \"image\"\nb = \"puid-env\"\nc = \"uid\"\nd = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }",
+    );
     assert_eq!(
         modes
             .ok()
             .map(|read| read.into_values().collect::<Vec<_>>()),
-        Some(vec![UserMode::Image, UserMode::PuidEnv, UserMode::Uid])
+        Some(vec![
+            UserMode::Image,
+            UserMode::IdsIn(IdVariables::puid()),
+            UserMode::Uid,
+            UserMode::IdsIn(IdVariables {
+                uid_env: "PLEX_UID".to_owned(),
+                gid_env: "PLEX_GID".to_owned(),
+            }),
+        ])
     );
+    let unknown: Result<UserMode, _> =
+        toml::from_str("uid_env = \"A\"\ngid_env = \"B\"\nhome = \"C\"");
+    assert!(unknown.is_err());
     let postures: Result<BTreeMap<String, Posture>, _> =
         toml::from_str("a = \"standard\"\nb = \"confined\"");
     assert_eq!(
@@ -747,4 +760,44 @@ fn a_secret_a_recording_stands_in_for_is_needed_to_start_unless_it_is_a_code_tha
     assert!(!secret(None, None).needed_to_start());
     assert!(secret(Some(RecordedWith::Minted), None).needed_to_start());
     assert!(!secret(Some(RecordedWith::Minted), Some(240)).needed_to_start());
+}
+
+#[test]
+fn puid_env_is_the_pair_of_named_variables_and_is_written_back_by_its_name() {
+    let named: Result<BTreeMap<String, UserMode>, _> = toml::from_str(
+        "a = { uid_env = \"PUID\", gid_env = \"PGID\" }\nb = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }",
+    );
+    let written = named.ok().and_then(|read| toml::to_string(&read).ok());
+    assert_eq!(
+        written.as_deref(),
+        Some("a = \"puid-env\"\n\n[b]\nuid_env = \"PLEX_UID\"\ngid_env = \"PLEX_GID\"\n")
+    );
+}
+
+#[test]
+fn named_id_variables_are_two_different_variables_lemonfiber_alone_writes() {
+    let none = NONE;
+    let declared = BTreeMap::from([(
+        "PLEX_UID".to_owned(),
+        Value::Secret(SecretOf {
+            secret: "admin-key".to_owned(),
+        }),
+    )]);
+    let cases = [
+        (("PLEX_UID", "PLEX_GID"), &none, 0),
+        (("plex_uid", "PLEX_GID"), &none, 1),
+        (("TZ", "PLEX_GID"), &none, 1),
+        (("PLEX_ID", "PLEX_ID"), &none, 1),
+        (("PLEX_UID", "PLEX_GID"), &declared, 1),
+    ];
+    for ((uid_env, gid_env), declared, refused) in cases {
+        let mode = UserMode::IdsIn(IdVariables {
+            uid_env: uid_env.to_owned(),
+            gid_env: gid_env.to_owned(),
+        });
+        let mut service = plain(declared);
+        service.user_mode = Some(&mode);
+        let said = wrong(&service);
+        assert_eq!(said.len(), refused, "{uid_env} {gid_env}: {said:#?}");
+    }
 }
