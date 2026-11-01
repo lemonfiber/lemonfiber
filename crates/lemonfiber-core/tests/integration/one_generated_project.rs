@@ -39,16 +39,6 @@ fn installed() -> Project {
     generated(&manifest, &parts, &Chosen::read(None), &Reading::bare())
 }
 
-/// The carried stack, generated with its guards moved onto their plugins, as every
-/// machine running this release holds it.
-fn guarded() -> Project {
-    let Ok(manifest) = Manifest::from_toml(STACK) else {
-        unreachable!("the embedded stack parses; the manifest crate asserts it separately");
-    };
-    let guards = lemonfiber_testing::guards::both_installed();
-    generated(&manifest, &guards, &Chosen::read(None), &Reading::bare())
-}
-
 /// The project's document, read back.
 fn document(project: &Project) -> Value {
     serde_norway::from_str(&project.text).unwrap_or_default()
@@ -217,9 +207,11 @@ fn declared_subnets(document: &Value) -> Vec<(String, Option<(Ipv4Addr, u8)>)> {
         .collect()
 }
 
+/// With every part the bundle installs moved in place, each network names its own subnet
+/// in the range lemonfiber holds, and no two of them meet.
 #[test]
 fn the_engine_draws_no_network_from_its_own_pools_and_no_two_subnets_meet() {
-    let declared = declared_subnets(&document(&guarded()));
+    let declared = declared_subnets(&document(&installed()));
     let drawn: Vec<&String> = declared
         .iter()
         .filter(|(_, subnet)| subnet.is_none())
@@ -231,16 +223,19 @@ fn the_engine_draws_no_network_from_its_own_pools_and_no_two_subnets_meet() {
         "the stack asks for more networks than a default install's pools hold, which is why each names its subnet"
     );
     assert!(drawn.is_empty(), "drawn from the engine's pools: {drawn:?}");
-    let subnets: Vec<(Ipv4Addr, u8)> = declared.iter().filter_map(|(_, subnet)| *subnet).collect();
-    for (at, subnet) in subnets.iter().enumerate() {
+    let subnets: Vec<(&String, (Ipv4Addr, u8))> = declared
+        .iter()
+        .filter_map(|(name, subnet)| Some((name, (*subnet)?)))
+        .collect();
+    for (at, (name, subnet)) in subnets.iter().enumerate() {
         assert!(
             within(subnet.0, lemonfiber_core::topology::RANGE),
-            "{subnet:?} outside the range lemonfiber holds"
+            "{name} at {subnet:?} outside the range lemonfiber holds"
         );
-        for other in subnets.iter().skip(at + 1) {
+        for (other_name, other) in subnets.iter().skip(at + 1) {
             assert!(
                 !within(other.0, *subnet) && !within(subnet.0, *other),
-                "{subnet:?} meets {other:?}"
+                "{name} at {subnet:?} meets {other_name} at {other:?}"
             );
         }
     }

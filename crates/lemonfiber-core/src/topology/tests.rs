@@ -232,6 +232,53 @@ fn the_door_holds_fixed_addresses_on_its_asks_of_the_proxy_and_the_media_server(
         .all(|network| network.fixed.is_none()));
 }
 
+/// An ask reaching the proxy and the adapter in front of it is one network, the proxy's,
+/// holding the fixed subnet once and both services on it; an adapter reached alone keeps
+/// a network of its own.
+#[test]
+fn an_ask_reaching_an_adapter_beside_its_upstream_is_the_upstreams_network_alone() {
+    let door = Member {
+        confined: true,
+        publishes: true,
+        ..member("door")
+    };
+    let adapter = Member {
+        fronts: Some("caddy"),
+        ..member("caddy-adapter")
+    };
+    let members = [door, member("caddy"), adapter];
+    let asks = [
+        ask("door", PROXY_FRONT, "caddy"),
+        ask("door", PROXY_FRONT, "caddy-adapter"),
+    ];
+    let topology = derived(&members, &asks, &[], Some("door"), false);
+
+    let fixed: Vec<&String> = topology
+        .networks
+        .iter()
+        .filter(|(_, network)| network.fixed == Some(PROXY_SUBNET))
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(fixed, ["ask__door__proxy.front__caddy"]);
+    assert_eq!(
+        on(&topology, "caddy-adapter").get("ask__door__proxy.front__caddy"),
+        Some(&None)
+    );
+    assert_eq!(
+        on(&topology, "caddy").get("ask__door__proxy.front__caddy"),
+        Some(&Some(PROXY_ON_PROXY))
+    );
+
+    let alone = derived(
+        &members,
+        &[ask("door", PROXY_FRONT, "caddy-adapter")],
+        &[],
+        None,
+        false,
+    );
+    assert!(names(&alone, "door").contains(&"ask__door__proxy.front__caddy-adapter".to_owned()));
+}
+
 #[test]
 fn no_network_joins_services_that_no_rule_joins() {
     let adapter = Member {
