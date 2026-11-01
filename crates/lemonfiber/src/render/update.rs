@@ -21,6 +21,7 @@ pub(crate) fn update(report: &Report) -> Lines {
     let mut lines = Lines::default();
     if report.state == State::Current {
         lines.put("Every service is on the version this build of lemonfiber pins.");
+        lines.extend(super::moving::guards(&report.guards));
         return lines;
     }
 
@@ -31,6 +32,7 @@ pub(crate) fn update(report: &Report) -> Lines {
     lines.extend(transfers(&report.in_flight));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
     lines.extend(super::moving::moved(&report.moved));
+    lines.extend(super::moving::guards(&report.guards));
     lines.extend(super::moving::offered(&report.moves));
     if report.confirmed {
         lines.extend(carried(report));

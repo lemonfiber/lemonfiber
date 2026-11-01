@@ -2,6 +2,25 @@
 
 use super::*;
 
+/// A listing of `installed`, with nothing else on the page.
+fn listing(installed: Vec<Installed>) -> Installs {
+    Installs {
+        demand: None,
+        nonconforming: Vec::new(),
+        proof: None,
+        rehearsed: false,
+        agreement: None,
+        removal: None,
+        installed,
+        install: None,
+        update: None,
+        substituted: Vec::new(),
+        sources: Vec::new(),
+        unvetted: None,
+        guards: Vec::new(),
+    }
+}
+
 /// One declared override, as the report states it.
 fn override_of() -> Overriding {
     Overriding {
@@ -12,21 +31,7 @@ fn override_of() -> Overriding {
 
 #[test]
 fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
-    let said = installs(&Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        agreement: None,
-        removal: None,
-        installed: Vec::new(),
-        install: None,
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-        unvetted: None,
-    })
-    .text();
+    let said = installs(&listing(Vec::new())).text();
     assert_eq!(said, "No plugins are installed.");
 }
 
@@ -34,21 +39,7 @@ fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
 /// keep, so it is on the page rather than only in the document.
 #[test]
 fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
-    let said = installs(&Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        agreement: None,
-        removal: None,
-        installed: vec![recorded("komga", Some(household()))],
-        install: None,
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-        unvetted: None,
-    })
-    .text();
+    let said = installs(&listing(vec![recorded("komga", Some(household()))])).text();
     assert!(said.contains("One plugin is installed:"), "{said}");
     assert!(said.contains("komga 1.2.0"), "{said}");
     assert!(said.contains("config  /app/data"), "{said}");
@@ -63,20 +54,10 @@ fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
 
 #[test]
 fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
-    let said = installs(&Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        agreement: None,
-        removal: None,
-        installed: vec![recorded("komga", Some(household())), recorded("plex", None)],
-        install: None,
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-        unvetted: None,
-    })
+    let said = installs(&listing(vec![
+        recorded("komga", Some(household())),
+        recorded("plex", None),
+    ]))
     .text();
     assert!(said.contains("2 plugins are installed:"), "{said}");
     assert!(said.contains("nothing — it publishes no port"), "{said}");
@@ -110,6 +91,7 @@ fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -141,6 +123,7 @@ fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -163,6 +146,7 @@ fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
@@ -194,6 +178,7 @@ fn the_install_shows_the_container_that_is_written_for_it() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -230,6 +215,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
             substituted: Vec::new(),
             sources: Vec::new(),
             unvetted: None,
+            guards: Vec::new(),
         })
         .text()
     };
@@ -266,6 +252,7 @@ fn a_rehearsal_states_every_change_every_proof_and_every_override() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -336,6 +323,7 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     let keyed = said
@@ -381,6 +369,7 @@ fn an_install_states_the_same_three_in_the_past_tense() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(said.contains("What it put on this machine:"), "{said}");
@@ -412,6 +401,7 @@ fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -493,6 +483,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
         }],
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     for expected in [
@@ -542,6 +533,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -572,6 +564,7 @@ fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(said.starts_with("Would install komga 1.2.0:"), "{said}");
@@ -603,6 +596,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
             substituted: Vec::new(),
             sources: Vec::new(),
             unvetted: None,
+            guards: Vec::new(),
         })
         .text();
         let header = said.lines().nth(1).unwrap_or_default();
@@ -633,6 +627,7 @@ fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -660,6 +655,7 @@ fn the_printer_reaches_this_renderer_for_this_outcome() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     }))
     .text();
     assert!(drawn.contains("komga 1.2.0"), "{drawn}");
@@ -673,21 +669,7 @@ fn a_plugin_from_a_git_source_is_said_with_its_commit() {
         revision: "8fa05ba718f70624f2c122f8c0371d47e6c90d0e".to_owned(),
         ..recorded("komga", Some(household()))
     };
-    let said = installs(&Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        agreement: None,
-        removal: None,
-        installed: vec![one],
-        install: None,
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-        unvetted: None,
-    })
-    .text();
+    let said = installs(&listing(vec![one])).text();
 
     assert!(
         said.contains("from       https://example.org/plugin-komga at 8fa05ba718f7 — unreviewed"),
@@ -735,6 +717,7 @@ fn a_source_that_cannot_be_fetched_is_said_to_leave_the_plugin_unupdatable() {
             standing("calibre", lemonfiber_core::plugin::Fetchable::Reachable),
         ],
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
 
@@ -772,6 +755,7 @@ fn an_answer_kept_against_a_plugin_is_named_with_when_why_and_what_it_stops() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(

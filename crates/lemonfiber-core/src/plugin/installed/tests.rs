@@ -556,6 +556,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     };
     let done = Installs {
         demand: None,
@@ -589,6 +590,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     };
     assert!(read.install.is_none());
     assert_eq!(done.install.map(|one| one.recorded), Some(true));

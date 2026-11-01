@@ -117,6 +117,7 @@ pub(super) async fn apply(
         unvetted: None,
         moves: Vec::new(),
         moved: Vec::new(),
+        guards: Vec::new(),
     })
 }
 

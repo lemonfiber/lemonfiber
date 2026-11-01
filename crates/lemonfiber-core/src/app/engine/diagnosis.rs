@@ -340,8 +340,8 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     );
     let telling = deferring::telling(ctx, manifest);
     let owned = deferring::owned(ctx, manifest);
-    let gate = deferring::gated(ctx, manifest, project.as_deref());
-    let decline = deferring::declined(ctx, manifest, project.as_deref());
+    let gate = deferring::gated(ctx, manifest);
+    let decline = deferring::declined(ctx, manifest);
     let moves = crate::doctor::moving::MovesCheck::new(Arc::new(
         crate::app::plugins::moving_in::Offering::of(ctx, manifest),
     ));

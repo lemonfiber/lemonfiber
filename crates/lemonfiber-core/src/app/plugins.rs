@@ -88,6 +88,7 @@ mod refusals;
 mod occupied;
 // Which plugins may move one of the stack's own services in place.
 pub(crate) mod granting;
+pub(crate) mod guarding;
 mod replacing;
 // Installing what the record already holds: an update, or a second source for one name.
 mod planned;
@@ -233,10 +234,23 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
         action,
         Asked::Installed | Asked::Prove { .. } | Asked::Run { .. }
     );
-    Box::pin(asked(ctx, action)).await.map(|installs| Installs {
+    let installs = Box::pin(asked(ctx, action)).await?;
+    let guards = Box::pin(guarding::carried(ctx, action, &installs)).await;
+    Ok(Installs {
         unvetted: crate::overlay::unvetted(ctx).filter(|_| starts),
+        guards,
         ..installs
     })
+}
+
+/// What is installed, or what installing one came to, with no guard moved beside it:
+/// the entry point a move itself installs through.
+///
+/// # Errors
+///
+/// As [`plugins`].
+pub(crate) async fn unguarded(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
+    Box::pin(asked(ctx, action)).await
 }
 
 /// What is installed, or what installing, updating or removing one came to.

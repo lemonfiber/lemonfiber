@@ -94,6 +94,10 @@ pub struct Noted {
     pub because: String,
 }
 
+/// Every refusal of putting a change back that a request is answered with for what it
+/// asked: a guard moved onto its plugin for good, whether by an undo or a removal.
+pub const REFUSALS: [crate::error::Code; 1] = [crate::error::codes::undo::MOVED_FOR_GOOD];
+
 /// The operation a reversal records its own work under, so it can be put back in turn.
 pub const OPERATION: &str = "undo";
 
@@ -129,9 +133,21 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
         .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
-    let operation = operation_at(changes, at)?;
+    let operation = moved_at(changes, at).map_or_else(|| operation_at(changes, at), Ok)?;
     let run: Vec<&Change> = together(changes, &operation, at);
     carried_out(ctx, (&paths, &stack), changes, &run, at).await
+}
+
+/// The run stamped `at` that moved a guard onto its plugin, where one did: judged as that
+/// run whatever else shares its stamp, so it is refused for good rather than as one of
+/// several.
+fn moved_at(changes: &[Change], at: &str) -> Option<String> {
+    changes
+        .iter()
+        .find(|change| {
+            change.at == at && matches!(change.kind, crate::journal::Kind::MovedInPlace { .. })
+        })
+        .map(|change| change.operation.clone())
 }
 
 /// Put back every change `whose` claims, called `at` in what is said about it.
@@ -374,6 +390,18 @@ fn judged(
             // The reason and what to do instead, joined rather than branched on: a
             // refusal carrying no remedy is a shape this judgement does not produce, and
             // a branch for it would be a line no test could ever reach.
+            if let Some((code, refusal)) = verdict
+                .refusal
+                .as_ref()
+                .and_then(|refusal| refusal.code.map(|code| (code, refusal)))
+            {
+                return Err(Box::new(refused::of_its_own(
+                    code,
+                    at,
+                    &change.target,
+                    refusal,
+                )));
+            }
             let why = verdict
                 .refusal
                 .map(|refusal| {

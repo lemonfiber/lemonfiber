@@ -106,13 +106,29 @@ const MUSIC: lemonfiber_testing::adapted::Adapted = lemonfiber_testing::adapted:
 
 /// The services of `moved` asking `capability`.
 fn asking_from(moved: Option<lemonfiber_core::plugin::Installed>, capability: &str) -> Vec<String> {
+    asked_from(moved, capability)
+        .into_iter()
+        .map(|(service, _)| service)
+        .collect()
+}
+
+/// Each service of `moved` asking `capability`, with whether it asks each filler.
+fn asked_from(
+    moved: Option<lemonfiber_core::plugin::Installed>,
+    capability: &str,
+) -> Vec<(String, bool)> {
     moved
         .map(|installed| {
             installed
                 .services
                 .into_iter()
-                .filter(|placed| placed.asks.iter().any(|ask| ask.capability == capability))
-                .map(|placed| placed.service)
+                .filter_map(|placed| {
+                    let ask = placed
+                        .asks
+                        .iter()
+                        .find(|ask| ask.capability == capability)?;
+                    Some((placed.service.clone(), ask.each))
+                })
                 .collect()
         })
         .unwrap_or_default()
@@ -190,7 +206,6 @@ fn the_installed_parts_given_a_household_hostname_ask_the_proxy_from_their_plugi
 
 #[test]
 fn the_request_service_asks_the_gate_and_the_gate_asks_what_it_admits_to() {
-    let manifest = stack();
     assert_eq!(
         asking_from(
             lemonfiber_testing::requests::REQUESTS.installed(),
@@ -198,8 +213,15 @@ fn the_request_service_asks_the_gate_and_the_gate_asks_what_it_admits_to() {
         ),
         vec![lemonfiber_testing::requests::REQUESTS.plugin.to_owned()]
     );
-    assert!(askers(&manifest, "library.curate").contains(&("request-gate".to_owned(), true)));
-    assert!(askers(&manifest, "identity.source").contains(&("request-gate".to_owned(), false)));
+    let gate = lemonfiber_testing::guards::GATE;
+    assert_eq!(
+        asked_from(gate.installed(), "library.curate"),
+        vec![(gate.plugin.to_owned(), true)]
+    );
+    assert_eq!(
+        asked_from(gate.installed(), "identity.source"),
+        vec![(gate.plugin.to_owned(), false)]
+    );
 }
 
 #[test]
@@ -217,8 +239,11 @@ fn the_door_asks_the_media_server_and_names_none() {
 
 #[test]
 fn the_decline_service_asks_what_it_acts_on() {
-    let manifest = stack();
-    assert!(askers(&manifest, "identity.source").contains(&("decline".to_owned(), false)));
+    let decline = lemonfiber_testing::guards::DECLINE;
+    assert_eq!(
+        asked_from(decline.installed(), "identity.source"),
+        vec![(decline.plugin.to_owned(), false)]
+    );
 }
 
 #[test]

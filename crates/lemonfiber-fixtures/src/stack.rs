@@ -51,8 +51,8 @@ pub fn manifest_into(into: &Path) {
 }
 
 /// What the carried stack holds beside its manifest that a run reads: the starting files
-/// of every service's configuration.
-const BESIDE: [&str; 1] = ["config"];
+/// of every service's configuration, and every recording a claim names.
+const BESIDE: [&str; 2] = ["config", "recordings"];
 
 /// The carried stack written into `into` as a stack directory holds it: its manifest
 /// without the secrets an assembled part declares, and what a run reads beside it.
@@ -93,14 +93,43 @@ fn copied(from: &Path, to: &Path) {
 
 /// The carried stack's manifest written into `into` without `service`.
 pub fn manifest_without(into: &Path, service: &str) {
-    let mut stack = carried();
-    let named = Value::String(service.to_owned());
-    dropped(&mut stack, "service", |row| row.get("id") == Some(&named));
-    dropped(&mut stack, "wiring", |row| {
-        row.as_table()
-            .is_some_and(|row| row.values().any(|value| *value == named))
-    });
-    written_apart(into, &toml::to_string(&stack).unwrap_or_default());
+    written_apart(into, &without(&[service]));
+}
+
+/// The carried stack written into `into` as [`directory_into`] writes it, without each
+/// of `services`.
+pub fn directory_without(into: &Path, services: &[&str]) {
+    directory_into(into);
+    written_apart(into, &without(services));
+}
+
+/// The carried stack's manifest without each of `services` and every link naming one.
+#[must_use]
+pub fn without(services: &[&str]) -> String {
+    leaving_out(carried(), services)
+}
+
+/// The stack this build assembles, its manifest as compiled in, secrets and all, without
+/// each of `services` and every link naming one.
+#[must_use]
+pub fn assembled_without(services: &[&str]) -> String {
+    leaving_out(
+        toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default(),
+        services,
+    )
+}
+
+/// `stack` without each of `services` and every link naming one.
+fn leaving_out(mut stack: Table, services: &[&str]) -> String {
+    for service in services {
+        let named = Value::String((*service).to_owned());
+        dropped(&mut stack, "service", |row| row.get("id") == Some(&named));
+        dropped(&mut stack, "wiring", |row| {
+            row.as_table()
+                .is_some_and(|row| row.values().any(|value| *value == named))
+        });
+    }
+    toml::to_string(&stack).unwrap_or_default()
 }
 
 /// `stack` without each row of its list `list` that is `gone`.

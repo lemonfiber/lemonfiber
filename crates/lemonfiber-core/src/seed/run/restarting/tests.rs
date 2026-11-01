@@ -19,7 +19,7 @@ fn machine(name: &str, runner: Arc<Recording>) -> Ctx {
     let project = scratch.path().to_path_buf();
     std::mem::forget(scratch);
     let mut ctx = crate::test_support::a_context()
-        .over(crate::test_support::embedded())
+        .over(crate::test_support::unguarded_embedded())
         .runner(runner)
         .build();
     ctx.settings.stack_dir = Some(project.clone());

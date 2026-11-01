@@ -280,11 +280,7 @@ pub fn resolve(
 /// Returns [`Failure::NothingLeft`] where the configuration supports none of the
 /// profiles the stack declares — a stack with no way of downloading at all.
 pub fn everything(manifest: &Manifest, protocols: Protocols) -> Result<Plan, Failure> {
-    let closure: BTreeSet<String> = manifest
-        .profiles
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect();
+    let closure: BTreeSet<String> = manifest.profile_ids();
     planned(manifest, &[], closure, protocols)
 }
 

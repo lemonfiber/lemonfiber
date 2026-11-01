@@ -13,7 +13,6 @@
 //! server refuses leaves it filed under the gate's name and held by nothing, which the next
 //! seed revokes.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_manifest::Service;
@@ -78,15 +77,10 @@ const UNHELD: &str = "the request gate did not answer holding the new key, so it
 ///
 /// Read off the gate alone, so listing what the stack holds asks the media server nothing;
 /// the key itself is only read where the operator asks to see it.
-pub(super) async fn held(
-    ctx: &Ctx,
-    services: &[Service],
-    fillers: &Fillers,
-    project: Option<&Path>,
-) -> Option<Held> {
+pub(super) async fn held(ctx: &Ctx, services: &[Service], fillers: &Fillers) -> Option<Held> {
     gating::service(services)?;
-    MediaServer::of(fillers)?.gate_kind()?;
-    let gate = gating::asked(ctx, fillers, project?).await;
+    MediaServer::of(fillers).filter(MediaServer::gates)?;
+    let gate = gating::asked(ctx, fillers).await;
     let presented = match gate {
         Some(gate) => gate.admitted().await.is_ok_and(|admitted| {
             admitted
@@ -113,8 +107,8 @@ pub(super) async fn held(
 }
 
 /// The core's own copy of the key the gate presents to the media server.
-pub(super) async fn value(ctx: &Ctx, fillers: &Fillers, project: Option<&Path>) -> Option<String> {
-    let gate = gating::asked(ctx, fillers, project?).await?;
+pub(super) async fn value(ctx: &Ctx, fillers: &Fillers) -> Option<String> {
+    let gate = gating::asked(ctx, fillers).await?;
     let admitted = gate.admitted().await.ok()?;
     let client = MediaServer::of(fillers)?.administering(ctx).await?;
     let filed = client.filed_as(GATE_APP).await.ok()?;
@@ -122,14 +116,8 @@ pub(super) async fn value(ctx: &Ctx, fillers: &Fillers, project: Option<&Path>) 
 }
 
 /// Replace the key, keeping a working one at every moment.
-pub(super) async fn rotate(
-    ctx: &Ctx,
-    held: &Held,
-    fillers: &Fillers,
-    project: Option<&Path>,
-) -> Rotation {
-    let Some(server) = MediaServer::of(fillers).filter(|server| server.gate_kind().is_some())
-    else {
+pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &Fillers) -> Rotation {
+    let Some(server) = MediaServer::of(fillers).filter(MediaServer::gates) else {
         return unproven(held, NO_ADMINISTRATOR);
     };
     let Some(client) = server.administering(ctx).await else {
@@ -138,7 +126,7 @@ pub(super) async fn rotate(
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
-    let Some(gate) = asked(ctx, fillers, (&server, project)).await else {
+    let Some(gate) = asked(ctx, fillers, &server).await else {
         return unproven(held, UNASKED);
     };
     let admitted = gate.admitted().await.unwrap_or_default();
@@ -181,15 +169,11 @@ pub(super) async fn rotate(
     )
 }
 
-/// The gate under `project`, where it can be asked and may be handed a key `server`
+/// The gate, where it can be asked over its contract and may be handed a key `server`
 /// holds.
-async fn asked(
-    ctx: &Ctx,
-    fillers: &Fillers,
-    (server, project): (&MediaServer, Option<&Path>),
-) -> Option<Arc<dyn Gating>> {
+async fn asked(ctx: &Ctx, fillers: &Fillers, server: &MediaServer) -> Option<Arc<dyn Gating>> {
     gating::may_hold(fillers, server.filler.holder()).then_some(())?;
-    gating::asked(ctx, fillers, project?).await
+    gating::asked(ctx, fillers).await
 }
 
 /// Every route of `admitted` as it is applied, each presenting the credential the core

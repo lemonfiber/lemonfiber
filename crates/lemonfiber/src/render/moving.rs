@@ -49,5 +49,31 @@ pub(crate) fn moved(moved: &[Moved]) -> Lines {
     lines
 }
 
+/// Each of lemonfiber's own guards a run moved onto its plugin for good, has still to
+/// move, or could not move, with why.
+pub(crate) fn guards(guards: &[Moved]) -> Lines {
+    let mut lines = Lines::default();
+    for one in guards {
+        lines.spaced(match &one.why {
+            None if one.taken => format!(
+                "Moved for good: {} now runs as its plugin in the place of the stack's own {}. \
+                 Neither an undo nor a removal puts it back.",
+                one.plugin, one.service
+            ),
+            None => format!(
+                "To move: {} moves onto its plugin {} with the next run that leaves the stack \
+                 running, for good and with no yes of its own.",
+                one.service, one.plugin
+            ),
+            Some(why) => format!(
+                "Not moved: {} still runs as the stack's own service, because {why}. It stays \
+                 on offer for the next run that leaves the stack running.",
+                one.service
+            ),
+        });
+    }
+    lines
+}
+
 #[cfg(test)]
 mod tests;

@@ -13,6 +13,7 @@ use crate::journal::Change;
 use crate::plugin::Installs;
 use crate::plugin::Verdict;
 use crate::ports::http::Http;
+use crate::test_support::unguarded_stack;
 use crate::test_support::{a_context, a_password, env_at};
 
 /// A plugin's source, as one lands on an operator's disk.
@@ -136,7 +137,8 @@ why    = "Until somebody does, the first caller on the household network becomes
 "#;
 
 /// A context whose settings point at a scratch configuration directory, with a
-/// stack directory beside it for the install to write its wiring into.
+/// stack directory beside it for the install to write its wiring into, over a stack no
+/// guard moves in.
 ///
 /// Both under one scratch root, so the layout a run resolves — the journal in the
 /// configuration directory, the stack under the data one — is the layout an
@@ -145,6 +147,7 @@ fn ctx(name: &str) -> Ctx {
     let env_file = env_at(name, &a_password());
     let stack = env_file.with_file_name("data").join("stack");
     a_context()
+        .over(unguarded_stack())
         .settings(crate::config::Settings {
             env_file: Some(env_file),
             stack_dir: Some(stack),
@@ -163,6 +166,7 @@ fn proving(name: &str, runner: Arc<dyn crate::ports::Runner>, http: Arc<dyn Http
     let stack = env_file.with_file_name("data").join("stack");
     a_context()
         .runner(runner)
+        .over(unguarded_stack())
         .settings(crate::config::Settings {
             env_file: Some(env_file),
             stack_dir: Some(stack),

@@ -556,6 +556,18 @@ fn a_replaced_certificate_is_said_to_be_left_as_it_is() {
 }
 
 #[test]
+fn a_guard_moved_in_place_is_said_to_be_left_on_its_plugin() {
+    let undos = vec![Undo {
+        target: "decline".to_owned(),
+        action: Action::Unmoved {
+            service: "decline".to_owned(),
+        },
+    }];
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+    assert!(said.contains("decline left on its plugin"), "{said}");
+}
+
+#[test]
 fn a_part_started_or_stopped_again_is_said_by_its_service() {
     let undos = [true, false]
         .into_iter()

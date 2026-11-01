@@ -64,29 +64,14 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
         project.as_deref(),
     )
     .numbered(crate::app::targets::ordinals(ctx));
-    let held = reading::taken(
-        ctx,
-        &manifest.services,
-        &fillers,
-        project.as_deref(),
-        installed,
-    )
-    .await;
+    let held = reading::taken(ctx, &manifest.services, &fillers, installed).await;
 
     let inventory = match asked {
         Asking::Read => Inventory::of(held),
         Asking::Reveal {
             credential,
             confirmed,
-        } => {
-            showing(
-                ctx,
-                held,
-                (&credential, confirmed),
-                (&fillers, project.as_deref()),
-            )
-            .await
-        }
+        } => showing(ctx, held, (&credential, confirmed), &fillers).await,
         Asking::Revoke {
             plugin,
             credential,
@@ -95,14 +80,7 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
             let (revoked, after) =
                 super::plugins::granting::revoke(ctx, &plugin, &credential, agreement.as_deref())
                     .await?;
-            let held = reading::taken(
-                ctx,
-                &manifest.services,
-                &fillers,
-                project.as_deref(),
-                after.installed(),
-            )
-            .await;
+            let held = reading::taken(ctx, &manifest.services, &fillers, after.installed()).await;
             return Ok(Inventory::of(held)
                 .granting(after.installed())
                 .revoking(revoked));
@@ -118,7 +96,6 @@ pub(crate) async fn credentials(ctx: &Ctx, asked: Asking) -> Result<Inventory, B
                 Reaching {
                     services: &manifest.services,
                     fillers: &fillers,
-                    project: project.as_deref(),
                     installed,
                 },
             )
@@ -133,7 +110,7 @@ async fn showing(
     ctx: &Ctx,
     held: Vec<Held>,
     (credential, confirmed): (&str, bool),
-    reaching: (&crate::wiring::Fillers, Option<&std::path::Path>),
+    reaching: &crate::wiring::Fillers,
 ) -> Inventory {
     let revealed = match named(&held, credential) {
         Some(found) => revealing::reveal(ctx, found, confirmed, reaching).await,
@@ -160,18 +137,13 @@ async fn replacing(
     let Reaching {
         services,
         fillers,
-        project,
         installed,
     } = reaching;
     let mut rotated = if found.setting == certifying::SETTING {
-        let stack = crate::seed::run::replacing::Stack {
-            services,
-            fillers,
-            project,
-        };
+        let stack = crate::seed::run::replacing::Stack { services, fillers };
         certifying::rotate(ctx, found, stack, agreement).await?
     } else {
-        rotating::rotate(ctx, found, services, fillers, project).await
+        rotating::rotate(ctx, found, services, fillers).await
     };
     if matches!(rotated.settled, Settled::Replaced { .. }) {
         rotated
@@ -180,7 +152,7 @@ async fn replacing(
     }
     // Read again, because a landed replacement has changed what the answer is and an
     // inventory taken before it would report the state the rotation just left behind.
-    let after = reading::taken(ctx, services, fillers, project, installed).await;
+    let after = reading::taken(ctx, services, fillers, installed).await;
     Ok(Inventory::of(after).after(rotated))
 }
 
@@ -192,8 +164,6 @@ struct Reaching<'a> {
     services: &'a [lemonfiber_manifest::Service],
     /// Who fills each ask, so every copy of a replaced key is found.
     fillers: &'a crate::wiring::Fillers,
-    /// Where the stack was written to disk.
-    project: Option<&'a std::path::Path>,
     /// What is installed beside the stack.
     installed: &'a [crate::plugin::Installed],
 }

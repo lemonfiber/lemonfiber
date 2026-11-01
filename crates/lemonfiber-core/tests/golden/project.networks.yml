@@ -4,42 +4,12 @@ networks:
     ipam:
       config:
       - subnet: 10.80.111.216/29
-  ask__decline__identity.source__jellyfin:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.34.80/29
   ask__door__media.serve__jellyfin:
     internal: true
     ipam:
       config:
       - subnet: 10.80.96.16/28
         ip_range: 10.80.96.24/29
-  ask__request-gate__identity.source__jellyfin:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.80.136/29
-  ask__request-gate__library.curate__bindery:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.116.8/29
-  ask__request-gate__library.curate__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.190.240/29
-  ask__request-gate__library.curate__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.53.0/29
-  ask__request-gate__library.curate__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.140.168/29
   link__decline__jellyfin:
     internal: true
     ipam:

@@ -11,7 +11,9 @@ pub(crate) use lemonfiber_fixtures::support::*;
 #[path = "../../lemonfiber-testing/src/context.rs"]
 pub mod context;
 
-pub(crate) use context::{a_context, nowhere, repository_stack as stack};
+pub(crate) use context::{
+    a_context, nowhere, repository_stack as stack, unguarded_embedded, unguarded_stack,
+};
 
 mod blocking;
 pub(crate) use blocking::{blocking, blocking_the_journal};
@@ -25,6 +27,8 @@ pub mod books;
 #[path = "../../lemonfiber-testing/src/curators.rs"]
 pub mod curators;
 pub mod guard;
+#[path = "../../lemonfiber-testing/src/guards.rs"]
+pub mod guards;
 #[path = "../../lemonfiber-testing/src/indexer.rs"]
 pub mod indexer;
 #[path = "../../lemonfiber-testing/src/listening.rs"]
@@ -44,9 +48,13 @@ mod crossing;
 mod typing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader, crossing_stack};
 pub(crate) use typing::Typing;
+mod contracting;
+mod declining;
 pub(crate) mod egress;
 mod gating;
 pub(crate) mod syncing;
+pub(crate) use contracting::{contracted_context, declined, gated};
+pub(crate) use declining::{a_contracted_decline, DECLINE_TRUSTED};
 pub(crate) use gating::{a_contracted_gate, unaskable_gates, GATE_TRUSTED};
 
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.
@@ -432,29 +440,6 @@ pub(crate) const fn first_party(
         manifest: CONTRACTED_MANIFEST,
         tree: A_TREE,
     }]
-}
-
-/// A context reaching `service` on loopback [`CONTRACTED_PORT`], holding its key in
-/// `project` where `keyed`, beside the media server's adapter running where a moved server
-/// is reached.
-pub(crate) fn contracted_context(
-    project: &std::path::Path,
-    service: &str,
-    keyed: bool,
-) -> context::Context {
-    if keyed {
-        let at = crate::plugin::key_file(project, service);
-        let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
-        let _ = std::fs::write(&at, CONTRACTED_KEY);
-    }
-    let engine = Reporting::holding(
-        &[service],
-        crate::ports::docker::Lifecycle::Running,
-        crate::ports::docker::Health::Healthy,
-    )
-    .publishing(&[(service, "127.0.0.1", CONTRACTED_PORT)])
-    .alongside(media::running());
-    a_context().engine(std::sync::Arc::new(engine))
 }
 
 /// The id of the request service `server` is handed to, where one is.

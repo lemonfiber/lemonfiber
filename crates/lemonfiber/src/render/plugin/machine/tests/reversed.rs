@@ -134,6 +134,7 @@ fn taking(
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     }
 }
 
@@ -302,6 +303,7 @@ fn an_install_that_went_back_names_what_went_and_what_stayed() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -357,6 +359,7 @@ fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
     .text();
     assert!(
@@ -521,6 +524,12 @@ fn a_device_key_put_back_is_said_by_its_name() {
             service: "jellyfin".to_owned()
         }),
         "left the internal certificate of jellyfin as it is"
+    );
+    assert_eq!(
+        undone(Action::Unmoved {
+            service: "decline".to_owned()
+        }),
+        "left decline on its plugin"
     );
     for (running, said) in [
         (true, "started prowlarr again"),

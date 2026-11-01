@@ -8,13 +8,13 @@ use super::asked;
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::credential::{Inventory, Reach, Settled};
-use lemonfiber_core::ports::service::{Application, RegisteredApplication};
+use lemonfiber_core::ports::service::{Application, Gated, RegisteredApplication, Target};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::FixedRandom;
-use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
 use lemonfiber_testing::adapted::{answered, path_of, refusing, taken};
 use lemonfiber_testing::curators::TELEVISION;
+use lemonfiber_testing::guards::{with_gate, Gate};
 use lemonfiber_testing::indexer::INDEXER;
 use lemonfiber_testing::requests::REQUESTS;
 use lemonfiber_testing::{media, subtitles};
@@ -29,26 +29,27 @@ const MINTED: &str = "sonarr upstream-key";
 const RANDOM: u8 = 0xcd;
 
 /// The gate's routes: the curator's presenting [`OLD_KEY`], and the media server's.
-fn gate_routes() -> String {
-    Upstreams::of(vec![
-        Upstream {
-            route: "sonarr".to_owned(),
-            kind: Kind::Sonarr,
+fn gate_routes() -> Vec<Gated> {
+    vec![
+        Gated {
+            target: Target::Curator {
+                media_type: "tv".to_owned(),
+            },
+            path: "sonarr".to_owned(),
             address: "http://sonarr:8989".to_owned(),
-            credential: Credential::new(OLD_KEY),
             majors: Vec::new(),
-            pins: lemonfiber_sidecar::Pins::default(),
+            credential: OLD_KEY.to_owned(),
+            tokens: Vec::new(),
         },
-        Upstream {
-            route: "jellyfin".to_owned(),
-            kind: Kind::Jellyfin,
+        Gated {
+            target: Target::MediaServer { pins: Vec::new() },
+            path: "jellyfin".to_owned(),
             address: "http://jellyfin:8096".to_owned(),
-            credential: Credential::new("gates"),
             majors: vec![10],
-            pins: lemonfiber_sidecar::Pins::default(),
+            credential: "gates".to_owned(),
+            tokens: Vec::new(),
         },
-    ])
-    .written()
+    ]
 }
 
 /// A plugin the build trusts, its one service reading the curator's key as a secret that
@@ -106,15 +107,13 @@ fn searching(operation: &str) -> &'static str {
     path_of(search::CAPABILITY, search::MAJOR, operation)
 }
 
-/// A stack written to a directory of its own named `name`, with the gate, whose curator,
-/// request service, indexer aggregator, subtitle finder and media server have moved into
-/// their plugins and run, the curator's key minted as [`OLD_KEY`], over `http`.
-fn moved(name: &str, http: &Arc<Fake>) -> (lemonfiber_core::app::Ctx, &'static Path) {
+/// A stack written to a directory of its own named `name`, whose gate, curator, request
+/// service, indexer aggregator, subtitle finder and media server have moved into their
+/// plugins and run, the curator's key minted as [`OLD_KEY`], over `http`; with the gate.
+fn moved(name: &str, http: &Arc<Fake>) -> (lemonfiber_core::app::Ctx, &'static Path, Arc<Gate>) {
     let stack: &'static Path =
         Box::leak(crate::common::stack::with_the_gate(name).into_boxed_path());
-    let gate = stack.join("config/request-gate");
-    let _ = std::fs::create_dir_all(&gate);
-    let _ = std::fs::write(gate.join("upstreams.json"), gate_routes());
+    let gate = Arc::new(Gate::admitting(gate_routes()));
     let ctx = lemonfiber_testing::adapted::reaching(
         lemonfiber_testing::a_context()
             .over(Source::External(stack))
@@ -137,8 +136,9 @@ fn moved(name: &str, http: &Arc<Fake>) -> (lemonfiber_core::app::Ctx, &'static P
             media::MOVED,
         ],
     );
+    let ctx = with_gate(ctx, &gate);
     TELEVISION.minted(&ctx, OLD_KEY);
-    (ctx, stack)
+    (ctx, stack, gate)
 }
 
 /// Where the aggregator reaches the curator.
@@ -202,15 +202,13 @@ fn held(stack: &Path) -> Option<String> {
 #[tokio::test]
 async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
     let http = answering();
-    let (ctx, stack) = moved("reminted", &http);
+    let (ctx, stack, gate) = moved("reminted", &http);
     reading_the_key(&ctx);
 
     let inventory = rotated(&ctx).await;
     let read = std::fs::read_to_string(stack.join("env/reader.env")).unwrap_or_default();
     let new_key = held(stack).unwrap_or_default();
     let upstream = std::fs::read_to_string(stack.join("config/sonarr-adapter/upstream.json"))
-        .unwrap_or_default();
-    let routed = std::fs::read_to_string(stack.join("config/request-gate/upstreams.json"))
         .unwrap_or_default();
     let _ = std::fs::remove_dir_all(stack);
 
@@ -248,8 +246,12 @@ async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
         format!("SONARR_KEY={new_key}\n"),
         "the plugin kept the old key"
     );
-    assert!(
-        routed.contains(&new_key),
+    assert_eq!(
+        gate.routes()
+            .into_iter()
+            .find(|route| route.path == "sonarr")
+            .map(|route| route.credential),
+        Some(new_key.clone()),
         "the gate's route kept the old key"
     );
     let registered: Vec<String> =
@@ -272,7 +274,7 @@ async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
 #[tokio::test]
 async fn a_rehearsed_rotation_replaces_nothing_and_hands_nothing_over() {
     let http = answering();
-    let (ctx, stack) = moved("reminted-rehearsed", &http);
+    let (ctx, stack, gate) = moved("reminted-rehearsed", &http);
 
     let inventory = rotated(&ctx.rehearsing()).await;
     let still = held(stack);
@@ -282,6 +284,7 @@ async fn a_rehearsed_rotation_replaces_nothing_and_hands_nothing_over() {
     assert!(said.starts_with("Some(Rehearsed"), "{said}");
     assert!(said.contains("Nothing was replaced"), "{said}");
     assert_eq!(still.as_deref(), Some(OLD_KEY));
+    assert_eq!(gate.routes(), gate_routes());
     let sent = http.requests();
     for written in [
         searching("register_application"),
@@ -299,7 +302,7 @@ async fn a_rehearsed_rotation_replaces_nothing_and_hands_nothing_over() {
 #[tokio::test]
 async fn a_copy_that_refuses_the_new_key_is_said_to_have_failed() {
     let http = registering(refusing());
-    let (ctx, stack) = moved("reminted-refused", &http);
+    let (ctx, stack, _) = moved("reminted-refused", &http);
 
     let inventory = rotated(&ctx).await;
     let _ = std::fs::remove_dir_all(stack);

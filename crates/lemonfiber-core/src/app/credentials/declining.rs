@@ -11,11 +11,10 @@
 //! handed back. A revocation of the old key that the media server refuses leaves it filed
 //! under the service's name and held by nothing, which the next seed revokes.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_manifest::Service;
-use lemonfiber_sidecar::decline::Key;
+use lemonfiber_sidecar::TokenHash;
 
 use super::rotating::{said, unproven, would_rotate};
 use crate::app::invite::declining;
@@ -81,14 +80,9 @@ const UNHELD: &str = "the decline service did not answer holding the new key, so
 ///
 /// Read off the service alone, so listing what the stack holds asks the media server
 /// nothing; the key itself is only read where the operator asks to see it.
-pub(super) async fn held(
-    ctx: &Ctx,
-    services: &[Service],
-    fillers: &Fillers,
-    project: Option<&Path>,
-) -> Option<Held> {
+pub(super) async fn held(ctx: &Ctx, services: &[Service], fillers: &Fillers) -> Option<Held> {
     declining::service(services)?;
-    let holding = match declining::asked(ctx, fillers, project?).await {
+    let holding = match declining::asked(ctx, fillers).await {
         Some(decline) => decline.held().await.is_ok_and(|held| held.is_some()),
         None => false,
     };
@@ -110,8 +104,8 @@ pub(super) async fn held(
 }
 
 /// The core's own copy of the key the decline service holds.
-pub(super) async fn value(ctx: &Ctx, fillers: &Fillers, project: Option<&Path>) -> Option<String> {
-    let decline = declining::asked(ctx, fillers, project?).await?;
+pub(super) async fn value(ctx: &Ctx, fillers: &Fillers) -> Option<String> {
+    let decline = declining::asked(ctx, fillers).await?;
     let holding = decline.held().await.ok()??;
     let server = crate::app::targets::declined_server(fillers)?;
     let client = server.administering(ctx).await?;
@@ -120,12 +114,7 @@ pub(super) async fn value(ctx: &Ctx, fillers: &Fillers, project: Option<&Path>) 
 }
 
 /// Replace the key, keeping a working one at every moment.
-pub(super) async fn rotate(
-    ctx: &Ctx,
-    held: &Held,
-    fillers: &Fillers,
-    project: Option<&Path>,
-) -> Rotation {
+pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &Fillers) -> Rotation {
     let Some(server) = crate::app::targets::declined_server(fillers) else {
         return unproven(held, NO_ADMINISTRATOR);
     };
@@ -135,7 +124,7 @@ pub(super) async fn rotate(
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
-    let Some(decline) = asked(ctx, fillers, (&server.filler, project)).await else {
+    let Some(decline) = asked(ctx, fillers, &server.filler).await else {
         return unproven(held, UNASKED);
     };
     let holding = decline.held().await.ok().flatten();
@@ -149,10 +138,12 @@ pub(super) async fn rotate(
         Ok(minted) => minted,
         Err(failure) => return unproven(held, &said(&failure)),
     };
-    let Some(key) = Key::read(&minted).ok() else {
+    let key = minted.trim();
+    if key.is_empty() || key.split_whitespace().nth(1).is_some() {
         let _ = client.revoke(&minted).await;
         return unproven(held, UNWRITTEN);
-    };
+    }
+    let fingerprint = TokenHash::of(key);
     if decline.hold(&minted, &pins).await.is_err() {
         let _ = client.revoke(&minted).await;
         return unproven(held, UNWRITTEN);
@@ -160,7 +151,7 @@ pub(super) async fn rotate(
     let holds = decline
         .held()
         .await
-        .is_ok_and(|holding| holding.is_some_and(|holding| holding.key == key.fingerprint()));
+        .is_ok_and(|holding| holding.is_some_and(|holding| holding.key == fingerprint.as_str()));
     if !holds {
         put_back(decline.as_ref(), client.as_ref(), (&old, &pins), &minted).await;
         return unproven(held, UNHELD);
@@ -187,10 +178,10 @@ pub(super) async fn rotate(
 async fn asked(
     ctx: &Ctx,
     fillers: &Fillers,
-    (server, project): (&crate::wiring::Filler, Option<&Path>),
+    server: &crate::wiring::Filler,
 ) -> Option<Arc<dyn Declining>> {
     declining::may_hold(fillers, server).then_some(())?;
-    declining::asked(ctx, fillers, project?).await
+    declining::asked(ctx, fillers).await
 }
 
 /// Hand the service `old` again, with the certificates it accepted, and revoke `minted`.

@@ -39,6 +39,16 @@ fn installed() -> Project {
     generated(&manifest, &parts, &Chosen::read(None), &Reading::bare())
 }
 
+/// The carried stack, generated with its guards moved onto their plugins, as every
+/// machine running this release holds it.
+fn guarded() -> Project {
+    let Ok(manifest) = Manifest::from_toml(STACK) else {
+        unreachable!("the embedded stack parses; the manifest crate asserts it separately");
+    };
+    let guards = lemonfiber_testing::guards::both_installed();
+    generated(&manifest, &guards, &Chosen::read(None), &Reading::bare())
+}
+
 /// The project's document, read back.
 fn document(project: &Project) -> Value {
     serde_norway::from_str(&project.text).unwrap_or_default()
@@ -209,7 +219,7 @@ fn declared_subnets(document: &Value) -> Vec<(String, Option<(Ipv4Addr, u8)>)> {
 
 #[test]
 fn the_engine_draws_no_network_from_its_own_pools_and_no_two_subnets_meet() {
-    let declared = declared_subnets(&document(&shipped()));
+    let declared = declared_subnets(&document(&guarded()));
     let drawn: Vec<&String> = declared
         .iter()
         .filter(|(_, subnet)| subnet.is_none())

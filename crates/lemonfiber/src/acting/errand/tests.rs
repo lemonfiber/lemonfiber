@@ -272,6 +272,7 @@ fn an_update(coming: &[&str]) -> Outcome {
         unvetted: None,
         moved: Vec::new(),
         moves: Vec::new(),
+        guards: Vec::new(),
     })
 }
 
@@ -572,6 +573,7 @@ fn a_reset_reverts_nothing_until_its_reading_is_answered() {
         reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
         confirmed: false,
         offer: "00000000-00000000".to_owned(),
+        guards: Vec::new(),
     };
 
     let stage = super::weighed(

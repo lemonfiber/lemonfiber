@@ -102,7 +102,6 @@ pub(super) async fn seed_request_identity(
     expected: &crate::baseline::Baseline,
     server: Option<&MediaServer>,
     admin: Option<Admin>,
-    project: Option<&std::path::Path>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let mut records = crate::baseline::Baseline::new();
     let (
@@ -119,15 +118,12 @@ pub(super) async fn seed_request_identity(
         return (vec![unpaired(server)], records);
     };
     // The gate answers for the server only where it speaks the server's API.
-    let gate = project.filter(|_| {
-        crate::app::gating::service(services).is_some() && server.gate_kind().is_some()
-    });
-    let server_url = match gate {
-        Some(_) => {
-            let at = super::tokens::through_the_gate(server.id());
-            format!("http://{}:{}{}", at.host, at.port, at.base)
-        }
-        None => pairing.at.url(),
+    let gate = crate::app::gating::service(services).is_some() && server.gates();
+    let server_url = if gate {
+        let at = super::tokens::through_the_gate(server.id());
+        format!("http://{}:{}{}", at.host, at.port, at.base)
+    } else {
+        pairing.at.url()
     };
 
     let answering = fillers.fronting(&requests).unwrap_or(&requests);
@@ -156,17 +152,16 @@ pub(super) async fn seed_request_identity(
         .unwrap_or(client);
 
     let linked = match (gate, &wiring.state) {
-        (Some(_), crate::seed::State::WouldWire { .. }) => {
+        (true, crate::seed::State::WouldWire { .. }) => {
             Some(super::linking::would_link(&requests, server))
         }
-        (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => Some(
+        (true, crate::seed::State::Wired | crate::seed::State::AlreadyWired) => Some(
             Box::pin(super::linking::seed_media_server_link(
                 ctx,
                 fillers,
                 owner.as_ref(),
                 &requests,
                 server,
-                project,
             ))
             .await,
         ),

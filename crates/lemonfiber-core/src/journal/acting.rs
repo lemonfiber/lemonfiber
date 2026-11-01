@@ -196,6 +196,14 @@ pub enum Action {
         /// The media server's service.
         service: String,
     },
+    /// Leave one of lemonfiber's own guards on its plugin.
+    ///
+    /// Worked out so the record of the move has a reversal to name, and never carried out:
+    /// the release that moved the guard moves it for good.
+    Unmoved {
+        /// The stack's own service the guard's plugin took the place of.
+        service: String,
+    },
     /// Start a service again, or stop it again.
     Run {
         /// The service.

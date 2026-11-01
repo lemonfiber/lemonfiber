@@ -214,7 +214,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
             ctx,
             &manifest.services,
             &fillers,
-            project.as_deref(),
             (&mut baseline, &kept_off),
         )
         .await,
@@ -234,16 +233,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // The curators the request service hands a request to, and the credentials it held
     // before the gate taken back.
-    wirings.extend(
-        seed_requests(
-            ctx,
-            &manifest.services,
-            &fillers,
-            project.as_deref(),
-            &mut baseline,
-        )
-        .await,
-    );
+    wirings.extend(seed_requests(ctx, &manifest.services, &fillers, &mut baseline).await);
 
     published::retire_keys(ctx, &fillers).await;
     wirings.extend(crossing::unhanded(ctx, &manifest, &installed, &fillers));
@@ -388,12 +378,11 @@ async fn seed_requests(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
     baseline: &mut crate::baseline::Baseline,
 ) -> Vec<crate::seed::Wiring> {
-    taken_back::note_held(ctx, services, fillers, project, baseline).await;
-    let mut wirings = seed_fulfilment_targets(ctx, services, fillers, project).await;
-    wirings.extend(taken_back::seed_taken_back(ctx, services, fillers, project, baseline).await);
+    taken_back::note_held(ctx, services, fillers, baseline).await;
+    let mut wirings = seed_fulfilment_targets(ctx, services, fillers).await;
+    wirings.extend(taken_back::seed_taken_back(ctx, services, fillers, baseline).await);
     wirings
 }
 
@@ -408,7 +397,6 @@ async fn seed_media_server(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
     (baseline, kept_off): (
         &mut crate::baseline::Baseline,
         &std::collections::BTreeSet<String>,
@@ -434,23 +422,14 @@ async fn seed_media_server(
     wirings.extend(encrypting::seed_internal_tls(ctx, server).await);
 
     // The decline service's key, minted in the server the decline service names.
-    wirings.extend(decline::seed_decline_key(ctx, services, fillers, project).await);
+    wirings.extend(decline::seed_decline_key(ctx, services, fillers).await);
 
     // The request gate's routes, with the same session.
-    wirings.extend(
-        Box::pin(gate::seed_gate_routes(
-            ctx, services, fillers, server, project,
-        ))
-        .await,
-    );
+    wirings.extend(Box::pin(gate::seed_gate_routes(ctx, services, fillers, server)).await);
 
     // A replacement of the media server's internal certificate taken as far as the holders
     // handed its SHA-256 just above let it go.
-    let stack = replacing::Stack {
-        services,
-        fillers,
-        project,
-    };
+    let stack = replacing::Stack { services, fillers };
     wirings.extend(Box::pin(replacing::advanced(ctx, stack, server)).await);
 
     // The second half: the request service pointed at the media server, through the
@@ -461,7 +440,7 @@ async fn seed_media_server(
     // pass that asked it for anything first would report a fresh stack as broken and
     // then, in the same run, fix what it had just reported.
     let (identity_wirings, identity_records) =
-        seed_request_identity(ctx, services, fillers, baseline, server, admin, project).await;
+        seed_request_identity(ctx, services, fillers, baseline, server, admin).await;
     baseline.merge(&identity_records);
     wirings.extend(identity_wirings);
 

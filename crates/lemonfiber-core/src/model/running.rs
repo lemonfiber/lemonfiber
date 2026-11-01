@@ -90,6 +90,11 @@ pub struct LifecycleReport {
     /// service: a move in place on offer, named by every start and taken by none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub moves: Vec<crate::app::plugins::MoveOffered>,
+    /// Each of lemonfiber's own guards this act moved onto its plugin, or on a rehearsal
+    /// would move, for good and with no yes of its own; one it could not move stays on
+    /// offer and says why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guards: Vec<crate::update::run::Moved>,
     /// Every network the engine holds for the project that the project no longer
     /// declares, by the engine's name: disconnected and taken away before a start, or
     /// named and left by a rehearsal. Empty for every other action.
@@ -180,6 +185,11 @@ pub struct ResetReport {
     pub confirmed: bool,
     /// The name of this reading, which the reset takes as its yes.
     pub offer: String,
+    /// Each of lemonfiber's own guards this act moved onto its plugin after its own
+    /// change, or on a reading would move, for good and with no yes of its own; one it
+    /// could not move stays on offer and says why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guards: Vec<crate::update::run::Moved>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by

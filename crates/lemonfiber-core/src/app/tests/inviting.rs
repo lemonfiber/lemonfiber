@@ -515,16 +515,22 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
     let stack = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack").kept();
     lemonfiber_fixtures::stack::manifest_into(&stack);
     let stack: &'static std::path::Path = Box::leak(stack.into_boxed_path());
-    let ctx = media::reaching(
-        a_context()
-            .over(crate::stack::Source::External(stack))
-            .settings(Settings {
-                env_file: Some(env.clone()),
-                household_host: Some("192.168.1.20".to_owned()),
-                ..Settings::default()
-            })
-            .build()
-            .with_http(holding(&[], &[])),
+    let decline = Arc::new(
+        crate::test_support::guards::Decline::default().paging(crate::test_support::guards::PAGE),
+    );
+    let ctx = crate::test_support::guards::with_decline(
+        media::reaching(
+            a_context()
+                .over(crate::stack::Source::External(stack))
+                .settings(Settings {
+                    env_file: Some(env.clone()),
+                    household_host: Some("192.168.1.20".to_owned()),
+                    ..Settings::default()
+                })
+                .build()
+                .with_http(holding(&[], &[])),
+        ),
+        &decline,
     );
 
     let made = dispatch(

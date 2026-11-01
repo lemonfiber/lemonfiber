@@ -16,6 +16,13 @@ use super::Lines;
 /// What a full reset did, or — until confirmed — would do: the edits it reverts to
 /// lemonfiber's own state, named with what is lost, so nothing is discarded unseen.
 pub(super) fn reset(report: &ResetReport) -> Lines {
+    let mut lines = reverting(report);
+    lines.extend(super::moving::guards(&report.guards));
+    lines
+}
+
+/// The edits and connections a reset reverts, or would.
+fn reverting(report: &ResetReport) -> Lines {
     let mut lines = Lines::default();
     if report.reverted.is_empty() && report.reverted_connections.is_empty() {
         lines.put("Nothing to reset — the stack is already lemonfiber's own.");
@@ -243,6 +250,7 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     lines.put(format!("{}: {}", report.action, profiles.join(", ")));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
     lines.extend(super::moving::offered(&report.moves));
+    lines.extend(super::moving::guards(&report.guards));
 
     // A run Compose did not carry out says so here rather than leaving the operator to
     // infer it from the settled services that are missing below. The exit status says

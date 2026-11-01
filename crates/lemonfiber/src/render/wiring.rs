@@ -200,6 +200,7 @@ pub(crate) fn substituted(report: &SubstitutionReport) -> Lines {
     lines.extend(behind(made, report.applied));
     lines.extend(parts(report));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
+    lines.extend(super::moving::guards(&report.guards));
     if !report.applied {
         lines.extend(answering(report));
     }

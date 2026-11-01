@@ -14,6 +14,7 @@ fn a_reset(confirmed: bool) -> ResetReport {
         reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
         confirmed,
         offer: "00000000-00000000".to_owned(),
+        guards: Vec::new(),
     }
 }
 

@@ -43,24 +43,26 @@ fn answering(serving: Answer, ready: bool) -> Arc<Fake> {
 }
 
 /// A machine whose gate holds its routes and whose media server keeps a certificate,
-/// answering over `http`; with that certificate.
-fn machine(name: &str, http: Arc<Fake>) -> (Ctx, std::path::PathBuf, Internal) {
-    machine_administered(name, true, http)
+/// answering over `http`; with that certificate and the gate.
+fn machine(name: &str, http: Arc<Fake>) -> (Ctx, std::path::PathBuf, Internal, Arc<Gate>) {
+    machine_beside(name, true, Gate::admitting(holding(CURATORS, "held")), http)
 }
 
-/// The same, with the media server administered where `administered` says.
-fn machine_administered(
+/// The same, beside `gate`, with the media server administered where `administered`
+/// says.
+fn machine_beside(
     name: &str,
     administered: bool,
+    gate: Gate,
     http: Arc<Fake>,
-) -> (Ctx, std::path::PathBuf, Internal) {
-    let (mut ctx, at) = gate_ctx(name, administered, CURATORS, Some("held"), http);
+) -> (Ctx, std::path::PathBuf, Internal, Arc<Gate>) {
+    let (mut ctx, at, gate) = gate_ctx_beside(name, administered, CURATORS, gate, http);
     ctx.settings.stack_dir = Some(at.join("stack"));
     let made = internal::kept_or_made(&lemonfiber_adapters::Disk, &config(&at), "jellyfin");
     let Ok(made) = made else {
         unreachable!("the internal certificate is made: {made:?}");
     };
-    (ctx, at, made)
+    (ctx, at, made, gate)
 }
 
 /// The media server's configuration directory, under `project`.
@@ -73,12 +75,14 @@ fn kept(project: &std::path::Path) -> Replacing {
     internal::replacing(&lemonfiber_adapters::Disk, &config(project)).unwrap_or_default()
 }
 
-/// The SHA-256s the gate's route to the media server holds.
-fn gate_pins(project: &std::path::Path) -> Vec<String> {
-    routes(project)
-        .and_then(|held| held.route("jellyfin").cloned())
-        .map(|route| route.pins.listed().to_vec())
-        .unwrap_or_default()
+/// The SHA-256s the gate's route to the media server holds, in order.
+fn gate_pins(gate: &Gate) -> Vec<String> {
+    let mut pins = match route(gate, "jellyfin").map(|route| route.target) {
+        Some(Target::MediaServer { pins }) => pins,
+        _ => Vec::new(),
+    };
+    pins.sort();
+    pins
 }
 
 /// The SHA-256s of `kept`, in the order a holder is handed them.
@@ -111,7 +115,6 @@ async fn replace(ctx: &Ctx, project: &std::path::Path) -> Vec<crate::seed::Wirin
         Stack {
             services: &services,
             fillers: &fillers,
-            project: Some(project),
         },
         &server,
     )
@@ -126,7 +129,6 @@ async fn advance(ctx: &Ctx, project: &std::path::Path) -> Vec<crate::seed::Wirin
         Stack {
             services: &services,
             fillers: &fillers,
-            project: Some(project),
         },
         Some(&server),
     )
@@ -158,7 +160,7 @@ fn journalled(ctx: &Ctx) -> Vec<crate::journal::Kind> {
 #[tokio::test(start_paused = true)]
 async fn a_replacement_the_gate_holds_is_served_journalled_and_the_old_one_withdrawn() {
     let http = answering(now(), true);
-    let (ctx, at, old) = machine("rotating-landed", http.clone());
+    let (ctx, at, old, gate) = machine("rotating-landed", http.clone());
 
     let wirings = replace(&ctx, &at).await;
 
@@ -168,7 +170,7 @@ async fn a_replacement_the_gate_holds_is_served_journalled_and_the_old_one_withd
     };
     assert_ne!(new, old);
     assert_eq!((after.next, after.previous), (None, None), "{wirings:?}");
-    assert_eq!(gate_pins(&at), vec![new.fingerprint.clone()]);
+    assert_eq!(gate_pins(&gate), vec![new.fingerprint.clone()]);
     assert_eq!(
         journalled(&ctx),
         vec![crate::journal::Kind::Certified {
@@ -182,19 +184,14 @@ async fn a_replacement_the_gate_holds_is_served_journalled_and_the_old_one_withd
 #[tokio::test(start_paused = true)]
 async fn a_replacement_the_gate_cannot_be_handed_is_never_served() {
     let http = answering(now(), true);
-    let (ctx, at, old) = machine("rotating-unhanded", http.clone());
-    let (services, fillers, server) = parts(&at);
+    let (ctx, at, old, gate) = machine_beside(
+        "rotating-unhanded",
+        true,
+        Gate::admitting(holding(CURATORS, "held")).refusing(&["admit"]),
+        http.clone(),
+    );
 
-    let wirings = replacing::replaced(
-        &ctx,
-        Stack {
-            services: &services,
-            fillers: &fillers,
-            project: None,
-        },
-        &server,
-    )
-    .await;
+    let wirings = replace(&ctx, &at).await;
 
     assert!(
         failed_saying(&wirings, "not yet hold the replacement"),
@@ -209,12 +206,13 @@ async fn a_replacement_the_gate_cannot_be_handed_is_never_served() {
     assert!(after.next.is_some(), "the replacement waits");
     assert!(!http.asked_for(media::serve("serve_tls")));
     assert!(journalled(&ctx).is_empty());
+    assert_eq!(gate.routes(), holding(CURATORS, "held"));
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_replacement_that_cannot_be_journalled_is_never_served() {
     let http = answering(now(), true);
-    let (ctx, at, old) = machine("rotating-unjournalled", http.clone());
+    let (ctx, at, old, gate) = machine("rotating-unjournalled", http.clone());
     let mut nowhere = ctx.clone();
     nowhere.settings.stack_dir = None;
 
@@ -242,14 +240,14 @@ async fn a_replacement_that_cannot_be_journalled_is_never_served() {
     let Some(next) = after.next else {
         unreachable!("the replacement waits");
     };
-    assert_eq!(gate_pins(&at), both(&old, &next), "the gate holds both");
+    assert_eq!(gate_pins(&gate), both(&old, &next), "the gate holds both");
     assert!(!http.asked_for(media::serve("serve_tls")));
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_media_server_that_does_not_start_again_keeps_both_handed() {
     let http = answering(on_restart(), true);
-    let (mut ctx, at, old) = machine("rotating-unrestarted", http.clone());
+    let (mut ctx, at, old, gate) = machine("rotating-unrestarted", http.clone());
     ctx.seams.runner = Arc::new(lemonfiber_fixtures::support::Scripted(Err(
         crate::ports::process::Failure::NotFound {
             program: "docker".to_owned(),
@@ -271,13 +269,13 @@ async fn a_media_server_that_does_not_start_again_keeps_both_handed() {
         Some(old.clone()),
         "the old one is not withdrawn"
     );
-    assert_eq!(gate_pins(&at), both(&old, &new));
+    assert_eq!(gate_pins(&gate), both(&old, &new));
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_media_server_that_never_presents_the_new_one_keeps_both_handed() {
     let http = answering_in_turn(vec![now(), on_restart()], true);
-    let (ctx, at, old) = machine("rotating-unpresented", http.clone());
+    let (ctx, at, old, gate) = machine("rotating-unpresented", http.clone());
 
     let wirings = replace(&ctx, &at).await;
 
@@ -294,13 +292,13 @@ async fn a_media_server_that_never_presents_the_new_one_keeps_both_handed() {
         Some(old.clone()),
         "the old one is not withdrawn"
     );
-    assert_eq!(gate_pins(&at), both(&old, &new));
+    assert_eq!(gate_pins(&gate), both(&old, &new));
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_media_server_that_is_not_ready_keeps_both_handed() {
     let http = answering(now(), false);
-    let (ctx, at, old) = machine("rotating-unready", http.clone());
+    let (ctx, at, old, gate) = machine("rotating-unready", http.clone());
 
     let wirings = replace(&ctx, &at).await;
 
@@ -313,15 +311,15 @@ async fn a_media_server_that_is_not_ready_keeps_both_handed() {
         unreachable!("the replacement is in place");
     };
     assert_eq!(after.previous, Some(old.clone()));
-    assert_eq!(gate_pins(&at), both(&old, &new));
+    assert_eq!(gate_pins(&gate), both(&old, &new));
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_certificate_kept_that_cannot_be_read_stops_everything_and_hands_nothing_less() {
     let http = answering(now(), true);
-    let (ctx, at, old) = machine("rotating-unread", http.clone());
+    let (ctx, at, old, gate) = machine("rotating-unread", http.clone());
     let _ = seeded(&ctx, &http, true, &at).await;
-    assert_eq!(gate_pins(&at), vec![old.fingerprint.clone()]);
+    assert_eq!(gate_pins(&gate), vec![old.fingerprint.clone()]);
     let _ = std::fs::write(config(&at).join(NEXT), "not a certificate");
 
     let (state, _) = seeded(&ctx, &http, true, &at).await;
@@ -332,7 +330,7 @@ async fn a_certificate_kept_that_cannot_be_read_stops_everything_and_hands_nothi
     assert!(failed_saying(&wirings, "does not read"), "{wirings:?}");
     assert!(failed_saying(&advanced, "does not read"), "{advanced:?}");
     assert_eq!(
-        gate_pins(&at),
+        gate_pins(&gate),
         vec![old.fingerprint],
         "the gate keeps what it holds"
     );
@@ -348,7 +346,6 @@ fn line(ctx: &Ctx, project: &std::path::Path) -> Option<crate::credential::Held>
         Stack {
             services: &services,
             fillers: &fillers,
-            project: Some(project),
         },
     )
 }
@@ -370,7 +367,6 @@ async fn rotated(
         Stack {
             services: &services,
             fillers: &fillers,
-            project: Some(project),
         },
         agreement,
     )
@@ -380,7 +376,7 @@ async fn rotated(
 #[tokio::test(start_paused = true)]
 async fn the_certificate_is_listed_by_the_sha256_in_force_and_says_how_it_stands() {
     let http = answering(now(), true);
-    let (ctx, at) = gate_ctx("rotating-listed", true, CURATORS, Some("held"), http);
+    let (ctx, at, _) = gate_ctx("rotating-listed", true, CURATORS, Some("held"), http);
     let absent = line(&ctx, &at);
     assert_eq!(
         absent
@@ -430,7 +426,7 @@ async fn the_certificate_is_listed_by_the_sha256_in_force_and_says_how_it_stands
 #[tokio::test(start_paused = true)]
 async fn a_replacement_is_read_first_and_carried_out_on_the_offer_it_named() {
     let http = answering(now(), true);
-    let (ctx, at, old) = machine("rotating-offered", http.clone());
+    let (ctx, at, old, _) = machine("rotating-offered", http.clone());
 
     let read = rotated(&ctx, &at, None).await;
     let Ok(read) = read else {
@@ -475,7 +471,7 @@ async fn a_replacement_is_read_first_and_carried_out_on_the_offer_it_named() {
 #[tokio::test(start_paused = true)]
 async fn a_replacement_that_stops_part_way_is_never_reported_as_landed() {
     let http = answering(on_restart(), false);
-    let (mut ctx, at, _) = machine("rotating-stopped", http);
+    let (mut ctx, at, _, _) = machine("rotating-stopped", http);
     ctx.seams.runner = Arc::new(lemonfiber_fixtures::support::Scripted(Err(
         crate::ports::process::Failure::NotFound {
             program: "docker".to_owned(),
@@ -526,7 +522,7 @@ async fn a_replacement_that_stops_part_way_is_never_reported_as_landed() {
 
 #[tokio::test(start_paused = true)]
 async fn a_stack_without_a_media_server_has_no_certificate_to_replace() {
-    let (ctx, at) = gate_ctx(
+    let (ctx, at, _) = gate_ctx(
         "rotating-serverless",
         true,
         CURATORS,
@@ -544,7 +540,6 @@ async fn a_stack_without_a_media_server_has_no_certificate_to_replace() {
         Stack {
             services: &services,
             fillers: &nothing,
-            project: Some(&at),
         },
         None,
     )
@@ -558,7 +553,6 @@ async fn a_stack_without_a_media_server_has_no_certificate_to_replace() {
         Stack {
             services: &services,
             fillers: &nothing,
-            project: Some(&at),
         },
     )
     .is_none());

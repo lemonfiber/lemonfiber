@@ -54,8 +54,8 @@ fn a_by_name_wiring_whose_reason_is_blank_is_caught() {
 #[test]
 fn a_wiring_that_asks_and_names_is_caught() {
     fault(
-        "asks = \"identity.source\"\nby = \"request-gate\"",
-        "asks = \"identity.source\"\nby = \"request-gate\"\nto = \"jellyfin\"\nwhy = \"both\"",
+        "asks = \"media.serve\"\nby = \"door\"",
+        "asks = \"media.serve\"\nby = \"door\"\nto = \"jellyfin\"",
         "a wiring does one or the other",
     );
 }
@@ -63,8 +63,8 @@ fn a_wiring_that_asks_and_names_is_caught() {
 #[test]
 fn a_wiring_with_neither_end_is_caught() {
     fault(
-        "asks = \"library.curate\"\nby = \"request-gate\"\neach = true",
-        "by = \"request-gate\"",
+        "asks = \"media.serve\"\nby = \"door\"",
+        "by = \"door\"",
         "neither asks for a capability nor names a service",
     );
 }
@@ -72,8 +72,8 @@ fn a_wiring_with_neither_end_is_caught() {
 #[test]
 fn a_wiring_from_something_that_is_not_a_service_is_caught() {
     fault(
-        "asks = \"identity.source\"\nby = \"decline\"",
-        "asks = \"identity.source\"\nby = \"subtitler\"",
+        "asks = \"media.serve\"\nby = \"door\"",
+        "asks = \"media.serve\"\nby = \"subtitler\"",
         "by names subtitler, which is not a service",
     );
 }
@@ -92,8 +92,8 @@ fn a_wiring_to_something_that_is_not_a_service_is_caught() {
 #[test]
 fn a_wiring_asking_for_a_name_of_the_wrong_shape_is_caught() {
     fault(
-        "asks = \"identity.source\"\nby = \"request-gate\"",
-        "asks = \"plex:identity\"\nby = \"request-gate\"",
+        "asks = \"media.serve\"\nby = \"door\"",
+        "asks = \"plex:identity\"\nby = \"door\"",
         "asks for plex:identity, which is not a core capability name",
     );
 }
@@ -123,8 +123,8 @@ fn a_chosen_filler_with_no_reason_is_caught() {
 #[test]
 fn a_wiring_that_reaches_all_of_them_and_chooses_one_is_caught() {
     fault(
-        "asks = \"library.curate\"\nby = \"request-gate\"\neach = true",
-        "asks = \"library.curate\"\nby = \"request-gate\"\neach = true\nfilled_by = \"sonarr\"",
+        "asks = \"media.serve\"\nby = \"door\"\nfilled_by",
+        "asks = \"media.serve\"\nby = \"door\"\neach = true\nfilled_by",
         "it does both only by meaning neither",
     );
 }
@@ -150,10 +150,10 @@ fn a_wiring_from_a_service_to_itself_is_caught() {
 #[test]
 fn the_same_ask_written_twice_is_caught() {
     fault(
-        "asks = \"identity.source\"\nby = \"decline\"",
-        "asks = \"identity.source\"\nby = \"decline\"\n\n[[wiring]]\nasks = \"identity.source\"\n\
-         by = \"decline\"",
-        "names identity.source more than once",
+        "asks = \"indexer.search\"\nby = \"bindery\"",
+        "asks = \"indexer.search\"\nby = \"bindery\"\n\n[[wiring]]\nasks = \"indexer.search\"\n\
+         by = \"bindery\"",
+        "names indexer.search more than once",
     );
 }
 

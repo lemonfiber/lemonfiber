@@ -11,6 +11,7 @@ pub mod aggregator;
 pub mod books;
 pub mod context;
 pub mod curators;
+pub mod guards;
 pub mod indexer;
 pub mod listening;
 pub mod media;

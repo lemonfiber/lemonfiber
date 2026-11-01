@@ -67,8 +67,20 @@ fn configuring(copy: &str, service: &str) -> Option<String> {
 /// The moves on offer on this machine, against the stack `manifest` declares: nothing
 /// where its record of what is installed cannot be read, since a move offered over a
 /// plugin already installed would be one nothing can take.
+///
+/// lemonfiber's own guards are not among them: they move with the next act that keeps
+/// the stack running ([`super::guarding`]), never with an update's yes.
 #[must_use]
 pub(crate) fn on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
+    all_on_offer(ctx, manifest)
+        .into_iter()
+        .filter(|offered| !super::guarding::guards(&offered.plugin))
+        .collect()
+}
+
+/// Every move on offer on this machine against `manifest`, the guards' included.
+#[must_use]
+pub(crate) fn all_on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
     here(ctx, &manifest.services).unwrap_or_default()
 }
 

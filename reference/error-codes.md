@@ -601,6 +601,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `UNDO-2` | `MORE_THAN_ONE_RUN` | error | 1 | 500 | 0.14.0 | Raised when a stamp names more than one run, so which to put back is not settled. |
 | `UNDO-3` | `CANNOT_SUCCEED` | error | 1 | 500 | 0.14.0 | Raised when a run cannot be put back, carrying the reason it cannot. |
 | `UNDO-4` | `NOWHERE_TO_LOOK` | error | 1 | 500 | 0.14.0 | Raised when a run cannot say where lemonfiber's own files are. |
+| `UNDO-5` | `MOVED_FOR_GOOD` | error | 1 | 409 | 0.18.0 | Raised when a run moved one of lemonfiber's own guards onto its plugin, which no undo or removal puts back. |
 
 ## `UPDATE` — moving the stack onto newer versions
 

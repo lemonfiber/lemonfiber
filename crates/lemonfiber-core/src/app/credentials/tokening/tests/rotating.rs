@@ -6,15 +6,15 @@ use super::*;
 #[tokio::test]
 async fn a_third_party_request_service_is_never_handed_a_token() {
     let http = taking("held", "linked");
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-third-party",
         true,
-        &accepting(&["held"], &["linked"]),
+        accepting(&["held"], &["linked"]),
         http.clone(),
         true,
     );
     let line = named(
-        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        &held(&ctx, &stack(true), &fillers(true, Some(&at))).await,
         CURATOR_LINE,
     );
     let without_requests: Vec<_> = stack(true)
@@ -36,7 +36,6 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
             )],
             Some(&at),
         ),
-        Some(&at),
     )
     .await;
 
@@ -44,7 +43,7 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
         matches!(&rotation.settled, Settled::Unproven { detail } if detail.contains("does not hand")),
         "{rotation:?}"
     );
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &["linked"])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &["linked"]));
     assert_eq!(http.requests().len(), asked_before);
 }
 
@@ -60,21 +59,21 @@ fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::In
     installed
 }
 
-/// A stack directory whose gate accepts `held` on the curator's route, and a context over
-/// `http` reaching a first-party plugin's request service speaking `request.intake` in
-/// place of the stack's own, holding its key where `keyed`, with the media server moved
-/// into its plugin; with the stack's services and what its asks come to.
+/// A gate accepting `held` on the curator's route, and a context over `http` reaching a
+/// first-party plugin's request service speaking `request.intake` in place of the stack's
+/// own, holding its key where `keyed`, with the media server moved into its plugin; with
+/// the stack's services and what its asks come to.
 fn beside_contracted_requests(
     name: &str,
     keyed: bool,
     http: &Arc<Fake>,
 ) -> (
     Ctx,
-    PathBuf,
+    Arc<Gate>,
     Vec<lemonfiber_manifest::Service>,
     crate::wiring::Fillers,
 ) {
-    let (_, at) = scene(name, true, &accepting(&["held"], &[]), http.clone(), true);
+    let (_, at, gate) = scene(name, true, accepting(&["held"], &[]), http.clone(), true);
     let ctx = crate::test_support::contracted_context(
         &at,
         crate::test_support::CONTRACTED_REQUESTS,
@@ -89,6 +88,7 @@ fn beside_contracted_requests(
     .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(Some(
         vec![0xab; crate::secret::SECRET_BYTES],
     ))));
+    let ctx = crate::test_support::gated(ctx, &at, &gate);
     let services: Vec<_> = stack(true)
         .into_iter()
         .filter(|service| service.id != "seerr")
@@ -105,9 +105,11 @@ fn beside_contracted_requests(
                     crate::test_support::CONTRACTED_REQUESTS,
                     "request.intake",
                 ))])
+                .chain([crate::test_support::a_contracted_gate()])
                 .collect();
             let trusted: Vec<_> = crate::test_support::first_party("intake")
                 .into_iter()
+                .chain(crate::test_support::GATE_TRUSTED)
                 .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
                 .collect();
             crate::wiring::Fillers::trusting(
@@ -119,7 +121,7 @@ fn beside_contracted_requests(
             )
         })
         .unwrap_or_default();
-    (ctx, at, services, fillers)
+    (ctx, gate, services, fillers)
 }
 
 /// The curator's token's line, as the inventory reads it.
@@ -171,16 +173,16 @@ async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
             vec![Answer::reply(200, crate::test_support::json(&["gates"]))],
         ),
     ]);
-    let (ctx, at, services, fillers) =
+    let (ctx, gate, services, fillers) =
         beside_contracted_requests("tokens-first-party", true, &http);
 
-    let rotation = rotate(&ctx, &curator_line(), &services, &fillers, Some(&at)).await;
+    let rotation = rotate(&ctx, &curator_line(), &services, &fillers).await;
 
     assert!(
         matches!(rotation.settled, Settled::Replaced { .. }),
         "{rotation:?}"
     );
-    assert_eq!(accepted(&at), Some(accepting(&[&minted()], &[])));
+    assert_eq!(accepted(&gate), accepting(&[&minted()], &[]));
     let asked = http.requests();
     assert!(
         asked.iter().any(|one| one.url
@@ -206,32 +208,32 @@ async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
 #[tokio::test]
 async fn a_request_service_that_cannot_be_asked_over_the_contract_is_handed_nothing() {
     let http = Fake::always(Answer::reply(200, "[]"));
-    let (ctx, at, services, fillers) = beside_contracted_requests("tokens-unasked", false, &http);
+    let (ctx, gate, services, fillers) = beside_contracted_requests("tokens-unasked", false, &http);
 
-    let lines = held(&ctx, &services, &fillers, Some(&at)).await;
-    let rotation = rotate(&ctx, &curator_line(), &services, &fillers, Some(&at)).await;
+    let lines = held(&ctx, &services, &fillers).await;
+    let rotation = rotate(&ctx, &curator_line(), &services, &fillers).await;
 
     assert!(lines.is_empty(), "{lines:?}");
     assert!(
         unproven(&rotation.settled).is_some_and(|said| said.ends_with("Run lemonfiber seed.")),
         "{rotation:?}"
     );
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &[]));
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
 #[tokio::test]
 async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
     let http = taking("held", "linked");
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-rotate-arr",
         true,
-        &accepting(&["held"], &["linked"]),
+        accepting(&["held"], &["linked"]),
         http.clone(),
         true,
     );
     let line = named(
-        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        &held(&ctx, &stack(true), &fillers(true, Some(&at))).await,
         CURATOR_LINE,
     );
 
@@ -240,7 +242,6 @@ async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
         &line,
         &stack(true),
         &fillers(true, Some(&at)),
-        Some(&at),
     )
     .await;
 
@@ -248,7 +249,7 @@ async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
         matches!(rotation.settled, Settled::Replaced { .. }),
         "{rotation:?}"
     );
-    assert_eq!(accepted(&at), Some(accepting(&[&minted()], &["linked"])));
+    assert_eq!(accepted(&gate), accepting(&[&minted()], &["linked"]));
     assert_eq!(
         rotation.consumers.first().map(|one| one.reach.clone()),
         Some(Reach::Updated)
@@ -262,26 +263,19 @@ async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
 #[tokio::test]
 async fn a_curator_token_the_request_service_cannot_prove_is_taken_back() {
     let http = serving("held", "linked", taken(), vec![refusing()], taken());
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-rotate-unproven",
         true,
-        &accepting(&["held"], &[]),
+        accepting(&["held"], &[]),
         http.clone(),
         true,
     );
     let line = named(
-        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        &held(&ctx, &stack(true), &fillers(true, Some(&at))).await,
         CURATOR_LINE,
     );
 
-    let rotation = rotate(
-        &ctx,
-        &line,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
-    )
-    .await;
+    let rotation = rotate(&ctx, &line, &stack(true), &fillers(true, Some(&at))).await;
 
     assert_eq!(
         unproven(&rotation.settled),
@@ -290,7 +284,7 @@ async fn a_curator_token_the_request_service_cannot_prove_is_taken_back() {
              so the old one was put back"
         )
     );
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &[]));
     assert_eq!(
         told::<String>(&http.requests(), "move_fulfilment_target", "key"),
         vec![minted(), "held".to_owned()]
@@ -300,133 +294,105 @@ async fn a_curator_token_the_request_service_cannot_prove_is_taken_back() {
 #[tokio::test]
 async fn the_media_server_token_is_replaced_once_the_request_service_keeps_it() {
     let http = taking("held", "linked");
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-rotate-jellyfin",
         true,
-        &accepting(&["held"], &["linked"]),
+        accepting(&["held"], &["linked"]),
         http,
         true,
     );
     let line = named(
-        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        &held(&ctx, &stack(true), &fillers(true, Some(&at))).await,
         MEDIA_SERVER_LINE,
     );
 
-    let rotation = rotate(
-        &ctx,
-        &line,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
-    )
-    .await;
+    let rotation = rotate(&ctx, &line, &stack(true), &fillers(true, Some(&at))).await;
 
     assert!(
         matches!(rotation.settled, Settled::Replaced { .. }),
         "{rotation:?}"
     );
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &[&minted()])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &[&minted()]));
 
     let refused = serving("held", "linked", taken(), vec![taken()], refusing());
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-rotate-unlinked",
         true,
-        &accepting(&["held"], &["linked"]),
+        accepting(&["held"], &["linked"]),
         refused,
         true,
     );
-    let rotation = rotate(
-        &ctx,
-        &line,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
-    )
-    .await;
+    let rotation = rotate(&ctx, &line, &stack(true), &fillers(true, Some(&at))).await;
     assert!(unproven(&rotation.settled).is_some_and(|said| said.contains("reach Jellyfin")));
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &["linked"])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &["linked"]));
 }
 
 #[tokio::test]
 async fn a_rotation_that_cannot_start_changes_nothing() {
     let http = taking("held", "linked");
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-rotate-unstarted",
         true,
-        &accepting(&["held"], &[]),
+        accepting(&["held"], &[]),
         http.clone(),
         false,
     );
     let line = named(
-        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        &held(&ctx, &stack(true), &fillers(true, Some(&at))).await,
         CURATOR_LINE,
     );
 
-    let unrandom = rotate(
-        &ctx,
-        &line,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
-    )
-    .await;
+    let unrandom = rotate(&ctx, &line, &stack(true), &fillers(true, Some(&at))).await;
     assert_eq!(
         unproven(&unrandom.settled),
         Some("no randomness was available to generate a token")
     );
-    let unrouted = rotate(&ctx, &line, &stack(true), &fillers(true, None), None).await;
+    let unrouted = rotate(&ctx, &line, &stack(true), &fillers(true, None)).await;
     assert!(unproven(&unrouted.settled).is_some_and(|said| said.ends_with("Run lemonfiber seed.")));
-    let mut gone = line.clone();
-    gone.setting = "request-gate/tokens.json#radarr".to_owned();
-    let unknown = rotate(
+    let unrequested = super::unrequested();
+    let unasked = rotate(
         &ctx,
-        &gone,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
+        &line,
+        &unrequested,
+        &fillers_beside(unrequested.clone(), &[], Some(&at)),
     )
     .await;
+    assert_eq!(unproven(&unasked.settled), unproven(&unrouted.settled));
+    let mut gone = line.clone();
+    gone.setting = "request-gate/tokens.json#radarr".to_owned();
+    let unknown = rotate(&ctx, &gone, &stack(true), &fillers(true, Some(&at))).await;
     assert!(unproven(&unknown.settled).is_some());
 
-    let (mut rehearsing, _) = scene(
+    let (mut rehearsing, _, rehearsed_gate) = scene(
         "tokens-rotate-rehearsed",
         true,
-        &accepting(&["held"], &[]),
+        accepting(&["held"], &[]),
         http.clone(),
         true,
     );
     rehearsing.dry_run = true;
-    let rehearsed = rotate(
-        &rehearsing,
-        &line,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
-    )
-    .await;
+    let rehearsed = rotate(&rehearsing, &line, &stack(true), &fillers(true, Some(&at))).await;
     assert!(
         matches!(rehearsed.settled, Settled::Rehearsed { .. }),
         "{rehearsed:?}"
     );
     assert!(!written(&http));
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &[]));
+    assert_eq!(accepted(&rehearsed_gate), accepting(&["held"], &[]));
 }
 
 /// A rotation the request service refuses to move, holds no target for, or whose tokens
-/// cannot be written stops, saying which.
+/// the gate will not take stops, saying which.
 #[tokio::test]
-async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
-    let unwritten = |at: &Path| {
-        format!(
-            "the tokens could not be handed to the request gate: request-gate answered \
-             unexpectedly: {}",
-            store::write(&tokens_file(at), "")
-                .err()
-                .map(|failure| failure.to_string())
-                .unwrap_or_default()
-        )
-    };
-    for (name, moved, unheld, blocked) in [
+async fn a_rotation_the_service_or_the_gate_stops_is_unproven() {
+    let unhanded = format!(
+        "the tokens could not be handed to the request gate: {}",
+        crate::ports::service::Failure::Refused {
+            service: crate::app::gating::SERVICE.to_owned(),
+            detail: "it refused admit_tokens".to_owned(),
+        }
+    );
+    for (name, moved, unheld, refused) in [
         ("tokens-rotate-unmoved", refusing(), false, false),
         ("tokens-rotate-untargeted", taken(), true, false),
         ("tokens-rotate-unwritable", taken(), false, true),
@@ -439,21 +405,15 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
         } else {
             serving("held", "linked", moved, vec![taken()], taken())
         };
-        let (ctx, at) = scene(name, true, &accepting(&["held"], &[]), http, true);
-        let ctx = if blocked {
-            let held_text = accepting(&["held"], &[]).written();
-            let routes_text = routes().written();
-            let _ = std::fs::remove_file(tokens_file(&at));
-            let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
-            ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
-                (tokens_file(&at), &held_text),
-                (crate::app::gating::path(&at, File::Upstreams), &routes_text),
-            ]))
+        let gate = Gate::admitting(routes(accepting(&["held"], &[])));
+        let gate = if refused {
+            gate.refusing(&["admit_tokens"])
         } else {
-            ctx
+            gate
         };
-        let expected = if blocked {
-            unwritten(&at)
+        let (ctx, at, gate) = scene_beside(name, gate, http, true);
+        let expected = if refused {
+            unhanded.clone()
         } else if unheld {
             not_handed_yet()
         } else {
@@ -465,7 +425,6 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
             &curator_line(),
             &stack(true),
             &fillers(true, Some(&at)),
-            Some(&at),
         )
         .await;
 
@@ -474,40 +433,25 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
             Some(expected.as_str()),
             "{name}"
         );
+        assert_eq!(accepted(&gate), accepting(&["held"], &[]), "{name}");
     }
 }
 
 #[tokio::test]
 async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     let http = taking("held", "linked");
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene_beside(
         "tokens-rotate-unretired",
-        true,
-        &accepting(&[], &[]),
+        Gate::admitting(routes(accepting(&["held", &minted()], &[]))).refusing(&["admit_tokens"]),
         http,
         true,
     );
-    let both = accepting(&["held", &minted()], &[]).written();
-    let routes_text = routes().written();
-    let _ = std::fs::remove_file(tokens_file(&at));
-    let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
-    let ctx = ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
-        (tokens_file(&at), &both),
-        (crate::app::gating::path(&at, File::Upstreams), &routes_text),
-    ]));
     let line = named(
-        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        &held(&ctx, &stack(true), &fillers(true, Some(&at))).await,
         CURATOR_LINE,
     );
 
-    let rotation = rotate(
-        &ctx,
-        &line,
-        &stack(true),
-        &fillers(true, Some(&at)),
-        Some(&at),
-    )
-    .await;
+    let rotation = rotate(&ctx, &line, &stack(true), &fillers(true, Some(&at))).await;
 
     assert!(
         unproven(&rotation.settled).is_some_and(
@@ -515,6 +459,7 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
         ),
         "{rotation:?}"
     );
+    assert_eq!(accepted(&gate), accepting(&["held", &minted()], &[]));
 }
 
 /// A request service that stops answering once the gate holds the new token beside the
@@ -522,10 +467,10 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
 #[tokio::test]
 async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
     let http = beside_the_gates_key(vec![(intake("fulfilment_targets"), vec![Answer::Silent])]);
-    let (ctx, at) = scene(
+    let (ctx, at, gate) = scene(
         "tokens-rotate-unanswered",
         true,
-        &accepting(&["held"], &[]),
+        accepting(&["held"], &[]),
         http,
         true,
     );
@@ -535,7 +480,6 @@ async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
         &curator_line(),
         &stack(true),
         &fillers(true, Some(&at)),
-        Some(&at),
     )
     .await;
 
@@ -543,7 +487,7 @@ async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
         unproven(&rotation.settled),
         Some(not_proven("seerr-adapter is not answering").as_str())
     );
-    assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
+    assert_eq!(accepted(&gate), accepting(&["held"], &[]));
 }
 
 /// **A gate speaking `request.gate` that cannot be asked over it is handed no token.**
@@ -554,7 +498,9 @@ async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_no_token() {
     for (tag, trusted, keyed) in crate::test_support::unaskable_gates() {
         let http = Fake::always(Answer::reply(200, "[]"));
         let name = format!("tokens-rotate-unasked-{tag}");
-        let (_, at) = scene(&name, true, &accepting(&["held"], &[]), http.clone(), true);
+        let at = lemonfiber_fixtures::scratch::Scratch::named(&name).kept();
+        let _ = std::fs::remove_dir_all(&at);
+        let _ = std::fs::create_dir_all(&at);
         let ctx = crate::test_support::contracted_context(&at, crate::app::gating::SERVICE, keyed)
             .settings(Settings {
                 env_file: Some(at.join(".env")),
@@ -572,14 +518,13 @@ async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_no_token() {
             trusted,
         );
 
-        let rotation = rotate(&ctx, &curator_line(), &stack(true), &fillers, Some(&at)).await;
+        let rotation = rotate(&ctx, &curator_line(), &stack(true), &fillers).await;
 
         assert_eq!(
             unproven(&rotation.settled),
             Some(not_handed_yet().as_str()),
             "{tag}"
         );
-        assert_eq!(accepted(&at), Some(accepting(&["held"], &[])), "{tag}");
         assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
     }
 }

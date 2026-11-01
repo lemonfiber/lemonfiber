@@ -33,24 +33,11 @@ fn ctx(into: Option<PathBuf>, env: Option<PathBuf>) -> Ctx {
         .build()
 }
 
-/// A context operating the stack this build carries, materialised under `into`.
+/// A context operating the stack this build carries, materialised under `into`, with no
+/// guard to move.
 fn carried(into: &Path, env: &Path) -> Ctx {
     a_context()
-        .over(crate::test_support::embedded())
-        .settings(Settings {
-            stack_dir: Some(into.to_path_buf()),
-            env_file: Some(env.to_path_buf()),
-            ..Settings::default()
-        })
-        .environment(Environment::LinuxNative)
-        .build()
-}
-
-/// A context operating the stack this build assembles from its bundle, materialised under
-/// `into`.
-fn bundled(into: &Path, env: &Path) -> Ctx {
-    a_context()
-        .over(crate::test_support::embedded())
+        .over(crate::test_support::unguarded_embedded())
         .settings(Settings {
             stack_dir: Some(into.to_path_buf()),
             env_file: Some(env.to_path_buf()),
@@ -214,9 +201,9 @@ async fn a_confirmed_reset_writes_each_secrets_file_and_a_preview_none() {
         .with_file_name(crate::config::paths::SECRETS_FILES)
         .join("gluetun.env");
 
-    assert!(reset(&bundled(&into, &env), None).await.is_ok());
+    assert!(reset(&carried(&into, &env), None).await.is_ok());
     let previewed = guard.exists();
-    assert!(confirmed(&bundled(&into, &env)).await.is_ok());
+    assert!(confirmed(&carried(&into, &env)).await.is_ok());
 
     assert!(!previewed);
     assert!(guard.is_file());
@@ -246,5 +233,5 @@ async fn a_confirmed_reset_that_cannot_write_a_secrets_file_is_an_error() {
         "a file, not a directory",
     );
 
-    assert!(confirmed(&bundled(&into, &env)).await.is_err());
+    assert!(confirmed(&carried(&into, &env)).await.is_err());
 }

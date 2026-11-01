@@ -1,24 +1,20 @@
-//! The request gate, as the stack declares it and as its files are placed.
+//! The request gate, as the stack declares it and as the core asks it.
 //!
 //! The gate stands between the request service and the services it fulfils requests
 //! through, holding their credentials so the request service holds only tokens
-//! lemonfiber minted for the gate. Its files live in its configuration directory, in
-//! the shapes [`lemonfiber_sidecar::gate`] defines.
+//! lemonfiber minted for the gate. The core asks it over `request.gate` and no other way.
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-use lemonfiber_contract::capabilities::request::gate;
-use lemonfiber_sidecar::gate::{File, Kind};
 
 use crate::app::targets::{spoken, Spoken};
 use crate::app::Ctx;
-use crate::origin::Origin;
 use crate::ports::media;
 use crate::ports::service::Gating;
 use crate::wiring::Fillers;
+use lemonfiber_contract::capabilities::request::gate;
 
-pub(crate) mod configured;
+/// The port the request gate answers its routes on, inside the stack's network.
+pub(crate) const PORT: u16 = 5057;
 
 /// The request gate's id in the stack manifest.
 pub(crate) const SERVICE: &str = "request-gate";
@@ -30,23 +26,17 @@ pub(crate) fn service(
     services.iter().find(|service| service.id == SERVICE)
 }
 
-/// The request gate as the core asks it: over `request.gate` where its filler speaks the
-/// contract, otherwise the stack's own gate told through its files under `project`. Nothing
-/// where nothing fills the capability, its filler is not one the stack's credentials may be
-/// handed to, or it speaks the contract and cannot be asked over it.
-pub(crate) async fn asked(ctx: &Ctx, fillers: &Fillers, project: &Path) -> Option<Arc<dyn Gating>> {
+/// The request gate as the core asks it: over `request.gate`, where its filler speaks the
+/// contract. Nothing where nothing fills the capability, its filler is not one the stack's
+/// credentials may be handed to, it speaks nothing, or it speaks the contract and cannot
+/// be asked over it.
+pub(crate) async fn asked(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn Gating>> {
     let (filler, _) = fillers.filling(gate::CAPABILITY).filter(|(filler, _)| {
         crate::wiring::crosses(crate::wiring::Holder::Stack, filler.holder())
     })?;
     match spoken(ctx, filler, gate::CAPABILITY, gate::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(gate::Adapter(adapter))),
-        Spoken::Unanswered => None,
-        Spoken::Not => (filler.origin == Origin::Bundled).then(|| {
-            Arc::new(configured::Configured::at(
-                project,
-                ctx.seams.filesystem.clone(),
-            )) as Arc<dyn Gating>
-        }),
+        Spoken::Unanswered | Spoken::Not => None,
     }
 }
 
@@ -57,22 +47,6 @@ pub(crate) fn may_hold(fillers: &Fillers, owner: crate::wiring::Holder<'_>) -> b
         .is_some_and(|(filler, _)| crate::wiring::crosses(owner, filler.holder()))
 }
 
-/// Where one of the gate's files lives: its configuration directory, under the project
-/// root the stack's config volumes are mounted from.
-pub(crate) fn path(project: &Path, file: File) -> PathBuf {
-    project.join("config").join(SERVICE).join(file.name())
-}
-
-/// The kind of video the curator a route reaches fetches, or `None` for the media
-/// server's route.
-pub(crate) const fn fetching(route: Kind) -> Option<media::Kind> {
-    match route {
-        Kind::Sonarr => Some(media::Kind::Tv),
-        Kind::Radarr => Some(media::Kind::Movies),
-        Kind::Jellyfin => None,
-    }
-}
-
 /// The kind of video the curator a route reaching `target` fetches, or `None` for the media
 /// server's route or a curator of anything else.
 pub(crate) fn fetched(target: &crate::ports::service::Target) -> Option<media::Kind> {
@@ -81,14 +55,6 @@ pub(crate) fn fetched(target: &crate::ports::service::Target) -> Option<media::K
             media::Kind::for_media_type(media_type)
         }
         crate::ports::service::Target::MediaServer { .. } => None,
-    }
-}
-
-/// The route kind for a curator fetching `kind`.
-pub(crate) const fn route_for(kind: media::Kind) -> Kind {
-    match kind {
-        media::Kind::Tv => Kind::Sonarr,
-        media::Kind::Movies => Kind::Radarr,
     }
 }
 

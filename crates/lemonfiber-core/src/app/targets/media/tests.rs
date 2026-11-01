@@ -60,12 +60,10 @@ fn a_moved_server_is_asked_at_its_adapter_and_kept_under_the_stacks_names() {
         server
             .as_ref()
             .and_then(MediaServer::gated)
-            .map(|(kind, pairing)| (kind, pairing.at.url())),
-        Some((
-            lemonfiber_sidecar::gate::Kind::Jellyfin,
-            "http://jellyfin:8096".to_owned()
-        ))
+            .map(|pairing| pairing.at.url()),
+        Some("http://jellyfin:8096".to_owned())
     );
+    assert!(server.as_ref().is_some_and(MediaServer::gates));
 }
 
 /// A third party's server chosen in the stack's place is served on its own terms: at its
@@ -197,12 +195,8 @@ fn the_gate_routes_to_a_contracted_servers_upstream_where_it_speaks_its_api() {
         server
             .as_ref()
             .and_then(MediaServer::gated)
-            .map(|(kind, pairing)| (kind, pairing.at.url(), pairing.majors.clone())),
-        Some((
-            lemonfiber_sidecar::gate::Kind::Jellyfin,
-            format!("http://{MEDIA_UPSTREAM}:9000"),
-            vec![1]
-        ))
+            .map(|pairing| (pairing.at.url(), pairing.majors.clone())),
+        Some((format!("http://{MEDIA_UPSTREAM}:9000"), vec![1]))
     );
 }
 
@@ -232,7 +226,7 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
             majors: vec![1],
         })
     );
-    assert_eq!(server.as_ref().and_then(MediaServer::gate_kind), None);
+    assert!(server.as_ref().is_some_and(|one| !one.gates()));
 }
 
 /// An upstream that names no native API leaves the contracted server unpaired: there is

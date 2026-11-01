@@ -115,6 +115,7 @@ fn only_an_update_that_stopped_part_way_is_a_failure() {
             unvetted: None,
             moved: Vec::new(),
             moves: Vec::new(),
+            guards: Vec::new(),
         })))
     };
 
@@ -152,6 +153,7 @@ fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
         unvetted: None,
         moved: Vec::new(),
         moves: Vec::new(),
+        guards: Vec::new(),
     })));
 
     assert_eq!(left_down, shown(std::process::ExitCode::from(FAILURE)));
@@ -386,6 +388,7 @@ fn installed(
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     })
 }
 
@@ -438,6 +441,7 @@ fn only_a_proof_asked_again_that_did_not_hold_is_a_refusal() {
             substituted: Vec::new(),
             sources: Vec::new(),
             unvetted: None,
+            guards: Vec::new(),
         })
     };
     assert_eq!(shown(settled(&proved(false, false))), success());
@@ -476,6 +480,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
             substituted: Vec::new(),
             sources: Vec::new(),
             unvetted: None,
+            guards: Vec::new(),
         })
     };
 
@@ -557,6 +562,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
             substituted: Vec::new(),
             sources: Vec::new(),
             unvetted: None,
+            guards: Vec::new(),
         })
     };
     assert_eq!(
@@ -594,6 +600,7 @@ fn reading_what_is_installed_always_succeeds() {
                 substituted: Vec::new(),
                 sources: Vec::new(),
                 unvetted: None,
+                guards: Vec::new(),
             }
         ))),
         success()
@@ -648,6 +655,7 @@ fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out()
             },
             agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned(),
             applied,
+            guards: Vec::new(),
         })
     };
     assert_eq!(settled(&made(true)), std::process::ExitCode::SUCCESS);
@@ -722,6 +730,7 @@ fn a_setting_changed_and_left_unrestarted_is_a_failure() {
             rehearsed: false,
             unvetted: None,
             waiting: Vec::new(),
+            guards: Vec::new(),
         })
     };
     assert_eq!(

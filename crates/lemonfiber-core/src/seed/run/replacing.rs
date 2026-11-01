@@ -40,8 +40,6 @@ pub(crate) struct Stack<'a> {
     pub(crate) services: &'a [lemonfiber_manifest::Service],
     /// Who fills each ask.
     pub(crate) fillers: &'a crate::wiring::Fillers,
-    /// Where the stack was written to disk.
-    pub(crate) project: Option<&'a Path>,
 }
 
 /// What the report calls this connection.
@@ -83,10 +81,9 @@ async fn holding(
 ) -> Vec<(&'static str, bool)> {
     let mut holding = Vec::new();
     for holder in holders(stack, server) {
-        let holds = match (holder, stack.project) {
-            (DECLINE, Some(project)) => decline_holds(ctx, stack.fillers, project, pin).await,
-            (_, Some(project)) => gate_holds(ctx, stack.fillers, project, pin).await,
-            (_, None) => false,
+        let holds = match holder {
+            DECLINE => decline_holds(ctx, stack.fillers, pin).await,
+            _ => gate_holds(ctx, stack.fillers, pin).await,
         };
         holding.push((holder, holds));
     }
@@ -103,13 +100,8 @@ async fn unheld(ctx: &Ctx, stack: Stack<'_>, server: &MediaServer, pin: &str) ->
 }
 
 /// Whether the decline service holds `pin` with its key, or holds no key to strand.
-async fn decline_holds(
-    ctx: &Ctx,
-    fillers: &crate::wiring::Fillers,
-    project: &Path,
-    pin: &str,
-) -> bool {
-    let decline = declining::asked(ctx, fillers, project).await;
+async fn decline_holds(ctx: &Ctx, fillers: &crate::wiring::Fillers, pin: &str) -> bool {
+    let decline = declining::asked(ctx, fillers).await;
     OptionFuture::from(decline.as_ref().map(|decline| decline.held()))
         .await
         .is_some_and(|held| {
@@ -118,13 +110,8 @@ async fn decline_holds(
 }
 
 /// Whether the request gate's route to the media server holds `pin`, or it has none.
-async fn gate_holds(
-    ctx: &Ctx,
-    fillers: &crate::wiring::Fillers,
-    project: &Path,
-    pin: &str,
-) -> bool {
-    let gate = gating::asked(ctx, fillers, project).await;
+async fn gate_holds(ctx: &Ctx, fillers: &crate::wiring::Fillers, pin: &str) -> bool {
+    let gate = gating::asked(ctx, fillers).await;
     OptionFuture::from(gate.as_ref().map(|gate| gate.admitted()))
         .await
         .is_some_and(|admitted| {
@@ -159,7 +146,7 @@ pub(crate) async fn replaced(ctx: &Ctx, stack: Stack<'_>, server: &MediaServer) 
 /// Every holder handed every certificate kept for `server`, as the seed hands them.
 async fn handed(ctx: &Ctx, stack: Stack<'_>, server: &MediaServer) -> Vec<Wiring> {
     let mut wirings: Vec<Wiring> =
-        super::decline::seed_decline_key(ctx, stack.services, stack.fillers, stack.project)
+        super::decline::seed_decline_key(ctx, stack.services, stack.fillers)
             .await
             .into_iter()
             .collect();
@@ -169,7 +156,6 @@ async fn handed(ctx: &Ctx, stack: Stack<'_>, server: &MediaServer) -> Vec<Wiring
             stack.services,
             stack.fillers,
             Some(server),
-            stack.project,
         ))
         .await,
     );

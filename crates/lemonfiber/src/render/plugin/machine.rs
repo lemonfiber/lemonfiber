@@ -77,15 +77,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(reversal(put_back));
         }
         if !acted {
-            lines.extend(answering::unanswered(
-                "install",
-                report.agreement.as_deref(),
-                &asked(&install.would, &install.taking)
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>(),
-                report.rehearsed,
-            ));
+            lines.extend(unanswered("install", report, install));
         }
         lines.spaced(shelf(report.installed.len()));
     } else if let Some(one) = &report.removal {
@@ -125,21 +117,14 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(updated::updated(one));
         let acted = one.install.recorded || one.restored.is_some();
         if !acted {
-            lines.extend(answering::unanswered(
-                "update",
-                report.agreement.as_deref(),
-                &asked(&one.install.would, &one.install.taking)
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>(),
-                report.rehearsed,
-            ));
+            lines.extend(unanswered("update", report, &one.install));
         }
         lines.spaced(shelf(report.installed.len()));
     } else {
         lines.put(shelf(report.installed.len()));
     }
     lines.extend(crate::render::overlay::unvetted(report.unvetted.as_ref()));
+    lines.extend(crate::render::moving::guards(&report.guards));
     for one in &report.installed {
         lines.spaced(format!("  {}", named(one)));
         lines.extend(listed::provenance(one, report));
@@ -178,6 +163,17 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
         ));
     }
     lines
+}
+
+/// What answering `install`'s offer would take, said on a `verb` that did not act.
+fn unanswered(verb: &str, report: &Installs, install: &lemonfiber_core::plugin::Install) -> Lines {
+    let asked = asked(&install.would, &install.taking);
+    answering::unanswered(
+        verb,
+        report.agreement.as_deref(),
+        &asked.iter().map(String::as_str).collect::<Vec<_>>(),
+        report.rehearsed,
+    )
 }
 
 /// Every proof that has to hold, and on a run that asked them, what each came to.
@@ -393,6 +389,7 @@ fn undone(undo: &Undo) -> String {
         Action::Unreplaced { service } => {
             format!("left the internal certificate of {service} as it is")
         }
+        Action::Unmoved { service } => format!("left {service} on its plugin"),
         Action::Run {
             service,
             running: true,

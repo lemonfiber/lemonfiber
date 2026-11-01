@@ -27,7 +27,7 @@ pub(crate) async fn reset(
     ctx: &Ctx,
     agreement: Option<String>,
 ) -> Result<ResetReport, Box<Problem>> {
-    let (reverted, reverted_connections) = reading(ctx, false).await?;
+    let (reverted, reverted_connections, manifest) = reading(ctx, false).await?;
     let standing = offer(&reverted, &reverted_connections);
     let Some(answered) = agreement else {
         return Ok(ResetReport {
@@ -36,19 +36,21 @@ pub(crate) async fn reset(
             reverted_connections,
             confirmed: false,
             offer: standing,
+            guards: crate::app::plugins::guarding::rehearsed(ctx, &manifest).await,
         });
     };
     let moved = crate::agreement::differs(&answered, &standing, &OFFERED);
     if !moved.is_empty() {
         return Err(Box::new(reset_moved(&moved, &standing)));
     }
-    let (reverted, reverted_connections) = reading(ctx, true).await?;
+    let (reverted, reverted_connections, manifest) = reading(ctx, true).await?;
     Ok(ResetReport {
         rehearsed: false,
         reverted,
         reverted_connections,
         confirmed: true,
         offer: standing,
+        guards: crate::app::plugins::guarding::taken(ctx, &manifest).await,
     })
 }
 
@@ -78,8 +80,12 @@ fn reset_moved(moved: &[&str], standing: &str) -> Problem {
     .in_state(State::Guided)
 }
 
-/// What a reset reverts, carried out where `confirm` and only read otherwise.
-async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String>), Box<Problem>> {
+/// What a reset reverts, carried out where `confirm` and only read otherwise, and the
+/// stack it was read against.
+async fn reading(
+    ctx: &Ctx,
+    confirm: bool,
+) -> Result<(Vec<StackEdit>, Vec<String>, lemonfiber_manifest::Manifest), Box<Problem>> {
     let record = super::targets::beside_env(ctx, crate::config::paths::MATERIALISED);
     let into = ctx.settings.stack_dir.as_deref();
 
@@ -132,7 +138,7 @@ async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String
         .map(|wiring| wiring.connection)
         .collect();
 
-    Ok((reverted, reverted_connections))
+    Ok((reverted, reverted_connections, manifest))
 }
 
 #[cfg(test)]

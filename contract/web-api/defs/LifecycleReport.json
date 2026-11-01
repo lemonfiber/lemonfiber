@@ -39,6 +39,13 @@
         "null"
       ]
     },
+    "guards": {
+      "description": "Each of lemonfiber's own guards this act moved onto its plugin, or on a rehearsal\nwould move, for good and with no yes of its own; one it could not move stays on\noffer and says why.",
+      "type": "array",
+      "items": {
+        "$ref": "StackMoveTaken.json"
+      }
+    },
     "held": {
       "description": "Why nothing was run, where a start declined to run anything.\n\nAbsent for every ordinary command, which is what makes it readable: a\nlifecycle report with an empty plan and a status of nothing is a report of\nsomething that did not happen, and without this there is nowhere to say\nwhether that was a fault or the correct answer. A start at a login declines\nfor three reasons the operator would each act on differently — the stack was\nstopped on purpose, autostart was never asked for, or this machine is on its\nbattery and nobody said to start anyway — and a run nobody is watching has to\nleave the reason somewhere a reader finds later.",
       "type": [

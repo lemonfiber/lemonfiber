@@ -57,7 +57,6 @@ async fn a_guard_whose_credential_was_replaced_is_asked_to_hold_it_and_said_wher
         let amid = Amid {
             services: &[],
             fillers: &fillers,
-            project: None,
         };
         secured(&ctx, &guard(), &amid).await
     };

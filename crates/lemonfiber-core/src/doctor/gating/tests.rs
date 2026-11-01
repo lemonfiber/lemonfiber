@@ -1,61 +1,59 @@
 use std::path::{Path, PathBuf};
-
-use lemonfiber_sidecar::gate::{Kept, Outcome, Record};
+use std::sync::Arc;
 
 use super::{Gate, GateRecordCheck, LOST, REFUSED};
 use crate::config::store;
 use crate::doctor::{Category, Check, Finding, Verdict};
+use crate::ports::service::{GateEntry, GateOutcome as Outcome};
 
 /// A record holding `entries`, each a route, method, path and outcome, at one-minute
-/// steps from the epoch, with all but the last `kept` fallen off.
-fn record(entries: &[(&str, &str, &str, Outcome)], kept: usize) -> Record {
-    let mut record = Record::default();
-    for (step, (route, method, path, outcome)) in entries.iter().enumerate() {
-        record = record.with(
-            u64::try_from(step).unwrap_or_default() * 60,
-            route,
-            method,
-            path,
-            *outcome,
-            Kept::standard(),
-        );
-    }
-    let over = record.entries.len().saturating_sub(kept);
-    record.entries.drain(..over);
+/// steps from the epoch and numbered from one, with all but the last `kept` fallen off.
+fn record(entries: &[(&str, &str, &str, Outcome)], kept: usize) -> Vec<GateEntry> {
+    let mut record: Vec<GateEntry> = entries
+        .iter()
+        .enumerate()
+        .map(|(step, (route, method, path, outcome))| {
+            let step = u64::try_from(step).unwrap_or_default();
+            GateEntry {
+                seq: step + 1,
+                at: step * 60,
+                route: (*route).to_owned(),
+                method: (*method).to_owned(),
+                path: (*path).to_owned(),
+                outcome: *outcome,
+            }
+        })
+        .collect();
+    let over = record.len().saturating_sub(kept);
+    record.drain(..over);
     record
 }
 
-/// A scratch directory holding `record` where there is one, and the place last read
-/// at `read` where there is one.
-fn scene(name: &str, record: Option<&str>, read: Option<&str>) -> PathBuf {
+/// A scratch directory holding the place last read at `read` where there is one.
+fn scene(name: &str, read: Option<&str>) -> PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
-    if let Some(record) = record {
-        let _ = store::write(&kept_at(&at), record);
-    }
     if let Some(read) = read {
         let _ = store::write(&at.join("gate-read.json"), read);
     }
     at
 }
 
-/// The check over the gate under `at`, keeping its place there where `keeping`.
-fn check(at: &Path, keeping: bool) -> GateRecordCheck {
+/// The check over `gate`, keeping its place under `at` where `keeping`.
+fn check(gate: crate::test_support::guards::Gate, at: &Path, keeping: bool) -> GateRecordCheck {
     GateRecordCheck::new(
         files(),
         Some(Gate {
-            service: Some(std::sync::Arc::new(
-                crate::app::gating::configured::Configured::at(at, files()),
-            )),
+            service: Some(Arc::new(gate)),
             read: keeping.then(|| at.join("gate-read.json")),
         }),
     )
 }
 
-/// Where the gate under the project `at` keeps its record.
-fn kept_at(at: &Path) -> PathBuf {
-    crate::app::gating::path(at, lemonfiber_sidecar::gate::File::Record)
+/// A gate keeping `record`.
+fn keeping(record: Vec<GateEntry>) -> crate::test_support::guards::Gate {
+    crate::test_support::guards::Gate::default().recording(record)
 }
 
 /// The filesystem the checks read through.
@@ -115,8 +113,8 @@ async fn without_a_gate_or_a_record_there_is_nothing_to_report() {
         "{skipped:?}"
     );
 
-    let at = scene("gate-record-none", None, None);
-    let none = verdicts(&check(&at, true)).await;
+    let at = scene("gate-record-none", None);
+    let none = verdicts(&check(keeping(Vec::new()), &at, true)).await;
     assert_eq!(
         none.first().and_then(note),
         Some("nothing refused or removed since the last check")
@@ -133,10 +131,15 @@ async fn a_gate_that_cannot_be_asked_or_answers_no_record_is_unverified_never_a_
         }),
     ))
     .await;
-    let at = scene("gate-record-garbled", Some("not a record"), None);
-    let garbled = verdicts(&check(&at, false)).await;
+    let at = scene("gate-record-garbled", None);
+    let refused = verdicts(&check(
+        keeping(Vec::new()).refusing(&["record"]),
+        &at,
+        false,
+    ))
+    .await;
 
-    for found in [unaskable, garbled] {
+    for found in [unaskable, refused] {
         assert!(
             matches!(found.as_slice(), [Verdict::Unverified { .. }]),
             "{found:?}"
@@ -145,10 +148,10 @@ async fn a_gate_that_cannot_be_asked_or_answers_no_record_is_unverified_never_a_
 }
 
 #[tokio::test]
-async fn an_unreadable_record_is_unverified() {
-    let at = scene("gate-record-unreadable", Some("not a record"), None);
+async fn a_record_the_gate_will_not_answer_is_unverified() {
+    let at = scene("gate-record-unreadable", None);
 
-    let found = verdicts(&check(&at, true)).await;
+    let found = verdicts(&check(keeping(Vec::new()).refusing(&["record"]), &at, true)).await;
 
     assert!(
         matches!(found.as_slice(), [Verdict::Unverified { reason, .. }] if reason.starts_with("the request gate's record could not be read: ")),
@@ -158,9 +161,12 @@ async fn an_unreadable_record_is_unverified() {
 
 #[tokio::test]
 async fn refusals_warn_removals_are_told_and_each_is_reported_once() {
-    let written = record(&[REMOVAL, REFUSAL, REFUSAL], 1000).written();
-    let at = scene("gate-record-new", Some(&written), None);
-    let check = check(&at, true);
+    let at = scene("gate-record-new", None);
+    let check = check(
+        keeping(record(&[REMOVAL, REFUSAL, REFUSAL], 1000)),
+        &at,
+        true,
+    );
 
     let first = verdicts(&check).await;
 
@@ -197,10 +203,9 @@ async fn refusals_warn_removals_are_told_and_each_is_reported_once() {
 
 #[tokio::test]
 async fn one_refusal_is_one_call() {
-    let written = record(&[REFUSAL], 1000).written();
-    let at = scene("gate-record-one", Some(&written), None);
+    let at = scene("gate-record-one", None);
 
-    let found = verdicts(&check(&at, false)).await;
+    let found = verdicts(&check(keeping(record(&[REFUSAL], 1000)), &at, false)).await;
 
     let said = match found.first() {
         Some(Verdict::Warn(problem)) => problem.summary.clone(),
@@ -218,10 +223,9 @@ async fn entries_that_fell_off_unread_are_counted() {
     // Fifteen recorded and the first twelve fallen off: read from the start, twelve
     // were never seen.
     let fifteen: Vec<_> = std::iter::repeat_n(REMOVAL, 15).collect();
-    let written = record(&fifteen, 3).written();
-    let at = scene("gate-record-lost", Some(&written), Some("0\n"));
+    let at = scene("gate-record-lost", Some("0\n"));
 
-    let found = verdicts(&check(&at, true)).await;
+    let found = verdicts(&check(keeping(record(&fifteen, 3)), &at, true)).await;
 
     let lost = found
         .iter()

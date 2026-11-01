@@ -11,6 +11,7 @@
 use crate::error::{Problem, Remedy};
 
 use super::Refused;
+use crate::app::plugins::guarding::{rehearsed, taken};
 use crate::app::Ctx;
 use crate::error::codes::wire::{
     ALREADY_FILLS, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
@@ -121,16 +122,17 @@ async fn substituting(
 
     let standing = offer(&substitution);
     let unvetted = crate::overlay::unvetted(ctx);
-    let reading = |applied, unran| SubstitutionReport {
+    let reading = |applied, unran, guards| SubstitutionReport {
         rehearsed: false,
         substitution: substitution.clone(),
         applied,
         agreement: standing.clone(),
         unvetted: unvetted.clone(),
         unran,
+        guards,
     };
     let Some(answered) = filling.agreement.as_deref() else {
-        return Ok(reading(false, Vec::new()));
+        return Ok(reading(false, Vec::new(), rehearsed(ctx, &manifest).await));
     };
     let moved = crate::agreement::differs(answered, &standing, &OFFERED);
     if !moved.is_empty() {
@@ -148,7 +150,7 @@ async fn substituting(
         &crate::settings::Resolved::of(ctx, Some(&manifest), installed.installed()),
     )?;
     if ctx.dry_run {
-        return Ok(reading(false, Vec::new()));
+        return Ok(reading(false, Vec::new(), rehearsed(ctx, &manifest).await));
     }
 
     // The record of the change goes down before the change does, so a run stopped
@@ -205,7 +207,7 @@ async fn substituting(
         .map_err(crate::app::plugins::diagnosed)?;
 
     let unran = parts_ran(ctx, &stack, &substitution).await;
-    Ok(reading(true, unran))
+    Ok(reading(true, unran, taken(ctx, &manifest).await))
 }
 
 /// Each part `substitution` stops or starts, run in the project in `stack`, answering

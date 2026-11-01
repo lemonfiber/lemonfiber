@@ -390,6 +390,46 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
     );
 }
 
+/// What the services keep in their own configuration is measured on a line of its own,
+/// apart from the media, on a machine whose guards ask its curators, none of which can be
+/// asked what it is waiting for.
+#[tokio::test]
+async fn the_services_own_files_are_measured_on_a_line_of_their_own() {
+    let ctx = crate::test_support::guards::moved(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env_without_password("space-services")),
+                ..measuring()
+            })
+            .build(),
+    );
+    let kept = crate::app::targets::project_directory(&ctx.stack, None)
+        .map(|project| project.join(super::SERVICE_FILES).join("sonarr/sonarr.db"))
+        .unwrap_or_default();
+    let mut tree = a_tree();
+    tree.push(Occupant {
+        path: kept,
+        bytes: 500,
+        identity: Some(Identity { file: 43, links: 1 }),
+    });
+    let ctx = ctx
+        .with_filesystem(Arc::new(
+            SeedFs::keyed(None).with_facts(facts(900_000_000_000)),
+        ))
+        .with_occupancy(Walking::holding(tree));
+
+    let reckoned = space(&ctx, None).await;
+
+    assert!(
+        reckoned.is_ok_and(|reckoned| reckoned
+            .consumption
+            .iter()
+            .any(|line| line.category.heading() == "the services' own files")
+            && reckoned.interrupted.is_empty()),
+        "a line for the files the services keep, and no import stalled"
+    );
+}
+
 /// The offer read and then answered by name, as a surface that asks twice does.
 async fn answered(
     ctx: &crate::app::Ctx,

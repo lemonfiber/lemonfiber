@@ -87,7 +87,8 @@ pub(super) fn machine(name: &str, engine: Reporting) -> Machine {
     holding(name, engine, PLUGIN)
 }
 
-/// A machine with the plugin `plugin` describes installed, its project written.
+/// A machine with the plugin `plugin` describes installed, its project written, over a
+/// stack no guard moves in.
 #[track_caller]
 pub(super) fn holding(name: &str, engine: Reporting, plugin: &str) -> Machine {
     let env = env_without_password(&format!("changing-{name}"));
@@ -108,6 +109,7 @@ pub(super) fn holding(name: &str, engine: Reporting, plugin: &str) -> Machine {
     let ctx = a_context()
         .runner(runner.clone())
         .engine(Arc::new(engine))
+        .over(crate::test_support::unguarded_stack())
         .settings(crate::config::Settings {
             env_file: Some(env.clone()),
             stack_dir: Some(stack),

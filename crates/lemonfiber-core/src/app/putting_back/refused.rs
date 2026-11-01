@@ -42,6 +42,26 @@ pub(super) fn more_than_one(at: &str, operations: &[&str]) -> Problem {
     .in_state(State::Actionable)
 }
 
+/// A change answered with a refusal of its own, which says why and what to do instead.
+pub(super) fn of_its_own(
+    code: crate::error::Code,
+    at: &str,
+    target: &str,
+    refusal: &crate::rollback::Refusal,
+) -> Problem {
+    Problem::new(
+        code,
+        format!("The run stamped {at} cannot be put back"),
+        format!(
+            "One of its changes, against {target}, is never put back: {}. A run goes back \
+             whole or not at all, so nothing was put back.",
+            refusal.because
+        ),
+        Remedy::new(refusal.instead.as_deref().unwrap_or_default()),
+    )
+    .in_state(State::Actionable)
+}
+
 pub(super) fn cannot_succeed(at: &str, target: &str, why: &str) -> Problem {
     Problem::new(
         CANNOT_SUCCEED,

@@ -48,6 +48,37 @@ impl Adapted {
             .and_then(recorded)
     }
 
+    /// The port the adapter speaks its contracts on in its container, as the bundle declares
+    /// it.
+    #[must_use]
+    pub fn contract(self) -> u16 {
+        self.placed()
+            .and_then(|placed| placed.contract_port())
+            .unwrap_or(PORT)
+    }
+
+    /// The port the adapter listens on in its container, as the bundle declares it.
+    #[must_use]
+    pub fn listens(self) -> Option<u16> {
+        self.placed().and_then(|placed| placed.listens)
+    }
+
+    /// The digest the adapter's image is pinned by, as the bundle declares it.
+    #[must_use]
+    pub fn digest(self) -> Option<String> {
+        self.placed().map(|placed| placed.digest)
+    }
+
+    /// The adapter as the plugin's record places it.
+    fn placed(self) -> Option<lemonfiber_core::plugin::Placed> {
+        self.installed().and_then(|installed| {
+            installed
+                .services
+                .into_iter()
+                .find(|placed| placed.service == self.adapter)
+        })
+    }
+
     /// The engine's account of the adapter running healthy, published on its port.
     #[must_use]
     pub fn running(self) -> Reporting {
@@ -262,13 +293,13 @@ fn recorded_beside(ctx: &Ctx, installed: impl IntoIterator<Item = Installed>) {
 }
 
 /// The engine's account of every one of `adapted` running healthy, each published on its
-/// own port of the host's loopback, forwarded to [`PORT`].
+/// own port of the host's loopback, forwarded to the port it speaks its contracts on.
 #[must_use]
 pub fn running(adapted: &[Adapted]) -> Reporting {
     let adapters: Vec<&str> = adapted.iter().map(|one| one.adapter).collect();
     let forwarded: Vec<(&str, &str, u16, u16)> = adapted
         .iter()
-        .map(|one| (one.adapter, "127.0.0.1", one.port, PORT))
+        .map(|one| (one.adapter, "127.0.0.1", one.port, one.contract()))
         .collect();
     Reporting::holding(&adapters, Lifecycle::Running, Health::Healthy).forwarding(&forwarded)
 }

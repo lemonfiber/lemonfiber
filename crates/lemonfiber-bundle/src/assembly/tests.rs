@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use lemonfiber_manifest::Manifest;
 
-use super::assembled;
+use super::{asked, assembled};
 use crate::{Held, Pin, Stage};
 
 const BUNDLE: &str = r#"
@@ -308,4 +308,25 @@ fn an_assembled_part_keeps_every_secret_its_plugin_declares() {
         .services
         .iter()
         .all(|service| service.container().broken().is_empty()));
+}
+
+/// An ask of each filler is carried into the stack's wiring row as one, and an ask of one
+/// filler carries no `each`.
+#[test]
+fn an_ask_of_each_filler_is_carried_as_one() {
+    let each: toml::Value = toml::from_str("capability = \"library.curate\"\neach = true")
+        .unwrap_or(toml::Value::Boolean(false));
+    let one: toml::Value =
+        toml::from_str("capability = \"identity.source\"").unwrap_or(toml::Value::Boolean(false));
+
+    let carried = asked("gate", &each);
+    assert_eq!(
+        carried.as_ref().and_then(|row| row.get("each")),
+        Some(&toml::Value::Boolean(true))
+    );
+    assert_eq!(
+        carried.as_ref().and_then(|row| row.get("asks")),
+        Some(&toml::Value::String("library.curate".to_owned()))
+    );
+    assert!(asked("gate", &one).is_some_and(|row| row.get("each").is_none()));
 }

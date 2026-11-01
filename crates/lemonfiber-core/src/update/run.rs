@@ -17,7 +17,7 @@
 //! the teardown that first had to ask about them, the disk with the reckoning, the
 //! capture with the archive. Nothing here is a second implementation of any of them.
 
-mod moving;
+pub(crate) mod moving;
 mod staging;
 pub use moving::Moved;
 pub(crate) use staging::OPERATION;
@@ -110,6 +110,11 @@ pub struct Report {
     /// Each move in place this run took, or tried to take and could not, with why.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub moved: Vec<Moved>,
+    /// Each of lemonfiber's own guards this run moved onto its plugin, or would move once
+    /// confirmed, for good and with no yes of its own; one it could not move stays on
+    /// offer and says why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guards: Vec<Moved>,
 }
 
 /// What the release carrying this build changed, as every update report says it.
@@ -140,6 +145,7 @@ impl Report {
             unvetted: None,
             moves: Vec::new(),
             moved: Vec::new(),
+            guards: Vec::new(),
         }
     }
 }
@@ -174,6 +180,11 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
         return Err(Box::new(moved(answered, &offer)));
     }
 
+    let guards = if asked.confirm {
+        crate::app::plugins::guarding::taken(ctx, &manifest).await
+    } else {
+        crate::app::plugins::guarding::rehearsed(ctx, &manifest).await
+    };
     let report = if asked.confirm {
         Box::pin(staging::apply(ctx, &manifest, changes, asked.wait)).await?
     } else {
@@ -190,6 +201,7 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
         unvetted: crate::overlay::unvetted(ctx),
         moves: crate::app::plugins::moving_in::on_offer(ctx, &manifest),
         moved,
+        guards,
         ..report
     })
 }

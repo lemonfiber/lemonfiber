@@ -401,11 +401,7 @@ pub(super) async fn observe(
     manifest: Result<&Manifest, &String>,
 ) -> Result<(Vec<Service>, Vec<crate::docker::Undeclared>), String> {
     let manifest = manifest.map_err(Clone::clone)?;
-    let profiles: Vec<String> = manifest
-        .profiles
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect();
+    let profiles: Vec<String> = manifest.profile_ids();
     let containers = ctx
         .seams
         .engine

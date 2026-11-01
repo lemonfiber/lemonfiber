@@ -10,8 +10,6 @@
 //! network, and nothing depends on the core, so an image that depends on this crate
 //! carries no more of lemonfiber than the shapes it shares.
 
-pub mod decline;
-pub mod gate;
 pub mod pass;
 
 mod pins;

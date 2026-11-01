@@ -263,6 +263,7 @@ fn substituting(applied: bool, leaves: Vec<Unfilled>) -> SubstitutionReport {
         },
         applied,
         agreement: OFFER.to_owned(),
+        guards: Vec::new(),
     }
 }
 

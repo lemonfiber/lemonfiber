@@ -38,6 +38,7 @@ pub fn recorded(ctx: &Ctx) -> Result<Installs, Box<Problem>> {
         update: None,
         agreement: None,
         unvetted: None,
+        guards: Vec::new(),
     })
 }
 

@@ -11,6 +11,7 @@ license-file = "../../LICENSE"
 publish = false
 
 [dependencies]
+async-trait = { workspace = true }
 lemonfiber-adapters = { workspace = true }
 lemonfiber-bundle = { workspace = true }
 lemonfiber-bundled = { workspace = true }
@@ -21,6 +22,7 @@ lemonfiber-manifest = { workspace = true }
 lemonfiber-plugin = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 include_dir = { workspace = true }

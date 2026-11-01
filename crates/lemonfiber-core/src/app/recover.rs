@@ -284,6 +284,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         Action::Unreplaced { service } => Ok(Step::BeyondReach(format!(
             "the internal certificate of {service}"
         ))),
+        Action::Unmoved { service } => Ok(Step::BeyondReach(format!("{service} on its plugin"))),
         Action::Resettle {
             name,
             value,

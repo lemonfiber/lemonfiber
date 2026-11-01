@@ -3,10 +3,9 @@
 //! The gate holds the credentials the request service would otherwise hold: each
 //! fulfilling curator's key, the one lemonfiber minted for it, and a key minted for the
 //! gate alone in the media server, whichever service fills the identity source, and filed
-//! under its name. They are handed over through `request.gate`, which the stack's own gate
-//! is told in owner-only files in its configuration directory, never its environment, and
-//! again whenever what they should hold has moved — a curator key minted anew reaches the
-//! gate on the next pass.
+//! under its name. They are handed over through `request.gate`, never its environment,
+//! and again whenever what they should hold has moved — a curator key minted anew reaches
+//! the gate on the next pass.
 //!
 //! **A curator the request service fulfils through that the gate holds no route to is
 //! said**, on a line of its own beside the gate's: one whose credential the gate may not
@@ -16,7 +15,6 @@
 //! whose SHA-256 the gate does not answer is one nothing holds, and is revoked, as the
 //! decline service's are.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use super::minted;
@@ -38,19 +36,18 @@ pub(super) async fn seed_gate_routes(
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     server: Option<&MediaServer>,
-    project: Option<&Path>,
 ) -> Vec<Wiring> {
-    let routed = server.and_then(|server| server.gated().map(|gated| (server, gated)));
+    let routed = server.and_then(|server| server.gated().map(|pairing| (server, pairing)));
     match routed {
-        Some((server, (_, pairing))) if gating::may_hold(fillers, server.filler.holder()) => {
-            with_the_media_server(ctx, services, fillers, (server, pairing), project).await
+        Some((server, pairing)) if gating::may_hold(fillers, server.filler.holder()) => {
+            with_the_media_server(ctx, services, fillers, (server, pairing)).await
         }
         Some((server, _)) => {
-            let mut wirings = curators_alone(ctx, services, fillers, project).await;
+            let mut wirings = curators_alone(ctx, services, fillers).await;
             wirings.extend(withheld(ctx, server).await);
             wirings
         }
-        None => curators_alone(ctx, services, fillers, project).await,
+        None => curators_alone(ctx, services, fillers).await,
     }
 }
 
@@ -67,9 +64,7 @@ async fn withheld(ctx: &Ctx, server: &MediaServer) -> Option<Wiring> {
 async fn asked(
     ctx: &Ctx,
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
 ) -> Result<(Arc<dyn Gating>, Vec<Admitted>), State> {
-    let project = project.ok_or_else(no_project)?;
     if !gating::may_hold(fillers, crate::wiring::Holder::Stack) {
         return Err(State::Skipped {
             reason: "the service filling request.gate is not one the stack's credentials may \
@@ -77,7 +72,7 @@ async fn asked(
                 .to_owned(),
         });
     }
-    let gate = gating::asked(ctx, fillers, project)
+    let gate = gating::asked(ctx, fillers)
         .await
         .ok_or_else(|| State::Skipped {
             reason: "the request gate cannot be asked over its contract, so it is handed no \
@@ -97,12 +92,11 @@ async fn curators_alone(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
 ) -> Vec<Wiring> {
     if gating::service(services).is_none() {
         return Vec::new();
     }
-    let (gate, admitted) = match asked(ctx, fillers, project).await {
+    let (gate, admitted) = match asked(ctx, fillers).await {
         Ok(asked) => asked,
         Err(state) => return vec![settled(state)],
     };
@@ -131,7 +125,6 @@ async fn with_the_media_server(
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     (server, pairing): (&MediaServer, &Pairing),
-    project: Option<&Path>,
 ) -> Vec<Wiring> {
     let gating = gating::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
@@ -171,7 +164,7 @@ async fn with_the_media_server(
         .ok()
         .and_then(|declared| declared.ports.internal_tls)
     else {
-        let mut wirings = curators_alone(ctx, services, fillers, project).await;
+        let mut wirings = curators_alone(ctx, services, fillers).await;
         wirings.push(Wiring::settled(
             format!("{} routed through the request gate", server.name()),
             State::Unmatched {
@@ -194,7 +187,7 @@ async fn with_the_media_server(
         internal,
         pins,
     };
-    let (gate, admitted) = match asked(ctx, fillers, project).await {
+    let (gate, admitted) = match asked(ctx, fillers).await {
         Ok(asked) => asked,
         Err(state) => return vec![settled(state)],
     };
@@ -276,13 +269,6 @@ fn unadmitted(failure: &crate::ports::service::Failure) -> State {
     }
 }
 
-/// What is said where there is no stack directory to hand the gate its routes in.
-fn no_project() -> State {
-    State::Skipped {
-        reason: "there is no stack directory to hand the request gate its routes in".to_owned(),
-    }
-}
-
 /// Write the gate's routes again after the curator `curator_id` replaced its key, so its
 /// route presents the new one: what replacing that key owes the gate.
 ///
@@ -292,7 +278,6 @@ pub(crate) async fn reroute(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
     curator_id: &str,
 ) -> Option<State> {
     gating::service(services)?;
@@ -302,7 +287,7 @@ pub(crate) async fn reroute(
     routed.then_some(())?;
     // Boxed, because it is carried across the routes being written.
     let server = crate::app::targets::MediaServer::of(fillers).map(Box::new);
-    seed_gate_routes(ctx, services, fillers, server.as_deref(), project)
+    seed_gate_routes(ctx, services, fillers, server.as_deref())
         .await
         .into_iter()
         .next()
@@ -425,17 +410,26 @@ fn with(routes: &[Gated], media: Gated) -> Vec<Gated> {
 
 /// What a set of routes answers for, said by their names and never their credentials.
 fn named(routes: &[Gated]) -> String {
-    said(routes.iter().map(|route| route.path.as_str()))
+    said(
+        &routes
+            .iter()
+            .map(|route| route.path.as_str())
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// What the gate admits now, said the same way.
 fn listed(admitted: &[Admitted]) -> String {
-    said(admitted.iter().map(|route| route.path.as_str()))
+    said(
+        &admitted
+            .iter()
+            .map(|route| route.path.as_str())
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// Routes by their names.
-fn said<'a>(paths: impl Iterator<Item = &'a str>) -> String {
-    let names: Vec<&str> = paths.collect();
+fn said(names: &[&str]) -> String {
     if names.is_empty() {
         return "no routes".to_owned();
     }

@@ -29,6 +29,7 @@ pub(super) fn report(
         unvetted: change.as_ref().and(crate::overlay::unvetted(ctx)),
         change,
         rehearsed: ctx.dry_run,
+        guards: Vec::new(),
     }
 }
 

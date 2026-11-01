@@ -462,6 +462,24 @@
       ]
     },
     {
+      "description": "Leave one of lemonfiber's own guards on its plugin.\n\nWorked out so the record of the move has a reversal to name, and never carried out:\nthe release that moved the guard moves it for good.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "unmoved"
+        },
+        "service": {
+          "description": "The stack's own service the guard's plugin took the place of.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "service"
+      ]
+    },
+    {
       "description": "Start a service again, or stop it again.",
       "type": "object",
       "properties": {

@@ -70,3 +70,34 @@ fn a_move_taken_or_not_says_which_and_why() {
         "{said}"
     );
 }
+
+/// A guard moved says it moved for good, one still to move says which run moves it, and
+/// one refused says why and that it stays on offer.
+#[test]
+fn a_guard_moved_still_to_move_or_refused_says_which() {
+    let guard = |taken, why: Option<&str>| lemonfiber_core::update::run::Moved {
+        plugin: "decline".to_owned(),
+        service: "decline".to_owned(),
+        taken,
+        why: why.map(str::to_owned),
+    };
+    let said = super::guards(&[
+        guard(true, None),
+        guard(false, None),
+        guard(false, Some("a value it sends needs approving")),
+    ])
+    .text();
+    assert!(
+        said.contains("Moved for good: decline now runs as its plugin in the place of the stack's own decline. Neither an undo nor a removal puts it back."),
+        "{said}"
+    );
+    assert!(
+        said.contains("To move: decline moves onto its plugin decline with the next run that leaves the stack running, for good and with no yes of its own."),
+        "{said}"
+    );
+    assert!(
+        said.contains("Not moved: decline still runs as the stack's own service, because a value it sends needs approving. It stays on offer"),
+        "{said}"
+    );
+    assert!(super::guards(&[]).text().is_empty());
+}

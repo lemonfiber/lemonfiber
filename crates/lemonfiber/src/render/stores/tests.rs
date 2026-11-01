@@ -58,6 +58,7 @@ fn listing() -> SettingsReport {
         rehearsed: false,
         unvetted: None,
         waiting: Vec::new(),
+        guards: Vec::new(),
     }
 }
 

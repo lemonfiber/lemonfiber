@@ -34,11 +34,7 @@ pub(crate) async fn permitted(
     // Surveyed across every profile the stack declares. What is running is a question
     // about the machine rather than about the form being stopped, and the forms that
     // would be deprived are by definition ones the operator did not name.
-    let declared: Vec<String> = manifest
-        .profiles
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect();
+    let declared: Vec<String> = manifest.profile_ids();
     let containers = ctx
         .seams
         .engine

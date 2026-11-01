@@ -100,32 +100,26 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
         waiting,
     };
     let Some(answered) = asked.agreement else {
-        return Ok(super::listing::report(
-            ctx,
-            &manifest,
-            installed,
-            Some(change),
-        ));
+        return Ok(SettingsReport {
+            guards: crate::app::plugins::guarding::rehearsed(ctx, &manifest).await,
+            ..super::listing::report(ctx, &manifest, installed, Some(change))
+        });
     };
     let moved = crate::agreement::differs(answered, &standing, &OFFERED);
     if !moved.is_empty() {
         return Err(Box::new(offer_moved(&changing, &moved, &standing)));
     }
     if ctx.dry_run {
-        return Ok(super::listing::report(
-            ctx,
-            &manifest,
-            installed,
-            Some(change),
-        ));
+        return Ok(SettingsReport {
+            guards: crate::app::plugins::guarding::rehearsed(ctx, &manifest).await,
+            ..super::listing::report(ctx, &manifest, installed, Some(change))
+        });
     }
     written(ctx, &mut change, &changing, &overwrites).await?;
-    Ok(super::listing::report(
-        ctx,
-        &manifest,
-        installed,
-        Some(change),
-    ))
+    Ok(SettingsReport {
+        guards: crate::app::plugins::guarding::taken(ctx, &manifest).await,
+        ..super::listing::report(ctx, &manifest, installed, Some(change))
+    })
 }
 
 /// Write `change`: journalled, recorded, the entries it regenerates overwritten, and what

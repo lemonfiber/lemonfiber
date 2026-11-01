@@ -11,6 +11,13 @@
       "description": "Whether it was written, or only worked out.\n\nA run that only says what it would do writes nothing and reports the same\nanswer, so the two are told apart here rather than by the caller remembering\nwhich flags it passed.",
       "type": "boolean"
     },
+    "guards": {
+      "description": "Each of lemonfiber's own guards this act moved onto its plugin after its own\nchange, or on a reading would move, for good and with no yes of its own; one it\ncould not move stays on offer and says why.",
+      "type": "array",
+      "items": {
+        "$ref": "StackMoveTaken.json"
+      }
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
       "type": "boolean"

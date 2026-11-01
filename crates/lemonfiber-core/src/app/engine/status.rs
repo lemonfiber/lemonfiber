@@ -19,11 +19,7 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .map_err(|err| Box::new(err.problem()))?;
 
     let protocols = ctx.settings.protocols;
-    let whole: Vec<String> = manifest
-        .profiles
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect();
+    let whole: Vec<String> = manifest.profile_ids();
     let profiles: Vec<String> = if forms.is_empty() {
         whole.clone()
     } else {

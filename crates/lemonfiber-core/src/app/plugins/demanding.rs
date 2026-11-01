@@ -63,6 +63,7 @@ pub(super) async fn demand(
         agreement: Some(offer),
         rehearsed: ctx.dry_run,
         unvetted: None,
+        guards: Vec::new(),
     })
 }
 

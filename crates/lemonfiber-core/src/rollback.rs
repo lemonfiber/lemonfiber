@@ -40,6 +40,9 @@ pub struct Refusal {
     pub because: String,
     /// What to do instead, where there is something.
     pub instead: Option<String>,
+    /// The refusal of its own this change is answered with, where it has one; the
+    /// general refusal otherwise.
+    pub code: Option<crate::error::Code>,
 }
 
 /// What putting one change back would come to.
@@ -67,6 +70,7 @@ impl Standing {
             refusal: Some(Refusal {
                 because: because.to_owned(),
                 instead: instead.map(str::to_owned),
+                code: None,
             }),
         }
     }
@@ -78,6 +82,7 @@ impl Standing {
             refusal: Some(Refusal {
                 because: because.to_owned(),
                 instead: instead.map(str::to_owned),
+                code: None,
             }),
         }
     }
@@ -252,6 +257,7 @@ pub fn standing(
             ..
         } => bounded(path, owner, *written, reads),
         Kind::Certified { service, .. } => withdrawn_for_good(service),
+        Kind::MovedInPlace { service, release } => moved_for_good(service, release),
         Kind::Overlaid { path, .. } => the_operators(path),
         // A key is revoked because something should stop holding it, and making it good
         // again would hand back exactly what the revoke took away.
@@ -308,6 +314,24 @@ fn withdrawn_for_good(service: &str) -> Standing {
         ),
         Some("replace it again: lemonfiber credentials --rotate internal-certificate"),
     )
+}
+
+/// A guard moved onto its plugin: the release that moved it no longer configures the
+/// stack's own service, so putting the move back would leave the guard standing nowhere.
+fn moved_for_good(service: &str, release: &str) -> Standing {
+    Standing {
+        reversal: Reversal::None,
+        refusal: Some(Refusal {
+            because: format!(
+                "lemonfiber {release} moved {service} onto its plugin for good, and the stack's \
+                 own {service} is no longer configured"
+            ),
+            instead: Some(format!(
+                "leave {service} on its plugin, or choose another filler for its capability"
+            )),
+            code: Some(crate::error::codes::undo::MOVED_FOR_GOOD),
+        }),
+    }
 }
 
 fn resettled(

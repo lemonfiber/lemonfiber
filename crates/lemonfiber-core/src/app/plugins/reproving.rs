@@ -119,5 +119,6 @@ fn answering(held: &Register, proof: Reproof, offer: String) -> Installs {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     }
 }

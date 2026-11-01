@@ -63,8 +63,6 @@ pub(crate) struct Amid<'a> {
     pub(crate) services: &'a [Service],
     /// Who fills each ask, and where each is reached.
     pub(crate) fillers: &'a Fillers,
-    /// Where the stack is written.
-    pub(crate) project: Option<&'a Path>,
 }
 
 /// Replace the minted secret `secret` of `installed` with a fresh value, everywhere it is
@@ -223,9 +221,7 @@ async fn copies(ctx: &Ctx, of: &str, amid: &Amid<'_>) -> Vec<Propagation> {
             copies.push(copy(format!("{holder}, which {what}"), state));
         }
     }
-    if let Some(state) =
-        crate::seed::run::reroute(ctx, amid.services, amid.fillers, amid.project, of).await
-    {
+    if let Some(state) = crate::seed::run::reroute(ctx, amid.services, amid.fillers, of).await {
         copies.push(copy(
             format!("the request gate, which reaches {named} for the request service"),
             state,

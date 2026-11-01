@@ -53,7 +53,7 @@ pub(crate) fn machine(name: &str, http: Arc<Fake>, runner: Arc<Recording>, keyed
     let project = scratch.path().to_path_buf();
     std::mem::forget(scratch);
     let mut ctx = crate::test_support::contracted_context(&project, GUARD, keyed)
-        .over(crate::test_support::embedded())
+        .over(crate::test_support::unguarded_embedded())
         .runner(runner)
         .build()
         .with_http(http);
