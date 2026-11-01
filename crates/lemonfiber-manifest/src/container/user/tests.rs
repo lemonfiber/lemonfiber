@@ -7,12 +7,12 @@ use super::{IdVariables, UserMode};
 #[test]
 fn puid_env_is_the_pair_of_named_variables_and_is_written_back_by_its_name() {
     let named: Result<BTreeMap<String, UserMode>, _> = toml::from_str(
-        "a = { uid_env = \"PUID\", gid_env = \"PGID\" }\nb = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }",
+        "a = { uid_env = \"PUID\", gid_env = \"PGID\" }\nb = { uid_env = \"PLEX_UID\", gid_env = \"PLEX_GID\" }\nc = \"image\"\nd = \"uid\"",
     );
     let written = named.ok().and_then(|read| toml::to_string(&read).ok());
     assert_eq!(
         written.as_deref(),
-        Some("a = \"puid-env\"\n\n[b]\nuid_env = \"PLEX_UID\"\ngid_env = \"PLEX_GID\"\n")
+        Some("a = \"puid-env\"\nc = \"image\"\nd = \"uid\"\n\n[b]\nuid_env = \"PLEX_UID\"\ngid_env = \"PLEX_GID\"\n")
     );
 }
 
