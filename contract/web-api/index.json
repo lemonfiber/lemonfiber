@@ -155,5 +155,36 @@
     "word": "kinds/word.json"
   },
   "reads": "reads.json",
-  "refusals": "refusals.json"
+  "refusals": {
+    "ADMIT": "refusals/ADMIT.json",
+    "ASK": "refusals/ASK.json",
+    "BUNDLE": "refusals/BUNDLE.json",
+    "CRED": "refusals/CRED.json",
+    "DEVICE": "refusals/DEVICE.json",
+    "FORM": "refusals/FORM.json",
+    "GONE": "refusals/GONE.json",
+    "KEY": "refusals/KEY.json",
+    "LIFE": "refusals/LIFE.json",
+    "MIGRATE": "refusals/MIGRATE.json",
+    "PLAY": "refusals/PLAY.json",
+    "PLUGIN": "refusals/PLUGIN.json",
+    "QUOTA": "refusals/QUOTA.json",
+    "RATE": "refusals/RATE.json",
+    "READ": "refusals/READ.json",
+    "REHEARSE": "refusals/REHEARSE.json",
+    "REMOVE": "refusals/REMOVE.json",
+    "REPAIR": "refusals/REPAIR.json",
+    "RESTORE": "refusals/RESTORE.json",
+    "SERVE": "refusals/SERVE.json",
+    "SETTING": "refusals/SETTING.json",
+    "SETUP": "refusals/SETUP.json",
+    "SPACE": "refusals/SPACE.json",
+    "STACK": "refusals/STACK.json",
+    "STORAGE": "refusals/STORAGE.json",
+    "UNDO": "refusals/UNDO.json",
+    "UPDATE": "refusals/UPDATE.json",
+    "WIRE": "refusals/WIRE.json",
+    "WISH": "refusals/WISH.json",
+    "WORD": "refusals/WORD.json"
+  }
 }

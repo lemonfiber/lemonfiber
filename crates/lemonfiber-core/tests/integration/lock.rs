@@ -399,6 +399,7 @@ async fn a_switch_waits_for_the_stack_and_is_refused_when_the_wait_runs_out() {
     let refused = dispatch(
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &ctx(&files),
     )

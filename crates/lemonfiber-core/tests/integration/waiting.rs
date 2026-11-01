@@ -162,6 +162,7 @@ async fn a_rehearsal_waits_for_nothing_and_says_nothing_about_waiting() {
     let rehearsed = dispatch(
         Command::Up {
             forms: named(&["library"]),
+            offer: None,
         },
         &ctx,
     )

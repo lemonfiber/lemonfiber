@@ -1,0 +1,62 @@
+{
+  "STACK-1": {
+    "name": "STACK_UNREADABLE",
+    "status": 500,
+    "description": "Raised when a stack directory holds no readable manifest."
+  },
+  "STACK-10": {
+    "name": "STACK_UNASSEMBLED",
+    "status": 500,
+    "description": "Raised when a manifest's files are not laid out as the contract says."
+  },
+  "STACK-11": {
+    "name": "PROJECT_EDITED",
+    "status": 409,
+    "description": "Raised when a change would write over a generated project the operator has edited."
+  },
+  "STACK-13": {
+    "name": "RESET_MOVED",
+    "status": 400,
+    "description": "Raised where the offer a reset answers is not the one a reading of it makes now."
+  },
+  "STACK-15": {
+    "name": "SERVICE_UNFENCED",
+    "status": 409,
+    "description": "Raised where a start names a fenced service no fence can be written for."
+  },
+  "STACK-2": {
+    "name": "STACK_UNUSABLE",
+    "status": 500,
+    "description": "Raised when a manifest is readable and this build cannot use it."
+  },
+  "STACK-4": {
+    "name": "STACK_NOT_SET_UP",
+    "status": 500,
+    "description": "Raised when lemonfiber has nowhere to write the stack."
+  },
+  "STACK-5": {
+    "name": "STACK_NOT_WRITTEN",
+    "status": 500,
+    "description": "Raised when the stack could not be written to disk."
+  },
+  "STACK-6": {
+    "name": "STACK_INVALID",
+    "status": 500,
+    "description": "Raised when a manifest parses and breaks the contract."
+  },
+  "STACK-7": {
+    "name": "STACK_MALFORMED",
+    "status": 500,
+    "description": "Raised when a manifest is not TOML at all."
+  },
+  "STACK-8": {
+    "name": "STACK_UNRECOGNISED",
+    "status": 500,
+    "description": "Raised when a manifest declares names this build does not know."
+  },
+  "STACK-9": {
+    "name": "STACK_NEEDS_NEWER",
+    "status": 500,
+    "description": "Raised when a stack names a newer lemonfiber than the one running."
+  }
+}

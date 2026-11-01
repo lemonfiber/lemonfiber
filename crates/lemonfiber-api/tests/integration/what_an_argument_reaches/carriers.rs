@@ -56,9 +56,9 @@ pub(super) fn refusal(action: &str, given: Arguments) -> Option<Refused> {
 /// Whether the command has the forms it was given in it.
 fn carries_forms(command: &Command) -> bool {
     match command {
-        Command::Up { forms }
+        Command::Up { forms, .. }
         | Command::Down(Teardown { forms, .. })
-        | Command::Switch { forms }
+        | Command::Switch { forms, .. }
         | Command::Pull { forms }
         | Command::Watch { forms }
         | Command::Start { forms, .. }

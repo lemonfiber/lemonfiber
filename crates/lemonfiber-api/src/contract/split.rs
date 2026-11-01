@@ -36,8 +36,9 @@ const ACTIONS: &str = "actions";
 /// The reads the surface serves, inside the contract's directory.
 const READS: &str = "reads.json";
 
-/// The refusals a request may meet, inside the contract's directory.
-const REFUSALS: &str = "refusals.json";
+/// Where the refusals a request may meet are, a file per code family, inside the
+/// contract's directory.
+const REFUSALS: &str = "refusals";
 
 /// The one reference form `schemars` writes: a definition carried beside the schema.
 const LOCAL: &str = "#/$defs/";
@@ -57,8 +58,8 @@ struct Index {
     kinds: BTreeMap<String, String>,
     /// The file listing every read the surface serves.
     reads: &'static str,
-    /// The file listing every code a refusal may carry.
-    refusals: &'static str,
+    /// Each code family, to the file listing the codes of it a refusal may carry.
+    refusals: BTreeMap<String, String>,
 }
 
 impl Contract {
@@ -112,7 +113,12 @@ impl Contract {
         }
         put(&mut files, KEY_CALLABLE, &self.key_callable);
         put(&mut files, READS, &self.reads);
-        put(&mut files, REFUSALS, &self.refusals);
+        let mut refusals = BTreeMap::new();
+        for (family, listed) in by_family(&self.refusals) {
+            let path = format!("{REFUSALS}/{family}.json");
+            put(&mut files, &path, &listed);
+            refusals.insert(family.to_owned(), path);
+        }
         let index = Index {
             api_version: self.api_version,
             actions,
@@ -120,7 +126,7 @@ impl Contract {
             key_callable: KEY_CALLABLE,
             kinds,
             reads: READS,
-            refusals: REFUSALS,
+            refusals,
         };
         put(&mut files, INDEX, &index);
 
@@ -133,6 +139,18 @@ impl Contract {
 }
 
 /// One file into the set.
+/// `refusals` by the code family each belongs to, the part of its code before the dash.
+fn by_family<T>(refusals: &BTreeMap<String, T>) -> BTreeMap<&str, BTreeMap<&str, &T>> {
+    let mut families: BTreeMap<&str, BTreeMap<&str, &T>> = BTreeMap::new();
+    for (code, listed) in refusals {
+        let family = code
+            .split_once('-')
+            .map_or(code.as_str(), |(family, _)| family);
+        families.entry(family).or_default().insert(code, listed);
+    }
+    families
+}
+
 /// A route as the name of the file its body is described in: the path past `/api/`,
 /// its segments joined by a dash.
 fn slug(route: &str) -> String {

@@ -425,12 +425,116 @@ async fn a_stack_that_came_back_is_not_started_twice_and_leaves_nothing_to_repor
 async fn a_confirmation_that_could_not_run_files_nothing_against_the_boot() {
     let ctx = a_context().over(nowhere()).build();
 
-    confirmed(&ctx).await;
+    confirmed(&ctx, &super::nothing_started("")).await;
 
     assert_eq!(
         standing(&ctx),
         None,
         "a check that could not run has established nothing to report"
+    );
+}
+
+/// Settings as [`settings_at`] gives them, with a stack directory beside the records, so
+/// lemonfiber keeps files of its own here and a start can offer to install a part this
+/// machine has never run.
+fn settings_with_a_stack(name: &str) -> Settings {
+    let settings = settings_at(name);
+    Settings {
+        stack_dir: Some(scratch(name).kept().join("stack")),
+        ..settings
+    }
+}
+
+/// What a boot's report says waits for its install.
+fn waiting(outcome: &Result<LifecycleReport, Box<Problem>>) -> Vec<String> {
+    outcome
+        .iter()
+        .flat_map(|report| report.installing.iter().map(|one| one.plugin.clone()))
+        .collect()
+}
+
+/// A boot where every service the forms hold waits for its install starts nothing, and
+/// says for the next interaction which parts wait and that `up` offers them.
+#[tokio::test]
+async fn a_boot_whose_every_service_waits_for_its_install_starts_nothing() {
+    let ctx = ctx_answering(
+        settings_with_a_stack("all-waiting"),
+        plugged_in(1_000),
+        awake(),
+        spoke(""),
+    );
+    asked_for_the_library(&ctx);
+
+    let outcome = run(&ctx).await;
+
+    assert!(
+        outcome
+            .as_ref()
+            .is_ok_and(|report| report.command.is_empty() && report.offer.is_some()),
+        "{outcome:?}"
+    );
+    let waits = waiting(&outcome);
+    assert!(
+        LIBRARY
+            .iter()
+            .all(|service| waits.iter().any(|one| one == service)),
+        "{waits:?}"
+    );
+    let said = held(&outcome);
+    assert!(
+        said.as_deref()
+            .is_some_and(|said| said.ends_with("waits for its install from this build")),
+        "{said:?}"
+    );
+    let filed = standing(&ctx);
+    assert!(
+        filed
+            .as_deref()
+            .is_some_and(|said| said.contains("jellyfin")
+                && said.ends_with("lemonfiber up offers the install")),
+        "{filed:?}"
+    );
+}
+
+/// A boot where one part waits for its install starts everything else, leaves that part
+/// out of the start, and says for the next interaction that it waits and how to answer it.
+#[tokio::test]
+async fn a_boot_starts_the_rest_and_says_which_part_waits_for_its_install() {
+    let ran: Vec<&str> = LIBRARY
+        .into_iter()
+        .filter(|service| *service != "jellyfin")
+        .collect();
+    let ctx = ctx_answering(
+        settings_with_a_stack("one-waiting"),
+        plugged_in(1_000),
+        Arc::new(Reporting::holding(
+            &ran,
+            Lifecycle::Running,
+            Health::Healthy,
+        )),
+        spoke(""),
+    );
+    asked_for_the_library(&ctx);
+
+    let outcome = run(&ctx).await;
+
+    assert_eq!(waiting(&outcome), ["jellyfin"], "{outcome:?}");
+    let command = outcome
+        .as_ref()
+        .map(|report| report.command.clone())
+        .unwrap_or_default();
+    assert!(
+        command.iter().any(|word| word == "navidrome")
+            && !command.iter().any(|word| word == "jellyfin"),
+        "{command:?}"
+    );
+    assert!(outcome.as_ref().is_ok_and(|report| report.offer.is_some()));
+    let filed = standing(&ctx);
+    assert!(
+        filed
+            .as_deref()
+            .is_some_and(|said| said.starts_with("jellyfin waits for its install")),
+        "{filed:?}"
     );
 }
 

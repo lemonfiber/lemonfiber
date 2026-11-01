@@ -1,0 +1,67 @@
+{
+  "ASK-1": {
+    "name": "NO_SUCH_ACTION",
+    "status": 404,
+    "description": "Raised where no action goes by the name that was asked for."
+  },
+  "ASK-10": {
+    "name": "WRONG_METHOD",
+    "status": 405,
+    "description": "Raised where an endpoint was asked with a method it does not answer."
+  },
+  "ASK-11": {
+    "name": "NOT_A_KEY_REQUEST",
+    "status": 400,
+    "description": "Raised where the body of a mint is not a key's name, scope, purpose and the password, or the body of a collection is not a claim alone."
+  },
+  "ASK-12": {
+    "name": "NOT_AN_IDEMPOTENCY_KEY",
+    "status": 400,
+    "description": "Raised where an action's `Idempotency-Key` is not one to 255 visible characters, or is given more than once."
+  },
+  "ASK-13": {
+    "name": "IDEMPOTENCY_KEY_REUSED",
+    "status": 400,
+    "description": "Raised where an `Idempotency-Key` already sent with one action and its arguments is sent with another."
+  },
+  "ASK-2": {
+    "name": "MISSING_ARGUMENT",
+    "status": 400,
+    "description": "Raised where an action was not given an argument it needs."
+  },
+  "ASK-3": {
+    "name": "UNRECOGNISED_ARGUMENT",
+    "status": 400,
+    "description": "Raised where an argument was given a value that names nothing."
+  },
+  "ASK-4": {
+    "name": "UNWANTED_ARGUMENT",
+    "status": 400,
+    "description": "Raised where an action was given an argument its command has nowhere to put."
+  },
+  "ASK-5": {
+    "name": "ARGUMENTS_TOGETHER",
+    "status": 400,
+    "description": "Raised where two arguments that each name a different request arrived together."
+  },
+  "ASK-6": {
+    "name": "NOT_ARGUMENTS",
+    "status": 400,
+    "description": "Raised where the body of an action is not arguments it can read."
+  },
+  "ASK-7": {
+    "name": "NO_SUCH_JOB",
+    "status": 404,
+    "description": "Raised where a job was asked about that this run did not start."
+  },
+  "ASK-8": {
+    "name": "NOT_AN_ANSWER",
+    "status": 400,
+    "description": "Raised where the body of a setup step is not an answer it can read."
+  },
+  "ASK-9": {
+    "name": "NO_ENDPOINT",
+    "status": 404,
+    "description": "Raised where a path under the endpoints is one no endpoint answers."
+  }
+}

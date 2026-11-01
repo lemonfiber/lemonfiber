@@ -150,7 +150,13 @@ fn marking_the_whole_stack_takes_the_marks_off_the_forms() {
 
     assert!(listed.contains("[x] everything"), "{listed}");
     assert!(listed.contains("[ ] Full stack"), "{listed}");
-    assert_eq!(carried, Wanted::Carry(Command::Up { forms: Vec::new() }));
+    assert_eq!(
+        carried,
+        Wanted::Carry(Command::Up {
+            forms: Vec::new(),
+            offer: None
+        })
+    );
 }
 
 /// A guard is chosen off the same list by the same movement, so it names several

@@ -1,0 +1,7 @@
+{
+  "CRED-4": {
+    "name": "REPLACEMENT_MOVED",
+    "status": 400,
+    "description": "Raised where a replacement of the media server's internal certificate answers an offer that is not the one a fresh reading builds."
+  }
+}

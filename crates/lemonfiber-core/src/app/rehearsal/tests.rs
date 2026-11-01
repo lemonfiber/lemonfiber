@@ -317,7 +317,10 @@ fn reports() -> Vec<Command> {
 /// and the write was never reached.
 fn always_reported() -> Vec<Command> {
     vec![
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         Command::Start {
             forms: Vec::new(),
             services: Vec::new(),
@@ -332,6 +335,7 @@ fn always_reported() -> Vec<Command> {
         },
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         Command::Restart(Restarting {
             forms: Vec::new(),

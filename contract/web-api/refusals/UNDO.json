@@ -1,0 +1,7 @@
+{
+  "UNDO-5": {
+    "name": "MOVED_FOR_GOOD",
+    "status": 409,
+    "description": "Raised when a run moved one of lemonfiber's own guards onto its plugin, which no undo or removal puts back."
+  }
+}

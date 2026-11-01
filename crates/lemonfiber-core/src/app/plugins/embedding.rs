@@ -13,6 +13,28 @@ use super::{fetching, Consent, Errand, Installs, Register};
 use crate::app::Ctx;
 use crate::error::{Diagnose as _, Problem};
 
+/// Install the plugin `plugin` the bundle installs from the tree this build carries,
+/// answering `consent`, with no guard moved beside it: without its offer, the reading
+/// that names it.
+///
+/// # Errors
+///
+/// Every refusal an install makes.
+pub(crate) async fn from_this_build(
+    ctx: &Ctx,
+    plugin: &str,
+    consent: Consent,
+) -> Result<Installs, Box<Problem>> {
+    Box::pin(super::unguarded(
+        ctx,
+        &super::Asked::Install {
+            source: crate::plugin::Source::Name(plugin.to_owned()),
+            consent,
+        },
+    ))
+    .await
+}
+
 /// The plugin of this id the bundle installs, where it pins one.
 pub(super) fn pinned(id: &str) -> Option<&'static Pinned> {
     PINNED

@@ -30,6 +30,7 @@ fn linked(name: &str, up: &[&str], service: &str) -> (Ctx, Arc<Recording>) {
     ctx.settings.stack_dir = Some(project.clone());
     ctx.settings.env_file = Some(env);
     lemonfiber_fixtures::scratch::linked_away(&project, service);
+    crate::test_support::every_part_has_run(&ctx);
     (ctx, runner)
 }
 
@@ -46,7 +47,14 @@ fn refused(outcome: Result<Outcome, Box<super::super::Problem>>) -> Option<crate
 #[tokio::test]
 async fn a_start_over_a_linked_directory_starts_nothing() {
     let (ctx, runner) = linked("linking-up", &LIBRARY, "navidrome");
-    let outcome = dispatch(Command::Up { forms: library() }, &ctx).await;
+    let outcome = dispatch(
+        Command::Up {
+            forms: library(),
+            offer: None,
+        },
+        &ctx,
+    )
+    .await;
     assert_eq!(refused(outcome), Some(MOUNT_LINKED));
     assert!(!runner.ran("up"), "{:?}", runner.seen());
 }
@@ -66,7 +74,7 @@ async fn a_restart_over_a_linked_directory_restarts_nothing() {
 #[tokio::test]
 async fn a_streamed_start_over_a_linked_directory_opens_no_stream() {
     let (ctx, runner) = linked("linking-stream", &LIBRARY, "navidrome");
-    let opened = crate::app::start_progress(&ctx, &library(), &[]).await;
+    let opened = crate::app::start_progress(&ctx, &library(), &[], None).await;
     assert_eq!(opened.err().map(|problem| problem.code), Some(MOUNT_LINKED));
     assert!(!runner.ran("up"), "{:?}", runner.seen());
 }
@@ -74,7 +82,14 @@ async fn a_streamed_start_over_a_linked_directory_opens_no_stream() {
 #[tokio::test]
 async fn a_switch_over_a_linked_directory_stops_and_starts_nothing() {
     let (ctx, runner) = linked("linking-switch", &["jellyfin", "qbittorrent"], "navidrome");
-    let outcome = dispatch(Command::Switch { forms: library() }, &ctx).await;
+    let outcome = dispatch(
+        Command::Switch {
+            forms: library(),
+            offer: None,
+        },
+        &ctx,
+    )
+    .await;
     assert_eq!(refused(outcome), Some(MOUNT_LINKED));
     assert!(
         !runner.ran("stop") && !runner.ran("up"),

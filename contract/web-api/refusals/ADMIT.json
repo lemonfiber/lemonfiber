@@ -1,0 +1,57 @@
+{
+  "ADMIT-10": {
+    "name": "NOT_A_PASSWORD",
+    "status": 400,
+    "description": "Raised when what was offered at the door is not a password."
+  },
+  "ADMIT-11": {
+    "name": "KEY_IN_THE_CLEAR",
+    "status": 403,
+    "description": "Raised when a key arrived from another machine over a connection its pin does not verify."
+  },
+  "ADMIT-12": {
+    "name": "NOT_FOR_A_KEY",
+    "status": 403,
+    "description": "Raised when a key asked for something its scope does not reach."
+  },
+  "ADMIT-13": {
+    "name": "NOT_OPEN",
+    "status": 401,
+    "description": "Raised when a claim names an invitation that is not open."
+  },
+  "ADMIT-14": {
+    "name": "SHORT_CHOICE",
+    "status": 400,
+    "description": "Raised when the password chosen at a claim is shorter than the least this takes."
+  },
+  "ADMIT-4": {
+    "name": "NOT_ADMITTED",
+    "status": 403,
+    "description": "Raised when a request carried no token, session or key this run admits."
+  },
+  "ADMIT-5": {
+    "name": "ELSEWHERE",
+    "status": 403,
+    "description": "Raised when a request said it came from somewhere this server is not."
+  },
+  "ADMIT-6": {
+    "name": "NOT_YOURS",
+    "status": 403,
+    "description": "Raised when an account asked for something that is not its to ask for."
+  },
+  "ADMIT-7": {
+    "name": "UNCONFIRMED",
+    "status": 403,
+    "description": "Raised when the media server could not say whether an account is still one."
+  },
+  "ADMIT-8": {
+    "name": "NOT_THE_PASSWORD",
+    "status": 401,
+    "description": "Raised when the password offered at the door was wrong, or none is set."
+  },
+  "ADMIT-9": {
+    "name": "TOO_MANY_ATTEMPTS",
+    "status": 429,
+    "description": "Raised when the door has been given too many wrong passwords lately."
+  }
+}

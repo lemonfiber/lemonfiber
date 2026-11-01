@@ -29,6 +29,7 @@ async fn a_switch_onto_a_cold_stack_starts_the_closure_and_stops_nothing() {
         dispatch(
             Command::Switch {
                 forms: vec!["tv".to_owned()],
+                offer: None,
             },
             &ctx,
         )
@@ -58,6 +59,7 @@ async fn a_switch_stops_what_left_the_closure_and_keeps_what_stayed() {
         dispatch(
             Command::Switch {
                 forms: vec!["library".to_owned()],
+                offer: None,
             },
             &ctx,
         )
@@ -124,6 +126,7 @@ async fn a_switch_that_succeeds_stops_starts_and_then_waits_for_health() {
         dispatch(
             Command::Switch {
                 forms: vec!["library".to_owned()],
+                offer: None,
             },
             &ctx,
         )
@@ -181,6 +184,7 @@ async fn a_switch_that_cannot_run_the_stop_says_so() {
     let refusal = dispatch(
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         // Something is up and outside `library`, so the stop is the first thing run.
         &without_compose(&["qbittorrent"]),
@@ -197,6 +201,7 @@ async fn a_switch_that_cannot_run_the_start_says_so() {
     let refusal = dispatch(
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         // Nothing is up, so there is nothing to stop and the start is run first.
         &without_compose(&[]),
@@ -232,6 +237,7 @@ async fn a_switch_whose_start_fails_reports_it_without_waiting() {
         dispatch(
             Command::Switch {
                 forms: vec!["library".to_owned()],
+                offer: None,
             },
             &ctx,
         )
@@ -269,6 +275,7 @@ async fn a_switch_whose_stop_fails_does_not_go_on_to_start_anything() {
         dispatch(
             Command::Switch {
                 forms: vec!["library".to_owned()],
+                offer: None,
             },
             &ctx,
         )
@@ -298,6 +305,7 @@ async fn a_switch_that_cannot_reach_the_engine_refuses_rather_than_guessing() {
     let refusal = dispatch(
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &rehearsing(crate::config::Protocols::both()),
     )
@@ -320,6 +328,7 @@ async fn a_switch_publishes_what_it_moved_under_the_names_a_script_reads() {
         dispatch(
             Command::Switch {
                 forms: vec!["library".to_owned()],
+                offer: None,
             },
             &ctx,
         )

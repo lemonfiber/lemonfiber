@@ -1,7 +1,7 @@
 use lemonfiber_bundled::{Stage, PINNED};
 use lemonfiber_manifest::Service;
 
-use super::{offered, on_offer, MoveOffered, Offering};
+use super::{offered, on_offer, MoveOffered, Offering, Ran};
 use crate::config::paths::PLUGINS;
 use crate::doctor::moving::Offers;
 use crate::test_support::an_installed;
@@ -23,6 +23,11 @@ fn installs() -> Vec<&'static str> {
         .collect()
 }
 
+/// A machine where every part the bundle installs has run.
+fn all_ran() -> Ran {
+    Ran::of(None, installs().into_iter().map(str::to_owned).collect())
+}
+
 /// Every part the bundle installs that the carried stack runs as its own service is a move
 /// on offer, under the service of its id.
 #[test]
@@ -33,7 +38,7 @@ fn a_part_the_bundle_installs_that_the_stack_runs_itself_is_offered_a_move() {
         .filter(|plugin| stack.iter().any(|service| service.id == *plugin))
         .collect::<Vec<_>>()
         .into_iter()
-        .map(|plugin| (plugin, offered(PINNED, &stack, &[])))
+        .map(|plugin| (plugin, offered(PINNED, &stack, &[], &all_ran())))
         .filter_map(|(plugin, all)| all.into_iter().find(|one| one.plugin == plugin))
         .collect();
 
@@ -41,7 +46,7 @@ fn a_part_the_bundle_installs_that_the_stack_runs_itself_is_offered_a_move() {
         !expected.is_empty(),
         "the carried stack runs no part the bundle installs"
     );
-    assert_eq!(offered(PINNED, &stack, &[]), expected);
+    assert_eq!(offered(PINNED, &stack, &[], &all_ran()), expected);
     assert!(expected.iter().all(|one| one.service == one.plugin));
 }
 
@@ -52,7 +57,7 @@ fn a_part_the_bundle_installs_that_the_stack_runs_itself_is_offered_a_move() {
 fn a_kept_part_configured_by_its_adapter_is_offered_naming_that_adapter() {
     let stack = carried();
     let configured = |plugin: &str| {
-        offered(PINNED, &stack, &[])
+        offered(PINNED, &stack, &[], &all_ran())
             .into_iter()
             .find(|one| one.plugin == plugin)
             .map(|one| one.configured_by)
@@ -76,7 +81,7 @@ fn a_part_whose_plugin_is_installed_is_offered_nothing() {
         .map(|plugin| an_installed(plugin, Vec::new()))
         .collect();
 
-    assert_eq!(offered(PINNED, &carried(), &held), Vec::new());
+    assert_eq!(offered(PINNED, &carried(), &held, &all_ran()), Vec::new());
 }
 
 /// A stack that does not run a part's service has nothing to move.
@@ -87,7 +92,7 @@ fn a_stack_without_the_parts_service_is_offered_nothing() {
         .filter(|service| !installs().contains(&service.id.as_str()))
         .collect();
 
-    assert_eq!(offered(PINNED, &without, &[]), Vec::new());
+    assert_eq!(offered(PINNED, &without, &[], &all_ran()), Vec::new());
 }
 
 /// A part the bundle assembles is the stack's own service and never a move.
@@ -99,7 +104,7 @@ fn a_part_the_bundle_assembles_is_never_offered_a_move() {
         .map(|one| one.first_party.plugin)
         .collect();
 
-    assert!(offered(PINNED, &carried(), &[])
+    assert!(offered(PINNED, &carried(), &[], &all_ran())
         .iter()
         .all(|one| !assembled.contains(&one.plugin.as_str())));
 }
@@ -122,11 +127,35 @@ async fn the_offer_is_read_from_the_machines_record_each_time_it_is_asked() {
 
     assert_eq!(
         offering.moves().await,
-        Ok(offered(PINNED, &manifest.services, &[]))
+        Ok(Vec::new()),
+        "nothing has run here"
     );
 
     let _ = std::fs::create_dir_all(env.with_file_name(PLUGINS));
     assert_eq!(offering.moves().await, Err(()));
-    assert_eq!(on_offer(&ctx, &manifest), Vec::new());
+    assert_eq!(on_offer(&ctx, &manifest).await, Vec::new());
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
+/// A part whose stack service has never run here is no move: neither its configuration
+/// directory holds anything nor does the engine hold a container for it.
+#[test]
+fn a_part_never_run_here_is_offered_no_move() {
+    let stack = lemonfiber_fixtures::scratch::Scratch::unmade("moving-in-ran");
+    let config = crate::plugin::configuration(&stack, "jellyfin");
+    assert!(std::fs::create_dir_all(&config).is_ok());
+    let ran = Ran::of(Some(stack.to_path_buf()), vec!["sonarr".to_owned()]);
+    let moved = |ran: &Ran| -> Vec<String> {
+        offered(PINNED, &carried(), &[], ran)
+            .into_iter()
+            .map(|one| one.plugin)
+            .collect()
+    };
+
+    assert_eq!(moved(&ran), ["sonarr"], "an empty directory is no run");
+    assert!(std::fs::write(config.join("system.xml"), "<x/>").is_ok());
+    let mut both = moved(&ran);
+    both.sort();
+    assert_eq!(both, ["jellyfin", "sonarr"]);
+    assert!(moved(&Ran::default()).is_empty());
 }

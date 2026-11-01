@@ -493,7 +493,10 @@ fn a_guard_is_the_one_command_held_only_while_somebody_asks() {
         Lease::WhileAsked
     );
     for command in [
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         Command::Pull {
             forms: vec!["library".to_owned()],
         },

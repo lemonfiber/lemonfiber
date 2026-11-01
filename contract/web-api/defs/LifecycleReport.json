@@ -53,6 +53,13 @@
         "null"
       ]
     },
+    "installing": {
+      "description": "Each part this build carries that the forms hold and this machine has never run,\noffered as an install from the build, offline, before anything of the forms is\nwritten or started; answered by [`Self::offer`].",
+      "type": "array",
+      "items": {
+        "$ref": "UpInstallOffered.json"
+      }
+    },
     "moves": {
       "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice: a move in place on offer, named by every start and taken by none.",
       "type": "array",
