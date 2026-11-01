@@ -4,7 +4,7 @@
 //! A pure function of what it is handed: no manifest names a network, a subnet or an
 //! address, so nothing here is read from one.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::Ipv4Addr;
 
 use lemonfiber_contract::capabilities::media::serve;
@@ -200,9 +200,21 @@ pub fn derived(
         }
     }
     let guard = guard.map(&host);
+    let settled: BTreeSet<(String, &str, String)> = asks
+        .iter()
+        .map(|ask| (host(ask.asker), ask.capability, host(ask.reached)))
+        .collect();
     for ask in asks {
         let (asker, reached) = (host(ask.asker), host(ask.reached));
         if asker == reached {
+            continue;
+        }
+        if let Some(upstream) = fronted_beside(members, ask, &settled, &host) {
+            join(
+                &named(&["ask", &asker, ask.capability, &upstream]),
+                &reached,
+                None,
+            );
             continue;
         }
         let name = named(&["ask", &asker, ask.capability, &reached]);
@@ -245,6 +257,25 @@ pub fn derived(
     }
     subnets::assigned(&mut networks);
     Topology { networks, placed }
+}
+
+/// The upstream of the adapter `ask` reaches, where the same asker's ask of the same
+/// capability reaches that upstream too: the one network both are joined on, so an ask
+/// holding a fixed subnet holds it once.
+fn fronted_beside(
+    members: &[Member<'_>],
+    ask: &Settled<'_>,
+    settled: &BTreeSet<(String, &str, String)>,
+    host: &dyn Fn(&str) -> String,
+) -> Option<String> {
+    let upstream = members
+        .iter()
+        .find(|member| member.id == ask.reached)
+        .and_then(|member| member.fronts)
+        .map(host)?;
+    settled
+        .contains(&(host(ask.asker), ask.capability, upstream.clone()))
+        .then_some(upstream)
 }
 
 /// The fixed subnet and addresses one ask's network carries.
