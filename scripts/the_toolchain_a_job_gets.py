@@ -154,7 +154,7 @@ CLAIMS = {
 # Each claim, and the smallest edit to the tree that takes it away.
 BREAKS = {
     "selected": lambda texts: {
-        file: text.replace(f"      {OVERRIDE}: nightly\n", "")
+        file: re.sub(rf"\n      {OVERRIDE}: nightly[^\n]*", "", text)
         for file, text in texts.items()
     },
     # The floor, put in front of the tree it is a floor under: with no job naming

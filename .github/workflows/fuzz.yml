@@ -113,7 +113,7 @@ jobs:
     # and the sanitiser flags are refused by a compiler that never had to accept
     # them. Quiet, because a job running the wrong compiler still reports normally.
     env:
-      RUSTUP_TOOLCHAIN: nightly
+      RUSTUP_TOOLCHAIN: nightly-2026-10-29
       SECONDS_TO_RUN: "60"
       # Every target `fuzz/Cargo.toml` declares. A step below refuses a list that is
       # not the one `cargo fuzz list` reads from there, so a target added to the
@@ -137,9 +137,9 @@ jobs:
       # cargo-fuzz builds with a sanitizer, which needs the nightly compiler.
       # The crate itself is still built and shipped on stable; nothing here
       # changes what the product is compiled with.
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # nightly
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # nightly-2026-10-29
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-10-29
       # Saved by a push to main, never by a pull request. A cache saved on a pull
       # request's ref is readable by that pull request alone, so it would spend the
       # repository's cache allowance on a build no other run restores, and evict
@@ -441,7 +441,7 @@ jobs:
     # Named here as well as installed, for the reason given on the smoke job:
     # `rust-toolchain.toml` would otherwise hand every step the pinned compiler.
     env:
-      RUSTUP_TOOLCHAIN: nightly
+      RUSTUP_TOOLCHAIN: nightly-2026-10-29
     strategy:
       fail-fast: false
       matrix:
@@ -460,9 +460,9 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # nightly
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # nightly-2026-10-29
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-10-29
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: fuzz
