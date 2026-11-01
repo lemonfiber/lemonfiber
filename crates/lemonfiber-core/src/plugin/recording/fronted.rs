@@ -356,9 +356,9 @@ impl Asking<'_> {
         heard: &BTreeMap<String, Response>,
     ) -> Result<Case, String> {
         let url = format!("{}{}", reached.base, case.operation.path());
-        let unoffered = filling.unoffered(&case.asks, &self.adapter.service.speaks);
-        let response = match (unoffered, heard.get(&url).filter(|_| case.keyed)) {
-            (Some(why), _) => filling::unsupported(why),
+        let unasked = filling.unasked(&case.asks, &self.adapter.service.speaks);
+        let response = match (unasked, heard.get(&url).filter(|_| case.keyed)) {
+            (Some(answered), _) => answered,
             (None, Some(first)) => first.clone(),
             (None, None) => self.posted(reached, filling, case, url).await?,
         };
