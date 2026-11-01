@@ -34,6 +34,7 @@ fn report(changes: Vec<Change>, applied: Vec<Applied>, confirmed: bool) -> Repor
         unvetted: None,
         moved: Vec::new(),
         moves: Vec::new(),
+        guards: Vec::new(),
     }
 }
 

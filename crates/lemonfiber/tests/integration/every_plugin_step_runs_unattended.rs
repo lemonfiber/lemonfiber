@@ -221,8 +221,9 @@ fn plain() -> String {
         .replace("provides    = [\"media.serve\"]\n", "")
 }
 
-/// A machine with the stack this binary carries and a container engine that agrees to
-/// everything, so the verbs that act can be seen acting from start to finish.
+/// A machine with the stack this binary carries, its guards already moved onto their
+/// plugins, and a container engine that agrees to everything, so the verbs that act can
+/// be seen acting from start to finish.
 ///
 /// The engine is a script rather than a real one, and that is enough for the question
 /// here — whether each verb reaches its end with nobody present and says how it went —
@@ -241,6 +242,15 @@ fn engine_agreeing(named: &str) -> PathBuf {
         root.join("bin/docker"),
         std::fs::Permissions::from_mode(0o755),
     );
+    let mut register = lemonfiber_core::plugin::Register::empty();
+    for guard in lemonfiber_testing::guards::both_installed() {
+        let _ = register.record(guard);
+    }
+    let kept =
+        lemonfiber_core::config::paths::Paths::rooted(&root.join("config"), &root.join("data"))
+            .plugins();
+    let _ = std::fs::create_dir_all(kept.parent().unwrap_or(&kept));
+    let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
     let _ = std::fs::write(root.join("source/plugin.toml"), plain());
     let _ = std::fs::write(
         root.join("next/plugin.toml"),

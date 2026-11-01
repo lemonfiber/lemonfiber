@@ -120,6 +120,18 @@ fn a_replaced_certificate_reads_as_its_service() {
     );
 }
 
+/// A guard moved onto its plugin reads as moved for good, in the release that moved it.
+#[test]
+fn a_guard_moved_in_place_reads_as_moved_for_good() {
+    assert_eq!(
+        did(&crate::journal::Kind::MovedInPlace {
+            service: "decline".to_owned(),
+            release: "0.18.0".to_owned(),
+        }),
+        "moved decline onto its plugin for good, in 0.18.0"
+    );
+}
+
 /// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {

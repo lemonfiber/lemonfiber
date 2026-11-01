@@ -62,6 +62,11 @@ pub struct SubstitutionReport {
     /// Each part the change was to stop or start and could not, with why.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unran: Vec<Unran>,
+    /// Each of lemonfiber's own guards this act moved onto its plugin after its own
+    /// change, or on a reading would move, for good and with no yes of its own; one it
+    /// could not move stays on offer and says why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guards: Vec<crate::update::run::Moved>,
 }
 
 /// A part a substitution was to stop or start and could not.

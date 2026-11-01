@@ -31,6 +31,40 @@ use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 /// down, so what a test puts beside the stack stays the test's own too.
 #[must_use]
 pub fn repository_stack() -> Source {
+    stack_apart(lemonfiber_fixtures::stack::directory_into)
+}
+
+/// The repository's stack written apart for one test without either guard among its
+/// own services: a stack no guard moves in.
+#[must_use]
+pub fn unguarded_stack() -> Source {
+    stack_apart(|at| {
+        lemonfiber_fixtures::stack::directory_without(
+            at,
+            &super::guards::BOTH.map(|guard| guard.plugin),
+        );
+    })
+}
+
+/// The stack this build carries, compiled in as it is, without either guard among its
+/// own services.
+#[must_use]
+pub fn unguarded_embedded() -> Source {
+    static CARRIED: std::sync::LazyLock<lemonfiber_core::stack::Carried> =
+        std::sync::LazyLock::new(|| lemonfiber_core::stack::Carried {
+            manifest: Box::leak(
+                lemonfiber_fixtures::stack::assembled_without(
+                    &super::guards::BOTH.map(|guard| guard.plugin),
+                )
+                .into_boxed_str(),
+            ),
+            files: lemonfiber_core::stack::BUNDLED.files,
+        });
+    Source::Embedded(&CARRIED)
+}
+
+/// A stack directory of its own for one test, as `written` writes it.
+pub fn stack_apart(written: impl FnOnce(&Path)) -> Source {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let copy = Scratch::new(&format!(
         "repository-stack-{}",
@@ -38,7 +72,7 @@ pub fn repository_stack() -> Source {
     ))
     .kept()
     .join("stack");
-    lemonfiber_fixtures::stack::directory_into(&copy);
+    written(&copy);
     Source::External(Box::leak(copy.into_boxed_path()))
 }
 

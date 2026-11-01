@@ -212,6 +212,12 @@ const fn starts(action: &Action) -> bool {
     matches!(action, Action::Up | Action::Start(_))
 }
 
+/// Whether `action` leaves the stack running, which is what moves lemonfiber's own
+/// guards onto their plugins.
+const fn keeps_running(action: &Action) -> bool {
+    matches!(action, Action::Up | Action::Start(_) | Action::Restart(_))
+}
+
 /// The services an action is aimed at: the ones it names, or everything its plan holds.
 ///
 /// What a stop is written down against and what a start lets go of, so the two are
@@ -238,6 +244,15 @@ pub(crate) fn addressed(action: &Action, plan: &Plan) -> Vec<String> {
     }
 }
 
+/// Each guard move the stack `forms` resolve against takes.
+async fn guards_moved(
+    ctx: &Ctx,
+    forms: &[String],
+) -> Result<Vec<crate::update::run::Moved>, Box<Problem>> {
+    let (manifest, _) = resolved(ctx, forms)?;
+    Ok(crate::app::plugins::guarding::taken(ctx, &manifest).await)
+}
+
 /// Everything a lifecycle command settles before anything runs: the manifest, the
 /// command to spawn, and the report it will be filling in.
 ///
@@ -256,6 +271,14 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         beside_readied(ctx).await
     } else {
         (None, None)
+    };
+
+    // Before the project is composed, so what it writes already holds each guard moved
+    // onto its plugin.
+    let guards = if keeps_running(action) {
+        guards_moved(ctx, forms).await?
+    } else {
+        Vec::new()
     };
 
     let Composed {
@@ -313,6 +336,7 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         } else {
             Vec::new()
         },
+        guards,
         swept: sweep.networks.clone(),
         passing,
         fencing,

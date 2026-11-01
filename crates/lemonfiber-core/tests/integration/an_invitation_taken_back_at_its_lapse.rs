@@ -11,10 +11,11 @@ use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{HouseholdReport, MemberStanding};
 use lemonfiber_core::ports::http::Request;
-use lemonfiber_core::ports::service::Member;
+use lemonfiber_core::ports::service::{Lapsed, LeftBecause, Member, TakenBack};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
-use lemonfiber_sidecar::decline::{Lapse, Lapses, Left, Outcome as Lapsed, TokenHash};
+use lemonfiber_sidecar::TokenHash;
+use lemonfiber_testing::guards::{with_decline, Decline};
 use lemonfiber_testing::media;
 
 /// The shipped stack, which runs the decline service, under a scratch directory of its
@@ -58,28 +59,25 @@ fn at(hours: i64) -> String {
         .unwrap_or_default()
 }
 
-/// An offer to ana's account `9`, made fifty hours ago and run out two hours ago, and the
-/// decline service's record of what it did with it at the lapse, where it did anything.
-fn offered_and_lapsed(env: &Path, stack: &Path, done: Option<Lapsed>) {
+/// An offer to ana's account `9`, made fifty hours ago and run out two hours ago, and a
+/// decline service answering what it did with it at the lapse, where it did anything.
+fn offered_and_lapsed(env: &Path, done: Option<TakenBack>) -> Arc<Decline> {
     let record = serde_json::json!({
         "9": {"offered": at(-50), "lapses": at(-2), "decline": TokenHash::of("ana-token").as_str()}
     });
     let _ = std::fs::write(env.with_file_name("invitations.json"), record.to_string());
-    if let Some(outcome) = done {
-        let record_of_lapses = Lapses::default().with(Lapse {
-            token: TokenHash::of("ana-token"),
+    let lapses = done
+        .map(|outcome| Lapsed {
+            token: TokenHash::of("ana-token").as_str().to_owned(),
             account: "9".to_owned(),
             name: "ana".to_owned(),
             issued: 1,
             at: 2,
             outcome,
-        });
-        let _ = std::fs::create_dir_all(stack.join("config/decline"));
-        let _ = std::fs::write(
-            stack.join("config/decline/lapses.json"),
-            record_of_lapses.written(),
-        );
-    }
+        })
+        .into_iter()
+        .collect();
+    Arc::new(Decline::default().lapsing(lapses))
 }
 
 /// What a household read says, what was sent, and the core's offer record after it.
@@ -89,10 +87,10 @@ struct Read {
     record: String,
 }
 
-async fn read(tag: &str, others: &[Member], lapsed: Option<Lapsed>) -> Read {
+async fn read(tag: &str, others: &[Member], lapsed: Option<TakenBack>) -> Read {
     let env = recorded_admin(&format!("lapsed-{tag}"));
     let stack: &'static Path = Box::leak(stack_with_decline(tag).into_boxed_path());
-    offered_and_lapsed(&env, stack, lapsed);
+    let decline = offered_and_lapsed(&env, lapsed);
     let http = holding(others);
     let ctx = media::keyed_in(
         lemonfiber_testing::a_context()
@@ -107,6 +105,7 @@ async fn read(tag: &str, others: &[Member], lapsed: Option<Lapsed>) -> Read {
             .build()
             .with_http(http.clone()),
     );
+    let ctx = with_decline(ctx, &decline);
 
     let said = dispatch(Command::Household { member: None }, &ctx).await;
     let record =
@@ -135,7 +134,12 @@ fn ana(report: Option<&HouseholdReport>) -> Option<MemberStanding> {
 /// account the operator suspended, and nothing more is written to it.
 #[tokio::test]
 async fn a_reset_switched_off_at_its_lapse_stands_as_expired() {
-    let read = read("switched-off", &[ana_seen(true)], Some(Lapsed::SwitchedOff)).await;
+    let read = read(
+        "switched-off",
+        &[ana_seen(true)],
+        Some(TakenBack::SwitchedOff),
+    )
+    .await;
 
     assert_eq!(ana(read.report.as_ref()), Some(MemberStanding::Expired));
     assert!(!wrote_on_ana(&read.sent));
@@ -145,7 +149,7 @@ async fn a_reset_switched_off_at_its_lapse_stands_as_expired() {
 /// nothing is said about it having gone; the offer is kept for the next read.
 #[tokio::test]
 async fn an_account_removed_at_its_lapse_is_listed_as_expired_and_not_as_missing() {
-    let read = read("removed", &[], Some(Lapsed::Removed)).await;
+    let read = read("removed", &[], Some(TakenBack::Removed)).await;
 
     assert_eq!(ana(read.report.as_ref()), Some(MemberStanding::Expired));
     let findings = read
@@ -163,7 +167,12 @@ async fn an_account_removed_at_its_lapse_is_listed_as_expired_and_not_as_missing
 /// and its offer comes off the record.
 #[tokio::test]
 async fn an_account_gone_with_no_lapse_recorded_is_not_listed() {
-    for lapsed in [None, Some(Lapsed::Left(Left::Gone))] {
+    for lapsed in [
+        None,
+        Some(TakenBack::Left {
+            why: LeftBecause::Gone,
+        }),
+    ] {
         let read = read("vanished", &[], lapsed).await;
 
         assert_eq!(ana(read.report.as_ref()), None);

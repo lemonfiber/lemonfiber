@@ -463,7 +463,8 @@ fn came_to(applied: &[Applied], service: &str) -> Option<(Ending, Reversal)> {
 ///
 /// A whole layout is an environment file and a stack directory, and the contexts
 /// above carry neither — so an update run against one has nowhere to write what it
-/// did and writes nothing, which is what every case before this one is about.
+/// did and writes nothing, which is what every case before this one is about. Its stack
+/// has no guard to move, so the run is the update's alone.
 fn recording(machine: &Arc<Machine>, archive: &Arc<Kept>, name: &str) -> (Ctx, PathBuf) {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("journal-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
@@ -471,6 +472,7 @@ fn recording(machine: &Arc<Machine>, archive: &Arc<Kept>, name: &str) -> (Ctx, P
     let _ = std::fs::create_dir_all(&stack);
 
     let context = lemonfiber_testing::a_context()
+        .over(lemonfiber_testing::context::unguarded_stack())
         .runner(Arc::clone(machine) as Arc<dyn Runner>)
         .engine(Arc::clone(machine) as Arc<dyn Engine>)
         .filesystem(Files::empty())

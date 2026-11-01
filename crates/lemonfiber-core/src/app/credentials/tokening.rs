@@ -12,8 +12,6 @@
 //! proof fails the request service is put back on the old token and the new hash taken
 //! out again.
 
-use std::path::Path;
-
 use lemonfiber_manifest::Service;
 
 use crate::ports::media;
@@ -67,15 +65,14 @@ pub(super) async fn held(
     ctx: &Ctx,
     services: &[Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
 ) -> Vec<Held> {
-    let (Some(project), Some(filler)) = (
-        project.filter(|_| gating::service(services).is_some()),
-        crate::app::targets::request_service(fillers),
-    ) else {
+    if gating::service(services).is_none() {
+        return Vec::new();
+    }
+    let Some(filler) = crate::app::targets::request_service(fillers) else {
         return Vec::new();
     };
-    let Some(kept) = Kept::read(ctx, fillers, project).await else {
+    let Some(kept) = Kept::read(ctx, fillers).await else {
         return Vec::new();
     };
     let routes = routes(&kept, services);
@@ -153,14 +150,12 @@ pub(super) async fn rotate(
     held: &Held,
     services: &[Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
 ) -> Rotation {
     let id = held.setting.trim_start_matches(SETTING);
-    let (Some(project), Some(filler)) = (project, crate::app::targets::request_service(fillers))
-    else {
+    let Some(filler) = crate::app::targets::request_service(fillers) else {
         return unproven(held, &not_handed(&held.name));
     };
-    let Some(kept) = Kept::read(ctx, fillers, project).await else {
+    let Some(kept) = Kept::read(ctx, fillers).await else {
         return unproven(held, &not_handed(&held.name));
     };
     let Some(route) = routes(&kept, services)

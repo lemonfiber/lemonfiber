@@ -173,6 +173,7 @@ fn what_this_stack_wires_to_what_and_one_change_to_it_render_apart() {
             },
             agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned(),
             applied: true,
+            guards: Vec::new(),
         }),
         false,
     )

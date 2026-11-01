@@ -7,7 +7,7 @@ use super::*;
 #[tokio::test]
 async fn a_refusal_is_reported() {
     let unlisted = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
-    let (ctx, at) = gate_ctx(
+    let (ctx, at, _) = gate_ctx(
         "gate-routes-unlisted",
         true,
         CURATORS,
@@ -37,7 +37,7 @@ async fn a_refusal_is_reported() {
         ),
     ] {
         let http = serving(filed, "fresh", mints, revokes);
-        let (ctx, at) = gate_ctx(name, true, CURATORS, held_now, http.clone());
+        let (ctx, at, _) = gate_ctx(name, true, CURATORS, held_now, http.clone());
 
         let (state, _) = seeded(&ctx, &http, true, &at).await;
 
@@ -53,8 +53,13 @@ async fn a_refusal_is_reported() {
 #[tokio::test]
 async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
     let http = serving(&[], "fresh", true, true);
-    let (ctx, at) = gate_ctx("gate-routes-unwritable", true, CURATORS, None, http.clone());
-    blocked(&at);
+    let (ctx, at, gate) = gate_ctx_beside(
+        "gate-routes-unwritable",
+        true,
+        CURATORS,
+        Gate::default().refusing(&["admit"]),
+        http.clone(),
+    );
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
@@ -64,11 +69,12 @@ async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
             detail: format!(
                 "the routes could not be handed to the request gate, so the new key was \
                  revoked again: {}",
-                refused(&at)
+                refused()
             ),
         })
     );
     assert_eq!(revoked, vec!["fresh".to_owned()]);
+    assert!(gate.routes().is_empty());
 }
 
 /// Routes that cannot be brought up to date under a key the gate holds are said, and
@@ -76,26 +82,13 @@ async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
 #[tokio::test]
 async fn routes_that_cannot_be_updated_are_said() {
     let http = serving(&["stray", "kept"], "fresh", true, true);
-    let (ctx, at) = gate_ctx(
+    let (ctx, at, gate) = gate_ctx_beside(
         "gate-routes-unwritable-kept",
         true,
         CURATORS,
-        None,
+        Gate::admitting(holding(MOVIES_ONLY, "kept")).refusing(&["admit"]),
         http.clone(),
     );
-    blocked(&at);
-    let outdated = holding(MOVIES_ONLY, "kept").written();
-    let ctx = ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
-        (
-            at.join("config/sonarr/config.xml"),
-            "<Config><ApiKey>sonarrs</ApiKey></Config>",
-        ),
-        (
-            at.join("config/radarr/config.xml"),
-            "<Config><ApiKey>radarrs</ApiKey></Config>",
-        ),
-        (routes_file(&at), &outdated),
-    ]));
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
@@ -104,31 +97,40 @@ async fn routes_that_cannot_be_updated_are_said() {
         Some(State::Failed {
             detail: format!(
                 "the routes could not be handed to the request gate: {}",
-                refused(&at)
+                refused()
             ),
         })
     );
     assert!(revoked.is_empty(), "{revoked:?}");
+    assert_eq!(gate.routes(), holding(MOVIES_ONLY, "kept"));
 }
 
-/// Put a directory where the routes file belongs under `project`, leaving nowhere to
-/// write it.
-fn blocked(project: &std::path::Path) {
-    let _ = std::fs::create_dir_all(routes_file(project).join("blocked"));
+/// A gate that will not say what it admits, with the media server routed through it, is
+/// reported and handed no route, and no key is minted for it.
+#[tokio::test]
+async fn a_gate_that_will_not_say_what_it_admits_beside_the_media_server_is_reported() {
+    let http = serving(&[], "fresh", true, true);
+    let (ctx, at, gate) = gate_ctx_beside(
+        "gate-routes-unread",
+        true,
+        CURATORS,
+        Gate::default().refusing(&["admitted"]),
+        http.clone(),
+    );
+
+    let (state, revoked) = seeded(&ctx, &http, true, &at).await;
+
+    assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
+    assert!(!minted_on(&http));
+    assert!(revoked.is_empty(), "{revoked:?}");
+    assert!(gate.routes().is_empty());
 }
 
-/// What the gate says where its routes file cannot be written under a blocked `project`.
-fn refused(project: &std::path::Path) -> String {
-    format!(
-        "request-gate answered unexpectedly: {}",
-        unwritable(project)
-    )
-}
-
-/// What writing the routes file under a blocked `project` fails with.
-fn unwritable(project: &std::path::Path) -> String {
-    store::write(&routes_file(project), "")
-        .err()
-        .map(|failure| failure.to_string())
-        .unwrap_or_default()
+/// What a gate refusing the routes it is handed answers.
+fn refused() -> String {
+    crate::ports::service::Failure::Refused {
+        service: crate::app::gating::SERVICE.to_owned(),
+        detail: "it refused admit".to_owned(),
+    }
+    .to_string()
 }

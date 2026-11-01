@@ -5,7 +5,6 @@
 use crate::app::gating::SERVICE;
 use crate::test_support::{a_contracted_gate, unaskable_gates, GATE_TRUSTED};
 
-use super::gate::routes;
 use super::*;
 use crate::test_support::curators::{self, FILM, TELEVISION};
 
@@ -111,9 +110,7 @@ async fn a_first_party_gate_speaking_the_contract_is_handed_its_routes_over_it()
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
     let fillers = contracted_gate(&project, &GATE_TRUSTED);
 
-    let wirings =
-        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None, Some(&project))
-            .await;
+    let wirings = super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None).await;
 
     assert_eq!(states(&wirings), vec![&State::Wired]);
     assert!(http.requests().iter().all(|one| one
@@ -126,7 +123,6 @@ async fn a_first_party_gate_speaking_the_contract_is_handed_its_routes_over_it()
             ("radarr".to_owned(), "the-key".to_owned()),
         ]
     );
-    assert_eq!(routes(&project), None);
 }
 
 /// A third-party plugin's curator filing film, beside the request service moved into its
@@ -183,17 +179,8 @@ async fn a_third_party_curators_key_is_never_handed_to_the_gate() {
         }],
     );
 
-    let alone = super::super::gate::seed_gate_routes(
-        &ctx,
-        &standing_in(),
-        &ungranted,
-        None,
-        Some(&project),
-    )
-    .await;
-    let said =
-        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &granted, None, Some(&project))
-            .await;
+    let alone = super::super::gate::seed_gate_routes(&ctx, &standing_in(), &ungranted, None).await;
+    let said = super::super::gate::seed_gate_routes(&ctx, &standing_in(), &granted, None).await;
 
     assert_eq!(
         admitted_routes(&http),
@@ -227,14 +214,8 @@ async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_nothing() {
         let ctx = contracted_ctx(&project, SERVICE, keyed, http.clone());
         let fillers = contracted_gate(&project, trusted);
 
-        let wirings = super::super::gate::seed_gate_routes(
-            &ctx,
-            &standing_in(),
-            &fillers,
-            None,
-            Some(&project),
-        )
-        .await;
+        let wirings =
+            super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None).await;
 
         assert!(
             wirings
@@ -243,7 +224,6 @@ async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_nothing() {
             "{tag}: {wirings:?}"
         );
         assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
-        assert_eq!(routes(&project), None, "{tag}");
     }
 }
 
@@ -256,9 +236,7 @@ async fn a_gate_that_cannot_say_what_it_admits_is_reported_and_handed_nothing() 
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
     let fillers = contracted_gate(&project, &GATE_TRUSTED);
 
-    let wirings =
-        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None, Some(&project))
-            .await;
+    let wirings = super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None).await;
 
     assert_eq!(
         states(&wirings),
@@ -271,7 +249,6 @@ async fn a_gate_that_cannot_say_what_it_admits_is_reported_and_handed_nothing() 
         "{:?}",
         http.requests()
     );
-    assert_eq!(routes(&project), None);
 }
 
 /// A request service reaching each curator through a gate that cannot be asked over its
@@ -333,13 +310,8 @@ async fn without_a_gate_to_ask_no_curator_is_handed_to_the_request_service() {
             &trusting(trusted),
         );
 
-        let wirings = super::super::seed_fulfilment_targets(
-            &ctx,
-            &[request_gate()],
-            &fillers,
-            Some(&project),
-        )
-        .await;
+        let wirings =
+            super::super::seed_fulfilment_targets(&ctx, &[request_gate()], &fillers).await;
 
         assert_eq!(states(&wirings), vec![&unasked, &unasked], "{tag}");
         assert!(!wrote(&http), "{tag}: {:?}", http.requests());
@@ -384,7 +356,7 @@ async fn without_a_gate_to_ask_the_media_server_link_is_handed_no_token() {
         );
 
         assert_eq!(
-            linked(&ctx, &fillers, &project).await,
+            linked(&ctx, &fillers).await,
             Some(State::Failed {
                 detail: super::super::tokens::UNASKED.to_owned(),
             }),
@@ -395,12 +367,8 @@ async fn without_a_gate_to_ask_the_media_server_link_is_handed_no_token() {
 }
 
 /// What holding the request service of `fillers` to its media server link through the gate
-/// under `project` comes to, where both are there.
-async fn linked(
-    ctx: &Ctx,
-    fillers: &crate::wiring::Fillers,
-    project: &std::path::Path,
-) -> Option<State> {
+/// comes to, where both are there.
+async fn linked(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Option<State> {
     let asker = crate::app::targets::request_service(fillers)?;
     let server = crate::app::targets::MediaServer::of(fillers)?;
     let requests = crate::app::targets::requests_as_owner(ctx, asker).await?;
@@ -411,7 +379,6 @@ async fn linked(
             requests.as_ref(),
             asker,
             &server,
-            project,
         )
         .await
         .state,

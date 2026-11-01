@@ -8,22 +8,22 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::ports::service::{Gated, Target};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
-use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
+use lemonfiber_testing::guards::{with_gate, Gate};
 use lemonfiber_testing::media;
 
 /// The gate's routes, with the media server's presenting `key`.
-fn routes(key: &str) -> String {
-    Upstreams::of(vec![Upstream {
-        route: "jellyfin".to_owned(),
-        kind: Kind::Jellyfin,
+fn routes(key: &str) -> Vec<Gated> {
+    vec![Gated {
+        target: Target::MediaServer { pins: Vec::new() },
+        path: "jellyfin".to_owned(),
         address: "http://jellyfin:8096".to_owned(),
-        credential: Credential::new(key),
         majors: vec![10],
-        pins: lemonfiber_sidecar::Pins::default(),
-    }])
-    .written()
+        credential: key.to_owned(),
+        tokens: Vec::new(),
+    }]
 }
 
 #[tokio::test]
@@ -31,9 +31,7 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
     let env = recorded_admin("gate-key-credentials");
     let stack: &'static Path =
         Box::leak(crate::common::stack::with_the_gate("key-credentials").into_boxed_path());
-    let routes_file = stack.join("config/request-gate/upstreams.json");
-    let _ = std::fs::create_dir_all(stack.join("config/request-gate"));
-    let _ = std::fs::write(&routes_file, routes("old"));
+    let gate = Arc::new(Gate::admitting(routes("old")));
     let filed = |keys: &[&str]| media::answered(&keys);
     let http = Fake::by_path_in_turn(vec![
         (
@@ -59,6 +57,7 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
             .build()
             .with_http(http.clone()),
     );
+    let ctx = with_gate(ctx, &gate);
     let asked = |asking| dispatch(Command::Credentials(asking), &ctx);
 
     let shown = match asked(lemonfiber_core::app::Asking::Reveal {
@@ -79,7 +78,6 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
         Ok(Outcome::Credentials(inventory)) => inventory.rotated.map(|one| one.settled),
         _ => None,
     };
-    let held_now = std::fs::read_to_string(&routes_file).unwrap_or_default();
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(Path::new("/")));
     let _ = std::fs::remove_dir_all(stack);
 
@@ -91,7 +89,7 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
         ),
         "{rotated:?}"
     );
-    assert_eq!(held_now, routes("fresh"));
+    assert_eq!(gate.routes(), routes("fresh"));
     assert!(http.requests().iter().any(|asked| {
         asked.url.ends_with(media::serve("revoke"))
             && asked.body.as_deref() == Some(r#"{"key":"old"}"#)

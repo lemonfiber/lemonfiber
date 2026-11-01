@@ -32,6 +32,13 @@
       "description": "Whether the steps were agreed to, or only shown.",
       "type": "boolean"
     },
+    "guards": {
+      "description": "Each of lemonfiber's own guards this run moved onto its plugin, or would move once\nconfirmed, for good and with no yes of its own; one it could not move stays on\noffer and says why.",
+      "type": "array",
+      "items": {
+        "$ref": "StackMoveTaken.json"
+      }
+    },
     "halted": {
       "description": "Why the stack is not as the run found it, where it is not.\n\nTwo runs end that way and an operator has the same thing to do about either:\none that met a service which would not come back and stopped there, and one\nwhere every step succeeded and the stack would not start again afterwards.\nThe second is not a failure of the update — `state` still says `Updated`,\nbecause it is — but the stack came down for the capture and something has to\nsay that it is still down.",
       "type": [

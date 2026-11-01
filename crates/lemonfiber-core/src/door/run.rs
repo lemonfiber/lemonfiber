@@ -48,11 +48,7 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         .list(&ctx.settings.project)
         .await
         .map_err(|err| Box::new(err.problem()))?;
-    let profiles: Vec<String> = manifest
-        .profiles
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect();
+    let profiles: Vec<String> = manifest.profile_ids();
     let halted = crate::app::engine::halted::load(ctx);
     let surveyed = crate::docker::survey(
         &manifest,

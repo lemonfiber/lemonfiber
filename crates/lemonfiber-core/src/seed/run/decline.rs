@@ -1,21 +1,20 @@
-//! The decline service's own media server key: minted for it alone, and handed over in a
-//! file.
+//! The decline service's own media server key: minted for it alone, and handed over
+//! through `invite.decline`.
 //!
 //! The service switches off an invitation the invitee refuses, which on the media server
 //! is an administrator's act on every supported line — and no credential narrower than an
 //! API key, which administers the whole server, can do it. So the key is the service's
 //! and nothing else's: filed under its own name, so the server's key list says what holds
-//! it, and written owner-only into the service's configuration directory rather than its
-//! environment, which `docker compose config` and `docker inspect` print.
+//! it, and handed to the service over its contract rather than through its environment,
+//! which `docker compose config` and `docker inspect` print.
 //!
-//! **The file is what holds the key.** A key filed under the service's name that the
-//! file does not hold is one nothing holds — left by a run interrupted between minting
-//! and writing, or by a stack that no longer runs the service — and is revoked, because
-//! a credential that administers the server and serves nobody is all risk.
+//! **The service is what holds the key.** A key filed under the service's name whose
+//! SHA-256 the service does not answer is one nothing holds — left by a run interrupted
+//! between minting and handing it over, or by a stack that no longer runs the service —
+//! and is revoked, because a credential that administers the server and serves nobody is
+//! all risk.
 
-use std::path::Path;
-
-use lemonfiber_sidecar::decline::Key;
+use lemonfiber_sidecar::TokenHash;
 
 use super::Ctx;
 use crate::app::invite::declining;
@@ -35,7 +34,6 @@ pub(super) async fn seed_decline_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
 ) -> Option<Wiring> {
     let server = &crate::app::targets::declined_server(fillers)?;
     let declining = declining::service(services).is_some();
@@ -65,15 +63,6 @@ pub(super) async fn seed_decline_key(
         Ok(filed) => filed,
         Err(failure) => return Some(settled(server, crate::seed::unreached(&failure))),
     };
-    let Some(project) = project else {
-        return Some(settled(
-            server,
-            State::Skipped {
-                reason: "there is no stack directory to hand the decline service its key in"
-                    .to_owned(),
-            },
-        ));
-    };
     if !declining::may_hold(fillers, &server.filler) {
         return Some(settled(
             server,
@@ -84,7 +73,7 @@ pub(super) async fn seed_decline_key(
             },
         ));
     }
-    let Some(decline) = declining::asked(ctx, fillers, project).await else {
+    let Some(decline) = declining::asked(ctx, fillers).await else {
         return Some(settled(
             server,
             State::Skipped {
@@ -133,7 +122,7 @@ async fn repinned(
 pub(crate) fn named_by(filed: &[String], hash: &str) -> Option<String> {
     filed
         .iter()
-        .find(|one| Key::read(one).is_ok_and(|key| key.fingerprint() == hash))
+        .find(|one| TokenHash::of(one.trim()).as_str() == hash)
         .cloned()
 }
 

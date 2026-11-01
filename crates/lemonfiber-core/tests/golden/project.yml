@@ -1,28 +1,5 @@
 name: lemonfiber
 services:
-  decline:
-    image: ghcr.io/lemonfiber/decline:0.17.0@sha256:814d551113e93135259ac8e92586938bf88c3bb03bc8ce75b8e0d7e4d14a8147
-    profiles:
-    - media
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      TZ: Europe/Amsterdam
-    ports:
-    - 0.0.0.0:5056:8080
-    volumes:
-    - ./config/decline:/config
-    networks:
-    - ask__decline__identity.source__jellyfin
-    - link__decline__jellyfin
-    - own__decline
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    pids_limit: 1024
-    read_only: true
-    mem_limit: 64m
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.5.2@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
     profiles:
@@ -49,29 +26,6 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  request-gate:
-    image: ghcr.io/lemonfiber/request-gate:main-b1472d34833c@sha256:fc84286bdac98df045a6df97837ae5134ff5a5c4dc75a8875675988992cec55e
-    profiles:
-    - media
-    restart: unless-stopped
-    user: 1000:1000
-    environment:
-      TZ: Europe/Amsterdam
-    volumes:
-    - ./config/request-gate:/config
-    networks:
-    - ask__request-gate__identity.source__jellyfin
-    - ask__request-gate__library.curate__bindery
-    - ask__request-gate__library.curate__lidarr
-    - ask__request-gate__library.curate__radarr
-    - ask__request-gate__library.curate__sonarr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    pids_limit: 1024
-    read_only: true
-    mem_limit: 64m
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
     profiles:
@@ -145,7 +99,6 @@ services:
     - ./config/bindery:/config
     networks:
     - ask__bindery__indexer.search__prowlarr
-    - ask__request-gate__library.curate__bindery
     - own__bindery
     security_opt:
     - no-new-privileges:true
@@ -216,6 +169,28 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
+  decline:
+    image: ghcr.io/lemonfiber/decline:main-41947a4c7bbf@sha256:ee908ae2c4cb7d41682f4d8410c65dc6a09038a75a1153a037d6292c89f6a6e8
+    profiles:
+    - media
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+    - 0.0.0.0:5056:8080
+    volumes:
+    - ./config/decline:/config
+    networks:
+    - link__decline__jellyfin
+    - own__decline
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    pids_limit: 1024
+    read_only: true
+    mem_limit: 64m
   door:
     image: ghcr.io/lemonfiber/door:main-5b65b742fdf9@sha256:e8fa70c407ba25320f0a8606681837b6bdc1cecad7c4b649639de32afebb2def
     profiles:
@@ -320,9 +295,7 @@ services:
     - ./config/jellyfin:/config
     - ./mounts/jellyfin/cache:/cache
     networks:
-    - ask__decline__identity.source__jellyfin
     - ask__door__media.serve__jellyfin
-    - ask__request-gate__identity.source__jellyfin
     - link__decline__jellyfin
     - own__jellyfin
     security_opt:
@@ -352,7 +325,6 @@ services:
     - ./data:/data
     - ./config/lidarr:/config
     networks:
-    - ask__request-gate__library.curate__lidarr
     - link__unpackerr__lidarr
     - own__lidarr
     security_opt:
@@ -499,7 +471,6 @@ services:
     - ./data:/data
     - ./config/radarr:/config
     networks:
-    - ask__request-gate__library.curate__radarr
     - link__recyclarr__radarr
     - link__unpackerr__radarr
     - own__radarr
@@ -542,6 +513,24 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
+  request-gate:
+    image: ghcr.io/lemonfiber/request-gate:main-650998188bd8@sha256:35742d09dd9a4cb0c1421457ddc6ac004947a91e6a424233c8c116842c49972f
+    profiles:
+    - media
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      TZ: Europe/Amsterdam
+    volumes:
+    - ./config/request-gate:/config
+    network_mode: none
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    pids_limit: 1024
+    read_only: true
+    mem_limit: 64m
   sabnzbd:
     image: lscr.io/linuxserver/sabnzbd:4.5.5-ls250@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
     profiles:
@@ -612,7 +601,6 @@ services:
     - ./data:/data
     - ./config/sonarr:/config
     networks:
-    - ask__request-gate__library.curate__sonarr
     - link__recyclarr__sonarr
     - link__unpackerr__sonarr
     - own__sonarr

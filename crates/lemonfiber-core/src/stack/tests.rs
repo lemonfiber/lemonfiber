@@ -99,7 +99,7 @@ fn an_embedded_stack_writes_its_starting_files_and_never_its_manifest() {
 
     assert_eq!(written.ok().as_deref(), Some(dir.path()));
     assert!(
-        dir.join("config").is_dir(),
+        dir.join("recordings").is_dir(),
         "the starting files are written"
     );
     assert!(

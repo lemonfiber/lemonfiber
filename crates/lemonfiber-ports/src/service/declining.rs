@@ -116,12 +116,6 @@ pub enum TakenBack {
     },
 }
 
-impl From<LeftBecause> for TakenBack {
-    fn from(why: LeftBecause) -> Self {
-        Self::Left { why }
-    }
-}
-
 /// One invitation the service took back, or looked at and left, as its window closed.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,

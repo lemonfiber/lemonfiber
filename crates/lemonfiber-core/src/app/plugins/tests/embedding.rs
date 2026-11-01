@@ -46,11 +46,12 @@ async fn a_plugin_the_bundle_installs_is_read_from_this_build_at_its_pin() {
         .asked()
         .iter()
         .any(|one| one.contains(&"fetch".to_owned())));
-    let checkouts = crate::app::targets::layout(&ctx)
-        .map(|paths| paths.data_dir().join("checkouts"))
-        .and_then(|at| std::fs::read_dir(at).ok())
-        .map(Iterator::count);
-    assert_eq!(checkouts, Some(0), "the tree written out is removed again");
+    let checkouts =
+        crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().join("checkouts"));
+    assert!(
+        checkouts.is_some_and(|at| !at.exists()),
+        "the tree written out is removed again, with the directory made for it"
+    );
 }
 
 /// What the bundled plugin's adapter says of itself: the contracts it speaks and the
@@ -220,7 +221,7 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
     let ctx = unmoved("embedded-narrowed", &serving);
 
-    let confirmed = crate::update::run::update(&ctx, updating(Some("request-gate"), true)).await;
+    let confirmed = crate::update::run::update(&ctx, updating(Some("flaresolverr"), true)).await;
 
     assert_eq!(
         confirmed

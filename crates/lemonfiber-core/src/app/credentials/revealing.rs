@@ -11,8 +11,6 @@
 //! for — never as a side effect of listing what is held, and never from a surface
 //! that merely renders whatever it is given.
 
-use std::path::Path;
-
 use crate::app::targets::recorded_secret;
 use crate::app::Ctx;
 use crate::credential::{Held, Revealed, REVEALED, SHOULDER};
@@ -23,12 +21,7 @@ use crate::wiring::Fillers;
 /// Unconfirmed, the warning is the whole answer. Confirmed, the value comes with the
 /// warning still attached, because the thing worth saying is as true afterwards as it
 /// was before — the value is in the scrollback either way once it has been printed.
-pub(crate) async fn reveal(
-    ctx: &Ctx,
-    held: &Held,
-    confirmed: bool,
-    (fillers, project): (&Fillers, Option<&Path>),
-) -> Revealed {
+pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool, fillers: &Fillers) -> Revealed {
     if !confirmed {
         return Revealed {
             name: held.name.clone(),
@@ -61,9 +54,9 @@ pub(crate) async fn reveal(
         };
     }
     let recorded = if held.setting == super::declining::SETTING {
-        super::declining::value(ctx, fillers, project).await
+        super::declining::value(ctx, fillers).await
     } else if held.setting == super::gating::SETTING {
-        super::gating::value(ctx, fillers, project).await
+        super::gating::value(ctx, fillers).await
     } else {
         recorded_secret(ctx, &held.setting)
     };

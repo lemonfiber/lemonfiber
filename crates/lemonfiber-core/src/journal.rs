@@ -297,6 +297,14 @@ pub enum Kind {
         /// The fingerprint of what it holds now, or nothing where it was taken away.
         current: Option<String>,
     },
+    /// One of lemonfiber's own guards was moved from the stack's own service onto its
+    /// plugin, which the release that moved it moves for good.
+    MovedInPlace {
+        /// The stack's own service the guard's plugin took the place of.
+        service: String,
+        /// The release that moved it.
+        release: String,
+    },
     /// A service was started again so it takes up what its adapter applied.
     Restarted {
         /// The service.

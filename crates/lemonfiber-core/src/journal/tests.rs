@@ -601,6 +601,35 @@ fn a_replaced_certificate_is_reversed_by_leaving_it() {
     );
 }
 
+/// A guard moved onto its plugin survives the log format with the release that moved it,
+/// and is reversed by leaving it on its plugin.
+#[test]
+fn a_guard_moved_in_place_round_trips_and_is_reversed_by_leaving_it() {
+    let moved = Change {
+        at: "1".to_owned(),
+        operation: "plugin request-gate".to_owned(),
+        target: "request-gate".to_owned(),
+        kind: Kind::MovedInPlace {
+            service: "request-gate".to_owned(),
+            release: "0.18.0".to_owned(),
+        },
+    };
+    let line = serde_json::to_string(&moved).unwrap_or_default();
+
+    assert_eq!(
+        serde_json::from_str::<Change>(&line).ok(),
+        Some(moved.clone()),
+        "{line}"
+    );
+    assert!(line.contains(r#""release":"0.18.0""#), "{line}");
+    assert_eq!(
+        moved.undo().action,
+        Action::Unmoved {
+            service: "request-gate".to_owned()
+        }
+    );
+}
+
 #[test]
 fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left() {
     let setting = Change {

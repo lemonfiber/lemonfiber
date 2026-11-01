@@ -66,8 +66,8 @@ fn unminted() -> Option<crate::plugin::Installed> {
 
 /// What this step comes to over `ctx` and `fillers` where the curator's key is owed: said
 /// as one lemonfiber did not mint, and still owed.
-async fn said_unminted(ctx: &Ctx, project: &std::path::Path, fillers: &crate::wiring::Fillers) {
-    let (state, baseline) = taken_among(ctx, &gated(), fillers, project, owing()).await;
+async fn said_unminted(ctx: &Ctx, fillers: &crate::wiring::Fillers) {
+    let (state, baseline) = taken_among(ctx, &gated(), fillers, owing()).await;
     assert!(
         matches!(&state, Some(State::Failed { detail })
             if detail.contains("lemonfiber replaces a key only where it minted it")),
@@ -95,7 +95,7 @@ async fn a_key_lemonfiber_did_not_mint_is_said_and_stays_owed() {
             REQUESTS.installed(),
         ],
     );
-    said_unminted(&ctx, &project, &fillers).await;
+    said_unminted(&ctx, &fillers).await;
 }
 
 #[tokio::test]
@@ -122,7 +122,7 @@ async fn a_key_the_record_of_what_is_installed_says_was_not_minted_stays_owed() 
     }
     let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
 
-    said_unminted(&ctx, &project, &moved(gated(), &project)).await;
+    said_unminted(&ctx, &moved(gated(), &project)).await;
 }
 
 #[tokio::test]

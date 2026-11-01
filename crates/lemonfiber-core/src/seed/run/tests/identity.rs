@@ -72,16 +72,8 @@ async fn identity_at(
     let fillers = fillers_trusting(services.to_vec(), &installed, project, &trusted);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
-    super::super::seed_request_identity(
-        ctx,
-        services,
-        &fillers,
-        expected,
-        server.as_ref(),
-        admin,
-        None,
-    )
-    .await
+    super::super::seed_request_identity(ctx, services, &fillers, expected, server.as_ref(), admin)
+        .await
 }
 
 #[tokio::test]

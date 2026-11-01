@@ -90,7 +90,6 @@ async fn identity_over(
         &crate::baseline::Baseline::new(),
         server.as_ref(),
         admin,
-        None,
     )
     .await
 }

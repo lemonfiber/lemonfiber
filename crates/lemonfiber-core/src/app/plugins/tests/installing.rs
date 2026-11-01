@@ -341,10 +341,11 @@ async fn a_machine_with_nowhere_to_keep_a_record_refuses_to_install() {
 
 /// Installing a plugin whose service claims what the stack asks for says, before it
 /// happens, that the ask will be contested and reach nothing until somebody chooses —
-/// read against the stack this build carries.
+/// read against the stack this build carries, its guards moved onto their plugins.
 #[tokio::test]
 async fn an_install_says_which_asks_it_would_leave_contested() {
-    let ctx = ctx("contesting");
+    let mut ctx = ctx("contesting");
+    ctx.stack = crate::test_support::stack();
     let would = crate::plugin::read(&source("contesting", MANIFEST))
         .ok()
         .map(|manifest| crate::plugin::Installed::of(&manifest))
@@ -355,17 +356,18 @@ async fn an_install_says_which_asks_it_would_leave_contested() {
             would
         });
 
+    let mut held = crate::plugin::Register::empty();
+    for guard in [
+        crate::test_support::guards::DECLINE,
+        crate::test_support::guards::GATE,
+    ] {
+        let _ = guard.installed().map(|installed| held.record(installed));
+    }
     let contests = super::super::writing::stack_manifest(&ctx)
         .ok()
         .zip(would)
         .map(|(manifest, would)| {
-            super::super::standing::standing(
-                &ctx,
-                &manifest,
-                &crate::plugin::Register::empty(),
-                &would,
-            )
-            .contests
+            super::super::standing::standing(&ctx, &manifest, &held, &would).contests
         })
         .unwrap_or_default();
 

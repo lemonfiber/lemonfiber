@@ -14,8 +14,6 @@
 //! password: a value this product made up would be one the provider has never heard of,
 //! so what is owed there is a sentence saying where a replacement comes from.
 
-use std::path::Path;
-
 use lemonfiber_manifest::Service;
 
 use crate::app::targets::{recorded_secret, MediaServer};
@@ -46,7 +44,6 @@ pub(crate) async fn rotate(
     held: &Held,
     services: &[Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
 ) -> Rotation {
     if let Some(plugin) = held.plugins() {
         let register = crate::app::plugins::read(ctx).unwrap_or_default();
@@ -58,11 +55,7 @@ pub(crate) async fn rotate(
                 held,
                 installed,
                 secret,
-                &super::minting::Amid {
-                    services,
-                    fillers,
-                    project,
-                },
+                &super::minting::Amid { services, fillers },
             )
             .await;
         }
@@ -75,13 +68,13 @@ pub(crate) async fn rotate(
     }
     match held.origin {
         Origin::Lemonfiber if held.setting == super::declining::SETTING => {
-            super::declining::rotate(ctx, held, fillers, project).await
+            super::declining::rotate(ctx, held, fillers).await
         }
         Origin::Lemonfiber if held.setting == super::gating::SETTING => {
-            super::gating::rotate(ctx, held, fillers, project).await
+            super::gating::rotate(ctx, held, fillers).await
         }
         Origin::Lemonfiber if super::tokening::is_token(held) => {
-            super::tokening::rotate(ctx, held, services, fillers, project).await
+            super::tokening::rotate(ctx, held, services, fillers).await
         }
         Origin::Lemonfiber if held.setting == config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await

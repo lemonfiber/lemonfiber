@@ -9,6 +9,7 @@ pub(crate) fn settings(report: &SettingsReport) -> Lines {
         Some(change) => {
             let mut lines = changed(change, report.rehearsed);
             lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
+            lines.extend(super::moving::guards(&report.guards));
             lines
         }
         None => listed(report),

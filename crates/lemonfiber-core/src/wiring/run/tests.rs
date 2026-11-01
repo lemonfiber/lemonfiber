@@ -13,7 +13,8 @@ fn dir(named: &str) -> std::path::PathBuf {
     at
 }
 
-/// A context over the stack this build pins, keeping its settings in `named`.
+/// A context over the stack this build pins, its guards moved onto their plugins,
+/// keeping its settings in `named`.
 fn ctx(named: &str) -> (crate::app::Ctx, std::path::PathBuf) {
     let at = dir(named);
     let settings = crate::config::Settings {
@@ -22,7 +23,9 @@ fn ctx(named: &str) -> (crate::app::Ctx, std::path::PathBuf) {
         ..crate::config::Settings::default()
     };
     (
-        crate::test_support::a_context().settings(settings).build(),
+        crate::test_support::guards::moved(
+            crate::test_support::a_context().settings(settings).build(),
+        ),
         at,
     )
 }

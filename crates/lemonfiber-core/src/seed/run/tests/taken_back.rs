@@ -1,10 +1,10 @@
 //! The credentials the request service held before the gate, taken back once it reaches
 //! everything through the gate.
 
+use crate::app::gating::PORT;
+use crate::ports::digest::sha256;
 use async_trait::async_trait;
 use lemonfiber_ports::filesystem::{Fault, FileSystem, Identity, Ownership, StorageFacts};
-use lemonfiber_sidecar::gate::{Accepted, Kind, Tokens, PORT};
-use lemonfiber_sidecar::TokenHash;
 
 use super::*;
 use crate::baseline::Baseline;
@@ -41,7 +41,7 @@ fn moving(
     moved: &[Option<crate::plugin::Installed>],
 ) -> crate::wiring::Fillers {
     let installed: Vec<_> = moved.iter().flatten().cloned().collect();
-    fillers_beside(services, &installed, project)
+    guarded_beside(services, &installed, project)
 }
 
 /// Every part this step reaches moved into its plugin: the media server, both curators
@@ -63,7 +63,7 @@ fn moved(
     moving(services, project, &every_part())
 }
 
-/// The gate's routes and the tokens it accepts, and nothing else on disk.
+/// Nothing on disk.
 struct Taking;
 
 #[async_trait]
@@ -86,29 +86,7 @@ impl FileSystem for Taking {
 
     async fn remove(&self, _path: &std::path::Path) {}
 
-    async fn read(&self, path: &std::path::Path) -> Option<String> {
-        let name = path.to_string_lossy();
-        if name.ends_with("upstreams.json") {
-            return Some(admitting(&[
-                ("sonarr", Kind::Sonarr, OLD_KEY),
-                ("jellyfin", Kind::Jellyfin, "gates-key"),
-            ]));
-        }
-        if name.ends_with("tokens.json") {
-            return Some(
-                Tokens::of(vec![
-                    Accepted {
-                        route: "sonarr".to_owned(),
-                        tokens: vec![TokenHash::of(CURATOR_TOKEN)],
-                    },
-                    Accepted {
-                        route: "jellyfin".to_owned(),
-                        tokens: vec![TokenHash::of(LINK_TOKEN)],
-                    },
-                ])
-                .written(),
-            );
-        }
+    async fn read(&self, _path: &std::path::Path) -> Option<String> {
         None
     }
 
@@ -130,6 +108,16 @@ impl Storage for Taking {
             total: 0,
         }
     }
+}
+
+/// The gate reaching the curator under [`OLD_KEY`] and the media server, accepting
+/// [`CURATOR_TOKEN`] on the one and [`LINK_TOKEN`] on the other.
+fn the_gate() -> Arc<Gate> {
+    let mut curator = gated_route("sonarr", Some("tv"), OLD_KEY);
+    curator.tokens = vec![sha256(CURATOR_TOKEN)];
+    let mut media_server = gated_route("jellyfin", None, "gates-key");
+    media_server.tokens = vec![sha256(LINK_TOKEN)];
+    Arc::new(Gate::admitting(vec![curator, media_server]))
 }
 
 /// Where the request service reaches a service: at `host` and `port` under `base`.
@@ -216,9 +204,10 @@ fn linked_household(
     ])
 }
 
-/// A run over `http` holding the administrator's password, in a scratch project, every
-/// part recorded as moved and the television curator holding [`OLD_KEY`] as the key
-/// lemonfiber minted for it, with randomness to replace it where `random`.
+/// A run over `http` holding the administrator's password, in a scratch project beside
+/// [`the_gate`], every part recorded as moved and the television curator holding
+/// [`OLD_KEY`] as the key lemonfiber minted for it, with randomness to replace it where
+/// `random`.
 fn taking_with(
     name: &str,
     http: &Arc<Fake>,
@@ -240,7 +229,10 @@ fn taking_with(
     }
     TELEVISION.minted(&ctx, OLD_KEY);
     ctx.dry_run = rehearsing;
-    (ctx, project)
+    (
+        crate::test_support::gated(ctx, &project, &the_gate()),
+        project,
+    )
 }
 
 /// [`taking_with`], with randomness to replace a key.
@@ -273,14 +265,7 @@ async fn taken(
     project: &std::path::Path,
     baseline: Baseline,
 ) -> (Option<State>, Baseline) {
-    taken_among(
-        ctx,
-        services,
-        &moved(services.to_vec(), project),
-        project,
-        baseline,
-    )
-    .await
+    taken_among(ctx, services, &moved(services.to_vec(), project), baseline).await
 }
 
 /// This step over `ctx` among `fillers`, and the baseline it left.
@@ -288,17 +273,10 @@ async fn taken_among(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    project: &std::path::Path,
     mut baseline: Baseline,
 ) -> (Option<State>, Baseline) {
-    let wiring = super::super::taken_back::seed_taken_back(
-        ctx,
-        services,
-        fillers,
-        Some(project),
-        &mut baseline,
-    )
-    .await;
+    let wiring =
+        super::super::taken_back::seed_taken_back(ctx, services, fillers, &mut baseline).await;
     (
         wiring.map(|one| {
             assert_eq!(one.connection, HELD);
@@ -324,14 +302,8 @@ async fn a_key_held_at_the_curators_own_address_is_owed_and_one_at_the_gate_is_n
     );
     let (ctx, project) = taking("noted", &direct, false);
     let mut noted = Baseline::new();
-    super::super::taken_back::note_held(
-        &ctx,
-        &gated(),
-        &moved(gated(), &project),
-        Some(&project),
-        &mut noted,
-    )
-    .await;
+    super::super::taken_back::note_held(&ctx, &gated(), &moved(gated(), &project), &mut noted)
+        .await;
     assert_eq!(noted.expected("seerr", OWED_CURATOR), Some("owed"));
 
     let through = household(
@@ -342,14 +314,8 @@ async fn a_key_held_at_the_curators_own_address_is_owed_and_one_at_the_gate_is_n
     );
     let (ctx, project) = taking("not-noted", &through, false);
     let mut clean = Baseline::new();
-    super::super::taken_back::note_held(
-        &ctx,
-        &gated(),
-        &moved(gated(), &project),
-        Some(&project),
-        &mut clean,
-    )
-    .await;
+    super::super::taken_back::note_held(&ctx, &gated(), &moved(gated(), &project), &mut clean)
+        .await;
     assert!(clean.is_empty());
 
     // A stack without the gate owes nothing: the request service is meant to hold it.
@@ -362,7 +328,6 @@ async fn a_key_held_at_the_curators_own_address_is_owed_and_one_at_the_gate_is_n
         &ctx,
         &ungated,
         &moved(ungated.clone(), &project),
-        Some(&project),
         &mut none,
     )
     .await;
@@ -374,14 +339,8 @@ async fn a_request_service_that_will_not_say_what_it_holds_owes_nothing_yet() {
     let silent = Fake::by_path(Vec::new());
     let (ctx, project) = taking("unsaid", &silent, false);
     let mut noted = Baseline::new();
-    super::super::taken_back::note_held(
-        &ctx,
-        &gated(),
-        &moved(gated(), &project),
-        Some(&project),
-        &mut noted,
-    )
-    .await;
+    super::super::taken_back::note_held(&ctx, &gated(), &moved(gated(), &project), &mut noted)
+        .await;
     assert!(noted.is_empty());
 }
 
@@ -409,8 +368,7 @@ async fn a_plugins_request_service_owes_nothing_and_is_asked_nothing() {
         &first_party("intake"),
     );
     let mut noted = Baseline::new();
-    super::super::taken_back::note_held(&ctx, &services, &fillers, Some(&project), &mut noted)
-        .await;
+    super::super::taken_back::note_held(&ctx, &services, &fillers, &mut noted).await;
     let mut owing = Baseline::new();
     owing.record(
         crate::test_support::CONTRACTED_REQUESTS,
@@ -419,14 +377,8 @@ async fn a_plugins_request_service_owes_nothing_and_is_asked_nothing() {
         "1",
     );
 
-    let wiring = super::super::taken_back::seed_taken_back(
-        &ctx,
-        &services,
-        &fillers,
-        Some(&project),
-        &mut owing,
-    )
-    .await;
+    let wiring =
+        super::super::taken_back::seed_taken_back(&ctx, &services, &fillers, &mut owing).await;
 
     assert!(noted.is_empty());
     assert!(wiring.is_none(), "{wiring:?}");
@@ -546,6 +498,7 @@ async fn a_request_service_that_cannot_be_asked_over_its_contract_is_left_for_a_
     ctx.seams.engine = Arc::new(
         crate::test_support::adapted::running(&[TELEVISION, MUSIC]).alongside(media::running()),
     );
+    let ctx = crate::test_support::gated(ctx, &project, &the_gate());
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert!(
         matches!(&state, Some(State::Skipped { reason })
@@ -661,7 +614,6 @@ async fn a_stack_without_the_request_service_or_the_media_server_has_nothing_to_
             &project,
             &[media::moved(), TELEVISION.installed(), MUSIC.installed()],
         ),
-        &project,
         owing(),
     )
     .await;
@@ -682,7 +634,6 @@ async fn a_stack_without_the_request_service_or_the_media_server_has_nothing_to_
                 REQUESTS.installed(),
             ],
         ),
-        &project,
         Baseline::new(),
     )
     .await;
@@ -712,7 +663,6 @@ async fn a_media_server_that_cannot_be_asked_leaves_the_curator_keys_still_repla
                 REQUESTS.installed(),
             ],
         ),
-        &project,
         owing(),
     )
     .await;

@@ -1,22 +1,21 @@
-//! The decline address an invitation carries, and the table the decline service acts on.
+//! The decline address an invitation carries, and the invitations the decline service
+//! acts on.
 //!
 //! Where the stack runs the decline service, every offer gets a token of its own. The
 //! token goes out once, in the decline address, and this program keeps only its hash:
-//! in the offer record, and in the table it writes into the service's configuration
-//! directory. Offering the same person again mints a new token, so an older address
-//! stops declining anything.
+//! in the offer record, and in the invitations it hands the service over
+//! `invite.decline`. Offering the same person again mints a new token, so an older
+//! address stops declining anything.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::invite::decline;
-use lemonfiber_sidecar::decline::{File, TokenHash};
+use lemonfiber_sidecar::TokenHash;
 
 use crate::app::targets::{spoken, Spoken};
 use crate::app::Ctx;
 use crate::invitation::Offers;
-use crate::origin::Origin;
 use crate::ports::service::{
     Claimed, Declinable, Declined, Declining, Invitations, Lapsed, Member, TakenBack,
 };
@@ -71,27 +70,16 @@ pub(super) fn invitations(offers: &Offers, household: &[Member]) -> Invitations 
     }
 }
 
-/// The decline service as the core asks it: over `invite.decline` where the service
-/// filling it speaks it, and through the files it reads where it is the stack's own or a
-/// first-party service standing in for it.
+/// The decline service as the core asks it: over `invite.decline`, where the service
+/// filling it speaks it.
 ///
-/// Nothing where nothing fills it, or where it speaks the contract and cannot be asked
-/// over it.
-pub(crate) async fn asked(
-    ctx: &Ctx,
-    fillers: &Fillers,
-    project: &Path,
-) -> Option<Arc<dyn Declining>> {
+/// Nothing where nothing fills it, where its filler speaks nothing, or where it speaks
+/// the contract and cannot be asked over it.
+pub(crate) async fn asked(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn Declining>> {
     let (filler, _) = fillers.filling(decline::CAPABILITY)?;
     match spoken(ctx, filler, decline::CAPABILITY, decline::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(decline::Adapter(adapter))),
-        Spoken::Unanswered => None,
-        Spoken::Not => (filler.origin == Origin::Bundled).then(|| {
-            Arc::new(configured::Configured::at(
-                project,
-                ctx.seams.filesystem.clone(),
-            )) as Arc<dyn Declining>
-        }),
+        Spoken::Unanswered | Spoken::Not => None,
     }
 }
 
@@ -102,13 +90,6 @@ pub(crate) fn may_hold(fillers: &Fillers, server: &crate::wiring::Filler) -> boo
     fillers
         .filling(decline::CAPABILITY)
         .is_some_and(|(filler, _)| crate::wiring::crosses(server.holder(), filler.holder()))
-}
-
-/// Where one of the files the core and the decline service hand each other lives: the
-/// service's configuration directory, under the project root the stack's config volumes
-/// are mounted from.
-pub(crate) fn path(project: &Path, file: File) -> PathBuf {
-    project.join("config").join(SERVICE).join(file.name())
 }
 
 /// The accounts whose standing offer was declined: the ones whose offer's token the
@@ -130,14 +111,7 @@ pub(crate) async fn declined(ctx: &Ctx, offers: &Offers) -> BTreeSet<String> {
 /// The decline service of the stack written to disk, as the core asks it.
 async fn here(ctx: &Ctx) -> Option<Arc<dyn Declining>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
-    asked(
-        ctx,
-        &crate::app::targets::fillers_here(ctx, &manifest),
-        &project,
-    )
-    .await
+    asked(ctx, &crate::app::targets::fillers_here(ctx, &manifest)).await
 }
 
 /// Whether `offer`'s token is the one `hash` names.
@@ -225,14 +199,7 @@ pub(super) async fn issued(
     member: &Member,
 ) -> Option<String> {
     let service = service(&manifest.services)?;
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
-    let declining = asked(
-        ctx,
-        &crate::app::targets::fillers_here(ctx, manifest),
-        &project,
-    )
-    .await?;
+    let declining = asked(ctx, &crate::app::targets::fillers_here(ctx, manifest)).await?;
     let token = minted(ctx)?;
     let offers: Offers = crate::app::record::beside(ctx, crate::invitation::RECORD);
     let offers = with_token(offers, &member.id, &token)?;
@@ -257,8 +224,6 @@ pub(super) fn seconds(moment: &str) -> Option<u64> {
     let at: jiff::Timestamp = moment.parse().ok()?;
     u64::try_from(at.as_second()).ok()
 }
-
-pub(crate) mod configured;
 
 #[cfg(test)]
 mod tests;

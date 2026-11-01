@@ -28,6 +28,13 @@ impl Action {
         }
     }
 
+    /// Leave the guard that took `service`'s place on its plugin.
+    fn unmoved(service: &str) -> Self {
+        Self::Unmoved {
+            service: service.to_owned(),
+        }
+    }
+
     /// Give `grant` to `plugin` again where `give`, and end it otherwise.
     fn regrant(plugin: &str, grant: &crate::plugin::Grant, give: bool) -> Self {
         Self::Regrant {
@@ -148,6 +155,7 @@ impl Change {
             Kind::Ran { service, running } => Action::run(service, !running),
             Kind::Restarted { service } => Action::run(service, true),
             Kind::Certified { service, .. } => Action::unreplaced(service),
+            Kind::MovedInPlace { service, .. } => Action::unmoved(service),
         }
     }
 }

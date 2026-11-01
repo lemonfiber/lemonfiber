@@ -11,8 +11,6 @@
 //! their service and confirmed there before they were ever written down. Everything
 //! else is stale — present, unproven, and worth a sentence rather than an alarm.
 
-use std::path::Path;
-
 use lemonfiber_manifest::Service;
 
 use crate::app::targets::recorded_secret;
@@ -32,23 +30,18 @@ pub(crate) async fn taken(
     ctx: &Ctx,
     services: &[Service],
     fillers: &crate::wiring::Fillers,
-    project: Option<&Path>,
     installed: &[Installed],
 ) -> Vec<Held> {
     let mut taken: Vec<Held> = catalogue(ctx.settings.protocols)
         .into_iter()
         .map(|entry| recorded(ctx, entry))
         .collect();
-    taken.extend(super::declining::held(ctx, services, fillers, project).await);
-    taken.extend(super::gating::held(ctx, services, fillers, project).await);
-    taken.extend(super::tokening::held(ctx, services, fillers, project).await);
+    taken.extend(super::declining::held(ctx, services, fillers).await);
+    taken.extend(super::gating::held(ctx, services, fillers).await);
+    taken.extend(super::tokening::held(ctx, services, fillers).await);
     taken.extend(super::certifying::held(
         ctx,
-        crate::seed::run::replacing::Stack {
-            services,
-            fillers,
-            project,
-        },
+        crate::seed::run::replacing::Stack { services, fillers },
     ));
     let secrets = crate::settings::secrets_at(ctx);
     let kept = secrets

@@ -82,6 +82,13 @@ pub(crate) async fn remove(
     // about what is about to stop is no use once it has.
     let interrupts = super::offering::stopping(&going);
     let offer = super::offering::removing(&going, &leaves);
+
+    // Judged before anything is taken, and before the answer is: the rollback layer
+    // refuses a drifted setting, a change a later one depends on or a guard moved for
+    // good, whatever the operator agreed to, and a removal that had already stopped the
+    // container when it heard that would leave a plugin the register still calls
+    // installed with nothing of it running — the one state this verb must not leave.
+    super::super::putting_back::admitted(ctx, &at, &whose)?;
     let acting = super::offering::acting(
         ctx,
         consent,
@@ -110,11 +117,6 @@ pub(crate) async fn remove(
         ));
     }
 
-    // Judged before anything is taken. The rollback layer refuses a drifted setting or a
-    // change a later one depends on, and a removal that had already stopped the
-    // container when it heard that would leave a plugin the register still calls
-    // installed with nothing of it running — the one state this verb must not leave.
-    super::super::putting_back::admitted(ctx, &at, &whose)?;
     super::super::project::unedited(ctx)?;
     ctx.narrator
         .say(&interrupting(&going.plugin, &interrupts))
@@ -217,6 +219,7 @@ fn answering(
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     }
 }
 

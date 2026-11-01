@@ -710,6 +710,13 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the restart of recyclarr"
     );
+    assert_eq!(
+        described(&change(Kind::MovedInPlace {
+            service: "decline".to_owned(),
+            release: "0.18.0".to_owned(),
+        })),
+        "the move of decline onto its plugin"
+    );
 }
 
 #[test]

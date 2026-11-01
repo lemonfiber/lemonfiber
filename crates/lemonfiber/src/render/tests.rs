@@ -78,6 +78,7 @@ fn every_outcome() -> Vec<Outcome> {
         rehearsed: false,
         unvetted: None,
         waiting: Vec::new(),
+        guards: Vec::new(),
     }));
     every
 }
@@ -338,6 +339,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             reverted_connections: Vec::new(),
             offer: "00000000-00000000".to_owned(),
             confirmed: false,
+            guards: Vec::new(),
         }),
         Outcome::Word(a_term()),
         Outcome::Glossary(Vocabulary {

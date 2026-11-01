@@ -4,8 +4,9 @@ use super::{agreed, ctx, fill};
 use crate::journal::{Change, Kind};
 use crate::wiring::FILLS_KEY;
 
-/// A media server a plugin brought, recorded as installed, with the project written as
-/// lemonfiber last wrote it; answers where the project is.
+/// A media server a plugin brought, recorded as installed beside every plugin recorded
+/// before, with the project written as lemonfiber last wrote it; answers where the
+/// project is.
 fn a_plugin_media_server(ctx: &crate::app::Ctx) -> std::path::PathBuf {
     a_plugin_media_server_as(ctx, |_| ())
 }
@@ -18,7 +19,8 @@ fn a_plugin_media_server_as(
     let mut server = crate::test_support::a_placed("server", &["identity.source"], Some(8097));
     change(&mut server);
     let installed = crate::test_support::an_installed("serving", vec![server]);
-    let mut register = crate::plugin::Register::empty();
+    let mut register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
     assert!(register.record(installed).is_ok());
     assert!(
         crate::app::record::keep(crate::app::plugins::kept_at(ctx).as_deref(), &register).is_ok()

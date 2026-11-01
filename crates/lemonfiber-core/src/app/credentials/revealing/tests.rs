@@ -4,13 +4,9 @@ use crate::config::Settings;
 use crate::credential::{Held, Origin, State, REVEALED, SHOULDER};
 use crate::test_support::a_context;
 
-/// Reached through no filler and no stack directory: the lines these tests name are none a
-/// filler holds.
-fn nowhere() -> (
-    &'static crate::wiring::Fillers,
-    Option<&'static std::path::Path>,
-) {
-    (&EMPTY, None)
+/// Reached through no filler: the lines these tests name are none a filler holds.
+fn nowhere() -> &'static crate::wiring::Fillers {
+    &EMPTY
 }
 
 static EMPTY: std::sync::LazyLock<crate::wiring::Fillers> =

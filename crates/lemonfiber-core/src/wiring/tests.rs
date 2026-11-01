@@ -87,6 +87,17 @@ fn substituting(
     manifest.map(|manifest| substitute(&manifest, &[], chosen, capability, service))
 }
 
+/// What a substitution against the stack this build pins comes to, its guards moved onto
+/// their plugins.
+fn substituting_moved(
+    chosen: &Chosen,
+    capability: &str,
+    service: &str,
+) -> Option<Result<Substitution, Refused>> {
+    let moved = crate::test_support::guards::both_installed();
+    stack().map(|manifest| substitute(&manifest, &moved, chosen, capability, service))
+}
+
 /// One field of a substitution, where it was worked out at all. Three of them,
 /// because a case about one field reads better against that field than against a
 /// whole value most of which it is not about.
@@ -325,8 +336,7 @@ fn a_substitution_names_the_capability_both_services_and_everything_that_asked()
 #[test]
 fn a_capability_every_filler_answers_has_no_single_service_it_was() {
     assert_eq!(
-        was(substituting(
-            stack(),
+        was(substituting_moved(
             &Chosen::default(),
             "library.curate",
             "sonarr"
@@ -423,7 +433,7 @@ fn a_capability_nothing_asks_for_is_refused_rather_than_recorded() {
 #[test]
 fn choosing_what_already_fills_it_is_refused_rather_than_journalled_as_a_change() {
     assert_eq!(
-        substituting(stack(), &Chosen::default(), "identity.source", "jellyfin"),
+        substituting_moved(&Chosen::default(), "identity.source", "jellyfin"),
         Some(Err(Refused::AlreadyFills {
             service: "jellyfin".to_owned(),
             capability: "identity.source".to_owned(),

@@ -6,6 +6,12 @@
       ],
       "required": true
     },
+    "guards": {
+      "type": [
+        "array[ref:StackMoveTaken]"
+      ],
+      "required": false
+    },
     "offer": {
       "type": [
         "string"

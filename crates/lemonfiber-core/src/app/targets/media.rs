@@ -15,7 +15,6 @@ use lemonfiber_contract::capabilities::identity::source;
 use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_manifest::{ApiKind, Manifest};
-use lemonfiber_sidecar::gate::Kind;
 
 use crate::app::Ctx;
 use crate::ports::service::Protocol;
@@ -149,21 +148,20 @@ impl MediaServer {
         self.filler.brought_by()
     }
 
-    /// The kind of route the request gate answers for it, where the gate speaks the API
+    /// Whether the request gate answers a route for it: where the gate speaks the API
     /// other services sign the household in through it in.
     #[must_use]
-    pub(crate) fn gate_kind(&self) -> Option<Kind> {
-        self.gated().map(|(kind, _)| kind)
+    pub(crate) fn gates(&self) -> bool {
+        self.gated().is_some()
     }
 
-    /// The kind of route the request gate answers for it and where that route reaches,
-    /// where the gate speaks the API other services sign the household in through it in.
+    /// Where the request gate's route for it reaches, where the gate speaks the API other
+    /// services sign the household in through it in.
     #[must_use]
-    pub(crate) fn gated(&self) -> Option<(Kind, &Pairing)> {
+    pub(crate) fn gated(&self) -> Option<&Pairing> {
         self.pairing
             .as_ref()
             .filter(|pairing| pairing.protocol.0 == GATE_SPEAKS.name())
-            .map(|pairing| (Kind::Jellyfin, pairing))
     }
 
     /// Whether a rehearsal stands where the identity step mints this server's

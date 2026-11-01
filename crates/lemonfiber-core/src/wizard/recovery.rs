@@ -168,6 +168,7 @@ pub fn described(change: &Change) -> String {
         Kind::Certified { service, .. } => format!("the internal certificate of {service}"),
         Kind::Ran { service, .. } => format!("the stop or start of {service}"),
         Kind::Restarted { service } => format!("the restart of {service}"),
+        Kind::MovedInPlace { service, .. } => format!("the move of {service} onto its plugin"),
     }
 }
 

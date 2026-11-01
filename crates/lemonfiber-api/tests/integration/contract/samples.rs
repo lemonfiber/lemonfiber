@@ -72,6 +72,7 @@ fn running() -> Vec<Outcome> {
             passing: None,
             fencing: None,
             unfenced: Vec::new(),
+            guards: Vec::new(),
         }),
         Outcome::Config(ConfigReport {
             settings: Vec::new(),

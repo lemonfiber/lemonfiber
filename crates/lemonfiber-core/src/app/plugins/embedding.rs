@@ -5,6 +5,8 @@
 //! the bundle pins: nothing is fetched, and nothing about it passes the gates any other
 //! install is held to.
 
+use std::path::{Path, PathBuf};
+
 use lemonfiber_bundled::{Pinned, Stage, PINNED};
 
 use super::{fetching, Consent, Errand, Installs, Register};
@@ -35,8 +37,9 @@ pub(super) async fn embedded(
     let Some(into) = fetching::checkout(ctx, pinned.revision) else {
         return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
     };
+    let outermost = outermost_missing(&into);
     if let Err(why) = written(&into, pinned) {
-        let _ = tokio::fs::remove_dir_all(&into).await;
+        taken_away(&into, &outermost);
         return Err(Box::new(fetching::unfetched(
             pinned.origin,
             &why.to_string(),
@@ -48,8 +51,32 @@ pub(super) async fn embedded(
         vouched: None,
     };
     let result = super::carried(ctx, held, &into, Some(&from), errand, consent).await;
-    let _ = tokio::fs::remove_dir_all(&into).await;
+    taken_away(&into, &outermost);
     result
+}
+
+/// The outermost directory on the way to `into` that is not there yet.
+fn outermost_missing(into: &Path) -> PathBuf {
+    into.ancestors()
+        .take_while(|dir| !dir.exists())
+        .last()
+        .unwrap_or(into)
+        .to_path_buf()
+}
+
+/// `into` taken away, and each directory above it up to `outermost` the errand made,
+/// where nothing else was written into it since.
+fn taken_away(into: &Path, outermost: &Path) {
+    let _ = std::fs::remove_dir_all(into);
+    for dir in into
+        .ancestors()
+        .skip(1)
+        .take_while(|dir| dir.starts_with(outermost))
+    {
+        if std::fs::remove_dir(dir).is_err() {
+            break;
+        }
+    }
 }
 
 /// `pinned`'s manifest and tree, written into `into` made fresh.

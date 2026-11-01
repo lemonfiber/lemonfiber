@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "guards": {
+      "type": [
+        "array[ref:StackMoveTaken]"
+      ],
+      "required": false
+    },
     "rehearsed": {
       "type": [
         "boolean"

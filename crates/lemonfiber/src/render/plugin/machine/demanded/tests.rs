@@ -47,6 +47,7 @@ fn asked(ran: Option<Ran>) -> Installs {
         agreement: Some("1a2b3c4d".to_owned()),
         rehearsed: false,
         unvetted: None,
+        guards: Vec::new(),
     }
 }
 

@@ -96,13 +96,8 @@ async fn the_moved_request_service_is_handed_each_moved_curator_with_its_minted_
     let http = Fake::by_path_in_turn(routes);
     let ctx = asking("targets", http.clone(), &[TELEVISION, REQUESTS]);
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |_| {}),
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
 
     assert_eq!(
         wirings
@@ -136,13 +131,8 @@ async fn a_rehearsed_pass_names_the_curator_and_writes_nothing() {
     let http = Fake::by_path_in_turn(routes);
     let ctx = asking("targets-rehearsed", http.clone(), &[TELEVISION, REQUESTS]).rehearsing();
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |_| {}),
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
 
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
@@ -171,7 +161,6 @@ async fn a_stack_with_no_request_service_is_handed_nothing() {
         &ctx,
         &[curator("sonarr", 8989, "tv")],
         &fillers_of(vec![curator("sonarr", 8989, "tv")]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -187,13 +176,8 @@ async fn a_request_service_that_does_not_answer_is_handed_nothing() {
     let http = Fake::by_path_in_turn(a_curator(television_folder()));
     let ctx = asking("targets-unanswered", http.clone(), &[TELEVISION]);
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |_| {}),
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
@@ -217,13 +201,8 @@ async fn a_curator_that_will_not_say_where_it_files_is_left_out() {
         &[TELEVISION, REQUESTS],
     );
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |_| {}),
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
 
     assert!(
         wirings.is_empty(),
@@ -253,13 +232,8 @@ async fn a_curator_with_no_quality_profile_is_left_out() {
         &[TELEVISION, REQUESTS],
     );
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |_| {}),
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
 
     assert!(
         wirings.is_empty(),
@@ -285,7 +259,6 @@ async fn a_curator_with_no_key_to_read_is_left_out() {
                 secret.minted = false;
             }
         }),
-        Some(stack_root()),
     )
     .await;
 
@@ -307,7 +280,6 @@ async fn a_curator_publishing_no_port_is_left_out() {
         &moved(Vec::new(), |plugin| {
             curators(plugin).for_each(|placed| placed.listens = None);
         }),
-        Some(stack_root()),
     )
     .await;
 
@@ -323,7 +295,6 @@ async fn nothing_is_handed_over_where_there_is_no_request_service() {
         &ctx,
         &[curator("sonarr", 8989, "tv")],
         &fillers_of(vec![curator("sonarr", 8989, "tv")]),
-        Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
 
@@ -343,13 +314,8 @@ async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
     let http = Fake::by_path_in_turn(a_curator(television_folder()));
     let ctx = asking("targets-unread", http.clone(), &[REQUESTS]);
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |_| {}),
-        Some(stack_root()),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
 
     assert!(
         wirings.is_empty(),
@@ -392,7 +358,6 @@ async fn a_contracted_request_service_untrusted_or_unreachable_is_handed_nothing
             &ctx,
             &[curator("sonarr", 8989, "tv")],
             &contracted_requests(&project, trusted),
-            Some(&project),
         )
         .await;
 
@@ -436,13 +401,9 @@ async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_
     let http = Fake::by_path_in_turn(a_curator(television_folder()));
     let ctx = contracted_ctx(&project, "seerr", true, http.clone());
 
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[curator("sonarr", 8989, "tv")],
-        &fillers,
-        Some(&project),
-    )
-    .await;
+    let wirings =
+        super::super::seed_fulfilment_targets(&ctx, &[curator("sonarr", 8989, "tv")], &fillers)
+            .await;
 
     assert!(
         wirings

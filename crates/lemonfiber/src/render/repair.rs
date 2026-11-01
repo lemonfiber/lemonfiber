@@ -155,6 +155,7 @@ fn restoring(action: &Action) -> String {
         Action::Unreplaced { service } => {
             format!("the internal certificate of {service} left as it is")
         }
+        Action::Unmoved { service } => format!("{service} left on its plugin"),
         Action::Run {
             service,
             running: true,

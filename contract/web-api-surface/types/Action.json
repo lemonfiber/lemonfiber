@@ -26,6 +26,7 @@
         "const:\"revoke-device\"",
         "const:\"rewind\"",
         "const:\"run\"",
+        "const:\"unmoved\"",
         "const:\"unreplaced\"",
         "const:\"withdraw\""
       ],
@@ -189,6 +190,7 @@
     "\"revoke-device\"",
     "\"rewind\"",
     "\"run\"",
+    "\"unmoved\"",
     "\"unreplaced\"",
     "\"withdraw\""
   ]

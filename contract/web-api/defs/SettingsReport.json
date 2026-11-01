@@ -14,6 +14,13 @@
         }
       ]
     },
+    "guards": {
+      "description": "Each of lemonfiber's own guards this act moved onto its plugin after its own\nchange, or on a reading would move, for good and with no yes of its own; one it\ncould not move stays on offer and says why.",
+      "type": "array",
+      "items": {
+        "$ref": "StackMoveTaken.json"
+      }
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal.",
       "type": "boolean"

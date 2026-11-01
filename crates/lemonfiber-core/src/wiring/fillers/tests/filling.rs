@@ -1,6 +1,7 @@
 use super::super::Fillers;
 use super::shipped;
 use crate::origin::Origin;
+use crate::test_support::guards::both_installed;
 use crate::test_support::{a_placed, an_installed};
 use crate::wiring::Chosen;
 
@@ -11,11 +12,12 @@ fn filled_by(fillers: &Fillers, capability: &str) -> Option<(String, Option<Stri
         .map(|(filler, asker)| (filler.id.clone(), asker.map(|one| one.id.clone())))
 }
 
-/// A capability the stack asks for is filled by what the ask settled on, with the
+/// A capability the stack's guards ask for is filled by what the ask settled on, with the
 /// service that asked; one the ask leaves contested is filled by nothing.
 #[test]
 fn a_capability_asked_for_is_filled_as_the_ask_settled() {
-    let fillers = shipped(&[], &Chosen::default(), |_| ());
+    let moved = both_installed();
+    let fillers = shipped(&moved, &Chosen::default(), |_| ());
     assert_eq!(
         filled_by(&fillers, "identity.source"),
         Some(("jellyfin".to_owned(), Some("decline".to_owned())))
@@ -25,7 +27,7 @@ fn a_capability_asked_for_is_filled_as_the_ask_settled() {
         "emby",
         vec![a_placed("emby", &["identity.source"], Some(8920))],
     );
-    let contested = shipped(&[rival], &Chosen::default(), |_| ());
+    let contested = shipped(&[moved, vec![rival]].concat(), &Chosen::default(), |_| ());
     assert_eq!(filled_by(&contested, "identity.source"), None);
 }
 

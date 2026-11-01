@@ -20,6 +20,11 @@ pub struct SettingsReport {
     /// over the project this run would start, and held to nothing lemonfiber vets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unvetted: Option<crate::model::Unvetted>,
+    /// Each of lemonfiber's own guards this act moved onto its plugin after its own
+    /// change, or on a reading would move, for good and with no yes of its own; one it
+    /// could not move stays on offer and says why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guards: Vec<crate::update::run::Moved>,
 }
 
 /// One setting.

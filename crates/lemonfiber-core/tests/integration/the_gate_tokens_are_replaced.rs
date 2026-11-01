@@ -6,47 +6,38 @@ use std::sync::Arc;
 
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::ports::service::{Endpoint, MediaServerLink, RegisteredTarget};
+use lemonfiber_core::ports::digest::sha256;
+use lemonfiber_core::ports::service::{Endpoint, Gated, MediaServerLink, RegisteredTarget, Target};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::FixedRandom;
-use lemonfiber_sidecar::gate::{Accepted, Credential, Kind, Tokens, Upstream, Upstreams};
-use lemonfiber_sidecar::TokenHash;
 use lemonfiber_testing::curators::TELEVISION;
+use lemonfiber_testing::guards::{with_gate, Gate, GATE};
 use lemonfiber_testing::media;
 use lemonfiber_testing::requests::{self, REQUESTS};
 
-/// The gate accepting `tokens` on the curator's route.
-fn accepting(tokens: &[&str]) -> String {
-    Tokens::of(vec![Accepted {
-        route: "sonarr".to_owned(),
-        tokens: tokens.iter().map(|token| TokenHash::of(token)).collect(),
-    }])
-    .written()
+/// The hash of each of `tokens`, as the gate accepts them.
+fn accepting(tokens: &[&str]) -> Vec<String> {
+    tokens.iter().map(|token| sha256(token)).collect()
 }
 
 #[tokio::test]
 async fn a_gate_token_is_listed_unprinted_and_replaced() {
     let stack: &'static Path =
         Box::leak(crate::common::stack::with_the_gate("tokens-dispatched").into_boxed_path());
-    let gate = stack.join("config/request-gate");
-    let _ = std::fs::create_dir_all(&gate);
-    let _ = std::fs::write(
-        gate.join("upstreams.json"),
-        Upstreams::of(vec![Upstream {
-            route: "sonarr".to_owned(),
-            kind: Kind::Sonarr,
-            address: "http://sonarr:8989".to_owned(),
-            credential: Credential::new("sonarrs"),
-            majors: Vec::new(),
-            pins: lemonfiber_sidecar::Pins::default(),
-        }])
-        .written(),
-    );
-    let _ = std::fs::write(gate.join("tokens.json"), accepting(&["held"]));
+    let gate = Arc::new(Gate::admitting(vec![Gated {
+        target: Target::Curator {
+            media_type: "tv".to_owned(),
+        },
+        path: "sonarr".to_owned(),
+        address: "http://sonarr:8989".to_owned(),
+        majors: Vec::new(),
+        credential: "sonarrs".to_owned(),
+        tokens: accepting(&["held"]),
+    }]));
     let through = |base: &str| Endpoint {
         host: "request-gate".to_owned(),
-        port: lemonfiber_sidecar::gate::PORT,
+        port: GATE.listens().unwrap_or_default(),
         base: base.to_owned(),
     };
     let http = Fake::by_path_in_turn(vec![
@@ -88,6 +79,7 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
             .with_random(Arc::new(FixedRandom(Some(vec![0xab; 24])))),
         &[TELEVISION, REQUESTS, media::MOVED],
     );
+    let ctx = with_gate(ctx, &gate);
     TELEVISION.minted(&ctx, "sonarrs");
     let asked = |asking| dispatch(Command::Credentials(asking), &ctx);
 
@@ -109,7 +101,6 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
         Ok(Outcome::Credentials(inventory)) => inventory.rotated.map(|one| one.settled),
         _ => None,
     };
-    let accepted_now = std::fs::read_to_string(gate.join("tokens.json")).unwrap_or_default();
     let _ = std::fs::remove_dir_all(stack);
 
     assert!(shown.is_some_and(|one| one.value.is_none()));
@@ -120,5 +111,5 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
         ),
         "{rotated:?}"
     );
-    assert_eq!(accepted_now, accepting(&[&"ab".repeat(24)]));
+    assert_eq!(gate.tokens("sonarr"), Some(accepting(&[&"ab".repeat(24)])));
 }

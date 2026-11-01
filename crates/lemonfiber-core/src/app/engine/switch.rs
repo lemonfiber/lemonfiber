@@ -69,6 +69,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     // guard comes to hold everywhere but the path nobody remembered.
     super::verified(ctx).await?;
     let (passing, fencing) = super::beside_readied(ctx).await;
+    let guards = super::guards_moved(ctx, forms).await?;
 
     let Composed {
         manifest,
@@ -82,11 +83,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     // Surveyed across every profile the stack declares rather than across the new
     // closure. The services a switch has to stop are the ones the new closure does
     // not hold, so asking only about the new closure would never see them.
-    let declared: Vec<String> = manifest
-        .profiles
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect();
+    let declared: Vec<String> = manifest.profile_ids();
     let containers = ctx
         .seams
         .engine
@@ -140,6 +137,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         offer: None,
         unvetted: crate::overlay::unvetted(ctx),
         moves: Vec::new(),
+        guards,
         swept: sweep.networks.clone(),
         passing,
         fencing,

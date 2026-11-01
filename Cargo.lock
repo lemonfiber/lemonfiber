@@ -1832,6 +1832,7 @@ dependencies = [
 name = "lemonfiber-testing"
 version = "0.17.0"
 dependencies = [
+ "async-trait",
  "include_dir",
  "lemonfiber-adapters",
  "lemonfiber-bundle",
@@ -1843,6 +1844,7 @@ dependencies = [
  "lemonfiber-plugin",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

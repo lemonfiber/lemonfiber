@@ -874,6 +874,11 @@
     "status": 409,
     "description": "Raised where `DATA_ROOT` names an NFS export lemonfiber cannot write into the mount options, so no project is written from it."
   },
+  "UNDO-5": {
+    "name": "MOVED_FOR_GOOD",
+    "status": 409,
+    "description": "Raised when a run moved one of lemonfiber's own guards onto its plugin, which no undo or removal puts back."
+  },
   "UPDATE-5": {
     "name": "UPDATE_MOVED",
     "status": 400,

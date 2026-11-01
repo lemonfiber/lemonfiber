@@ -442,6 +442,7 @@ fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Instal
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     }
 }
 

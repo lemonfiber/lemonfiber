@@ -167,6 +167,7 @@ pub(super) async fn install(
                 return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
             }
             recorded = true;
+            super::guarding::journalled(ctx, &stack_manifest, &would)?;
             super::kept::kept(ctx, &would, &crate::plugin::root(path));
             let _ = super::conformance::cleared(ctx, &would.plugin);
             let _ = crate::seed::run::refront(ctx).await;
@@ -211,6 +212,7 @@ pub(super) async fn install(
         sources: Vec::new(),
         agreement: Some(offer),
         unvetted: None,
+        guards: Vec::new(),
     })
 }
 

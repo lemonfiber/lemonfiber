@@ -249,6 +249,7 @@ fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
         reverted_connections: Vec::new(),
         offer: "00000000-00000000".to_owned(),
         confirmed: false,
+        guards: Vec::new(),
     };
     assert_ne!(
         format!("{:?}", settled(&Outcome::Reset(pending))),
@@ -260,6 +261,7 @@ fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
         reverted_connections: Vec::new(),
         offer: "00000000-00000000".to_owned(),
         confirmed: false,
+        guards: Vec::new(),
     };
     assert_eq!(
         format!("{:?}", settled(&Outcome::Reset(nothing))),

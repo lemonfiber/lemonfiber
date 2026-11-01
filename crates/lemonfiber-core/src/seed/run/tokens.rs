@@ -6,10 +6,7 @@
 //! hash the gate is handed beside the old one before the request service is, so no
 //! call fails in between, and alone once the request service holds the new one.
 
-use std::path::Path;
 use std::sync::Arc;
-
-use lemonfiber_sidecar::gate::PORT;
 
 use super::Ctx;
 use crate::app::gating;
@@ -27,7 +24,7 @@ pub(crate) const UNASKED: &str = "the request gate is not one the stack's creden
 pub(crate) fn through_the_gate(route: &str) -> Endpoint {
     Endpoint {
         host: gating::SERVICE.to_owned(),
-        port: PORT,
+        port: crate::app::gating::PORT,
         base: format!("/{route}"),
     }
 }
@@ -43,10 +40,10 @@ pub(crate) struct Kept {
 }
 
 impl Kept {
-    /// What the gate under `project` admits now: nothing, where it cannot say, which every
-    /// token then fails and is replaced. Nothing at all where the gate cannot be asked.
-    pub(crate) async fn read(ctx: &Ctx, fillers: &Fillers, project: &Path) -> Option<Kept> {
-        let gate = gating::asked(ctx, fillers, project).await?;
+    /// What the gate admits now: nothing, where it cannot say, which every token then
+    /// fails and is replaced. Nothing at all where the gate cannot be asked.
+    pub(crate) async fn read(ctx: &Ctx, fillers: &Fillers) -> Option<Kept> {
+        let gate = gating::asked(ctx, fillers).await?;
         let accepted = gate.admitted().await.unwrap_or_default();
         Some(Self { gate, accepted })
     }

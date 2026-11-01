@@ -129,10 +129,11 @@ fn an_account_never_offered_is_vouched_for() {
 }
 
 /// A context whose record holds an offer on `a7f3` lapsing `lapses_in` hours from now,
-/// claimed by `a-claim` and declined by `a-refusal`, with the decline service's refusals
-/// written under a stack of its own where `refused`.
+/// claimed by `a-claim` and declined by `a-refusal`, over a stack of its own whose decline
+/// service answers it declined that offer where `refused`.
 fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
-    use lemonfiber_sidecar::decline::{File, Refusal, Refusals, TokenHash};
+    use crate::test_support::guards::{Decline, Serving, DECLINE};
+    use lemonfiber_sidecar::TokenHash;
 
     let context = offered(tag, lapses_in);
     let mut offers = on_record(&context);
@@ -144,21 +145,25 @@ fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
     let project =
         lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}-stack")).kept();
     lemonfiber_fixtures::stack::manifest_into(&project);
-    if refused {
-        let record = crate::app::invite::declining::path(&project, File::Refusals);
-        let refusals = Refusals::default().with(Refusal {
-            token: TokenHash::of("a-refusal"),
+    let refusals = if refused {
+        vec![crate::ports::service::Declined {
+            token: TokenHash::of("a-refusal").as_str().to_owned(),
             account: "a7f3".to_owned(),
             at: 1,
-        });
-        let _ = std::fs::create_dir_all(record.parent().unwrap_or(project.as_path()));
-        let _ = std::fs::write(&record, refusals.written());
-    }
+        }]
+    } else {
+        Vec::new()
+    };
+    let decline = Arc::new(Decline::default().declining(refusals));
     let project: &'static std::path::Path = Box::leak(project.into_boxed_path());
-    Ctx {
-        stack: crate::stack::Source::External(project),
-        ..context
-    }
+    DECLINE
+        .reaching(Ctx {
+            stack: crate::stack::Source::External(project),
+            ..context
+        })
+        .with_http(Arc::new(
+            Serving::beside(Transport::silent()).decline(&decline),
+        ))
 }
 
 /// The token its offer carries claims an account's standing invitation, and nothing

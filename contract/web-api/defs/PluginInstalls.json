@@ -21,6 +21,13 @@
         }
       ]
     },
+    "guards": {
+      "description": "Each of lemonfiber's own guards this run moved onto its plugin after its own\nchange, or on a reading would move, for good and with no yes of its own; one it\ncould not move stays on offer and says why.",
+      "type": "array",
+      "items": {
+        "$ref": "StackMoveTaken.json"
+      }
+    },
     "install": {
       "description": "What this run's install came to, or nothing where it only read.\n\nBoxed for the reason the update is: it carries a whole account, and every other\nrun's report would otherwise be as large as the one run that installs.",
       "anyOf": [

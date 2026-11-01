@@ -30,6 +30,12 @@
       ],
       "required": true
     },
+    "guards": {
+      "type": [
+        "array[ref:StackMoveTaken]"
+      ],
+      "required": false
+    },
     "halted": {
       "type": [
         "null|string"

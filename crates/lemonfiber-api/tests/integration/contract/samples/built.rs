@@ -51,6 +51,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
             service: "jellyfin".to_owned(),
             configured_by: None,
         }],
+        guards: Vec::new(),
     }
 }
 
@@ -220,6 +221,7 @@ pub(super) fn a_substitution() -> SubstitutionReport {
         },
         applied: true,
         agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned(),
+        guards: Vec::new(),
     }
 }
 
@@ -280,6 +282,7 @@ pub(super) fn a_settings_report() -> SettingsReport {
         rehearsed: false,
         unvetted: None,
         waiting: Vec::new(),
+        guards: Vec::new(),
     }
 }
 
@@ -402,6 +405,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         substituted: Vec::new(),
         sources: Vec::new(),
         unvetted: None,
+        guards: Vec::new(),
     }
 }
 

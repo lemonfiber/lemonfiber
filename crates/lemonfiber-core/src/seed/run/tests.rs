@@ -11,15 +11,17 @@ use crate::app::{dispatch, Command, Ctx, Outcome};
 use crate::config::{store, Settings};
 use crate::model::VersionReport;
 use crate::ports::docker::{Health, Lifecycle};
-use crate::ports::service::{Credential, RootFolder};
+use crate::ports::service::{Credential, Gated, RootFolder, Target};
 use crate::seed::{Severity, State, Wiring};
 use crate::stack::Source;
 use crate::test_support::curators::curated;
+use crate::test_support::guards::Gate;
 use crate::test_support::indexer::INDEXER;
 use crate::test_support::requests::REQUESTS;
 use crate::test_support::syncing::minted_for_every_part;
 use crate::test_support::{
-    a_context, contracted, first_party, seeding, seeding_with, FixedRandom, Reporting, SeedFs,
+    a_context, a_contracted_decline, a_contracted_gate, contracted, first_party, seeding,
+    seeding_with, FixedRandom, Reporting, SeedFs, DECLINE_TRUSTED, GATE_TRUSTED,
 };
 use lemonfiber_fixtures::http::{Answer, Fake};
 
@@ -330,41 +332,58 @@ fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wi
         .collect()
 }
 
-/// The gate's routes file admitting one route to each of `routes`, named by the curator's
-/// id or the media server's, presenting the credential beside it.
-fn admitting(routes: &[(&str, lemonfiber_sidecar::gate::Kind, &str)]) -> String {
-    lemonfiber_sidecar::gate::Upstreams::of(
-        routes
-            .iter()
-            .map(
-                |(route, kind, credential)| lemonfiber_sidecar::gate::Upstream {
-                    route: (*route).to_owned(),
-                    kind: *kind,
-                    address: format!("http://{route}:80"),
-                    credential: lemonfiber_sidecar::gate::Credential::new(*credential),
-                    majors: Vec::new(),
-                    pins: lemonfiber_sidecar::Pins::default(),
-                },
-            )
-            .collect(),
-    )
-    .written()
+/// A route the gate admits under `path`, to the curator filing `media_type` or to the
+/// media server where none, presenting `credential` and admitting no token yet.
+fn gated_route(path: &str, media_type: Option<&str>, credential: &str) -> Gated {
+    Gated {
+        target: media_type.map_or(Target::MediaServer { pins: Vec::new() }, |media_type| {
+            Target::Curator {
+                media_type: media_type.to_owned(),
+            }
+        }),
+        path: path.to_owned(),
+        address: format!("http://{path}:80"),
+        majors: Vec::new(),
+        credential: credential.to_owned(),
+        tokens: Vec::new(),
+    }
 }
 
-/// The gate under `project` admitting `routes`, as [`admitting`] writes them.
-fn routed(project: &std::path::Path, routes: &[(&str, lemonfiber_sidecar::gate::Kind, &str)]) {
-    let _ = store::write(
-        &crate::app::gating::path(project, lemonfiber_sidecar::gate::File::Upstreams),
-        &admitting(routes),
-    );
+/// A gate admitting one route to each of `routes`, under the curator's id or the media
+/// server's, to the curator filing the media type beside it or the media server where
+/// none, presenting the credential beside that.
+fn admitting(routes: &[(&str, Option<&str>, &str)]) -> Gate {
+    Gate::admitting(
+        routes
+            .iter()
+            .map(|(path, media_type, credential)| gated_route(path, *media_type, credential))
+            .collect(),
+    )
+}
+
+/// `services` written at `project`, with `installed` beside them, and
+/// [`a_contracted_gate`] and [`a_contracted_decline`] standing in for the stack's own
+/// guards where `services` runs them.
+fn guarded_beside(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+    project: &std::path::Path,
+) -> crate::wiring::Fillers {
+    let gating = crate::app::gating::service(&services).is_some();
+    let declining = crate::app::invite::declining::service(&services).is_some();
+    let installed: Vec<_> = installed
+        .iter()
+        .cloned()
+        .chain(gating.then(a_contracted_gate))
+        .chain(declining.then(a_contracted_decline))
+        .collect();
+    let trusted: Vec<_> = GATE_TRUSTED.into_iter().chain(DECLINE_TRUSTED).collect();
+    fillers_trusting(services, &installed, project, &beside_the_bundle(&trusted))
 }
 
 /// The stack's request gate, filling `request.gate`.
 fn request_gate() -> lemonfiber_manifest::Service {
-    let mut gate = manifest_service(
-        crate::app::gating::SERVICE,
-        Some(lemonfiber_sidecar::gate::PORT),
-    );
+    let mut gate = manifest_service(crate::app::gating::SERVICE, Some(crate::app::gating::PORT));
     gate.provides = vec![lemonfiber_contract::capabilities::request::gate::CAPABILITY.to_owned()];
     gate
 }

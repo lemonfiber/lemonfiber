@@ -101,43 +101,13 @@ const NAMED: &[Named] = &[
         file: "crates/lemonfiber-core/src/app/credentials/declining.rs",
         part: "jellyfin",
         count: 1,
-        until: Until::Moves("decline"),
+        until: Until::Earlier,
     },
     Named {
         file: "crates/lemonfiber-core/src/app/credentials/gating.rs",
         part: "jellyfin",
         count: 2,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/app/gating.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/app/gating.rs",
-        part: "radarr",
-        count: 2,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/app/gating.rs",
-        part: "sonarr",
-        count: 2,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/app/gating/configured.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/app/targets/media.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Moves("request-gate"),
+        until: Until::Earlier,
     },
     Named {
         file: "crates/lemonfiber-core/src/backup.rs",
@@ -306,30 +276,6 @@ const NAMED: &[Named] = &[
         part: "gluetun",
         count: 1,
         until: Until::Moves("gluetun"),
-    },
-    Named {
-        file: "crates/lemonfiber-sidecar/src/decline.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Moves("decline"),
-    },
-    Named {
-        file: "crates/lemonfiber-sidecar/src/gate.rs",
-        part: "jellyfin",
-        count: 1,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-sidecar/src/gate.rs",
-        part: "radarr",
-        count: 1,
-        until: Until::Moves("request-gate"),
-    },
-    Named {
-        file: "crates/lemonfiber-sidecar/src/gate.rs",
-        part: "sonarr",
-        count: 1,
-        until: Until::Moves("request-gate"),
     },
 ];
 

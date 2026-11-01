@@ -7,8 +7,6 @@
 //! hashes and could not hand over a real one. So the token is written to the request
 //! service here, straight after, which it proves through the gate before it keeps it.
 
-use std::path::Path;
-
 use super::tokens::{through_the_gate, Kept, Presented};
 use super::Ctx;
 use crate::app::targets::MediaServer;
@@ -24,7 +22,6 @@ pub(super) async fn seed_media_server_link(
     requests: &dyn Requests,
     asker: &Filler,
     server: &MediaServer,
-    project: &Path,
 ) -> Wiring {
     let rests = |state| settled(asker, server, state);
     let route = server.id();
@@ -33,7 +30,7 @@ pub(super) async fn seed_media_server_link(
         Ok(link) => link,
         Err(failure) => return rests(crate::seed::unreached(&failure)),
     };
-    let Some(kept) = Kept::read(ctx, fillers, project).await else {
+    let Some(kept) = Kept::read(ctx, fillers).await else {
         return rests(State::Failed {
             detail: super::tokens::UNASKED.to_owned(),
         });

@@ -105,37 +105,23 @@ pub(super) fn telling(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> De
 /// Whether the decline service's key was used for anything the service did not record,
 /// built when it runs, so the media server that dates the key is asked over its contract
 /// where it speaks it.
-pub(super) fn declined(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    project: Option<&Path>,
-) -> Deferred {
+pub(super) fn declined(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
     let (ctx, manifest) = (ctx.clone(), manifest.clone());
-    let project: Option<PathBuf> = project.map(Path::to_path_buf);
     Deferred::new(Category::Services, CHECK_BUDGET, move || {
-        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
-        async move {
-            Box::new(DeclineKeyCheck::new(
-                decline(&ctx, &manifest, project.as_deref()).await,
-            )) as Box<dyn Check>
-        }
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
+        async move { Box::new(DeclineKeyCheck::new(decline(&ctx, &manifest).await)) as Box<dyn Check> }
     })
 }
 
 /// What the request gate refused and removed since the last diagnosis, built when it runs.
-pub(super) fn gated(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    project: Option<&Path>,
-) -> Deferred {
+pub(super) fn gated(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
     let (ctx, manifest) = (ctx.clone(), manifest.clone());
-    let project: Option<PathBuf> = project.map(Path::to_path_buf);
     Deferred::new(Category::Services, CHECK_BUDGET, move || {
-        let (ctx, manifest, project) = (ctx.clone(), manifest.clone(), project.clone());
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
         async move {
             Box::new(GateRecordCheck::new(
                 ctx.seams.filesystem.clone(),
-                gate(&ctx, &manifest, project.as_deref()).await,
+                gate(&ctx, &manifest).await,
             )) as Box<dyn Check>
         }
     })
@@ -143,30 +129,21 @@ pub(super) fn gated(
 
 /// The request gate as the core asks it, and where the last place read in its record is
 /// kept beside the settings, where the stack runs one.
-async fn gate(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    project: Option<&Path>,
-) -> Option<Gate> {
-    let project = project.filter(|_| crate::app::gating::service(&manifest.services).is_some())?;
+async fn gate(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Option<Gate> {
+    crate::app::gating::service(&manifest.services)?;
     let fillers = crate::app::targets::fillers_here(ctx, manifest);
     Some(Gate {
-        service: crate::app::gating::asked(ctx, &fillers, project).await,
+        service: crate::app::gating::asked(ctx, &fillers).await,
         read: crate::app::targets::beside_env(ctx, crate::config::paths::GATE_READ),
     })
 }
 
 /// The decline service as the core asks it and the media server that dates its key, where
 /// the stack runs one it can ask.
-async fn decline(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    project: Option<&Path>,
-) -> Option<Decline> {
-    let project =
-        project.filter(|_| crate::app::invite::declining::service(&manifest.services).is_some())?;
+async fn decline(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Option<Decline> {
+    crate::app::invite::declining::service(&manifest.services)?;
     let fillers = crate::app::targets::fillers_here(ctx, manifest);
-    let service = crate::app::invite::declining::asked(ctx, &fillers, project).await;
+    let service = crate::app::invite::declining::asked(ctx, &fillers).await;
     let keys = match crate::app::targets::declined_server(&fillers) {
         Some(server) => server.administering(ctx).await,
         None => None,

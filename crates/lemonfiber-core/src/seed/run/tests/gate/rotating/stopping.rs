@@ -6,13 +6,12 @@ use super::*;
 
 #[tokio::test(start_paused = true)]
 async fn a_media_server_lemonfiber_writes_no_certificate_for_has_none_replaced() {
-    let (ctx, at, old) = machine("rotating-unconfined", answering(now(), true));
+    let (ctx, at, old, _) = machine("rotating-unconfined", answering(now(), true));
     let (services, fillers, mut server) = parts(&at);
     server.served.confined_to = None;
     let stack = Stack {
         services: &services,
         fillers: &fillers,
-        project: Some(&at),
     };
 
     assert!(replacing::replaced(&ctx, stack, &server).await.is_empty());
@@ -25,13 +24,12 @@ async fn a_media_server_lemonfiber_writes_no_certificate_for_has_none_replaced()
 
 #[tokio::test(start_paused = true)]
 async fn a_media_server_that_cannot_be_asked_to_serve_it_goes_on_serving_the_old_one() {
-    let (ctx, at, old) = machine("rotating-unplaced", answering(now(), true));
+    let (ctx, at, old, _) = machine("rotating-unplaced", answering(now(), true));
     let (services, fillers, mut server) = parts(&at);
     server.served.config_at = None;
     let stack = Stack {
         services: &services,
         fillers: &fillers,
-        project: Some(&at),
     };
 
     let unplaced = replacing::replaced(&ctx, stack, &server).await;
@@ -43,7 +41,12 @@ async fn a_media_server_that_cannot_be_asked_to_serve_it_goes_on_serving_the_old
     assert_eq!(kept(&at).current, Some(old.clone()));
 
     let http = answering(now(), true);
-    let (ctx, at, old) = machine_administered("rotating-unadministered", false, http.clone());
+    let (ctx, at, old, _) = machine_beside(
+        "rotating-unadministered",
+        false,
+        Gate::admitting(holding(CURATORS, "held")),
+        http.clone(),
+    );
 
     let unasked = replace(&ctx, &at).await;
 
@@ -59,9 +62,9 @@ async fn a_media_server_that_cannot_be_asked_to_serve_it_goes_on_serving_the_old
 #[tokio::test(start_paused = true)]
 async fn a_certificate_that_cannot_be_withdrawn_stays_handed_beside_the_new_one() {
     use std::os::unix::fs::PermissionsExt as _;
-    let (mut ctx, at, old) = machine("rotating-unwithdrawn", answering(now(), false));
+    let (mut ctx, at, old, gate) = machine("rotating-unwithdrawn", answering(now(), false));
     let _ = replace(&ctx, &at).await;
-    ctx.seams.http = answering(now(), true);
+    ctx.seams.http = beside(answering(now(), true), &gate);
     let directory = internal::path(&config(&at))
         .parent()
         .map(std::path::Path::to_path_buf)
@@ -82,12 +85,12 @@ async fn a_certificate_that_cannot_be_withdrawn_stays_handed_beside_the_new_one(
         unreachable!("the replacement is in place");
     };
     assert_eq!(after.previous, Some(old.clone()));
-    assert_eq!(gate_pins(&at), both(&old, &new));
+    assert_eq!(gate_pins(&gate), both(&old, &new));
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_replacement_with_nobody_to_hand_it_says_so() {
-    let (_, at, _) = machine("rotating-unheld", answering(now(), true));
+    let (_, at, _, _) = machine("rotating-unheld", answering(now(), true));
     let (_, fillers, server) = parts(&at);
     let alone = stack(false);
 
@@ -95,7 +98,6 @@ async fn a_replacement_with_nobody_to_hand_it_says_so() {
         Stack {
             services: &alone,
             fillers: &fillers,
-            project: Some(&at),
         },
         &server,
     );
@@ -110,7 +112,7 @@ async fn a_replacement_with_nobody_to_hand_it_says_so() {
 /// where `left` is nothing, once the media server is asked to serve one, as a disk that
 /// fails part-way through a replacement leaves it.
 struct Spoiling {
-    inner: Arc<Fake>,
+    inner: Arc<dyn crate::ports::http::Http>,
     spoiled: std::path::PathBuf,
     left: Option<&'static str>,
 }
@@ -134,14 +136,14 @@ impl crate::ports::http::Http for Spoiling {
 #[tokio::test(start_paused = true)]
 async fn a_replacement_whose_outcome_cannot_be_read_back_is_never_reported_as_landed() {
     let http = answering(now(), true);
-    let (mut ctx, at, _) = machine("rotating-spoiled", http.clone());
+    let (mut ctx, at, _, gate) = machine("rotating-spoiled", http.clone());
     let offer = rotated(&ctx, &at, None)
         .await
         .ok()
         .and_then(|read| read.offer)
         .unwrap_or_default();
     ctx.seams.http = Arc::new(Spoiling {
-        inner: http.clone(),
+        inner: beside(http.clone(), &gate),
         spoiled: internal::path(&config(&at)),
         left: Some("not a certificate"),
     });
@@ -156,9 +158,9 @@ async fn a_replacement_whose_outcome_cannot_be_read_back_is_never_reported_as_la
         "{spoiled:?}"
     );
 
-    let (mut ctx, at, _) = machine("rotating-lost", http.clone());
+    let (mut ctx, at, _, gate) = machine("rotating-lost", http.clone());
     ctx.seams.http = Arc::new(Spoiling {
-        inner: http,
+        inner: beside(http, &gate),
         spoiled: internal::path(&config(&at)),
         left: None,
     });
@@ -173,15 +175,35 @@ async fn a_replacement_whose_outcome_cannot_be_read_back_is_never_reported_as_la
 
 #[tokio::test(start_paused = true)]
 async fn a_replacement_taken_up_again_stops_where_a_holder_or_the_certificate_went_missing() {
-    let (mut ctx, at, old) = machine("rotating-taken-up", answering(now(), false));
+    let (mut ctx, at, old, gate) = machine("rotating-taken-up", answering(now(), false));
     let _ = replace(&ctx, &at).await;
-    ctx.seams.http = answering(now(), true);
+    ctx.seams.http = beside(answering(now(), true), &gate);
     let Some(new) = kept(&at).current else {
         unreachable!("the replacement is in place");
     };
-    let routes = routes_file(&at);
-    let held = std::fs::read_to_string(&routes).unwrap_or_default();
-    let _ = std::fs::write(&routes, held.replace(&new.fingerprint, &"0".repeat(64)));
+    let unpinned: Vec<Gated> = gate
+        .routes()
+        .into_iter()
+        .map(|route| match route.target {
+            Target::MediaServer { pins } => Gated {
+                target: Target::MediaServer {
+                    pins: pins
+                        .into_iter()
+                        .map(|pin| {
+                            if pin == new.fingerprint {
+                                "0".repeat(64)
+                            } else {
+                                pin
+                            }
+                        })
+                        .collect(),
+                },
+                ..route
+            },
+            Target::Curator { .. } => route,
+        })
+        .collect();
+    let _ = crate::ports::service::Gating::admit(gate.as_ref(), &unpinned).await;
 
     let unheld = advance(&ctx, &at).await;
 
@@ -206,18 +228,8 @@ async fn a_replacement_taken_up_again_stops_where_a_holder_or_the_certificate_we
 async fn a_replacement_that_cannot_be_put_in_place_is_never_served() {
     use std::os::unix::fs::PermissionsExt as _;
     let http = answering(now(), true);
-    let (ctx, at, old) = machine("rotating-unpromoted", http.clone());
-    let (services, fillers, server) = parts(&at);
-    let _ = replacing::replaced(
-        &ctx,
-        Stack {
-            services: &services,
-            fillers: &fillers,
-            project: None,
-        },
-        &server,
-    )
-    .await;
+    let (ctx, at, old, _) = machine("rotating-unpromoted", http.clone());
+    let _ = internal::staged(&lemonfiber_adapters::Disk, &config(&at), "jellyfin");
     let _ = seeded(&ctx, &http, true, &at).await;
     let directory = internal::path(&config(&at))
         .parent()
@@ -234,4 +246,9 @@ async fn a_replacement_that_cannot_be_put_in_place_is_never_served() {
     );
     assert_eq!(kept(&at).current, Some(old));
     assert!(!http.asked_for(media::serve("serve_tls")));
+}
+
+/// `http`, with `gate` answering every `request.gate` call beside it.
+fn beside(http: Arc<Fake>, gate: &Arc<Gate>) -> Arc<dyn crate::ports::http::Http> {
+    Arc::new(crate::test_support::guards::Serving::beside(http).gate(gate))
 }

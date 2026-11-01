@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "guards": {
+      "type": [
+        "array[ref:StackMoveTaken]"
+      ],
+      "required": false
+    },
     "install": {
       "type": [
         "anyOf(null,ref:PluginInstall)"

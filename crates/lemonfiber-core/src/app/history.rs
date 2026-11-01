@@ -180,6 +180,9 @@ fn did(kind: &Kind) -> String {
         } => format!("started {service}"),
         Kind::Ran { service, .. } => format!("stopped {service}"),
         Kind::Restarted { service } => format!("restarted {service}"),
+        Kind::MovedInPlace { service, release } => {
+            format!("moved {service} onto its plugin for good, in {release}")
+        }
     }
 }
 

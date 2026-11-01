@@ -12,8 +12,6 @@
 //! not an omission, but the same rule applied: a curator that cannot fulfil a request
 //! is not offered as somewhere to send one.
 
-use std::path::Path;
-
 use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_manifest::Service;
 
@@ -135,11 +133,10 @@ pub(super) async fn seed_fulfilment_targets(
     ctx: &Ctx,
     services: &[Service],
     fillers: &Fillers,
-    project: Option<&Path>,
 ) -> Vec<Wiring> {
     let mut wirings = Vec::new();
     for (asker, curators) in by_asker(fulfilling(fillers)) {
-        wirings.extend(handed(ctx, services, fillers, asker, &curators, project).await);
+        wirings.extend(handed(ctx, services, fillers, asker, &curators).await);
     }
     wirings
 }
@@ -166,7 +163,6 @@ async fn handed(
     fillers: &Fillers,
     asker: Cleared<'_>,
     curators: &[Fulfils<'_>],
-    project: Option<&Path>,
 ) -> Vec<Wiring> {
     let Some(requests) = crate::app::targets::requests_as_owner(ctx, asker.answering()).await
     else {
@@ -177,9 +173,10 @@ async fn handed(
         return refused;
     }
     let requests = requests.as_ref();
-    let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
-        Some(project) => Box::pin(through_the_gate(ctx, fillers, requests, wanted, project)).await,
-        None => wired(ctx, requests, &wanted).await,
+    let mut wirings = if crate::app::gating::service(services).is_some() {
+        Box::pin(through_the_gate(ctx, fillers, requests, wanted)).await
+    } else {
+        wired(ctx, requests, &wanted).await
     };
     wirings.extend(refused);
     wirings
@@ -199,9 +196,8 @@ async fn through_the_gate(
     fillers: &Fillers,
     requests: &dyn Requests,
     wanted: Vec<FulfilmentTarget>,
-    project: &Path,
 ) -> Vec<Wiring> {
-    let Some(kept) = super::tokens::Kept::read(ctx, fillers, project).await else {
+    let Some(kept) = super::tokens::Kept::read(ctx, fillers).await else {
         return wanted
             .iter()
             .map(|target| {

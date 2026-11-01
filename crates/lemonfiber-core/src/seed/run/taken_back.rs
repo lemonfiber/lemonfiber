@@ -15,7 +15,6 @@
 //! reset lands. Its own media server key needs no memory: it is filed under its name
 //! until it is revoked.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::media::serve;
@@ -61,10 +60,10 @@ pub(super) async fn note_held(
     ctx: &Ctx,
     services: &[Service],
     fillers: &Fillers,
-    project: Option<&Path>,
     baseline: &mut Baseline,
 ) {
-    let Some((filler, asked)) = gated(services, project).and(held_before(fillers)) else {
+    let Some((filler, asked)) = crate::app::gating::service(services).and(held_before(fillers))
+    else {
         return;
     };
     let Some(requests) = crate::app::targets::requests_as_owner(ctx, asked).await else {
@@ -94,10 +93,9 @@ pub(super) async fn seed_taken_back(
     ctx: &Ctx,
     services: &[Service],
     fillers: &Fillers,
-    project: Option<&Path>,
     baseline: &mut Baseline,
 ) -> Option<Wiring> {
-    let project = gated(services, project)?;
+    crate::app::gating::service(services)?;
     let (filler, asked) = held_before(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
     let media_server = media_server_admin(ctx, fillers).await;
@@ -128,7 +126,7 @@ pub(super) async fn seed_taken_back(
     let server = media_server
         .as_ref()
         .map(|(_, route, name)| (route.as_str(), name.as_str()));
-    let direct = match still_direct(ctx, requests, fillers, project, server).await {
+    let direct = match still_direct(ctx, requests, fillers, server).await {
         Ok(direct) => direct,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
     };
@@ -144,12 +142,7 @@ pub(super) async fn seed_taken_back(
     }
     let mut unsettled = Vec::new();
     for curator in owed {
-        unsettled.extend(
-            replaced(
-                ctx, services, fillers, project, &filler.id, &curator, baseline,
-            )
-            .await,
-        );
+        unsettled.extend(replaced(ctx, services, fillers, &filler.id, &curator, baseline).await);
     }
     if let Some((client, _, server)) = &media_server {
         for key in &minted {
@@ -180,7 +173,6 @@ async fn replaced(
     ctx: &Ctx,
     services: &[Service],
     fillers: &Fillers,
-    project: &Path,
     owed_by: &str,
     curator: &str,
     baseline: &mut Baseline,
@@ -190,11 +182,7 @@ async fn replaced(
         baseline.forget(owed_by, &field);
         return Vec::new();
     };
-    let amid = crate::app::credentials::Amid {
-        services,
-        fillers,
-        project: Some(project),
-    };
+    let amid = crate::app::credentials::Amid { services, fillers };
     let Some(rotation) = crate::app::credentials::reminted(ctx, held, &amid).await else {
         return vec![format!(
             "{}'s key could not be replaced: lemonfiber replaces a key only where it minted it, \
@@ -231,10 +219,9 @@ async fn still_direct(
     ctx: &Ctx,
     requests: &dyn Requests,
     fillers: &Fillers,
-    project: &Path,
     server: Option<(&str, &str)>,
 ) -> Result<Vec<String>, crate::ports::service::Failure> {
-    let kept = Kept::read(ctx, fillers, project).await;
+    let kept = Kept::read(ctx, fillers).await;
     let mut direct = Vec::new();
     if let Some((route, name)) = server {
         let link = requests.media_server_link().await?;
@@ -275,11 +262,6 @@ async fn gated_target(
             .test_fulfilment_target(kind, &one.at, &one.key)
             .await
             .is_ok()
-}
-
-/// The project directory, where the stack runs the gate.
-fn gated<'a>(services: &[Service], project: Option<&'a Path>) -> Option<&'a Path> {
-    project.filter(|_| crate::app::gating::service(services).is_some())
 }
 
 /// The media server as its administrator, with the route the gate reaches it on and what

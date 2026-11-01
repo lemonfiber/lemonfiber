@@ -730,6 +730,12 @@ fn a_key_is_left_standing_and_named() {
             "the internal certificate of jellyfin",
         ),
         (
+            Action::Unmoved {
+                service: "decline".to_owned(),
+            },
+            "decline on its plugin",
+        ),
+        (
             Action::Run {
                 service: "prowlarr".to_owned(),
                 running: true,

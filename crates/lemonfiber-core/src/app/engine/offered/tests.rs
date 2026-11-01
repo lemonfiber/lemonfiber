@@ -38,6 +38,7 @@ fn report(services: &[&str]) -> LifecycleReport {
         passing: None,
         fencing: None,
         unfenced: Vec::new(),
+        guards: Vec::new(),
     }
 }
 

@@ -53,6 +53,15 @@ pub struct Manifest {
 }
 
 impl Manifest {
+    /// The id of every profile it declares, in the order it declares them.
+    #[must_use]
+    pub fn profile_ids<T: FromIterator<String>>(&self) -> T {
+        self.profiles
+            .iter()
+            .map(|profile| profile.id.clone())
+            .collect()
+    }
+
     /// Read a manifest from TOML, refusing a schema generation this build
     /// cannot read.
     ///

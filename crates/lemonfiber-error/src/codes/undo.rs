@@ -43,4 +43,18 @@ codes! {
             is. Nothing was put back.",
         remedy: "Set a home directory for this user and run it again.",
     }
+    /// Raised when a run moved one of lemonfiber's own guards onto its plugin, which no
+    /// undo or removal puts back.
+    MOVED_FOR_GOOD = "UNDO-5" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "The run moved one of lemonfiber's own guards, the part that declines \
+            invitations or the one that gates requests, from the stack's own service onto its \
+            plugin, and the release named in the message moves it for good: the stack's own \
+            service is no longer configured, so putting the move back would leave the guard \
+            standing nowhere. Nothing was put back or removed.",
+        remedy: "Leave the guard on its plugin. To stop using it, choose another filler for \
+            its capability.",
+    }
 }

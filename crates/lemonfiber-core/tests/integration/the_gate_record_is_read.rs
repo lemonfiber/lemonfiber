@@ -7,26 +7,24 @@ use std::sync::Arc;
 use lemonfiber_core::app::diagnose;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Narrowing, Verdict};
+use lemonfiber_core::ports::service::{GateEntry, GateOutcome};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
-use lemonfiber_sidecar::gate::{Kept, Outcome, Record};
+use lemonfiber_testing::guards::{with_gate, Gate};
 
 #[tokio::test]
 async fn a_refusal_is_reported_once_through_the_whole_diagnosis() {
     let stack: &'static Path =
         Box::leak(crate::common::stack::with_the_gate("record-read").into_boxed_path());
-    let gate = stack.join("config/request-gate");
-    let _ = std::fs::create_dir_all(&gate);
-    let refused = Record::default().with(
-        60,
-        "sonarr",
-        "POST",
-        "/sonarr/api/v3/command",
-        Outcome::Refused,
-        Kept::standard(),
-    );
-    let _ = std::fs::write(gate.join("record.json"), refused.written());
+    let gate = Arc::new(Gate::default().recording(vec![GateEntry {
+        seq: 1,
+        at: 60,
+        route: "sonarr".to_owned(),
+        method: "POST".to_owned(),
+        path: "/sonarr/api/v3/command".to_owned(),
+        outcome: GateOutcome::Refused,
+    }]));
     let config = lemonfiber_fixtures::scratch::Scratch::named("gated-record-config").kept();
     let _ = std::fs::create_dir_all(&config);
     let env = config.join(".env");
@@ -44,6 +42,7 @@ async fn a_refusal_is_reported_once_through_the_whole_diagnosis() {
             ..Settings::default()
         })
         .build();
+    let ctx = with_gate(ctx, &gate);
     let narrowing = Narrowing::Check("services.request-gate-record".to_owned());
 
     let first = diagnose(&ctx, &narrowing, false).await;

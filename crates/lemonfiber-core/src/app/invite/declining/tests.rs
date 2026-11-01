@@ -1,10 +1,12 @@
 use std::path::Path;
+use std::sync::Arc;
 
-use lemonfiber_sidecar::decline::TokenHash;
+use lemonfiber_sidecar::TokenHash;
 
-use super::{invitations, path, with_token};
+use super::{invitations, with_token};
 use crate::invitation::{Offer, Offers};
 use crate::ports::service::Member;
+use crate::test_support::guards::{Decline, Serving, DECLINE};
 
 fn member(id: &str, name: &str, claimed: bool) -> Member {
     Member {
@@ -82,17 +84,6 @@ fn a_token_is_recorded_as_its_hash_on_an_offer_already_recorded() {
 }
 
 #[test]
-fn the_table_goes_into_the_decline_services_configuration_directory() {
-    assert_eq!(
-        path(
-            Path::new("/stack"),
-            lemonfiber_sidecar::decline::File::Table
-        ),
-        Path::new("/stack/config/decline/invitations.json")
-    );
-}
-
-#[test]
 fn an_account_is_declined_where_its_offers_token_was_refused() {
     use crate::ports::service::Declined;
 
@@ -121,17 +112,6 @@ fn an_account_is_declined_where_its_offers_token_was_refused() {
     assert_eq!(
         declined.into_iter().collect::<Vec<_>>(),
         vec!["9".to_owned()]
-    );
-}
-
-#[test]
-fn refusals_are_recorded_beside_the_table() {
-    assert_eq!(
-        path(
-            Path::new("/stack"),
-            lemonfiber_sidecar::decline::File::Refusals
-        ),
-        Path::new("/stack/config/decline/refusals.json")
     );
 }
 
@@ -177,96 +157,45 @@ fn an_account_is_removed_at_its_lapse_only_for_the_offer_standing_now() {
     );
 }
 
-#[test]
-fn lapses_are_recorded_beside_the_refusals() {
-    assert_eq!(
-        path(
-            Path::new("/stack"),
-            lemonfiber_sidecar::decline::File::Lapses
-        ),
-        Path::new("/stack/config/decline/lapses.json")
-    );
+/// A context over a stack written out on the real disk whose decline service, moved into
+/// its plugin, answers as `decline` does.
+fn reaching(decline: Decline) -> crate::app::Ctx {
+    let mut ctx = crate::test_support::a_context().build();
+    ctx.settings.env_file =
+        crate::app::targets::project_directory(&ctx.stack, None).map(|at| at.join(".env"));
+    let decline = Arc::new(decline);
+    DECLINE.reaching(ctx).with_http(Arc::new(
+        Serving::beside(lemonfiber_fixtures::http::Fake::silent()).decline(&decline),
+    ))
 }
 
-/// A context over a stack written out on the real disk, and the directory it is written
-/// to, where the decline service's records go.
-fn written() -> (crate::app::Ctx, std::path::PathBuf) {
-    let ctx = crate::test_support::a_context().build();
-    let project =
-        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())
-            .unwrap_or_default();
-    (ctx, project)
-}
-
-/// A pipe the decline service put where its record goes is refused at once rather than
-/// waited on, and a link there is not followed: either declines nobody.
-#[cfg(unix)]
+/// What the decline service answers it declined is read, and an answer it will not give
+/// declines nobody and removed nobody: what it says cannot be told.
 #[tokio::test]
-async fn a_record_that_is_a_pipe_or_a_link_declines_nobody_and_never_waits() {
-    let (ctx, project) = written();
-    let record = path(&project, super::File::Refusals);
-    let _ = std::fs::create_dir_all(record.parent().unwrap_or(&project));
+async fn what_the_service_will_not_answer_declines_and_removed_nobody() {
     let offers: Offers = [("9".to_owned(), offer(Some("ana-token")))]
         .into_iter()
         .collect();
-    let made = tokio::process::Command::new("mkfifo")
-        .arg(&record)
-        .status()
-        .await;
-    assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
-
-    let piped = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        super::declined(&ctx, &offers),
-    )
-    .await;
-
-    assert_eq!(piped.ok().map(|declined| declined.len()), Some(0));
-
-    let elsewhere = project.join("elsewhere.json");
-    let _ = std::fs::write(&elsewhere, "{}");
-    let _ = std::fs::remove_file(&record);
-    let _ = std::os::unix::fs::symlink(&elsewhere, &record);
-    assert!(super::declined(&ctx, &offers).await.is_empty());
-}
-
-/// A record the decline service wrote that does not read, or that has grown past what is
-/// read, declines nobody and removed nobody: what it says cannot be told.
-#[tokio::test]
-async fn a_record_that_does_not_read_declines_and_removed_nobody() {
-    let (ctx, project) = written();
-    let offers: Offers = [("9".to_owned(), offer(Some("ana-token")))]
-        .into_iter()
-        .collect();
-    let overlong =
-        "x".repeat(usize::try_from(crate::ports::filesystem::READ_LIMIT).unwrap_or(0) + 1);
-    let refused = lemonfiber_sidecar::decline::Refusals::default()
-        .with(lemonfiber_sidecar::decline::Refusal {
-            token: TokenHash::of("ana-token"),
+    let declining = || {
+        Decline::default().declining(vec![crate::ports::service::Declined {
+            token: TokenHash::of("ana-token").as_str().to_owned(),
             account: "9".to_owned(),
             at: 1,
-        })
-        .written();
-    let at = path(&project, super::File::Refusals);
-    let _ = std::fs::create_dir_all(at.parent().unwrap_or(&project));
-    let _ = std::fs::write(&at, refused);
+        }])
+    };
     assert_eq!(
-        super::declined(&ctx, &offers)
+        super::declined(&reaching(declining()), &offers)
             .await
             .into_iter()
             .collect::<Vec<_>>(),
         vec!["9".to_owned()],
-        "the record read is the one written here"
+        "what the service answers is what is read"
     );
 
-    for record in ["not a record".to_owned(), overlong] {
-        for file in [super::File::Refusals, super::File::Lapses] {
-            let _ = std::fs::write(path(&project, file), &record);
-        }
+    let silent = reaching(declining().refusing(&["refusals", "lapses"]));
 
-        assert!(super::declined(&ctx, &offers).await.is_empty());
-        assert!(super::removed_at_lapse(&ctx, &offers).await.is_empty());
-    }
+    assert!(super::declined(&silent, &offers).await.is_empty());
+    assert!(super::removed_at_lapse(&silent, &offers).await.is_empty());
 }
 
 /// With no record on disk, or no stack written out to hold one, there is nothing to read,
@@ -344,7 +273,7 @@ async fn a_decline_service_speaking_its_contract_is_asked_over_it() {
     let http = Fake::always(Answer::reply(200, "null"));
     let ctx = reaching_theirs(&project, true, http.clone());
 
-    let asked = super::asked(&ctx, &filled_by_theirs(&project, true), &project).await;
+    let asked = super::asked(&ctx, &filled_by_theirs(&project, true)).await;
     let held = match asked {
         Some(decline) => decline.held().await.ok(),
         None => None,
@@ -361,7 +290,7 @@ async fn a_decline_service_speaking_its_contract_is_asked_over_it() {
 }
 
 /// A decline service that speaks its contract and cannot be reached over it is not
-/// asked at all, never through the files its own service reads.
+/// asked at all.
 #[tokio::test]
 async fn a_decline_service_that_cannot_be_reached_over_its_contract_is_not_asked() {
     use lemonfiber_fixtures::http::{Answer, Fake};
@@ -369,17 +298,14 @@ async fn a_decline_service_that_cannot_be_reached_over_its_contract_is_not_asked
     let http = Fake::always(Answer::reply(200, "null"));
     let ctx = reaching_theirs(&project, false, http.clone());
 
-    assert!(
-        super::asked(&ctx, &filled_by_theirs(&project, true), &project)
-            .await
-            .is_none()
-    );
+    assert!(super::asked(&ctx, &filled_by_theirs(&project, true))
+        .await
+        .is_none());
     assert!(http.request().is_none());
 }
 
 /// A plugin filling the decline service that speaks no contract is asked nothing, a
-/// first-party one standing in for the stack's own included: only the stack's own decline
-/// service is told through its files.
+/// first-party one standing in for the stack's own included.
 #[tokio::test]
 async fn a_plugin_speaking_no_contract_is_not_asked_even_standing_in() {
     use lemonfiber_fixtures::http::{Answer, Fake};
@@ -406,6 +332,6 @@ async fn a_plugin_speaking_no_contract_is_not_asked_even_standing_in() {
         .service(THEIRS)
         .is_some_and(crate::wiring::Filler::stands_in));
     for fillers in [unspoken, stood_in] {
-        assert!(super::asked(&ctx, &fillers, &project).await.is_none());
+        assert!(super::asked(&ctx, &fillers).await.is_none());
     }
 }
