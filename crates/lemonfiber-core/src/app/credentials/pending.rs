@@ -75,15 +75,7 @@ pub(crate) async fn settled(ctx: &Ctx) {
     // Only what is asked about is carried across the questions below: the settings file
     // and the stack are read to find it and let go.
     let asked = {
-        let Some(env) = ctx.settings.env_file.as_deref() else {
-            return;
-        };
-        let file = config::store::read(env).unwrap_or_default();
-        if !file
-            .keys()
-            .iter()
-            .any(|key| key.ends_with(config::PENDING_SUFFIX))
-        {
+        if !is_any_pending(ctx) {
             return;
         }
         // A stack that cannot be read has no service to ask, which leaves both for later.
@@ -95,6 +87,22 @@ pub(crate) async fn settled(ctx: &Ctx) {
     if let Some(server) = asked {
         settle(ctx, &server).await;
     }
+}
+
+/// Whether a replacement is left pending: held in the secret store, or still in the
+/// environment file where an earlier release left it and no run has filed it yet.
+fn is_any_pending(ctx: &Ctx) -> bool {
+    let pending = |name: &str| name.ends_with(config::PENDING_SUFFIX);
+    let held = crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .is_some_and(|secrets| secrets.names().any(pending));
+    held || ctx.settings.env_file.as_deref().is_some_and(|env| {
+        config::store::read(env)
+            .unwrap_or_default()
+            .keys()
+            .iter()
+            .any(|key| pending(key))
+    })
 }
 
 /// Settle the administrator's password of whatever media server fills the identity

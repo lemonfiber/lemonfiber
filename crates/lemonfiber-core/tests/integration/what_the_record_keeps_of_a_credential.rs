@@ -223,3 +223,31 @@ fn a_sealed_setting_whose_key_is_gone_is_refused_rather_than_put_back_as_it_read
     let file = std::fs::read_to_string(layout.env_file()).unwrap_or_default();
     assert!(!file.contains("sealed:"), "{file}");
 }
+
+/// A journal line that does not read is refused without repeating what the line holds,
+/// since what a broken line holds may be a credential an earlier release wrote there.
+#[test]
+fn a_line_that_does_not_read_is_refused_without_what_it_holds() {
+    let root = scratch("unreadable-line");
+    let journal = paths(&root).journal();
+    let tz = serde_json::to_string(&set("TZ", None, "UTC")).unwrap_or_default();
+    written_earlier(
+        &journal,
+        &[
+            format!(
+                r#"{{"at":"1","operation":"x","target":".env","kind":"{}"}}"#,
+                now()
+            ),
+            tz,
+        ],
+    );
+
+    let refused = journal_at(&journal)
+        .err()
+        .map(|failure| failure.to_string());
+
+    assert!(refused
+        .as_ref()
+        .is_some_and(|said| said.contains("entry 1")));
+    assert!(refused.is_some_and(|said| !said.contains(&now())));
+}

@@ -367,6 +367,49 @@ async fn a_credential_an_earlier_release_journalled_is_named_to_replace_and_neve
     assert_eq!(std::fs::read_to_string(&env).ok(), Some(holding));
 }
 
+/// What a reversal says it put back withholds a setting whose name reads as a credential,
+/// though the setting is no secret the store holds: the values are what it was carried out
+/// with, and this list is what a terminal prints and `/api/undo` serves.
+#[tokio::test]
+async fn what_a_reversal_reports_withholds_a_setting_named_like_a_credential() {
+    let root = scratch("account-reported");
+    let (was, now) = (["old", "-acc0unt"].concat(), ["new", "-acc0unt"].concat());
+    journalled(
+        &root,
+        &[Change {
+            at: "2000".to_owned(),
+            operation: OPERATION.to_owned(),
+            target: ".env".to_owned(),
+            kind: Kind::Set {
+                key: "USENET_USER".to_owned(),
+                previous: Some(was.clone()),
+                current: now.clone(),
+            },
+        }],
+    );
+    let env = paths(&root).env_file();
+    if let Some(dir) = env.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&env, format!("USENET_USER={now}\n"));
+
+    let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
+
+    let said = put_back
+        .map(|undos| serde_json::to_string(&undos).unwrap_or_default())
+        .unwrap_or_default();
+    assert!(
+        said.contains("USENET_USER"),
+        "which setting went back is said"
+    );
+    assert!(said.contains(REDACTED), "and that a value was put back");
+    assert!(
+        !said.contains(&was) && !said.contains(&now),
+        "but never the value"
+    );
+    assert!(std::fs::read_to_string(&env).is_ok_and(|text| text.contains(&was)));
+}
+
 /// The same withholding, for the half of it nothing produces yet.
 ///
 /// A field inside a service is put back through that service rather than on the host,

@@ -175,12 +175,9 @@ pub(crate) fn forget_secret(ctx: &Ctx, key: &str, operation: &str) -> Result<(),
     {
         return Ok(());
     }
-    let Some(previous) =
-        crate::settings::keyed_at(&secrets, ctx.seams.random.as_ref())?.fingerprint(&name)
-    else {
-        return Ok(());
-    };
-    let change = secret_changed(&name, Some(previous), None, operation, &ctx.stamp());
+    let previous =
+        crate::settings::keyed_at(&secrets, ctx.seams.random.as_ref())?.fingerprint(&name);
+    let change = secret_changed(&name, previous, None, operation, &ctx.stamp());
     crate::app::recover::journalled(&journal, &[change])?;
     crate::settings::dropped(&secrets, &[name])
 }

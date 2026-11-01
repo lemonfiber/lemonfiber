@@ -60,6 +60,11 @@ impl Secrets {
         self.held.get(name).map(|kept| kept.value.as_str())
     }
 
+    /// The name of every secret held.
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
+        self.held.keys().map(String::as_str)
+    }
+
     /// Every value held, and every value each replaced.
     pub(crate) fn values(&self) -> impl Iterator<Item = &str> {
         self.held

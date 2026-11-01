@@ -198,6 +198,15 @@ fn only_a_credential_is_held_as_a_secret() {
     assert_eq!(held_as(&pending), Some(pending.clone()));
     let pending = format!("USENET_PASS{}", crate::config::PENDING_SUFFIX);
     assert_eq!(held_as(&pending), Some(pending.clone()));
+    assert_eq!(
+        held_as("KOMGA_TOKEN_SECRET").as_deref(),
+        Some("KOMGA_TOKEN_SECRET"),
+        "a value a plugin's recipe captured, where an earlier release kept it"
+    );
+    assert_eq!(
+        crate::settings::legacy::source_of("KOMGA_TOKEN_SECRET"),
+        crate::settings::Source::Recipe
+    );
     for setting in [
         "USENET_USER",
         "MEMBER_KEYS",

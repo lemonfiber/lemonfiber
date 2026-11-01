@@ -149,7 +149,9 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
 /// store holds the credential `key` as, the way lemonfiber records one.
 #[track_caller]
 pub(crate) fn held_secret(env: &std::path::Path, key: &str, value: &str) {
-    let name = crate::settings::legacy::held_as(key).unwrap_or_else(|| key.to_owned());
+    let name = crate::settings::legacy::held_as(key);
+    assert!(name.is_some(), "{key} is a credential the store holds");
+    let name = name.unwrap_or_default();
     let keeping = [crate::settings::Keeping {
         name: &name,
         value,

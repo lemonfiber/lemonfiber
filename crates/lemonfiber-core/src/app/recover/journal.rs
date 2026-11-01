@@ -58,9 +58,10 @@ pub fn journal_at(path: &Path) -> Result<Journal, store::Failure> {
                 return Err(store::Failure::Unreadable {
                     path: path.to_path_buf(),
                     reason: format!(
-                        "entry {} is not a change this build can read ({why}), so the journal \
-                         is left as it is rather than read without it",
-                        at + 1
+                        "entry {} is not a change this build can read (column {}), so the \
+                         journal is left as it is rather than read without it",
+                        at + 1,
+                        why.column()
                     ),
                 })
             }

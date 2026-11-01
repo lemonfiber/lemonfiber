@@ -6,7 +6,7 @@ use crate::config::env::EnvFile;
 use crate::config::paths::{SECRETS, SETTINGS};
 use crate::config::store::Failure;
 use crate::config::{
-    CREDENTIAL_SUFFIXES, DOMAIN_KEY, HOUSEHOLD_HOST_KEY, HOUSEHOLD_HOST_SETTING,
+    CAPTURED_SUFFIX, CREDENTIAL_SUFFIXES, DOMAIN_KEY, HOUSEHOLD_HOST_KEY, HOUSEHOLD_HOST_SETTING,
     INDEXER_APIKEY_KEY, PENDING_SUFFIX, PROVIDER_PASS_KEY, VPN_PORT_FORWARDING_KEY,
     VPN_PROVIDER_KEY,
 };
@@ -66,7 +66,8 @@ pub(crate) fn keyed(key: &str) -> Option<&'static Legacy> {
 
 /// The name the secret store holds the credential the environment file kept under `key`
 /// as, where `key` names one: a secret of the table under its name, and a credential the
-/// stack records for a service, or its replacement pending, under the same name.
+/// stack records for a service, its replacement pending, or a value a plugin's recipe
+/// captured that an earlier release kept there, under the same name.
 pub(crate) fn held_as(key: &str) -> Option<String> {
     if let Some(replaced) = key.strip_suffix(PENDING_SUFFIX) {
         return held_as(replaced).map(|name| format!("{name}{PENDING_SUFFIX}"));
@@ -76,6 +77,7 @@ pub(crate) fn held_as(key: &str) -> Option<String> {
     }
     CREDENTIAL_SUFFIXES
         .iter()
+        .chain(std::iter::once(&CAPTURED_SUFFIX))
         .any(|ending| key.ends_with(ending))
         .then(|| key.to_owned())
 }
@@ -95,10 +97,13 @@ pub(crate) fn unfiled(env: &Path, key: &str) -> Result<(), Failure> {
 }
 
 /// Where the credential the environment file kept under `key` came from: the operator for
-/// a secret of the table, and lemonfiber for one it minted for a service.
+/// a secret of the table, a plugin's recipe for a value one captured, and lemonfiber for
+/// one it minted for a service.
 pub(crate) fn source_of(key: &str) -> super::Source {
     if keyed(key).is_some() {
         super::Source::Operator
+    } else if key.ends_with(CAPTURED_SUFFIX) {
+        super::Source::Recipe
     } else {
         super::Source::Minted
     }

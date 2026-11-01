@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD};
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-use super::{pending, settle, settled};
+use super::{is_any_pending, pending, settle, settled};
 use crate::app::targets::{record_secret, recorded_secret, service_config_dir, MediaServer};
 use crate::config;
 use crate::test_support::{a_contracted_media_server, contracted_context, MEDIA_ADAPTER};
@@ -180,4 +180,35 @@ async fn a_pending_copy_of_another_setting_is_asked_of_nobody() {
     let left = left_pending(&ctx, config::PROVIDER_PASS_KEY).await;
 
     assert_eq!(left.as_deref(), Some("replacement"));
+}
+
+/// A replacement is pending where the secret store holds one, and where an earlier release
+/// left one in the environment file that no run has filed yet; nowhere else.
+#[test]
+fn a_replacement_is_pending_where_the_store_or_an_unfiled_line_holds_one() {
+    let held = pending_in("pending-held").build();
+    let setting = config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY;
+    assert!(!is_any_pending(&held));
+    let _ = record_secret(
+        &held,
+        setting,
+        "in-force",
+        crate::app::credentials::OPERATION,
+    );
+    assert!(
+        !is_any_pending(&held),
+        "a credential in force is not pending"
+    );
+    let _ = record_secret(
+        &held,
+        &pending(setting),
+        "replacement",
+        crate::app::credentials::OPERATION,
+    );
+    assert!(is_any_pending(&held));
+
+    let unfiled = pending_in("pending-unfiled").build();
+    let env = unfiled.settings.env_file.clone().unwrap_or_default();
+    assert!(config::store::set(&env, &pending(setting), "replacement").is_ok());
+    assert!(is_any_pending(&unfiled));
 }

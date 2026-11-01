@@ -139,6 +139,10 @@ fn a_credential_is_written_down_by_its_keyed_fingerprints_alone() {
             Some("was")
         )
     );
+    assert_eq!(
+        scrubbed_of("KOMGA_TOKEN_SECRET", Some("was")),
+        secret("KOMGA_TOKEN_SECRET", "recipe", Some("was"))
+    );
     assert!(keyed("now").is_some_and(|keyed| keyed != fingerprint("now")));
 }
 
