@@ -68,7 +68,7 @@ pub(crate) async fn pending(ctx: &Ctx, manifest: &Manifest) -> Copies {
             match ctx.seams.engine_volumes.kept(&volume).await {
                 Ok(true) => copies.pending.push(Copy {
                     volume,
-                    image: crate::project::reference(service),
+                    image: service.reference(),
                     to,
                 }),
                 Ok(false) => {}

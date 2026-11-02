@@ -135,7 +135,7 @@ fn naming_forms_in_a_different_order_produces_the_same_command() {
 }
 
 #[test]
-fn an_environment_file_is_passed_when_one_has_been_written() {
+fn the_environment_file_is_never_handed_to_compose() {
     let settings = Settings {
         env_file: Some(PathBuf::from("/home/op/.config/lemonfiber/.env")),
         ..Settings::default()
@@ -143,8 +143,8 @@ fn an_environment_file_is_passed_when_one_has_been_written() {
     assert_eq!(
         line(&["library"], &Action::Up, &settings)
             .as_deref()
-            .map(|command| command.contains("--env-file /home/op/.config/lemonfiber/.env --file")),
-        Some(true)
+            .map(|command| command.contains("--env-file") || command.contains(".env")),
+        Some(false)
     );
 }
 

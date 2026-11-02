@@ -120,6 +120,9 @@ pub mod seed;
 pub mod self_update;
 pub(crate) mod settings;
 pub mod shell;
+/// Files what the environment files hold into the settings and secret stores, before
+/// anything of a run reads them.
+pub use settings::filing::everything as filed;
 /// Moves every value the stack's environment file holds for a part or a published setting
 /// into the stores, once.
 pub use settings::filing::stack as filed_stack;

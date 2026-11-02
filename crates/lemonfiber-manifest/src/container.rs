@@ -19,7 +19,7 @@ mod words;
 
 pub use certified::{Certificate, MOST_NAMES};
 use paths::target;
-pub use paths::{is_plain, is_source, is_target, lies_inside};
+pub use paths::{is_plain, is_source, is_target, lies_inside, shares_a_source};
 pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
 pub use record::Fields;
 pub use user::{IdVariables, UserMode, UserModeName, UserModeWritten};
@@ -328,8 +328,14 @@ impl Container<'_> {
 
     fn mounted(&self, found: &mut Vec<(String, String)>) {
         let mut targets = vec![self.configuration()];
-        for mount in self.mounts {
+        for (index, mount) in self.mounts.iter().enumerate() {
             let at = self.at(&format!("mount {}", mount.to));
+            if shares_a_source(self.mounts, index) {
+                found.push((
+                    at.clone(),
+                    format!("{} is the source of another of its mounts", mount.from),
+                ));
+            }
             if !is_source(&mount.from) {
                 found.push((
                     at.clone(),

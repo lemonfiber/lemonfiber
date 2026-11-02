@@ -124,7 +124,7 @@ impl Resolved {
     }
 
     pub(crate) fn reading<T>(&self, write: impl FnOnce(&Reading<'_>) -> T) -> T {
-        let setting = |_: &str, name: &str| self.setting(name);
+        let setting = |name: &str| self.setting(name);
         let secrets_file = |service: &str| self.secrets_file(service);
         let crossing = |plugin: &str, of: &str| self.crossing(plugin, of);
         write(&Reading {
@@ -135,7 +135,7 @@ impl Resolved {
     }
 
     pub(crate) fn project<T>(&self, write: impl FnOnce(&crate::project::Reading<'_>) -> T) -> T {
-        let setting = |_: &str, name: &str| self.setting(name);
+        let setting = |name: &str| self.setting(name);
         let secrets_file = |service: &str| self.secrets_file(service);
         let operator = |key: &str| {
             OPERATOR_KEYS

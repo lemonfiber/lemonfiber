@@ -604,7 +604,29 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
 /// that otherwise reads back whole.
 #[test]
 fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
-    let altered: [(&str, Alter); 17] = [
+    assert!(whole().is_some(), "the fixture reads");
+    for (what, alter) in alterations().into_iter().chain(landings()) {
+        let Some(mut one) = whole() else {
+            continue;
+        };
+        alter(&mut one);
+        let mut register = Register::empty();
+        assert_eq!(register.record(one), Ok(()), "{what}");
+        let read = Register::parse(&register.to_json().unwrap_or_default());
+        if what == "nothing altered" {
+            assert_eq!(read, Ok(register), "the fixture itself reads back");
+        } else {
+            assert!(
+                matches!(&read, Err(Unreadable::Damaged(why)) if why.contains("would not have written")),
+                "{what}: {read:?}"
+            );
+        }
+    }
+}
+
+/// Each value a record could carry that this build would not have written, with what it is.
+fn alterations() -> [(&'static str, Alter); 14] {
+    [
         ("an empty plugin id", |one| one.plugin = String::new()),
         ("a plugin id with a separator", |one| {
             one.plugin = "../x".to_owned();
@@ -632,30 +654,6 @@ fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
         ("a directory at the root", |one| {
             each(one, |placed| placed.config_path = "/".to_owned());
         }),
-        ("a mount leaving its tree", |one| {
-            each(one, |placed| {
-                placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
-                    from: "../../etc".to_owned(),
-                    to: "/etc-of-host".to_owned(),
-                    ro: false,
-                }];
-            });
-        }),
-        ("a mount landing on the library", |one| {
-            each(one, |placed| {
-                placed.takes_data = true;
-                placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
-                    from: "cache".to_owned(),
-                    to: "/data/x".to_owned(),
-                    ro: false,
-                }];
-            });
-        }),
-        ("scratch space with an option", |one| {
-            each(one, |placed| {
-                placed.fields.tmpfs = vec!["/tmp:exec".to_owned()];
-            });
-        }),
         ("a hostname that is two labels", |one| {
             each(one, |placed| {
                 if let Some(Reached::Household { hostname, .. }) = &mut placed.reached {
@@ -677,25 +675,65 @@ fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
             });
         }),
         ("nothing altered", |_| ()),
-    ];
-    assert!(whole().is_some(), "the fixture reads");
-    for (what, alter) in altered {
-        let Some(mut one) = whole() else {
-            continue;
-        };
-        alter(&mut one);
-        let mut register = Register::empty();
-        assert_eq!(register.record(one), Ok(()), "{what}");
-        let read = Register::parse(&register.to_json().unwrap_or_default());
-        if what == "nothing altered" {
-            assert_eq!(read, Ok(register), "the fixture itself reads back");
-        } else {
-            assert!(
-                matches!(&read, Err(Unreadable::Damaged(why)) if why.contains("would not have written")),
-                "{what}: {read:?}"
-            );
-        }
-    }
+    ]
+}
+
+/// Each path a record could land a mount or scratch space at that this build would not
+/// have written, with what it is.
+fn landings() -> [(&'static str, Alter); 6] {
+    [
+        ("a mount leaving its tree", |one| {
+            each(one, |placed| {
+                placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
+                    from: "../../etc".to_owned(),
+                    to: "/etc-of-host".to_owned(),
+                    ro: false,
+                }];
+            });
+        }),
+        ("a mount landing on the library", |one| {
+            each(one, |placed| {
+                placed.takes_data = true;
+                placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
+                    from: "cache".to_owned(),
+                    to: "/data/x".to_owned(),
+                    ro: false,
+                }];
+            });
+        }),
+        ("two mounts from one source", |one| {
+            each(one, |placed| {
+                placed.fields.mount = ["/cache", "/again"]
+                    .map(|to| lemonfiber_manifest::container::Mount {
+                        from: "cache".to_owned(),
+                        to: to.to_owned(),
+                        ro: false,
+                    })
+                    .to_vec();
+            });
+        }),
+        ("two mounts landing at one target", |one| {
+            each(one, |placed| {
+                placed.fields.mount = ["cache", "logs"]
+                    .map(|from| lemonfiber_manifest::container::Mount {
+                        from: from.to_owned(),
+                        to: "/cache".to_owned(),
+                        ro: false,
+                    })
+                    .to_vec();
+            });
+        }),
+        ("scratch space over the configuration", |one| {
+            each(one, |placed| {
+                placed.fields.tmpfs = vec![placed.config_path.clone()];
+            });
+        }),
+        ("scratch space with an option", |one| {
+            each(one, |placed| {
+                placed.fields.tmpfs = vec!["/tmp:exec".to_owned()];
+            });
+        }),
+    ]
 }
 
 /// One change made to a record, for the case above.

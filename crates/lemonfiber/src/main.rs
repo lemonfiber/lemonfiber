@@ -208,10 +208,10 @@ async fn main() -> ExitCode {
     context::settle_roots(cli.config_dir.take(), cli.data_dir.take());
 
     let Some(request) = cli.command else {
-        return greeted(context(cli.stack_dir.take(), cli.dry_run, cli.force)).await;
+        return greeted(context(cli.stack_dir.take(), cli.dry_run, cli.force).await).await;
     };
 
-    let mut ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force);
+    let mut ctx = context(cli.stack_dir.take(), cli.dry_run, cli.force).await;
 
     let command = match request {
         // Streaming is not a value that arrives once, so it does not become a

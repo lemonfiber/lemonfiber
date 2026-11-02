@@ -10,7 +10,8 @@ use std::path::PathBuf;
 
 use lemonfiber_manifest::container::choices;
 use lemonfiber_manifest::container::{
-    is_source, is_target, lies_inside, Mount, Posture, Shape, UrlOf, UserMode, Value, CONFIGURATION,
+    is_source, is_target, lies_inside, shares_a_source, Mount, Posture, Shape, UrlOf, UserMode,
+    Value, CONFIGURATION,
 };
 use serde::ser::SerializeMap;
 use serde::Serialize;
@@ -98,8 +99,6 @@ impl Tier {
 pub struct Unit<'a> {
     /// Its id, which is its container's name in the project.
     pub id: &'a str,
-    /// The namespace its own settings are read from.
-    pub namespace: &'a str,
     /// The Compose profile it sits in.
     pub profile: String,
     /// The image it runs, pinned.
@@ -143,8 +142,8 @@ pub struct Unit<'a> {
 
 /// What an entry's values are read from beyond its unit.
 pub struct Values<'a> {
-    /// The operator's value for a setting of the named namespace, where one is recorded.
-    pub setting: &'a dyn Fn(&str, &str) -> Option<String>,
+    /// The operator's value for the named setting, where one is recorded.
+    pub setting: &'a dyn Fn(&str) -> Option<String>,
     /// The address the named service's ask reaches, where something fills it.
     pub address: &'a dyn Fn(&str, &UrlOf) -> Option<String>,
     /// The group that owns the host's render devices, where the host has them.
@@ -441,12 +440,10 @@ fn valued(unit: &Unit<'_>, value: &Value, values: &Values<'_>) -> Option<String>
         Value::Constant(constant) => Some(constant.text()),
         Value::Setting(setting) => {
             let held = |named: &str| {
-                (values.setting)(unit.namespace, named)
-                    .or_else(|| choices::defaulted(unit.env, named))
+                (values.setting)(named).or_else(|| choices::defaulted(unit.env, named))
             };
             choices::met(&setting.needs, &held).then(|| {
-                (values.setting)(unit.namespace, &setting.setting)
-                    .unwrap_or_else(|| setting.default.text())
+                (values.setting)(&setting.setting).unwrap_or_else(|| setting.default.text())
             })
         }
         Value::Url(url) => (values.address)(unit.id, url),
@@ -515,16 +512,20 @@ pub(crate) fn configuration(declared: &str) -> &str {
     }
 }
 
-/// Each further mount the model allows: a source inside its own mount tree and inside no
-/// other of its sources, landing where a mount may land.
+/// Each further mount the model allows: a source inside its own mount tree, inside no
+/// other of its sources and the source of no other mount, landing where a mount may land.
 pub(crate) fn mounts(all: &[Mount], takes_data: bool) -> impl Iterator<Item = &Mount> {
-    all.iter().filter(move |mount| {
-        is_source(&mount.from)
-            && is_target(&mount.to, takes_data)
-            && !all
-                .iter()
-                .any(|other| lies_inside(&mount.from, &other.from))
-    })
+    all.iter()
+        .enumerate()
+        .filter(move |(index, mount)| {
+            is_source(&mount.from)
+                && is_target(&mount.to, takes_data)
+                && !shares_a_source(all, *index)
+                && !all
+                    .iter()
+                    .any(|other| lies_inside(&mount.from, &other.from))
+        })
+        .map(|(_, mount)| mount)
 }
 
 /// Each scratch path in memory the model allows.

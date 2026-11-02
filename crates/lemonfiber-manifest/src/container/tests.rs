@@ -507,6 +507,37 @@ fn no_mount_source_lies_inside_another() {
 }
 
 #[test]
+fn two_mounts_from_one_source_are_each_refused_naming_the_mount() {
+    let none = NONE;
+    let mounts = [
+        Mount {
+            from: "cache".to_owned(),
+            to: "/cache".to_owned(),
+            ro: false,
+        },
+        Mount {
+            from: "cache".to_owned(),
+            to: "/again".to_owned(),
+            ro: true,
+        },
+        Mount {
+            from: "logs".to_owned(),
+            to: "/logs".to_owned(),
+            ro: false,
+        },
+    ];
+    let mut doubled = plain(&none);
+    doubled.mounts = &mounts;
+    assert_eq!(
+        wrong(&doubled),
+        [
+            "service jellyfin.mount /cache: cache is the source of another of its mounts",
+            "service jellyfin.mount /again: cache is the source of another of its mounts",
+        ]
+    );
+}
+
+#[test]
 fn an_address_files_a_medium_of_the_vocabulary_and_names_its_api_in_one_word() {
     let url = |files: Option<&str>, native: Option<&str>| {
         Value::Url(UrlOf {
@@ -760,4 +791,26 @@ fn a_secret_a_recording_stands_in_for_is_needed_to_start_unless_it_is_a_code_tha
     assert!(!secret(None, None).needed_to_start());
     assert!(secret(Some(RecordedWith::Minted), None).needed_to_start());
     assert!(!secret(Some(RecordedWith::Minted), Some(240)).needed_to_start());
+}
+
+#[test]
+fn a_confined_or_contracted_service_running_as_its_image_says_is_refused_naming_it() {
+    let none = NONE;
+    for (posture, speaks) in [(Posture::Confined, false), (Posture::Standard, true)] {
+        for mode in [UserMode::Image, UserMode::IdsIn(IdVariables::puid())] {
+            let mut held = plain(&none);
+            held.posture = posture;
+            held.speaks = speaks;
+            held.user_mode = Some(&mode);
+            assert_eq!(
+                wrong(&held),
+                ["service jellyfin.user_mode: must be uid for a service that speaks a contract or is confined"],
+                "{posture:?} {speaks} {mode:?}"
+            );
+        }
+    }
+    let mut held = plain(&none);
+    held.posture = Posture::Confined;
+    held.user_mode = Some(&UserMode::Uid);
+    assert!(wrong(&held).is_empty());
 }
