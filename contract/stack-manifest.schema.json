@@ -464,12 +464,6 @@
           "$ref": "#/$defs/Dashboard",
           "default": {}
         },
-        "depends_on": {
-          "description": "Same-profile dependencies only.",
-          "type": "array",
-          "default": [],
-          "items": {"type": "string"}
-        },
         "describes": {"description": "What it does for the operator.", "type": "string"},
         "digest": {
           "description": "The digest of the image's multi-architecture index, `sha256:` and 64 lower-case\nhex digits.\n\nWhat actually runs. A digest names one index for good, where the tag beside it\ncould be moved to a different one tomorrow, so the stack resolves every image by\nthis and a service without one is refused by validation. Optional here so that\nrefusal can name the service, rather than the file failing to parse.",
@@ -481,12 +475,6 @@
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/ServiceValue"},
           "default": {}
-        },
-        "grants": {
-          "description": "Extra kernel capabilities granted to the container, checked against an allow-list.\n\nNamed `grants` rather than `capabilities` because the word is about to mean\nsomething else entirely: what a service *can do*, which is how a plugin declares\nitself and how wiring asks for a filler. Two meanings under one spelling is how a\nsetting that decides what a container may do to the kernel gets read as a\ndescription of what it offers.\n\nThe old spelling is still accepted, because an operator's own stack description is\ntheirs and a rename is not a reason to refuse to read it.",
-          "type": "array",
-          "default": [],
-          "items": {"type": "string"}
         },
         "health": {
           "description": "How to tell the service has actually started.",

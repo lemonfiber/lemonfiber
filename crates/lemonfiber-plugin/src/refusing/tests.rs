@@ -659,8 +659,10 @@ fn every_way_a_plugin_could_ask_for_more_of_the_machine_is_refused_by_name() {
 fn a_manifest_asking_for_more_of_the_machine_yields_nothing_to_act_on() {
     for (reach, declared, _) in MORE_OF_THE_MACHINE {
         assert!(
-            Manifest::from_toml(&asking(declared)).ok().is_none(),
-            "{reach} yields no manifest"
+            Manifest::from_toml(&asking(declared))
+                .ok()
+                .is_none_or(|read| !refusals(&read, &[]).is_empty()),
+            "{reach} yields no manifest to act on"
         );
     }
 }

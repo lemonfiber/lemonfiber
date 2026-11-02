@@ -31,6 +31,8 @@ impl Service {
             certificate: self.certificate.as_ref(),
             provides: &self.provides,
             speaks: false,
+            grants: &self.grants,
+            depends_on: &self.depends_on,
         }
     }
 }

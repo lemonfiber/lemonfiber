@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::container::{choices, earlier, Shape};
+use crate::container::{choices, earlier};
 use crate::{Date, Manifest, Protocol, Removed, Service};
 
 mod wiring;
@@ -199,7 +199,6 @@ fn check_services(
             .chain(estimated(service))
             .chain(licensed(service, &osi))
             .chain(released(service, today))
-            .chain(retired(service))
             .chain(outbound(service))
             .chain(offered(service))
             .chain(contained(service));
@@ -479,26 +478,6 @@ fn offered(service: &Service) -> Vec<String> {
             shape.into_iter().chain(repeated)
         })
         .collect()
-}
-
-/// The fields the service model retired, each refused with what replaces it.
-fn retired(service: &Service) -> Vec<String> {
-    let grants = service.grants.iter().map(|granted| {
-        match Shape::ALL
-            .into_iter()
-            .find(|shape| shape.grants().contains(&granted.as_str()))
-        {
-            Some(shape) => format!(
-                "grants {granted}: refused; shape = \"{}\" grants it",
-                shape.name()
-            ),
-            None => format!("grants {granted}: refused, and no shape grants it"),
-        }
-    });
-    let ordering = service.depends_on.iter().map(|on| {
-        format!("depends_on {on}: refused; network = {{ via = \"<capability>\" }} replaces it")
-    });
-    grants.chain(ordering).collect()
 }
 
 /// Every rule the service's container fields break, and a shape taken by a service

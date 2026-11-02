@@ -90,6 +90,10 @@ pub const MEDIA: [&str; 7] = [
 /// The capabilities a service may run inside the network of.
 pub const VIA: [&str; 1] = [EGRESS_GUARD];
 
+/// The fields the service model retired, each still read so it is refused naming what
+/// replaces it.
+pub const RETIRED: [&str; 3] = ["grants", "capabilities", "depends_on"];
+
 /// What separates a setting's or a secret's namespace from its name.
 pub const NAMESPACED: char = ':';
 
@@ -270,6 +274,10 @@ pub struct Container<'a> {
     pub provides: &'a [String],
     /// Whether it speaks a capability contract.
     pub speaks: bool,
+    /// Each kernel capability an earlier format granted it.
+    pub grants: &'a [String],
+    /// Each service an earlier format started before it.
+    pub depends_on: &'a [String],
 }
 
 impl Container<'_> {
@@ -295,7 +303,31 @@ impl Container<'_> {
         self.environed(&mut found);
         self.held(&mut found);
         self.routed(&mut found);
+        self.retired(&mut found);
         found
+    }
+
+    /// Each field the service model retired, refused naming what replaces it.
+    fn retired(&self, found: &mut Vec<(String, String)>) {
+        for granted in self.grants {
+            let refusal = match Shape::ALL
+                .into_iter()
+                .find(|shape| shape.grants().contains(&granted.as_str()))
+            {
+                Some(shape) => format!(
+                    "{granted} is refused; shape = \"{}\" grants it",
+                    shape.name()
+                ),
+                None => format!("{granted} is refused, and no shape grants it"),
+            };
+            found.push((self.at("grants"), refusal));
+        }
+        for on in self.depends_on {
+            found.push((
+                self.at("depends_on"),
+                format!("{on} is refused; network = {{ via = \"<capability>\" }} replaces it"),
+            ));
+        }
     }
 
     fn at(&self, field: &str) -> String {

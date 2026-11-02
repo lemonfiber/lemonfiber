@@ -48,6 +48,8 @@ pub(super) fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
         certificate: None,
         provides: &[],
         speaks: false,
+        grants: &[],
+        depends_on: &[],
     }
 }
 
