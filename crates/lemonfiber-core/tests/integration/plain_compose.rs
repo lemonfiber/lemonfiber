@@ -124,7 +124,14 @@ fn configured(command: &[String], action: &str) -> Vec<String> {
 /// What `docker compose config` resolves lemonfiber's own start to, and what plain
 /// `docker compose config` in the project directory resolves.
 async fn both(ctx: &Ctx, project: &Path) -> (String, String) {
-    let outcome = dispatch(Command::Up { forms: Vec::new() }, ctx).await;
+    let outcome = dispatch(
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
+        ctx,
+    )
+    .await;
     let Ok(Outcome::Lifecycle(report)) = outcome else {
         unreachable!("the start ran: {outcome:?}")
     };

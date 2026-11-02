@@ -66,7 +66,10 @@ fn the_whole_stack() -> Choice {
         about: super::EVERY_FORM.to_owned(),
         names: Vec::new(),
         marked: Some(false),
-        command: Command::Up { forms: Vec::new() },
+        command: Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
     }
 }
 

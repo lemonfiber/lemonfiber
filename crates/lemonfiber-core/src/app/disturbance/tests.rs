@@ -12,6 +12,7 @@ const WAITED: Duration = Duration::from_secs(41);
 fn starting_is_bounded_by_the_patience_the_run_was_given() {
     let command = Command::Up {
         forms: vec!["media".to_owned()],
+        offer: None,
     };
 
     assert_eq!(
@@ -24,7 +25,10 @@ fn starting_is_bounded_by_the_patience_the_run_was_given() {
 #[test]
 fn every_verb_that_starts_something_is_bounded_the_same_way() {
     let starting = [
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         Command::Start {
             forms: Vec::new(),
             services: vec!["sonarr".to_owned()],
@@ -34,7 +38,10 @@ fn every_verb_that_starts_something_is_bounded_the_same_way() {
             services: Vec::new(),
             offer: None,
         }),
-        Command::Switch { forms: Vec::new() },
+        Command::Switch {
+            forms: Vec::new(),
+            offer: None,
+        },
     ];
 
     for command in starting {
@@ -240,7 +247,13 @@ fn the_payload_and_the_command_agree_on_every_length() {
     let payload = crate::model::Disturbances::all(WAITED);
 
     let pairs = [
-        (Command::Up { forms: forms() }, payload.starting),
+        (
+            Command::Up {
+                forms: forms(),
+                offer: None,
+            },
+            payload.starting,
+        ),
         (
             Command::Start {
                 forms: forms(),
@@ -277,7 +290,13 @@ fn the_payload_and_the_command_agree_on_every_length() {
             }),
             payload.restarting,
         ),
-        (Command::Switch { forms: forms() }, payload.switching),
+        (
+            Command::Switch {
+                forms: forms(),
+                offer: None,
+            },
+            payload.switching,
+        ),
     ];
 
     for (command, published) in pairs {
@@ -310,6 +329,7 @@ fn a_form_and_the_services_inside_it_are_held_to_the_same_clock() {
         (
             Command::Up {
                 forms: forms.clone(),
+                offer: None,
             },
             Command::Start {
                 forms: forms.clone(),

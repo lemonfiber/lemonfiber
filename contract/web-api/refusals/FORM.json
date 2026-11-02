@@ -1,0 +1,17 @@
+{
+  "FORM-1": {
+    "name": "NO_FORM_NAMED",
+    "status": 400,
+    "description": "Raised when no form was named."
+  },
+  "FORM-2": {
+    "name": "NO_SUCH_FORM",
+    "status": 404,
+    "description": "Raised when a named form is not declared by the stack."
+  },
+  "FORM-3": {
+    "name": "FORMS_CONFLICT",
+    "status": 400,
+    "description": "Raised when forms that cannot be combined are named together."
+  }
+}

@@ -95,6 +95,11 @@ pub struct LifecycleReport {
     /// offer and says why.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guards: Vec<crate::update::run::Moved>,
+    /// Each part this build carries that the forms hold and this machine has never run,
+    /// offered as an install from the build, offline, before anything of the forms is
+    /// written or started; answered by [`Self::offer`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installing: Vec<crate::app::InstallOffered>,
     /// Every network the engine holds for the project that the project no longer
     /// declares, by the engine's name: disconnected and taken away before a start, or
     /// named and left by a rehearsal. Empty for every other action.

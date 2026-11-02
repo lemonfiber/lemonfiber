@@ -110,8 +110,8 @@ pub use setup::SetupAction;
 // The log-following reads a surface streams from live outside dispatch, so they are the
 // engine module's functions re-exported for the binary and the log commands to reach.
 pub use engine::{
-    claimed, diagnose, in_flight, logs, pull_progress, released, start_progress, started, Claim,
-    Interrupted, Waiting,
+    claimed, diagnose, in_flight, logs, offline, pull_progress, released, start_progress, started,
+    unstarted, Claim, InstallOffered, Interrupted, Offline, Waiting, INSTALL_REFUSALS,
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
@@ -427,12 +427,12 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Version => engine::version(ctx).await.map(Outcome::Version),
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).await.map(Outcome::Preview),
-        Command::Up { forms } => lifecycle(ctx, &forms, Action::Up).await,
+        Command::Up { forms, offer } => engine::up(ctx, &forms, offer).await,
         Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::Lifecycle),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
-        Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
+        Command::Switch { forms, offer } => engine::switched(ctx, &forms, offer).await,
         Command::Restart(restart) => engine::restarted(ctx, restart).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),

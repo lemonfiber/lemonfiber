@@ -52,7 +52,13 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
                 confirmed: true,
             }),
         ),
-        ("up", Command::Up { forms: Vec::new() }),
+        (
+            "up",
+            Command::Up {
+                forms: Vec::new(),
+                offer: None,
+            },
+        ),
         (
             "down",
             Command::Down(Teardown {
@@ -64,6 +70,7 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
             "switch",
             Command::Switch {
                 forms: vec!["library".to_owned()],
+                offer: None,
             },
         ),
         (

@@ -140,12 +140,16 @@ async fn waited(
             raised(ctx, &problem.summary, NOTHING_CAME_BACK);
             Err(problem)
         }
+        Ok(outcome) if !came_up(&outcome) && !outcome.installing.is_empty() => {
+            raised(ctx, &waits(&outcome), NOTHING_CAME_BACK);
+            Ok(outcome)
+        }
         Ok(outcome) if !came_up(&outcome) => {
             raised(ctx, COMPOSE_REFUSED, NOTHING_CAME_BACK);
             Ok(outcome)
         }
         Ok(outcome) => {
-            confirmed(ctx).await;
+            confirmed(ctx, &outcome).await;
             Ok(outcome)
         }
     }
@@ -262,10 +266,25 @@ async fn tried(
     tries: u32,
     between: Duration,
 ) -> Result<LifecycleReport, Box<Problem>> {
-    let mut outcome = super::engine::lifecycle(ctx, forms, &Action::Up).await;
+    let waiting = super::engine::without_waiting(ctx, forms).await?;
+    if let Some((started, offline)) = &waiting {
+        if started.is_empty() {
+            let mut report = nothing_started(&format!(
+                "{} waits for its install from this build",
+                super::engine::plugins_of(offline)
+            ));
+            report.installing.clone_from(&offline.installs);
+            report.offer = Some(offline.offer.clone());
+            return Ok(report);
+        }
+    }
+    let action = waiting
+        .as_ref()
+        .map_or(Action::Up, |(started, _)| Action::Start(started.clone()));
+    let mut outcome = super::engine::lifecycle(ctx, forms, &action).await;
     for attempt in 1..tries {
         if outcome.as_ref().is_ok_and(came_up) {
-            return outcome;
+            break;
         }
         ctx.narrator
             .say(&format!(
@@ -274,9 +293,15 @@ async fn tried(
             ))
             .await;
         tokio::time::sleep(between).await;
-        outcome = super::engine::lifecycle(ctx, forms, &Action::Up).await;
+        outcome = super::engine::lifecycle(ctx, forms, &action).await;
     }
-    outcome
+    outcome.map(|mut report| {
+        if let Some((_, offline)) = waiting {
+            report.installing = offline.installs;
+            report.offer = Some(offline.offer);
+        }
+        report
+    })
 }
 
 /// Whether an attempt brought the stack up.
@@ -292,12 +317,36 @@ fn came_up(report: &LifecycleReport) -> bool {
 /// is not holding, a client that could not be moved onto the port the provider grants
 /// now. Everything it asks is a check that already existed and that nothing asked
 /// after a restart.
-async fn confirmed(ctx: &Ctx) {
-    match wrong(ctx).await {
-        None => observed(ctx, None),
-        Some(said) => raised(ctx, &said, TUNNEL_UNPROVEN),
+///
+/// A part left waiting for its install is said where nothing more pressing is.
+async fn confirmed(ctx: &Ctx, report: &LifecycleReport) {
+    match (wrong(ctx).await, report.offer.as_ref()) {
+        (Some(said), _) => raised(ctx, &said, TUNNEL_UNPROVEN),
+        (None, Some(_)) if !report.installing.is_empty() => {
+            raised(ctx, &waits(report), WAITING_COSTS);
+        }
+        (None, _) => observed(ctx, None),
     }
 }
+
+/// What a boot that left parts waiting for their install says.
+fn waits(report: &LifecycleReport) -> String {
+    let plugins: Vec<&str> = report
+        .installing
+        .iter()
+        .map(|one| one.plugin.as_str())
+        .collect();
+    format!(
+        "{} waits for its install from this build, so it and what runs through it did not \
+         start; lemonfiber up offers the install",
+        plugins.join(", ")
+    )
+}
+
+/// What a part left waiting for its install costs while it waits.
+const WAITING_COSTS: &str =
+    "the rest of the stack is back, and what the waiting part fills stays unfilled until the \
+     install is agreed to";
 
 /// What the trust checks found wrong after the stack came back, if anything.
 ///
@@ -399,6 +448,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         unvetted: None,
         moves: Vec::new(),
         guards: Vec::new(),
+        installing: Vec::new(),
         swept: Vec::new(),
         passing: None,
         fencing: None,

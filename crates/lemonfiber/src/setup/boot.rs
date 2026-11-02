@@ -93,7 +93,11 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
         return code;
     }
 
-    match dispatch(Command::Up { forms }, ctx).await {
+    let offer = crate::installing::answered(ctx, &forms, surface.interactive(), &|asked| {
+        surface.line(asked)
+    })
+    .await;
+    match dispatch(Command::Up { forms, offer }, ctx).await {
         Ok(outcome) => {
             render(&outcome, false);
             wire(ctx, condition(&outcome)).await;

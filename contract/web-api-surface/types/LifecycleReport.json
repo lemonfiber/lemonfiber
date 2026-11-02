@@ -42,6 +42,12 @@
       ],
       "required": false
     },
+    "installing": {
+      "type": [
+        "array[ref:UpInstallOffered]"
+      ],
+      "required": false
+    },
     "moves": {
       "type": [
         "array[ref:MoveOffered]"

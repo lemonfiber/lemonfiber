@@ -26,6 +26,27 @@ pub struct RawUp {
     /// back is the record's answer, not this command line's.
     #[arg(long, conflicts_with_all = ["forms", "services"])]
     pub at_boot: bool,
+    /// The offer being answered, as the rehearsal printed it: the yes to installing the
+    /// parts this build carries that the forms hold and this machine has never run.
+    ///
+    /// Without it, a start that would install one asks at a terminal and otherwise starts
+    /// nothing, saying what is on offer.
+    #[arg(long, value_name = "NAME", conflicts_with_all = ["at_boot", "services"])]
+    pub offer: Option<String>,
+}
+
+/// What to switch to, as the command line spells it.
+#[derive(Debug, Args)]
+pub struct RawSwitch {
+    /// The forms to switch to.
+    #[arg(required = true)]
+    pub forms: Vec<String>,
+    /// The offer being answered, as the rehearsal printed it: the yes to installing the
+    /// parts this build carries that the forms hold and this machine has never run.
+    /// Without it, a switch that would install one asks at a terminal and otherwise
+    /// changes nothing, saying what is on offer.
+    #[arg(long, value_name = "NAME")]
+    pub offer: Option<String>,
 }
 
 /// What to stop, and whether to wait for downloads first, as the command line spells it.

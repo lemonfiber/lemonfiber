@@ -163,7 +163,10 @@ async fn a_context_this_machine_does_not_have_stops_the_reads_and_the_writes() {
         stderr: String::new(),
     })));
     let refused = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(aimed_at(target), &runner, Located::holding(&[])),
     )
     .await;
@@ -201,7 +204,10 @@ async fn a_location_that_is_not_on_the_other_machine_stops_the_command_over_any_
         };
 
         let refused = dispatch(
-            Command::Up { forms: Vec::new() },
+            Command::Up {
+                forms: Vec::new(),
+                offer: None,
+            },
             &ctx(
                 settings,
                 &runner,
@@ -247,7 +253,10 @@ async fn a_machine_that_has_the_location_is_let_through_on_a_check_that_proved_i
     };
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(
             settings,
             &runner,
@@ -299,7 +308,10 @@ async fn a_machine_that_says_yes_to_everywhere_is_not_believed_about_anywhere() 
     };
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(settings, &runner, Located::saying(Presence::There))
             .with_narrator(Arc::clone(&heard) as Arc<dyn Narrator>),
     )
@@ -337,7 +349,10 @@ async fn a_run_that_could_not_be_checked_is_let_through_and_told_so() {
     };
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(settings, &runner, Located::saying(Presence::Unknown))
             .with_narrator(Arc::clone(&heard) as Arc<dyn Narrator>),
     )
@@ -369,7 +384,10 @@ async fn a_machine_that_cannot_be_reached_is_refused_in_the_engines_own_words() 
     };
 
     let refused = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(settings, &runner, Located::unreachable("no route to host")),
     )
     .await;
@@ -396,7 +414,10 @@ async fn a_run_with_no_location_chosen_asks_the_machine_nothing() {
     let machine = Located::holding(&[]);
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(
             aimed_at(Target::at("tcp://nas.local:2375", Origin::Variable)),
             &runner,

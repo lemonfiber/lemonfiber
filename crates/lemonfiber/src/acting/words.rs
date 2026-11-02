@@ -63,6 +63,13 @@ const WALKING: &str = "asking the services";
 /// What the box says while the core is working out what an errand would do.
 const WEIGHING: &str = "working out what this would do";
 
+/// The question before a start installs what it offers from this build.
+const INSTALLS: &str = "Install from this build, offline, and start";
+
+/// What agreeing to that install comes to, under the question.
+const INSTALLS_ABOUT: &str =
+    "each part is installed as a plugin before anything else of the form is written or started";
+
 /// What the box says while a question is with the stack.
 const ANSWERING: &str = "waiting for this stack to answer";
 
@@ -106,6 +113,10 @@ fn on_a_key(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<Li
         Stage::Confirming { offer, taken } => {
             (titled(offer), confirming(offer, taken, rows, across))
         }
+        Stage::Installing { offer, account, .. } => (
+            titled(offer),
+            agreed(INSTALLS, INSTALLS_ABOUT, Some(account), rows, across),
+        ),
         Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
         Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
         Stage::Typing {

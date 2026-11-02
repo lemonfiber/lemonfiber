@@ -32,10 +32,14 @@ const POLL: std::time::Duration = std::time::Duration::from_millis(500);
 /// supplied. Compose's own narration stops the moment the containers exist, and
 /// that is the moment this begins — so without it the operator meets minutes of
 /// silence exactly where they have most reason to think the command has hung.
+///
+/// A service the start did not address that has no container is not waited for: nothing
+/// is going to start it.
 async fn settle(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     profiles: &[String],
+    addressed: &[String],
 ) -> Result<Vec<Service>, Box<Problem>> {
     let began = ctx.seams.clock.now();
     let deadline = began + ctx.patience;
@@ -62,6 +66,9 @@ async fn settle(
 
         let waiting: Vec<String> = unsettled(&services)
             .into_iter()
+            .filter(|service| {
+                service.state != crate::docker::State::Absent || addressed.contains(&service.id)
+            })
             .map(|service| service.id.clone())
             .collect();
         if waiting.is_empty() {
@@ -198,14 +205,16 @@ pub(crate) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
 ///
 /// Shared rather than written twice, because anything that starts services owes the
 /// operator the same wait: bringing a form up and switching to one differ in what
-/// they start and not at all in what "started" has to mean before it is said.
+/// they start and not at all in what "started" has to mean before it is said. What is
+/// waited for is what the start `addressed`, and whatever else has a container.
 pub(crate) async fn settled_into(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     report: &mut LifecycleReport,
+    addressed: &[String],
 ) -> Result<(), Box<Problem>> {
     let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
-    let settled = settle(ctx, manifest, &profiles).await?;
+    let settled = settle(ctx, manifest, &profiles, addressed).await?;
     report.condition = Some(condition(&settled));
     report.services = settled;
     let project =

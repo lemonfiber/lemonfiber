@@ -185,11 +185,11 @@ fn every_file_is_reached_from_the_index() {
             reached.insert(path.to_owned());
         }
     };
-    ["key_callable", "reads", "refusals"]
+    ["key_callable", "reads"]
         .iter()
         .filter_map(|key| index.get(key))
         .for_each(&mut named);
-    ["kinds", "actions", "bodies"]
+    ["kinds", "actions", "bodies", "refusals"]
         .iter()
         .filter_map(|key| index.get(key).and_then(Value::as_object))
         .flat_map(|listed| listed.values())

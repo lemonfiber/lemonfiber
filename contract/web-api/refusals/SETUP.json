@@ -1,0 +1,27 @@
+{
+  "SETUP-1": {
+    "name": "NOT_REVIEWED",
+    "status": 400,
+    "description": "Raised when apply is asked for before the answers have been reviewed."
+  },
+  "SETUP-16": {
+    "name": "GUARD_UNANSWERED",
+    "status": 400,
+    "description": "Raised when a VPN answer leaves the egress guard without what it needs to start."
+  },
+  "SETUP-5": {
+    "name": "DOES_NOT_APPLY",
+    "status": 400,
+    "description": "Raised when an answer is not meaningful on the platform setup is running on."
+  },
+  "SETUP-7": {
+    "name": "ALREADY_SET_UP",
+    "status": 400,
+    "description": "Raised when setup is answered on a machine that is already set up."
+  },
+  "SETUP-8": {
+    "name": "NOTHING_TO_RECOVER",
+    "status": 400,
+    "description": "Raised when a recovery is asked for and no apply stopped part-way."
+  }
+}

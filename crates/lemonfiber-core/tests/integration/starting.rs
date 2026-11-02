@@ -58,7 +58,9 @@ fn named(forms: &[&str]) -> Vec<String> {
 /// Everything the start said and the status it ended on, or nothing where it could
 /// not be spawned at all.
 async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
-    let mut progress = start_progress(ctx, &named(&["library"]), &[]).await.ok()?;
+    let mut progress = start_progress(ctx, &named(&["library"]), &[], None)
+        .await
+        .ok()?;
     let mut said = Vec::new();
     let mut status = None;
     while let Some(event) = progress.recv().await {
@@ -111,7 +113,7 @@ async fn a_start_that_cannot_be_spawned_is_refused_rather_than_silent() {
         program: "docker".to_owned(),
     };
 
-    let opened = start_progress(&ctx(Err(missing)), &named(&["library"]), &[]).await;
+    let opened = start_progress(&ctx(Err(missing)), &named(&["library"]), &[], None).await;
 
     assert!(opened.is_err(), "the spawn failure reaches the caller");
 }

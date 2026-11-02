@@ -1,0 +1,7 @@
+{
+  "REMOVE-7": {
+    "name": "REMOVAL_MOVED",
+    "status": 400,
+    "description": "Said where the offer answered is not the one a reading of the removal makes now."
+  }
+}

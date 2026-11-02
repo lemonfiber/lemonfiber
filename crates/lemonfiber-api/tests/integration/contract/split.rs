@@ -24,7 +24,19 @@ fn holding(kinds: &[(&str, Value)]) -> Contract {
             })
             .collect(),
         reads: Vec::new(),
-        refusals: BTreeMap::new(),
+        refusals: [("ADMIT-4", 403), ("ADMIT-10", 400), ("LIFE-13", 409)]
+            .into_iter()
+            .map(|(code, status)| {
+                (
+                    code.to_owned(),
+                    lemonfiber_api::contract::Listed {
+                        name: "A_REFUSAL",
+                        status,
+                        description: "Raised when a request is refused.",
+                    },
+                )
+            })
+            .collect(),
     }
 }
 
@@ -122,13 +134,17 @@ fn the_index_carries_the_version_and_names_every_other_file() {
             "key_callable": "key-callable.json",
             "kinds": { "doctor": "kinds/doctor.json" },
             "reads": "reads.json",
-            "refusals": "refusals.json"
+            "refusals": {
+                "ADMIT": "refusals/ADMIT.json",
+                "LIFE": "refusals/LIFE.json"
+            }
         })
     );
     for named in [
         "key-callable.json",
         "reads.json",
-        "refusals.json",
+        "refusals/ADMIT.json",
+        "refusals/LIFE.json",
         "kinds/doctor.json",
     ] {
         assert!(
@@ -136,6 +152,9 @@ fn the_index_carries_the_version_and_names_every_other_file() {
             "the index names {named} and nothing wrote it"
         );
     }
+    assert!(files
+        .get("refusals/LIFE.json")
+        .is_some_and(|listed| listed.contains("LIFE-13") && !listed.contains("ADMIT")));
 }
 
 #[test]

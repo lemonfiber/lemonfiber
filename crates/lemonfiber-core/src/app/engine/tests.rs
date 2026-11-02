@@ -121,6 +121,7 @@ async fn a_start_that_failed_reads_nothing_from_an_engine_that_is_not_there() {
     let started = crate::app::dispatch(
         crate::app::Command::Up {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &rehearsed,
     )
@@ -201,9 +202,11 @@ async fn an_overlay_change_the_journal_cannot_hold_starts_nothing() {
             ..crate::config::Settings::default()
         })
         .build();
+    crate::test_support::every_part_has_run(&ctx);
     let started = crate::app::dispatch(
         crate::app::Command::Up {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &ctx,
     )

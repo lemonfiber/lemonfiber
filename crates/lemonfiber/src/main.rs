@@ -18,6 +18,7 @@ mod context;
 mod dashboard;
 mod engine;
 mod exit;
+mod installing;
 mod keyboard;
 mod logs;
 mod pane;
@@ -34,7 +35,7 @@ mod ui;
 
 use crate::say::{complain, say};
 use context::{context, here};
-use engine::{halting, pull, starting, stream};
+use engine::{halting, pull, starting, stream, switching};
 use exit::{complain, no_config_home, settled, USAGE};
 use keyboard::{Console, Keyboard};
 use prompt::SetupFlags;
@@ -179,6 +180,17 @@ async fn doctoring(ctx: &Ctx, asked: RawDoctor, json: bool) -> Result<Command, E
     diagnosing(asked.only.as_deref(), asked.disruptive, asked.accept).map_err(ExitCode::from)
 }
 
+/// A start of forms or of services, streamed as it runs.
+async fn brought_up(ctx: &Ctx, up: RawUp, json: bool) -> ExitCode {
+    let RawUp {
+        forms,
+        services,
+        offer,
+        ..
+    } = up;
+    starting(ctx, &forms, &services, offer, json).await
+}
+
 /// A translation that may refuse, taken or reported.
 ///
 /// Four arms of the table below wrote the same three lines around a translation that can
@@ -250,9 +262,7 @@ async fn main() -> ExitCode {
         // the request at all. It goes through dispatch like every other value that
         // arrives once.
         Request::Up(RawUp { at_boot: true, .. }) => Command::AtBoot,
-        Request::Up(RawUp {
-            forms, services, ..
-        }) => return starting(&ctx, &forms, &services, cli.json).await,
+        Request::Up(up) => return brought_up(&ctx, up, cli.json).await,
         Request::Down(RawDown {
             forms,
             services,
@@ -262,7 +272,7 @@ async fn main() -> ExitCode {
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
-        Request::Switch { forms } => Command::Switch { forms },
+        Request::Switch(asked) => taken!(switching(&ctx, asked, cli.json).await),
         Request::Restart(asked) => restarting(asked),
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.

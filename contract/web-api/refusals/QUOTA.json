@@ -1,0 +1,27 @@
+{
+  "QUOTA-2": {
+    "name": "NO_LIMIT",
+    "status": 400,
+    "description": "Raised where a policy that lives inside a limit was chosen without one."
+  },
+  "QUOTA-4": {
+    "name": "NOT_WAITING",
+    "status": 404,
+    "description": "Raised where the request named is not one that is waiting on anybody."
+  },
+  "QUOTA-5": {
+    "name": "NO_REASON",
+    "status": 400,
+    "description": "Raised where a request was turned down and the reason said nothing."
+  },
+  "QUOTA-6": {
+    "name": "NOBODY",
+    "status": 404,
+    "description": "Raised where nobody in the household goes by the name that was given."
+  },
+  "QUOTA-7": {
+    "name": "NEVER_HERE",
+    "status": 404,
+    "description": "Raised where the request service holds no account for somebody who has one here."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "REHEARSE-1": {
+    "name": "CANNOT",
+    "status": 400,
+    "description": "The flag cannot be honoured by this command, and never will be."
+  },
+  "REHEARSE-2": {
+    "name": "NOT_YET",
+    "status": 400,
+    "description": "The flag is not honoured by this command yet."
+  }
+}
