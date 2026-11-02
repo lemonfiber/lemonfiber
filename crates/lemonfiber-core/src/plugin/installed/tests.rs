@@ -159,7 +159,7 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
 }
 
 #[test]
-fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked() {
+fn a_variable_asking_an_address_is_an_ask_once_for_each_medium_it_files() {
     use lemonfiber_manifest::container::{UrlOf, Value};
     let url = |capability: &str| {
         Value::Url(UrlOf {
@@ -204,9 +204,19 @@ fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked(
         each: false,
         files: None,
     };
+    let curating = |files: Option<&str>, native: Option<&str>| super::Asking {
+        native: native.map(str::to_owned),
+        files: files.map(str::to_owned),
+        ..asked("library.curate")
+    };
     assert_eq!(
         placed(record.as_ref(), "komga").map(|one| one.asks),
-        Some(vec![asked("download.usenet"), asked("indexer.search")])
+        Some(vec![
+            asked("download.usenet"),
+            asked("indexer.search"),
+            curating(None, Some("servarr")),
+            curating(Some("tv"), None),
+        ])
     );
 }
 

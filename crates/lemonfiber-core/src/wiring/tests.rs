@@ -497,8 +497,9 @@ fn a_stack_with_nothing_chosen_says_nothing_rather_than_an_empty_setting() {
     assert_eq!(Chosen::read(Some("")).setting(), None);
 }
 
-/// Every link the shipped stack declares is answered, and the by-name ones are
-/// the six the manifest says they are.
+/// Every link the shipped stack declares is answered, and so is the one ask no wiring
+/// declares: the torrent client's of the guard whose network it runs inside. The
+/// by-name ones are the six the manifest says they are.
 #[test]
 fn every_link_the_shipped_stack_declares_is_answered() {
     let counted = stack().map(|manifest| {
@@ -507,13 +508,32 @@ fn every_link_the_shipped_stack_declares_is_answered() {
             .iter()
             .filter(|one| matches!(one.reaches, Reaches::ByName { .. }))
             .count();
-        (wired.len(), manifest.wirings.len(), by_name)
+        let guarded = wired
+            .iter()
+            .filter(|one| one.by == "qbittorrent")
+            .map(|one| &one.reaches)
+            .find_map(|reaches| match reaches {
+                Reaches::Asked {
+                    capability,
+                    services,
+                    ..
+                } => Some((capability.clone(), services.clone())),
+                Reaches::ByName { .. } => None,
+            });
+        (wired.len(), manifest.wirings.len(), by_name, guarded)
     });
     assert_eq!(
-        counted.map(|(answered, _, _)| answered),
-        counted.map(|(_, declared, _)| declared)
+        counted.as_ref().map(|(answered, _, _, _)| *answered),
+        counted.as_ref().map(|(_, declared, _, _)| declared + 1)
     );
-    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(6));
+    assert_eq!(counted.as_ref().map(|(_, _, by_name, _)| *by_name), Some(6));
+    assert_eq!(
+        counted.and_then(|(_, _, _, guarded)| guarded),
+        Some((
+            "network.egress-guard".to_owned(),
+            vec!["gluetun".to_owned()]
+        ))
+    );
 }
 
 /// An ask for every filler with nothing to fill it is unfilled, not "every one of

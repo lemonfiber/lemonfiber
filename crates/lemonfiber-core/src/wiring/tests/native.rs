@@ -111,3 +111,38 @@ fn an_upstream_is_reached_with_the_key_lemonfiber_minted_for_it_where_it_crosses
         Some(A_MINTED_KEY.to_owned())
     );
 }
+
+/// A curator brought by itself, fronting nothing, that talks `native` where it says.
+fn a_lone_curator(native: Option<&str>) -> Installed {
+    let mut placed = crate::test_support::a_placed("curator", &["library.curate"], None);
+    placed.native = native.map(str::to_owned);
+    crate::test_support::an_installed("curator", vec![placed])
+}
+
+#[test]
+fn an_ask_in_an_api_reaches_a_filler_fronting_nothing_unless_it_talks_another() {
+    let reaching = |curator: Installed| {
+        let manifest = written(&service("asker", ""))?;
+        settle(
+            &manifest,
+            &[curator, an_asker(Some("servarr"))],
+            &Chosen::default(),
+        )
+        .into_iter()
+        .find(|wired| wired.by == "finder")
+        .and_then(|wired| match wired.reaches {
+            Reaches::Asked { services, .. } => Some(services),
+            Reaches::ByName { .. } => None,
+        })
+    };
+
+    assert_eq!(
+        reaching(a_lone_curator(None)),
+        Some(vec!["curator".to_owned()])
+    );
+    assert_eq!(
+        reaching(a_lone_curator(Some("servarr"))),
+        Some(vec!["curator".to_owned()])
+    );
+    assert_eq!(reaching(a_lone_curator(Some("komga"))), Some(Vec::new()));
+}

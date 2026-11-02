@@ -19,7 +19,7 @@ use lemonfiber_manifest::{Manifest, Wiring};
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::origin::Origin;
 use crate::plugin::first_party::FirstParty;
-use crate::plugin::{Asking, Installed};
+use crate::plugin::{Asking, Installed, Placed};
 
 use super::{Chosen, Contest, Reaches, Settled, Unfilled, Whose, Wired};
 
@@ -291,38 +291,46 @@ fn reached(
 }
 
 /// What an ask in the API `api` settles on: the upstream each adapter in `services`
-/// fronts, where that upstream declares `api`, and unfilled where none does.
+/// fronts, where that upstream declares `api`, each other service as itself, where it
+/// declares `api` or no API of its own, and unfilled where none is left.
 fn in_native(
     installed: &[Installed],
     services: &[String],
     settled: Settled,
     api: &str,
 ) -> (Vec<String>, Settled) {
-    let upstreams: Vec<String> = services
+    let spoken: Vec<String> = services
         .iter()
-        .filter_map(|adapter| fronted_in(installed, adapter, api))
+        .filter_map(|service| spoken_by(installed, service, api))
         .collect();
-    if upstreams.is_empty() && !services.is_empty() {
-        (upstreams, Settled::Unfilled)
+    if spoken.is_empty() && !services.is_empty() {
+        (spoken, Settled::Unfilled)
     } else {
-        (upstreams, settled)
+        (spoken, settled)
     }
 }
 
-/// The upstream `adapter` fronts, where it declares the API `api`.
-fn fronted_in(installed: &[Installed], adapter: &str, api: &str) -> Option<String> {
-    installed.iter().find_map(|one| {
-        let upstream = one
-            .services
-            .iter()
-            .find(|placed| placed.service == adapter)?
-            .fronts
-            .as_deref()?;
+/// What of `service` an ask in the API `api` reaches: the upstream it fronts where it is
+/// an adapter and that upstream declares `api`, and `service` itself where it fronts
+/// nothing and declares `api` or no API of its own.
+fn spoken_by(installed: &[Installed], service: &str, api: &str) -> Option<String> {
+    let speaks = |placed: &Placed| placed.native.as_deref().is_none_or(|own| own == api);
+    let Some((one, placed)) = installed.iter().find_map(|one| {
         one.services
             .iter()
+            .find(|placed| placed.service == service)
+            .map(|placed| (one, placed))
+    }) else {
+        return Some(service.to_owned());
+    };
+    match placed.fronts.as_deref() {
+        Some(upstream) => one
+            .services
+            .iter()
             .find(|placed| placed.service == upstream && placed.native.as_deref() == Some(api))
-            .map(|placed| placed.service.clone())
-    })
+            .map(|placed| placed.service.clone()),
+        None => speaks(placed).then(|| service.to_owned()),
+    }
 }
 
 /// A plugin's ask as a link of the stack's, carrying the stack's own choice for that

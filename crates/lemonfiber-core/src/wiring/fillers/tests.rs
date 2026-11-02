@@ -82,8 +82,8 @@ fn a_service_waiting_on_something_other_than_a_tunnel_is_reached_at_its_own_id()
     );
 }
 
-/// Every ask the stack declares is answered, and a link kept to a named service is not
-/// an ask.
+/// Every ask the stack declares is answered, and so is the torrent client's of the guard
+/// whose network it runs inside, and a link kept to a named service is not an ask.
 #[test]
 fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
     let mut asks = 0;
@@ -96,7 +96,7 @@ fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
     });
 
     assert!(asks > 0, "the shipped stack asks for something");
-    assert_eq!(fillers.asks().len(), asks);
+    assert_eq!(fillers.asks().len(), asks + 1);
     let unanswered: Vec<(&str, &str)> = fillers
         .asks()
         .iter()
