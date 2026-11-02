@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "stream.guard/v1/openapi.json",
-      "sha256": "5d802ea680514fd310074b01def7fcdc21b7477e4947c9a3b10221df401bf63d"
+      "sha256": "210efa48d7f97062786008c53490f4be67fec987070ba7b54193e96859aa4a4d"
     },
     {
       "path": "stream.guard/v1/operations/guard.json",

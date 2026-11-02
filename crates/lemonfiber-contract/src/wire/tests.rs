@@ -49,6 +49,18 @@ fn what_only_a_contract_can_refuse_is_read_as_refused() {
     );
 }
 
+/// An operation of a major the adapter speaks that it does not know is read as not
+/// offered, as an operation its upstream cannot perform is.
+#[test]
+fn an_operation_an_adapter_does_not_know_is_read_as_not_offered() {
+    let refusal = Refusal::not_known("astray");
+    assert_eq!(refusal.kind, Kind::Unsupported);
+    assert!(matches!(
+        refusal.failure("adapter"),
+        Failure::Unsupported { detail, .. } if detail.contains("astray")
+    ));
+}
+
 #[test]
 fn every_refusal_has_a_status_of_its_own_kind() {
     let statuses = [

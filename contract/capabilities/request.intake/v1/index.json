@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "request.intake/v1/openapi.json",
-      "sha256": "280f4c42b4cd8d61d35d4b6123f4aaa8bce773ad78ac8037694ebcdfae0e5ee1"
+      "sha256": "a92a0ecc5c25ffde3d6e446fb94e6f6e32b06da961208b4b6231538029500465"
     },
     {
       "path": "request.intake/v1/operations/establish.json",

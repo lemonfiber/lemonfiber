@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "library.curate/v1/openapi.json",
-      "sha256": "b4837ece7cdba77b09e867282c2c6b414bbcb08eab9a1bdb8357e5d99fb96123"
+      "sha256": "dde71d5e7abb67efe976b0f6f43d719ec9ae09229d3389e48e45c0ee0d032b28"
     },
     {
       "path": "library.curate/v1/operations/identity.json",

@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "proxy.front/v1/openapi.json",
-      "sha256": "d66f61392b2dfd19cc6f50dc03c19636f6dd188657aa16c5cd22f5d63c2a4ca8"
+      "sha256": "672714b5a5a1b55bbb52de47f440570dd1e7f24aa5398c74d82ac27c27b357ec"
     },
     {
       "path": "proxy.front/v1/operations/apply.json",

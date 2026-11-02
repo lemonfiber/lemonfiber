@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "subtitles.fetch/v1/openapi.json",
-      "sha256": "cf06cffa0533864ea4ee5410084cd0fa9b458f8f8997c25371b9090e1de99faa"
+      "sha256": "d75c59ad0e99b8b15f1158d8b7d3915fcca5570cb397ba4178c347cc6034d0ff"
     },
     {
       "path": "subtitles.fetch/v1/operations/watching.json",

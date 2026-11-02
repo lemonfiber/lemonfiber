@@ -5,6 +5,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use lemonfiber_contract::adapter::{About, Release, KEY_FILE, UPSTREAM_FILE};
 use lemonfiber_contract::capabilities::subtitles::fetch;
+use lemonfiber_contract::wire;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
 use tower::ServiceExt as _;
@@ -129,7 +130,6 @@ async fn nothing_is_answered_without_the_plugins_key() {
 #[tokio::test]
 async fn an_operation_nothing_serves_is_refused_as_a_problem() {
     for path in [
-        "/lemonfiber/subtitles.fetch/v1/unheard",
         "/lemonfiber/subtitles.fetch/v2/watching",
         "/lemonfiber/media.serve/v1/title",
     ] {
@@ -138,6 +138,26 @@ async fn an_operation_nothing_serves_is_refused_as_a_problem() {
         assert_eq!(sort, "application/problem+json", "{path}");
         assert!(body.contains("unknown-operation"), "{path}: {body}");
     }
+}
+
+#[tokio::test]
+async fn an_operation_it_does_not_know_of_a_major_it_speaks_is_answered_unsupported() {
+    let (status, sort, body) = asked(
+        kit(),
+        "POST",
+        "/lemonfiber/subtitles.fetch/v1/unheard",
+        Some(KEY),
+    )
+    .await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(sort, "application/problem+json");
+    assert_eq!(
+        serde_json::from_str::<wire::Refusal>(&body)
+            .ok()
+            .map(|refusal| refusal.kind),
+        Some(wire::Kind::Unsupported),
+        "{body}"
+    );
 }
 
 #[tokio::test]
