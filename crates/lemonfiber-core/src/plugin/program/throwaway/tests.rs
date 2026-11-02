@@ -177,7 +177,8 @@ fn starting_files_past_the_bounds_are_refused() {
         put(&many, &format!("config/recyclarr/{index}.yml"), b"x");
     }
     let refused = Throwaway::of(of(&many), &lemonfiber_fixtures::ports::Chance::cycling());
-    assert!(refused.is_err_and(|why| why.contains("pass 64 files")));
+    assert!(refused
+        .is_err_and(|why| why.contains("service recyclarr") && why.contains("pass 64 files")));
 
     let exactly = Scratch::new("throwaway-exactly");
     for index in 0..MOST_FILES {
@@ -191,7 +192,7 @@ fn starting_files_past_the_bounds_are_refused() {
     put(&heavy, "config/recyclarr/b.bin", &vec![0; half + 1]);
     assert!(
         Throwaway::of(of(&heavy), &lemonfiber_fixtures::ports::Chance::cycling())
-            .is_err_and(|why| why.contains("bytes"))
+            .is_err_and(|why| why.contains("service recyclarr") && why.contains("bytes"))
     );
 
     let full = Scratch::new("throwaway-full");

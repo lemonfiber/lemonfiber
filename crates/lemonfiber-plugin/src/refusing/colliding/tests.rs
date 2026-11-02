@@ -166,3 +166,79 @@ fn a_port_two_of_the_plugins_services_publish_is_refused_naming_both() {
         "got: {said:?}"
     );
 }
+
+#[test]
+fn a_service_taking_the_id_of_an_installed_parts_adapter_is_refused_naming_its_plugin() {
+    let said = without(SERVICE, "[[service]]\nid          = \"jellyfin-adapter\"");
+    assert!(
+        names(
+            &said,
+            &[
+                "service jellyfin-adapter.id",
+                "plugin jellyfin",
+                "Jellyfin adapter"
+            ]
+        ),
+        "got: {said:?}"
+    );
+}
+
+#[test]
+fn each_reservation_refused_names_the_plugin_holding_it() {
+    let said = without("port        = 25600", "port        = 8096");
+    assert!(
+        names(&said, &["service komga.port", "plugin door"]),
+        "got: {said:?}"
+    );
+    let said = without(
+        r#"hostname        = "comics""#,
+        r#"hostname        = "watch""#,
+    );
+    assert!(
+        names(&said, &["wiring.hostname", "plugin door"]),
+        "got: {said:?}"
+    );
+    let said = without(SERVICE, "[[service]]\nid          = \"Jellyfin_Adapter\"");
+    assert!(
+        names(
+            &said,
+            &[
+                "service Jellyfin_Adapter.id",
+                "plugin jellyfin",
+                "once case"
+            ]
+        ),
+        "got: {said:?}"
+    );
+}
+
+#[test]
+fn the_plugin_holding_an_id_is_refused_none_of_what_it_holds() {
+    let said = said(
+        &INSTALLABLE
+            .replace(
+                "[plugin]\nid          = \"komga\"",
+                "[plugin]\nid          = \"jellyfin\"",
+            )
+            .replace(SERVICE, "[[service]]\nid          = \"jellyfin-adapter\""),
+    );
+    assert!(
+        !names(&said, &["service jellyfin-adapter.id"]),
+        "got: {said:?}"
+    );
+}
+
+#[test]
+fn every_pinned_part_takes_nothing_another_holds() {
+    let mut read = 0;
+    for pinned in lemonfiber_bundled::PINNED {
+        let Ok(part) = crate::Manifest::from_toml(pinned.copy) else {
+            continue;
+        };
+        let mut found = Vec::new();
+        super::with_the_stack(&part, &mut found);
+        assert_eq!(found, Vec::new(), "{}", pinned.first_party.plugin);
+        read += 1;
+    }
+    assert!(read > 20, "{read} parts read");
+}
