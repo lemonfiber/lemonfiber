@@ -366,21 +366,21 @@ async fn a_usenet_client_answers_its_accounts_and_not_seeding_or_a_peer_port() {
         let unserved = usenet::dispatch(&Client, operation, b"{}").await;
         assert_eq!(
             unserved.err().map(|refusal| refusal.kind),
-            Some(wire::Kind::UnknownOperation),
+            Some(wire::Kind::Unsupported),
             "{operation}"
         );
     }
 }
 
 #[tokio::test]
-async fn an_operation_neither_capability_declares_is_refused_by_both() {
+async fn an_operation_neither_capability_declares_is_answered_unsupported_by_both() {
     for refused in [
         torrent::dispatch(&Client, "accounts", b"{}").await,
         usenet::dispatch(&Client, "nothing", b"{}").await,
     ] {
         assert_eq!(
             refused.err().map(|refusal| refusal.kind),
-            Some(wire::Kind::UnknownOperation)
+            Some(wire::Kind::Unsupported)
         );
     }
 }

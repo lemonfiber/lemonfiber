@@ -77,6 +77,6 @@ async fn an_egress_guard_is_served_its_answers_its_failures_and_nothing_else() {
     );
     assert_eq!(
         refused(egress::dispatch(&Unreached, "peer_port", b"{}").await),
-        Some(crate::wire::Kind::UnknownOperation)
+        Some(crate::wire::Kind::Unsupported)
     );
 }

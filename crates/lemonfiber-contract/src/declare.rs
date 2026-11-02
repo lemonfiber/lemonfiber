@@ -133,8 +133,9 @@ macro_rules! contract {
             ///
             /// # Errors
             ///
-            /// The refusal for an operation nobody declared, for a body that does not
-            /// read as its request, and for a failure the port answered.
+            /// `unsupported` for an operation this major does not declare, and the refusal
+            /// for a body that does not read as its request and for a failure the port
+            /// answered.
             pub async fn dispatch<A>(
                 adapter: &A,
                 operation: &str,
@@ -155,7 +156,7 @@ macro_rules! contract {
                         return $crate::wire::answered(answer);
                     }
                 )*)*
-                Err($crate::Refusal::unknown_operation(operation))
+                Err($crate::Refusal::not_known(operation))
             }
 
             /// This capability, served from `adapter` by an adapter kit.

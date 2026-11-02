@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "invite.decline/v1/openapi.json",
-      "sha256": "21793f359cb9e75f3476a1c2aeedac4a48e9ca4320b994110dbb3c1b926ce631"
+      "sha256": "21bf2ee259f5dbcc1d2ae344411de53e90cff00f8c62b06b5bd1796969ade4bd"
     },
     {
       "path": "invite.decline/v1/operations/hold.json",

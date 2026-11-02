@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "identity.source/v1/openapi.json",
-      "sha256": "7ac525d3bf12b6514213ca47677184c53b12f1ca186b5808bd321307674ca3e1"
+      "sha256": "a185d32df2718b7b81cd0d6aa3bd2a020c658aa67a4382004ec27c87e3b2aadb"
     },
     {
       "path": "identity.source/v1/operations/startup_completed.json",

@@ -23,10 +23,11 @@ pub enum Kind {
     Unauthorised,
     /// The upstream answered in a way the adapter did not expect.
     Refused,
-    /// The upstream speaks a release the adapter does not support, or cannot perform the
-    /// operation at all, which is then not offered.
+    /// The upstream speaks a release the adapter does not support, cannot perform the
+    /// operation at all, or the adapter does not know the operation of a major it speaks;
+    /// the operation is then not offered.
     Unsupported,
-    /// The operation is not one this adapter serves.
+    /// The capability or major is not one this adapter speaks.
     UnknownOperation,
     /// What was asked did not read as the operation's request.
     NotAsked,
@@ -70,12 +71,22 @@ impl Refusal {
         }
     }
 
-    /// The refusal for an operation nobody declared.
+    /// The refusal for an operation of a capability or major the adapter does not speak.
     #[must_use]
     pub fn unknown_operation(operation: &str) -> Self {
         Self::new(
             Kind::UnknownOperation,
             format!("{operation} is not an operation this adapter serves"),
+        )
+    }
+
+    /// The refusal for an operation of a major the adapter speaks that it does not know:
+    /// one added to the major after the adapter was built, answered as not offered.
+    #[must_use]
+    pub fn not_known(operation: &str) -> Self {
+        Self::new(
+            Kind::Unsupported,
+            format!("{operation} is not an operation this adapter knows"),
         )
     }
 
