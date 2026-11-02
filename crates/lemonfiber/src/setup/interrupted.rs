@@ -39,7 +39,7 @@ pub(super) async fn recover_setup(
     // nothing to resume from, so a fresh run is the honest fallback — interactive,
     // since recovery carries no flags.
     if progress.is_none() {
-        return fresh_setup(ctx, paths, surface, SetupFlags::none()).await;
+        return Box::pin(fresh_setup(ctx, paths, surface, SetupFlags::none())).await;
     }
 
     say!("A previous setup was interrupted part-way through applying.");
@@ -79,7 +79,7 @@ pub(super) async fn recover_setup(
     // they are refreshed before the stack is brought up against them.
     ctx.settings = read_settings();
     say!("\nSetup is done — bringing your stack up.");
-    start(&ctx, surface).await
+    Box::pin(start(&ctx, surface)).await
 }
 
 /// What each way out is about to do, said before it happens.

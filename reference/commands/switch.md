@@ -20,6 +20,9 @@ Options:
       --json
           Print machine-readable output
 
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it: the yes to installing the parts this build carries that the forms hold and this machine has never run. Without it, a switch that would install one asks at a terminal and otherwise changes nothing, saying what is on offer
+
       --dry-run
           Say what would happen, and change nothing
 

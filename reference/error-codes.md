@@ -267,6 +267,9 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `LIFE-9` | `NOT_ON_THIS_ENGINE` | error | 1 | 500 | 0.17.0 | Raised when the engine lemonfiber reaches from a container does not know that container. |
 | `LIFE-10` | `RESTART_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where a restart names an offer that is not the one a fresh look at the stack builds. |
 | `LIFE-11` | `MOUNT_LINKED` | error | 1 | 409 | 0.18.0 | Raised when a start finds a service's mount source reached through a link. |
+| `LIFE-12` | `OFFLINE_INSTALL_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where an `up` or a `switch` names an offer that is not the install a fresh look at the stack offers. |
+| `LIFE-13` | `OFFLINE_INSTALL_UNANSWERED` | warning | 1 | 409 | 0.18.0 | Raised where a start would install a part this build carries and nobody said yes. |
+| `LIFE-14` | `OFFLINE_INSTALL_UNHELD` | error | 1 | 409 | 0.18.0 | Raised where an install a start was agreed to did not hold. |
 
 ## `MIGRATE` — taking over a setup already here
 

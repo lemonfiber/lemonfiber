@@ -98,6 +98,7 @@ fn naming_no_service_asks_about_the_form_it_always_asked_about() {
         acting.pressed(&Press::Typed('y')),
         Wanted::Carry(Command::Up {
             forms: vec!["full".to_owned()],
+            offer: None,
         })
     );
 }

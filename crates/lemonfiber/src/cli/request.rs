@@ -16,8 +16,8 @@ use clap::{Args, Subcommand};
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawRemoving, RawRestart, RawSetup, RawTrace,
-    RawUi, RawUp, RawWhom, UpdateCommand,
+    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawRemoving, RawRestart, RawSetup,
+    RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -66,11 +66,7 @@ pub enum Request {
     /// Only what falls outside the new shape is stopped. A service the old shape
     /// and the new one both hold keeps running rather than being restarted, so a
     /// download in flight is not interrupted to change the stack around it.
-    Switch {
-        /// The forms to switch to.
-        #[arg(required = true)]
-        forms: Vec<String>,
-    },
+    Switch(RawSwitch),
     /// Restart services without touching the rest.
     Restart(RawRestart),
     /// Fetch newer images without applying them.

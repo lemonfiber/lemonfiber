@@ -10,9 +10,8 @@ use lemonfiber_manifest::Manifest;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::app::plugins::{Asked, Consent, MoveOffered};
+use crate::app::plugins::{Consent, MoveOffered};
 use crate::app::Ctx;
-use crate::plugin::Source;
 
 /// A move in place this run took, or tried to take and could not.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
@@ -45,6 +44,7 @@ pub(super) async fn read(ctx: &Ctx, manifest: &Manifest, service: Option<&str>) 
     reading(
         ctx,
         crate::app::plugins::moving_in::on_offer(ctx, manifest)
+            .await
             .into_iter()
             .filter(|one| service.is_none_or(|named| named == one.service))
             .collect(),
@@ -139,15 +139,9 @@ async fn installing(
     plugin: &str,
     consent: Consent,
 ) -> Result<crate::plugin::Installs, String> {
-    crate::app::plugins::unguarded(
-        ctx,
-        &Asked::Install {
-            source: Source::Name(plugin.to_owned()),
-            consent,
-        },
-    )
-    .await
-    .map_err(|problem| problem.summary.clone())
+    crate::app::plugins::from_this_build(ctx, plugin, consent)
+        .await
+        .map_err(|problem| problem.summary.clone())
 }
 
 #[cfg(test)]

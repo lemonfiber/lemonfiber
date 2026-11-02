@@ -49,7 +49,7 @@ pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
-pub use starting::{RawDown, RawRestart, RawUp};
+pub use starting::{RawDown, RawRestart, RawSwitch, RawUp};
 pub use trace::RawTrace;
 pub use whom::RawWhom;
 

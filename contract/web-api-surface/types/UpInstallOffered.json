@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "offer": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

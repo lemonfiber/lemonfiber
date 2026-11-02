@@ -45,9 +45,10 @@ fn given_away(pinned: &Pinned, chosen: &crate::wiring::Chosen) -> bool {
 
 /// The guard moves on offer against `manifest`: each guard the stack still runs as its
 /// own service, unless its capability was given to another filler.
-pub(crate) fn on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
+pub(crate) async fn on_offer(ctx: &Ctx, manifest: &Manifest) -> Vec<MoveOffered> {
     let chosen = crate::app::targets::chosen_fillers(ctx);
     super::moving_in::all_on_offer(ctx, manifest)
+        .await
         .into_iter()
         .filter(|offered| {
             PINNED.iter().any(|pinned| {
@@ -67,7 +68,7 @@ pub(crate) async fn taken(ctx: &Ctx, manifest: &Manifest) -> Vec<Moved> {
     if ctx.dry_run {
         return rehearsed(ctx, manifest).await;
     }
-    let offered = on_offer(ctx, manifest);
+    let offered = on_offer(ctx, manifest).await;
     if offered.is_empty() {
         return Vec::new();
     }
@@ -78,7 +79,7 @@ pub(crate) async fn taken(ctx: &Ctx, manifest: &Manifest) -> Vec<Moved> {
 /// Every guard move on offer, each read as its install would go and none taken: what an
 /// act's rehearsal shows.
 pub(crate) async fn rehearsed(ctx: &Ctx, manifest: &Manifest) -> Vec<Moved> {
-    crate::update::run::moving::reading(ctx, on_offer(ctx, manifest))
+    crate::update::run::moving::reading(ctx, on_offer(ctx, manifest).await)
         .await
         .into_iter()
         .map(|one| Moved {

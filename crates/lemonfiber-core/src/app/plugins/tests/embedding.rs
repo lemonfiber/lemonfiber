@@ -58,10 +58,18 @@ async fn a_plugin_the_bundle_installs_is_read_from_this_build_at_its_pin() {
 /// upstream release it fronts, as its manifest pins them.
 const ABOUT: &str = r#"{"speaks":["media.serve@1","identity.source@1"],"upstream":"Jellyfin","releases":[{"version":"10.11.11","digest":"sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db"}]}"#;
 
-/// A context over the shipped stack, which still runs the bundled plugin's own service,
-/// with its server and adapter answering every proof it declares and published where
-/// the engine says.
-fn unmoved(name: &str, serving: &Arc<Serving>) -> Ctx {
+/// The stack's own service `service` as having run beneath `stack`: its configuration
+/// directory holding a file.
+pub(super) fn ran(stack: &Path, service: &str) {
+    let at = crate::plugin::configuration(stack, service);
+    assert!(std::fs::create_dir_all(&at).is_ok());
+    assert!(std::fs::write(at.join("system.xml"), "<x/>").is_ok());
+}
+
+/// A context over the shipped stack, which still runs every part the bundle installs as
+/// its own service and has run each of them, with the bundled plugin's server and adapter
+/// answering every proof it declares and published where the engine says.
+pub(super) fn unmoved(name: &str, serving: &Arc<Serving>) -> Ctx {
     use lemonfiber_fixtures::http::Answer;
     let http = lemonfiber_fixtures::http::Fake::by_path(vec![
         (
@@ -81,6 +89,7 @@ fn unmoved(name: &str, serving: &Arc<Serving>) -> Ctx {
         Reporting::holding(&[BUNDLED, ADAPTER], Lifecycle::Running, Health::Healthy)
             .publishing(&[(BUNDLED, "127.0.0.1", 8095), (ADAPTER, "127.0.0.1", 8080)]),
     );
+    crate::test_support::every_part_has_run(&ctx);
     ctx.with_images(lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()))
 }
 

@@ -10,12 +10,16 @@ fn starting_and_stopping_take_the_forms_they_are_given() {
     assert_eq!(
         command("up", naming("tv")),
         Some(Command::Up {
-            forms: vec!["tv".to_owned()]
+            forms: vec!["tv".to_owned()],
+            offer: None,
         })
     );
     assert_eq!(
         command("up", nothing()),
-        Some(Command::Up { forms: vec![] })
+        Some(Command::Up {
+            forms: vec![],
+            offer: None
+        })
     );
     assert_eq!(
         command("down", naming("tv")),
@@ -47,7 +51,8 @@ fn starting_named_services_is_a_different_request_from_bringing_a_form_up() {
     assert_eq!(
         command("up", naming("tv")),
         Some(Command::Up {
-            forms: vec!["tv".to_owned()]
+            forms: vec!["tv".to_owned()],
+            offer: None,
         })
     );
 }

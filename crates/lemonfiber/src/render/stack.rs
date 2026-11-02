@@ -232,6 +232,9 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
         lines.put(format!("{}: nothing was started — {held}", report.action));
         return lines;
     }
+    if let Some(unanswered) = super::moving::unanswered(report) {
+        return unanswered;
+    }
     if report.rehearsed {
         lines.put("would run:");
         // Both invocations, in the order they would run. A switch that stops
@@ -251,6 +254,7 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
     lines.extend(super::moving::offered(&report.moves));
     lines.extend(super::moving::guards(&report.guards));
+    lines.extend(super::moving::rehearsed(report));
 
     // A run Compose did not carry out says so here rather than leaving the operator to
     // infer it from the settled services that are missing below. The exit status says

@@ -77,13 +77,11 @@ impl Acting {
     /// whatever the operator went on to do.
     pub(crate) fn came_to(&mut self, answer: Result<Outcome, Box<Problem>>) {
         self.stage = match std::mem::replace(&mut self.stage, Stage::Idle) {
-            Stage::Running { .. } => Stage::Came(Reading::of(match answer {
-                Ok(Outcome::Lifecycle(report)) => {
-                    lines_of(&crate::render::stack::lifecycle(&report))
-                }
-                Ok(_) => unexpected(),
-                Err(problem) => complaint(&problem),
-            })),
+            Stage::Running { offer, taken } => match answer {
+                Ok(Outcome::Lifecycle(report)) => super::installing::started(offer, taken, &report),
+                Ok(_) => Stage::Came(Reading::of(unexpected())),
+                Err(problem) => Stage::Came(Reading::of(complaint(&problem))),
+            },
             // What an errand would do is the answer the operator reads before
             // agreeing, so it lands on the question rather than closing over it. A
             // failure ends the errand there: there is nothing to agree to.

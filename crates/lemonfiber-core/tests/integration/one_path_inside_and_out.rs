@@ -77,7 +77,10 @@ async fn started(
 ) -> (Option<lemonfiber_core::error::Problem>, Arc<Recording>) {
     let runner = runner();
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(
             settings,
             &runner,
@@ -154,7 +157,10 @@ async fn a_container_that_shares_its_paths_with_the_machine_is_let_through() {
     let machine = Located::running(ID, &[(at.as_str(), at.as_str()), (MEDIA, MEDIA)]);
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(inside(), &runner, machine as Arc<dyn Locations>, stack).rehearsing(),
     )
     .await;
@@ -199,7 +205,10 @@ async fn a_copy_that_is_not_in_a_container_asks_nothing_of_the_engine() {
     };
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(
             settings,
             &runner,
@@ -225,7 +234,10 @@ async fn a_remote_engine_is_left_to_the_remote_guard() {
     };
 
     let outcome = dispatch(
-        Command::Up { forms: Vec::new() },
+        Command::Up {
+            forms: Vec::new(),
+            offer: None,
+        },
         &ctx(
             settings,
             &runner,

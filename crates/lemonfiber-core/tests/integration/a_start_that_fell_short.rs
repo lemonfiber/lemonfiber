@@ -112,6 +112,7 @@ async fn a_start_that_failed_reports_a_service_it_left_created_as_failed() {
     let outcome = dispatch(
         Command::Up {
             forms: named(&["library"]),
+            offer: None,
         },
         &ctx,
     )
@@ -143,6 +144,7 @@ async fn a_rehearsed_start_reads_no_service() {
     let outcome = dispatch(
         Command::Up {
             forms: named(&["library"]),
+            offer: None,
         },
         &ctx,
     )

@@ -37,7 +37,7 @@ use crate::error::Code;
 /// an operator searching for the code reads what else that command refuses. Letting a
 /// download go raises the disk account's, because its offer is one line of that
 /// account.
-pub const MOVED: [Code; 14] = [
+pub const MOVED: [Code; 15] = [
     repair::STALE,
     restore::MOVED_ON,
     migrate::OFFER_MOVED,
@@ -46,6 +46,7 @@ pub const MOVED: [Code; 14] = [
     wire::WIRING_MOVED,
     plugin::PLUGIN_OFFER_MOVED,
     life::RESTART_MOVED,
+    life::OFFLINE_INSTALL_MOVED,
     update::UPDATE_MOVED,
     rate::PAUSING_MOVED,
     setting::SETTINGS_MOVED,

@@ -212,6 +212,7 @@ async fn a_guard_whose_capability_went_to_another_filler_is_left_where_it_is() {
     assert!(chose.is_ok(), "{chose:?}");
 
     let offered: Vec<String> = super::on_offer(&ctx, &manifest(&ctx))
+        .await
         .into_iter()
         .map(|one| one.plugin)
         .collect();
@@ -245,6 +246,7 @@ async fn a_move_the_install_refuses_stays_on_offer_saying_why() {
 
     let moved = super::taken(&ctx, &manifest(&ctx)).await;
     let still: Vec<String> = super::on_offer(&ctx, &manifest(&ctx))
+        .await
         .into_iter()
         .map(|one| one.plugin)
         .collect();
@@ -609,6 +611,7 @@ async fn up(ctx: &Ctx) -> Result<Vec<Moved>, Box<crate::error::Problem>> {
     let outcome = crate::app::dispatch(
         crate::app::Command::Up {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         ctx,
     )

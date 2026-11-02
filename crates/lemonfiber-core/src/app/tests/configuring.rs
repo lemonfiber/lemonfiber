@@ -160,6 +160,7 @@ async fn a_lifecycle_command_with_a_config_file_reports_no_edits_for_an_external
     let outcome = dispatch(
         Command::Up {
             forms: vec!["tv".to_owned()],
+            offer: None,
         },
         &ctx,
     )
@@ -317,6 +318,7 @@ async fn a_lifecycle_outcome_serialises_under_its_own_kind() {
     let ctx = rehearsing(crate::config::Protocols::both());
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
     let rendered = dispatch(command, &ctx)
         .await

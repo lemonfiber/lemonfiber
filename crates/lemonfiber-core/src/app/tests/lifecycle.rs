@@ -9,6 +9,7 @@ async fn starting_a_form_reports_what_it_would_run_and_runs_nothing() {
     let ctx = rehearsing(crate::config::Protocols::both());
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
     let produced = report(dispatch(command, &ctx).await);
     assert_eq!(
@@ -38,6 +39,7 @@ async fn what_the_configuration_left_out_is_reported_rather_than_dropped() {
     });
     let command = Command::Up {
         forms: vec!["tv".to_owned()],
+        offer: None,
     };
     let produced = report(dispatch(command, &ctx).await);
 
@@ -244,6 +246,7 @@ async fn a_form_this_stack_does_not_have_never_reaches_the_engine() {
     let ctx = rehearsing(crate::config::Protocols::both());
     let command = Command::Up {
         forms: vec!["telly".to_owned()],
+        offer: None,
     };
     let outcome = dispatch(command, &ctx).await;
     assert_eq!(
@@ -262,6 +265,7 @@ async fn an_unreadable_stack_is_reported_before_anything_is_started() {
         .build();
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
     assert_eq!(
         dispatch(command, &ctx).await.err().map(|p| p.code),
@@ -283,6 +287,7 @@ async fn an_embedded_stack_with_nowhere_to_go_stops_before_starting_anything() {
         .build();
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
     assert_eq!(
         dispatch(command, &ctx).await.err().map(|p| p.code),
@@ -303,6 +308,7 @@ async fn a_stack_that_contradicts_itself_is_refused_with_every_fault_at_once() {
         .build();
     let command = Command::Up {
         forms: vec!["library".to_owned()],
+        offer: None,
     };
 
     let problem = dispatch(command, &ctx).await.err();

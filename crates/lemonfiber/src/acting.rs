@@ -66,6 +66,7 @@ mod bundling;
 mod chooser;
 mod disturbing;
 mod errand;
+mod installing;
 mod inviting;
 mod lasting;
 mod mending;
@@ -389,6 +390,11 @@ impl Acting {
                 offer::confirming(&mut self.stage, offer, taken, press)
             }
             Stage::Running { offer, taken } => offer::running(&mut self.stage, offer, taken, press),
+            Stage::Installing {
+                offer,
+                taken,
+                account,
+            } => installing::installing(&mut self.stage, offer, taken, account, press),
             Stage::Wondering(chooser) => question::wondering(&mut self.stage, chooser, press),
             Stage::Typing {
                 question,

@@ -11,6 +11,7 @@ fn a_choice(name: &str) -> Choice {
         marked: Some(false),
         command: Command::Up {
             forms: vec![name.to_owned()],
+            offer: None,
         },
     }
 }

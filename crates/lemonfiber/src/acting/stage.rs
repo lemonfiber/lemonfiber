@@ -76,6 +76,16 @@ pub(super) enum Stage {
         /// What it is about to be taken on: one subject, or the forms marked together.
         taken: Taken,
     },
+    /// Holding the question before a start installs the parts this build carries that
+    /// what was taken holds and this machine has never run, under what is on offer.
+    Installing {
+        /// The action that asked to start them.
+        offer: &'static Offer,
+        /// What it was taken on, its command answering the install's offer.
+        taken: Taken,
+        /// What is on offer, and where in it the box is.
+        account: Reading,
+    },
     /// The action is with the core.
     Running {
         /// The action that is running.

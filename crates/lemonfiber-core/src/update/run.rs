@@ -199,7 +199,7 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
     Ok(Report {
         offer,
         unvetted: crate::overlay::unvetted(ctx),
-        moves: crate::app::plugins::moving_in::on_offer(ctx, &manifest),
+        moves: crate::app::plugins::moving_in::on_offer(ctx, &manifest).await,
         moved,
         guards,
         ..report

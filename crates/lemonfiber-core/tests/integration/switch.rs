@@ -44,6 +44,7 @@ async fn switching_to(form: &str, up: &[&str]) -> Option<Switched> {
     match dispatch(
         Command::Switch {
             forms: vec![form.to_owned()],
+            offer: None,
         },
         &ctx(up),
     )
@@ -122,6 +123,7 @@ async fn a_rehearsed_switch_says_what_it_would_stop_without_stopping_it() {
     let outcome = dispatch(
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &ctx(&["qbittorrent"]),
     )
@@ -176,6 +178,7 @@ async fn a_real_switch_stops_then_starts_then_waits() {
     let outcome = dispatch(
         Command::Switch {
             forms: vec!["library".to_owned()],
+            offer: None,
         },
         &ctx,
     )
