@@ -121,11 +121,9 @@ pub(super) fn astray(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Def
     Deferred::new(Category::Services, CHECK_BUDGET, move || {
         let (ctx, manifest) = (ctx.clone(), manifest.clone());
         async move {
-            let named = crate::app::targets::served_by(&ctx, &manifest).map(|id| Named {
-                name: crate::app::targets::server_named(&ctx, &manifest)
-                    .unwrap_or_else(|| id.clone()),
-                id,
-            });
+            let named = crate::app::targets::served_by(&ctx, &manifest)
+                .zip(crate::app::targets::server_named(&ctx, &manifest))
+                .map(|(id, name)| Named { id, name });
             let served = crate::app::targets::serving(&ctx, &manifest).await;
             Box::new(AstrayCheck::new(
                 named,

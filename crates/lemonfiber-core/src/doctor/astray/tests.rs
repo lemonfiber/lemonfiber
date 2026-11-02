@@ -152,21 +152,8 @@ async fn each_one_held_is_a_warning_naming_the_server_what_and_where_to_remove_i
 }
 
 #[tokio::test]
-async fn nothing_held_is_one_pass() {
-    assert_eq!(
-        found(&Server::answering(&[])).await,
-        vec![about_plex(
-            CHECK,
-            TITLE,
-            Verdict::Pass {
-                note: Some(
-                    "Plex holds nothing under the stack's services' names that lemonfiber did \
-                     not make"
-                        .to_owned()
-                ),
-            }
-        )]
-    );
+async fn nothing_held_adds_no_finding() {
+    assert_eq!(found(&Server::answering(&[])).await, Vec::new());
 }
 
 #[tokio::test]

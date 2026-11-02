@@ -89,16 +89,6 @@ impl Check for AstrayCheck {
     }
 }
 
-/// How asking for every name went, apart from what each answered.
-enum Asked {
-    /// Every name was answered.
-    Answered,
-    /// The filler answers `astray` unsupported.
-    Unsupported(String),
-    /// A name could not be answered.
-    Unread(String),
-}
-
 /// What the media server holds under each name the core mints a key under.
 async fn ran(check: &AstrayCheck) -> Vec<Finding> {
     let server = match &check.server {
@@ -121,7 +111,7 @@ async fn ran(check: &AstrayCheck) -> Vec<Finding> {
         Server::Served(server) => server,
     };
     let mut findings = Vec::new();
-    let mut asked = Asked::Answered;
+    let mut unanswered = None;
     for app in MINTED_FOR {
         match server.astray(app).await {
             Ok(held) => findings.extend(held.iter().map(|one| {
@@ -132,36 +122,26 @@ async fn ran(check: &AstrayCheck) -> Vec<Finding> {
                 )
             })),
             Err(Failure::Unsupported { .. }) => {
-                asked = Asked::Unsupported(format!(
-                    "{} cannot say what it holds under the stack's services' names that \
+                unanswered = Some(Verdict::Skipped {
+                    reason: format!(
+                        "{} cannot say what it holds under the stack's services' names that \
                      lemonfiber did not make, so anything somebody else made there goes \
                      unreported",
-                    check.server_name()
-                ));
+                        check.server_name()
+                    ),
+                });
                 break;
             }
             Err(failure) => {
-                asked = Asked::Unread(format!(
+                unanswered = Some(unverified(&format!(
                     "{} could not be asked what it holds under {app}: {failure}",
                     check.server_name()
-                ));
+                )));
             }
         }
     }
-    let summary = match asked {
-        Asked::Answered if findings.is_empty() => Some(Verdict::Pass {
-            note: Some(format!(
-                "{} holds nothing under the stack's services' names that lemonfiber did not \
-                 make",
-                check.server_name()
-            )),
-        }),
-        Asked::Answered => None,
-        Asked::Unsupported(reason) => Some(Verdict::Skipped { reason }),
-        Asked::Unread(reason) => Some(unverified(&reason)),
-    };
     findings.extend(
-        summary
+        unanswered
             .into_iter()
             .map(|verdict| check.finding(CHECK, TITLE, verdict)),
     );
