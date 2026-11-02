@@ -1,7 +1,8 @@
 use lemonfiber_contract::capabilities::proxy::front;
 
 use super::{
-    answered, answering, held, joined, on_port, proxied, spelled_as, taking, Answered, Held,
+    answered, answering, held, joined, on_port, proxied, reserved, spelled_as, taking, Answered,
+    Held,
 };
 
 fn holder(id: &str) -> Option<&'static str> {
@@ -184,4 +185,22 @@ fn a_stack_service_no_pin_declares_is_held_against_every_plugin() {
     assert!(spelled_as(&held, "lonely", "Lonely").is_some());
     let port = held.first().and_then(|one| one.ports.first().copied());
     assert!(port.is_some_and(|port| on_port(&held, "lonely", port).is_some()));
+}
+
+#[test]
+fn a_stack_service_no_pin_declares_is_held_by_the_stack_and_a_parts_by_its_plugin() {
+    let stack = super::bundled::services();
+    let unpinned = reserved(&[], stack);
+    assert_eq!(unpinned.len(), stack.len());
+    assert!(unpinned
+        .iter()
+        .all(|one| one.plugin.is_none() && one.holder() == "the stack"));
+    let pinned = Held {
+        plugin: Some("jellyfin".to_owned()),
+        ..unpinned
+            .first()
+            .cloned()
+            .unwrap_or_else(|| unreachable!("the stack ships services"))
+    };
+    assert_eq!(pinned.holder(), "plugin jellyfin");
 }
