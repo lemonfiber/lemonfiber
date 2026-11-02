@@ -139,6 +139,12 @@ impl Shape {
         }
     }
 
+    /// Whether the shape adds the group owning its devices on the engine's host.
+    #[must_use]
+    pub const fn grouped(self) -> bool {
+        matches!(self, Self::Render)
+    }
+
     /// The capability a service declaring the shape provides, or whose adapter fronts it.
     #[must_use]
     pub const fn serves(self) -> &'static str {

@@ -286,6 +286,12 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     if let Some(fencing) = &report.fencing {
         lines.put(format!("not asked: {fencing}"));
     }
+    for unrendered in &report.unrendered {
+        lines.put(unrendered.clone());
+    }
+    if let Some(rendering) = &report.rendering {
+        lines.put(format!("not asked: {rendering}"));
+    }
 
     if let Some(condition) = report.condition {
         lines.spaced(describe(condition));

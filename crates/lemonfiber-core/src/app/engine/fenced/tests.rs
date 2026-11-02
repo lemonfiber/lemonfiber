@@ -8,6 +8,7 @@ fn project() -> Project {
         text: String::new(),
         topology: crate::topology::Topology::default(),
         unfenced: vec![("solver".to_owned(), Unfenced::Unaddressed)],
+        unrendered: Vec::new(),
     }
 }
 

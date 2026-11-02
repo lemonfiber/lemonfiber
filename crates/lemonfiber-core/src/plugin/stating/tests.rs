@@ -237,6 +237,7 @@ fn a_service_taking_the_egress_guard_shape_is_stated_with_what_it_is_given() {
             shape: Shape::EgressGuard,
             grants: vec!["NET_ADMIN".to_owned()],
             devices: vec!["/dev/net/tun".to_owned()],
+            grouped: false,
             approval: "egress-guard@komga".to_owned(),
         }])
     );

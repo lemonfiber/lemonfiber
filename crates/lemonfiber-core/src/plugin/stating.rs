@@ -119,6 +119,8 @@ pub struct Taking {
     pub grants: Vec<String>,
     /// The devices it is given.
     pub devices: Vec<String>,
+    /// Whether it is added to the group owning those devices on the engine's host.
+    pub grouped: bool,
     /// What approving it is written as, apart from the offer.
     pub approval: String,
 }
@@ -144,6 +146,7 @@ pub fn taking(installed: &Installed) -> Vec<Taking> {
                     .iter()
                     .map(|&device| device.to_owned())
                     .collect(),
+                grouped: shape.grouped(),
                 approval: shape.approval(&placed.service),
             })
         })

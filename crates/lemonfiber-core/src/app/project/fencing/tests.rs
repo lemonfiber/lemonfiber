@@ -70,7 +70,7 @@ async fn the_engines_host_is_asked_its_addresses_holding_no_capability_and_the_a
     assert_eq!(run.cap_drop, vec!["ALL".to_owned()]);
     assert!(run.cap_add.is_empty());
     assert!(run.read_only);
-    assert_eq!(run.configuration, None);
+    assert_eq!(run.bound, None);
     assert_eq!(run.security_opt, vec!["no-new-privileges:true".to_owned()]);
 }
 

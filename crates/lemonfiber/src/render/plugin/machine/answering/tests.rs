@@ -218,8 +218,29 @@ fn gluetun() -> Taking {
         shape: lemonfiber_core::plugin::Shape::EgressGuard,
         grants: vec!["NET_ADMIN".to_owned()],
         devices: vec!["/dev/net/tun".to_owned()],
+        grouped: false,
         approval: "egress-guard@gluetun".to_owned(),
     }
+}
+
+#[test]
+fn a_render_shape_is_said_as_the_device_and_the_group_owning_it_with_no_capability() {
+    let jellyfin = Taking {
+        service: "jellyfin".to_owned(),
+        shape: lemonfiber_core::plugin::Shape::Render,
+        grants: Vec::new(),
+        devices: vec!["/dev/dri".to_owned()],
+        grouped: true,
+        approval: "render@jellyfin".to_owned(),
+    };
+    let said = taking(&[jellyfin], true).text();
+    assert!(
+        said.ends_with(
+            "jellyfin takes render: the /dev/dri device and the group owning it on the \
+             engine's host"
+        ),
+        "{said}"
+    );
 }
 
 #[test]

@@ -83,7 +83,7 @@ async fn a_part_proved_by_its_own_program_is_installed_once_the_run_holds() {
         .first()
         .is_some_and(|one| one.user.as_deref() == Some("1000:1000")
             && one.args == vec!["--version".to_owned()]
-            && one.configuration.is_some()));
+            && one.bound.is_some()));
     let record = read(&record_of(&ctx));
     assert!(
         record.contains("\"run_proofs\"") && record.contains("\"starting\":\"sha256:"),

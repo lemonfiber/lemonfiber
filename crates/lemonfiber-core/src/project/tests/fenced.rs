@@ -95,18 +95,24 @@ fn the_fence_answers_to_its_services_id_on_every_network_it_holds() {
     }
 }
 
-/// The reason the fence may run as root: every capability dropped but the one it needs,
-/// no privilege gained after it starts, and nothing it can write.
+/// The fence is written as its requirement names it: a read-only root, no kernel
+/// capability but `NET_ADMIN`, the image's own user, no mount, no new privileges, at most
+/// 1024 processes and a memory limit of 32 MiB.
 #[test]
-fn the_fence_holds_net_admin_alone_gains_no_privilege_and_writes_nothing() {
+fn the_fence_is_written_with_the_one_posture_its_requirement_names() {
     let project = written(&[fenced("solver")], Some(FENCE), &HOST);
     let fence = entry(&project, "solver-fence");
 
+    assert_eq!(fence.get("read_only").and_then(Yaml::as_bool), Some(true));
     assert_eq!(sequence(&fence, "cap_drop"), ["ALL"]);
     assert_eq!(sequence(&fence, "cap_add"), ["NET_ADMIN"]);
-    assert_eq!(sequence(&fence, "security_opt"), ["no-new-privileges:true"]);
-    assert_eq!(fence.get("read_only").and_then(Yaml::as_bool), Some(true));
+    assert!(fence.get("user").is_none());
     assert!(sequence(&fence, "volumes").is_empty());
+    assert!(sequence(&fence, "tmpfs").is_empty());
+    assert!(sequence(&fence, "devices").is_empty());
+    assert_eq!(sequence(&fence, "security_opt"), ["no-new-privileges:true"]);
+    assert_eq!(fence.get("pids_limit").and_then(Yaml::as_u64), Some(1024));
+    assert_eq!(text(&fence, "mem_limit"), "32m");
     assert!(!sequence(&entry(&project, "solver"), "cap_add").contains(&"NET_ADMIN".to_owned()));
 }
 

@@ -272,10 +272,10 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
     // materialised rather than after, so a run that is going to be refused does not
     // rewrite anything on the way to saying so.
     verified(ctx).await?;
-    let (passing, fencing) = if starts(action) {
+    let beside = if starts(action) {
         beside_readied(ctx).await
     } else {
-        (None, None)
+        Beside::default()
     };
 
     // Before the project is composed, so what it writes already holds each guard moved
@@ -349,10 +349,16 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         guards,
         installing,
         swept: sweep.networks.clone(),
-        passing,
-        fencing,
+        passing: beside.passing,
+        fencing: beside.fencing,
         unfenced: if starts(action) {
             fenced::held_back(action, &project)?
+        } else {
+            Vec::new()
+        },
+        rendering: beside.rendering,
+        unrendered: if starts(action) {
+            super::project::unrendered(&project)
         } else {
             Vec::new()
         },
@@ -366,27 +372,43 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
     })
 }
 
-/// Ready the pass service before a start writes the project that runs it, and say why it
-/// is left out where it is. A rehearsal pins and makes nothing.
-async fn pass_readied(ctx: &Ctx) -> Option<String> {
-    if ctx.dry_run {
-        return None;
+/// Why each thing a start readies beside the project was not readied, where it was not.
+#[derive(Default)]
+struct Beside {
+    /// Why the pass service is left out.
+    passing: Option<String>,
+    /// Why the addresses of the engine's host were not asked or kept for a fence.
+    fencing: Option<String>,
+    /// Why the group owning the render devices of the engine's host was not asked or kept.
+    rendering: Option<String>,
+}
+
+/// Ready the pass service and ask the engine for its host's addresses and render group
+/// before a start writes the project that reads them, and say why each is not readied,
+/// where it is not. A rehearsal asks nothing.
+async fn beside_readied(ctx: &Ctx) -> Beside {
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        return Beside::default();
+    };
+    Beside {
+        passing: if ctx.dry_run {
+            None
+        } else {
+            super::project::pass_readied(ctx, &manifest).await
+        },
+        fencing: Box::pin(super::project::fence_readied(
+            ctx,
+            &manifest,
+            lemonfiber_bundled::FENCE,
+        ))
+        .await,
+        rendering: Box::pin(super::project::render_readied(
+            ctx,
+            &manifest,
+            lemonfiber_bundled::FENCE,
+        ))
+        .await,
     }
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    super::project::pass_readied(ctx, &manifest).await
-}
-
-/// Ready the pass service and ask the engine for its host's addresses before a start
-/// writes the project that runs them, and say why each is left out, where it is.
-async fn beside_readied(ctx: &Ctx) -> (Option<String>, Option<String>) {
-    (pass_readied(ctx).await, fence_readied(ctx).await)
-}
-
-/// Ask the engine for its host's addresses before a start writes a project holding a
-/// fence, and say why none is kept, where none is. A rehearsal asks nothing.
-async fn fence_readied(ctx: &Ctx) -> Option<String> {
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    super::project::fence_readied(ctx, &manifest, lemonfiber_bundled::FENCE).await
 }
 
 /// What a lifecycle command settled before anything runs.

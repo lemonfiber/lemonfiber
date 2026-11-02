@@ -272,6 +272,8 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         passing: None,
         fencing: None,
         unfenced: Vec::new(),
+        rendering: None,
+        unrendered: Vec::new(),
         guards: Vec::new(),
     }
 }

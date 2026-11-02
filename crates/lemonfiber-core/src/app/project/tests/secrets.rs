@@ -119,15 +119,20 @@ fn the_operators_values_are_written_in_and_no_secret_reaches_the_project_or_its_
 }
 
 #[test]
-fn the_render_group_the_operator_recorded_is_what_the_project_is_written_with() {
+fn the_render_group_the_engine_answered_is_what_the_project_is_written_with() {
     let (ctx, _) = machine("render-group");
     let env = ctx.settings.env_file.clone().unwrap_or_default();
-    assert!(crate::config::store::set(&env, crate::config::RENDER_GROUP_KEY, " 44 ").is_ok());
-
     let group =
-        crate::settings::Resolved::of(&ctx, None, &[]).project(|reading| reading.render_group);
+        || crate::settings::Resolved::of(&ctx, None, &[]).project(|reading| reading.render_group);
+    assert_eq!(group(), None, "nothing answered is no group");
+    assert!(crate::config::store::set(&env, "RENDER_GID", "44").is_ok());
+    assert_eq!(group(), None, "a group written by hand is never read");
 
-    assert_eq!(group, Some(44));
+    let directory = crate::app::project::directory(&ctx).unwrap_or_default();
+    assert!(std::fs::create_dir_all(&directory).is_ok());
+    assert!(std::fs::write(directory.join(crate::fence::RENDER_HELD), " 44\n").is_ok());
+
+    assert_eq!(group(), Some(44));
 }
 
 /// A key the operator replaces is written into the file that reads it, and into no other.

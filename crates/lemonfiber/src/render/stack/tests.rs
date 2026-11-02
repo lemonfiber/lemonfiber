@@ -90,6 +90,25 @@ fn a_start_that_leaves_the_pass_service_out_says_why() {
 }
 
 #[test]
+fn a_start_writing_a_service_without_its_render_devices_says_it_runs_without_hardware_transcoding()
+{
+    let report = LifecycleReport {
+        status: Some(0),
+        rendering: Some(
+            "the engine's host was not asked its render group: no such device".to_owned(),
+        ),
+        unrendered: vec!["jellyfin runs without hardware transcoding".to_owned()],
+        ..a_lifecycle("up", a_plan("media", Vec::new()))
+    };
+    let text = lifecycle(&report).text();
+    assert!(
+        text.contains("jellyfin runs without hardware transcoding")
+            && text.contains("not asked: the engine's host was not asked its render group"),
+        "{text}"
+    );
+}
+
+#[test]
 fn a_start_that_holds_a_fenced_service_back_says_why_and_what_was_not_asked() {
     let report = LifecycleReport {
         status: Some(0),

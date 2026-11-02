@@ -22,6 +22,11 @@ pub const GRANTED: [&str; 1] = ["NET_ADMIN"];
 /// one to a line, as the engine last answered them.
 pub const HELD: &str = "fence.addresses";
 
+/// The file beneath the project directory holding the id of the group that owns the
+/// engine's host's render devices, as the engine last answered it, and nothing where the
+/// host has none or the engine could not be asked.
+pub const RENDER_HELD: &str = "fence.render-group";
+
 /// The memory a fence is held to, in MiB.
 pub const MEMORY_MIB: u32 = 32;
 
@@ -50,6 +55,16 @@ pub fn kept(held: &str) -> Vec<IpAddr> {
         .map(|line| line.trim().parse::<IpAddr>())
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_default()
+}
+
+/// The group id `held` keeps, where it keeps one and nothing else.
+#[must_use]
+pub fn group(held: &str) -> Option<u32> {
+    let held = held.trim();
+    held.bytes()
+        .all(|byte| byte.is_ascii_digit())
+        .then(|| held.parse().ok())
+        .flatten()
 }
 
 /// Why no fence can be written for a service that declares one.

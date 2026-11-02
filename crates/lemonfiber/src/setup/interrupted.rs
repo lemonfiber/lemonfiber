@@ -66,7 +66,9 @@ pub(super) async fn recover_setup(
     // one step now, so there is no moment between them to report from — and what is
     // about to happen is what an operator watching a pause wants to read.
     say!("\n{}", about_to(choice));
-    if let Err(problem) = dispatch(Command::Setup(SetupAction::Recover(choice)), &ctx).await {
+    if let Err(problem) =
+        Box::pin(dispatch(Command::Setup(SetupAction::Recover(choice)), &ctx)).await
+    {
         return complain(&problem);
     }
 

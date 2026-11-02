@@ -772,3 +772,38 @@ fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
         );
     }
 }
+
+#[test]
+fn a_part_taking_render_needs_the_fence_image_pinned_to_read_its_group_with() {
+    let rendering = PART.replace(
+        "asks_for = \"The articles each download is made of\"",
+        "asks_for = \"The articles each download is made of\"\nshape = \"render\"",
+    );
+    let files = files();
+    let digest = format!("sha256:{}", "a".repeat(64));
+    let catalogued = |name: &str, tables: &str| {
+        catalogue(
+            name,
+            &bundle(&rendering, &files, &[], tables),
+            "sabnzbd",
+            &rendering,
+            &files,
+        )
+    };
+    let naming = |lines: &[String]| {
+        lines
+            .iter()
+            .any(|line| line.contains("service sabnzbd takes render") && line.contains("[fence]"))
+    };
+
+    let unpinned = refused(&catalogued("render-unpinned", TABLES));
+    assert!(naming(&unpinned), "{unpinned:?}");
+    let pinned = refused(&catalogued(
+        "render-pinned",
+        &format!(
+            "{TABLES}\n{}",
+            fence("ghcr.io/lemonfiber/fence", "0.18.0", &digest)
+        ),
+    ));
+    assert!(!naming(&pinned), "{pinned:?}");
+}

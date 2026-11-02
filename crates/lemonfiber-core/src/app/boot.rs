@@ -453,6 +453,8 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         passing: None,
         fencing: None,
         unfenced: Vec::new(),
+        rendering: None,
+        unrendered: Vec::new(),
     }
 }
 

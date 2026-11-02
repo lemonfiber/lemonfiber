@@ -40,9 +40,7 @@ impl Resolved {
     ) -> Self {
         let recorded = Recorded::of(ctx);
         Self {
-            render_group: recorded
-                .line(crate::config::RENDER_GROUP_KEY)
-                .and_then(|group| group.trim().parse().ok()),
+            render_group: crate::app::project::render_group(ctx),
             moved: crate::app::beside::moved(recorded.env()),
             recorded,
             changing: BTreeMap::new(),

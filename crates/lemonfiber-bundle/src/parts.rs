@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use lemonfiber_manifest::container::Shape;
 use lemonfiber_manifest::Date;
 use toml::Value;
 
@@ -23,6 +24,7 @@ const MOST_BYTES: usize = 1024 * 1024;
 pub(crate) struct Declared {
     pub(crate) id: String,
     fenced: bool,
+    renders: bool,
     provides: Vec<String>,
     speaks: Vec<String>,
     replaces: Option<String>,
@@ -62,9 +64,16 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>, broken: &
     tables(bundle, &parts, broken);
     if bundle.fence.is_none() {
         for (id, part) in &parts {
-            for service in part.services.iter().filter(|service| service.fenced) {
+            for service in &part.services {
+                let needs = if service.fenced {
+                    "is fenced"
+                } else if service.renders {
+                    "takes render, whose group the fence reads"
+                } else {
+                    continue;
+                };
                 broken.push(format!(
-                    "plugin {id}'s service {} is fenced, and the bundle pins no [fence] image",
+                    "plugin {id}'s service {} {needs}, and the bundle pins no [fence] image",
                     service.id
                 ));
             }
@@ -406,6 +415,7 @@ pub(crate) fn declared(manifest: &str) -> Part {
                 .and_then(|network| network.get("fenced"))
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            renders: text(one, "shape").as_deref() == Some(Shape::Render.name()),
             provides: words(one.get("provides")),
             speaks: words(one.get("speaks")),
             replaces: text(one, "replaces"),

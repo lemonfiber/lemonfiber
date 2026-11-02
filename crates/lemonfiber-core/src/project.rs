@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-use lemonfiber_manifest::container::{UrlOf, UserMode, Value};
+use lemonfiber_manifest::container::{Shape, UrlOf, UserMode, Value};
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
 use crate::config::storage::Export;
@@ -106,6 +106,9 @@ pub struct Project {
     /// Each fenced service no fence can be written for, held back under [`UNFENCED`], and
     /// why.
     pub unfenced: Vec<(String, Unfenced)>,
+    /// Each service taking `render` written without the host's render devices, because the
+    /// engine's host answered no group owning them.
+    pub unrendered: Vec<String>,
 }
 
 /// The project `manifest`'s services and `installed`'s come to, wired as `chosen`
@@ -193,6 +196,11 @@ pub fn generated(
         })
         .collect();
     let taken = units.iter().any(|unit| unit.takes_data);
+    let unrendered = units
+        .iter()
+        .filter(|unit| reading.render_group.is_none() && unit.shape == Some(Shape::Render))
+        .map(|unit| unit.id.to_owned())
+        .collect();
     let document = Document {
         name: literal(reading.name),
         services: Services(entries),
@@ -203,6 +211,7 @@ pub fn generated(
         text: document::yaml(&document),
         topology,
         unfenced: fencing.unfenced(),
+        unrendered,
     }
 }
 

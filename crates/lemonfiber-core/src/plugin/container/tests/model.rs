@@ -159,7 +159,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             }),
         ),
         ("INDEXER".to_owned(), url("indexer.search")),
-        ("UNFILLED".to_owned(), url("subtitles.fetch")),
+        ("UNFILLED".to_owned(), url("owner.claim")),
         (
             "KEY".to_owned(),
             Value::Secret(SecretOf {
@@ -243,6 +243,42 @@ fn an_image_that_drops_to_the_operators_pair_is_told_it() {
 }
 
 #[test]
+fn a_standard_service_gains_no_privilege_and_holds_six_capabilities_and_1024_processes() {
+    let entry = entry_of(&document(placed()));
+    assert_eq!(strings(&entry, "security_opt"), ["no-new-privileges:true"]);
+    assert_eq!(strings(&entry, "cap_drop"), ["ALL"]);
+    assert_eq!(
+        strings(&entry, "cap_add"),
+        [
+            "CHOWN",
+            "DAC_OVERRIDE",
+            "FOWNER",
+            "SETGID",
+            "SETUID",
+            "KILL"
+        ]
+    );
+    assert_eq!(text(&entry, &["pids_limit"]).as_deref(), Some("1024"));
+    assert_ne!(text(&entry, &["read_only"]).as_deref(), Some("true"));
+    let shaped = entry_of(&document(Placed {
+        shape: Some(Shape::EgressGuard),
+        ..placed()
+    }));
+    assert_eq!(
+        strings(&shaped, "cap_add"),
+        [
+            "CHOWN",
+            "DAC_OVERRIDE",
+            "FOWNER",
+            "SETGID",
+            "SETUID",
+            "KILL",
+            "NET_ADMIN"
+        ]
+    );
+}
+
+#[test]
 fn a_confined_service_is_read_only_holds_no_capability_and_runs_as_the_operator() {
     let entry = entry_of(&document(with(Fields {
         posture: Posture::Confined,
@@ -254,6 +290,8 @@ fn a_confined_service_is_read_only_holds_no_capability_and_runs_as_the_operator(
     assert_eq!(strings(&entry, "cap_drop"), ["ALL"]);
     assert_eq!(text(&entry, &["user"]).as_deref(), Some("1000:1000"));
     assert_eq!(text(&entry, &["mem_limit"]).as_deref(), Some("64m"));
+    assert_eq!(strings(&entry, "security_opt"), ["no-new-privileges:true"]);
+    assert_eq!(text(&entry, &["pids_limit"]).as_deref(), Some("1024"));
 }
 
 #[test]

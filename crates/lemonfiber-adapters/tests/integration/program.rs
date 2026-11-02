@@ -20,7 +20,7 @@ fn run(within: Duration) -> Run {
         pids_limit: 1024,
         read_only: true,
         memory: None,
-        configuration: None,
+        bound: None,
         within,
         read_at_most: 64 * 1024,
         network: Joined::Nothing,

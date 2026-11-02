@@ -201,10 +201,6 @@ pub const HOUSEHOLD_HOST_SETTING: &str = lemonfiber_manifest::container::LAN_HOS
 /// that domain.
 pub(crate) const DOMAIN_KEY: &str = "DOMAIN";
 
-/// The group that owns the host's render devices, which a service of the render shape
-/// is added to.
-pub(crate) const RENDER_GROUP_KEY: &str = "RENDER_GID";
-
 /// The service the operator chose to send the household to, by the id the stack
 /// declares it under.
 ///
