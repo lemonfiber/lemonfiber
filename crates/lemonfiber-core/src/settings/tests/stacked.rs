@@ -534,3 +534,43 @@ fn a_filed_setting_written_into_the_environment_file_by_hand_is_never_read() {
     );
     assert_eq!(shown.get("VPN_COUNTRIES"), None);
 }
+
+#[test]
+fn a_rehearsal_plans_nothing_where_there_is_no_environment_file_or_it_cannot_be_read() {
+    let nowhere = crate::test_support::a_context().build().rehearsing();
+    let planned = super::super::filing::plan(&nowhere);
+    assert!(planned.settings.is_empty() && planned.secrets.is_empty());
+    assert!(super::super::Stores::read(&nowhere)
+        .is_ok_and(|stores| stores.settings.value("gluetun:countries").is_none()));
+
+    let (ctx, env) = stacked("unreadable-env", &[("VPN_COUNTRIES", "Belgium")]);
+    assert!(std::fs::remove_file(&env).is_ok());
+    assert!(std::fs::create_dir_all(&env).is_ok());
+    let planned = super::super::filing::plan(&ctx.rehearsing());
+    assert!(planned.settings.is_empty() && planned.secrets.is_empty());
+}
+
+#[test]
+fn a_rehearsal_after_a_plugins_secrets_were_filed_plans_only_the_stack_and_its_credentials() {
+    let (ctx, env) = stacked(
+        "plugins-filed",
+        &[
+            ("VPN_COUNTRIES", "Belgium"),
+            ("INDEXER_APIKEY", "indexer-key"),
+        ],
+    );
+    assert!(crate::settings::store::marked_filed(&env.with_file_name(SETTINGS)).is_ok());
+    let planned = super::super::filing::plan(&ctx.rehearsing());
+    assert_eq!(
+        planned.settings,
+        [("gluetun:countries".to_owned(), "Belgium".to_owned())]
+    );
+    assert!(planned
+        .secrets
+        .iter()
+        .all(|(_, _, from)| *from != crate::settings::Source::Recipe));
+    assert!(planned
+        .secrets
+        .iter()
+        .any(|(name, value, _)| name == "INDEXER_APIKEY" && value == "indexer-key"));
+}
