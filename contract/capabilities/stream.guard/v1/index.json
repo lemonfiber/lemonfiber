@@ -7,19 +7,19 @@
     },
     {
       "path": "stream.guard/v1/operations/guard.json",
-      "sha256": "151d2e726b5d805247296d66902a893902f7e607f5841c25e0aced28ec44fb5c"
+      "sha256": "56c253846cd34723a0811cb5cbbc31a57df1cb390ed47408144377f84e66529c"
     },
     {
       "path": "stream.guard/v1/operations/guarding.json",
-      "sha256": "51f52ab7d341b94c9a0cc7118593b1ec50c703cf196512483bb399f6d9a46230"
+      "sha256": "31c02b91c17002682aef5d27ea74e9abacdc30436dfcdf79496a8ceddad58161"
     },
     {
       "path": "stream.guard/v1/operations/certificate.json",
-      "sha256": "049514b3ba317f424835a76d4a639f6be54630199434e4391152b31f9c7cccbf"
+      "sha256": "67ad903a96111b385b8bcf97e777a0581d0c47c4dbb8006793534a31661993ec"
     },
     {
       "path": "stream.guard/v1/conformance.json",
-      "sha256": "60dc892570c84efb9d7dc6b6f5ebeba134e599a751028cf9c88c2173a4067f8a"
+      "sha256": "727523b5b00e8c660c5cf0c624234e4c2b4214c395d26998ede4a819a7dedfb9"
     },
     {
       "path": "stream.guard/v1/holds.json",

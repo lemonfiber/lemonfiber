@@ -7,15 +7,15 @@
     },
     {
       "path": "subtitles.fetch/v1/operations/watching.json",
-      "sha256": "1ae69ebc974a32680a6dd9b259954c9f72d3f560677809d49bd8e5d86ce4c4b3"
+      "sha256": "ed18dfb0e5908f89cd0650c9cf47d5ab09a692a589723a8a2d1199b93516f7aa"
     },
     {
       "path": "subtitles.fetch/v1/operations/watch.json",
-      "sha256": "b249b80494489e2ccdf7009d3acc86d093bc566f818eff519f22a92ab8e8cf4c"
+      "sha256": "3d7a8fb7e3f348255998caf48f50c4afa2dc8b04431797332e64c9912e18b2db"
     },
     {
       "path": "subtitles.fetch/v1/conformance.json",
-      "sha256": "32366d84655be6af598fbf1826fde81681457cf71c59f39cfc310ac202d1bfb8"
+      "sha256": "f683a538a7d6209b92779b45266b0bf5476488685fd6b0c5578f392d3f665bf6"
     },
     {
       "path": "subtitles.fetch/v1/holds.json",

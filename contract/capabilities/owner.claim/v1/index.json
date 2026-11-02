@@ -7,15 +7,15 @@
     },
     {
       "path": "owner.claim/v1/operations/owner.json",
-      "sha256": "3d4c84f37d8df663f5052c515f663e716756c9a4b13e418b9ef0e912b05f4d09"
+      "sha256": "083736b0560d6bd86539c9f82f6ca981bb00c89fc10589ff6f6ec628510fcb5d"
     },
     {
       "path": "owner.claim/v1/operations/claim.json",
-      "sha256": "d233e8c60bc186c10472bd4feaa4a1aa81f76270378ecebdcbb96def6597a411"
+      "sha256": "3372c1325b77c5c9d350c2f90afb47e3d1f15e0e33107ba38c2fe92f70e19c02"
     },
     {
       "path": "owner.claim/v1/conformance.json",
-      "sha256": "e5a00b8068cda61163518739bba75db6ff768fb39ff29f0630f93f7d821032cf"
+      "sha256": "f9a782939d5b1cd46685c9606ece6177d85f791ebed385e9deb5858fab4d2df3"
     },
     {
       "path": "owner.claim/v1/holds.json",

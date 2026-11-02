@@ -135,7 +135,7 @@ crate::contract! {
             /// Revoke a key.
             fn revoke(str key: &str) -> () where asks = Asked { key: minted() };
             /// What it holds under an app's name that is no key it made.
-            fn astray(str app: &str) -> Vec<Astray> where asks = Asked { app: APP.to_owned() };
+            fn astray(str app: &str) -> Vec<Astray> where since = 1, asks = Asked { app: APP.to_owned() };
         }
         impl Fronted {
             /// The addresses trusted to name the client.

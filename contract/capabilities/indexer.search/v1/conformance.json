@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "register_application"
+      "operation": "register_application",
+      "since": 0
     },
     {
       "asked": {
@@ -29,7 +30,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "register_application"
+      "operation": "register_application",
+      "since": 0
     },
     {
       "asked": {},
@@ -39,7 +41,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "applications"
+      "operation": "applications",
+      "since": 0
     },
     {
       "asked": {
@@ -54,7 +57,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "test_application"
+      "operation": "test_application",
+      "since": 0
     },
     {
       "asked": {
@@ -70,7 +74,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "rekey_application"
+      "operation": "rekey_application",
+      "since": 0
     },
     {
       "asked": {
@@ -85,7 +90,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "indexers"
+      "operation": "indexers",
+      "since": 0
     },
     {
       "asked": {},
@@ -95,7 +101,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "aggregators"
+      "operation": "aggregators",
+      "since": 0
     },
     {
       "asked": {
@@ -111,7 +118,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "add_aggregator"
+      "operation": "add_aggregator",
+      "since": 0
     }
   ],
   "major": 1

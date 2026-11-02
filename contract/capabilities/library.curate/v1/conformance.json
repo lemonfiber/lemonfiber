@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "identity"
+      "operation": "identity",
+      "since": 0
     },
     {
       "asked": {},
@@ -21,7 +22,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "identity"
+      "operation": "identity",
+      "since": 0
     },
     {
       "asked": {
@@ -45,7 +47,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "register_download_client"
+      "operation": "register_download_client",
+      "since": 0
     },
     {
       "asked": {},
@@ -55,7 +58,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "download_clients"
+      "operation": "download_clients",
+      "since": 0
     },
     {
       "asked": {
@@ -80,7 +84,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "update_download_client"
+      "operation": "update_download_client",
+      "since": 0
     },
     {
       "asked": {
@@ -94,7 +99,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "set_client_field"
+      "operation": "set_client_field",
+      "since": 0
     },
     {
       "asked": {},
@@ -104,7 +110,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "test_download_clients"
+      "operation": "test_download_clients",
+      "since": 0
     },
     {
       "asked": {
@@ -120,7 +127,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "register_root_folder"
+      "operation": "register_root_folder",
+      "since": 0
     },
     {
       "asked": {
@@ -136,7 +144,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "register_root_folder"
+      "operation": "register_root_folder",
+      "since": 0
     },
     {
       "asked": {
@@ -152,7 +161,8 @@
       "keyed": true,
       "live": false,
       "media_type": "music",
-      "operation": "register_root_folder"
+      "operation": "register_root_folder",
+      "since": 0
     },
     {
       "asked": {
@@ -168,7 +178,8 @@
       "keyed": true,
       "live": false,
       "media_type": "books",
-      "operation": "register_root_folder"
+      "operation": "register_root_folder",
+      "since": 0
     },
     {
       "asked": {},
@@ -178,7 +189,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "root_folders"
+      "operation": "root_folders",
+      "since": 0
     },
     {
       "asked": {},
@@ -188,7 +200,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "quality_profiles"
+      "operation": "quality_profiles",
+      "since": 0
     },
     {
       "asked": {
@@ -201,7 +214,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "search_upgrades"
+      "operation": "search_upgrades",
+      "since": 0
     },
     {
       "asked": {
@@ -214,7 +228,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "search_upgrades"
+      "operation": "search_upgrades",
+      "since": 0
     },
     {
       "asked": {},
@@ -224,7 +239,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "wanting"
+      "operation": "wanting",
+      "since": 0
     },
     {
       "asked": {},
@@ -234,7 +250,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "hardlinks"
+      "operation": "hardlinks",
+      "since": 0
     },
     {
       "asked": {
@@ -246,7 +263,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "set_hardlinks"
+      "operation": "set_hardlinks",
+      "since": 0
     },
     {
       "asked": {
@@ -259,7 +277,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "records"
+      "operation": "records",
+      "since": 0
     },
     {
       "asked": {
@@ -272,7 +291,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "records"
+      "operation": "records",
+      "since": 0
     },
     {
       "asked": {
@@ -285,7 +305,8 @@
       "keyed": true,
       "live": false,
       "media_type": "music",
-      "operation": "records"
+      "operation": "records",
+      "since": 0
     },
     {
       "asked": {
@@ -298,7 +319,8 @@
       "keyed": true,
       "live": false,
       "media_type": "books",
-      "operation": "records"
+      "operation": "records",
+      "since": 0
     },
     {
       "asked": {
@@ -317,7 +339,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "carry"
+      "operation": "carry",
+      "since": 0
     },
     {
       "asked": {
@@ -336,7 +359,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "carry"
+      "operation": "carry",
+      "since": 0
     },
     {
       "asked": {
@@ -355,7 +379,8 @@
       "keyed": true,
       "live": false,
       "media_type": "music",
-      "operation": "carry"
+      "operation": "carry",
+      "since": 0
     },
     {
       "asked": {
@@ -374,7 +399,8 @@
       "keyed": true,
       "live": false,
       "media_type": "books",
-      "operation": "carry"
+      "operation": "carry",
+      "since": 0
     },
     {
       "asked": {
@@ -388,7 +414,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "lookup"
+      "operation": "lookup",
+      "since": 0
     },
     {
       "asked": {
@@ -402,7 +429,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "lookup"
+      "operation": "lookup",
+      "since": 0
     },
     {
       "asked": {
@@ -415,7 +443,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "add_plan"
+      "operation": "add_plan",
+      "since": 0
     },
     {
       "asked": {
@@ -428,7 +457,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "add_plan"
+      "operation": "add_plan",
+      "since": 0
     },
     {
       "asked": {
@@ -451,7 +481,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "add"
+      "operation": "add",
+      "since": 0
     },
     {
       "asked": {
@@ -474,7 +505,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "add"
+      "operation": "add",
+      "since": 0
     },
     {
       "asked": {},
@@ -484,7 +516,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "indexer_count"
+      "operation": "indexer_count",
+      "since": 0
     },
     {
       "asked": {},
@@ -494,7 +527,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "queue"
+      "operation": "queue",
+      "since": 0
     },
     {
       "asked": {
@@ -507,7 +541,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "probe_releases"
+      "operation": "probe_releases",
+      "since": 0
     },
     {
       "asked": {
@@ -520,7 +555,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "probe_releases"
+      "operation": "probe_releases",
+      "since": 0
     },
     {
       "asked": {
@@ -532,7 +568,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "apply_music_format"
+      "operation": "apply_music_format",
+      "since": 0
     },
     {
       "asked": {
@@ -545,7 +582,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "library"
+      "operation": "library",
+      "since": 0
     },
     {
       "asked": {
@@ -558,7 +596,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "library"
+      "operation": "library",
+      "since": 0
     },
     {
       "asked": {
@@ -572,7 +611,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "find_items"
+      "operation": "find_items",
+      "since": 0
     },
     {
       "asked": {
@@ -586,7 +626,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "find_items"
+      "operation": "find_items",
+      "since": 0
     },
     {
       "asked": {
@@ -600,7 +641,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "item_history"
+      "operation": "item_history",
+      "since": 0
     },
     {
       "asked": {
@@ -614,7 +656,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "item_history"
+      "operation": "item_history",
+      "since": 0
     },
     {
       "asked": {
@@ -628,7 +671,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "item_queue"
+      "operation": "item_queue",
+      "since": 0
     },
     {
       "asked": {
@@ -642,7 +686,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "item_queue"
+      "operation": "item_queue",
+      "since": 0
     },
     {
       "asked": {
@@ -657,7 +702,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "item_parts"
+      "operation": "item_parts",
+      "since": 0
     },
     {
       "asked": {
@@ -672,7 +718,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "item_parts"
+      "operation": "item_parts",
+      "since": 0
     },
     {
       "asked": {
@@ -685,7 +732,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "stuck_items"
+      "operation": "stuck_items",
+      "since": 0
     },
     {
       "asked": {
@@ -698,7 +746,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "stuck_items"
+      "operation": "stuck_items",
+      "since": 0
     }
   ],
   "major": 1

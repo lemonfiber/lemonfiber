@@ -148,6 +148,7 @@ pub fn path_item(operation: &crate::Operation) -> Value {
     let mut item = json!({
         "post": {
             "operationId": operation.name,
+            "x-lemonfiber-since": operation.since,
             "x-lemonfiber-largest": operation.bounds.largest,
             "x-lemonfiber-deadline": operation.bounds.deadline.as_secs(),
             "security": [{ KEY: [] }],
@@ -203,6 +204,7 @@ pub fn conformance(capability: &Capability) -> Value {
             let mut listed = json!({
                 "case": case.case,
                 "operation": case.operation.name,
+                "since": case.operation.since,
                 "keyed": case.keyed,
                 "expect": expect,
                 "live": case.live,

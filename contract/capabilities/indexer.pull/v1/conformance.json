@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "aggregators"
+      "operation": "aggregators",
+      "since": 0
     },
     {
       "asked": {},
@@ -21,7 +22,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "aggregators"
+      "operation": "aggregators",
+      "since": 0
     },
     {
       "asked": {
@@ -38,7 +40,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "add_aggregator"
+      "operation": "add_aggregator",
+      "since": 0
     }
   ],
   "major": 1

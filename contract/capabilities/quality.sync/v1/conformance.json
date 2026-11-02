@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "apply"
+      "operation": "apply",
+      "since": 0
     },
     {
       "asked": {
@@ -29,7 +30,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "apply"
+      "operation": "apply",
+      "since": 0
     },
     {
       "asked": {
@@ -41,7 +43,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "applied"
+      "operation": "applied",
+      "since": 0
     },
     {
       "asked": {
@@ -59,7 +62,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "edited"
+      "operation": "edited",
+      "since": 0
     },
     {
       "asked": {
@@ -77,7 +81,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "reapply"
+      "operation": "reapply",
+      "since": 0
     }
   ],
   "major": 1

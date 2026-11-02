@@ -7,15 +7,15 @@
     },
     {
       "path": "dashboard.show/v1/operations/apply.json",
-      "sha256": "58d7b7296f2fc2cbff5d9071d1ca85dfe2501f4332f0807af34332cc10e0a4fa"
+      "sha256": "57e3dcae7b599daaa439f56d0df81a0ff4470375d5085d2756ee2655536ae3a6"
     },
     {
       "path": "dashboard.show/v1/operations/panels.json",
-      "sha256": "1355409dfbf62807dc715f62639dec2f0402c9c21a9a80385d7b655264d2a84b"
+      "sha256": "f33d0949eee0b73208be121c9f293ed42a937e3ccba3a5b30771e9374f48183a"
     },
     {
       "path": "dashboard.show/v1/conformance.json",
-      "sha256": "eaeb6ac8255c57cc3d256113b4f5d3e06bbe697d1b59875ca620410e06f78d31"
+      "sha256": "920c545dfde171126e3888cfa8728c3831a97729c5eaffb1d3daa4cfcf02a04d"
     },
     {
       "path": "dashboard.show/v1/holds.json",
