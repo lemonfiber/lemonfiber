@@ -386,13 +386,12 @@ fn earlier(ctx: &Ctx) -> Vec<Earlier> {
             secret: row.secret,
         })
         .collect::<Vec<_>>();
-    let mut kept: Vec<Earlier> = Vec::new();
-    for one in declared.into_iter().chain(table) {
-        if !kept.iter().any(|held| held.key == one.key) {
-            kept.push(one);
-        }
-    }
-    kept
+    let mut seen = std::collections::BTreeSet::new();
+    declared
+        .into_iter()
+        .chain(table)
+        .filter(|one| seen.insert(one.key.clone()))
+        .collect()
 }
 
 fn nas_folded(
