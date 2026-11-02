@@ -679,3 +679,54 @@ async fn an_install_over_a_refused_data_root_is_refused_and_records_nothing() {
     );
     assert!(!record_of(&ctx).exists(), "the record was written");
 }
+
+#[tokio::test]
+async fn a_plugin_carrying_a_pinned_id_from_a_path_is_refused_naming_it_and_writes_nothing() {
+    let ctx = ctx("install-pinned-elsewhere");
+    let manifest = MANIFEST
+        .replace(
+            "[plugin]\nid          = \"komga\"",
+            "[plugin]\nid          = \"jellyfin\"",
+        )
+        .replace(
+            "[[service]]\nid          = \"komga\"",
+            "[[service]]\nid          = \"jellyfin-reader\"",
+        );
+    let asked = Asked::Install {
+        source: crate::plugin::Source::Path(source("install-pinned-elsewhere", &manifest)),
+        consent: crate::app::plugins::Consent::default(),
+    };
+    let (code, said) = refused(plugins(&ctx, &asked).await);
+    assert_eq!(code, crate::error::codes::plugin::ANOTHER_SOURCE.as_str());
+    assert!(said.contains("jellyfin"), "{said}");
+    assert!(said.contains("this build carries"), "{said}");
+    assert_eq!(made_paths(&ctx), Vec::<String>::new());
+}
+
+#[tokio::test]
+async fn a_starting_file_outside_a_declared_services_directory_is_refused_naming_its_path() {
+    let ctx = ctx("install-stray");
+    let at = source("install-stray", MANIFEST);
+    for (path, bytes) in [
+        ("config/kavita/settings.yml", "a: 1"),
+        ("config/loose.yml", "b: 2"),
+    ] {
+        let file = at.join(path);
+        assert!(file
+            .parent()
+            .is_some_and(|dir| std::fs::create_dir_all(dir).is_ok()));
+        assert!(std::fs::write(file, bytes).is_ok());
+    }
+    let asked = Asked::Install {
+        source: crate::plugin::Source::Path(at),
+        consent: crate::app::plugins::Consent::default(),
+    };
+    let detail = plugins(&ctx, &asked)
+        .await
+        .err()
+        .and_then(|problem| problem.detail)
+        .unwrap_or_default();
+    assert!(detail.contains("config/kavita"), "{detail}");
+    assert!(detail.contains("config/loose.yml"), "{detail}");
+    assert_eq!(made_paths(&ctx), Vec::<String>::new());
+}
