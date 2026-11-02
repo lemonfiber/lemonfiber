@@ -377,6 +377,7 @@ fn puller(media: &str) -> crate::plugin::Installed {
         capability: "indexer.search".to_owned(),
         each: false,
         native: None,
+        files: None,
     }];
     let mut adapter = crate::test_support::a_placed(
         PULLER_ADAPTER,

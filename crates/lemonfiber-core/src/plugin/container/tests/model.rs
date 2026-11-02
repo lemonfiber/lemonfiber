@@ -177,6 +177,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             native: None,
             capability: "indexer.search".to_owned(),
             each: false,
+            files: None,
         }],
         ..with(Fields {
             env,

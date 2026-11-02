@@ -125,6 +125,7 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
         came(manifest, &Chosen::default(), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["server".to_owned()],
             settled: Settled::Outright,
@@ -147,6 +148,7 @@ fn several_claimants_and_no_choice_is_contested_and_names_each() {
         came(manifest, &Chosen::default(), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: Vec::new(),
             settled: Settled::Contested {
@@ -273,6 +275,7 @@ fn an_ask_nothing_fills_names_what_asked_for_it() {
         found,
         Some(vec![Unfilled {
             native: None,
+            files: None,
             by: "asker".to_owned(),
             capability: "media.serve".to_owned(),
         }])
@@ -526,6 +529,7 @@ fn an_ask_for_every_filler_that_nothing_fills_is_unfilled() {
         came(manifest, &Chosen::default(), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "library.curate".to_owned(),
             services: Vec::new(),
             settled: Settled::Unfilled,
@@ -548,6 +552,7 @@ fn a_choice_where_only_one_claims_it_is_reported_as_no_choice_at_all() {
         came(manifest, &Chosen::read(Some("media.serve=server")), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["server".to_owned()],
             settled: Settled::Outright,
@@ -643,6 +648,7 @@ fn a_plugin_claiming_what_the_stack_asks_for_contests_it_and_says_whose_each_is(
         reaches,
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: Vec::new(),
             settled: Settled::Contested {

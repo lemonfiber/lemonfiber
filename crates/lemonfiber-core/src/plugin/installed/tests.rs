@@ -144,6 +144,7 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
             native: None,
             capability: "library.curate".to_owned(),
             each: true,
+            files: None,
         }])
     );
     assert_eq!(
@@ -152,6 +153,7 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
             native: None,
             capability: "download.usenet".to_owned(),
             each: false,
+            files: None,
         }])
     );
 }
@@ -200,6 +202,7 @@ fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked(
         native: None,
         capability: capability.to_owned(),
         each: false,
+        files: None,
     };
     assert_eq!(
         placed(record.as_ref(), "komga").map(|one| one.asks),

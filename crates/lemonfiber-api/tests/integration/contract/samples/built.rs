@@ -148,6 +148,7 @@ pub(super) fn what_is_wired() -> WiringReport {
                 origin: lemonfiber_core::origin::Origin::Bundled,
                 reaches: Reaches::Asked {
                     native: None,
+                    files: None,
                     capability: "identity.source".to_owned(),
                     services: vec!["jellyfin".to_owned()],
                     settled: Settled::Outright,
@@ -173,6 +174,7 @@ pub(super) fn what_is_wired() -> WiringReport {
                 },
                 reaches: Reaches::Asked {
                     native: None,
+                    files: None,
                     capability: "library.curate".to_owned(),
                     services: vec!["sonarr".to_owned()],
                     settled: Settled::Each,
@@ -186,6 +188,7 @@ pub(super) fn what_is_wired() -> WiringReport {
         ],
         unfilled: vec![Unfilled {
             native: None,
+            files: None,
             by: "bazarr".to_owned(),
             capability: "library.curate".to_owned(),
         }],
@@ -206,6 +209,7 @@ pub(super) fn a_substitution() -> SubstitutionReport {
             asked_by: vec!["bindery".to_owned()],
             leaves_unfilled: vec![Unfilled {
                 native: None,
+                files: None,
                 by: "bindery".to_owned(),
                 capability: "indexer.proxy".to_owned(),
             }],

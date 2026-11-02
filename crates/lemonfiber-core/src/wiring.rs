@@ -42,7 +42,7 @@ pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
 pub use replacing::replaced;
 use settling::claimants;
-pub use settling::{address, asked_by, contested_by, filled, settle, settle_trusting, unfilled};
+pub use settling::{asked_by, contested_by, filled, settle, settle_trusting, unfilled};
 
 /// Every code the wiring, or the record of what is installed, is refused with where
 /// something it is read from cannot be read.
@@ -142,6 +142,9 @@ pub enum Reaches {
         /// adapter fronts rather than the adapter.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         native: Option<String>,
+        /// The medium the filler it reaches files, where the ask is narrowed to one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        files: Option<String>,
     },
     /// A link deliberately kept to a named service, shown as the exception it is.
     ByName {
@@ -191,19 +194,27 @@ pub struct Unfilled {
     /// The upstream's own API it asked in, where no upstream filling it declares that API.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<String>,
+    /// The medium it asked a filler of, where nothing filling it files that medium.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub files: Option<String>,
 }
 
 impl std::fmt::Display for Unfilled {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let filing = self
+            .files
+            .as_deref()
+            .map(|medium| format!(" filing {medium}"))
+            .unwrap_or_default();
         match &self.native {
             Some(api) => write!(
                 f,
-                "{} asks for {} in {api} and nothing filling it talks {api}",
+                "{} asks for {}{filing} in {api} and nothing filling it talks {api}",
                 self.by, self.capability
             ),
             None => write!(
                 f,
-                "{} asks for {} and nothing fills it",
+                "{} asks for {}{filing} and nothing fills it",
                 self.by, self.capability
             ),
         }
@@ -303,7 +314,7 @@ pub fn substitute(
     if !claimants(
         manifest,
         installed,
-        capability,
+        (capability, None),
         crate::plugin::first_party::EMBEDDED,
     )
     .iter()

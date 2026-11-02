@@ -51,10 +51,12 @@ fn entry(link: &Wired) -> Lines {
             settled,
             origins,
             native,
+            files,
         } => {
             lines.spaced(format!(
-                "  {} asks for {capability}{}",
+                "  {} asks for {capability}{}{}",
                 asker(link),
+                filing(files.as_deref()),
                 talking(native.as_deref())
             ));
             lines.put(format!("    reaches  {}", reached(services, origins)));
@@ -68,6 +70,11 @@ fn entry(link: &Wired) -> Lines {
         }
     }
     lines
+}
+
+/// The medium an ask narrows its filler to, as the words following what it asks for.
+pub(super) fn filing(files: Option<&str>) -> String {
+    files.map_or_else(String::new, |medium| format!(" filing {medium}"))
 }
 
 /// The upstream's own API an ask talks in, as the words following what it asks for.

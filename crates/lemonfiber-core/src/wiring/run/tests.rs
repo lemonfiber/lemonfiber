@@ -487,6 +487,7 @@ fn the_listing_carries_an_installed_plugins_ask_after_the_stacks_with_its_origin
         native: None,
         capability: "media.serve".to_owned(),
         each: false,
+        files: None,
     }];
     let mut register = crate::plugin::Register::empty();
     assert!(register

@@ -10,6 +10,7 @@ fn an_asker(native: Option<&str>) -> Installed {
         capability: "library.curate".to_owned(),
         each: false,
         native: native.map(str::to_owned),
+        files: None,
     }];
     crate::test_support::an_installed("finder", vec![placed])
 }
@@ -70,6 +71,7 @@ fn an_ask_in_an_api_no_upstream_talks_is_unfilled_naming_the_api() {
             by: "finder".to_owned(),
             capability: "library.curate".to_owned(),
             native: Some("sabnzbd".to_owned()),
+            files: None,
         }]
     );
     assert_eq!(

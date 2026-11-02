@@ -774,3 +774,15 @@ fn a_fenced_service_the_host_manages_is_caught() {
         messages(&managed)
     );
 }
+
+#[test]
+fn a_stack_ask_for_every_filler_is_refused() {
+    let text =
+        format!("{SHIPPED}\n[[wiring]]\nby = \"bazarr\"\nasks = \"library.curate\"\neach = true\n");
+    assert!(
+        messages(&text).iter().any(|m| m
+            == "wiring by bazarr: asks for every filler; a stack's ask reaches one, and only a plugin's ask may reach each"),
+        "{:?}",
+        messages(&text)
+    );
+}

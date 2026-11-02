@@ -468,7 +468,16 @@ impl Container<'_> {
                 }),
                 self.settled(&setting.setting),
             ),
-            Value::Url(url) => (None, narrowed(url)),
+            Value::Url(url) => (
+                self.provides.contains(&url.url_of).then(|| {
+                    format!(
+                        "asks for the address of {}, which it provides itself; nothing asks \
+                             itself",
+                        url.url_of
+                    )
+                }),
+                narrowed(url),
+            ),
             Value::Secret(secret) => (
                 None,
                 (!self.declares(&secret.secret)).then(|| {

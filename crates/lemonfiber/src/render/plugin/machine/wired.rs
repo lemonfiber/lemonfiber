@@ -45,10 +45,12 @@ pub(super) fn asking(asks: &[lemonfiber_core::wiring::Wired], recorded: bool) ->
                 settled,
                 origins,
                 native,
+                files,
             } => {
                 lines.put(format!(
-                    "      {} asks for {capability}{}, reaching {}",
+                    "      {} asks for {capability}{}{}, reaching {}",
                     link.by,
+                    super::super::super::wiring::filing(files.as_deref()),
                     super::super::super::wiring::talking(native.as_deref()),
                     super::super::super::wiring::reached(services, origins)
                 ));

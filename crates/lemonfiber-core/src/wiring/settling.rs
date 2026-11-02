@@ -14,7 +14,6 @@
 
 use std::collections::BTreeMap;
 
-use lemonfiber_manifest::container::UrlOf;
 use lemonfiber_manifest::{Manifest, Wiring};
 
 use crate::filling::{fills, Claimant, Filling, Shown};
@@ -34,13 +33,16 @@ use super::{Chosen, Contest, Reaches, Settled, Unfilled, Whose, Wired};
 pub(super) fn claimants(
     manifest: &Manifest,
     installed: &[Installed],
-    capability: &str,
+    (capability, files): (&str, Option<&str>),
     trusted: &[FirstParty],
 ) -> Vec<Claimant> {
+    let filing =
+        |media: &[String]| files.is_none_or(|medium| media.iter().any(|one| one == medium));
     let bundled = manifest
         .services
         .iter()
         .filter(|service| service.provides.iter().any(|named| named == capability))
+        .filter(|service| filing(&service.media_types))
         .filter(|service| crate::project::moving(installed, &service.id, trusted).is_none())
         .map(|service| Claimant {
             service: service.id.clone(),
@@ -51,6 +53,7 @@ pub(super) fn claimants(
         one.services
             .iter()
             .filter(|placed| placed.provides.iter().any(|named| named == capability))
+            .filter(|placed| filing(&placed.media_types))
             .map(|placed| Claimant {
                 service: placed.service.clone(),
                 plugin: Some(one.plugin.clone()),
@@ -191,8 +194,7 @@ pub fn settle_trusting(
                 manifest,
                 (installed, trusted),
                 wiring,
-                capability,
-                None,
+                &stack_ask(capability),
                 chosen,
             ),
             (None, Some(service)) => Reaches::ByName {
@@ -207,43 +209,74 @@ pub fn settle_trusting(
             reaches,
         })
     });
+    let implied =
+        crate::project::written_trusting(manifest, installed, trusted).flat_map(|service| {
+            crate::plugin::implied(&service.env, service.network.as_ref())
+                .into_iter()
+                .filter(|ask| {
+                    !manifest.wirings.iter().any(|wiring| {
+                        wiring.by == service.id
+                            && wiring.asks.as_deref() == Some(ask.capability.as_str())
+                            && ask.files.is_none()
+                    })
+                })
+                .map(|ask| Wired {
+                    by: service.id.clone(),
+                    origin: Origin::Bundled,
+                    reaches: reached(
+                        manifest,
+                        (installed, trusted),
+                        &plugins_ask(manifest, &service.id, &ask),
+                        &ask,
+                        chosen,
+                    ),
+                })
+        });
     let brought = installed.iter().flat_map(|one| {
         one.services.iter().flat_map(move |placed| {
-            placed.asks.iter().map(move |ask| {
-                let wiring = plugins_ask(manifest, &placed.service, ask);
+            placed.asking().into_iter().map(move |ask| {
+                let wiring = plugins_ask(manifest, &placed.service, &ask);
                 Wired {
                     by: placed.service.clone(),
                     origin: Origin::Plugin {
                         named: one.plugin.clone(),
                     },
-                    reaches: reached(
-                        manifest,
-                        (installed, trusted),
-                        &wiring,
-                        &ask.capability,
-                        ask.native.as_deref(),
-                        chosen,
-                    ),
+                    reaches: reached(manifest, (installed, trusted), &wiring, &ask, chosen),
                 }
             })
         })
     });
-    stack.chain(brought).collect()
+    stack.chain(implied).chain(brought).collect()
 }
 
-/// What an ask for `capability` reaches, against everything installed that claims it,
-/// talking in the upstream's own API `native` where it names one.
+/// A link of the stack's asking for `capability`, narrowed by nothing.
+fn stack_ask(capability: &str) -> Asking {
+    Asking {
+        capability: capability.to_owned(),
+        each: false,
+        native: None,
+        files: None,
+    }
+}
+
+/// What `ask` reaches, against everything installed that claims its capability and files
+/// the medium it narrows to, talking in the upstream's own API where it names one.
 fn reached(
     manifest: &Manifest,
     (installed, trusted): (&[Installed], &[FirstParty]),
     wiring: &Wiring,
-    capability: &str,
-    native: Option<&str>,
+    ask: &Asking,
     chosen: &Chosen,
 ) -> Reaches {
-    let held = claimants(manifest, installed, capability, trusted);
+    let capability = ask.capability.as_str();
+    let held = claimants(
+        manifest,
+        installed,
+        (capability, ask.files.as_deref()),
+        trusted,
+    );
     let (services, settled) = asked(wiring, capability, &held, chosen, (installed, trusted));
-    let (services, settled) = match native {
+    let (services, settled) = match ask.native.as_deref() {
         Some(api) => in_native(installed, &services, settled, api),
         None => (services, settled),
     };
@@ -252,7 +285,8 @@ fn reached(
         services,
         settled,
         origins: origins(&held),
-        native: native.map(str::to_owned),
+        native: ask.native.clone(),
+        files: ask.files.clone(),
     }
 }
 
@@ -307,49 +341,6 @@ fn plugins_ask(manifest: &Manifest, by: &str, ask: &Asking) -> Wiring {
     }
 }
 
-/// The address `by`'s ask for `url`'s capability reaches, where it settled on one
-/// service: that service at the port it listens on.
-///
-/// Nothing for an ask narrowed by a medium or an API, which settling does not narrow, and
-/// nothing where the ask reaches no service or several.
-#[must_use]
-pub fn address(
-    settled: &[Wired],
-    manifest: &Manifest,
-    installed: &[Installed],
-    by: &str,
-    url: &UrlOf,
-) -> Option<String> {
-    if url.files.is_some() || url.native.is_some() {
-        return None;
-    }
-    let filler = settled.iter().find_map(|wired| match &wired.reaches {
-        Reaches::Asked {
-            capability,
-            services,
-            ..
-        } if wired.by == by && *capability == url.url_of => match services.as_slice() {
-            [one] => Some(one),
-            _ => None,
-        },
-        Reaches::Asked { .. } | Reaches::ByName { .. } => None,
-    })?;
-    let placed = installed
-        .iter()
-        .flat_map(|one| &one.services)
-        .find(|placed| placed.service == *filler)
-        .map(|placed| placed.listens.or_else(|| placed.published()));
-    let bundled = || {
-        manifest
-            .services
-            .iter()
-            .find(|service| service.id == *filler)
-            .map(|service| service.listens.or(service.port))
-    };
-    let port = placed.or_else(bundled).flatten()?;
-    Some(format!("http://{filler}:{port}"))
-}
-
 /// Every ask `adding`'s services would make once it is installed beside `installed`, as
 /// each would then stand.
 #[must_use]
@@ -379,11 +370,13 @@ pub fn unfilled(wired: &[Wired]) -> Vec<Unfilled> {
                 capability,
                 settled: Settled::Unfilled,
                 native,
+                files,
                 ..
             } => Some(Unfilled {
                 by: one.by.clone(),
                 capability: capability.clone(),
                 native: native.clone(),
+                files: files.clone(),
             }),
             _ => None,
         })

@@ -54,6 +54,7 @@ fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::In
             native: None,
             capability: "library.curate".to_owned(),
             each: true,
+            files: None,
         }];
     }
     installed

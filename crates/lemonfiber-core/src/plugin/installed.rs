@@ -33,6 +33,7 @@ mod proved;
 mod reached;
 
 use asking::asks;
+pub(crate) use asking::implied;
 pub use asking::Asking;
 pub use proved::{RequestProof, RunProof};
 pub use reached::Reached;
@@ -139,6 +140,17 @@ pub struct Placed {
 }
 
 impl Placed {
+    /// Every capability it asks for: each its record keeps, then each its container fields
+    /// ask that none of those already asks.
+    #[must_use]
+    pub fn asking(&self) -> Vec<Asking> {
+        asking::merged(
+            self.asks.clone(),
+            &self.fields.env,
+            self.fields.network.as_ref(),
+        )
+    }
+
     /// One service, as installing it settles it.
     fn of(manifest: &Manifest, service: &Service) -> Self {
         let entry = manifest.entry(service);

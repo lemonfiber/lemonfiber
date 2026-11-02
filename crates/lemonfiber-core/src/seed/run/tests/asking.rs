@@ -27,6 +27,7 @@ fn asker(service: &str, listens: u16, asks: &[(&str, bool)]) -> Placed {
             native: None,
             capability: (*capability).to_owned(),
             each: *each,
+            files: None,
         })
         .collect();
     placed

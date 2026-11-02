@@ -88,12 +88,13 @@ fn asked(wiring: &Wiring, provides: &BTreeMap<&str, &[String]>) -> Vec<String> {
     };
     let shape = (!is_core_name(asks))
         .then(|| format!("asks for {asks}, which is not a core capability name"));
-    let both = (wiring.each && wiring.filled_by.is_some()).then(|| {
-        "reaches every filler and also chooses one; it does both only by meaning neither".to_owned()
+    let each = wiring.each.then(|| {
+        "asks for every filler; a stack's ask reaches one, and only a plugin's ask may reach each"
+            .to_owned()
     });
     shape
         .into_iter()
-        .chain(both)
+        .chain(each)
         .chain(chosen(wiring, asks, provides))
         .collect()
 }

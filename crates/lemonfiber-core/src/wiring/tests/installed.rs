@@ -39,6 +39,7 @@ fn an_ask_for_every_filler_reaches_every_filler() {
         reaches,
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "library.curate".to_owned(),
             services: curators.map(|one| format!("{one}-adapter")).to_vec(),
             settled: Settled::Each,
