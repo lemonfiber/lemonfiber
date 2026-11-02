@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "transfers"
+      "operation": "transfers",
+      "since": 0
     },
     {
       "asked": {},
@@ -21,7 +22,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "transfers"
+      "operation": "transfers",
+      "since": 0
     },
     {
       "asked": {},
@@ -31,7 +33,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "pulling"
+      "operation": "pulling",
+      "since": 0
     },
     {
       "asked": {},
@@ -41,7 +44,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "stop"
+      "operation": "stop",
+      "since": 0
     },
     {
       "asked": {},
@@ -51,7 +55,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "resume"
+      "operation": "resume",
+      "since": 0
     },
     {
       "asked": {},
@@ -61,7 +66,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "throttled"
+      "operation": "throttled",
+      "since": 0
     },
     {
       "asked": {
@@ -83,7 +89,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "restrain"
+      "operation": "restrain",
+      "since": 0
     },
     {
       "asked": {},
@@ -93,7 +100,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "moving"
+      "operation": "moving",
+      "since": 0
     },
     {
       "asked": {
@@ -105,7 +113,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "moved"
+      "operation": "moved",
+      "since": 0
     },
     {
       "asked": {},
@@ -115,7 +124,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "filed"
+      "operation": "filed",
+      "since": 0
     },
     {
       "asked": {
@@ -132,7 +142,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "file_under"
+      "operation": "file_under",
+      "since": 0
     },
     {
       "asked": {},
@@ -142,7 +153,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "accounts"
+      "operation": "accounts",
+      "since": 0
     }
   ],
   "major": 1

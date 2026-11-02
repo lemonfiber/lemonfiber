@@ -7,15 +7,15 @@
     },
     {
       "path": "archive.extract/v1/operations/watch.json",
-      "sha256": "565061adac539cf34bf425e87f0ba6ae2bedb17f3286af06f2c0e8573f5d443e"
+      "sha256": "ed1fb4268723db27d34b0b562b487a809a0f9692c2e3cc71cb9bf4aeb8609647"
     },
     {
       "path": "archive.extract/v1/operations/working.json",
-      "sha256": "e25a21804253878b22821b7d35476b70621eb5f2e63cfe633a1050043f91c1ca"
+      "sha256": "8f153af1387db1a1b9326f30b9c1b20dfd8bba996808038bdb71cd9cd1f57615"
     },
     {
       "path": "archive.extract/v1/conformance.json",
-      "sha256": "501b5cdce4a16790e1d6c8f53bf114c75a106048b7828aaec39b204132f1c5b5"
+      "sha256": "9be39daf0b80bca74e0848af725ed477169476382a059fe19194af428348a0dd"
     },
     {
       "path": "archive.extract/v1/holds.json",

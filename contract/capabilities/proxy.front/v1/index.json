@@ -7,19 +7,19 @@
     },
     {
       "path": "proxy.front/v1/operations/apply.json",
-      "sha256": "8f8e1a10cc74d924aa7d871222a66315c91092647a03db063165529554b702ff"
+      "sha256": "376c4dfec7ac61b19b62230541710144721562564bf88dd10680ff771d6514d5"
     },
     {
       "path": "proxy.front/v1/operations/routing.json",
-      "sha256": "f204a3dd70c947df5753fab898d7af5cd34d3635035d5b3e42f96a4431d269f8"
+      "sha256": "4cdcd4cb486d79c616243ef068c944880912cc26c368ef09086e1e9703944710"
     },
     {
       "path": "proxy.front/v1/operations/reload.json",
-      "sha256": "9d436a04054044ef67ecff6fd08eab5c3b276883c621d348a5dd2d4ef0dbdc6a"
+      "sha256": "2d53a85015e498f4447b00048205364ff5b4a03d0a17bbda607a3fb073f47a6f"
     },
     {
       "path": "proxy.front/v1/conformance.json",
-      "sha256": "55eddca781df5bfd908b886956347eb7fa4a0ea1c08c9dea3e01aa6ae7c9509c"
+      "sha256": "760df27c1b4d7c157790818ef934fdf72cb6d5fa9c168179bb50c223bce74fa2"
     },
     {
       "path": "proxy.front/v1/holds.json",

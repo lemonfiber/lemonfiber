@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "startup_completed"
+      "operation": "startup_completed",
+      "since": 0
     },
     {
       "asked": {},
@@ -21,7 +22,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "startup_completed"
+      "operation": "startup_completed",
+      "since": 0
     },
     {
       "asked": {
@@ -34,7 +36,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "create_admin"
+      "operation": "create_admin",
+      "since": 0
     },
     {
       "asked": {
@@ -46,7 +49,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "replace_admin_password"
+      "operation": "replace_admin_password",
+      "since": 0
     },
     {
       "asked": {},
@@ -56,7 +60,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "household"
+      "operation": "household",
+      "since": 0
     },
     {
       "asked": {
@@ -70,7 +75,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "whoever"
+      "operation": "whoever",
+      "since": 0
     },
     {
       "asked": {
@@ -85,7 +91,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "standing"
+      "operation": "standing",
+      "since": 0
     },
     {
       "asked": {
@@ -97,7 +104,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "invite"
+      "operation": "invite",
+      "since": 0
     },
     {
       "asked": {
@@ -111,7 +119,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "claim"
+      "operation": "claim",
+      "since": 0
     },
     {
       "asked": {
@@ -123,7 +132,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "unclaim"
+      "operation": "unclaim",
+      "since": 0
     },
     {
       "asked": {
@@ -135,7 +145,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "when_invited"
+      "operation": "when_invited",
+      "since": 0
     },
     {
       "asked": {},
@@ -145,7 +156,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "libraries"
+      "operation": "libraries",
+      "since": 0
     },
     {
       "asked": {},
@@ -155,7 +167,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "ratings"
+      "operation": "ratings",
+      "since": 0
     },
     {
       "asked": {},
@@ -165,7 +178,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "country"
+      "operation": "country",
+      "since": 0
     },
     {
       "asked": {
@@ -182,7 +196,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "allow"
+      "operation": "allow",
+      "since": 0
     },
     {
       "asked": {
@@ -199,7 +214,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "claimable"
+      "operation": "claimable",
+      "since": 0
     },
     {
       "asked": {
@@ -211,7 +227,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "suspend"
+      "operation": "suspend",
+      "since": 0
     },
     {
       "asked": {
@@ -223,7 +240,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "sessions"
+      "operation": "sessions",
+      "since": 0
     },
     {
       "asked": {},
@@ -233,7 +251,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "signs_devices_in"
+      "operation": "signs_devices_in",
+      "since": 0
     },
     {
       "asked": {
@@ -245,7 +264,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "withdraw"
+      "operation": "withdraw",
+      "since": 0
     }
   ],
   "major": 1

@@ -7,19 +7,19 @@
     },
     {
       "path": "network.egress-guard/v1/operations/up.json",
-      "sha256": "f88120276f62b77dbfd66458cecf67a6ee40939574afc77653defd2b1fd8658f"
+      "sha256": "34aec4724f73102a92ddb63d05242c174ec767eb130e96650aa244818791690d"
     },
     {
       "path": "network.egress-guard/v1/operations/forwarded.json",
-      "sha256": "920b2045ab196559077c3193513eddea757dd6f93364ed6801042f93b9b6875e"
+      "sha256": "bf9728dd4702f8291007c23492cff8343fc53500069ae31f722ea7fb5eb0dc37"
     },
     {
       "path": "network.egress-guard/v1/operations/secure.json",
-      "sha256": "89c5600fa4248ee59465a7ac4f381801d9078c79c3c96c5357cf2be5206be2fe"
+      "sha256": "2efdf06dbe974cdf32452094baece2aa6e55e515a14675fc9b08bc563c1009a2"
     },
     {
       "path": "network.egress-guard/v1/conformance.json",
-      "sha256": "30b198b17384d1594dd79f21be26b91786e5e626d34cab0faede476e51c5a1fe"
+      "sha256": "ccaf4d5aafa3287d736bb4b22cbb52d70953ad52abc9f8ca911491b72b8b0b55"
     },
     {
       "path": "network.egress-guard/v1/holds.json",

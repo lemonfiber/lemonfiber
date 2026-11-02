@@ -99,6 +99,9 @@
     "/lemonfiber/media.serve/v1/answers_to": {
       "$ref": "operations/answers_to.json"
     },
+    "/lemonfiber/media.serve/v1/astray": {
+      "$ref": "operations/astray.json"
+    },
     "/lemonfiber/media.serve/v1/dated": {
       "$ref": "operations/dated.json"
     },

@@ -7,35 +7,35 @@
     },
     {
       "path": "indexer.search/v1/operations/register_application.json",
-      "sha256": "0ba1602262fd5430fa7cc0bf3ee2d5bdf71f51fae16d3f882944eb56534f8fde"
+      "sha256": "2cf1cd9a64d3713de175e84403a54926d1201d5421226a9a27647d4aa8acdc19"
     },
     {
       "path": "indexer.search/v1/operations/applications.json",
-      "sha256": "06572a9d87d7da71c07bc25bef9b2cc82050b5ab1d9763c12edf8481498d1fe0"
+      "sha256": "75ea368ddd54cefaadb1ef953f86c266a6dc13c5a06fe93bed32789666496b15"
     },
     {
       "path": "indexer.search/v1/operations/test_application.json",
-      "sha256": "afaa342e318363c6f0da865eab1515b2c16069cc0bf526296ddc41e599547a09"
+      "sha256": "39d8e7a580ac552cab5cc399096663158fb09d45a390525d2dfbf15103dc6bee"
     },
     {
       "path": "indexer.search/v1/operations/rekey_application.json",
-      "sha256": "82147f669bf16bd794eb087df3eaf2cbb1021c110e569b4b20b4390cd29c6b1a"
+      "sha256": "6dacd0ef77100afcf8e9e92905cf025cac95efe2ebb4d2d2d6c0dfe19c5e3eda"
     },
     {
       "path": "indexer.search/v1/operations/indexers.json",
-      "sha256": "761788691f5a1a189cdcfacd4f52185a4a127f3ae3daab2373601170647fcc6f"
+      "sha256": "b325c08d8f980875c2507b5a5bcf786c4cb15b13ee1991e97e72e7886a5c34cd"
     },
     {
       "path": "indexer.search/v1/operations/aggregators.json",
-      "sha256": "b60dc4be690f57119ac6bbbca2a8a0ab22b1d0608d1e86eb5231da19e8f1066b"
+      "sha256": "1933d939fe3db3ed027acc4bb522fc291c50142b125f983b3415e79ead7ad235"
     },
     {
       "path": "indexer.search/v1/operations/add_aggregator.json",
-      "sha256": "e85b0e63188a65013454e4cb108f7ae968ac8ad13234286356661e1eec035a2e"
+      "sha256": "6cb9fcb9fe4354f5a7998d4ccec96ea1842258051fe67c8cd2e840de486a7323"
     },
     {
       "path": "indexer.search/v1/conformance.json",
-      "sha256": "f36390ba8b7bc711ca2c5f3e2ea22225e94a9c4f3ecf6a8604a4a8123ddfc618"
+      "sha256": "35e47373fc7b91c2b195f768c6f0235cce268f665431d5913bc7fc858fc591b0"
     },
     {
       "path": "indexer.search/v1/holds.json",

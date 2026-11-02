@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "apply"
+      "operation": "apply",
+      "since": 0
     },
     {
       "asked": {
@@ -47,7 +48,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "apply"
+      "operation": "apply",
+      "since": 0
     },
     {
       "asked": {},
@@ -57,7 +59,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "panels"
+      "operation": "panels",
+      "since": 0
     }
   ],
   "major": 1

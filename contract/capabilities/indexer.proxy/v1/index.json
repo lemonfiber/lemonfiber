@@ -7,15 +7,15 @@
     },
     {
       "path": "indexer.proxy/v1/operations/solve.json",
-      "sha256": "e53ee14b623e7cbdf206c9cc1afddb59c9244a5ca8e5f91bc98dd660e09116a2"
+      "sha256": "a84fa89a01ec7f4d55d955b187871c89e4b69a92ac7ef59a300c970bae096e1a"
     },
     {
       "path": "indexer.proxy/v1/operations/answers.json",
-      "sha256": "a979da1be45b7ca18228e5dd154569b473285d3f598111f00fa444ba6d52a38d"
+      "sha256": "cc56c13b0b882fe5797a589df6bb84d422a1966345dc725bd85d51d0aa415acb"
     },
     {
       "path": "indexer.proxy/v1/conformance.json",
-      "sha256": "b0a2059894a9416d32d1b4d02af84038082393a92e42af93c99ea7544fc0f40a"
+      "sha256": "9172a95d3dd9a778a689a26dd9119eae8a4b219a3b92ed6f4b1ac6b657d9eab0"
     },
     {
       "path": "indexer.proxy/v1/holds.json",

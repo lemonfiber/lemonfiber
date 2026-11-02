@@ -14,7 +14,8 @@
 //!
 //! After its return type every operation says what its conformance case posts, as
 //! `where asks = Asked { … }`: a value of the request it crosses as, any string of which
-//! may be a [`crate::conformance::Placeholder`]. One whose answer may be larger than
+//! may be a [`crate::conformance::Placeholder`]. One added to its major after the major was
+//! published says at which minor first, as `where since = 1, asks = …`. One whose answer may be larger than
 //! [`crate::client::LARGEST`] says so first, as `where largest = BYTES, asks = …`, one
 //! whose answer may take longer than [`crate::client::DEADLINE`] says so next, as
 //! `where deadline = DURATION, asks = …`, and one
@@ -44,7 +45,7 @@ macro_rules! contract {
                 impl $Trait:path {
                     $(
                         $(#[$op_meta:meta])*
-                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? $(deadline = $deadline:expr,)? $(secret = $secret:expr,)? $(refused = $refused:expr,)? asks = $asks:expr;
+                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(since = $since:expr,)? $(largest = $largest:expr,)? $(deadline = $deadline:expr,)? $(secret = $secret:expr,)? $(refused = $refused:expr,)? asks = $asks:expr;
                     )*
                 }
             )*
@@ -187,6 +188,7 @@ macro_rules! contract {
                                 MAJOR,
                                 stringify!($op),
                             )
+                            .added_at($crate::contract!(@since $($since)?))
                             .within($crate::contract!(@largest $($largest)?))
                             .awaited($crate::contract!(@deadline $($deadline)?))
                             .holding($crate::contract!(@secret $($secret)?))
@@ -199,6 +201,8 @@ macro_rules! contract {
         }
     };
 
+    (@since) => { 0 };
+    (@since $since:expr) => { $since };
     (@largest) => { $crate::client::LARGEST };
     (@largest $largest:expr) => { $largest };
     (@deadline) => { $crate::client::DEADLINE };

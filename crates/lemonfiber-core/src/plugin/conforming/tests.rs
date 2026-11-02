@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{conformed, Conformed};
+use super::{conformed, conformed_to, Conformed};
 use crate::plugin::claimed::Verdict;
 
 /// A plugin whose adapter speaks `subtitles.fetch@1` in front of its own finder.
@@ -281,4 +281,120 @@ async fn an_upstream_refusing_the_adapters_credential_passes_as_a_declared_refus
     let read = judged(&source("upstream-unauthorised", MANIFEST, &recorded)).await;
 
     assert!(read.conforms, "{read:?}");
+}
+
+/// `subtitles.fetch@1` with each operation named in `added` added to it at minor 1.
+fn fetch_adding(added: &[&str]) -> Vec<lemonfiber_contract::Capability> {
+    let mut fetch = lemonfiber_contract::capabilities::subtitles::fetch::capability();
+    for operation in &mut fetch.operations {
+        if added.contains(&operation.name) {
+            operation.since = 1;
+        }
+    }
+    vec![fetch]
+}
+
+/// What judging the source at `root` against `published` came to.
+async fn judged_against(
+    root: &std::path::Path,
+    published: &[lemonfiber_contract::Capability],
+) -> Conformed {
+    match conformed_to(root, published).await {
+        Ok(read) => read,
+        Err(unreadable) => unreachable!("the fixture reads: {unreadable}"),
+    }
+}
+
+/// Every case but `left_out`, recorded as an adapter that conforms answers it.
+fn conforming_but(left_out: &[&str]) -> Vec<(&'static str, String)> {
+    conforming()
+        .into_iter()
+        .filter(|(case, _)| !left_out.contains(case))
+        .collect()
+}
+
+/// An adapter recorded before an operation was added to the major answers it
+/// `unsupported`, so a case of it no recording answers passes.
+#[tokio::test]
+async fn a_case_of_an_operation_added_since_the_recordings_passes_unrecorded() {
+    let root = source("added-since", MANIFEST, &conforming_but(&["watch-answers"]));
+    let read = judged_against(&root, &fetch_adding(&["watch"])).await;
+
+    assert!(read.conforms, "{read:?}");
+    assert_eq!(
+        verdicts(&read),
+        vec![
+            ("refuses-without-the-key".to_owned(), Verdict::Passed),
+            ("watching-answers".to_owned(), Verdict::Passed),
+            ("watch-answers".to_owned(), Verdict::Passed),
+        ]
+    );
+}
+
+/// A recording of an operation added at a minor holds the adapter to every operation at
+/// or below it.
+#[tokio::test]
+async fn a_recording_of_an_added_operation_holds_the_adapter_to_every_one_at_its_minor() {
+    let root = source(
+        "recorded-since",
+        MANIFEST,
+        &conforming_but(&["watching-answers"]),
+    );
+    let read = judged_against(&root, &fetch_adding(&["watching", "watch"])).await;
+
+    assert!(!read.conforms, "{read:?}");
+    assert!(
+        read.cases.iter().any(|one| one.case == "watching-answers"
+            && matches!(&one.verdict, Verdict::Unproven { why } if why.contains("could not be read"))),
+        "{:?}",
+        verdicts(&read)
+    );
+}
+
+/// An operation the major was published with is never passed unrecorded, whatever was
+/// added since.
+#[tokio::test]
+async fn a_case_of_an_operation_the_major_was_published_with_is_held_unrecorded() {
+    let root = source(
+        "published-with",
+        MANIFEST,
+        &conforming_but(&["watching-answers", "watch-answers"]),
+    );
+    let read = judged_against(&root, &fetch_adding(&["watch"])).await;
+
+    assert!(!read.conforms, "{read:?}");
+    assert_eq!(
+        read.cases
+            .iter()
+            .filter(|one| matches!(one.verdict, Verdict::Unproven { .. }))
+            .map(|one| one.case.as_str())
+            .collect::<Vec<_>>(),
+        vec!["watching-answers"]
+    );
+}
+
+/// A recording the adapter does hold of an added operation is judged as any other.
+#[tokio::test]
+async fn a_recording_of_an_added_operation_is_judged_as_any_other() {
+    let recorded: Vec<(&str, String)> = conforming()
+        .into_iter()
+        .map(|(case, text)| match case {
+            "watch-answers" => (
+                case,
+                recording(PINNED, WATCH, r#"{"status": 200, "json": 7}"#),
+            ),
+            _ => (case, text),
+        })
+        .collect();
+    let read = judged_against(
+        &source("added-judged", MANIFEST, &recorded),
+        &fetch_adding(&["watch"]),
+    )
+    .await;
+
+    assert!(!read.conforms, "{read:?}");
+    assert!(read
+        .cases
+        .iter()
+        .any(|one| one.case == "watch-answers" && matches!(one.verdict, Verdict::Failed { .. })));
 }

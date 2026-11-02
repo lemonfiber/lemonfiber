@@ -7,23 +7,23 @@
     },
     {
       "path": "quality.sync/v1/operations/apply.json",
-      "sha256": "639c6dcafc5fe83b06d471d967e93dd7dcb64925079902b9bd0a8152126142ba"
+      "sha256": "8533b225e33618af63e5b25122ee90d1c6de859d1336dadc2e3f481a2d891ce4"
     },
     {
       "path": "quality.sync/v1/operations/applied.json",
-      "sha256": "4a5c709caa7c1302914b0825e8854d5ae46f68e5517a5d2731a803b239d50283"
+      "sha256": "d8c034fd1064808713776d33845166742d668fa24a2223766e536d8853e66413"
     },
     {
       "path": "quality.sync/v1/operations/edited.json",
-      "sha256": "a88dff3e8a170ee45d1b579ddbf98d5bc18f32a934347ec54652ec2631403add"
+      "sha256": "d977687e6b5643227dfd41c86f4166f277b588586daf85c481dcf5d739dc6b7e"
     },
     {
       "path": "quality.sync/v1/operations/reapply.json",
-      "sha256": "f687602137389ecc77db0672c55c864d549d318969fdc70bd9043aeed5d941b6"
+      "sha256": "8834d0de61ebcf338ba4ff1b5385a76525bbf3e4e7b29d1f0fbdb251e58d3c4e"
     },
     {
       "path": "quality.sync/v1/conformance.json",
-      "sha256": "bc0066b36c93f8af825de6051c95529cbb5cd2f15a9914ac3b897861d623645a"
+      "sha256": "9c5135729e16356166744699faf6ef22e958533be8891a7361eb1569ab9c805c"
     },
     {
       "path": "quality.sync/v1/holds.json",

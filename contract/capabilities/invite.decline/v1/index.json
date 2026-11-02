@@ -7,31 +7,31 @@
     },
     {
       "path": "invite.decline/v1/operations/hold.json",
-      "sha256": "4e565958c64d5a84222dccc72c5577076072ce134cea1183e90374facfb88bc7"
+      "sha256": "35ece5365bdbd4a1ad196b39a8f656328e49f7adc8d30a286bf06e16f29bb815"
     },
     {
       "path": "invite.decline/v1/operations/held.json",
-      "sha256": "4fc8aeee5a5ebe07695a48fd7256ac519ee7caa2888c9dcad86677003fbc73fc"
+      "sha256": "faf1546c361f78a36ec2cacca27be372b99e08b8b909a6b38ca6d50e29c408ad"
     },
     {
       "path": "invite.decline/v1/operations/apply_invitations.json",
-      "sha256": "f60f1294c1f427d6018bc3c5c2843792337e297d4383b5d88dd48edef735121f"
+      "sha256": "e291c59a98e731eac0a55d46ca9d7b3c74452a4efafc3610211325b49ade4b43"
     },
     {
       "path": "invite.decline/v1/operations/refusals.json",
-      "sha256": "02ba132c0ebb46f8449c5ad5182b3d2c48a319b3594c3368ce34758f9fa4c19b"
+      "sha256": "7291292cad77516763a537853292027e78b143dfced60c72c7c46621499d7b1e"
     },
     {
       "path": "invite.decline/v1/operations/lapses.json",
-      "sha256": "53246f51db7efd06ff64bd4c4b5b995e18b71fb07b9496fa7f4869aa3a9e9bcd"
+      "sha256": "1a9e683081e7e32cc29e8dfdfc8aa2c1974d5e36da67e045cd24885204d018cc"
     },
     {
       "path": "invite.decline/v1/operations/page.json",
-      "sha256": "d36afdec72c85a3c79246fecfe64e368f7a9de7a67fddc7436f5e5d8c4daa624"
+      "sha256": "ad3f13b3c91844fbc6f36eb74369a931ce46edaa355ec1d3f2e19c98aa871fba"
     },
     {
       "path": "invite.decline/v1/conformance.json",
-      "sha256": "99c52baa2da53792a5d12437999cde0a682ddab8199cb47f137ed3eba83baccd"
+      "sha256": "09407113809b72e164a1e8c22767045925633538ce4ce30adeb4700fc150f2b2"
     },
     {
       "path": "invite.decline/v1/holds.json",

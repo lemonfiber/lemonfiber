@@ -87,6 +87,8 @@ pub struct Operation {
     /// The statuses its conformance case is to be refused with, where what the case asks
     /// is something the operation must refuse; nothing where the case is to be answered.
     pub refused: Option<&'static [u16]>,
+    /// The minor of its major it was added at, `0` for those the major was published with.
+    pub since: u32,
     /// How its answer is read.
     reads: Reading,
 }
@@ -111,6 +113,7 @@ impl Operation {
             filed: Vec::new(),
             restarts: lemonfiber_ports::service::may_restart::<R>(),
             refused: None,
+            since: 0,
             reads: read_as::<R>,
         }
     }
@@ -158,6 +161,13 @@ impl Operation {
     #[must_use]
     pub const fn refusing(mut self, refused: Option<&'static [u16]>) -> Self {
         self.refused = refused;
+        self
+    }
+
+    /// The same operation, added to its major at the minor `since`.
+    #[must_use]
+    pub const fn added_at(mut self, since: u32) -> Self {
+        self.since = since;
         self
     }
 

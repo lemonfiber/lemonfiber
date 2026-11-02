@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{files, path_item, DIRECTORY};
+use super::{conformance, files, path_item, DIRECTORY};
 
 /// The committed documents are exactly what the types generate: run `just capability-contracts`
 /// after changing a capability.
@@ -275,4 +275,47 @@ fn only_an_operation_saying_when_it_is_in_force_publishes_a_reset() {
             (spoken("owner.claim"), "claim"),
         ]
     );
+}
+
+/// Every operation publishes the minor it was added at, with its operation and with each
+/// of its cases, and only `media.serve@1`'s `astray` was added after its major.
+#[test]
+fn every_operation_publishes_the_minor_it_was_added_at() {
+    let mut added = Vec::new();
+    for capability in crate::capabilities::all() {
+        for operation in &capability.operations {
+            let published = path_item(operation)
+                .pointer("/post/x-lemonfiber-since")
+                .and_then(serde_json::Value::as_u64);
+            assert_eq!(
+                published,
+                Some(u64::from(operation.since)),
+                "{}",
+                operation.name
+            );
+            if operation.since > 0 {
+                added.push((
+                    crate::spoken(capability.name, capability.major),
+                    operation.name,
+                ));
+            }
+        }
+        let listed = conformance(&capability);
+        let cases = listed
+            .get("cases")
+            .and_then(serde_json::Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        assert!(!cases.is_empty(), "{}", capability.name);
+        for case in cases {
+            let operation = case.get("operation").and_then(serde_json::Value::as_str);
+            let since = capability
+                .operations
+                .iter()
+                .find(|one| Some(one.name) == operation)
+                .map(|one| u64::from(one.since));
+            assert_eq!(case.get("since").and_then(serde_json::Value::as_u64), since);
+        }
+    }
+    assert_eq!(added, vec![("media.serve@1".to_owned(), "astray")]);
 }

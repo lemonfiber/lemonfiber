@@ -106,6 +106,7 @@
     "x-lemonfiber-largest": 1048576,
     "x-lemonfiber-secret": [
       "/token"
-    ]
+    ],
+    "x-lemonfiber-since": 0
   }
 }

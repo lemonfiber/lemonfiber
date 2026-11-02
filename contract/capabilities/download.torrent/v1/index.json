@@ -7,63 +7,63 @@
     },
     {
       "path": "download.torrent/v1/operations/transfers.json",
-      "sha256": "fe378f45f08ea3570f2644621d610845c3d754d379dd0fb21c3a68a25b3bfdd5"
+      "sha256": "8589870ba9c8c065854ed2116a8944f24b579f3cd707bd278482e612640408b8"
     },
     {
       "path": "download.torrent/v1/operations/pulling.json",
-      "sha256": "33671e51a2b56e52370b0373bb2f1ac5cab7b13985b079531624dc68c4a0a6bf"
+      "sha256": "b8c7bf3044120d60fbf037377882a27509c140a0e3c4d9ba0684b2ee8ac8f959"
     },
     {
       "path": "download.torrent/v1/operations/stop.json",
-      "sha256": "0997abf0b8e879e8ccaf626cce954fc9b697a86c62899f97ba30e583c39d756e"
+      "sha256": "0caab643ebd09de9cf7549490cbe1ad2adcd69b3105c39764990604878268bcf"
     },
     {
       "path": "download.torrent/v1/operations/resume.json",
-      "sha256": "e2a75406f321fa0f690e318d8261685f4a96f702e92594fb8087091b74fa4f9a"
+      "sha256": "c42b498f3144440775a162130e365a79613220e375de7e0065843db0eb68f3a3"
     },
     {
       "path": "download.torrent/v1/operations/throttled.json",
-      "sha256": "43ed764516db5ab6f1a0f9be2044a063592d389071ecd413def43325d1c9b0b5"
+      "sha256": "6eaff95c3c8e55bed4b612393c055bb898f224877d93a41bc0eb45243823adc5"
     },
     {
       "path": "download.torrent/v1/operations/restrain.json",
-      "sha256": "88a0c155752ab34a20d82e361c827a39b31ad2ed9ba0f0063a224ffd6dc928d7"
+      "sha256": "92ab710786c09086ede7209e9f0bfbf14965ffe4d168dc764c57e6a8f445848c"
     },
     {
       "path": "download.torrent/v1/operations/moving.json",
-      "sha256": "624d33bbc706f2fa61f4cddd9f3e1073cc02781381efab52181c79d22d9db60f"
+      "sha256": "3e23eea44093015f9633050a6ebf77dcb348f12c3659d290e75ea672f04c597c"
     },
     {
       "path": "download.torrent/v1/operations/moved.json",
-      "sha256": "80d2ca10b94f85e2cea074416da034e35efc7e0d5f0b2d6fbd0b0cfe10e49ed8"
+      "sha256": "1dbccbb2dd1d59e6ff9b47a63568dd5632e15b4c2e8a17c820b5f2aef4c48fb2"
     },
     {
       "path": "download.torrent/v1/operations/seeding.json",
-      "sha256": "74760ee8014d219539c15280a6285a9e967ce9ca26d14fbe86fd6bf4f5d90044"
+      "sha256": "a5d4457e1f97f38524a59f1397f2ee6ddb76e7a34c66142c1b911ba869af7d70"
     },
     {
       "path": "download.torrent/v1/operations/stop_seeding.json",
-      "sha256": "426e40ffca5175aca0194c2228453016ae7f8c55bc83f456a4d26d04eed73b8c"
+      "sha256": "dc0ec20c662edb9949c585397e2ecb21313e80ec0033c50f4dfc33ba2bee2b4e"
     },
     {
       "path": "download.torrent/v1/operations/filed.json",
-      "sha256": "24ab47a7feb227ab6f6fb6e67c6a1fcce4ebfff194a3be17491511844f56cf53"
+      "sha256": "bd96b5b485e3ac2b9318e52d51fabb52cc4f0ea8ee4bbfb97bc96ee6fa7a22ae"
     },
     {
       "path": "download.torrent/v1/operations/file_under.json",
-      "sha256": "531bd40d09050285f0d6673f8567a86c17e03ea9771d152d3b85a5b82308b7d7"
+      "sha256": "dbbdcb84de267d7425e9c28e7fdc5c2a277142e4bb8c03af5f20c8479ab27dc0"
     },
     {
       "path": "download.torrent/v1/operations/peer_port.json",
-      "sha256": "f1fa01006300f4e728cc5252b372dafdbc895fe1e73d135cad2d54cab3a76d0b"
+      "sha256": "c5e8725da42bad88dbadaffcb738405aebb8a0495a22400acc13f7772b3e7ab4"
     },
     {
       "path": "download.torrent/v1/operations/set_peer_port.json",
-      "sha256": "3f047e010be3462b2a12c0f84851d0da27f5a8dadc6391432efcf51ecd535e7d"
+      "sha256": "6ca371710e1bf4deedd429559df76995f8e2c20375fe1dd03bcf3d2dd29739ed"
     },
     {
       "path": "download.torrent/v1/conformance.json",
-      "sha256": "6d089c4b0151c8288d9c9f14f89f8aa0d9863831f7876395422280f8b3d7fe6a"
+      "sha256": "7e6282b92e46a83eb1d029dd89fb1373ec646ee61ba53cf403654cabe32f4e8b"
     },
     {
       "path": "download.torrent/v1/holds.json",

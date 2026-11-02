@@ -59,9 +59,16 @@ pub struct Judged {
 ///
 /// [`Unreadable`] where there is no manifest at the path, or this build cannot read it.
 pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
+    conformed_to(path, &lemonfiber_contract::capabilities::all()).await
+}
+
+/// What the plugin whose source is at this path conforms to of the contracts `published`.
+async fn conformed_to(
+    path: &Path,
+    published: &[lemonfiber_contract::Capability],
+) -> Result<Conformed, Unreadable> {
     let (root, manifest) = sourced(path)?;
     let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
-    let published = lemonfiber_contract::capabilities::all();
     let mut judged = Vec::new();
     for service in manifest
         .services
@@ -80,9 +87,17 @@ pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
             else {
                 continue;
             };
-            for case in filed(spoken, &files) {
-                let recording = format!("{RECORDINGS}/{named}/{}.json", case.case);
+            let cases = filed(spoken, &files);
+            let recorded_at = recorded_minor(&root, named, &cases);
+            for case in cases {
+                let recording = recording_of(named, &case);
                 let verdict = match recorded::read(&root, &recording) {
+                    Err(_)
+                        if !root.join(&recording).exists()
+                            && case.operation.since > recorded_at =>
+                    {
+                        Verdict::Passed
+                    }
                     Err(unrunnable) => Verdict::Unproven { why: unrunnable.0 },
                     Ok(recorded) => {
                         let asked = Asked {
@@ -109,6 +124,23 @@ pub async fn conformed(path: &Path) -> Result<Conformed, Unreadable> {
         cases: judged,
         conforms,
     })
+}
+
+/// The highest minor among the operations of `contract` the plugin holds a recording for:
+/// the minor of the core it was recorded against. A case of an operation added after it is
+/// answered `unsupported` by an adapter built before the operation existed.
+fn recorded_minor(root: &Path, contract: &str, cases: &[Case<'_>]) -> u32 {
+    cases
+        .iter()
+        .filter(|case| root.join(recording_of(contract, case)).exists())
+        .map(|case| case.operation.since)
+        .max()
+        .unwrap_or_default()
+}
+
+/// Where the recording of `case` of `contract` sits, beneath the plugin's source.
+fn recording_of(contract: &str, case: &Case<'_>) -> String {
+    format!("{RECORDINGS}/{contract}/{}.json", case.case)
 }
 
 /// The image the service a speaker answers for is pinned by, as a recording names it:

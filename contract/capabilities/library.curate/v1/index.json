@@ -7,119 +7,119 @@
     },
     {
       "path": "library.curate/v1/operations/identity.json",
-      "sha256": "ae63b079d42aa58d2d1e317a2d9a56f9d316f1f29a14d4e36fd4880bd92b13fb"
+      "sha256": "a13653cf1a28b2b740d14a7fb31e57e8c5172e035d0c8457d4f6948111e54553"
     },
     {
       "path": "library.curate/v1/operations/register_download_client.json",
-      "sha256": "aa4ed2529a72ef69a780752b72ee0c741fcf1270680638aedc10819316e94491"
+      "sha256": "063edbbb2845f8ac0906c8655fe6c66a29b91bb562aa5803c7940bbc07f2340b"
     },
     {
       "path": "library.curate/v1/operations/download_clients.json",
-      "sha256": "0e405ba7e25d25f38899062487b7fe9e350bfcbcdcbd1dbc9627c7eb73cdbe61"
+      "sha256": "0b1fd943ce30ca621a99d452052d6d9233346ed985d6c2266916fd3531f2a84a"
     },
     {
       "path": "library.curate/v1/operations/update_download_client.json",
-      "sha256": "395cbe3494cf1256941b7688fbd2ee6cb2e5c95f1f3da032d49515229292a714"
+      "sha256": "caaadf60de76c6d8d6e98d00a4ed2678c85aa9087356814b8c28cf8051ef0972"
     },
     {
       "path": "library.curate/v1/operations/set_client_field.json",
-      "sha256": "dd40a18c4ea0be045b28b5f87f894e999b10116d4ca982f747a2de76b47b600e"
+      "sha256": "eae7c661b887527e2c7848c38cf33b8f65cf0a6664c4c75739c98ddbdc180473"
     },
     {
       "path": "library.curate/v1/operations/test_download_clients.json",
-      "sha256": "f4db2aee232ba75eb32b0c9aec7e050d5605cd087252ebec6e5c0110b63dc595"
+      "sha256": "c462e9cab89c47b315cdfff18d42b0b27bb3cf1752c8ebd84f8190c29a3f39e6"
     },
     {
       "path": "library.curate/v1/operations/register_root_folder.json",
-      "sha256": "10a1b6549d1f3beb2514e3b7a17305d019d1405a320c0a756880d20c316311a7"
+      "sha256": "352569a0c75d1b2e569eddf2ae4554631eaeedd6df4085bf2189651cb10eaa2e"
     },
     {
       "path": "library.curate/v1/operations/root_folders.json",
-      "sha256": "c38bb35ab1e954d8b03ecd89893bbd206b1608426a299b2332dd71efde137793"
+      "sha256": "be6138a5fd8f4771c38ecbbed9671829993f05775517f30b41cdd27b037dd405"
     },
     {
       "path": "library.curate/v1/operations/quality_profiles.json",
-      "sha256": "bdcc87ab69524bf9c03d63de0e63604a4d621167c484b65806f48eeda40261e7"
+      "sha256": "371b1ab7aa73a24596a5665699f448a646322807998dccfad0bc809c8d9ff262"
     },
     {
       "path": "library.curate/v1/operations/search_upgrades.json",
-      "sha256": "8d95f7eb3d601acaf9964ee46857041e1905e5acd7d9fa3c2317830bb5f07ae4"
+      "sha256": "39766867b594275d3980f1ccd18a0fe672db4b7ff729db5d0de7b044602d4bdc"
     },
     {
       "path": "library.curate/v1/operations/wanting.json",
-      "sha256": "0ceb158e0aeed12c755263f1c95ef10aff7ed96e7dda91ee268ce3f9788f9bb0"
+      "sha256": "98838b8c293898a3312f5673a44d65b1210d5c5b5c17bd3895724e9819b0246c"
     },
     {
       "path": "library.curate/v1/operations/hardlinks.json",
-      "sha256": "5aeb708b5a185f6aec6cfa19e0ad1c6a7f3fbe8f34257448bcb7341e1972e329"
+      "sha256": "78dcbadeefbd8c4b855b238a9a1e67cbbb73c417047b0380e948e7d81b754ca4"
     },
     {
       "path": "library.curate/v1/operations/set_hardlinks.json",
-      "sha256": "9c9fec010f65c6b44c0db5ab332e06149dd3ca5a2a6b149ce501db7a535027d6"
+      "sha256": "9763cf8052f7d83a4c98961d83ccde7a183417f4456ecb671f3aafe844da5eba"
     },
     {
       "path": "library.curate/v1/operations/records.json",
-      "sha256": "599f274563db2fe90d3d2ed9def63f7123f751e4d233d39fd1afd298e3aa9f14"
+      "sha256": "70402047cafbea34d6a7add4837fa541d0f3a8acecf3ceb1313858a1966a53c3"
     },
     {
       "path": "library.curate/v1/operations/carry.json",
-      "sha256": "af72e95743b9f44b4a8ef0c3844dc79468de07c43be03a19e8a9ca7c3f2204aa"
+      "sha256": "0725afb12e95c8cc7ee8a34074ca10f451e001e7596e76cb94861c41e1465d4f"
     },
     {
       "path": "library.curate/v1/operations/lookup.json",
-      "sha256": "e02503524ce882fc735c5119b48a455a019be6b1369d7a9dd6b0c5916b2361a6"
+      "sha256": "000f019349b02f0c04d86ee5805dba4bb87e3a7953c822371689e6f76c381fc0"
     },
     {
       "path": "library.curate/v1/operations/add_plan.json",
-      "sha256": "9c676eac7738c198f69cd2d23b66dc7e6d4388d047cbacc511b0c7c3820ea837"
+      "sha256": "72ff0923f168f19b50f6c1516488b80bfb5d427ed4f6db9573bef83604b5e792"
     },
     {
       "path": "library.curate/v1/operations/add.json",
-      "sha256": "b60d2744073e89e79d31e3acf98de1a4ce571a89ddaceabea679d89649a556d0"
+      "sha256": "fefdb2e2d69e08b00440bbbcfc8b4768bb95692ba4995afd61a61e09e4fa9037"
     },
     {
       "path": "library.curate/v1/operations/indexer_count.json",
-      "sha256": "097a3a95f2ee59196de4331630990a4696029357d8408dae679b070346b7d4b6"
+      "sha256": "fcbce20a417efa057eca18b0741bdeed8d5c08db651ef9c9e0c6efadc88344e6"
     },
     {
       "path": "library.curate/v1/operations/queue.json",
-      "sha256": "2c7cb53aa63ab9db7c44b5b1d29f3a5e58d4ffafe8e86001e3bcdb9a4f347aa2"
+      "sha256": "a77c4dc1e2124d5f0cba6a69d6ff6e53fe6710da0ecb1d79cfc3ddbcce4d1f68"
     },
     {
       "path": "library.curate/v1/operations/probe_releases.json",
-      "sha256": "c2882257a434d8c5aecfddf43da93f309ea8d693bbbcc728cd3e28c1817c265a"
+      "sha256": "975286abdc75151fb174ee7092018ab3996f5355fbba4b8bd75b65449481e479"
     },
     {
       "path": "library.curate/v1/operations/apply_music_format.json",
-      "sha256": "3e980402bc1dfac1d1980896481a55ca2f33f4a3659d8cd6c014b1b2aa7551ab"
+      "sha256": "98cff243adb59e9e8005028c7fd298b44667b6330a39d57c4ef388b44610de06"
     },
     {
       "path": "library.curate/v1/operations/library.json",
-      "sha256": "cdb73653725e40092a431ad975a5c09a3e2793ee1582d2d42816812195ceb7ff"
+      "sha256": "13e1c6612a1b799c4fc26028646838d669699dcf72276e89536cfe5071d13534"
     },
     {
       "path": "library.curate/v1/operations/find_items.json",
-      "sha256": "d5e8d323638bbcfa6f3d8750a201cfcb075e1260600b4cb366b173596ed68f3b"
+      "sha256": "342dfd1a633ce7a04ba74f3295f8e6e49d4cba1b17cd2f3c08bb36bfad81f6ef"
     },
     {
       "path": "library.curate/v1/operations/item_history.json",
-      "sha256": "7ff354e705dd40438edec2823467f02391322b7f6f03c2ef42c0e0c3f7f4f6fc"
+      "sha256": "e6e3ddd030bf369bff30ff7c10e4e4f25b690b256cd85d627c277e82c733aa59"
     },
     {
       "path": "library.curate/v1/operations/item_queue.json",
-      "sha256": "3aaba86e947a98e64e611fb22fd18a9d82c126bca0d89a8ee2bd9e3059a4e75e"
+      "sha256": "15f3fa3f3af4ffa7c8be2f01b3dfe367dea9f03823af77af032005652cdeb54c"
     },
     {
       "path": "library.curate/v1/operations/item_parts.json",
-      "sha256": "04f221b4b43c6e8e8568a9ab9e1a0746f49e4553195e8e2f50fd2965a6e90fe2"
+      "sha256": "9f012d00befbe6937338c86b1a260ccace08845eacab1f712ebe92852108b8cb"
     },
     {
       "path": "library.curate/v1/operations/stuck_items.json",
-      "sha256": "000d5cc9af9865b7ebf7e8d65b7c2e388339e94c3c0b30342b55bdbacbd8b9c6"
+      "sha256": "3c2f2533429c4a4c736e2f5f89c44e2433d916498cbc6b00538641b729317260"
     },
     {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "ee4c92b4a2202cdbc7069d5eab89efdbdb6e62cd50ed5b269c3f954caf23e162"
+      "sha256": "d04b40a969aaf4f98b372ae80e7bacb6728413efc00f0abced9ba01136d1ce07"
     },
     {
       "path": "library.curate/v1/holds.json",

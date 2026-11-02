@@ -27,6 +27,21 @@ pub struct Dated {
     pub last_used: Option<String>,
 }
 
+/// A key or account the server holds under an app's name that its filler did not make, or
+/// made and no longer records, by what the operator finds it under and never its secret.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct Astray {
+    /// The id the server holds it by.
+    pub id: String,
+    /// The name it is held under.
+    pub name: String,
+    /// Where in the server it is removed, in the words the server's own screens use.
+    pub removed_in: String,
+}
+
 /// Which address names the client, which origin a browser may read the server from, and
 /// starting it again so it reads them.
 #[async_trait]
@@ -111,4 +126,13 @@ pub trait AppKeys: Send + Sync {
     ///
     /// Returns [`Failure`] where the server is unreachable or refuses the revocation.
     async fn revoke(&self, key: &str) -> Result<(), Failure>;
+
+    /// Every key or account the server holds under `app` that this filler did not make, or
+    /// made and no longer records, and none where it holds nothing else. It is read only:
+    /// nothing acts on what it answers, which is left for the operator to remove.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where the server is unreachable or answers unreadably.
+    async fn astray(&self, app: &str) -> Result<Vec<Astray>, Failure>;
 }

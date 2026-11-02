@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "guard"
+      "operation": "guard",
+      "since": 0
     },
     {
       "asked": {
@@ -108,7 +109,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "guard"
+      "operation": "guard",
+      "since": 0
     },
     {
       "asked": {},
@@ -118,7 +120,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "guarding"
+      "operation": "guarding",
+      "since": 0
     },
     {
       "asked": {},
@@ -128,7 +131,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "certificate"
+      "operation": "certificate",
+      "since": 0
     }
   ],
   "major": 1

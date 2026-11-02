@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "signed_in"
+      "operation": "signed_in",
+      "since": 0
     },
     {
       "asked": {
@@ -24,7 +25,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "signed_in"
+      "operation": "signed_in",
+      "since": 0
     },
     {
       "asked": {
@@ -37,7 +39,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "title"
+      "operation": "title",
+      "since": 0
     },
     {
       "asked": {
@@ -50,7 +53,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "part_way"
+      "operation": "part_way",
+      "since": 0
     },
     {
       "asked": {
@@ -67,7 +71,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "progressed"
+      "operation": "progressed",
+      "since": 0
     },
     {
       "asked": {
@@ -79,7 +84,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "sign_out"
+      "operation": "sign_out",
+      "since": 0
     },
     {
       "asked": {
@@ -93,7 +99,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "picture"
+      "operation": "picture",
+      "since": 0
     },
     {
       "asked": {
@@ -106,7 +113,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "holdings"
+      "operation": "holdings",
+      "since": 0
     },
     {
       "asked": {
@@ -118,7 +126,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "playing"
+      "operation": "playing",
+      "since": 0
     },
     {
       "asked": {
@@ -131,7 +140,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "has_item"
+      "operation": "has_item",
+      "since": 0
     },
     {
       "asked": {},
@@ -141,7 +151,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "rescan"
+      "operation": "rescan",
+      "since": 0
     },
     {
       "asked": {
@@ -153,7 +164,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "series_held"
+      "operation": "series_held",
+      "since": 0
     },
     {
       "asked": {
@@ -165,7 +177,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "refresh"
+      "operation": "refresh",
+      "since": 0
     },
     {
       "asked": {
@@ -177,7 +190,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "filed_as"
+      "operation": "filed_as",
+      "since": 0
     },
     {
       "asked": {
@@ -189,7 +203,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "mint"
+      "operation": "mint",
+      "since": 0
     },
     {
       "asked": {
@@ -201,7 +216,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "dated"
+      "operation": "dated",
+      "since": 0
     },
     {
       "asked": {
@@ -213,7 +229,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "answers_to"
+      "operation": "answers_to",
+      "since": 0
     },
     {
       "asked": {
@@ -225,7 +242,21 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "revoke"
+      "operation": "revoke",
+      "since": 0
+    },
+    {
+      "asked": {
+        "app": "lemonfiber-conformance"
+      },
+      "case": "astray-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "astray",
+      "since": 1
     },
     {
       "asked": {},
@@ -235,7 +266,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "known_proxies"
+      "operation": "known_proxies",
+      "since": 0
     },
     {
       "asked": {
@@ -247,7 +279,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "trust_only"
+      "operation": "trust_only",
+      "since": 0
     },
     {
       "asked": {},
@@ -257,7 +290,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "allowed_origins"
+      "operation": "allowed_origins",
+      "since": 0
     },
     {
       "asked": {
@@ -269,7 +303,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "allow_only"
+      "operation": "allow_only",
+      "since": 0
     },
     {
       "asked": {},
@@ -279,7 +314,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "restart"
+      "operation": "restart",
+      "since": 0
     },
     {
       "asked": {},
@@ -289,7 +325,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "declared"
+      "operation": "declared",
+      "since": 0
     },
     {
       "asked": {
@@ -307,7 +344,8 @@
       "keyed": true,
       "live": false,
       "media_type": "tv",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -325,7 +363,8 @@
       "keyed": true,
       "live": false,
       "media_type": "movies",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -343,7 +382,8 @@
       "keyed": true,
       "live": false,
       "media_type": "music",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -361,7 +401,8 @@
       "keyed": true,
       "live": false,
       "media_type": "books",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -379,7 +420,8 @@
       "keyed": true,
       "live": false,
       "media_type": "comics",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -397,7 +439,8 @@
       "keyed": true,
       "live": false,
       "media_type": "audiobooks",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -415,7 +458,8 @@
       "keyed": true,
       "live": false,
       "media_type": "podcasts",
-      "operation": "furnish"
+      "operation": "furnish",
+      "since": 0
     },
     {
       "asked": {
@@ -428,7 +472,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "serve_tls"
+      "operation": "serve_tls",
+      "since": 0
     }
   ],
   "major": 1

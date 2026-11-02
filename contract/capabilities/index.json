@@ -10,7 +10,7 @@
       ],
       "openapi": "download.usenet/v1/openapi.json",
       "operations": 11,
-      "sha256": "5f6f9dc9ed9d1c0ea664ecce2a50c7f0ff57b6f25f90d01b77276532819a84cf"
+      "sha256": "1d957955584386c233fff168c6f61dcba45dd99f5bc6239bf5d6e484c9606a4f"
     },
     {
       "capability": "download.torrent",
@@ -22,7 +22,7 @@
       ],
       "openapi": "download.torrent/v1/openapi.json",
       "operations": 14,
-      "sha256": "76b552b7009ddb6fc0aca604af7a53e6d9d6d412a93381f100ae5b33d1382225"
+      "sha256": "cc58e81356b7555726f75994c2bd5162690c0ef81a8b0b3948df006139dfc3aa"
     },
     {
       "capability": "network.egress-guard",
@@ -34,7 +34,7 @@
       ],
       "openapi": "network.egress-guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "365c4b85c44e4830b84089f55285e9d7607fbc0fe1b71164b26a79970d1decaa"
+      "sha256": "6cc6ad092460b7bfae1527089bd0b2a302e1d195889a26cc5e208b79b8220790"
     },
     {
       "capability": "library.curate",
@@ -46,7 +46,7 @@
       ],
       "openapi": "library.curate/v1/openapi.json",
       "operations": 28,
-      "sha256": "d4bdaefe2b310902df4cf7d6c15ea40a049bf156f1e2ab5db5965e1fadc91ce4"
+      "sha256": "d77631c22c975ba7183dc4b8da630cb8b55ff993dac97b7e3694698abe015cfa"
     },
     {
       "capability": "indexer.search",
@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "0fb6e80399c3b0c01baee3369b5ef5fbff3bb9ffaee1964bdffec2fadd1bd2ca"
+      "sha256": "df9fade707c5b7ca886d80f6a13ec2ebc2a02cc229efdb5ea9f14d2576727d4c"
     },
     {
       "capability": "indexer.pull",
@@ -70,7 +70,7 @@
       ],
       "openapi": "indexer.pull/v1/openapi.json",
       "operations": 2,
-      "sha256": "b376c14896c271252d9a66ae792bb11ea5451f8729c33c47cb09afaee93c785c"
+      "sha256": "078073a367a0a24e989d4897107cc92b8228656faaaa15e805556e9c7b1cd004"
     },
     {
       "capability": "indexer.proxy",
@@ -82,7 +82,7 @@
       ],
       "openapi": "indexer.proxy/v1/openapi.json",
       "operations": 2,
-      "sha256": "6f49a96ebb98c83d133f9146b3f88913dc6cc08121292c3570c221494b0504d0"
+      "sha256": "8fac6d37e66512064ff7bb4a1e77c1fecdd4ac6738e3f7e574cb350e9b5e07c2"
     },
     {
       "capability": "subtitles.fetch",
@@ -94,7 +94,7 @@
       ],
       "openapi": "subtitles.fetch/v1/openapi.json",
       "operations": 2,
-      "sha256": "a4795514f4dd1908cb912af662bc910f944c70363ff253eb4d31651562e0d12a"
+      "sha256": "9fb037a577b730ac576baab35f3196e59a91884b014f051d034b397ec018e81c"
     },
     {
       "capability": "request.intake",
@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 31,
-      "sha256": "0de071d208cb8a8b71acb5c020e226ead72317cd7acf285549d7685626783434"
+      "sha256": "4c29dfd0f50427789aa7a11de2167771fc17fc44498a199ee88de3d4a5e658f7"
     },
     {
       "capability": "identity.source",
@@ -118,7 +118,7 @@
       ],
       "openapi": "identity.source/v1/openapi.json",
       "operations": 19,
-      "sha256": "a73675b1d9b7a053cf2b3c863b9f49ec86a3f6ba27b79ab1655f6db822dda4f1"
+      "sha256": "c49e77806202d01536c6e4dd3451fdacc3bbc6b606a5a67bdb7bafc959171d07"
     },
     {
       "capability": "media.serve",
@@ -129,8 +129,8 @@
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 25,
-      "sha256": "bca68bf3061c9424d5e808ea8aff55bbb0be7e6030a6b0476f5bf981ca9bc341"
+      "operations": 26,
+      "sha256": "f95d55c092403de4ae089f580b25d8f2d0f24fcd107c21b2d5de8d09d1024e32"
     },
     {
       "capability": "proxy.front",
@@ -142,7 +142,7 @@
       ],
       "openapi": "proxy.front/v1/openapi.json",
       "operations": 3,
-      "sha256": "6818d45870d3a14f67310ca1fa083913332a9cfee740b23754d561193f5e7f5d"
+      "sha256": "76b1f761c52ce874366539acdeaf8a7dca4f64ff4c9b18fc8e50cae10d99c4b7"
     },
     {
       "capability": "quality.sync",
@@ -154,7 +154,7 @@
       ],
       "openapi": "quality.sync/v1/openapi.json",
       "operations": 4,
-      "sha256": "84c4cf3d4de5eea606dc1d12435f0d08e7fecc8349d43711759cba7ada93363a"
+      "sha256": "9faab433552b7ceae64a17f39358f48354e74ec6c3004de80f063900fe0fa844"
     },
     {
       "capability": "dashboard.show",
@@ -166,7 +166,7 @@
       ],
       "openapi": "dashboard.show/v1/openapi.json",
       "operations": 2,
-      "sha256": "a0ea07bf4ab7eba2bb2298f47c864468fb9098c62ed7ccb498e2d171a8fb5b6d"
+      "sha256": "f1fd5d627a9b199a81df1f39822017d1bdf7b133d25c01b2d57194cb797464e3"
     },
     {
       "capability": "archive.extract",
@@ -178,7 +178,7 @@
       ],
       "openapi": "archive.extract/v1/openapi.json",
       "operations": 2,
-      "sha256": "a986458003b5ab27f69c927ba25692f1815c6b8d2f760e2c7b7bac915ffca102"
+      "sha256": "b6cc816ab83a52073e733cda9bd1af0ee5d1accb097ad4be35918cb2b6e1d7bb"
     },
     {
       "capability": "stream.guard",
@@ -190,7 +190,7 @@
       ],
       "openapi": "stream.guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "aba877de23bc4752bf2cd989cb45474837b5e0c4071a0d9fb1d1e606685dc13b"
+      "sha256": "0c165e1edbf8fb751e63b8b72c6b2e4a9c8fb679beb51223ac2e53209fede539"
     },
     {
       "capability": "invite.decline",
@@ -202,7 +202,7 @@
       ],
       "openapi": "invite.decline/v1/openapi.json",
       "operations": 6,
-      "sha256": "52b56a0de7e40a6c32ba70c51afb5f6d454cd1f9291ee8b7e096f2b569e0fec5"
+      "sha256": "1d38842212cec4bc9a7cf0af0edad921074e3f3aeb1313abc580c052f4c49d59"
     },
     {
       "capability": "request.gate",
@@ -214,7 +214,7 @@
       ],
       "openapi": "request.gate/v1/openapi.json",
       "operations": 4,
-      "sha256": "1894164f5b81a4b0fddd7bd40a673612037e9b298cadfeae7ce724221c41b2cd"
+      "sha256": "0be5865596400413e679e1eaae34317c151f8e362040f3b3a3de5d327fd97580"
     },
     {
       "capability": "owner.claim",
@@ -226,7 +226,7 @@
       ],
       "openapi": "owner.claim/v1/openapi.json",
       "operations": 2,
-      "sha256": "3be65a2b6ef1e45610242784f55463a77860a542017621660f0e7ce1543d2106"
+      "sha256": "76f54846c6b40417d018a0959681fe88a2910239bd376def97c8fa7c3ec7f30c"
     }
   ]
 }

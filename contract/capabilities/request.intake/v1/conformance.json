@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "establish"
+      "operation": "establish",
+      "since": 0
     },
     {
       "asked": {
@@ -32,7 +33,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "establish"
+      "operation": "establish",
+      "since": 0
     },
     {
       "asked": {},
@@ -42,7 +44,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "initialized"
+      "operation": "initialized",
+      "since": 0
     },
     {
       "asked": {
@@ -63,7 +66,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "configure_identity"
+      "operation": "configure_identity",
+      "since": 0
     },
     {
       "asked": {},
@@ -73,7 +77,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "answers"
+      "operation": "answers",
+      "since": 0
     },
     {
       "asked": {},
@@ -83,7 +88,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "requests"
+      "operation": "requests",
+      "since": 0
     },
     {
       "asked": {
@@ -97,7 +103,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "link_members"
+      "operation": "link_members",
+      "since": 0
     },
     {
       "asked": {
@@ -109,7 +116,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "member_for"
+      "operation": "member_for",
+      "since": 0
     },
     {
       "asked": {
@@ -121,7 +129,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "requesting"
+      "operation": "requesting",
+      "since": 0
     },
     {
       "asked": {
@@ -133,7 +142,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "approval_first"
+      "operation": "approval_first",
+      "since": 0
     },
     {
       "asked": {
@@ -145,7 +155,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "remove_member"
+      "operation": "remove_member",
+      "since": 0
     },
     {
       "asked": {},
@@ -155,7 +166,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "telling"
+      "operation": "telling",
+      "since": 0
     },
     {
       "asked": {
@@ -173,7 +185,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "tell"
+      "operation": "tell",
+      "since": 0
     },
     {
       "asked": {
@@ -200,7 +213,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "add_fulfilment_target"
+      "operation": "add_fulfilment_target",
+      "since": 0
     },
     {
       "asked": {},
@@ -210,7 +224,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "fulfilment_targets"
+      "operation": "fulfilment_targets",
+      "since": 0
     },
     {
       "asked": {
@@ -237,7 +252,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "move_fulfilment_target"
+      "operation": "move_fulfilment_target",
+      "since": 0
     },
     {
       "asked": {
@@ -255,7 +271,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "test_fulfilment_target"
+      "operation": "test_fulfilment_target",
+      "since": 0
     },
     {
       "asked": {},
@@ -265,7 +282,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "media_server_link"
+      "operation": "media_server_link",
+      "since": 0
     },
     {
       "asked": {
@@ -282,7 +300,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "link_media_server"
+      "operation": "link_media_server",
+      "since": 0
     },
     {
       "asked": {},
@@ -292,7 +311,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "asking"
+      "operation": "asking",
+      "since": 0
     },
     {
       "asked": {
@@ -310,7 +330,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "set_asking"
+      "operation": "set_asking",
+      "since": 0
     },
     {
       "asked": {
@@ -322,7 +343,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "left"
+      "operation": "left",
+      "since": 0
     },
     {
       "asked": {
@@ -338,7 +360,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "set_quota"
+      "operation": "set_quota",
+      "since": 0
     },
     {
       "asked": {
@@ -351,7 +374,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "approves_own"
+      "operation": "approves_own",
+      "since": 0
     },
     {
       "asked": {
@@ -364,7 +388,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "decide"
+      "operation": "decide",
+      "since": 0
     },
     {
       "asked": {
@@ -376,7 +401,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "hold_requests"
+      "operation": "hold_requests",
+      "since": 0
     },
     {
       "asked": {
@@ -391,7 +417,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "release_requests"
+      "operation": "release_requests",
+      "since": 0
     },
     {
       "asked": {
@@ -403,7 +430,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "reachable"
+      "operation": "reachable",
+      "since": 0
     },
     {
       "asked": {
@@ -417,7 +445,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "set_notices"
+      "operation": "set_notices",
+      "since": 0
     },
     {
       "asked": {
@@ -433,7 +462,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "search"
+      "operation": "search",
+      "since": 0
     },
     {
       "asked": {
@@ -447,7 +477,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "detail"
+      "operation": "detail",
+      "since": 0
     },
     {
       "asked": {
@@ -464,7 +495,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "ask"
+      "operation": "ask",
+      "since": 0
     }
   ],
   "major": 1

@@ -7,23 +7,23 @@
     },
     {
       "path": "request.gate/v1/operations/admit.json",
-      "sha256": "fa838a9a832bd3e43f0b6bc63ae84d8c33da6db61d3a75ff222c93562703305e"
+      "sha256": "2b274697155880643af4c7e6382dbcdb32f87749966c0a0fcff38c1fa228ece2"
     },
     {
       "path": "request.gate/v1/operations/admitted.json",
-      "sha256": "64ec38d6243ead0e6f69cae5ad1f285d3c996c58e033bdf1de5678e0f013c322"
+      "sha256": "d8810cb0f0875b962a0bbd4f57702676c243dcbfcd96e9d7bb17174c677c0245"
     },
     {
       "path": "request.gate/v1/operations/admit_tokens.json",
-      "sha256": "45b8ce28362d9cbc6af2f45f7fd68a86d790bab3a5b0590b2d3dbabd9838f3ee"
+      "sha256": "95a00a7553e541d5ea852a947e894454042426c341796d76b868984833dc30c3"
     },
     {
       "path": "request.gate/v1/operations/record.json",
-      "sha256": "19d738a1b3e9c11e02be8d2cd6193c3471089669f39594b50adf136fbba18882"
+      "sha256": "29f108b9123f91686636b505ae3561dda7823a15c64d6377b673707aa33e92ba"
     },
     {
       "path": "request.gate/v1/conformance.json",
-      "sha256": "9a36f569007e68d637045cee76242d30253a9b8ea72202f699ac816ec23a0cd7"
+      "sha256": "30345d96017cb969ec93bdcedea2351529e7dcb0db7c409a865208fedda40d5c"
     },
     {
       "path": "request.gate/v1/holds.json",

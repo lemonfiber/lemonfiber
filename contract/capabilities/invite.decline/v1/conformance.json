@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "hold"
+      "operation": "hold",
+      "since": 0
     },
     {
       "asked": {
@@ -26,7 +27,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "hold"
+      "operation": "hold",
+      "since": 0
     },
     {
       "asked": {},
@@ -36,7 +38,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "held"
+      "operation": "held",
+      "since": 0
     },
     {
       "asked": {
@@ -59,7 +62,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "apply_invitations"
+      "operation": "apply_invitations",
+      "since": 0
     },
     {
       "asked": {},
@@ -69,7 +73,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "refusals"
+      "operation": "refusals",
+      "since": 0
     },
     {
       "asked": {},
@@ -79,7 +84,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "lapses"
+      "operation": "lapses",
+      "since": 0
     },
     {
       "asked": {},
@@ -89,7 +95,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "page"
+      "operation": "page",
+      "since": 0
     }
   ],
   "major": 1

@@ -11,7 +11,8 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "watch"
+      "operation": "watch",
+      "since": 0
     },
     {
       "asked": {
@@ -30,7 +31,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "watch"
+      "operation": "watch",
+      "since": 0
     },
     {
       "asked": {},
@@ -40,7 +42,8 @@
       },
       "keyed": true,
       "live": false,
-      "operation": "working"
+      "operation": "working",
+      "since": 0
     }
   ],
   "major": 1
