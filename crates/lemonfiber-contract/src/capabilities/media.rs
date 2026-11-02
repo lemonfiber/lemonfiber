@@ -11,7 +11,7 @@
 
 use lemonfiber_ports::media::{Kind, MEDIA};
 use lemonfiber_ports::service::{
-    AppKeys, Applied, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
+    AppKeys, Applied, Astray, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
     Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture, Playback,
     Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
@@ -134,6 +134,8 @@ crate::contract! {
             fn answers_to(str key: &str) -> () where asks = Asked { key: minted() };
             /// Revoke a key.
             fn revoke(str key: &str) -> () where asks = Asked { key: minted() };
+            /// What it holds under an app's name that is no key it made.
+            fn astray(str app: &str) -> Vec<Astray> where asks = Asked { app: APP.to_owned() };
         }
         impl Fronted {
             /// The addresses trusted to name the client.

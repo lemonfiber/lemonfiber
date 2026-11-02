@@ -16,6 +16,7 @@
 
 pub mod acknowledged;
 mod asking;
+pub mod astray;
 pub mod autostart;
 pub mod bindings;
 pub mod bridging;

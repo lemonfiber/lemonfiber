@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use crate::app::targets::{committed_bytes, curator_targets, host_fillers};
 use crate::app::Ctx;
+use crate::doctor::astray::{AstrayCheck, Named};
 use crate::doctor::credentials::CredentialsCheck;
 use crate::doctor::declining::{Dating, Decline, DeclineKeyCheck, KeyDates};
 use crate::doctor::deferred::Deferred;
@@ -110,6 +111,27 @@ pub(super) fn declined(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> D
     Deferred::new(Category::Services, CHECK_BUDGET, move || {
         let (ctx, manifest) = (ctx.clone(), manifest.clone());
         async move { Box::new(DeclineKeyCheck::new(decline(&ctx, &manifest).await)) as Box<dyn Check> }
+    })
+}
+
+/// What the media server holds under the names the core mints keys under that lemonfiber
+/// did not make, built when it runs, so the media server is asked over its contract.
+pub(super) fn astray(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    Deferred::new(Category::Services, CHECK_BUDGET, move || {
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
+        async move {
+            let named = crate::app::targets::served_by(&ctx, &manifest).map(|id| Named {
+                name: crate::app::targets::server_named(&ctx, &manifest)
+                    .unwrap_or_else(|| id.clone()),
+                id,
+            });
+            let served = crate::app::targets::serving(&ctx, &manifest).await;
+            Box::new(AstrayCheck::new(
+                named,
+                served.map(|server| server as Arc<dyn crate::ports::service::AppKeys>),
+            )) as Box<dyn Check>
+        }
     })
 }
 

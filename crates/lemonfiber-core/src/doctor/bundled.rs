@@ -14,10 +14,11 @@
 /// second rule exists because the first is a property of two naming conventions
 /// staying disjoint, which is a rule with an undefended edge.
 ///
-/// **A name ending in a dot is a family, and everything under it is taken.** Six of
-/// these are: an account, an indexer, a curating service, a credential, a series and a
-/// service claimed first each get a finding of their own, and how many there are is the
-/// operator's configuration or library rather than this build's. The rest are whole names.
+/// **A name ending in a dot is a family, and everything under it is taken.** Seven of
+/// these are: an account, an indexer, a curating service, a credential, a series, a
+/// service claimed first and what the media server holds under a stack service's name each
+/// get a finding of their own, and how many there are is the operator's configuration or
+/// library rather than this build's. The rest are whole names.
 ///
 /// Held to the checks themselves by the guard below, which reads the modules that emit
 /// them: a list nobody compares against the code is a list that goes stale in the one
@@ -44,6 +45,8 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "providers.indexers",
     "providers.usenet",
     "providers.usenet.",
+    "services.astray",
+    "services.astray.",
     "services.decline-key",
     "services.move-offered",
     "services.quality-guides",

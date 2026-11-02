@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    Addressee, Answers, AppKeys, Applied, BytePath, Dated, Declared, Declaring, Encrypting,
+    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
     EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
     Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, Picture,
     Playback, Ports, Presentation, Question, Screening, SeasonDetail, SeriesHeld, Statuses, Token,
@@ -173,6 +173,13 @@ impl AppKeys for Upstream {
     async fn revoke(&self, key: &str) -> Result<(), Failure> {
         self.tell(format!("revoke {key}"));
         Ok(())
+    }
+    async fn astray(&self, app: &str) -> Result<Vec<Astray>, Failure> {
+        Ok(vec![Astray {
+            id: "7".to_owned(),
+            name: app.to_owned(),
+            removed_in: "Settings".to_owned(),
+        }])
     }
 }
 

@@ -107,6 +107,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `CRED-2` | `INDEXER_REJECTED` | error | 1 | 500 | 0.2.0 | Raised when the indexer answers and refuses the key it was given. |
 | `CRED-3` | `INDEXER_LIMITED` | warning | 1 | 500 | 0.2.0 | Raised when the indexer authenticates the key but cannot serve it right now. |
 | `CRED-4` | `REPLACEMENT_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where a replacement of the media server's internal certificate answers an offer that is not the one a fresh reading builds. |
+| `CRED-5` | `ASTRAY` | warning | 1 | 500 | 0.18.0 | Raised where the media server holds a key or account under one of the stack's services' names that lemonfiber did not make or no longer knows. |
 
 ## `DECLINE` — the service that answers an invitation's decline
 

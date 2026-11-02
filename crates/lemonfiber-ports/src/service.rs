@@ -75,7 +75,7 @@ pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use filing::{Filed, Filing};
-pub use fronting::{AppKeys, Dated, Fronted};
+pub use fronting::{AppKeys, Astray, Dated, Fronted};
 pub use furnishing::{FiledAt, Furnished, Furnishing};
 pub use gating::{Admitted, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target};
 pub use guarding::{Guarded, Guarding, Presented};

@@ -13,6 +13,9 @@ pub const DECLINE_APP: &str = "lemonfiber-decline";
 /// The name the request gate's key is filed under.
 pub const GATE_APP: &str = "lemonfiber-request-gate";
 
+/// Every name the core mints a key under.
+pub const MINTED_FOR: &[&str] = &[DECLINE_APP, GATE_APP];
+
 /// Revoke the key filed under lemonfiber's own name, where there is one, and answer
 /// whether there was.
 ///

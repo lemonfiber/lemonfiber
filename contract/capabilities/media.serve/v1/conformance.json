@@ -228,6 +228,18 @@
       "operation": "revoke"
     },
     {
+      "asked": {
+        "app": "lemonfiber-conformance"
+      },
+      "case": "astray-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "astray"
+    },
+    {
       "asked": {},
       "case": "known_proxies-answers",
       "expect": {

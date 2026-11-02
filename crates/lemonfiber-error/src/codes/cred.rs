@@ -39,4 +39,17 @@ codes! {
             since it was read, so nothing was replaced.",
         remedy: "Read the replacement again, and answer the offer it gives now.",
     }
+    /// Raised where the media server holds a key or account under one of the stack's
+    /// services' names that lemonfiber did not make or no longer knows.
+    ASTRAY = "CRED-5" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "The media server holds a key or account under the name of one of the stack's \
+            own services, and lemonfiber did not make it or no longer knows it. lemonfiber \
+            leaves it alone: it uses and removes only what it made, so one it does not know \
+            stays until somebody removes it. The message names the media server, what it holds \
+            and where in the media server it is removed.",
+        remedy: "If nobody here made it, remove it in the media server where the message says.",
+    }
 }
