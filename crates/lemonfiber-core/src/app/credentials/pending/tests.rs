@@ -210,5 +210,10 @@ fn a_replacement_is_pending_where_the_store_or_an_unfiled_line_holds_one() {
     let unfiled = pending_in("pending-unfiled").build();
     let env = unfiled.settings.env_file.clone().unwrap_or_default();
     assert!(config::store::set(&env, &pending(setting), "replacement").is_ok());
-    assert!(is_any_pending(&unfiled));
+    assert!(
+        !is_any_pending(&unfiled),
+        "a line no run has filed is not read"
+    );
+    assert!(is_any_pending(&unfiled.clone().rehearsing()));
+    assert!(is_any_pending(&crate::test_support::filed(unfiled)));
 }

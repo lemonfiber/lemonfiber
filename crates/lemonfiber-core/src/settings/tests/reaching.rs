@@ -26,7 +26,7 @@ fn registered(machine: &Machine, installed: Installed) {
 
 fn crossed(name: &str, engine: Reporting) -> (Machine, [Installed; 1]) {
     let machine = machine(name, engine);
-    assert!(store::set(&machine.env, CROSSING, "replacement-key").is_ok());
+    crate::test_support::recorded_as(&machine.env, CROSSING, "replacement-key");
     (machine, [crate::test_support::a_crossing_reader()])
 }
 
@@ -252,7 +252,7 @@ async fn a_stack_parts_crossing_key_is_listed_as_granted() {
 async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
     let machine = machine("set-by-hand", Reporting::absent());
     registered(&machine, crate::test_support::a_trusted_crossing_reader());
-    assert!(store::set(&machine.env, CROSSING, "the-replaced-key").is_ok());
+    crate::test_support::recorded_as(&machine.env, CROSSING, "the-replaced-key");
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=the-replaced-key\n").is_ok());
 
@@ -425,7 +425,7 @@ async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
 async fn a_crossing_key_put_back_by_an_undo_reaches_every_file_that_reads_it() {
     let machine = machine("restored", Reporting::absent());
     registered(&machine, crate::test_support::a_trusted_crossing_reader());
-    assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
+    crate::test_support::recorded_as(&machine.env, CROSSING, "put-back");
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=undone\n").is_ok());
     let carried = crate::app::recover::Carried {
@@ -467,7 +467,7 @@ pub(super) fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) 
 async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
     let machine = machine("set-unwritten", Reporting::absent());
     registered(&machine, crate::test_support::a_trusted_crossing_reader());
-    assert!(store::set(&machine.env, CROSSING, "recorded").is_ok());
+    crate::test_support::recorded_as(&machine.env, CROSSING, "recorded");
     unwritable_files(&machine);
 
     let set = crate::app::configuring::set(
@@ -485,7 +485,7 @@ async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
 async fn a_crossing_key_put_back_that_cannot_reach_its_reader_is_refused() {
     let machine = machine("restored-unwritten", Reporting::absent());
     registered(&machine, crate::test_support::a_trusted_crossing_reader());
-    assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
+    crate::test_support::recorded_as(&machine.env, CROSSING, "put-back");
     unwritable_files(&machine);
     let carried = crate::app::recover::Carried {
         done: vec![crate::journal::Undo {

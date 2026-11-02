@@ -65,7 +65,7 @@ async fn changing(ctx: &Ctx, key: &str, value: &str, confirmed: bool) -> Option<
 fn on_disk(path: &Path, key: &str) -> Option<String> {
     store::read(path)
         .ok()
-        .map(|file| lemonfiber_core::stored_over(path, file))
+        .map(|file| lemonfiber_core::stored_over(&ctx(path.to_path_buf()), file))
         .and_then(|file| file.get(key).map(str::to_owned))
 }
 

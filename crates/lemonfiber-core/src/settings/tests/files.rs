@@ -1,6 +1,5 @@
 use crate::app::Ctx;
 use crate::config::env::quoted;
-use crate::config::store;
 use crate::plugin::{Holding, Variable};
 use crate::test_support::{a_context, env_without_password, A_MINTED_KEY};
 
@@ -72,7 +71,7 @@ fn every_value_reads_back_as_exactly_itself_so_compose_substitutes_nothing() {
 fn a_secret_nothing_holds_or_that_may_not_cross_is_left_out() {
     let ctx = machine("unheld");
     let env = ctx.settings.env_file.clone().unwrap_or_default();
-    assert!(store::set(&env, "SONARR_API_KEY", "abc").is_ok());
+    crate::test_support::recorded_as(&env, "SONARR_API_KEY", "abc");
     let text = crate::settings::text(
         &ctx,
         &[

@@ -153,6 +153,29 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     path
 }
 
+/// `ctx`, with what its environment files hold filed into the stores, as every run files
+/// them before anything of it reads them.
+pub(crate) fn filed(ctx: crate::app::Ctx) -> crate::app::Ctx {
+    crate::settings::filing::filed(&ctx);
+    let _ = crate::settings::filing::stack(&ctx);
+    let _ = crate::settings::filing::credentials(&ctx);
+    ctx
+}
+
+/// `value` recorded under `key` where lemonfiber records it: in the secret store beside
+/// the environment file `env` where `key` names a credential, and in the file otherwise.
+#[track_caller]
+pub(crate) fn recorded_as(env: &std::path::Path, key: &str, value: &str) {
+    if crate::settings::legacy::held_as(key).is_some() {
+        held_secret(env, key, value);
+    } else {
+        assert!(
+            crate::config::store::set(env, key, value).is_ok(),
+            "the scratch environment file records {key}"
+        );
+    }
+}
+
 /// `value` held in the secret store beside the environment file `env`, under the name the
 /// store holds the credential `key` as, the way lemonfiber records one.
 #[track_caller]

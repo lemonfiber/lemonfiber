@@ -99,7 +99,7 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = store::set(
+    crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "the-stacks-administrator",
@@ -148,7 +148,7 @@ async fn identity_leaves_an_already_set_up_household_alone() {
     }
     // The media server's password was recorded on an earlier run, and both services are
     // already set up: nothing is minted and nothing re-pointed.
-    let _ = store::set(
+    crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
@@ -178,7 +178,7 @@ async fn a_recorded_password_is_handed_to_the_adapter_and_a_rehearsal_hands_noth
         if let Some(parent) = env.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let _ = store::set(
+        crate::test_support::recorded_as(
             &env,
             crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
             "minted-earlier",
@@ -215,7 +215,7 @@ async fn a_recorded_password_the_adapter_cannot_be_handed_fails_the_identity() {
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = store::set(
+    crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
@@ -460,7 +460,7 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = store::set(
+    crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
@@ -516,7 +516,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = store::set(
+    crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",

@@ -107,7 +107,7 @@ async fn settings(
     // operator is shown is the difference between this file and the one proposed, and a
     // file read afterwards is already the answer to the question.
     let held = match store::read(path) {
-        Ok(file) => crate::settings::legacy::overlaid(path, file),
+        Ok(file) => crate::settings::legacy::overlaid(ctx, file),
         Err(err) => return Err(Box::new(err.problem())),
     };
 
@@ -144,8 +144,7 @@ async fn settings(
             .map(|one| one.plugin.clone())
             .collect()
     });
-    let kept = crate::settings::Secrets::at(&path.with_file_name(crate::config::paths::SECRETS))
-        .unwrap_or_default();
+    let kept = crate::settings::Stores::of(ctx).secrets;
     let keyed = |value: &str| kept.keyed(value);
     let settings = store::shown(&file)
         .into_iter()

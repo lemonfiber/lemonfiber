@@ -9,13 +9,10 @@ use crate::config::store::{self, Failure};
 use crate::error::{Diagnose as _, Problem};
 use crate::plugin::{Holding, Installed, Placed, Variable};
 
-use super::{Resolved, Secrets};
+use super::Resolved;
 
 pub(crate) fn text(ctx: &Ctx, variables: &[Variable]) -> Result<String, Failure> {
-    let secrets = super::secrets_at(ctx)
-        .map(|at| Secrets::at(&at))
-        .transpose()?
-        .unwrap_or_default();
+    let secrets = super::Stores::read(ctx)?.secrets;
     Ok(variables
         .iter()
         .filter_map(|variable| {

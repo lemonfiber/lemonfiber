@@ -29,7 +29,7 @@ fn granting(name: &str, installed: Installed) -> Machine {
 /// the engine reporting `engine`.
 fn granting_on(name: &str, installed: Installed, engine: Reporting) -> Machine {
     let machine = machine(name, engine);
-    assert!(store::set(&machine.env, CROSSING, "series-key").is_ok());
+    crate::test_support::recorded_as(&machine.env, CROSSING, "series-key");
     let mut register = Register::empty();
     assert!(register.record(installed).is_ok());
     assert!(std::fs::write(

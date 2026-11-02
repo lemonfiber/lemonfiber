@@ -354,9 +354,7 @@ pub(crate) fn upstream_anew(
     stack: &Path,
     placed: &Placed,
 ) -> Result<(), String> {
-    let secrets = crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .unwrap_or_default();
+    let secrets = crate::settings::Stores::of(ctx).secrets;
     let held = |id: &str| {
         secrets
             .value(&crate::settings::named(&installed.plugin, id))

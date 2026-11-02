@@ -164,9 +164,7 @@ impl<'i> Coded<'i> {
 
 /// The secret store as it is now; empty where there is none.
 fn held(ctx: &Ctx) -> crate::settings::Secrets {
-    crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .unwrap_or_default()
+    crate::settings::Stores::of(ctx).secrets
 }
 
 /// Where the secret store is.

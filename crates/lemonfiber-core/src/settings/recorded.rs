@@ -1,32 +1,36 @@
 use crate::app::Ctx;
 use crate::config::env::EnvFile;
-use crate::config::paths::SETTINGS;
 
-use super::{legacy, Settings};
+use super::{legacy, Stores};
 
+/// What this run reads as recorded: the stores, and lemonfiber's own lines of the
+/// environment file, which hold no setting and no secret.
 #[derive(Debug, Default)]
 pub(crate) struct Recorded {
     env: EnvFile,
-    settings: Settings,
+    stores: Stores,
 }
 
 impl Recorded {
     pub(crate) fn of(ctx: &Ctx) -> Self {
-        let file = ctx.settings.env_file.as_deref();
         Self {
-            env: file
+            env: ctx
+                .settings
+                .env_file
+                .as_deref()
                 .and_then(|file| crate::config::store::read(file).ok())
+                .map(legacy::unstored)
                 .unwrap_or_default(),
-            settings: file
-                .and_then(|file| Settings::at(&file.with_file_name(SETTINGS)).ok())
-                .unwrap_or_default(),
+            stores: Stores::of(ctx),
         }
     }
 
     pub(crate) fn value(&self, name: &str) -> Option<&str> {
-        self.settings
-            .value(name)
-            .or_else(|| legacy::value(&self.env, name))
+        self.stores.settings.value(name)
+    }
+
+    pub(crate) fn holds_secret(&self, name: &str) -> bool {
+        self.stores.secrets.value(name).is_some()
     }
 
     pub(crate) const fn env(&self) -> &EnvFile {

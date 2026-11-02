@@ -316,8 +316,9 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
         "admin-unrecordable",
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
-    sealed(&env);
     let http = administered(media::taken());
+    lemonfiber_core::filed(&moved(env.clone(), http.clone())).await;
+    sealed(&env);
 
     let (said, _, _) = rotated_over(&env, "media server administrator", http.clone()).await;
 

@@ -241,10 +241,11 @@ fn only_a_credential_is_held_as_a_secret() {
     }
 }
 
-/// The secret store answers for a credential before any copy an earlier release left in
-/// the environment file, and the file is read only for one no run has filed yet.
+/// The secret store alone answers for a credential: a copy an earlier release left in the
+/// environment file is never read, filed or not, except by a rehearsal, which reads what
+/// filing would keep.
 #[test]
-fn the_store_answers_for_a_credential_before_the_environment_file() {
+fn the_store_alone_answers_for_a_credential_and_a_line_is_read_only_as_filing_would_keep_it() {
     let (held, stale) = (value("held"), value("stale"));
     let ctx = machine("answered", &[("INDEXER_APIKEY", &stale), (ADMIN, &stale)]);
     crate::test_support::held_secret(&env(&ctx), "INDEXER_APIKEY", &held);
@@ -255,12 +256,23 @@ fn the_store_answers_for_a_credential_before_the_environment_file() {
     );
     assert_eq!(
         crate::app::targets::recorded_secret(&ctx, ADMIN),
-        Some(stale),
-        "one no run has filed yet is read where it is"
+        None,
+        "one no run has filed yet is not read where it is"
+    );
+    assert_eq!(
+        crate::app::targets::recorded_secret(&ctx.clone().rehearsing(), ADMIN),
+        Some(stale.clone()),
+        "a rehearsal reads it as filing would keep it"
+    );
+    assert_eq!(
+        crate::app::targets::recorded_secret(&ctx.clone().rehearsing(), "INDEXER_APIKEY"),
+        Some(held.clone()),
+        "and filing keeps nothing over what the store holds"
     );
     let file = store::read(&env(&ctx)).unwrap_or_default();
     assert_eq!(
-        crate::settings::legacy::overlaid(&env(&ctx), file).get("INDEXER_APIKEY"),
+        crate::settings::legacy::answered(&crate::settings::Stores::beside(&env(&ctx)), file)
+            .get("INDEXER_APIKEY"),
         Some(held.as_str()),
         "what every reader of the name is handed"
     );

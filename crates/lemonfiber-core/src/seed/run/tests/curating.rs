@@ -301,19 +301,19 @@ fn a_recorded_password_is_read_back_or_read_as_absent() {
     let path = config_scratch("qbt-readback");
     let ctx = seed_ctx(true, None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
-    let _ = store::set(&path, "SOMETHING_ELSE", "x");
+    crate::test_support::recorded_as(&path, "SOMETHING_ELSE", "x");
     assert!(
         recorded_secret(&ctx, "DOWNLOAD_TORRENT_PASSWORD").is_none(),
         "no password recorded"
     );
     // An empty value is not a password.
-    let _ = store::set(&path, "DOWNLOAD_TORRENT_PASSWORD", "");
+    crate::test_support::recorded_as(&path, "DOWNLOAD_TORRENT_PASSWORD", "");
     assert!(
         recorded_secret(&ctx, "DOWNLOAD_TORRENT_PASSWORD").is_none(),
         "an empty value is absent"
     );
     // The value recorded on an earlier run is handed back.
-    let _ = store::set(&path, "DOWNLOAD_TORRENT_PASSWORD", "minted-earlier");
+    crate::test_support::recorded_as(&path, "DOWNLOAD_TORRENT_PASSWORD", "minted-earlier");
     assert_eq!(
         recorded_secret(&ctx, "DOWNLOAD_TORRENT_PASSWORD").as_deref(),
         Some("minted-earlier")

@@ -23,7 +23,7 @@ pub(super) async fn refusal(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -
     if key == OVERLAY_KEY {
         return Some(retired(ctx));
     }
-    if !known(ctx.stack, held, key).await {
+    if !known(ctx, held, key).await {
         return Some(format!(
             "neither lemonfiber nor the stack reads a setting called {key}, so it is not written"
         ));
@@ -40,13 +40,15 @@ pub(super) async fn refusal(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -
 }
 
 /// Whether anything reads `key`: lemonfiber itself, the stack's own declaration of what
-/// it reads, or the file already, where seeding or a plugin put it.
+/// it reads, or the file or the secret store already, where seeding or a plugin put it.
 ///
-/// The stack's declaration is read only where neither of the others answers.
-async fn known(stack: Source, held: &EnvFile, key: &str) -> bool {
+/// The stack's declaration is read only where none of the others answers.
+async fn known(ctx: &Ctx, held: &EnvFile, key: &str) -> bool {
     SETTINGS.contains(&key)
         || held.get(key).is_some()
-        || declared(stack).await.iter().any(|one| one == key)
+        || crate::settings::legacy::held_as(key)
+            .is_some_and(|name| crate::app::targets::stored_secret(ctx, &name).is_some())
+        || declared(ctx.stack).await.iter().any(|one| one == key)
 }
 
 /// Every setting the stack declares it reads: the embedded stack's are the names

@@ -1,7 +1,7 @@
 name: lemonfiber
 services:
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:v3.5.2@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
+    image: ghcr.io/flaresolverr/flaresolverr@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
     profiles:
     - search
     restart: unless-stopped
@@ -27,7 +27,7 @@ services:
     - KILL
     pids_limit: 1024
   audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
+    image: ghcr.io/advplyr/audiobookshelf@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
     profiles:
     - media
     restart: unless-stopped
@@ -54,7 +54,7 @@ services:
     - KILL
     pids_limit: 1024
   bazarr:
-    image: lscr.io/linuxserver/bazarr:v1.6.2-ls367@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
+    image: lscr.io/linuxserver/bazarr@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
     profiles:
     - subs
     restart: unless-stopped
@@ -82,7 +82,7 @@ services:
     - KILL
     pids_limit: 1024
   bindery:
-    image: ghcr.io/vavallee/bindery:v1.43.1@sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489
+    image: ghcr.io/vavallee/bindery@sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489
     profiles:
     - books
     restart: unless-stopped
@@ -113,7 +113,7 @@ services:
     - KILL
     pids_limit: 1024
   caddy:
-    image: ghcr.io/lemonfiber/caddy:main-7e36d4e7166c@sha256:6fb83b5215f34ce6c48d81bc4b42f2ca973343b5a330c46463f470e189bbc147
+    image: ghcr.io/lemonfiber/caddy@sha256:6fb83b5215f34ce6c48d81bc4b42f2ca973343b5a330c46463f470e189bbc147
     profiles:
     - proxy
     restart: unless-stopped
@@ -142,7 +142,7 @@ services:
     - KILL
     pids_limit: 1024
   calibre-web-automated:
-    image: crocodilestick/calibre-web-automated:V3.1.4@sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd
+    image: crocodilestick/calibre-web-automated@sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd
     profiles:
     - media
     restart: unless-stopped
@@ -170,7 +170,7 @@ services:
     - KILL
     pids_limit: 1024
   decline:
-    image: ghcr.io/lemonfiber/decline:main-41947a4c7bbf@sha256:ee908ae2c4cb7d41682f4d8410c65dc6a09038a75a1153a037d6292c89f6a6e8
+    image: ghcr.io/lemonfiber/decline@sha256:ee908ae2c4cb7d41682f4d8410c65dc6a09038a75a1153a037d6292c89f6a6e8
     profiles:
     - media
     restart: unless-stopped
@@ -192,7 +192,7 @@ services:
     read_only: true
     mem_limit: 64m
   door:
-    image: ghcr.io/lemonfiber/door:main-5b65b742fdf9@sha256:e8fa70c407ba25320f0a8606681837b6bdc1cecad7c4b649639de32afebb2def
+    image: ghcr.io/lemonfiber/door@sha256:e8fa70c407ba25320f0a8606681837b6bdc1cecad7c4b649639de32afebb2def
     profiles:
     - media
     restart: unless-stopped
@@ -216,7 +216,7 @@ services:
     pids_limit: 1024
     read_only: true
   gluetun:
-    image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
+    image: qmcgaw/gluetun@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
     profiles:
     - lemonfiber.waiting
     restart: unless-stopped
@@ -252,7 +252,7 @@ services:
     - /dev/net/tun:/dev/net/tun
     pids_limit: 1024
   homepage:
-    image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
+    image: ghcr.io/gethomepage/homepage@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
     profiles:
     - dash
     restart: unless-stopped
@@ -281,7 +281,7 @@ services:
     - KILL
     pids_limit: 1024
   jellyfin:
-    image: docker.io/jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
+    image: docker.io/jellyfin/jellyfin@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     profiles:
     - media
     restart: unless-stopped
@@ -311,7 +311,7 @@ services:
     - KILL
     pids_limit: 1024
   lidarr:
-    image: lscr.io/linuxserver/lidarr:2.14.5.4836-ls9@sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0
+    image: lscr.io/linuxserver/lidarr@sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0
     profiles:
     - music
     restart: unless-stopped
@@ -340,7 +340,7 @@ services:
     - KILL
     pids_limit: 1024
   navidrome:
-    image: ghcr.io/navidrome/navidrome:0.64.2@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
+    image: ghcr.io/navidrome/navidrome@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
     profiles:
     - media
     restart: unless-stopped
@@ -370,7 +370,7 @@ services:
     - KILL
     pids_limit: 1024
   nzbhydra2:
-    image: lscr.io/linuxserver/nzbhydra2:v8.9.0-ls104@sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516
+    image: lscr.io/linuxserver/nzbhydra2@sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516
     profiles:
     - search
     restart: unless-stopped
@@ -398,7 +398,7 @@ services:
     - KILL
     pids_limit: 1024
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls164@sha256:4e992f9b9229bc8c97c666b10b042a7360bce1d99b196e8aa29fd9805849cbf1
+    image: lscr.io/linuxserver/prowlarr@sha256:4e992f9b9229bc8c97c666b10b042a7360bce1d99b196e8aa29fd9805849cbf1
     profiles:
     - search
     restart: unless-stopped
@@ -427,7 +427,7 @@ services:
     - KILL
     pids_limit: 1024
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480@sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed
+    image: lscr.io/linuxserver/qbittorrent@sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed
     profiles:
     - lemonfiber.waiting
     restart: unless-stopped
@@ -457,7 +457,7 @@ services:
     - KILL
     pids_limit: 1024
   radarr:
-    image: lscr.io/linuxserver/radarr:5.28.0.10274-ls286@sha256:c984533510abe0219a70e80d15bd0d212b7df21baa0913759c4ce6cc9092240b
+    image: lscr.io/linuxserver/radarr@sha256:c984533510abe0219a70e80d15bd0d212b7df21baa0913759c4ce6cc9092240b
     profiles:
     - movies
     restart: unless-stopped
@@ -487,7 +487,7 @@ services:
     - KILL
     pids_limit: 1024
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:8.7.3@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9
+    image: ghcr.io/recyclarr/recyclarr@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9
     profiles:
     - tuning
     restart: unless-stopped
@@ -514,7 +514,7 @@ services:
     - KILL
     pids_limit: 1024
   request-gate:
-    image: ghcr.io/lemonfiber/request-gate:main-650998188bd8@sha256:35742d09dd9a4cb0c1421457ddc6ac004947a91e6a424233c8c116842c49972f
+    image: ghcr.io/lemonfiber/request-gate@sha256:35742d09dd9a4cb0c1421457ddc6ac004947a91e6a424233c8c116842c49972f
     profiles:
     - media
     restart: unless-stopped
@@ -532,7 +532,7 @@ services:
     read_only: true
     mem_limit: 64m
   sabnzbd:
-    image: lscr.io/linuxserver/sabnzbd:4.5.5-ls250@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
+    image: lscr.io/linuxserver/sabnzbd@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
     profiles:
     - usenet
     restart: unless-stopped
@@ -560,7 +560,7 @@ services:
     - KILL
     pids_limit: 1024
   seerr:
-    image: ghcr.io/seerr-team/seerr:v3.5.0@sha256:27602401178d54f1964442287b9f23f67a3fa2252645ee8065839ea1c3f69e45
+    image: ghcr.io/seerr-team/seerr@sha256:27602401178d54f1964442287b9f23f67a3fa2252645ee8065839ea1c3f69e45
     profiles:
     - media
     restart: unless-stopped
@@ -587,7 +587,7 @@ services:
     - KILL
     pids_limit: 1024
   sonarr:
-    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls327@sha256:dffc730adcb8b4f4342792fbb27fcad9c62fb8660523f2aeb082416980d7fe0c
+    image: lscr.io/linuxserver/sonarr@sha256:dffc730adcb8b4f4342792fbb27fcad9c62fb8660523f2aeb082416980d7fe0c
     profiles:
     - tv
     restart: unless-stopped
@@ -617,7 +617,7 @@ services:
     - KILL
     pids_limit: 1024
   unpackerr:
-    image: ghcr.io/hotio/unpackerr:release-0.15.2@sha256:724c702e81727e3d90c42cf2b3d900674203906a6d135ba07416c9a3f9f67fbb
+    image: ghcr.io/hotio/unpackerr@sha256:724c702e81727e3d90c42cf2b3d900674203906a6d135ba07416c9a3f9f67fbb
     profiles:
     - tuning
     restart: unless-stopped

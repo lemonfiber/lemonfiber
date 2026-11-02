@@ -95,8 +95,7 @@ pub(super) fn waiting_after(
     installed: &[Installed],
     changing: &std::collections::BTreeMap<&str, Option<&str>>,
 ) -> Vec<crate::model::Waiting> {
-    let recorded = super::recorded::Recorded::of(ctx);
-    let secrets = super::secrets_at(ctx).and_then(|at| super::Secrets::at(&at).ok());
+    let stores = super::Stores::of(ctx);
     let topology = crate::project::topology(
         manifest,
         installed,
@@ -108,13 +107,9 @@ pub(super) fn waiting_after(
         installed,
         &|name| match changing.get(name) {
             Some(value) => value.map(str::to_owned),
-            None => recorded.value(name).map(str::to_owned),
+            None => stores.settings.value(name).map(str::to_owned),
         },
-        &|name| {
-            secrets
-                .as_ref()
-                .is_some_and(|kept| kept.value(name).is_some())
-        },
+        &|name| stores.secrets.value(name).is_some(),
         &topology,
     )
 }

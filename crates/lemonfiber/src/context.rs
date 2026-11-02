@@ -40,7 +40,7 @@ pub(crate) async fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bo
         None => Source::Embedded(&STACK),
     };
 
-    let settings = read_settings();
+    let settings = read_settings(None);
     // Settled here rather than at each of the surfaces that explains something,
     // because it is a property of the run: the two places that build a context are
     // the only two that could be told, and neither can then be told wrong.
@@ -108,7 +108,7 @@ pub(crate) async fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bo
         ctx
     };
     lemonfiber_core::filed(&ctx).await;
-    ctx.settings = read_settings();
+    ctx.settings = read_settings(Some(&ctx));
     ctx
 }
 
@@ -152,19 +152,21 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
     }
 }
 
-/// The operator's settings, read from their file as it stands now.
+/// The operator's settings, read from their file as it stands now, with what the stores
+/// `run` reads hold for each name a setting or a secret was read into, and nothing for
+/// those names where there is no run to read them for yet.
 ///
 /// Read fresh rather than passed around, because setup writes the file mid-run:
 /// the settings this process started with predate what it just applied, and
 /// starting the stack against the stale set would run the wrong thing.
-pub(crate) fn read_settings() -> Settings {
+pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
     let env_file = configuration_file();
     let recorded = env_file
         .as_deref()
-        .and_then(|path| {
-            store::read(path)
-                .ok()
-                .map(|file| lemonfiber_core::stored_over(path, file))
+        .and_then(|path| store::read(path).ok())
+        .map(|file| match run {
+            Some(ctx) => lemonfiber_core::stored_over(ctx, file),
+            None => lemonfiber_core::unstored(file),
         })
         .unwrap_or_default();
 

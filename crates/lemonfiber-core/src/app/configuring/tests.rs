@@ -26,17 +26,19 @@ fn env_at(name: &str, contents: &str) -> std::path::PathBuf {
 
 /// A context over that file, for a stack that torrents.
 fn ctx(env_file: std::path::PathBuf) -> Ctx {
-    a_context()
-        .runner(Arc::new(crate::test_support::Scripted(Ok(
-            crate::test_support::spoke(""),
-        ))))
-        .settings(crate::config::Settings {
-            env_file: Some(env_file),
-            protocols: crate::config::Protocols::both(),
-            home: Some(std::path::PathBuf::from("/home/op")),
-            ..crate::config::Settings::default()
-        })
-        .build()
+    crate::test_support::filed(
+        a_context()
+            .runner(Arc::new(crate::test_support::Scripted(Ok(
+                crate::test_support::spoke(""),
+            ))))
+            .settings(crate::config::Settings {
+                env_file: Some(env_file),
+                protocols: crate::config::Protocols::both(),
+                home: Some(std::path::PathBuf::from("/home/op")),
+                ..crate::config::Settings::default()
+            })
+            .build(),
+    )
 }
 
 /// The same, reaching every service through a transport that answers `answer`.
@@ -77,7 +79,7 @@ fn stance(outcome: &Result<ConfigReport, Box<crate::error::Problem>>) -> Option<
 fn on_disk(path: &std::path::Path, key: &str) -> Option<String> {
     store::read(path)
         .ok()
-        .map(|file| crate::settings::legacy::overlaid(path, file))
+        .map(|file| crate::settings::legacy::answered(&crate::settings::Stores::beside(path), file))
         .and_then(|file| file.get(key).map(str::to_owned))
 }
 

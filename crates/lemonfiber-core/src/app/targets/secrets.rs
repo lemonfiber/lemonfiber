@@ -11,14 +11,12 @@ use crate::settings::legacy::held_as;
 use crate::settings::{Keeping, Source};
 
 /// What lemonfiber recorded under `key`, or nothing where nothing is recorded yet: a
-/// credential from the secret store, under the name it holds it as, and anything else
-/// from the environment file. The one reader for every credential lemonfiber records
+/// credential from the secret store alone, under the name it holds it as, and anything
+/// else from the environment file. The one reader for every credential lemonfiber records
 /// rather than reads from a service, so the read-back stays identical across them.
 ///
-/// A credential still in the environment file, where a run has not filed it yet, as on a
-/// rehearsal before the first run that does, is read there until it is. A credential
-/// named for what it reaches is read under the name an earlier release gave it while it
-/// has not moved yet.
+/// A credential named for what it reaches is read under the name an earlier release gave
+/// it while it has not moved yet.
 pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
     let file = ctx
         .settings
@@ -28,8 +26,10 @@ pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
         .unwrap_or_default();
     let held = |key: &str| {
         held_as(key)
-            .and_then(|name| stored_secret(ctx, &name))
-            .or_else(|| file.get(key).map(str::to_owned))
+            .map_or_else(
+                || file.get(key).map(str::to_owned),
+                |name| stored_secret(ctx, &name),
+            )
             .filter(|value| !value.is_empty())
     };
     held(key).or_else(|| earlier_credential(ctx, key).and_then(|earlier| held(&earlier)))
@@ -226,9 +226,10 @@ fn secret_changed(
 
 /// What the secret store holds under `name`, where it holds a value.
 pub(crate) fn stored_secret(ctx: &Ctx, name: &str) -> Option<String> {
-    crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .and_then(|secrets| secrets.value(name).map(str::to_owned))
+    crate::settings::Stores::of(ctx)
+        .secrets
+        .value(name)
+        .map(str::to_owned)
 }
 
 /// The key lemonfiber minted for the stack's service `service` where a first-party part

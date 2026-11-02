@@ -44,10 +44,7 @@ pub(crate) async fn taken(
         crate::seed::run::replacing::Stack { services, fillers },
     ));
     let secrets = crate::settings::secrets_at(ctx);
-    let kept = secrets
-        .as_deref()
-        .and_then(|at| crate::settings::Secrets::at(at).ok())
-        .unwrap_or_default();
+    let kept = crate::settings::Stores::of(ctx).secrets;
     let location = secrets.map(|at| at.display().to_string());
     for plugin in installed {
         taken.extend(declared(ctx, &kept, location.as_deref(), fillers, plugin));
