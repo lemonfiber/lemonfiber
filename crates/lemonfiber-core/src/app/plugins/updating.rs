@@ -518,6 +518,6 @@ fn unheld(
     served: &[crate::ports::service::Route],
 ) -> Result<(), Box<Problem>> {
     super::colliding::apart(would, others)?;
-    super::replacing::unreplaced(would, crate::plugin::first_party::EMBEDDED)?;
+    super::pinning::as_trusted(would, crate::plugin::first_party::EMBEDDED)?;
     super::occupied::unoccupied(ctx, would, others, served)
 }

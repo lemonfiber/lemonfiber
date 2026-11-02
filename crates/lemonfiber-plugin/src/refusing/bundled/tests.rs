@@ -1,6 +1,4 @@
-use super::{
-    answering, declared, named, publishing, publishing_in, routed, routed_to, services, STACK,
-};
+use super::{declared, named, routed, routed_to, services, STACK};
 
 /// The register found the stack, rather than finding nothing and passing.
 ///
@@ -49,21 +47,17 @@ fn the_register_holds_the_names_the_household_reaches_the_bundle_at() {
         "the bundle's parts were not read, so a plugin could take any name the household \
              already reaches: {answered} names"
     );
-    assert!(answering("watch"));
-    assert!(!answering("comics"), "and nothing the bundle does not name");
+    assert!(routed_to("watch").is_some());
+    assert!(
+        routed_to("comics").is_none(),
+        "and nothing the bundle does not name"
+    );
 }
 
 /// A name nothing declares is not held.
 #[test]
 fn nothing_the_stack_does_not_ship_is_reserved() {
     assert!(named("komga").is_none());
-    assert!(publishing(25600).is_none());
-}
-
-/// A port the stack publishes is found by the service that publishes it.
-#[test]
-fn a_port_the_stack_publishes_names_the_service_holding_it() {
-    assert_eq!(publishing(8096).map(|held| held.id.as_str()), Some("door"));
 }
 
 #[test]
@@ -73,25 +67,6 @@ fn each_name_is_routed_to_the_stack_service_its_part_stands_in_for() {
     assert_eq!(routed_to("nowhere"), None);
     assert_eq!(super::label_of("door"), Some("watch"));
     assert_eq!(super::label_of("nowhere"), None);
-}
-
-/// A port a shipped service publishes as a further port is held as its first is.
-#[test]
-fn a_further_port_a_shipped_service_publishes_is_held() {
-    let further = 8921;
-    let mut shipped = declared(STACK);
-    assert_eq!(publishing_in(&shipped, further), None);
-    if let Some(jellyfin) = shipped.iter_mut().find(|one| one.id == "jellyfin") {
-        jellyfin.publish = vec![lemonfiber_manifest::container::Publish {
-            port: further,
-            listens: None,
-        }];
-    }
-    assert_eq!(
-        publishing_in(&shipped, further).map(|held| held.id.as_str()),
-        Some("jellyfin")
-    );
-    assert_eq!(publishing_in(&shipped, further + 1), None);
 }
 
 /// A household service standing in for none of the stack's is routed to its own id.

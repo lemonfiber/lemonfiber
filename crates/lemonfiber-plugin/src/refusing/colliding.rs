@@ -26,18 +26,20 @@ use crate::schema::{Manifest, Service};
 use crate::Violation;
 
 use super::bundled;
+use super::held::{self, answered, answering, on_port, spelled_as, taking};
 use super::replacing::standing_in;
 
 /// Everything a manifest declares that the shipped stack already holds.
 pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
+    let own = manifest.plugin.id.as_str();
     for service in &manifest.services {
         let at = format!("service {}", service.id);
         let replaced = standing_in(service).map(|held| held.id.as_str());
         if replaced.is_none() {
-            named_like_the_stack(service, &at, found);
+            named_like_the_stack(own, service, &at, found);
         }
         let clashes = published(service.port, &service.publish)
-            .filter_map(|port| bundled::publishing(port).map(|held| (port, held)))
+            .filter_map(|port| on_port(held::held(), own, port).map(|held| (port, held)))
             .filter(|(_, held)| replaced != Some(held.id.as_str()));
         for (port, held) in clashes {
             let field = if service.port == Some(port) {
@@ -48,10 +50,10 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
             found.push(Violation {
                 location: format!("{at}.{field}"),
                 message: format!(
-                    "{port} is the port the stack already publishes {} on, and one address \
+                    "{port} is the port plugin {} already publishes {} on, and one address \
                      answers for one service; lemonfiber assigns the address from the tier, so a \
                      port the bundle holds is a collision rather than a preference",
-                    held.id
+                    held.plugin, held.id
                 ),
             });
         }
@@ -75,7 +77,7 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
 }
 
 /// An id the shipped stack declares, or one written as a shipped id is.
-fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>) {
+fn named_like_the_stack(own: &str, service: &Service, at: &str, found: &mut Vec<Violation>) {
     if lemonfiber_manifest::environment_name(&service.id)
         == lemonfiber_manifest::environment_name(PASS_SERVICE)
     {
@@ -88,24 +90,24 @@ fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>)
                 service.id
             ),
         });
-    } else if let Some(held) = bundled::named(&service.id) {
+    } else if let Some(held) = taking(held::held(), own, &service.id) {
         found.push(Violation {
             location: format!("{at}.id"),
             message: format!(
-                "{} is the id the stack's own {} is declared under, and lemonfiber writes a \
+                "{} is the id plugin {} declares its {} under, and lemonfiber writes a \
                  plugin's container, its proxy route and its dashboard link from that id — a \
                  second one would be written over the bundled service rather than beside it",
-                service.id, held.name
+                service.id, held.plugin, held.name
             ),
         });
-    } else if let Some(held) = bundled::spelled_like(&service.id) {
+    } else if let Some(held) = spelled_as(held::held(), own, &service.id) {
         found.push(Violation {
             location: format!("{at}.id"),
             message: format!(
-                "{} is written as the stack's own {} is ({}) once case and \"-\" or \"_\" are set \
+                "{} is written as plugin {}'s {} is ({}) once case and \"-\" or \"_\" are set \
                  aside, and lemonfiber keeps what a service holds in settings named that way \
                  — the two would share them",
-                service.id, held.name, held.id
+                service.id, held.plugin, held.name, held.id
             ),
         });
     }
@@ -119,14 +121,15 @@ fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>)
 /// costs is that the thing behind `watch` is no longer the thing that was behind
 /// `watch` — with both services running, both healthy, and nothing failing.
 fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
+    let own = manifest.plugin.id.as_str();
     // The label each household service is proxied at once the default is applied,
     // which is its id where the manifest names none. An undeclared label is still a
     // route lemonfiber applies, so it is held to the same names a declared one is.
     for service in proxied(manifest) {
         let hostname = manifest.entry(service).hostname;
-        if !bundled::answering(hostname) {
+        let Some(holder) = answering(answered(), own, hostname) else {
             continue;
-        }
+        };
         let replaced = standing_in(service).map(|held| held.id.as_str());
         if replaced.is_some() && bundled::routed_to(hostname) == replaced {
             continue;
@@ -151,7 +154,7 @@ fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
         found.push(Violation {
             location,
             message: format!(
-                "{said} is a name the household already reaches a part of the bundle at, and a \
+                "{said} is a name the household already reaches plugin {holder} at, and a \
                  second route for it puts this plugin in front of the bundled service rather than \
                  beside it; the label is the plugin's to choose, and this one is taken"
             ),

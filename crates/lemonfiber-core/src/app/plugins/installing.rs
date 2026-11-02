@@ -80,7 +80,7 @@ pub(super) async fn install(
         .record(would.clone())
         .map_err(|there| Box::new(already(&there, &named)))?;
     super::colliding::apart(&would, held.installed())?;
-    super::replacing::unreplaced(&would, trusted)?;
+    super::pinning::as_trusted(&would, trusted)?;
     super::granting::aimed(&would, trusted)?;
 
     // Where the writes land, asked for before the branch rather than inside it. What
@@ -370,6 +370,10 @@ pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accept
             message,
         }),
     }
+    refusals.extend(crate::plugin::seeding::strays(
+        manifest.services.iter().map(|service| service.id.as_str()),
+        &crate::plugin::root(path),
+    ));
     if refusals.is_empty() {
         Ok(Accepted {
             manifest,

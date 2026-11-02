@@ -91,6 +91,7 @@ pub(crate) mod granting;
 pub(crate) mod guarding;
 mod replacing;
 // Installing what the record already holds: an update, or a second source for one name.
+mod pinning;
 mod planned;
 pub(crate) use planned::beside;
 mod colliding;

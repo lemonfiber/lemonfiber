@@ -350,6 +350,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-46` | `UNAIMED_CROSSING` | error | 1 | 403 | 0.18.0 | Raised when a third-party plugin declares a secret of another service that names no capability of its own it is for. |
 | `PLUGIN-47` | `NO_GRANT` | error | 1 | 404 | 0.18.0 | Raised when a grant asked to be revoked is not one the plugin holds. |
 | `PLUGIN-48` | `EARLIER_TAKEN` | error | 1 | 400 | 0.18.0 | Raised when a plugin's setting or secret names, as the variable an earlier release kept its value under, one another installed plugin's setting or secret names. |
+| `PLUGIN-49` | `ANOTHER_SOURCE` | error | 1 | 403 | 0.18.0 | Raised when a plugin carrying the id of a part this build pins comes from anywhere but that pin. |
 
 ## `PROC` — the program underneath
 

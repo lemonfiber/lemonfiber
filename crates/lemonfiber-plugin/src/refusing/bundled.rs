@@ -116,33 +116,6 @@ fn minted_for(id: &str) -> bool {
         })
 }
 
-/// The shipped service whose id is written as this one is once each is spelled as an
-/// environment name, where the stack ships one.
-pub(super) fn spelled_like(id: &str) -> Option<&'static Service> {
-    let spelled = lemonfiber_manifest::environment_name(id);
-    services()
-        .iter()
-        .find(|service| lemonfiber_manifest::environment_name(&service.id) == spelled)
-}
-
-/// The shipped service published on this port, where the stack publishes one there.
-pub(super) fn publishing(port: u16) -> Option<&'static Service> {
-    publishing_in(services(), port)
-}
-
-/// The one of `services` published on this port, its further ports included.
-fn publishing_in(services: &[Service], port: u16) -> Option<&Service> {
-    services.iter().find(|service| {
-        lemonfiber_manifest::container::published(service.port, &service.publish)
-            .any(|held| held == port)
-    })
-}
-
-/// Whether the household reaches a part the bundle pins at this name.
-pub(super) fn answering(label: &str) -> bool {
-    routed().iter().any(|(held, _)| held == label)
-}
-
 /// The service the household reaches at this name, where it reaches a part the bundle
 /// pins there.
 pub(super) fn routed_to(label: &str) -> Option<&'static str> {

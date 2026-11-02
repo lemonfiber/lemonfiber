@@ -529,6 +529,11 @@
     "status": 400,
     "description": "Raised when a plugin's setting or secret names, as the variable an earlier release kept its value under, one another installed plugin's setting or secret names."
   },
+  "PLUGIN-49": {
+    "name": "ANOTHER_SOURCE",
+    "status": 403,
+    "description": "Raised when a plugin carrying the id of a part this build pins comes from anywhere but that pin."
+  },
   "PLUGIN-5": {
     "name": "ALREADY",
     "status": 400,

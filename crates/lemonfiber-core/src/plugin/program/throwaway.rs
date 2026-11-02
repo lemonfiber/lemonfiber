@@ -355,7 +355,8 @@ pub(crate) fn held(starting: Option<Starting<'_>>) -> Result<Vec<(String, Vec<u8
             found.push((named, bytes));
             if found.len() > MOST_FILES || weight > MOST_BYTES {
                 return Err(format!(
-                    "the starting files pass {MOST_FILES} files or {MOST_BYTES} bytes"
+                    "service {}'s starting files pass {MOST_FILES} files or {MOST_BYTES} bytes",
+                    starting.service
                 ));
             }
         }

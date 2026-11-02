@@ -392,3 +392,26 @@ fn a_starting_file_where_a_declared_certificate_is_written_is_refused() {
         )]
     );
 }
+
+#[test]
+fn only_a_declared_services_directory_may_hold_starting_files() {
+    let source = lemonfiber_fixtures::scratch::Scratch::new("seeding-strays");
+    for (path, bytes) in [
+        ("config/komga/settings.yml", "a: 1"),
+        ("config/kavita/settings.yml", "b: 2"),
+        ("config/loose.yml", "c: 3"),
+    ] {
+        let file = source.join(path);
+        assert!(file
+            .parent()
+            .is_some_and(|dir| std::fs::create_dir_all(dir).is_ok()));
+        assert!(std::fs::write(file, bytes).is_ok());
+    }
+    let found: Vec<String> = super::strays(["komga"], &source)
+        .into_iter()
+        .map(|refused| refused.location)
+        .collect();
+    assert_eq!(found, ["config/kavita", "config/loose.yml"]);
+    let nowhere = lemonfiber_fixtures::scratch::Scratch::new("seeding-no-tree");
+    assert!(super::strays(["komga"], &nowhere).is_empty());
+}

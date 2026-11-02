@@ -48,7 +48,7 @@ impl Leaves {
 }
 
 /// Declares one family's codes, each with what is published about it, and the list of
-/// them. Invoked once in each family's file.
+/// them. Invoked once in each family's file, and once in each part it is split into.
 macro_rules! codes {
     ($(
         $(#[doc = $doc:literal])*
@@ -66,7 +66,7 @@ macro_rules! codes {
         $($(#[doc = $doc])* pub const $name: Code = Code::declared($id);)*
 
         /// Every code this family declares, with what is published about each.
-        pub(super) const DECLARED: &[super::Declared] = &[$(super::Declared {
+        pub(crate) const DECLARED: &[crate::codes::Declared] = &[$(crate::codes::Declared {
             code: $name,
             name: stringify!($name),
             said: concat!($($doc),*),
@@ -78,14 +78,14 @@ macro_rules! codes {
             remedy: $remedy,
         },)*];
     };
-    (@leaves) => { super::Leaves::Failure };
-    (@leaves $leaves:ident) => { super::Leaves::$leaves };
+    (@leaves) => { crate::codes::Leaves::Failure };
+    (@leaves $leaves:ident) => { crate::codes::Leaves::$leaves };
 }
 
-/// Declares each family's module, with the line saying what it covers, and the list
-/// of every family.
+/// Declares each family's module, with the line saying what it covers and the parts its
+/// codes are split into, and the list of every family.
 macro_rules! families {
-    ($($family:ident => $prefix:literal: $covers:literal,)*) => {
+    ($($family:ident => $prefix:literal: $covers:literal $([$($part:ident),*])?,)*) => {
         $(
             #[doc = concat!("The `", $prefix, "` codes: ", $covers, ".")]
             pub mod $family;
@@ -95,7 +95,7 @@ macro_rules! families {
         const FAMILIES: &[Family] = &[$(Family {
             prefix: $prefix,
             covers: $covers,
-            declared: $family::DECLARED,
+            declared: &[$family::DECLARED $($(, $family::$part::DECLARED)*)?],
         },)*];
     };
 }
@@ -127,7 +127,7 @@ families! {
     migrate => "MIGRATE": "taking over a setup already here",
     pair => "PAIR": "pairing a phone with the stack",
     play => "PLAY": "playing what the household holds",
-    plugin => "PLUGIN": "installing and running plugins",
+    plugin => "PLUGIN": "installing and running plugins" [pinned],
     proc => "PROC": "the program underneath",
     provider => "PROVIDER": "accounts and indexers",
     qual => "QUAL": "quality against what is available",
@@ -163,7 +163,7 @@ families! {
 pub struct Family {
     prefix: &'static str,
     covers: &'static str,
-    declared: &'static [Declared],
+    declared: &'static [&'static [Declared]],
 }
 
 impl Family {
@@ -182,7 +182,7 @@ impl Family {
     /// The family's codes, in number order.
     #[must_use]
     pub fn declared(self) -> Vec<Declared> {
-        let mut declared = self.declared.to_vec();
+        let mut declared: Vec<Declared> = self.declared.concat();
         declared.sort_by_key(|one| ordering(one.code.as_str()));
         declared
     }
@@ -275,7 +275,7 @@ pub const fn families() -> &'static [Family] {
 pub fn declared(code: Code) -> Option<Declared> {
     FAMILIES
         .iter()
-        .flat_map(|family| family.declared)
+        .flat_map(|family| family.declared.iter().copied().flatten())
         .find(|declared| declared.code == code)
         .copied()
 }

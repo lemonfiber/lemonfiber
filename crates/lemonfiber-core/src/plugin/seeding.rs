@@ -95,6 +95,35 @@ pub(crate) fn shipped_by(
     )
 }
 
+/// Every entry of the configuration tree of the source at `source` that is not the
+/// directory of one of `services`, refused naming its path.
+#[must_use]
+pub fn strays<'a>(services: impl IntoIterator<Item = &'a str>, source: &Path) -> Vec<Violation> {
+    let tree = crate::project::entry::CONFIGURATION_TREE;
+    let declared: BTreeSet<&str> = services.into_iter().collect();
+    let mut found: Vec<String> = std::fs::read_dir(source.join(tree))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let directory = entry.file_type().is_ok_and(|kind| kind.is_dir());
+            (!directory || !declared.contains(name.as_str())).then(|| format!("{tree}/{name}"))
+        })
+        .collect();
+    found.sort();
+    found
+        .into_iter()
+        .map(|location| Violation {
+            location,
+            message: format!(
+                "is not the directory of a service the plugin declares, and a plugin ships \
+                 starting files only under {tree}/<service id>/"
+            ),
+        })
+        .collect()
+}
+
 /// What is wrong with any of the starting files `shipped` against `manifest`, each file on
 /// its own and each service's files together.
 #[must_use]
