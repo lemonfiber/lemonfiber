@@ -97,6 +97,19 @@ fn every_credential_left_in_the_environment_file_is_filed_and_its_line_taken_awa
 }
 
 #[test]
+fn a_credential_the_store_cannot_take_is_refused_and_its_line_stays() {
+    let indexer = value("indexer");
+    let ctx = machine("unfiled", &[("INDEXER_APIKEY", &indexer)]);
+    assert!(
+        std::fs::create_dir_all(env(&ctx).with_file_name(crate::config::paths::SECRETS)).is_ok()
+    );
+
+    assert!(super::super::filing::credentials(&ctx).is_err());
+
+    assert_eq!(line(&ctx, "INDEXER_APIKEY"), Some(indexer));
+}
+
+#[test]
 fn a_credential_the_store_holds_is_kept_and_its_line_still_goes() {
     let ctx = machine("held", &[("USENET_PASS", "stale")]);
     let at = crate::settings::secrets_at(&ctx).unwrap_or_default();
