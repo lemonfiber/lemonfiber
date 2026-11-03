@@ -2,6 +2,7 @@
 //! recordings to what it takes again leaves as recorded rather than reaching that host:
 //! its committed answer stands for it, and later cases' placeholders read it.
 
+use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::owner::claim;
 use std::collections::BTreeMap;
 
@@ -16,6 +17,29 @@ use crate::plugin::recorded::{Answer, Asked};
 /// The operation of `owner.claim` that claims a part.
 const CLAIMING: &str = "claim";
 
+/// The operation of `media.serve` that starts the upstream again.
+const RESTARTING: &str = "restart";
+
+/// Every case of each of `contracts` an upstream filing `files` is asked, in order, with
+/// each case starting the upstream again moved after every other.
+fn restarting_last<'c>(
+    contracts: &'c [(String, lemonfiber_contract::Capability)],
+    files: &[String],
+) -> Vec<(&'c str, Asks<'c>)> {
+    let (restarting, rest): (Vec<_>, Vec<_>) = contracts
+        .iter()
+        .flat_map(|(spoken, capability)| {
+            filed(capability, files)
+                .into_iter()
+                .map(move |case| (spoken.as_str(), case))
+        })
+        .partition(|(spoken, case)| {
+            *spoken == lemonfiber_contract::spoken(serve::CAPABILITY, serve::MAJOR)
+                && case.operation.name == RESTARTING
+        });
+    rest.into_iter().chain(restarting).collect()
+}
+
 impl Asking<'_> {
     /// Every case of each of `contracts` an upstream filing what this one files is asked,
     /// in order: each asked of the adapter, or, where the run holds recordings to what it
@@ -28,19 +52,17 @@ impl Asking<'_> {
         heard: &BTreeMap<String, Response>,
     ) -> Result<Vec<Case>, Faulted> {
         let mut asked = Vec::new();
-        for (spoken, capability) in contracts {
-            for case in filed(capability, &self.upstream.media_types) {
-                if let Some(host) = self.left(spoken, &case.case) {
-                    asked.push(self.as_recorded(filling, spoken, &case, host));
-                    continue;
-                }
-                let step = named(spoken, &case.case);
-                let one = self
-                    .case(reached, filling, spoken, &case, heard)
-                    .await
-                    .map_err(|why| Faulted::new(&step, why, filling.made.clone()))?;
-                asked.push(one);
+        for (spoken, case) in restarting_last(contracts, &self.upstream.media_types) {
+            if let Some(host) = self.left(spoken, &case.case) {
+                asked.push(self.as_recorded(filling, spoken, &case, host));
+                continue;
             }
+            let step = named(spoken, &case.case);
+            let one = self
+                .case(reached, filling, spoken, &case, heard)
+                .await
+                .map_err(|why| Faulted::new(&step, why, filling.made.clone()))?;
+            asked.push(one);
         }
         Ok(asked)
     }
@@ -97,3 +119,6 @@ impl Asking<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

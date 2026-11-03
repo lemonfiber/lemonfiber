@@ -35,6 +35,7 @@ async fn built(at: &Path, program: &dyn Program, serving: &Serves) -> Option<Rec
                 ..Retaking::default()
             },
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await

@@ -76,6 +76,8 @@ pub struct Recorder<'a> {
     pub taking: &'a Retaking,
     /// Writes into the throwaway copies a service's container is handed, through no link.
     pub confined: &'a dyn crate::ports::filesystem::Confined,
+    /// How long a service is given to come up and its adapter to say it answers.
+    pub patience: std::time::Duration,
 }
 
 /// What taking one recording came to.

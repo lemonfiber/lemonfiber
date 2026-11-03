@@ -30,6 +30,7 @@ async fn checked(at: &Path, serving: &Serves, http: &Arc<Fake>, adapter: Option<
             random: &FixedRandom(Some(vec![7; 32])),
             taking: &taking,
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await;
@@ -180,6 +181,7 @@ async fn writing_from_the_adapter_it_names_writes_what_that_adapter_answered() {
             random: &FixedRandom(Some(vec![7; 32])),
             taking: &taking,
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await;

@@ -19,7 +19,7 @@ use serde_json::Value;
 use super::addressed::Addressed;
 use super::asked::{answered, kept, Item};
 use super::scrubbed::Scrub;
-use super::served::{allowed, answering, healthy, started, LOG_LINES, POLL};
+use super::served::{answering, healthy, started, LOG_LINES, POLL};
 use super::{Failed, Recorder};
 use crate::plugin::conforming::ASKED_WITH;
 use crate::plugin::container::LOOPBACK;
@@ -317,9 +317,15 @@ impl Asking<'_> {
             super::served::inside(self.upstream),
         );
         let serving = self.recorder.serving;
-        healthy(serving, upstream.as_ref(), self.health, self.served)
-            .await
-            .map_err(|why| ("health", why))?;
+        healthy(
+            serving,
+            upstream.as_ref(),
+            self.health,
+            self.served,
+            self.recorder.patience,
+        )
+        .await
+        .map_err(|why| ("health", why))?;
         let adapter = (self.recorder.transport)();
         let base = self
             .fronting
@@ -331,8 +337,7 @@ impl Asking<'_> {
                 "it publishes no port, so nothing can ask it".to_owned(),
             ))?;
         let asked = self.contracted(Arc::clone(&adapter), &base);
-        let health = self.adapter.service.health.as_ref();
-        answering(serving, &asked, self.fronting, health)
+        answering(serving, &asked, self.fronting, self.recorder.patience)
             .await
             .map_err(|why| ("adapter's health", why))?;
         Ok(Reached {
@@ -462,7 +467,7 @@ impl Asking<'_> {
     }
 
     /// The upstream's first run, performed through the adapter as the seed performs it,
-    /// tried again while the upstream is not answering within its health's limit; the
+    /// tried again while the upstream is not answering within the recorder's patience; the
     /// administrator's password it left in the adapter's `upstream.json`, and the last
     /// answer the adapter gave to each address the first run asked.
     async fn first_run(
@@ -485,7 +490,7 @@ impl Asking<'_> {
                 ],
             )
         };
-        let until = tokio::time::Instant::now() + allowed(self.health);
+        let until = tokio::time::Instant::now() + self.recorder.patience;
         loop {
             match crate::seed::wire_media_server_admin(
                 &source,

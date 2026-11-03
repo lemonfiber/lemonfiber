@@ -102,6 +102,7 @@ async fn checked(at: &Path, http: &Arc<Fake>) -> Recorded {
             random: &FixedRandom(Some(vec![7; 32])),
             taking: &taking,
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await;

@@ -158,6 +158,7 @@ async fn read_through(
             random: &FixedRandom(random.map(|byte| vec![byte; 32])),
             taking: &crate::plugin::Retaking::default(),
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await
@@ -336,7 +337,9 @@ async fn an_adapter_saying_its_upstream_does_not_answer_fails_at_its_health_and_
         failed_at(&read),
         vec![(
             "adapter's health".to_owned(),
-            "it did not say its upstream answers within 2 seconds".to_owned()
+            "it did not say its upstream answers within 2 seconds: it last said its upstream does not \
+             answer yet"
+                .to_owned()
         )]
     );
     assert!(http

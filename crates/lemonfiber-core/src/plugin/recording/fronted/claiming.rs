@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::owner::claim;
 
-use super::super::served::{allowed, POLL};
+use super::super::served::POLL;
 use super::{Asking, Reached, Tapped};
 use crate::ports::http::{Http, Response};
 use crate::ports::service::{Claim, Failure, Owner, Ownership as _};
@@ -32,7 +32,7 @@ impl Asking<'_> {
         let tapped = Arc::new(Tapped::through(Arc::clone(&reached.adapter)));
         let part =
             claim::Adapter(self.contracted(Arc::clone(&tapped) as Arc<dyn Http>, &reached.base));
-        let until = tokio::time::Instant::now() + allowed(self.health);
+        let until = tokio::time::Instant::now() + self.recorder.patience;
         if self.coded() {
             return self.coded_claim(&part, until, tapped).await;
         }

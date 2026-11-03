@@ -132,6 +132,7 @@ pub(super) async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>) -> O
             random: &FixedRandom(Some(vec![7; 32])),
             taking: &crate::plugin::Retaking::default(),
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await
@@ -422,7 +423,7 @@ async fn a_service_whose_health_never_passes_fails_at_its_own_limit() {
     let http = Fake::by_path(vec![("/ping", Answer::reply(503, "starting"))]);
     let read = recorded(&at, &sonarr(), &http).await;
     assert!(read.is_some_and(|read| matches!(read.failed.first(),
-        Some(Failed { step, why, .. }) if step == "health" && why == "its health did not pass within 2 seconds")));
+        Some(Failed { step, why, .. }) if step == "health" && why == "its health did not pass within 2 seconds: it last answered /ping with 503")));
 }
 
 #[tokio::test]
