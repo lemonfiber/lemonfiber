@@ -59,6 +59,8 @@ pub(super) fn wrong(container: &Container<'_>) -> Vec<String> {
         .collect()
 }
 
+mod mounts;
+
 fn env(pairs: Vec<(&str, Value)>) -> BTreeMap<String, Value> {
     pairs
         .into_iter()
@@ -93,46 +95,6 @@ fn further_ports_need_a_port_and_none_is_published_twice() {
     portless.port = None;
     portless.publish = &further;
     assert_eq!(wrong(&portless).len(), 1);
-}
-
-#[test]
-fn a_mount_comes_from_inside_its_own_directory_and_lands_outside_the_data() {
-    let none = NONE;
-    let mounts = [
-        Mount {
-            from: "cache".to_owned(),
-            to: "/cache".to_owned(),
-            ro: false,
-        },
-        Mount {
-            from: "../etc".to_owned(),
-            to: "/etc/x".to_owned(),
-            ro: true,
-        },
-        Mount {
-            from: "/etc".to_owned(),
-            to: "/data/x".to_owned(),
-            ro: false,
-        },
-        Mount {
-            from: "again".to_owned(),
-            to: "/cache".to_owned(),
-            ro: false,
-        },
-    ];
-    let mut mounting = plain(&none);
-    mounting.mounts = &mounts;
-    let said = wrong(&mounting);
-    assert_eq!(said.len(), 4, "{said:#?}");
-    assert!(said
-        .iter()
-        .any(|line| line.contains("../etc is not a relative path")));
-    assert!(said
-        .iter()
-        .any(|line| line.contains("/data/x is inside the data mount")));
-    assert!(said
-        .iter()
-        .any(|line| line.contains("/cache is the target of another mount")));
 }
 
 #[test]
@@ -478,35 +440,6 @@ fn each_field_is_read_as_written_and_defaulted_where_left_out() {
 }
 
 #[test]
-fn no_mount_source_lies_inside_another() {
-    let none = NONE;
-    let mounts = [
-        Mount {
-            from: "cache".to_owned(),
-            to: "/cache".to_owned(),
-            ro: false,
-        },
-        Mount {
-            from: "cache/deep".to_owned(),
-            to: "/deep".to_owned(),
-            ro: false,
-        },
-        Mount {
-            from: "cachet".to_owned(),
-            to: "/cachet".to_owned(),
-            ro: false,
-        },
-    ];
-    let mut nested = plain(&none);
-    nested.mounts = &mounts;
-    let said = wrong(&nested);
-    assert_eq!(
-        said,
-        ["service jellyfin.mount /deep: cache/deep lies inside cache, another of its sources"]
-    );
-}
-
-#[test]
 fn an_address_files_a_medium_of_the_vocabulary_and_names_its_api_in_one_word() {
     let url = |files: Option<&str>, native: Option<&str>| {
         Value::Url(UrlOf {
@@ -760,4 +693,26 @@ fn a_secret_a_recording_stands_in_for_is_needed_to_start_unless_it_is_a_code_tha
     assert!(!secret(None, None).needed_to_start());
     assert!(secret(Some(RecordedWith::Minted), None).needed_to_start());
     assert!(!secret(Some(RecordedWith::Minted), Some(240)).needed_to_start());
+}
+
+#[test]
+fn a_confined_or_contracted_service_running_as_its_image_says_is_refused_naming_it() {
+    let none = NONE;
+    for (posture, speaks) in [(Posture::Confined, false), (Posture::Standard, true)] {
+        for mode in [UserMode::Image, UserMode::IdsIn(IdVariables::puid())] {
+            let mut held = plain(&none);
+            held.posture = posture;
+            held.speaks = speaks;
+            held.user_mode = Some(&mode);
+            assert_eq!(
+                wrong(&held),
+                ["service jellyfin.user_mode: must be uid for a service that speaks a contract or is confined"],
+                "{posture:?} {speaks} {mode:?}"
+            );
+        }
+    }
+    let mut held = plain(&none);
+    held.posture = Posture::Confined;
+    held.user_mode = Some(&UserMode::Uid);
+    assert!(wrong(&held).is_empty());
 }

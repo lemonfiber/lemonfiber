@@ -4,9 +4,8 @@ use std::path::{Path, PathBuf};
 use lemonfiber_manifest::Manifest;
 
 use super::recorded::Recorded;
-use super::Settings;
 use crate::app::Ctx;
-use crate::config::paths::{SECRETS_FILES, SETTINGS};
+use crate::config::paths::SECRETS_FILES;
 use crate::plugin::{Holding, Installed, Reading};
 use crate::wiring::Fillers;
 
@@ -21,7 +20,6 @@ pub(crate) struct Resolved {
     name: String,
     pass: Option<String>,
     host: Vec<std::net::IpAddr>,
-    secrets: Option<super::Secrets>,
 }
 
 impl Resolved {
@@ -52,7 +50,6 @@ impl Resolved {
             pass: crate::app::project::pinned(ctx),
             host: crate::app::project::host_addresses(ctx),
             files: files_of(ctx),
-            secrets: super::secrets_at(ctx).and_then(|at| super::Secrets::at(&at).ok()),
             nfs: ctx.settings.nfs.clone(),
             fillers: manifest.map(|manifest| {
                 Fillers::trusting(
@@ -124,7 +121,7 @@ impl Resolved {
     }
 
     pub(crate) fn reading<T>(&self, write: impl FnOnce(&Reading<'_>) -> T) -> T {
-        let setting = |_: &str, name: &str| self.setting(name);
+        let setting = |name: &str| self.setting(name);
         let secrets_file = |service: &str| self.secrets_file(service);
         let crossing = |plugin: &str, of: &str| self.crossing(plugin, of);
         write(&Reading {
@@ -135,7 +132,7 @@ impl Resolved {
     }
 
     pub(crate) fn project<T>(&self, write: impl FnOnce(&crate::project::Reading<'_>) -> T) -> T {
-        let setting = |_: &str, name: &str| self.setting(name);
+        let setting = |name: &str| self.setting(name);
         let secrets_file = |service: &str| self.secrets_file(service);
         let operator = |key: &str| {
             OPERATOR_KEYS
@@ -154,11 +151,7 @@ impl Resolved {
             pass: self.pass.as_deref(),
             fence: lemonfiber_bundled::FENCE,
             host: &self.host,
-            held: &|name| {
-                self.secrets
-                    .as_ref()
-                    .is_some_and(|kept| kept.value(name).is_some())
-            },
+            held: &|name| self.recorded.holds_secret(name),
         })
     }
 }
@@ -202,16 +195,17 @@ pub(super) fn file_in(files: &Path, service: &str) -> PathBuf {
 }
 
 pub(crate) fn holding(ctx: &Ctx) -> impl Fn(&str) -> Option<String> {
-    let env = ctx.settings.env_file.as_deref();
-    let file = env
+    let stores = super::Stores::of(ctx);
+    let file = ctx
+        .settings
+        .env_file
+        .as_deref()
         .and_then(|file| crate::config::store::read(file).ok())
-        .unwrap_or_default();
-    let settings = env
-        .and_then(|file| Settings::at(&file.with_file_name(SETTINGS)).ok())
+        .map(|read| super::legacy::answered(&stores, read))
         .unwrap_or_default();
     move |name: &str| {
         if super::is_stored(name) {
-            settings.value(name).map(str::to_owned)
+            stores.settings.value(name).map(str::to_owned)
         } else {
             file.get(name).map(str::to_owned)
         }

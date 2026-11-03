@@ -32,7 +32,7 @@ use lemonfiber_core::stack::Source;
 use lemonfiber::carried::STACK;
 
 /// Everything a command needs that the command itself does not carry.
-pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) -> Ctx {
+pub(crate) async fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) -> Ctx {
     // The path outlives the process, and `Source` is Copy so it can be handed
     // around freely; leaking one allocation at startup buys both.
     let stack = match stack_dir {
@@ -40,7 +40,7 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
         None => Source::Embedded(&STACK),
     };
 
-    let settings = read_settings();
+    let settings = read_settings(None);
     // Settled here rather than at each of the surfaces that explains something,
     // because it is a property of the run: the two places that build a context are
     // the only two that could be told, and neither can then be told wrong.
@@ -100,12 +100,15 @@ pub(crate) fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bool) ->
     // A rehearsal takes nothing, so the two never both apply — but a rehearsal that
     // was also asked to force is a rehearsal, because the harmless reading of an
     // ambiguous pair of flags is the one to take.
-    if dry_run {
-        return ctx.rehearsing();
-    }
-    if force {
-        return ctx.forcing();
-    }
+    let mut ctx = if dry_run {
+        ctx.rehearsing()
+    } else if force {
+        ctx.forcing()
+    } else {
+        ctx
+    };
+    lemonfiber_core::filed(&ctx).await;
+    ctx.settings = read_settings(Some(&ctx));
     ctx
 }
 
@@ -149,19 +152,21 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
     }
 }
 
-/// The operator's settings, read from their file as it stands now.
+/// The operator's settings, read from their file as it stands now, with what the stores
+/// `run` reads hold for each name a setting or a secret was read into, and nothing for
+/// those names where there is no run to read them for yet.
 ///
 /// Read fresh rather than passed around, because setup writes the file mid-run:
 /// the settings this process started with predate what it just applied, and
 /// starting the stack against the stale set would run the wrong thing.
-pub(crate) fn read_settings() -> Settings {
+pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
     let env_file = configuration_file();
     let recorded = env_file
         .as_deref()
-        .and_then(|path| {
-            store::read(path)
-                .ok()
-                .map(|file| lemonfiber_core::stored_over(path, file))
+        .and_then(|path| store::read(path).ok())
+        .map(|file| match run {
+            Some(ctx) => lemonfiber_core::stored_over(ctx, file),
+            None => lemonfiber_core::unstored(file),
         })
         .unwrap_or_default();
 

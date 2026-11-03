@@ -77,7 +77,7 @@ pub(super) async fn recover_setup(
     }
     // The settings read at startup predate the file the recovery just wrote, so
     // they are refreshed before the stack is brought up against them.
-    ctx.settings = read_settings();
+    ctx.settings = read_settings(Some(&ctx));
     say!("\nSetup is done — bringing your stack up.");
     Box::pin(start(&ctx, surface)).await
 }

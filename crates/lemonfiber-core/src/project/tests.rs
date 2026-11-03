@@ -137,17 +137,25 @@ fn a_confined_service_nothing_reaches_and_that_publishes_nothing_is_on_no_networ
 }
 
 #[test]
-fn a_stack_image_without_a_digest_is_written_by_its_tag() {
-    let mut manifest = carried();
-    let Some(sonarr) = manifest.services.iter_mut().find(|one| one.id == "sonarr") else {
-        unreachable!("the stack runs sonarr");
-    };
-    sonarr.digest = None;
-    let tag = sonarr.tag.clone();
+fn every_stack_image_is_written_by_its_digest_alone() {
+    let manifest = carried();
     let project = project(&manifest, &[]);
-    assert_eq!(
-        text(&entry(&project, "sonarr"), "image"),
-        format!("lscr.io/linuxserver/sonarr:{tag}")
+    let written: Vec<(String, String)> = manifest
+        .services
+        .iter()
+        .map(|service| (text(&entry(&project, &service.id), "image"), service))
+        .filter(|(image, _)| !image.is_empty())
+        .map(|(image, service)| {
+            let digest = service.digest.clone().unwrap_or_default();
+            (image, format!("{}@{digest}", service.image))
+        })
+        .collect();
+    assert!(written
+        .iter()
+        .any(|(image, _)| image.starts_with("lscr.io/linuxserver/sonarr@sha256:")));
+    assert!(
+        written.iter().all(|(image, pinned)| image == pinned),
+        "{written:?}"
     );
 }
 
@@ -717,6 +725,7 @@ mod inside;
 mod pass;
 mod replaced;
 mod sources;
+mod written;
 
 fn inside_the_guard() -> Network {
     Network {

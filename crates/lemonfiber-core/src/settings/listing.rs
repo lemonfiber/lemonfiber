@@ -9,7 +9,7 @@ use crate::plugin::{Holding, Installed};
 
 use super::readers::{self, Readers};
 use super::recorded::Recorded;
-use super::{legacy, own, Resolved, Secrets, Source};
+use super::{legacy, own, Resolved, Source};
 
 pub(super) fn report(
     ctx: &Ctx,
@@ -56,9 +56,7 @@ pub(super) fn secrets(
     installed: &[Installed],
     resolved: &Resolved,
 ) -> Vec<SecretRead> {
-    let kept = super::secrets_at(ctx)
-        .and_then(|at| Secrets::at(&at).ok())
-        .unwrap_or_default();
+    let kept = super::Stores::of(ctx).secrets;
     readers
         .secrets
         .iter()

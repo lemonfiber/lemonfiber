@@ -167,7 +167,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             }),
         ),
     ]);
-    let setting = |_: &str, name: &str| (name == "komga:mode").then(|| "fast".to_owned());
+    let setting = |name: &str| (name == "komga:mode").then(|| "fast".to_owned());
     let reading = Reading {
         setting: &setting,
         ..Reading::bare()
@@ -418,7 +418,7 @@ fn naming_a_secret() -> Placed {
 
 #[test]
 fn a_service_naming_a_secret_reads_its_own_file_and_a_recorded_setting_is_written() {
-    let setting = |_: &str, name: &str| (name == "komga:mode").then(|| "fast$1".to_owned());
+    let setting = |name: &str| (name == "komga:mode").then(|| "fast$1".to_owned());
     let file = |service: &str| {
         Some(std::path::PathBuf::from(format!(
             "/home/op/.config/lemonfiber/env/{service}.env"

@@ -107,6 +107,14 @@ impl Secrets {
             .unwrap_or_else(|| keyed::UNMATCHED.to_owned())
     }
 
+    /// `value` kept under `name` in memory, from `from` at `at`, where nothing is kept
+    /// under it yet.
+    pub(crate) fn planned(&mut self, name: &str, value: &str, from: Source, at: u64) {
+        if !self.held.contains_key(name) {
+            self.keep(name, value, from, at);
+        }
+    }
+
     pub(crate) fn entered_at(&self, name: &str) -> Option<u64> {
         self.held.get(name).map(|kept| kept.at)
     }

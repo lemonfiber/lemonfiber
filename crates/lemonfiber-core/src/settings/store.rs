@@ -25,6 +25,13 @@ impl Settings {
         self.values.get(name).map(String::as_str)
     }
 
+    /// `value` kept under `name` in memory, where nothing is kept under it yet.
+    pub(crate) fn planned(&mut self, name: &str, value: &str) {
+        self.values
+            .entry(name.to_owned())
+            .or_insert_with(|| value.to_owned());
+    }
+
     pub(crate) const fn is_filed(&self) -> bool {
         self.filed
     }

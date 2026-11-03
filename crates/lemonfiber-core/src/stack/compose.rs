@@ -156,11 +156,6 @@ pub fn build(
     argv.push("--project-directory".to_owned());
     argv.push(stack.display().to_string());
 
-    if let Some(env_file) = &settings.env_file {
-        argv.push("--env-file".to_owned());
-        argv.push(env_file.display().to_string());
-    }
-
     argv.push("--file".to_owned());
     argv.push(stack.join(crate::project::FILE).display().to_string());
 

@@ -4,7 +4,7 @@ use super::super::super::installed::Placed;
 use super::{installed, placed, written};
 use crate::project::Reading;
 
-fn environment(setting: &dyn Fn(&str, &str) -> Option<String>) -> Vec<(String, Option<String>)> {
+fn environment(setting: &dyn Fn(&str) -> Option<String>) -> Vec<(String, Option<String>)> {
     let env: std::collections::BTreeMap<String, Value> = toml::from_str(
         r#"
 VPN_TYPE = { setting = "komga:vpn-type", default = "wireguard", one_of = ["wireguard", "openvpn"] }
@@ -48,7 +48,7 @@ OPENVPN_PROTOCOL = { setting = "komga:protocol", default = "udp", needs = { "kom
 
 #[test]
 fn a_variable_is_written_only_where_the_settings_it_needs_hold_what_it_lists() {
-    let unset = |_: &str, _: &str| None;
+    let unset = |_: &str| None;
     assert_eq!(
         environment(&unset),
         vec![
@@ -60,7 +60,7 @@ fn a_variable_is_written_only_where_the_settings_it_needs_hold_what_it_lists() {
             ("OPENVPN_PROTOCOL".to_owned(), None),
         ]
     );
-    let openvpn = |_: &str, name: &str| (name == "komga:vpn-type").then(|| "openvpn".to_owned());
+    let openvpn = |name: &str| (name == "komga:vpn-type").then(|| "openvpn".to_owned());
     assert_eq!(
         environment(&openvpn),
         vec![
@@ -100,7 +100,7 @@ OPENVPN_USER = { secret = "openvpn-user" }
         lapses_s: None,
         captured: false,
     }];
-    let named = |setting: &dyn Fn(&str, &str) -> Option<String>| -> Vec<String> {
+    let named = |setting: &dyn Fn(&str) -> Option<String>| -> Vec<String> {
         let reading = super::super::Reading {
             setting,
             ..super::super::Reading::bare()
@@ -110,9 +110,9 @@ OPENVPN_USER = { secret = "openvpn-user" }
             .map(|variable| variable.name)
             .collect()
     };
-    assert!(named(&|_, _| None).is_empty());
+    assert!(named(&|_| None).is_empty());
     assert_eq!(
-        named(&|_, name| (name == "komga:vpn-type").then(|| "openvpn".to_owned())),
+        named(&|name| (name == "komga:vpn-type").then(|| "openvpn".to_owned())),
         ["OPENVPN_USER"]
     );
 }

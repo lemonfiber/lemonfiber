@@ -16,6 +16,7 @@ pub(crate) mod run;
 mod secrets;
 pub(crate) mod store;
 pub(crate) mod undoing;
+mod view;
 pub(crate) mod waiting;
 
 pub(crate) use files::{text, written};
@@ -24,6 +25,7 @@ pub(crate) use restarting::{restarted, running};
 pub(crate) use secrets::keyed::UNMATCHED;
 pub(crate) use secrets::{dropped, filed, kept, keyed_at, lapsing, Keeping, Secrets, Source};
 pub(crate) use store::Settings;
+pub(crate) use view::Stores;
 pub(crate) use waiting::held_back;
 
 use crate::app::Ctx;

@@ -653,7 +653,7 @@ async fn told_with(name: &str, prepared: fn(&crate::app::Ctx)) -> Vec<String> {
     let ctx = proving(name, runner, http.clone());
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     let key = crate::config::for_service("sonarr", crate::config::API_KEY_SUFFIX);
-    let _ = std::fs::write(&env, format!("{}{key}=k3y\n", read(&env)));
+    crate::test_support::recorded_as(&env, &key, "k3y");
     prepared(&ctx);
     let at = crate::plugin::Source::Path(source(name, &format!("{PROVING}{TELLING}")));
     let asked = Asked::Install {

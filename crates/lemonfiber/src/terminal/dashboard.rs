@@ -112,7 +112,7 @@ async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
         Source::External(path) => Some(path.to_path_buf()),
         Source::Embedded(_) => None,
     };
-    let ctx = crate::context::context(stack, again.dry_run, again.force);
+    let ctx = crate::context::context(stack, again.dry_run, again.force).await;
     crate::ui::run(
         ctx,
         asked,

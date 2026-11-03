@@ -357,15 +357,15 @@ fn a_fold_the_journal_will_not_take_is_not_made() {
 }
 
 #[test]
-fn stores_that_cannot_be_read_leave_the_file_as_it_is() {
+fn stores_that_cannot_be_read_answer_nothing_and_the_file_is_never_read_in_their_place() {
     let (_, env) = stacked("unread-stores", &[("VPN_COUNTRIES", "Sweden")]);
     assert!(std::fs::write(env.with_file_name(SETTINGS), "not a store").is_ok());
     assert!(std::fs::write(env.with_file_name(SECRETS), "not a store").is_ok());
     let file = store::read(&env).unwrap_or_default();
 
-    let overlaid = legacy::overlaid(&env, file);
+    let overlaid = legacy::answered(&crate::settings::Stores::beside(&env), file);
 
-    assert_eq!(overlaid.get("VPN_COUNTRIES"), Some("Sweden"));
+    assert_eq!(overlaid.get("VPN_COUNTRIES"), None);
 }
 
 fn keeping(plugin: &str, was: &str) -> crate::plugin::Installed {
@@ -447,4 +447,130 @@ fn a_first_party_plugins_values_are_filed_from_where_its_was_says_and_no_one_els
         line(&env, "STRANGER_KEY").as_deref(),
         Some("stranger-secret")
     );
+}
+
+/// Every file beside the environment file at `env`, with what it holds.
+fn beside(env: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut held: Vec<(PathBuf, Vec<u8>)> = env
+        .parent()
+        .and_then(|dir| std::fs::read_dir(dir).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .map(|path| {
+            let bytes = std::fs::read(&path).unwrap_or_default();
+            (path, bytes)
+        })
+        .collect();
+    held.sort();
+    held
+}
+
+#[tokio::test]
+async fn a_rehearsal_on_a_machine_never_filed_reads_what_filing_would_keep_and_writes_nothing() {
+    let (ctx, env) = stacked(
+        "rehearsed-reads",
+        &[
+            ("VPN_COUNTRIES", "Belgium"),
+            ("HOMEPAGE_VAR_LAN_HOST", "10.0.0.2"),
+            ("INDEXER_APIKEY", "indexer-key"),
+            ("SONARR_API_KEY", "series-key"),
+        ],
+    );
+    let rehearsal = ctx.clone().rehearsing();
+    let before = beside(&env);
+
+    crate::filed(&rehearsal).await;
+    let recorded = super::super::recorded::Recorded::of(&rehearsal);
+    let shown = legacy::overlaid(&rehearsal, store::read(&env).unwrap_or_default());
+
+    assert_eq!(recorded.value("gluetun:countries"), Some("Belgium"));
+    assert_eq!(shown.get("HOMEPAGE_VAR_LAN_HOST"), Some("10.0.0.2"));
+    assert_eq!(
+        crate::app::targets::recorded_secret(&rehearsal, "INDEXER_APIKEY").as_deref(),
+        Some("indexer-key")
+    );
+    assert_eq!(
+        crate::app::targets::recorded_secret(&rehearsal, "LIBRARY_CURATE_TV_API_KEY").as_deref(),
+        Some("series-key")
+    );
+    assert_eq!(beside(&env), before, "a rehearsal writes nothing");
+
+    assert_eq!(
+        super::super::recorded::Recorded::of(&ctx).value("gluetun:countries"),
+        None,
+        "a run that files reads nothing before it has"
+    );
+}
+
+#[test]
+fn a_filed_setting_written_into_the_environment_file_by_hand_is_never_read() {
+    let (ctx, env) = stacked("hand-edited", &[("VPN_COUNTRIES", "Belgium")]);
+    assert!(crate::filed_stack(&ctx).is_ok());
+    assert!(store::set(&env, "VPN_COUNTRIES", "Elsewhere").is_ok());
+    assert!(crate::filed_stack(&ctx).is_ok());
+
+    for run in [ctx.clone(), ctx.clone().rehearsing()] {
+        let shown = legacy::overlaid(&run, store::read(&env).unwrap_or_default());
+        assert_eq!(
+            super::super::recorded::Recorded::of(&run).value("gluetun:countries"),
+            Some("Belgium")
+        );
+        assert_eq!(shown.get("VPN_COUNTRIES"), Some("Belgium"));
+    }
+    assert_eq!(
+        setting(&env, "gluetun:countries").as_deref(),
+        Some("Belgium")
+    );
+
+    assert!(std::fs::remove_file(env.with_file_name(SETTINGS)).is_ok());
+    assert!(crate::settings::store::marked_stack_filed(&env.with_file_name(SETTINGS)).is_ok());
+    let shown = legacy::overlaid(&ctx, store::read(&env).unwrap_or_default());
+    assert_eq!(
+        super::super::recorded::Recorded::of(&ctx).value("gluetun:countries"),
+        None
+    );
+    assert_eq!(shown.get("VPN_COUNTRIES"), None);
+}
+
+#[test]
+fn a_rehearsal_plans_nothing_where_there_is_no_environment_file_or_it_cannot_be_read() {
+    let nowhere = crate::test_support::a_context().build().rehearsing();
+    let planned = super::super::filing::plan(&nowhere);
+    assert!(planned.settings.is_empty() && planned.secrets.is_empty());
+    assert!(super::super::Stores::read(&nowhere)
+        .is_ok_and(|stores| stores.settings.value("gluetun:countries").is_none()));
+
+    let (ctx, env) = stacked("unreadable-env", &[("VPN_COUNTRIES", "Belgium")]);
+    assert!(std::fs::remove_file(&env).is_ok());
+    assert!(std::fs::create_dir_all(&env).is_ok());
+    let planned = super::super::filing::plan(&ctx.rehearsing());
+    assert!(planned.settings.is_empty() && planned.secrets.is_empty());
+}
+
+#[test]
+fn a_rehearsal_after_a_plugins_secrets_were_filed_plans_only_the_stack_and_its_credentials() {
+    let (ctx, env) = stacked(
+        "plugins-filed",
+        &[
+            ("VPN_COUNTRIES", "Belgium"),
+            ("INDEXER_APIKEY", "indexer-key"),
+        ],
+    );
+    assert!(crate::settings::store::marked_filed(&env.with_file_name(SETTINGS)).is_ok());
+    let planned = super::super::filing::plan(&ctx.rehearsing());
+    assert_eq!(
+        planned.settings,
+        [("gluetun:countries".to_owned(), "Belgium".to_owned())]
+    );
+    assert!(planned
+        .secrets
+        .iter()
+        .all(|(_, _, from)| *from != crate::settings::Source::Recipe));
+    assert!(planned
+        .secrets
+        .iter()
+        .any(|(name, value, _)| name == "INDEXER_APIKEY" && value == "indexer-key"));
 }

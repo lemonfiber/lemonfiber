@@ -37,9 +37,10 @@ pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool, fillers: &Fi
         };
     }
     if let Some(plugin) = held.plugins() {
-        let value = crate::settings::secrets_at(ctx)
-            .and_then(|at| crate::settings::Secrets::at(&at).ok())
-            .and_then(|kept| kept.value(&held.setting).map(str::to_owned));
+        let value = crate::settings::Stores::of(ctx)
+            .secrets
+            .value(&held.setting)
+            .map(str::to_owned);
         return match value {
             Some(value) => Revealed {
                 name: held.name.clone(),

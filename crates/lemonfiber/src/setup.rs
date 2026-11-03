@@ -355,7 +355,7 @@ async fn drive(
         Ok(core_setup::Outcome::Applied) => {
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.
-            ctx.settings = read_settings();
+            ctx.settings = read_settings(Some(&ctx));
             concluded(
                 SetupOutcome::Applied,
                 &ctx.settings,

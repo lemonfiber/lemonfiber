@@ -106,7 +106,6 @@ impl<'a> Fencing<'a> {
     fn fence<'u>(&'u self, id: &'u str, profile: String, image: &str) -> Unit<'u> {
         Unit {
             id,
-            namespace: id,
             profile,
             image: literal(image),
             published: Vec::new(),

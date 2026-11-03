@@ -57,9 +57,7 @@ pub(super) fn upstream(
 
 /// The value the secret store holds for each of `plugin`'s secrets, by its id.
 fn holding(ctx: &Ctx, plugin: &str) -> impl Fn(&str) -> Option<String> {
-    let secrets = crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .unwrap_or_default();
+    let secrets = crate::settings::Stores::of(ctx).secrets;
     let plugin = plugin.to_owned();
     move |secret: &str| {
         secrets

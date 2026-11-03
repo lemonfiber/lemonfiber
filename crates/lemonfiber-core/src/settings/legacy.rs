@@ -2,8 +2,9 @@ use std::path::Path;
 
 use lemonfiber_manifest::container::DOMAIN;
 
+use crate::app::Ctx;
 use crate::config::env::EnvFile;
-use crate::config::paths::{SECRETS, SETTINGS};
+use crate::config::paths::SECRETS;
 use crate::config::store::Failure;
 use crate::config::{
     CAPTURED_SUFFIX, CREDENTIAL_SUFFIXES, DOMAIN_KEY, HOUSEHOLD_HOST_KEY, HOUSEHOLD_HOST_SETTING,
@@ -113,12 +114,6 @@ pub(crate) fn setting_key(name: &str) -> Option<&'static str> {
     named(name).filter(|row| !row.secret).map(|row| row.key)
 }
 
-pub(crate) fn value<'a>(env: &'a EnvFile, name: &str) -> Option<&'a str> {
-    setting_key(name)
-        .and_then(|key| env.get(key))
-        .filter(|value| !value.is_empty())
-}
-
 /// How a value entered under the environment file's name of a secret is journalled.
 pub(crate) struct Entering<'a> {
     /// The operation it is journalled under.
@@ -176,23 +171,36 @@ pub(crate) fn entered(
     )
 }
 
-/// `file`, the environment file at `env`, with each name a setting or a secret the core
-/// holds was read into answering what the settings and secret stores hold for it: what
-/// every reader of those names is handed, once the stores hold the stack's values.
+/// `file` without a line for any name a setting or a secret the core holds was read
+/// into: lemonfiber's own lines, which hold neither.
 #[must_use]
-pub fn overlaid(env: &Path, mut file: EnvFile) -> EnvFile {
-    if let Ok(held) = super::Settings::at(&env.with_file_name(SETTINGS)) {
-        for row in TABLE.iter().filter(|row| !row.secret) {
-            if let Some(value) = held.value(row.name) {
-                file.set(row.key, value);
-            }
-        }
+pub fn unstored(mut file: EnvFile) -> EnvFile {
+    for row in &TABLE {
+        file.remove(row.key);
     }
-    if let Ok(kept) = super::Secrets::at(&env.with_file_name(SECRETS)) {
-        for row in TABLE.iter().filter(|row| row.secret) {
-            if let Some(value) = kept.value(row.name) {
-                file.set(row.key, value);
-            }
+    file
+}
+
+/// `file`, the environment file, with each name a setting or a secret the core holds was
+/// read into answering only what the stores this run reads hold for it: what every reader
+/// of those names is handed, and nothing the file itself still says.
+#[must_use]
+pub fn overlaid(ctx: &Ctx, file: EnvFile) -> EnvFile {
+    answered(&super::Stores::of(ctx), file)
+}
+
+/// `file` with each name a setting or a secret the core holds was read into answering
+/// only what `stores` hold for it.
+pub(crate) fn answered(stores: &super::Stores, mut file: EnvFile) -> EnvFile {
+    for row in &TABLE {
+        let held = if row.secret {
+            stores.secrets.value(row.name)
+        } else {
+            stores.settings.value(row.name)
+        };
+        match held {
+            Some(value) => file.set(row.key, value),
+            None => file.remove(row.key),
         }
     }
     file

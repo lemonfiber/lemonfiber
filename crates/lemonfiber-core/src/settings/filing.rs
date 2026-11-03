@@ -1,7 +1,10 @@
+use std::path::Path;
+
 use lemonfiber_manifest::container::earlier::{self, Earlier};
 
 use crate::app::Ctx;
-use crate::config::paths::{SECRETS, SETTINGS};
+use crate::config::env::EnvFile;
+use crate::config::paths::{JOURNAL, SECRETS, SETTINGS};
 use crate::config::storage::{self, Storage};
 use crate::config::store::{self, Failure};
 use crate::config::{DATA_ROOT_KEY, NAS_EXPORT_KEY, NAS_HOST_KEY};
@@ -11,7 +14,7 @@ use crate::plugin::Installed;
 
 use super::legacy;
 use super::secrets::Keeping;
-use super::{Settings, Source};
+use super::{Secrets, Settings, Source};
 
 struct Filing {
     name: String,
@@ -21,7 +24,7 @@ struct Filing {
 
 /// File what the operator's environment file and the stack's hold into the stores, saying
 /// so where the stack's could not be filed yet.
-pub(crate) async fn everything(ctx: &Ctx) {
+pub async fn everything(ctx: &Ctx) {
     if let Err(failure) = super::renaming::renamed(ctx) {
         ctx.narrator
             .say(&format!(
@@ -62,18 +65,11 @@ pub(crate) fn credentials(ctx: &Ctx) -> Result<(), Failure> {
         return Ok(());
     };
     let file = store::read(env)?;
-    let held: Vec<(String, String, &str)> = file
-        .keys()
-        .into_iter()
-        .filter_map(|key| {
-            let value = file.get(key).filter(|value| !value.is_empty())?;
-            Some((key.to_owned(), legacy::held_as(key)?, value))
-        })
-        .collect();
+    let held = credentials_in(&file);
     if held.is_empty() {
         return Ok(());
     }
-    let journal = env.with_file_name(crate::config::paths::JOURNAL);
+    let journal = env.with_file_name(JOURNAL);
     let (at, stamp) = (ctx.seconds(), ctx.stamp());
     let keeping: Vec<Keeping<'_>> = held
         .iter()
@@ -104,6 +100,18 @@ pub(crate) fn credentials(ctx: &Ctx) -> Result<(), Failure> {
     Ok(())
 }
 
+/// Every credential `file` holds, as the key it is written under, the name the secret
+/// store holds it as and its value.
+fn credentials_in(file: &EnvFile) -> Vec<(String, String, &str)> {
+    file.keys()
+        .into_iter()
+        .filter_map(|key| {
+            let value = file.get(key).filter(|value| !value.is_empty())?;
+            Some((key.to_owned(), legacy::held_as(key)?, value))
+        })
+        .collect()
+}
+
 pub(crate) fn filed(ctx: &Ctx) {
     if ctx.dry_run {
         return;
@@ -121,11 +129,11 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
     let installed = crate::app::plugins::read(ctx)
         .map(|register| register.installed().to_vec())
         .unwrap_or_default();
-    let filings = candidates(ctx, &installed);
+    let filings = candidates(env, &store::read(env)?, &installed);
     if filings.is_empty() {
         return Ok(());
     }
-    let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
+    let journal = env.with_file_name(JOURNAL);
     let at = ctx.seconds();
     let stamp = ctx.stamp();
     let keeping: Vec<Keeping<'_>> = filings
@@ -143,7 +151,7 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
             .iter()
             .map(|(one, current)| change(one, current.clone(), &filings, &stamp))
             .collect();
-        crate::app::recover::journalled(&paths.journal(), &changes)
+        crate::app::recover::journalled(&journal, &changes)
     })?;
     for filing in &filings {
         store::unset(env, &filing.key)?;
@@ -160,7 +168,10 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
     super::store::marked_filed(&env.with_file_name(SETTINGS))
 }
 
-fn candidates(ctx: &Ctx, installed: &[Installed]) -> Vec<Filing> {
+/// Every secret of `installed` an earlier release kept under its captured key, in the
+/// secret store or in `file`, the environment file at `env`.
+fn candidates(env: &Path, file: &EnvFile, installed: &[Installed]) -> Vec<Filing> {
+    let kept = Secrets::at(&env.with_file_name(SECRETS)).unwrap_or_default();
     installed
         .iter()
         .flat_map(|one| {
@@ -177,7 +188,12 @@ fn candidates(ctx: &Ctx, installed: &[Installed]) -> Vec<Filing> {
                         &secret.id,
                         crate::config::CAPTURED_SUFFIX,
                     );
-                    crate::app::targets::recorded_secret(ctx, &key).map(|value| Filing {
+                    let value = kept
+                        .value(&key)
+                        .or_else(|| file.get(&key))
+                        .filter(|value| !value.is_empty())?
+                        .to_owned();
+                    Some(Filing {
                         name: super::named(&one.plugin, &secret.id),
                         key,
                         value,
@@ -224,22 +240,14 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
     }
     let file = store::read(env)?;
     let kept = earlier(ctx);
-    let rows: Vec<(&Earlier, &str)> = kept
-        .iter()
-        .filter_map(|row| {
-            file.get(&row.key)
-                .filter(|value| !value.is_empty())
-                .map(|value| (row, value))
-        })
-        .collect();
+    let rows = stacked(&kept, &file);
     let key_of = |name: &str| {
         rows.iter()
             .find(|(row, _)| row.name == name)
             .map(|(row, _)| row.key.clone())
     };
     if !rows.is_empty() {
-        let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
-        let journal = paths.journal();
+        let journal = env.with_file_name(JOURNAL);
         let at = ctx.seconds();
         let stamp = ctx.stamp();
         let keeping: Vec<Keeping<'_>> = rows
@@ -278,6 +286,65 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
     }
     nas_folded(ctx, env, &file)?;
     super::store::marked_stack_filed(&settings)
+}
+
+/// Each of `kept` that `file` holds a value for, with that value.
+fn stacked<'a>(kept: &'a [Earlier], file: &'a EnvFile) -> Vec<(&'a Earlier, &'a str)> {
+    kept.iter()
+        .filter_map(|row| {
+            file.get(&row.key)
+                .filter(|value| !value.is_empty())
+                .map(|value| (row, value))
+        })
+        .collect()
+}
+
+/// What filing would keep in the stores, read from the environment file and the stores as
+/// they stand: each setting and each secret by name, in the order filing keeps them, which
+/// a store takes only where it holds nothing under that name yet.
+pub(crate) fn plan(ctx: &Ctx) -> Plan {
+    let Some(env) = ctx.settings.env_file.as_deref() else {
+        return Plan::default();
+    };
+    let Ok(file) = store::read(env) else {
+        return Plan::default();
+    };
+    let settings = Settings::at(&env.with_file_name(SETTINGS)).unwrap_or_default();
+    let mut plan = Plan::default();
+    if !settings.is_filed() {
+        let installed = crate::app::plugins::read(ctx)
+            .map(|register| register.installed().to_vec())
+            .unwrap_or_default();
+        plan.secrets.extend(
+            candidates(env, &file, &installed)
+                .into_iter()
+                .map(|filing| (filing.name, filing.value, Source::Recipe)),
+        );
+    }
+    if !settings.is_stack_filed() {
+        for (row, value) in stacked(&earlier(ctx), &file) {
+            let (name, value) = (row.name.clone(), (*value).to_owned());
+            if row.secret {
+                plan.secrets.push((name, value, Source::Operator));
+            } else {
+                plan.settings.push((name, value));
+            }
+        }
+    }
+    plan.secrets.extend(
+        credentials_in(&file)
+            .into_iter()
+            .map(|(key, name, value)| (name, value.to_owned(), legacy::source_of(&key))),
+    );
+    plan
+}
+
+/// What filing would keep in the stores: each setting as its name and value, and each
+/// secret as its name, value and where it came from.
+#[derive(Debug, Default)]
+pub(crate) struct Plan {
+    pub(crate) settings: Vec<(String, String)>,
+    pub(crate) secrets: Vec<(String, String, Source)>,
 }
 
 /// Every variable an earlier release kept a setting's or a secret's value under, one
@@ -319,13 +386,12 @@ fn earlier(ctx: &Ctx) -> Vec<Earlier> {
             secret: row.secret,
         })
         .collect::<Vec<_>>();
-    let mut kept: Vec<Earlier> = Vec::new();
-    for one in declared.into_iter().chain(table) {
-        if !kept.iter().any(|held| held.key == one.key) {
-            kept.push(one);
-        }
-    }
-    kept
+    let mut seen = std::collections::BTreeSet::new();
+    declared
+        .into_iter()
+        .chain(table)
+        .filter(|one| seen.insert(one.key.clone()))
+        .collect()
 }
 
 fn nas_folded(
@@ -366,8 +432,7 @@ fn nas_folded(
         set(NAS_HOST_KEY, Some(host), ""),
         set(NAS_EXPORT_KEY, Some(path), ""),
     ];
-    let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
-    crate::app::recover::journalled(&paths.journal(), &changes)?;
+    crate::app::recover::journalled(&env.with_file_name(JOURNAL), &changes)?;
     store::set(env, DATA_ROOT_KEY, &folded)?;
     store::set(env, NAS_HOST_KEY, "")?;
     store::set(env, NAS_EXPORT_KEY, "")

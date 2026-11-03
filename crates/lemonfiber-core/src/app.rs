@@ -357,11 +357,11 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // costs. The line above is news from a run nobody saw; this one is about the
     // run the operator is in the middle of asking for.
     disturbance::said(&command, ctx).await;
+    crate::settings::filing::everything(ctx).await;
     // Before anything signs in with a credential lemonfiber minted: a rotation that
     // stopped part-way left its replacement beside it, and which of the two the
     // service takes is settled here so every command after it signs in with that one.
     credentials::pending::settled(ctx).await;
-    crate::settings::filing::everything(ctx).await;
     routed(rehearsal::carried(command, ctx), ctx)
         .await
         .map(|outcome| {

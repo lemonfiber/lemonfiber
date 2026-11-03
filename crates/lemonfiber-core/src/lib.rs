@@ -120,12 +120,18 @@ pub mod seed;
 pub mod self_update;
 pub(crate) mod settings;
 pub mod shell;
+/// Files what the environment files hold into the settings and secret stores, before
+/// anything of a run reads them.
+pub use settings::filing::everything as filed;
 /// Moves every value the stack's environment file holds for a part or a published setting
 /// into the stores, once.
 pub use settings::filing::stack as filed_stack;
-/// The environment file with every name a setting the core holds was read into
-/// answering what the settings store holds.
+/// The environment file with every name a setting or a secret the core holds was read
+/// into answering only what the stores a run reads hold.
 pub use settings::legacy::overlaid as stored_over;
+/// The environment file without a line for any name a setting or a secret the core holds
+/// was read into.
+pub use settings::legacy::unstored;
 /// Every setting and secret the services read, as `lemonfiber settings` lists them.
 pub use settings::run::listing as listed_settings;
 /// Every refusal a change to a setting answers with before it is weighed.

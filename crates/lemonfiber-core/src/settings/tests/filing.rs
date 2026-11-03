@@ -237,3 +237,18 @@ fn staging(record: &Path) -> PathBuf {
     name.push(".writing");
     record.with_file_name(name)
 }
+
+#[test]
+fn a_rehearsal_reads_a_plugins_captured_secret_as_filing_would_keep_it_and_files_nothing() {
+    let ctx = machine("rehearsed-captured", Some("s3cr$t")).rehearsing();
+    let stores = crate::settings::Stores::of(&ctx);
+    assert_eq!(stores.secrets.value("comics:komga"), Some("s3cr$t"));
+    assert_eq!(
+        stores.secrets.source("comics:komga"),
+        Some(crate::settings::Source::Recipe)
+    );
+    super::super::filing::filed(&ctx);
+    assert_eq!(held(&ctx), None);
+    assert_eq!(line(&ctx).as_deref(), Some("s3cr$t"));
+    assert!(!filed_marker(&ctx));
+}

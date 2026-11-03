@@ -50,8 +50,8 @@ pub enum Holding {
 
 /// Where a plugin's secrets are read from.
 pub struct Reading<'a> {
-    /// The operator's value for a setting of the named namespace, where one is recorded.
-    pub setting: &'a dyn Fn(&str, &str) -> Option<String>,
+    /// The operator's value for the named setting, where one is recorded.
+    pub setting: &'a dyn Fn(&str) -> Option<String>,
     /// The named service's secrets file, where there is somewhere to keep one.
     pub secrets_file: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// Where a credential the named service holds is read from for the named plugin,
@@ -64,7 +64,7 @@ impl Reading<'_> {
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
-            setting: &|_, _| None,
+            setting: &|_| None,
             secrets_file: &|_| None,
             crossing: &|_, _| None,
         }
@@ -80,7 +80,6 @@ pub(crate) fn unit<'a>(
     let fields = &placed.fields;
     Unit {
         id: &placed.service,
-        namespace: &placed.service,
         profile: super::profile_of(installed),
         image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
         published: published(placed),
@@ -183,7 +182,7 @@ pub(crate) fn needed(
         .find(|secret| secret.id == id)
         .is_none_or(|secret| {
             choices::met(&secret.needs, &|setting| {
-                (reading.setting)(&installed.plugin, setting)
+                (reading.setting)(setting)
                     .or_else(|| choices::defaulted(&placed.fields.env, setting))
             })
         })
@@ -235,7 +234,8 @@ pub(super) fn tmpfs(placed: &Placed) -> impl Iterator<Item = &String> {
     entry::tmpfs(&placed.fields.tmpfs, placed.takes_data)
 }
 
-/// Whether every path the record keeps for the service is one the model allows.
+/// Whether every path the record keeps for the service is one the model allows, and no
+/// two of them land at one target.
 pub(super) fn sound(placed: &Placed) -> bool {
     is_target(&placed.config_path, true)
         && mounts(placed).count() == placed.fields.mount.len()
@@ -244,6 +244,19 @@ pub(super) fn sound(placed: &Placed) -> bool {
             .tmpfs
             .iter()
             .all(|path| is_target(path, placed.takes_data))
+        && landing_apart(placed)
+}
+
+/// Whether the configuration directory, the fronted configuration, each mount and each
+/// scratch path land at targets of their own.
+fn landing_apart(placed: &Placed) -> bool {
+    let fields = &placed.fields;
+    let mut landed = std::collections::BTreeSet::new();
+    std::iter::once(placed.config_path.as_str())
+        .chain(fields.shares_config.as_deref())
+        .chain(fields.mount.iter().map(|mount| mount.to.as_str()))
+        .chain(fields.tmpfs.iter().map(String::as_str))
+        .all(|target| landed.insert(target))
 }
 
 #[cfg(test)]

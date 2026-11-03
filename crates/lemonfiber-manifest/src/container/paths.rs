@@ -1,6 +1,6 @@
 //! Where a mount may come from and where it may land.
 
-use super::DATA;
+use super::{Mount, DATA};
 
 /// What is wrong with `path` as a target inside a container, if anything.
 pub(super) fn target(path: &str, takes_data: bool) -> Option<&'static str> {
@@ -27,6 +27,16 @@ pub fn lies_inside(path: &str, other: &str) -> bool {
     path.len() > other.len()
         && path.starts_with(other)
         && path.as_bytes().get(other.len()) == Some(&b'/')
+}
+
+/// Whether a mount of `all` other than the one at `index` comes from that one's source.
+#[must_use]
+pub fn shares_a_source(all: &[Mount], index: usize) -> bool {
+    all.get(index).is_some_and(|mount| {
+        all.iter()
+            .enumerate()
+            .any(|(other, one)| other != index && one.from == mount.from)
+    })
 }
 
 /// Whether `path` is a mount source: a plain relative path inside the service's own mount

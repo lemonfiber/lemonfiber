@@ -169,7 +169,7 @@ async fn starting_named_services_runs_the_start_compose_spells_that_way() {
         "it is a start, and reports as one: {envelope}"
     );
     assert!(
-        envelope.contains("start") && envelope.contains("qbittorrent"),
+        envelope.contains(r#""--","qbittorrent"],"#),
         "and the command it ran names the services rather than the form: {envelope}"
     );
 }

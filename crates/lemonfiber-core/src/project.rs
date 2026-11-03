@@ -47,8 +47,8 @@ pub const UNFENCED: &str = "lemonfiber.unfenced";
 
 /// What the project's values are read from beyond the manifest and the register.
 pub struct Reading<'a> {
-    /// The operator's value for a setting of the named namespace, where one is recorded.
-    pub setting: &'a dyn Fn(&str, &str) -> Option<String>,
+    /// The operator's value for the named setting, where one is recorded.
+    pub setting: &'a dyn Fn(&str) -> Option<String>,
     /// The named service's secrets file, where it names a secret and has somewhere to
     /// keep one.
     pub secrets_file: &'a dyn Fn(&str) -> Option<PathBuf>,
@@ -81,7 +81,7 @@ impl Reading<'_> {
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
-            setting: &|_, _| None,
+            setting: &|_| None,
             secrets_file: &|_| None,
             render_group: None,
             nfs: None,
@@ -122,7 +122,7 @@ pub fn generated(
     let waiting: Vec<String> = crate::settings::held_back(
         manifest,
         installed,
-        &|name| (reading.setting)("", name),
+        reading.setting,
         reading.held,
         &topology,
     )
@@ -310,7 +310,6 @@ fn pass_unit<'a>(
     let profile = profile_of(manifest, installed, inputs.guard.as_deref()?)?;
     Some(Unit {
         id: crate::pass::SERVICE,
-        namespace: crate::pass::SERVICE,
         profile,
         image: literal(image),
         published: Vec::new(),
@@ -361,7 +360,7 @@ fn beside<'a>(unit: Unit<'a>, moved: &[MovedReport]) -> Unit<'a> {
 /// A stack service as its entry needs it, with its own secrets file where it names a
 /// secret.
 fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
-    let image = literal(&reference(service));
+    let image = literal(&service.reference());
     let tier = match service.bind {
         Some(Bind::Lan) => Tier::Household,
         Some(Bind::Loopback) | None => Tier::Loopback,
@@ -379,7 +378,6 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
         .collect();
     Unit {
         id: &service.id,
-        namespace: &service.id,
         profile: service.profile.clone(),
         image,
         published,
@@ -402,14 +400,6 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
             .flatten(),
         command: Vec::new(),
         granted: &[],
-    }
-}
-
-/// The image `service` runs, by its digest where it pins one.
-pub(crate) fn reference(service: &Service) -> String {
-    match &service.digest {
-        Some(digest) => format!("{}:{}@{digest}", service.image, service.tag),
-        None => format!("{}:{}", service.image, service.tag),
     }
 }
 

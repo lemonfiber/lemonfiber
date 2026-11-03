@@ -58,7 +58,7 @@ fn contracted_identity_ctx(
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = store::set(
+    crate::test_support::recorded_as(
         env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         ADMINISTRATOR,

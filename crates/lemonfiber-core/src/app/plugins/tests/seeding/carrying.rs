@@ -50,12 +50,11 @@ fn minted_moved(
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> Option<String> {
     let env = ctx.settings.env_file.clone().unwrap_or_default();
-    let recorded = format!(
-        "{}{}={RECORDED}\n",
-        std::fs::read_to_string(&env).unwrap_or_default(),
-        crate::config::for_service(RESERVED, crate::config::API_KEY_SUFFIX)
+    crate::test_support::recorded_as(
+        &env,
+        &crate::config::for_service(RESERVED, crate::config::API_KEY_SUFFIX),
+        RECORDED,
     );
-    let _ = std::fs::write(&env, recorded);
     let mut would = crate::plugin::Installed::of(manifest);
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     would.tree = crate::test_support::A_TREE.to_owned();
@@ -275,7 +274,7 @@ fn minted_moving_in(
     let plugin = would.plugin.clone();
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     if let Some(key) = recorded {
-        let _ = crate::config::store::set(
+        crate::test_support::recorded_as(
             &env,
             &crate::config::for_service(&plugin, crate::config::API_KEY_SUFFIX),
             key,
@@ -444,12 +443,14 @@ fn minted_account(
     let _ = crate::config::store::unset(&env, "DOWNLOAD_TORRENT_PASSWORD");
     let _ = crate::settings::dropped(
         &env.with_file_name(crate::config::paths::SECRETS),
-        &["DOWNLOAD_TORRENT_PASSWORD".to_owned()],
+        &[
+            "DOWNLOAD_TORRENT_PASSWORD".to_owned(),
+            "QBITTORRENT_PASSWORD".to_owned(),
+        ],
     );
-    let _ = match recorded {
-        Some(password) => crate::config::store::set(&env, "QBITTORRENT_PASSWORD", password),
-        None => crate::config::store::unset(&env, "QBITTORRENT_PASSWORD"),
-    };
+    if let Some(password) = recorded {
+        crate::test_support::recorded_as(&env, "QBITTORRENT_PASSWORD", password);
+    }
     let mut would = crate::plugin::Installed::of(&manifest);
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     would.tree = crate::test_support::A_TREE.to_owned();
@@ -530,7 +531,7 @@ fn carried(
     let ctx = seeding(name);
     let env = ctx.settings.env_file.clone().unwrap_or_default();
     for (setting, value) in recorded {
-        let _ = crate::config::store::set(&env, setting, value);
+        crate::test_support::recorded_as(&env, setting, value);
     }
     let Some(would) = moved else {
         return std::collections::BTreeMap::new();

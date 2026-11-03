@@ -89,20 +89,12 @@ pub(crate) async fn settled(ctx: &Ctx) {
     }
 }
 
-/// Whether a replacement is left pending: held in the secret store, or still in the
-/// environment file where an earlier release left it and no run has filed it yet.
+/// Whether a replacement is left pending in the secret store.
 fn is_any_pending(ctx: &Ctx) -> bool {
-    let pending = |name: &str| name.ends_with(config::PENDING_SUFFIX);
-    let held = crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .is_some_and(|secrets| secrets.names().any(pending));
-    held || ctx.settings.env_file.as_deref().is_some_and(|env| {
-        config::store::read(env)
-            .unwrap_or_default()
-            .keys()
-            .iter()
-            .any(|key| pending(key))
-    })
+    crate::settings::Stores::of(ctx)
+        .secrets
+        .names()
+        .any(|name| name.ends_with(config::PENDING_SUFFIX))
 }
 
 /// Settle the administrator's password of whatever media server fills the identity

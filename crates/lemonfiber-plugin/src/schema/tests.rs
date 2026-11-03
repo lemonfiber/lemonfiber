@@ -767,5 +767,6 @@ fn the_egress_guard_shape_is_named_as_a_manifest_spells_it_and_gives_the_tunnel_
 }
 
 mod dashboard;
+mod fields;
 mod linking;
 mod networks;

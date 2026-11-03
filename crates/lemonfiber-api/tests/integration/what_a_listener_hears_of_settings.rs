@@ -79,7 +79,12 @@ async fn the_settings_are_said_again_only_when_one_changes() {
     );
 
     if let Some(env) = ctx.settings.env_file.as_deref() {
-        assert!(std::fs::write(env, "VPN_COUNTRIES=Netherlands\n").is_ok());
+        let settings = serde_json::json!({
+            "schema": 1,
+            "written_by": "0.0.0",
+            "values": { "gluetun:countries": "Netherlands" },
+        });
+        assert!(std::fs::write(env.with_file_name("settings.json"), settings.to_string()).is_ok());
     }
     live.refresh(&settings).await;
     let changed = listening.next().await.unwrap_or_default();

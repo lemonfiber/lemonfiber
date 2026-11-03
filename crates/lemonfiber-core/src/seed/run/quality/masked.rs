@@ -37,11 +37,11 @@ const UNOPENING: [char; 3] = ['-', '?', ':'];
 /// Every value the secret store keeps, and every value each replaced; refused where there
 /// is no store to read or it cannot be read, since a file cannot then be shown safely.
 pub(super) fn held(ctx: &crate::app::Ctx) -> Result<Vec<String>, String> {
-    let at = crate::settings::secrets_at(ctx)
+    crate::settings::secrets_at(ctx)
         .ok_or_else(|| "there is no secret store to hold the edit against".to_owned())?;
-    let secrets = crate::settings::Secrets::at(&at)
+    let stores = crate::settings::Stores::read(ctx)
         .map_err(|_| "the secret store could not be read to hold the edit against".to_owned())?;
-    Ok(secrets.values().map(str::to_owned).collect())
+    Ok(stores.secrets.values().map(str::to_owned).collect())
 }
 
 /// What a sync said in refusing, as it may be shown: withheld as prose is, with every one

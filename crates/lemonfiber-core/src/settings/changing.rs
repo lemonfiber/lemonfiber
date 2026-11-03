@@ -176,9 +176,7 @@ async fn written(
 }
 
 fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>> {
-    let held = super::secrets_at(ctx)
-        .and_then(|at| super::Secrets::at(&at).ok())
-        .is_some_and(|kept| kept.value(setting).is_some());
+    let held = super::Stores::of(ctx).secrets.value(setting).is_some();
     if held || readers.secrets.contains_key(setting) {
         return Err(Box::new(fences::secret(setting)));
     }
@@ -205,11 +203,8 @@ fn consequence(ctx: &Ctx, setting: &str, value: Option<&str>) -> Option<String> 
         .settings
         .env_file
         .as_deref()
-        .and_then(|env| {
-            crate::config::store::read(env)
-                .ok()
-                .map(|file| legacy::overlaid(env, file))
-        })
+        .and_then(|env| crate::config::store::read(env).ok())
+        .map(|file| legacy::overlaid(ctx, file))
         .unwrap_or_default();
     crate::app::configuring::consequence(ctx, &held, key, value.unwrap_or_default())
 }

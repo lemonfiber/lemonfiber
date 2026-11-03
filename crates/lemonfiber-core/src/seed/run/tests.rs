@@ -671,7 +671,7 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("seed-{name}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
-    let _ = crate::config::store::set(
+    crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
         "minted-earlier",
