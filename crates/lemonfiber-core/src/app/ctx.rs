@@ -496,4 +496,4 @@ impl Ctx {
 /// the sample the contract publishes, and the test that reads back the sentences
 /// a wait produces. Both were a hand-copied `180` and would have gone on passing
 /// after this was tuned, saying a length no run was held to.
-pub const PATIENCE: Duration = Duration::from_secs(180);
+pub const PATIENCE: Duration = crate::patience::STARTING.longest();

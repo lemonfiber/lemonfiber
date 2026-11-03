@@ -118,7 +118,7 @@ async fn ready(
             )
         })?;
     let asked = Contracted::new(ctx.seams.http.clone(), base, &adapter.service, key);
-    super::recording::answering(ctx.seams.serving.as_ref(), &asked, served, None).await?;
+    super::recording::answering(ctx.seams.serving.as_ref(), &asked, served, ctx.patience).await?;
     Ok(asked)
 }
 

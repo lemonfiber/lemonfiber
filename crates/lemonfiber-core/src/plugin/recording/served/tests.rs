@@ -181,7 +181,14 @@ async fn health_of(
     port: Option<u16>,
 ) -> Result<(), String> {
     let serving = Serves::on(1).standing(standing);
-    healthy(&serving, http, health, &served(port)).await
+    healthy(
+        &serving,
+        http,
+        health,
+        &served(port),
+        std::time::Duration::from_secs(1),
+    )
+    .await
 }
 
 fn health(kind: HealthKind, path: Option<&str>) -> Health {
@@ -244,9 +251,12 @@ async fn a_tcp_health_passes_on_any_answer_at_all() {
         Ok(())
     );
     let silent = Fake::always(Answer::Silent);
-    assert_eq!(
-        health_of(Some(&tcp), Standing::Running, &silent, Some(9)).await,
-        Err("its health did not pass within 1 seconds".to_owned())
+    let unanswered = health_of(Some(&tcp), Standing::Running, &silent, Some(9)).await;
+    assert!(
+        unanswered.as_ref().is_err_and(|why| why.starts_with(
+            "its health did not pass within 1 seconds: it last did not answer on port 9"
+        )),
+        "{unanswered:?}"
     );
 }
 
@@ -325,4 +335,36 @@ async fn no_container_is_started_with_a_directory_reached_through_a_link() {
         );
     }
     assert!(serving.asked().is_empty());
+}
+
+#[tokio::test]
+async fn a_wait_that_runs_out_says_what_it_last_saw() {
+    let ping = health(HealthKind::Http, Some("/ping"));
+    let erring = Fake::by_path(vec![("/ping", Answer::reply(503, "starting"))]);
+    assert_eq!(
+        health_of(Some(&ping), Standing::Running, &erring, Some(9)).await,
+        Err("its health did not pass within 1 seconds: it last answered /ping with 503".to_owned())
+    );
+    let own = health(HealthKind::Container, None);
+    let silent = Fake::always(Answer::Silent);
+    assert_eq!(
+        health_of(Some(&own), Standing::Unhealthy, &silent, Some(9)).await,
+        Err(
+            "its health did not pass within 1 seconds: it last said its own health check fails"
+                .to_owned()
+        )
+    );
+    assert_eq!(
+        health_of(Some(&own), Standing::Starting, &silent, Some(9)).await,
+        Err(
+            "its health did not pass within 1 seconds: it last said it is still starting"
+                .to_owned()
+        )
+    );
+}
+
+#[test]
+fn the_recorder_polls_at_the_start_patience_s_own_interval() {
+    assert_eq!(super::POLL, crate::patience::STARTING.between);
+    assert_eq!(crate::app::PATIENCE, crate::patience::STARTING.longest());
 }

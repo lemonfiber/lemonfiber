@@ -25,10 +25,7 @@ use crate::ports::service::Failure;
 use crate::ports::serving::{Bound, Serve, Served, Standing};
 
 /// How often a service still coming up is looked at again.
-pub(super) const POLL: Duration = Duration::from_millis(500);
-
-/// How long a service may take to become healthy where its health names no limit.
-const HEALTHY_WITHIN: Duration = Duration::from_secs(60);
+pub(super) const POLL: Duration = crate::patience::STARTING.between;
 
 /// How many of the last lines a failed service's container wrote are shown.
 pub(super) const LOG_LINES: usize = 50;
@@ -296,9 +293,15 @@ async fn asked(
 ) -> Result<Vec<Answer>, (String, String)> {
     let served = reaching.served;
     let plain = Addressed::to((recorder.transport)(), LOOPBACK, inside(reaching.placed));
-    healthy(recorder.serving, plain.as_ref(), health, served)
-        .await
-        .map_err(|why| ("health".to_owned(), why))?;
+    healthy(
+        recorder.serving,
+        plain.as_ref(),
+        health,
+        served,
+        recorder.patience,
+    )
+    .await
+    .map_err(|why| ("health".to_owned(), why))?;
     if let Some(operators) = items.iter().find(|item| item.keyed) {
         return Err((
             "first run".to_owned(),
@@ -337,54 +340,41 @@ async fn asked(
     Ok(answers)
 }
 
-/// How long the service is given to come up: its health's own limit, or the recorder's.
-pub(super) fn allowed(health: Option<&Health>) -> Duration {
-    health
-        .and_then(|health| health.timeout_s)
-        .map_or(HEALTHY_WITHIN, |seconds| {
-            Duration::from_secs(u64::from(seconds))
-        })
-}
-
 /// Wait until the service's health passes, or say why it did not within its limit.
 pub(in crate::plugin) async fn healthy(
     serving: &dyn crate::ports::serving::Serving,
     http: &dyn Http,
     health: Option<&Health>,
     served: &Served,
+    within: Duration,
 ) -> Result<(), String> {
     let port = served.port;
     until(
         serving,
         served,
-        allowed(health),
+        within,
         &HEALTH_PASSES,
-        |standing| async move { Ok(passes(http, health, port, standing).await) },
+        |standing| async move { Ok(unpassed(http, health, port, standing).await) },
     )
     .await
 }
 
 /// Wait until the adapter `served`, asked as `adapter`, says its upstream answers, or say
-/// why it did not within its `health`'s limit.
+/// why it did not `within`.
 pub(in crate::plugin) async fn answering(
     serving: &dyn crate::ports::serving::Serving,
     adapter: &Contracted,
     served: &Served,
-    health: Option<&Health>,
+    within: Duration,
 ) -> Result<(), String> {
-    until(
-        serving,
-        served,
-        allowed(health),
-        &UPSTREAM_ANSWERS,
-        |_| async {
-            match adapter.ready().await {
-                Ok(ready) => Ok(ready),
-                Err(Failure::Unavailable { .. }) => Ok(false),
-                Err(failure) => Err(failure.to_string()),
-            }
-        },
-    )
+    until(serving, served, within, &UPSTREAM_ANSWERS, |_| async {
+        match adapter.ready().await {
+            Ok(true) => Ok(None),
+            Ok(false) => Ok(Some("said its upstream does not answer yet".to_owned())),
+            Err(Failure::Unavailable { .. }) => Ok(Some("did not answer".to_owned())),
+            Err(failure) => Err(failure.to_string()),
+        }
+    })
     .await
 }
 
@@ -409,7 +399,8 @@ const UPSTREAM_ANSWERS: Awaited = Awaited {
 };
 
 /// Wait until `now` holds of `served` as it stands, or say why it will not: it exited, it
-/// did not hold within `within`, or `now` refused.
+/// did not hold `within`, saying what was last seen, or `now` refused. `now` answers what
+/// it saw where it does not hold yet.
 async fn until<F, Holds>(
     serving: &dyn crate::ports::serving::Serving,
     served: &Served,
@@ -419,7 +410,7 @@ async fn until<F, Holds>(
 ) -> Result<(), String>
 where
     F: Fn(Standing) -> Holds,
-    Holds: std::future::Future<Output = Result<bool, String>>,
+    Holds: std::future::Future<Output = Result<Option<String>, String>>,
 {
     let until = Instant::now() + within;
     loop {
@@ -430,12 +421,12 @@ where
         if let Standing::Exited(code) = standing {
             return Err(format!("it exited {code} before {}", awaited.passed));
         }
-        if now(standing).await? {
+        let Some(seen) = now(standing).await? else {
             return Ok(());
-        }
+        };
         if Instant::now() >= until {
             return Err(format!(
-                "{} within {} seconds",
+                "{} within {} seconds: it last {seen}",
                 awaited.unpassed,
                 within.as_secs()
             ));
@@ -444,18 +435,25 @@ where
     }
 }
 
-/// Whether the service's health passes now: its path answering over HTTP without an
-/// error or with the application's own refusal, which no port proxy can give, anything
-/// answering over TCP, and the container's own word otherwise.
-async fn passes(
+/// What the service's health showed where it does not pass now, and nothing where it
+/// does: its path answering over HTTP without an error or with the application's own
+/// refusal, which no port proxy can give, anything answering over TCP, and the
+/// container's own word otherwise.
+async fn unpassed(
     http: &dyn Http,
     health: Option<&Health>,
     port: Option<u16>,
     standing: Standing,
-) -> bool {
+) -> Option<String> {
     let kind = health.map_or(HealthKind::Container, |health| health.kind);
     let (HealthKind::Http | HealthKind::Tcp, Some(port)) = (kind, port) else {
-        return matches!(standing, Standing::Healthy | Standing::Running);
+        return match standing {
+            Standing::Healthy | Standing::Running => None,
+            Standing::Unhealthy => Some("said its own health check fails".to_owned()),
+            Standing::Starting | Standing::Exited(_) => {
+                Some("said it is still starting".to_owned())
+            }
+        };
     };
     let path = health
         .and_then(|health| health.path.as_deref())
@@ -469,11 +467,19 @@ async fn passes(
         pinned: None,
     };
     match (kind, http.send(&request).await) {
-        (HealthKind::Http, Ok(response)) => {
-            (200..400).contains(&response.status) || REFUSALS.contains(&response.status)
+        (HealthKind::Http, Ok(response))
+            if (200..400).contains(&response.status) || REFUSALS.contains(&response.status) =>
+        {
+            None
         }
-        (_, Ok(_)) => true,
-        (_, Err(_)) => false,
+        (HealthKind::Http, Ok(response)) => {
+            Some(format!("answered {path} with {}", response.status))
+        }
+        (_, Ok(_)) => None,
+        (_, Err(unreached)) => Some(format!(
+            "did not answer on port {port}: {}",
+            unreached.reason
+        )),
     }
 }
 

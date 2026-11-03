@@ -12,6 +12,12 @@ pub(crate) struct Patience {
     pub asks: u32,
 }
 
+/// A service coming up from its first start, which takes up to three minutes on a slow disk.
+pub(crate) const STARTING: Patience = Patience {
+    between: Duration::from_millis(500),
+    asks: 360,
+};
+
 /// A service starting again, which takes a few seconds and up to two minutes on a slow
 /// machine.
 pub(crate) const RESTART: Patience = Patience {
@@ -28,7 +34,7 @@ pub(crate) const REFRESH: Patience = Patience {
 impl Patience {
     /// The longest it waits.
     #[must_use]
-    pub(crate) fn longest(self) -> Duration {
+    pub(crate) const fn longest(self) -> Duration {
         self.between.saturating_mul(self.asks)
     }
 

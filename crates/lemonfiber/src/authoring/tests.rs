@@ -96,6 +96,7 @@ async fn published(
             random: &lemonfiber_fixtures::support::FixedRandom(None),
             taking: &Retaking::default(),
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await

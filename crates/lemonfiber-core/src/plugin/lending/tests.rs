@@ -151,7 +151,14 @@ async fn an_adapter_whose_upstream_never_answers_is_taken_away_and_said_why() {
 
     assert_eq!(
         lent.err().as_deref(),
-        Some("it did not say its upstream answers within 60 seconds")
+        Some(
+            format!(
+                "it did not say its upstream answers within {} seconds: it last said its upstream \
+                 does not answer yet",
+                ctx.patience.as_secs()
+            )
+            .as_str()
+        )
     );
     assert_eq!(serves.removed().len(), 1);
 }

@@ -65,6 +65,7 @@ async fn ran(
             random: &lemonfiber_fixtures::support::FixedRandom(None),
             taking: &crate::plugin::Retaking::default(),
             confined: &lemonfiber_adapters::Disk,
+            patience: std::time::Duration::from_secs(2),
         },
     )
     .await
@@ -334,6 +335,7 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
         random: &chance,
         taking: &crate::plugin::Retaking::default(),
         confined: &lemonfiber_adapters::Disk,
+        patience: std::time::Duration::from_secs(2),
     };
     let mut took = Vec::new();
     for running in runs {
