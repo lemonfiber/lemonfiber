@@ -50,20 +50,11 @@ pub fn manifest_into(into: &Path) {
     written_apart(into, &toml::to_string(&carried()).unwrap_or_default());
 }
 
-/// What the carried stack holds beside its manifest that a run reads: the starting files
-/// of every service's configuration, and every recording a claim names.
-const BESIDE: [&str; 2] = ["config", "recordings"];
-
 /// The carried stack written into `into` as a stack directory holds it: its manifest
-/// without the secrets an assembled part declares, and what a run reads beside it.
+/// without the secrets an assembled part declares, and every file carried beside it.
 pub fn directory_into(into: &Path) {
     manifest_into(into);
-    for name in BESIDE {
-        copied(
-            &Path::new(lemonfiber_bundled::CARRIED_AT).join(name),
-            &into.join(name),
-        );
-    }
+    copied(Path::new(lemonfiber_bundled::CARRIED_AT), into);
 }
 
 /// The carried stack as a stack directory holds it, written once into a directory kept
