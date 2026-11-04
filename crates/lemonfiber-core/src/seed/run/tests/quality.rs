@@ -237,6 +237,7 @@ async fn a_curator_holding_no_minted_key_is_skipped_and_owes_the_sync_nothing() 
 async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_over() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing");
     let fillers = a_sync(&project, &first_party("syncer"), true);
+    let unedited = Fake::by_path(vec![(EDITED, Answer::reply(500, ""))]);
     let unread = Fake::by_path(vec![
         (EDITED, Answer::reply(200, NOTHING_EDITED)),
         (APPLIED, Answer::reply(500, "")),
@@ -252,6 +253,12 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
         &fillers,
     )
     .await;
+    let edits = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing-edits");
+    let not_edited = super::super::quality::seed_quality(
+        &contracted_ctx(&edits, "sync", true, unedited.clone()),
+        &fillers,
+    )
+    .await;
     let written = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing-written");
     let unwritten_ctx = contracted_ctx(&written, "sync", true, unwritten.clone());
     let not_written = super::super::quality::seed_quality(&unwritten_ctx, &fillers).await;
@@ -263,7 +270,7 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
     )
     .await;
 
-    for wirings in [&not_read, &not_written] {
+    for wirings in [&not_edited, &not_read, &not_written] {
         assert_eq!(wirings.len(), 2, "{wirings:?}");
         assert!(
             wirings
@@ -280,6 +287,7 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
         "{not_reprofiled:?}"
     );
     assert!(applied_bodies(&unread).is_empty());
+    assert!(applied_bodies(&unedited).is_empty());
 }
 
 /// Where a sync is told to put a preset back over a hand edit.
