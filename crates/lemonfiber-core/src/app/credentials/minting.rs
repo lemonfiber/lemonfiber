@@ -149,6 +149,11 @@ async fn replaced(
             .map(|service| reached(service, unwritten.clone())),
     );
     consumers.extend(handed(ctx, installed, &stack, secret));
+    let unreached: Vec<String> = consumers
+        .iter()
+        .filter(|one| matches!(one.reach, Reach::Failed { .. }))
+        .map(|one| one.consumer.clone())
+        .collect();
     let mut services: Vec<String> = installed
         .services
         .iter()
@@ -171,7 +176,16 @@ async fn replaced(
     }
     consumers.extend(secured(ctx, installed, amid).await);
     consumers.extend(copies(ctx, &declared.of, amid).await);
-    Rotation::landed(name, &fingerprint(&value), consumers)
+    if unreached.is_empty() {
+        return Rotation::landed(name, &fingerprint(&value), consumers);
+    }
+    let detail = format!(
+        "the new value is held, but what {} reads it from could not be written; {} \
+         credentials rotate {name} writes a fresh one everywhere it is read",
+        unreached.join(", "),
+        crate::PRODUCT
+    );
+    Rotation::unreached(name, &detail, consumers)
 }
 
 /// Every secrets file on this machine reading `setting` out of the secret store, written

@@ -57,7 +57,7 @@
       ]
     },
     {
-      "description": "The service replaced the credential itself, and the replacement did not answer.\n\nThe one way of not landing that keeps nothing: a service asked to replace its\nown key drops the old one the moment it makes the new one, so there is no order\nthat proves first. What is owed is the command that hands the new one out once\nthe service answers.",
+      "description": "The replacement is in force, and did not reach everything that reads it: the\nservice replaced the credential itself and the replacement did not answer, or a\nfile that names it could not be written.\n\nThe one way of not landing that keeps nothing: a service asked to replace its\nown key drops the old one the moment it makes the new one, and a value already\nheld cannot be called replaced while a copy of it was never written. What is owed\nis the command that hands the new one out.",
       "type": "object",
       "properties": {
         "detail": {

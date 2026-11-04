@@ -20,7 +20,7 @@ use crate::app::targets::MediaServer;
 use crate::app::{gating, invite::declining};
 use crate::certificate::internal;
 use crate::journal::{Change, Kind};
-use crate::ports::service::{Applied, Target};
+use crate::ports::service::Target;
 use crate::seed::{State, Wiring};
 
 /// The operation a replacement is journalled under.
@@ -235,7 +235,7 @@ async fn reached(
         .into_iter()
         .map(|holder| format!("{holder} does not yet hold its SHA-256"))
         .collect();
-    if !server.ready(ctx).await || !presents(asked, &current.fingerprint).await {
+    if !server.ready(ctx).await || !presents(ctx, (server, asked), &current.fingerprint).await {
         unreached.push(format!("{} does not yet present it", server.name()));
     }
     if unreached.is_empty() {
@@ -248,10 +248,14 @@ async fn reached(
     ))
 }
 
-/// Whether a handshake to the media server's internal port already presents the
-/// certificate whose SHA-256 is `pin`, as its adapter answers serving it again.
-async fn presents((path, client): &Asked, pin: &str) -> bool {
-    matches!(client.serve_tls(path, pin).await, Ok(Applied::Now))
+/// Whether a handshake to the media server's internal port presents the certificate whose
+/// SHA-256 is `pin`, as its adapter answers serving it again: at once, or once the media
+/// server started again where the adapter answers it takes it up only then.
+async fn presents(ctx: &Ctx, (server, (path, client)): (&MediaServer, &Asked), pin: &str) -> bool {
+    matches!(
+        served(ctx, server, client.as_ref(), (path, pin)).await,
+        State::AlreadyWired | State::Restarted { .. }
+    )
 }
 
 /// What serving the certificate in force again came to, for a replacement taken up after

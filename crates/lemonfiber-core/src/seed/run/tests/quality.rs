@@ -12,6 +12,12 @@ const APPLIED: &str = "/lemonfiber/quality.sync/v1/applied";
 /// Where a sync is told to apply a preset.
 const APPLY: &str = "/lemonfiber/quality.sync/v1/apply";
 
+/// Where a sync is asked what putting a preset back would replace.
+const EDITED: &str = "/lemonfiber/quality.sync/v1/edited";
+
+/// What a sync answers for a configuration nobody edited by hand.
+const NOTHING_EDITED: &str = "null";
+
 /// The sync as a replaced key's copies name it.
 const THE_SYNC: &str = "sync the stand-in";
 
@@ -41,9 +47,11 @@ struct Told {
     profiled: crate::ports::service::Profiled,
 }
 
-/// A sync answering `applied` with `applied` and taking every `apply`.
+/// A sync answering `edited` with no edit, `applied` with `applied` and taking every
+/// `apply`.
 fn syncing(applied: &'static str) -> Arc<Fake> {
     Fake::by_path(vec![
+        (EDITED, Answer::reply(200, NOTHING_EDITED)),
         (APPLIED, Answer::reply(200, applied)),
         (APPLY, Answer::reply(204, "")),
     ])
@@ -229,14 +237,25 @@ async fn a_curator_holding_no_minted_key_is_skipped_and_owes_the_sync_nothing() 
 async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_over() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing");
     let fillers = a_sync(&project, &first_party("syncer"), true);
-    let unread = Fake::by_path(vec![(APPLIED, Answer::reply(500, ""))]);
+    let unedited = Fake::by_path(vec![(EDITED, Answer::reply(500, ""))]);
+    let unread = Fake::by_path(vec![
+        (EDITED, Answer::reply(200, NOTHING_EDITED)),
+        (APPLIED, Answer::reply(500, "")),
+    ]);
     let unwritten = Fake::by_path(vec![
+        (EDITED, Answer::reply(200, NOTHING_EDITED)),
         (APPLIED, Answer::reply(200, NOTHING_APPLIED)),
         (APPLY, Answer::reply(500, "")),
     ]);
 
     let not_read = super::super::quality::seed_quality(
         &contracted_ctx(&project, "sync", true, unread.clone()),
+        &fillers,
+    )
+    .await;
+    let edits = lemonfiber_fixtures::scratch::Scratch::new("quality-refusing-edits");
+    let not_edited = super::super::quality::seed_quality(
+        &contracted_ctx(&edits, "sync", true, unedited.clone()),
         &fillers,
     )
     .await;
@@ -251,7 +270,7 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
     )
     .await;
 
-    for wirings in [&not_read, &not_written] {
+    for wirings in [&not_edited, &not_read, &not_written] {
         assert_eq!(wirings.len(), 2, "{wirings:?}");
         assert!(
             wirings
@@ -268,10 +287,8 @@ async fn a_sync_that_refuses_a_read_or_a_write_is_reported_rather_than_passed_ov
         "{not_reprofiled:?}"
     );
     assert!(applied_bodies(&unread).is_empty());
+    assert!(applied_bodies(&unedited).is_empty());
 }
-
-/// Where a sync is asked what putting a preset back would replace.
-const EDITED: &str = "/lemonfiber/quality.sync/v1/edited";
 
 /// Where a sync is told to put a preset back over a hand edit.
 const REAPPLY: &str = "/lemonfiber/quality.sync/v1/reapply";
@@ -373,4 +390,101 @@ async fn a_sync_that_refuses_or_a_curator_with_no_key_is_said_and_one_not_speaki
         "{unkeyed:?}"
     );
     assert_eq!(unspoken, None);
+}
+
+#[tokio::test]
+async fn a_hand_edit_is_kept_by_a_run_holding_the_preset_and_a_rehearsal_of_one() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-kept");
+    let fillers = a_sync(&project, &first_party("syncer"), true);
+    let http = Fake::by_path(vec![
+        (EDITED, Answer::reply(200, AN_EDIT)),
+        (APPLIED, Answer::reply(200, NOTHING_APPLIED)),
+        (APPLY, Answer::reply(204, "")),
+    ]);
+    let mut rehearsing = contracted_ctx(&project, "sync", true, http.clone());
+    rehearsing.dry_run = true;
+    let rehearsed = super::super::quality::seed_quality(&rehearsing, &fillers).await;
+    let ran = super::super::quality::seed_quality(
+        &contracted_ctx(&project, "sync", true, http.clone()),
+        &fillers,
+    )
+    .await;
+
+    let kept = crate::seed::State::Kept {
+        path: "recyclarr.yml".to_owned(),
+    };
+    for wirings in [&rehearsed, &ran] {
+        assert_eq!(wirings.len(), 2, "{wirings:?}");
+        assert!(
+            wirings.iter().all(|wiring| wiring.state == kept),
+            "{wirings:?}"
+        );
+    }
+    assert!(kept.is_settled());
+    assert_eq!(
+        (
+            asked_at(&http, "/applied"),
+            asked_at(&http, "/apply"),
+            asked_at(&http, "/reapply")
+        ),
+        (0, 0, 0)
+    );
+}
+
+/// A sync answering `edited` with `edit` for every curator, and nothing else.
+fn editing(edit: &serde_json::Value) -> Arc<Fake> {
+    Fake::by_path(vec![(EDITED, Answer::reply(200, edit.to_string().leak()))])
+}
+
+#[tokio::test]
+async fn a_hand_edit_named_by_what_a_terminal_obeys_is_refused_without_its_name_or_a_write() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-kept-forged");
+    let fillers = a_sync(&project, &first_party("syncer"), true);
+
+    for path in [
+        "recyclarr.yml\n  ✓ Radarr's quality profiles   already wired",
+        "\u{1b}[2Jrecyclarr.yml",
+    ] {
+        let http = editing(&serde_json::json!({ "path": path, "on_disk": "", "preset": "" }));
+        let ctx = contracted_ctx(&project, "sync", true, http.clone());
+
+        let wirings = super::super::quality::seed_quality(&ctx, &fillers).await;
+
+        assert_eq!(wirings.len(), 2, "{wirings:?}");
+        assert!(
+            wirings.iter().all(|wiring| matches!(
+                &wiring.state,
+                crate::seed::State::Failed { detail } if !detail.contains("recyclarr")
+            )),
+            "{wirings:?}"
+        );
+        assert_eq!(asked_at(&http, "/apply"), 0);
+    }
+}
+
+#[tokio::test]
+async fn a_kept_edit_holding_a_secret_is_named_with_it_taken_out_and_nothing_it_holds_is_said() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("quality-kept-secret");
+    let fillers = a_sync(&project, &first_party("syncer"), true);
+    let http = editing(&serde_json::json!({
+        "path": "the-key/recyclarr.yml",
+        "on_disk": "api_key: the-key\nmin: 0\n",
+        "preset": "api_key: the-key\nmin: 25\n",
+    }));
+    let ctx = contracted_ctx(&project, "sync", true, http);
+
+    let wirings = super::super::quality::seed_quality(&ctx, &fillers).await;
+
+    let said = serde_json::to_string(&wirings).unwrap_or_default();
+    assert!(
+        wirings.iter().all(|wiring| wiring.state
+            == crate::seed::State::Kept {
+                path: format!("{}/recyclarr.yml", crate::error::withheld::REDACTED),
+            }),
+        "{wirings:?}"
+    );
+    assert!(
+        !said.contains("the-key") && !said.contains("min:"),
+        "{said}"
+    );
 }

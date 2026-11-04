@@ -626,11 +626,7 @@ async fn a_replacement_reaches_the_decline_service_before_the_old_pin_is_withdra
         (media::serve("revoke"), vec![media::taken()]),
         (
             media::serve("serve_tls"),
-            vec![
-                media::taken(),
-                lemonfiber_fixtures::http::Answer::reply(205, ""),
-                media::taken(),
-            ],
+            vec![media::taken(), media::refusing(), media::taken()],
         ),
         ready,
     ]);

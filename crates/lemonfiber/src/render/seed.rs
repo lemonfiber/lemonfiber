@@ -27,6 +27,9 @@ fn connection(wiring: &lemonfiber_core::seed::Wiring) -> Lines {
         }
         SeedState::AlreadyWired => lines.put(format!("  ✓ {connection}   already wired")),
         SeedState::Drifted => lines.put(format!("  · {connection}   left as you set it")),
+        SeedState::Kept { path } => lines.put(format!(
+            "  · {connection}   your edit to {path} kept (run `{PRODUCT} quality reapply` to put the preset back over it)"
+        )),
         SeedState::Adopted => lines.put(format!("  ✓ {connection}   yours, adopted")),
         SeedState::Unmanaged => lines.put(format!(
             "  · {connection}   found already set — yours, left as is (run `{PRODUCT} adopt` to keep it)"

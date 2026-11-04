@@ -107,6 +107,20 @@ fn every_seed_state_says_what_became_of_the_connection() {
     }
 }
 
+#[test]
+fn a_kept_edit_names_its_file_and_the_command_that_puts_the_preset_back() {
+    let report = seed_report(vec![wiring(
+        "Sonarr's quality profiles",
+        SeedState::Kept {
+            path: "recyclarr.yml".to_owned(),
+        },
+    )]);
+
+    assert!(seeding(&report).text().contains(
+        "Sonarr's quality profiles   your edit to recyclarr.yml kept (run `lemonfiber quality reapply` to put the preset back over it)"
+    ));
+}
+
 /// A rehearsal's last lines are the two an operator has to read: what a real run
 /// would still have to do, and that this one did none of it.
 #[test]

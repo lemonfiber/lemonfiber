@@ -87,6 +87,36 @@ async fn a_replaced_upstream_key_is_written_where_the_old_one_stands_and_handed_
     )));
 }
 
+#[cfg(unix)]
+#[tokio::test]
+async fn a_replacement_a_file_naming_it_could_not_take_is_not_called_replaced() {
+    use std::os::unix::fs::PermissionsExt;
+    let (ctx, _) = installed("seeded-replaced-unwritable").await;
+    let upstream = stack_of(&ctx).join("config/komga-adapter/upstream.json");
+    let _ = std::fs::set_permissions(&upstream, std::fs::Permissions::from_mode(0o400));
+
+    let rotated = rotating(&ctx).await;
+    let _ = std::fs::set_permissions(&upstream, std::fs::Permissions::from_mode(0o600));
+
+    assert!(
+        rotated.as_ref().is_some_and(|rotation| matches!(
+            &rotation.settled,
+            Settled::ReplacedUnproven { detail }
+                if detail.contains("komga-adapter")
+                    && detail.contains("lemonfiber credentials rotate komga upstream-key")
+        )),
+        "{rotated:?}"
+    );
+    assert!(matches!(
+        reach(rotated.as_ref(), "komga-adapter"),
+        Some(Reach::Failed { .. })
+    ));
+    assert_eq!(
+        read(&starting_of(&ctx)),
+        settled(&minted(&ctx).unwrap_or_default())
+    );
+}
+
 #[tokio::test]
 async fn a_replacement_whose_line_the_service_took_away_is_refused_and_keeps_the_old_key() {
     let (ctx, before) = installed("seeded-unreplaced").await;

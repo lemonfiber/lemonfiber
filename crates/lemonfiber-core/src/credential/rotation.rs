@@ -35,12 +35,14 @@ pub enum Settled {
         /// Why nothing could be concluded.
         detail: String,
     },
-    /// The service replaced the credential itself, and the replacement did not answer.
+    /// The replacement is in force, and did not reach everything that reads it: the
+    /// service replaced the credential itself and the replacement did not answer, or a
+    /// file that names it could not be written.
     ///
     /// The one way of not landing that keeps nothing: a service asked to replace its
-    /// own key drops the old one the moment it makes the new one, so there is no order
-    /// that proves first. What is owed is the command that hands the new one out once
-    /// the service answers.
+    /// own key drops the old one the moment it makes the new one, and a value already
+    /// held cannot be called replaced while a copy of it was never written. What is owed
+    /// is the command that hands the new one out.
     ReplacedUnproven {
         /// What did not answer, and what to run once it does.
         detail: String,
@@ -195,6 +197,20 @@ impl Rotation {
             credential: credential.to_owned(),
             settled,
             consumers: Vec::new(),
+            offer: None,
+        }
+    }
+
+    /// A rotation whose replacement is held but did not reach every file that names it,
+    /// with what became of each consumer.
+    #[must_use]
+    pub fn unreached(credential: &str, detail: &str, consumers: Vec<Propagation>) -> Self {
+        Self {
+            credential: credential.to_owned(),
+            settled: Settled::ReplacedUnproven {
+                detail: detail.to_owned(),
+            },
+            consumers,
             offer: None,
         }
     }

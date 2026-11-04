@@ -68,13 +68,20 @@ pub(super) fn masked(edit: Edited, secrets: &[String]) -> Result<StackEdit, Stri
             long.len()
         ));
     }
-    if path.is_empty() || path.len() > LONGEST_PATH || path.chars().any(char::is_control) {
-        return Err("it answered a hand edit under a name that is not a path".to_owned());
-    }
     Ok(StackEdit {
-        path: taken_out(&path, secrets),
+        path: named(&path, secrets)?,
         diff: diff(&file(&on_disk, secrets), &file(&preset, secrets)),
     })
+}
+
+/// `path`, what a sync names a hand edit, as it may be shown: every one of `secrets` taken
+/// out; refused where it is empty, longer than [`LONGEST_PATH`] or holds anything a terminal
+/// would obey.
+pub(super) fn named(path: &str, secrets: &[String]) -> Result<String, String> {
+    if path.is_empty() || path.len() > LONGEST_PATH || crate::text::plain(path) != path {
+        return Err("it answered a hand edit under a name that is not a path".to_owned());
+    }
+    Ok(taken_out(path, secrets))
 }
 
 /// `text`, a whole file, as it may be shown: every one of `secrets` taken out, then read

@@ -273,8 +273,29 @@ async fn a_media_server_that_does_not_start_again_keeps_both_handed() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_media_server_that_never_presents_the_new_one_keeps_both_handed() {
+async fn a_media_server_presenting_the_new_one_once_it_restarts_is_started_again_and_withdraws_the_old(
+) {
     let http = answering_in_turn(vec![now(), on_restart()], true);
+    let (ctx, at, _, gate) = machine("rotating-presented-on-restart", http.clone());
+
+    let wirings = replace(&ctx, &at).await;
+
+    let after = kept(&at);
+    let Some(new) = after.current.clone() else {
+        unreachable!("a certificate is in force: {wirings:?}");
+    };
+    assert_eq!((after.next, after.previous), (None, None), "{wirings:?}");
+    assert_eq!(gate_pins(&gate), vec![new.fingerprint.clone()]);
+}
+
+/// What a media server not presenting the certificate it was handed answers.
+fn unpresented() -> Answer {
+    media::refusing()
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_media_server_that_never_presents_the_new_one_keeps_both_handed() {
+    let http = answering_in_turn(vec![now(), unpresented()], true);
     let (ctx, at, old, gate) = machine("rotating-unpresented", http.clone());
 
     let wirings = replace(&ctx, &at).await;
