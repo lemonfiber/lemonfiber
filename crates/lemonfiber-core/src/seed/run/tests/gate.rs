@@ -610,10 +610,12 @@ async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
     services.retain(|service| service.id != crate::app::gating::SERVICE);
     let installed: Vec<_> = moved_parts()
         .into_iter()
-        .chain([crate::test_support::contracted(
-            "stranger",
-            crate::app::gating::SERVICE,
-            lemonfiber_contract::capabilities::request::gate::CAPABILITY,
+        .chain([crate::test_support::asking_the_server_as_the_gate(
+            crate::test_support::contracted(
+                "stranger",
+                crate::app::gating::SERVICE,
+                lemonfiber_contract::capabilities::request::gate::CAPABILITY,
+            ),
         )])
         .collect();
     let fillers = fillers_trusting(

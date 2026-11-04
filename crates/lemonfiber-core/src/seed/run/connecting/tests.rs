@@ -586,6 +586,7 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
             let ask = crate::wiring::Ask {
                 by: asker.id.clone(),
                 capability: capability.to_owned(),
+                native: None,
                 fillers: vec![filler.clone()],
             };
             let fillers = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
@@ -646,6 +647,7 @@ fn a_credential_the_operator_granted_a_third_party_plugin_opens_its_connection()
     let ask = crate::wiring::Ask {
         by: asker.id.clone(),
         capability: "library.curate".to_owned(),
+        native: None,
         fillers: vec![filler.clone()],
     };
     let ungranted = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);

@@ -13,8 +13,8 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::capabilities::identity::source;
 use lemonfiber_contract::capabilities::media::serve;
-use lemonfiber_contract::capabilities::request::intake;
-use lemonfiber_manifest::{ApiKind, Manifest};
+use lemonfiber_contract::capabilities::request::{gate, intake};
+use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::ports::service::Protocol;
@@ -24,10 +24,6 @@ use super::downloads::host_fillers;
 use super::filled::{spoken, Spoken};
 use super::layout::project_directory;
 use super::secrets::{record_secret, recorded_secret};
-
-/// The API the request gate speaks to a media server in: a media server answering in any
-/// other has no route through the gate.
-const GATE_SPEAKS: ApiKind = ApiKind::Jellyfin;
 
 /// What the request service asks the stack for: a service that answers, for the services
 /// that ask, whether a person is who they say they are.
@@ -67,6 +63,9 @@ pub(crate) struct MediaServer {
     /// The setting the administrator's password lemonfiber minted for the server is kept
     /// under.
     pub setting: String,
+    /// The API the request gate asks the identity source in, where its ask names one: the
+    /// one API it answers a route to the server in.
+    pub gate_asks: Option<Protocol>,
 }
 
 /// The request service among the services asking `filler` for an identity: the one
@@ -125,6 +124,7 @@ impl MediaServer {
             port: served.published?,
             setting: fillers.setting(served, crate::config::ADMIN_PASSWORD_SUFFIX)?,
             pairing: upstream_pairing(fillers, filler),
+            gate_asks: gate_asks(fillers),
             served: served.clone(),
             filler: filler.clone(),
         })
@@ -148,20 +148,20 @@ impl MediaServer {
         self.filler.brought_by()
     }
 
-    /// Whether the request gate answers a route for it: where the gate speaks the API
-    /// other services sign the household in through it in.
+    /// Whether the request gate answers a route for it: where the gate asks the identity
+    /// source in the API other services sign the household in through it in.
     #[must_use]
     pub(crate) fn gates(&self) -> bool {
         self.gated().is_some()
     }
 
-    /// Where the request gate's route for it reaches, where the gate speaks the API other
-    /// services sign the household in through it in.
+    /// Where the request gate's route for it reaches, where the gate asks the identity
+    /// source in the API other services sign the household in through it in.
     #[must_use]
     pub(crate) fn gated(&self) -> Option<&Pairing> {
         self.pairing
             .as_ref()
-            .filter(|pairing| pairing.protocol.0 == GATE_SPEAKS.name())
+            .filter(|pairing| self.gate_asks.as_ref() == Some(&pairing.protocol))
     }
 
     /// Whether a rehearsal stands where the identity step mints this server's
@@ -236,6 +236,18 @@ impl MediaServer {
             Spoken::Unanswered | Spoken::Not => false,
         }
     }
+}
+
+/// The API the service filling `request.gate` asks the identity source in, where its ask
+/// names one.
+fn gate_asks(fillers: &Fillers) -> Option<Protocol> {
+    let (gate, _) = fillers.filling(gate::CAPABILITY)?;
+    fillers
+        .asks()
+        .iter()
+        .find(|ask| ask.capability == IDENTITY && ask.by == gate.id)
+        .and_then(|ask| ask.native.clone())
+        .map(Protocol)
 }
 
 /// Where the upstream the adapter `filler` fronts answers the services beside it, in the

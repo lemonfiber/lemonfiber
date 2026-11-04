@@ -163,6 +163,8 @@ pub struct Ask {
     pub by: String,
     /// What it asks for.
     pub capability: String,
+    /// The upstream's own API it talks in, where it names one.
+    pub native: Option<String>,
     /// Whatever answers, as settled — empty where nothing fills it or a contest stands.
     pub fillers: Vec<Filler>,
 }
@@ -260,11 +262,13 @@ impl Fillers {
                 Reaches::Asked {
                     capability,
                     services: answering,
+                    native,
                     files: None,
                     ..
                 } => Some(Ask {
                     by: wired.by,
                     capability,
+                    native,
                     fillers: answering
                         .iter()
                         .filter_map(|id| services.iter().find(|one| one.id == *id).cloned())
@@ -352,10 +356,15 @@ impl Fillers {
     /// does: the one the ask settled on, or where nothing asks, the one service here
     /// providing it, or among several the one the operator chose. Nothing where the ask is
     /// contested, or where nothing asks and no one service of those providing it is
-    /// settled on.
+    /// settled on. An ask in an upstream's own API reaches that upstream rather than what
+    /// fills the capability, so it settles nothing here.
     #[must_use]
     pub fn filling(&self, capability: &str) -> Option<(&Filler, Option<&Filler>)> {
-        if let Some(ask) = self.asks.iter().find(|ask| ask.capability == capability) {
+        if let Some(ask) = self
+            .asks
+            .iter()
+            .find(|ask| ask.capability == capability && ask.native.is_none())
+        {
             let [filler] = ask.fillers.as_slice() else {
                 return None;
             };
