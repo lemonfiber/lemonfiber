@@ -141,7 +141,7 @@ pub const REFUSALS: [Code; 5] = [
 async fn lifecycle(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcome, Box<Problem>> {
     engine::lifecycle(ctx, forms, &action)
         .await
-        .map(Outcome::Lifecycle)
+        .map(Outcome::from)
 }
 
 /// Upgrade existing content to the chosen preset, or state what that would cost.
@@ -155,9 +155,7 @@ async fn upgraded(ctx: &Ctx, confirm: bool) -> Result<Outcome, Box<Problem>> {
 ///
 /// Beside the table because its row, spelled out, is longer than one line.
 async fn down(ctx: &Ctx, forms: &[String], wait: Waiting) -> Result<Outcome, Box<Problem>> {
-    engine::teardown(ctx, forms, wait)
-        .await
-        .map(Outcome::Lifecycle)
+    engine::teardown(ctx, forms, wait).await.map(Outcome::from)
 }
 
 /// Remove somebody from the household, or say what that would cost.
@@ -362,7 +360,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // stopped part-way left its replacement beside it, and which of the two the
     // service takes is settled here so every command after it signs in with that one.
     credentials::pending::settled(ctx).await;
-    routed(rehearsal::carried(command, ctx), ctx)
+    Box::pin(routed(rehearsal::carried(command, ctx), ctx))
         .await
         .map(|outcome| {
             if ctx.dry_run {
@@ -428,7 +426,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Forms => engine::forms(ctx).map(Outcome::Forms),
         Command::Preview { forms } => engine::preview(ctx, &forms).await.map(Outcome::Preview),
         Command::Up { forms, offer } => engine::up(ctx, &forms, offer).await,
-        Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::Lifecycle),
+        Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::from),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,

@@ -134,12 +134,12 @@ fn a_start_that_compose_did_not_carry_out_is_not_a_success() {
     // verdict, a script could not tell a stack that came up from one that never
     // started.
     assert_eq!(
-        shown(settled(&Outcome::Lifecycle(lifecycle(Some(0))))),
+        shown(settled(&Outcome::from(lifecycle(Some(0))))),
         success()
     );
     for status in [Some(1), Some(137), None] {
         assert_ne!(
-            shown(settled(&Outcome::Lifecycle(lifecycle(status)))),
+            shown(settled(&Outcome::from(lifecycle(status)))),
             success(),
             "{status:?}"
         );
@@ -178,7 +178,7 @@ fn a_rehearsal_ran_nothing_and_so_failed_at_nothing() {
     // the flag exists for.
     let mut rehearsed = lifecycle(None);
     rehearsed.rehearsed = true;
-    assert_eq!(shown(settled(&Outcome::Lifecycle(rehearsed))), success());
+    assert_eq!(shown(settled(&Outcome::from(rehearsed))), success());
 }
 
 #[test]

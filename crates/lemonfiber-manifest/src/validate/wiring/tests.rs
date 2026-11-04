@@ -121,11 +121,11 @@ fn a_chosen_filler_with_no_reason_is_caught() {
 }
 
 #[test]
-fn a_wiring_that_reaches_all_of_them_and_chooses_one_is_caught() {
+fn a_stack_wiring_that_reaches_all_of_them_and_chooses_one_is_caught_asking_for_every_filler() {
     fault(
         "asks = \"media.serve\"\nby = \"door\"\nfilled_by",
         "asks = \"media.serve\"\nby = \"door\"\neach = true\nfilled_by",
-        "it does both only by meaning neither",
+        "asks for every filler; a stack's ask reaches one",
     );
 }
 

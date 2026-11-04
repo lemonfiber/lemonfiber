@@ -97,6 +97,13 @@
       "description": "Whether this was a rehearsal.",
       "type": "boolean"
     },
+    "rendering": {
+      "description": "Why the group owning the render devices of the engine's host was not asked or not\nkept, where a service takes `render` and it was not. Absent for every other action.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "secured": {
       "description": "What asking the egress guard to hold its control server to the credential its\nadapter was handed came to, where it was more than held at once: the guard\nrestarted to take it up, or why it did not. Absent where it held it at once or no\nguard speaks its contract.",
       "type": [
@@ -146,6 +153,13 @@
     },
     "unfenced": {
       "description": "Each fenced service a start holds back because no fence can be written for it, in\nwords naming it and why. Empty for every other action.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unrendered": {
+      "description": "Each service taking `render` a start writes without the host's render devices, in\nwords naming it. Empty for every other action.",
       "type": "array",
       "items": {
         "type": "string"

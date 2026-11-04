@@ -283,14 +283,11 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     for unfenced in &report.unfenced {
         lines.put(format!("left out: {unfenced}"));
     }
-    if let Some(fencing) = &report.fencing {
-        lines.put(format!("not asked: {fencing}"));
-    }
     for unrendered in &report.unrendered {
         lines.put(unrendered.clone());
     }
-    if let Some(rendering) = &report.rendering {
-        lines.put(format!("not asked: {rendering}"));
+    for why in report.fencing.iter().chain(&report.rendering) {
+        lines.put(format!("not asked: {why}"));
     }
 
     if let Some(condition) = report.condition {

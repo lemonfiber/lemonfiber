@@ -21,6 +21,10 @@
         "type": "string"
       }
     },
+    "grouped": {
+      "description": "Whether it is added to the group owning those devices on the engine's host.",
+      "type": "boolean"
+    },
     "service": {
       "description": "The service taking it.",
       "type": "string"
@@ -35,6 +39,7 @@
     "shape",
     "grants",
     "devices",
+    "grouped",
     "approval"
   ]
 }

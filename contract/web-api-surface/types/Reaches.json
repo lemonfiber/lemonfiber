@@ -6,6 +6,12 @@
       ],
       "required": true
     },
+    "files": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "how": {
       "type": [
         "const:\"asked\"",

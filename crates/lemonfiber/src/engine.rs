@@ -279,7 +279,7 @@ pub(crate) async fn start(
     released(claim).await;
     match outcome {
         Ok(report) => {
-            let outcome = Outcome::Lifecycle(report);
+            let outcome = Outcome::from(report);
             render(&outcome, json);
             settled(&outcome)
         }

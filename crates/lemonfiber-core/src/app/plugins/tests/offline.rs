@@ -87,7 +87,7 @@ async fn up(
         offer,
     };
     match crate::app::dispatch(up, ctx).await? {
-        Outcome::Lifecycle(report) => Ok(report),
+        Outcome::Lifecycle(report) => Ok(*report),
         other => unreachable!("an up answers with its lifecycle report, not {other:?}"),
     }
 }
@@ -326,7 +326,7 @@ async fn switch(
         offer,
     };
     match crate::app::dispatch(switch, ctx).await? {
-        Outcome::Lifecycle(report) => Ok(report),
+        Outcome::Lifecycle(report) => Ok(*report),
         other => unreachable!("a switch answers with its lifecycle report, not {other:?}"),
     }
 }

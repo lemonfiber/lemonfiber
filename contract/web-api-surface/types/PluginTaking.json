@@ -18,6 +18,12 @@
       ],
       "required": true
     },
+    "grouped": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
     "service": {
       "type": [
         "string"

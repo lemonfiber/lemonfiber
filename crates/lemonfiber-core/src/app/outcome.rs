@@ -89,6 +89,12 @@ macro_rules! outcomes {
     };
 }
 
+impl From<LifecycleReport> for Outcome {
+    fn from(report: LifecycleReport) -> Self {
+        Self::Lifecycle(Box::new(report))
+    }
+}
+
 outcomes! {
     /// The answer to [`Command::Version`].
     Version(VersionReport) => VERSION,
@@ -97,7 +103,7 @@ outcomes! {
     /// The answer to [`Command::Preview`].
     Preview(Plan) => PREVIEW,
     /// What a lifecycle command did, or would have done.
-    Lifecycle(LifecycleReport) => LIFECYCLE [rehearsed],
+    Lifecycle(Box<LifecycleReport>) => LIFECYCLE [rehearsed],
     /// The answer to a configuration command.
     Config(ConfigReport) => CONFIG [rehearsed],
     /// The quality choice, what it means, and what a command did with it.

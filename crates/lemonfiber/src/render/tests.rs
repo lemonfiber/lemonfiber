@@ -292,7 +292,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             meaning: "there is none".to_owned(),
             beside: Vec::new(),
         }),
-        Outcome::Lifecycle(a_lifecycle("up", a_plan("media", Vec::new()))),
+        Outcome::from(a_lifecycle("up", a_plan("media", Vec::new()))),
         Outcome::Credentials(lemonfiber_core::credential::Inventory::of(Vec::new())),
     ]
 }

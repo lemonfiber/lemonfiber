@@ -160,7 +160,7 @@ fn rehearsing(protocols: crate::config::Protocols) -> Ctx {
 
 fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model::LifecycleReport> {
     match outcome {
-        Ok(Outcome::Lifecycle(report)) => Some(report),
+        Ok(Outcome::Lifecycle(report)) => Some(*report),
         Ok(
             Outcome::Version(_)
             | Outcome::Alerts(_)

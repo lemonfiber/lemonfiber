@@ -12,6 +12,13 @@
       "type": "boolean",
       "default": false
     },
+    "files": {
+      "description": "The medium the filler it reaches files, where it narrows the ask to one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "native": {
       "description": "The upstream's own API it talks in, which it reaches in place of the adapter.",
       "type": [

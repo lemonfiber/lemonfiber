@@ -95,13 +95,32 @@ async fn answered(
     Ok(report)
 }
 
+/// What runs of every profile the stack declares rather than of the new closure: the
+/// services a switch has to stop are the ones the new closure does not hold.
+async fn standing(ctx: &Ctx, manifest: &Manifest) -> Result<Vec<Service>, Box<Problem>> {
+    let containers = ctx
+        .seams
+        .engine
+        .list(&ctx.settings.project)
+        .await
+        .map_err(|err| Box::new(err.problem()))?;
+    Ok(survey_beside(
+        manifest,
+        &crate::app::plugins::profiled(ctx),
+        &manifest.profile_ids::<Vec<String>>(),
+        &containers,
+        &halted::load(ctx),
+        ctx.settings.protocols,
+    ))
+}
+
 /// The switch itself, with the stack already claimed for it.
 async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Problem>> {
     // A switch is two lifecycle commands in a coat, so it owes the same pre-flight
     // they do. It does not go through the one they share, which is exactly how a
     // guard comes to hold everywhere but the path nobody remembered.
     super::verified(ctx).await?;
-    let beside = super::beside_readied(ctx).await;
+    let beside = Box::pin(super::beside_readied(ctx)).await;
     let guards = super::guards_moved(ctx, forms).await?;
 
     let Composed {
@@ -113,25 +132,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         project,
     } = compose(ctx, forms, &Action::Up)?;
 
-    // Surveyed across every profile the stack declares rather than across the new
-    // closure. The services a switch has to stop are the ones the new closure does
-    // not hold, so asking only about the new closure would never see them.
-    let declared: Vec<String> = manifest.profile_ids();
-    let containers = ctx
-        .seams
-        .engine
-        .list(&ctx.settings.project)
-        .await
-        .map_err(|err| Box::new(err.problem()))?;
-    let running = survey_beside(
-        &manifest,
-        &crate::app::plugins::profiled(ctx),
-        &declared,
-        &containers,
-        &halted::load(ctx),
-        ctx.settings.protocols,
-    );
-
+    let running = standing(ctx, &manifest).await?;
     let mut switched = moved(&running, &plan.services);
     if !switched.stopped.is_empty() {
         switched.stop_command = Some(build(

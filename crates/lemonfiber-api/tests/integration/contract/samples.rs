@@ -47,7 +47,7 @@ fn running() -> Vec<Outcome> {
             running: lemonfiber_core::stack::closure::Running::Read(vec!["sonarr".to_owned()]),
             ..plan()
         }),
-        Outcome::Lifecycle(LifecycleReport {
+        Outcome::from(LifecycleReport {
             action: "up".to_owned(),
             plan: plan(),
             command: vec!["docker".to_owned()],

@@ -121,7 +121,7 @@ fn the_dashboard_asks_about_the_install_and_a_yes_sends_the_answer() {
         taken: an_up(),
     };
 
-    acting.came_to(Ok(Outcome::Lifecycle(unanswered())));
+    acting.came_to(Ok(Outcome::from(unanswered())));
 
     let asked = showing(&acting);
     assert!(

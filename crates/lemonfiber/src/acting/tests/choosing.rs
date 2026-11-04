@@ -61,7 +61,7 @@ fn a_lifecycle_report_is_shown_in_the_words_the_command_line_gives() {
     acting.pressed(&Press::Accept);
     acting.pressed(&Press::Typed('y'));
 
-    acting.came_to(Ok(Outcome::Lifecycle(report)));
+    acting.came_to(Ok(Outcome::from(report)));
 
     let said = showing(&acting);
     let lines: Vec<&str> = printed.lines().filter(|line| !line.is_empty()).collect();
