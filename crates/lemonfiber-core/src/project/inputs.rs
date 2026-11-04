@@ -4,7 +4,7 @@
 
 use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::stream::guard;
-use lemonfiber_manifest::container::Posture;
+use lemonfiber_manifest::container::{Network, Posture};
 use lemonfiber_manifest::{Manifest, Service};
 
 use crate::plugin::{Installed, Reached};
@@ -168,16 +168,17 @@ pub(super) fn read(
 /// of a capability, with that capability.
 fn vias<'a>(manifest: &'a Manifest, installed: &'a [Installed]) -> Vec<(&'a str, &'a str)> {
     written(manifest, installed)
-        .filter_map(|service| Some((service.id.as_str(), service.network.as_ref()?.via()?)))
+        .filter_map(|service| {
+            let via = service.network.as_ref().and_then(Network::via)?;
+            Some((service.id.as_str(), via))
+        })
         .chain(
             installed
                 .iter()
                 .flat_map(|one| &one.services)
                 .filter_map(|placed| {
-                    Some((
-                        placed.service.as_str(),
-                        placed.fields.network.as_ref()?.via()?,
-                    ))
+                    let via = placed.fields.network.as_ref().and_then(Network::via)?;
+                    Some((placed.service.as_str(), via))
                 }),
         )
         .collect()

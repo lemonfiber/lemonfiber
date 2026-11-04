@@ -480,3 +480,35 @@ impl super::Fillers {
         self
     }
 }
+
+/// A plugin's service inside the network of the guard the operator chose over the stack's
+/// is reached at that guard.
+#[test]
+fn a_service_inside_the_guard_the_operator_chose_is_reached_at_that_guard() {
+    let mut client = a_placed("client", &["subtitles.fetch"], Some(6767));
+    client.fields.network = Some(lemonfiber_manifest::container::Network {
+        via: Some(lemonfiber_manifest::container::EGRESS_GUARD.to_owned()),
+        fenced: false,
+    });
+    let rival = a_placed(
+        "rival-guard",
+        &[lemonfiber_manifest::container::EGRESS_GUARD],
+        None,
+    );
+    let fillers = shipped(
+        &[
+            an_installed("client", vec![client]),
+            an_installed("rival", vec![rival]),
+        ],
+        &Chosen::read(Some("network.egress-guard=rival-guard")),
+        |_| (),
+    );
+
+    assert_eq!(
+        fillers
+            .service("client")
+            .and_then(|one| one.address.as_ref())
+            .map(|address| address.host.as_str()),
+        Some("rival-guard")
+    );
+}

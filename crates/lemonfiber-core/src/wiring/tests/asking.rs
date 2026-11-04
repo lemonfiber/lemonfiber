@@ -297,6 +297,21 @@ fn a_stack_services_address_is_an_ask_of_its_own() {
 }
 
 #[test]
+fn a_stack_services_address_its_wiring_also_asks_for_is_one_ask() {
+    let manifest = written(&format!(
+        "{}{}[service.env.INDEXER]\nurl_of = \"indexer.search\"\n\n\
+         [[wiring]]\nby = \"asker\"\nasks = \"indexer.search\"\n",
+        service("finder", "\"indexer.search\""),
+        service("asker", ""),
+    ));
+    let wired = manifest
+        .as_ref()
+        .map(|manifest| settle(manifest, &[], &Chosen::default()))
+        .unwrap_or_default();
+    assert_eq!(wired.len(), 1, "{wired:?}");
+}
+
+#[test]
 fn running_inside_a_fillers_network_is_an_ask_of_that_capability() {
     let mut placed = crate::test_support::a_placed("downloader", &[], None);
     placed.fields.network = Some(lemonfiber_manifest::container::Network {

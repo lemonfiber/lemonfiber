@@ -431,3 +431,31 @@ fn what_stays_with_the_stopped_part_is_named() {
     let nothing = substituted(&substituting(false, Vec::new())).text();
     assert!(!nothing.contains("Stays with"), "{nothing}");
 }
+
+#[test]
+fn an_ask_narrowed_to_a_medium_names_the_medium_after_the_capability() {
+    let mut link = asking("reader", "library.curate", &["sonarr"], Settled::Outright);
+    if let Reaches::Asked { files, .. } = &mut link.reaches {
+        *files = Some("tv".to_owned());
+    }
+    let said = shown(&WiringReport {
+        wired: vec![link],
+        unfilled: Vec::new(),
+    });
+    assert!(
+        said.contains("reader asks for library.curate filing tv"),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_substitution_of_what_nothing_filled_names_no_service_it_was() {
+    let mut report = substituting(true, Vec::new());
+    report.substitution.was = None;
+    let said = substituted(&report).text();
+    assert!(
+        said.contains("nzbhydra2 now fills indexer.search."),
+        "{said}"
+    );
+    assert!(!said.contains("was "), "{said}");
+}

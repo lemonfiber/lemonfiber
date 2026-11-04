@@ -86,3 +86,28 @@ fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards
         );
     }
 }
+
+/// Where two guards fill the capability a service runs inside and nothing chooses
+/// between them, it runs inside neither.
+#[test]
+fn a_service_inside_a_guard_two_fill_and_none_is_chosen_runs_inside_neither() {
+    let mut inside = a_placed("client", &[], None);
+    inside.fields.network = Some(inside_the_guard());
+    let rival = a_placed(
+        "rival-guard",
+        &[lemonfiber_manifest::container::EGRESS_GUARD],
+        None,
+    );
+    let project = project(
+        &carried(),
+        &[
+            an_installed("client", vec![inside]),
+            an_installed("rival", vec![rival]),
+        ],
+    );
+
+    assert!(!matches!(
+        project.topology.placed.get("client"),
+        Some(crate::topology::Placed::Inside(_))
+    ));
+}
