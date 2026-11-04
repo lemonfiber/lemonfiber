@@ -86,7 +86,7 @@ url = "2"
 # service, not their sum. Only the combinator is taken (no executor); already in
 # the tree via reqwest, so this adds no crate to the graph.
 futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
-sysinfo = { version = "0.39", default-features = false, features = ["disk"] }
+sysinfo = { version = "0.40", default-features = false, features = ["disk"] }
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "process", "rt", "sync", "time"] }
 tokio-stream = "0.1"
