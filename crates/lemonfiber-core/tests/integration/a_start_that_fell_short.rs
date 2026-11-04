@@ -119,7 +119,7 @@ async fn a_start_that_failed_reports_a_service_it_left_created_as_failed() {
     .await;
 
     let report = match outcome {
-        Ok(Outcome::Lifecycle(report)) => Some(report),
+        Ok(Outcome::Lifecycle(report)) => Some(*report),
         _ => None,
     };
     assert_eq!(report.as_ref().map(read), Some(all(State::Failed)));

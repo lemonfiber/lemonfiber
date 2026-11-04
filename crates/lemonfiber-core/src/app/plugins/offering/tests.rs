@@ -181,6 +181,7 @@ fn an_install_or_update_whose_asks_moved_is_refused_naming_that_part_alone() {
             },
             reaches: crate::wiring::Reaches::Asked {
                 native: None,
+                files: None,
                 capability: "library.curate".to_owned(),
                 services: Vec::new(),
                 settled: crate::wiring::Settled::Unfilled,

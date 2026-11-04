@@ -300,21 +300,6 @@ pub struct Service {
     /// held in its own id's namespace. A stack directory's service declares none.
     #[serde(default)]
     pub secret: Vec<crate::container::Secret>,
-    /// Same-profile dependencies only.
-    #[serde(default)]
-    pub depends_on: Vec<String>,
-    /// Extra kernel capabilities granted to the container, checked against an allow-list.
-    ///
-    /// Named `grants` rather than `capabilities` because the word is about to mean
-    /// something else entirely: what a service *can do*, which is how a plugin declares
-    /// itself and how wiring asks for a filler. Two meanings under one spelling is how a
-    /// setting that decides what a container may do to the kernel gets read as a
-    /// description of what it offers.
-    ///
-    /// The old spelling is still accepted, because an operator's own stack description is
-    /// theirs and a rename is not a reason to refuse to read it.
-    #[serde(default, alias = "capabilities")]
-    pub grants: Vec<String>,
     /// True where the OS owns the lifecycle rather than Compose.
     #[serde(default)]
     pub host_managed: bool,

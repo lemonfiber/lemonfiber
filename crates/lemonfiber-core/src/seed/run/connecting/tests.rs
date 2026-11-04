@@ -396,6 +396,7 @@ fn a_plugin_asker_is_connected_to_nothing() {
         capability: "library.curate".to_owned(),
         each: true,
         native: None,
+        files: None,
     }];
     let installed = vec![
         an_installed("asking", vec![asker]),

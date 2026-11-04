@@ -218,6 +218,7 @@ fn asking_for(service: &str, key: &str, capability: &str) -> Placed {
         capability: capability.to_owned(),
         each: false,
         native: None,
+        files: None,
     }];
     placed
 }
@@ -683,6 +684,7 @@ fn a_plugin_services_ask_joins_it_to_that_asks_network_and_no_other() {
         native: None,
         capability: "media.serve".to_owned(),
         each: false,
+        files: None,
     }];
     let project = project(&carried(), &[an_installed("subs", vec![asker])]);
 
@@ -732,4 +734,32 @@ fn inside_the_guard() -> Network {
         via: Some("network.egress-guard".into()),
         fenced: false,
     }
+}
+
+#[test]
+fn a_service_inside_a_network_an_adapter_fills_is_written_inside_the_upstream_it_fronts() {
+    let guard = lemonfiber_manifest::container::EGRESS_GUARD;
+    let mut manifest = carried();
+    manifest
+        .services
+        .retain(|service| !service.provides.iter().any(|named| named == guard));
+    let tunnel = a_placed("tunnel", &[], None);
+    let mut adapter = a_placed("tunnel-adapter", &[guard], None);
+    adapter.fronts = Some("tunnel".to_owned());
+    let mut downloader = a_placed("downloader", &[], None);
+    downloader.fields.network = Some(Network {
+        via: Some(guard.to_owned()),
+        fenced: false,
+    });
+    let project = project(
+        &manifest,
+        &[
+            an_installed("vpn", vec![tunnel, adapter]),
+            an_installed("dl", vec![downloader]),
+        ],
+    );
+    assert_eq!(
+        text(&entry(&project, "downloader"), "network_mode"),
+        "service:tunnel"
+    );
 }

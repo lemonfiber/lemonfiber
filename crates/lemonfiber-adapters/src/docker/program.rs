@@ -96,13 +96,13 @@ pub(super) fn body(run: &Run) -> ContainerCreateBody {
                 config: None,
             }),
             mounts: Some(
-                run.configuration
+                run.bound
                     .iter()
-                    .map(|configuration| Mount {
+                    .map(|bound| Mount {
                         typ: Some(MountType::BIND),
-                        source: Some(configuration.source.display().to_string()),
-                        target: Some(configuration.target.clone()),
-                        read_only: Some(false),
+                        source: Some(bound.source.display().to_string()),
+                        target: Some(bound.target.clone()),
+                        read_only: Some(bound.read_only),
                         ..Mount::default()
                     })
                     .collect(),

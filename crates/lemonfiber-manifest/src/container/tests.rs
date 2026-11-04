@@ -48,6 +48,8 @@ pub(super) fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
         certificate: None,
         provides: &[],
         speaks: false,
+        grants: &[],
+        depends_on: &[],
     }
 }
 
@@ -715,4 +717,23 @@ fn a_confined_or_contracted_service_running_as_its_image_says_is_refused_naming_
     held.posture = Posture::Confined;
     held.user_mode = Some(&UserMode::Uid);
     assert!(wrong(&held).is_empty());
+}
+
+#[test]
+fn a_service_asking_the_address_of_what_it_provides_is_refused_naming_the_variable() {
+    let env = env(vec![(
+        "SELF",
+        Value::Url(UrlOf {
+            url_of: "media.serve".to_owned(),
+            files: None,
+            native: None,
+        }),
+    )]);
+    let provides = ["media.serve".to_owned()];
+    let mut serving = plain(&env);
+    serving.provides = &provides;
+    assert_eq!(
+        wrong(&serving),
+        ["service jellyfin.env.SELF: asks for the address of media.serve, which it provides itself; nothing asks itself"]
+    );
 }

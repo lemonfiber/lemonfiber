@@ -82,8 +82,8 @@ fn a_service_waiting_on_something_other_than_a_tunnel_is_reached_at_its_own_id()
     );
 }
 
-/// Every ask the stack declares is answered, and a link kept to a named service is not
-/// an ask.
+/// Every ask the stack declares is answered, and so is the torrent client's of the guard
+/// whose network it runs inside, and a link kept to a named service is not an ask.
 #[test]
 fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
     let mut asks = 0;
@@ -96,7 +96,7 @@ fn every_ask_the_stack_declares_is_answered_and_no_link_by_name() {
     });
 
     assert!(asks > 0, "the shipped stack asks for something");
-    assert_eq!(fillers.asks().len(), asks);
+    assert_eq!(fillers.asks().len(), asks + 1);
     let unanswered: Vec<(&str, &str)> = fillers
         .asks()
         .iter()
@@ -479,4 +479,36 @@ impl super::Fillers {
         self.asks.extend(again);
         self
     }
+}
+
+/// A plugin's service inside the network of the guard the operator chose over the stack's
+/// is reached at that guard.
+#[test]
+fn a_service_inside_the_guard_the_operator_chose_is_reached_at_that_guard() {
+    let mut client = a_placed("client", &["subtitles.fetch"], Some(6767));
+    client.fields.network = Some(lemonfiber_manifest::container::Network {
+        via: Some(lemonfiber_manifest::container::EGRESS_GUARD.to_owned()),
+        fenced: false,
+    });
+    let rival = a_placed(
+        "rival-guard",
+        &[lemonfiber_manifest::container::EGRESS_GUARD],
+        None,
+    );
+    let fillers = shipped(
+        &[
+            an_installed("client", vec![client]),
+            an_installed("rival", vec![rival]),
+        ],
+        &Chosen::read(Some("network.egress-guard=rival-guard")),
+        |_| (),
+    );
+
+    assert_eq!(
+        fillers
+            .service("client")
+            .and_then(|one| one.address.as_ref())
+            .map(|address| address.host.as_str()),
+        Some("rival-guard")
+    );
 }

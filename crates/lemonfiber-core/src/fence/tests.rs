@@ -40,3 +40,18 @@ fn kept_addresses_are_read_whole_or_not_at_all() {
     assert!(super::kept("203.0.113.7\nnot one\n").is_empty());
     assert!(super::kept("").is_empty());
 }
+
+#[test]
+fn a_held_group_is_its_digits_alone_and_anything_else_is_none() {
+    for (held, group) in [
+        ("44", Some(44)),
+        (" 44\n", Some(44)),
+        ("", None),
+        ("+44", None),
+        ("-44", None),
+        ("render", None),
+        ("4294967296", None),
+    ] {
+        assert_eq!(super::group(held), group, "{held:?}");
+    }
+}

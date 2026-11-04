@@ -152,3 +152,77 @@ async fn a_copy_that_cannot_be_written_into_its_mount_stops_the_start_naming_it(
         "named and refused"
     );
 }
+
+#[tokio::test]
+async fn the_volumes_of_the_proxy_are_copied_into_the_mounts_of_the_part_moved_in_its_place() {
+    let (mut ctx, project) = machine("proxy-moved");
+    crate::test_support::adapted::parts_recorded(&ctx);
+    let volumes = Volumed::holding(&[
+        (
+            "lemonfiber_caddy_data",
+            &[("caddy/certificates/kept", "issued")],
+        ),
+        ("lemonfiber_caddy_config", &[("caddy/autosave.json", "{}")]),
+    ]);
+    ctx.seams.engine_volumes = volumes.clone();
+
+    let copied = copying(&ctx).await;
+
+    assert!(copied.is_ok(), "{copied:?}");
+    let mounted = project.join("mounts").join("caddy");
+    for (from, file, held) in [
+        ("data", "caddy/certificates/kept", "issued"),
+        ("config", "caddy/autosave.json", "{}"),
+    ] {
+        assert_eq!(
+            std::fs::read_to_string(mounted.join(from).join(file))
+                .ok()
+                .as_deref(),
+            Some(held),
+            "{from}"
+        );
+    }
+    let handed = volumes.handed_over();
+    assert_eq!(handed.len(), 2, "{handed:?}");
+    assert!(handed
+        .iter()
+        .all(|(_, image)| image.starts_with("ghcr.io/lemonfiber/caddy@sha256:")));
+}
+
+#[tokio::test]
+async fn a_volume_of_the_proxy_its_moved_part_mounts_nowhere_is_not_copied() {
+    let (mut ctx, project) = machine("proxy-unmounted");
+    crate::test_support::adapted::parts_recorded(&ctx);
+    let mut register = crate::app::plugins::read(&ctx).unwrap_or_default();
+    let mut caddy = register
+        .installed()
+        .iter()
+        .find(|one| one.plugin == "caddy")
+        .cloned();
+    for placed in caddy.iter_mut().flat_map(|one| &mut one.services) {
+        placed.fields.mount.retain(|mount| mount.to != "/config");
+    }
+    register.forget("caddy");
+    assert!(caddy.is_some_and(|caddy| register.record(caddy).is_ok()));
+    assert!(
+        crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register).is_ok()
+    );
+    let volumes = Volumed::holding(&[
+        (
+            "lemonfiber_caddy_data",
+            &[("caddy/certificates/kept", "issued")],
+        ),
+        ("lemonfiber_caddy_config", &[("caddy/autosave.json", "{}")]),
+    ]);
+    ctx.seams.engine_volumes = volumes.clone();
+
+    assert!(copying(&ctx).await.is_ok());
+
+    let mounted = project.join("mounts").join("caddy");
+    assert!(mounted
+        .join("data")
+        .join("caddy/certificates/kept")
+        .exists());
+    assert!(!mounted.join("config").exists());
+    assert_eq!(volumes.handed_over().len(), 1);
+}

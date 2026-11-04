@@ -15,6 +15,7 @@ fn plugin_asking(plugin: &str, service: &str, capability: &str, each: bool) -> I
         native: None,
         capability: capability.to_owned(),
         each,
+        files: None,
     }];
     crate::test_support::an_installed(plugin, vec![placed])
 }
@@ -68,6 +69,7 @@ fn a_plugins_ask_follows_the_stacks_and_says_whose_service_asked() {
         wired.last().map(|one| &one.reaches),
         Some(&Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["one".to_owned(), "two".to_owned()],
             settled: Settled::Each,
@@ -87,6 +89,7 @@ fn a_plugins_ask_for_one_of_several_takes_the_stacks_own_choice_and_its_reason()
         wired.first().map(|one| &one.reaches),
         Some(&Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["two".to_owned()],
             settled: Settled::Chosen {
@@ -137,6 +140,7 @@ fn a_plugins_ask_nothing_fills_is_reported_naming_the_plugins_service() {
         missing,
         Some(vec![Unfilled {
             native: None,
+            files: None,
             by: "subfinder".to_owned(),
             capability: "subtitles.fetch".to_owned(),
         }])
@@ -192,52 +196,144 @@ fn installing_a_plugin_whose_ask_stands_contested_says_so_and_lists_its_asks_alo
     assert_eq!(askers, vec![("elsewhere", &from("other"))]);
 }
 
-#[test]
-fn a_variable_asking_an_address_reaches_the_one_service_its_ask_settles_on() {
-    let url = |files: Option<&str>| lemonfiber_manifest::container::UrlOf {
-        url_of: "indexer.search".to_owned(),
+/// A plugin whose one service, `service`, holds `url` as the variable `ADDRESS`.
+fn plugin_addressing(service: &str, url: lemonfiber_manifest::container::UrlOf) -> Installed {
+    let mut placed = crate::test_support::a_placed(service, &[], None);
+    placed.fields.env.insert(
+        "ADDRESS".to_owned(),
+        lemonfiber_manifest::container::Value::Url(url),
+    );
+    crate::test_support::an_installed("reader", vec![placed])
+}
+
+fn url_of(capability: &str, files: Option<&str>) -> lemonfiber_manifest::container::UrlOf {
+    lemonfiber_manifest::container::UrlOf {
+        url_of: capability.to_owned(),
         files: files.map(str::to_owned),
         native: None,
-    };
-    let asker = plugin_asking("subs", "subfinder", "indexer.search", false);
-    let address = |manifest: Option<Manifest>, installed: &[Installed], by: &str, files| {
-        manifest.and_then(|manifest| {
-            let settled = settle(&manifest, installed, &Chosen::default());
-            crate::wiring::address(&settled, &manifest, installed, by, &url(files))
-        })
-    };
+    }
+}
 
-    let bundled = || {
-        written(&format!(
-            "{}listens = 9696\n",
-            service("one", "\"indexer.search\"")
-        ))
-    };
-    let held = [asker.clone()];
-    assert_eq!(
-        address(bundled(), &held, "subfinder", None).as_deref(),
-        Some("http://one:9696")
-    );
-    assert_eq!(address(bundled(), &held, "subfinder", Some("tv")), None);
-    assert_eq!(address(bundled(), &held, "somebody", None), None);
-    assert_eq!(address(written(""), &held, "subfinder", None), None);
+/// Two bundled curators, one filing tv and one filing movies, with `more` appended.
+fn two_curators(more: &str) -> Option<Manifest> {
+    written(&format!(
+        "{}media_types = [\"tv\"]\n{}media_types = [\"movies\"]\n{more}",
+        service("series", "\"library.curate\""),
+        service("films", "\"library.curate\""),
+    ))
+}
 
-    let mut finder = crate::test_support::a_placed("finder", &["indexer.search"], Some(8080));
-    let listening = [
-        asker.clone(),
-        crate::test_support::an_installed("idx", vec![finder.clone()]),
-    ];
-    assert_eq!(
-        address(written(""), &listening, "subfinder", None).as_deref(),
-        Some("http://finder:8080")
+#[test]
+fn an_address_narrowed_to_a_medium_is_settled_shown_and_reported_unfilled_as_an_ask() {
+    let manifest = two_curators("");
+    let reaches = |files: &str| {
+        plugins(
+            manifest.as_ref(),
+            &[plugin_addressing(
+                "reader",
+                url_of("library.curate", Some(files)),
+            )],
+            &Chosen::default(),
+        )
+    };
+    let tv = reaches("tv");
+    assert!(
+        matches!(
+            tv.as_slice(),
+            [Wired { by, reaches: Reaches::Asked { capability, services, settled: Settled::Outright, files: Some(medium), .. }, .. }]
+                if by == "reader" && capability == "library.curate" && services == &["series".to_owned()] && medium == "tv"
+        ),
+        "{tv:?}"
     );
-    finder.listens = None;
-    let published = [
-        asker,
-        crate::test_support::an_installed("idx", vec![finder]),
-    ];
+    let music = reaches("music");
     assert_eq!(
-        address(written(""), &published, "subfinder", None).as_deref(),
-        Some("http://finder:8080")
+        unfilled(&music),
+        [Unfilled {
+            by: "reader".to_owned(),
+            capability: "library.curate".to_owned(),
+            native: None,
+            files: Some("music".to_owned()),
+        }]
+    );
+    assert_eq!(
+        unfilled(&music).first().map(ToString::to_string).as_deref(),
+        Some("reader asks for library.curate filing music and nothing fills it")
+    );
+}
+
+#[test]
+fn an_address_and_an_ask_of_one_capability_and_medium_are_one_ask() {
+    let mut asker = plugin_asking("subs", "subfinder", "indexer.search", false);
+    for one in &mut asker.services {
+        one.fields.env.insert(
+            "INDEXER".to_owned(),
+            lemonfiber_manifest::container::Value::Url(url_of("indexer.search", None)),
+        );
+    }
+    let manifest = written(&service("finder", "\"indexer.search\""));
+    let wired = plugins(manifest.as_ref(), &[asker], &Chosen::default());
+    assert_eq!(wired.len(), 1, "{wired:?}");
+}
+
+#[test]
+fn a_stack_services_address_is_an_ask_of_its_own() {
+    let manifest = written(&format!(
+        "{}{}[service.env.INDEXER]\nurl_of = \"indexer.search\"\n",
+        service("finder", "\"indexer.search\""),
+        service("asker", ""),
+    ));
+    let wired = manifest
+        .as_ref()
+        .map(|manifest| settle(manifest, &[], &Chosen::default()))
+        .unwrap_or_default();
+    assert!(
+        matches!(
+            wired.as_slice(),
+            [Wired { by, origin: Origin::Bundled, reaches: Reaches::Asked { capability, services, .. } }]
+                if by == "asker" && capability == "indexer.search" && services == &["finder".to_owned()]
+        ),
+        "{wired:?}"
+    );
+}
+
+#[test]
+fn a_stack_services_address_its_wiring_also_asks_for_is_one_ask() {
+    let manifest = written(&format!(
+        "{}{}[service.env.INDEXER]\nurl_of = \"indexer.search\"\n\n\
+         [[wiring]]\nby = \"asker\"\nasks = \"indexer.search\"\n",
+        service("finder", "\"indexer.search\""),
+        service("asker", ""),
+    ));
+    let wired = manifest
+        .as_ref()
+        .map(|manifest| settle(manifest, &[], &Chosen::default()))
+        .unwrap_or_default();
+    assert_eq!(wired.len(), 1, "{wired:?}");
+}
+
+#[test]
+fn running_inside_a_fillers_network_is_an_ask_of_that_capability() {
+    let mut placed = crate::test_support::a_placed("downloader", &[], None);
+    placed.fields.network = Some(lemonfiber_manifest::container::Network {
+        via: Some(lemonfiber_manifest::container::EGRESS_GUARD.to_owned()),
+        fenced: false,
+    });
+    let manifest = written(&service(
+        "tunnel",
+        &format!("\"{}\"", lemonfiber_manifest::container::EGRESS_GUARD),
+    ));
+    let wired = plugins(
+        manifest.as_ref(),
+        &[crate::test_support::an_installed("dl", vec![placed])],
+        &Chosen::default(),
+    );
+    assert!(
+        matches!(
+            wired.as_slice(),
+            [Wired { by, reaches: Reaches::Asked { capability, services, settled: Settled::Outright, .. }, .. }]
+                if by == "downloader" && capability == lemonfiber_manifest::container::EGRESS_GUARD
+                    && services == &["tunnel".to_owned()]
+        ),
+        "{wired:?}"
     );
 }

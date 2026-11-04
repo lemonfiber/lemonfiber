@@ -299,6 +299,8 @@ impl Service {
             certificate: self.certificate.as_ref(),
             provides: &self.provides,
             speaks: !self.speaks.is_empty(),
+            grants: &self.grants,
+            depends_on: &self.depends_on,
         }
     }
 }

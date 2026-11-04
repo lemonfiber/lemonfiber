@@ -260,6 +260,7 @@ impl Fillers {
                 Reaches::Asked {
                     capability,
                     services: answering,
+                    files: None,
                     ..
                 } => Some(Ask {
                     by: wired.by,
@@ -269,7 +270,7 @@ impl Fillers {
                         .filter_map(|id| services.iter().find(|one| one.id == *id).cloned())
                         .collect(),
                 }),
-                Reaches::ByName { .. } => None,
+                Reaches::Asked { .. } | Reaches::ByName { .. } => None,
             })
             .collect();
         Self {

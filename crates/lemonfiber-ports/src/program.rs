@@ -38,8 +38,8 @@ pub struct Run {
     pub read_only: bool,
     /// Its memory ceiling in bytes, where it has one.
     pub memory: Option<i64>,
-    /// The directory mounted at its configuration path, where it has one.
-    pub configuration: Option<Configuration>,
+    /// The directory on the engine's machine bound into it, where it has one.
+    pub bound: Option<Bound>,
     /// How long it may take before it is stopped.
     pub within: Duration,
     /// The most of its standard output that is read.
@@ -63,11 +63,13 @@ pub enum Joined {
 
 /// A directory on the engine's machine, mounted at a path inside the container.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Configuration {
+pub struct Bound {
     /// The directory mounted.
     pub source: PathBuf,
     /// Where it lands inside the container.
     pub target: String,
+    /// Whether the container may only read it.
+    pub read_only: bool,
 }
 
 /// What a run came to.

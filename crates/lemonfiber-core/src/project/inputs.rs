@@ -4,10 +4,10 @@
 
 use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::stream::guard;
-use lemonfiber_manifest::container::{Posture, Value};
+use lemonfiber_manifest::container::{Network, Posture};
 use lemonfiber_manifest::{Manifest, Service};
 
-use crate::plugin::{Installed, Placed, Reached};
+use crate::plugin::{Installed, Reached};
 use crate::topology::{self, Member, Named, Settled, Topology};
 use crate::wiring::{settle, Chosen, Reaches};
 
@@ -28,13 +28,27 @@ pub(super) struct Standing {
     pub(super) fenced: bool,
 }
 
+/// One settled ask: what asked, the capability and the medium it asked of, and the service
+/// it reaches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Ask {
+    /// The service that asked.
+    pub(super) asker: String,
+    /// The capability it asked for.
+    pub(super) capability: String,
+    /// The medium it narrowed the ask to, where it named one.
+    pub(super) files: Option<String>,
+    /// The service the ask reaches.
+    pub(super) reached: String,
+}
+
 /// Everything the derivation reads, owned.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct Inputs {
     /// Every service the project writes.
     pub(super) members: Vec<Standing>,
-    /// Every settled ask, as asker, capability and the service it reaches.
-    pub(super) asks: Vec<(String, String, String)>,
+    /// Every settled ask a service on the networks makes.
+    pub(super) asks: Vec<Ask>,
     /// Every link by name, as the service that reaches and the one it names.
     pub(super) links: Vec<(String, String)>,
     /// The service that fills `stream.guard`, where one does.
@@ -63,10 +77,10 @@ impl Inputs {
         let asks: Vec<Settled<'_>> = self
             .asks
             .iter()
-            .map(|(asker, capability, reached)| Settled {
-                asker,
-                capability,
-                reached,
+            .map(|ask| Settled {
+                asker: &ask.asker,
+                capability: &ask.capability,
+                reached: &ask.reached,
             })
             .collect();
         let links: Vec<Named<'_>> = self.links.iter().map(|(by, to)| Named { by, to }).collect();
@@ -83,15 +97,15 @@ pub(super) fn read(
     pass: bool,
 ) -> Inputs {
     let fill = |capability: &str| filler(manifest, installed, chosen, capability);
+    let settled = settle(manifest, installed, chosen);
+    let vias = vias(manifest, installed);
+    let inside = |id: &str| inside(installed, &settled, &vias, id);
     let mut members: Vec<Standing> = written(manifest, installed)
         .map(|service| Standing {
             id: service.id.clone(),
             confined: service.posture == Posture::Confined,
             publishes: service.port.is_some() || !service.publish.is_empty(),
-            inside: service
-                .network
-                .as_ref()
-                .and_then(|network| fill(network.via()?)),
+            inside: inside(&service.id),
             fronts: None,
             fenced: service.fenced(),
         })
@@ -105,11 +119,7 @@ pub(super) fn read(
                     publishes: placed.reached.is_some()
                         || !placed.fields.publish.is_empty()
                         || (placed.listens.is_some() && !placed.speaks.is_empty()),
-                    inside: placed
-                        .fields
-                        .network
-                        .as_ref()
-                        .and_then(|network| fill(network.via()?)),
+                    inside: inside(&placed.service),
                     fronts: placed.fronts.clone(),
                     fenced: placed
                         .fields
@@ -142,23 +152,7 @@ pub(super) fn read(
             fenced: false,
         });
     }
-    let mut asks = Vec::new();
-    let mut links = Vec::new();
-    for wired in settle(manifest, installed, chosen) {
-        match wired.reaches {
-            Reaches::Asked {
-                capability,
-                services,
-                ..
-            } => asks.extend(
-                services
-                    .into_iter()
-                    .map(|reached| (wired.by.clone(), capability.clone(), reached)),
-            ),
-            Reaches::ByName { service, .. } => links.push((wired.by, service)),
-        }
-    }
-    asks.extend(narrowed(manifest, installed));
+    let (mut asks, links) = joined(settled, &vias);
     asks.extend(fronted(installed, fill(front::CAPABILITY)));
     Inputs {
         members,
@@ -168,6 +162,78 @@ pub(super) fn read(
         pass,
         fenced,
     }
+}
+
+/// Each service of the stack and of `installed` that runs inside the network of the filler
+/// of a capability, with that capability.
+fn vias<'a>(manifest: &'a Manifest, installed: &'a [Installed]) -> Vec<(&'a str, &'a str)> {
+    written(manifest, installed)
+        .filter_map(|service| {
+            let via = service.network.as_ref().and_then(Network::via)?;
+            Some((service.id.as_str(), via))
+        })
+        .chain(
+            installed
+                .iter()
+                .flat_map(|one| &one.services)
+                .filter_map(|placed| {
+                    let via = placed.fields.network.as_ref().and_then(Network::via)?;
+                    Some((placed.service.as_str(), via))
+                }),
+        )
+        .collect()
+}
+
+/// Where `id` runs inside, as `vias` says it does: the one service its ask of that
+/// capability settled on, or the upstream that service fronts where it is an adapter.
+fn inside(
+    installed: &[Installed],
+    settled: &[crate::wiring::Wired],
+    vias: &[(&str, &str)],
+    id: &str,
+) -> Option<String> {
+    let (_, via) = vias.iter().find(|(service, _)| *service == id)?;
+    settled.iter().find_map(|wired| match &wired.reaches {
+        Reaches::Asked {
+            capability,
+            services,
+            ..
+        } if wired.by == id && capability == via => match services.as_slice() {
+            [one] => Some(upstream_of(installed, one)),
+            _ => None,
+        },
+        _ => None,
+    })
+}
+
+/// Each settled ask as a network its asker joins, but the ask of the capability a
+/// service runs inside the network of, and each link by name.
+fn joined(
+    settled: Vec<crate::wiring::Wired>,
+    vias: &[(&str, &str)],
+) -> (Vec<Ask>, Vec<(String, String)>) {
+    let mut asks = Vec::new();
+    let mut links = Vec::new();
+    for wired in settled {
+        match wired.reaches {
+            Reaches::Asked {
+                capability,
+                services,
+                files,
+                ..
+            } if !vias.contains(&(wired.by.as_str(), capability.as_str())) => {
+                asks.extend(services.into_iter().map(|reached| Ask {
+                    asker: wired.by.clone(),
+                    capability: capability.clone(),
+                    files: files.clone(),
+                    reached,
+                }));
+            }
+            Reaches::Asked { .. } => {}
+            Reaches::ByName { service, .. } => links.push((wired.by, service)),
+        }
+    }
+    (asks, links)
 }
 
 /// A fence beside each of `members` that declares one, holding the networks and the
@@ -215,7 +281,7 @@ pub(crate) fn pass_taken(manifest: &Manifest, installed: &[Installed]) -> bool {
 
 /// The ask of `proxy.front` each plugin service the household reaches at a hostname makes
 /// of `proxy`, the service that fills it.
-fn fronted(installed: &[Installed], proxy: Option<String>) -> Vec<(String, String, String)> {
+fn fronted(installed: &[Installed], proxy: Option<String>) -> Vec<Ask> {
     let Some(proxy) = proxy else {
         return Vec::new();
     };
@@ -223,12 +289,11 @@ fn fronted(installed: &[Installed], proxy: Option<String>) -> Vec<(String, Strin
         .iter()
         .flat_map(|one| &one.services)
         .filter(|placed| matches!(placed.reached, Some(Reached::Household { .. })))
-        .map(|placed| {
-            (
-                placed.service.clone(),
-                front::CAPABILITY.to_owned(),
-                proxy.clone(),
-            )
+        .map(|placed| Ask {
+            asker: placed.service.clone(),
+            capability: front::CAPABILITY.to_owned(),
+            files: None,
+            reached: proxy.clone(),
         })
         .collect()
 }
@@ -248,7 +313,16 @@ pub(crate) fn written<'a>(
     manifest: &'a Manifest,
     installed: &'a [Installed],
 ) -> impl Iterator<Item = &'a Service> {
-    declared(manifest).filter(move |service| !moved_in_place(installed, &service.id))
+    written_trusting(manifest, installed, crate::plugin::first_party::EMBEDDED)
+}
+
+/// The same, with `trusted` as the plugins that are first-party.
+pub(crate) fn written_trusting<'a>(
+    manifest: &'a Manifest,
+    installed: &'a [Installed],
+    trusted: &'a [crate::plugin::first_party::FirstParty],
+) -> impl Iterator<Item = &'a Service> {
+    declared(manifest).filter(move |service| moving(installed, &service.id, trusted).is_none())
 }
 
 /// Whether one of `installed` has moved in place of the stack's service `service`: a
@@ -310,65 +384,13 @@ fn claims(provides: &[String], capability: &str) -> bool {
     provides.iter().any(|named| named == capability)
 }
 
-/// The asks a service's addresses make that settling does not: one narrowed to a medium,
-/// which reaches every claimant filing it, and one narrowed to an API, which reaches the
-/// upstream an adapter claiming it fronts.
-fn narrowed(manifest: &Manifest, installed: &[Installed]) -> Vec<(String, String, String)> {
-    let stack =
-        written(manifest, installed).map(|service| (service.id.as_str(), service.env.values()));
-    let plugins = installed
+/// Where an ask settled on `service` is held: the upstream `service` fronts where it is an
+/// adapter, and `service` itself otherwise.
+fn upstream_of(installed: &[Installed], service: &str) -> String {
+    installed
         .iter()
         .flat_map(|one| &one.services)
-        .map(|placed| (placed.service.as_str(), placed.fields.env.values()));
-    let mut asks = Vec::new();
-    for (by, values) in stack.chain(plugins) {
-        for value in values {
-            let Value::Url(url) = value else { continue };
-            if url.files.is_none() && url.native.is_none() {
-                continue;
-            }
-            let native = url.native.is_some();
-            for reached in reaching(
-                manifest,
-                installed,
-                &url.url_of,
-                url.files.as_deref(),
-                native,
-            ) {
-                if reached != by {
-                    asks.push((by.to_owned(), url.url_of.clone(), reached));
-                }
-            }
-        }
-    }
-    asks
-}
-
-/// Every service an ask for `capability`, narrowed to `files` where it names a medium,
-/// reaches: each claimant filing it, and the upstream an adapter fronts where the ask
-/// speaks the upstream's own API.
-pub(super) fn reaching(
-    manifest: &Manifest,
-    installed: &[Installed],
-    capability: &str,
-    files: Option<&str>,
-    native: bool,
-) -> Vec<String> {
-    let files_it = |media: &[String]| files.is_none_or(|medium| media.iter().any(|m| m == medium));
-    written(manifest, installed)
-        .filter(|service| claims(&service.provides, capability) && files_it(&service.media_types))
-        .map(|service| service.id.clone())
-        .chain(
-            installed
-                .iter()
-                .flat_map(|one| &one.services)
-                .filter(|placed: &&Placed| {
-                    claims(&placed.provides, capability) && files_it(&placed.media_types)
-                })
-                .map(|placed| match (&placed.fronts, native) {
-                    (Some(upstream), true) => upstream.clone(),
-                    _ => placed.service.clone(),
-                }),
-        )
-        .collect()
+        .find(|placed| placed.service == service)
+        .and_then(|placed| placed.fronts.clone())
+        .unwrap_or_else(|| service.to_owned())
 }

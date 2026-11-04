@@ -508,6 +508,7 @@ fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
         native: None,
         capability: "indexer.search".to_owned(),
         each: false,
+        files: None,
     }];
     placed.fields.env = [(
         "INDEXER".to_owned(),

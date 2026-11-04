@@ -249,6 +249,8 @@ pub fn unstarted(action: &str, plan: Plan, offline: Offline) -> LifecycleReport 
         passing: None,
         fencing: None,
         unfenced: Vec::new(),
+        rendering: None,
+        unrendered: Vec::new(),
     }
 }
 

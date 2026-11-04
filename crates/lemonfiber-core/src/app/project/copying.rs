@@ -44,8 +44,9 @@ pub(crate) struct Copies {
 }
 
 /// Every volume the engine keeps for a mount of the stack this build carries whose own
-/// directory holds nothing yet. None for a stack directory the operator named, which is
-/// run as it stands.
+/// directory holds nothing yet: the stack's own where it runs the service, and the one the
+/// plugin moved in its place mounts at the same target where a part has moved in. None for
+/// a stack directory the operator named, which is run as it stands.
 pub(crate) async fn pending(ctx: &Ctx, manifest: &Manifest) -> Copies {
     let (Source::Embedded(_), Some(within)) = (ctx.stack, super::directory(ctx)) else {
         return Copies::default();
@@ -54,23 +55,37 @@ pub(crate) async fn pending(ctx: &Ctx, manifest: &Manifest) -> Copies {
         within,
         ..Copies::default()
     };
+    let installed = crate::app::plugins::read(ctx).unwrap_or_default();
     for service in crate::project::declared(manifest) {
+        let moved = crate::project::moving(
+            installed.installed(),
+            &service.id,
+            crate::plugin::first_party::EMBEDDED,
+        )
+        .and_then(|part| {
+            part.services
+                .iter()
+                .find(|placed| placed.service == service.id)
+        });
         for mount in mounts(&service.mount, service.takes_data) {
-            let to = copies
-                .within
-                .join(MOUNT_TREE)
-                .join(&service.id)
-                .join(&mount.from);
+            let (from, image) = match moved {
+                Some(placed) => {
+                    let Some(own) = mounts(&placed.fields.mount, placed.takes_data)
+                        .find(|own| own.to == mount.to)
+                    else {
+                        continue;
+                    };
+                    (&own.from, format!("{}@{}", placed.image, placed.digest))
+                }
+                None => (&mount.from, service.reference()),
+            };
+            let to = copies.within.join(MOUNT_TREE).join(&service.id).join(from);
             if !empty(ctx, &to, &copies.within) {
                 continue;
             }
             let volume = format!("{}_{}_{}", ctx.settings.project, service.id, mount.from);
             match ctx.seams.engine_volumes.kept(&volume).await {
-                Ok(true) => copies.pending.push(Copy {
-                    volume,
-                    image: service.reference(),
-                    to,
-                }),
+                Ok(true) => copies.pending.push(Copy { volume, image, to }),
                 Ok(false) => {}
                 Err(failure) => {
                     copies.unasked.get_or_insert_with(|| failure.problem());

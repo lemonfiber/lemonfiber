@@ -10,6 +10,13 @@
           "description": "The capability asked for.",
           "type": "string"
         },
+        "files": {
+          "description": "The medium the filler it reaches files, where the ask is narrowed to one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "how": {
           "type": "string",
           "const": "asked"

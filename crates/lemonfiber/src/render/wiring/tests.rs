@@ -10,6 +10,7 @@ fn asking(by: &str, capability: &str, services: &[&str], settled: Settled) -> Wi
         origin: lemonfiber_core::origin::Origin::Bundled,
         reaches: Reaches::Asked {
             native: None,
+            files: None,
             capability: capability.to_owned(),
             services: services.iter().map(|one| (*one).to_owned()).collect(),
             settled,
@@ -89,6 +90,7 @@ fn what_an_ask_reaches_says_where_each_service_came_from() {
         origin: lemonfiber_core::origin::Origin::Bundled,
         reaches: Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["kavita".to_owned(), "stray".to_owned()],
             settled: Settled::Each,
@@ -223,6 +225,7 @@ fn what_nothing_fills_is_listed_again_naming_what_asked() {
         wired: vec![asking("seerr", "identity.source", &[], Settled::Unfilled)],
         unfilled: vec![Unfilled {
             native: None,
+            files: None,
             by: "seerr".to_owned(),
             capability: "identity.source".to_owned(),
         }],
@@ -335,6 +338,7 @@ fn a_choice_made_gives_no_name_to_answer_with() {
 fn what_a_substitution_would_leave_unfilled_is_said_in_the_conditional() {
     let leaves = vec![Unfilled {
         native: None,
+        files: None,
         by: "seerr".to_owned(),
         capability: "identity.source".to_owned(),
     }];
@@ -426,4 +430,32 @@ fn what_stays_with_the_stopped_part_is_named() {
 
     let nothing = substituted(&substituting(false, Vec::new())).text();
     assert!(!nothing.contains("Stays with"), "{nothing}");
+}
+
+#[test]
+fn an_ask_narrowed_to_a_medium_names_the_medium_after_the_capability() {
+    let mut link = asking("reader", "library.curate", &["sonarr"], Settled::Outright);
+    if let Reaches::Asked { files, .. } = &mut link.reaches {
+        *files = Some("tv".to_owned());
+    }
+    let said = shown(&WiringReport {
+        wired: vec![link],
+        unfilled: Vec::new(),
+    });
+    assert!(
+        said.contains("reader asks for library.curate filing tv"),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_substitution_of_what_nothing_filled_names_no_service_it_was() {
+    let mut report = substituting(true, Vec::new());
+    report.substitution.was = None;
+    let said = substituted(&report).text();
+    assert!(
+        said.contains("nzbhydra2 now fills indexer.search."),
+        "{said}"
+    );
+    assert!(!said.contains("was "), "{said}");
 }

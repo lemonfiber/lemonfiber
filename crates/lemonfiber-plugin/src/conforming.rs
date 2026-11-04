@@ -26,6 +26,9 @@ use toml::Value as Toml;
 
 use crate::schema::Manifest;
 
+/// Where the published schema declares a plugin's service.
+const SERVICE: &str = "/$defs/PluginService";
+
 /// One thing a manifest got wrong, and where.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Violation {
@@ -136,7 +139,14 @@ fn table_against(
     let closed = schema.get("additionalProperties") == Some(&Json::Bool(false));
     if closed {
         let takes = listed(properties.keys().cloned());
-        for key in table.keys().filter(|key| !properties.contains_key(*key)) {
+        let retired = |key: &str| {
+            lemonfiber_manifest::container::RETIRED.contains(&key)
+                && root.pointer(SERVICE) == Some(schema)
+        };
+        for key in table
+            .keys()
+            .filter(|key| !properties.contains_key(*key) && !retired(key))
+        {
             found.push(Violation {
                 location: under(at, key),
                 message: format!(

@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "files": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "native": {
       "type": [
         "null|string"

@@ -9,7 +9,9 @@ use crate::model::{LifecycleReport, StackEdit};
 use crate::ports::process::{Failure, Output, Progress};
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
+use beside::{beside_readied, Beside};
 
+mod beside;
 mod declared;
 pub(crate) use declared::{catalogue, forms, provenance, version};
 mod diagnosis;
@@ -272,10 +274,10 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
     // materialised rather than after, so a run that is going to be refused does not
     // rewrite anything on the way to saying so.
     verified(ctx).await?;
-    let (passing, fencing) = if starts(action) {
-        beside_readied(ctx).await
+    let beside = if starts(action) {
+        Box::pin(beside_readied(ctx)).await
     } else {
-        (None, None)
+        Beside::default()
     };
 
     // Before the project is composed, so what it writes already holds each guard moved
@@ -349,10 +351,16 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         guards,
         installing,
         swept: sweep.networks.clone(),
-        passing,
-        fencing,
+        passing: beside.passing,
+        fencing: beside.fencing,
         unfenced: if starts(action) {
             fenced::held_back(action, &project)?
+        } else {
+            Vec::new()
+        },
+        rendering: beside.rendering,
+        unrendered: if starts(action) {
+            super::project::unrendered(&project)
         } else {
             Vec::new()
         },
@@ -364,29 +372,6 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         sweep,
         copies,
     })
-}
-
-/// Ready the pass service before a start writes the project that runs it, and say why it
-/// is left out where it is. A rehearsal pins and makes nothing.
-async fn pass_readied(ctx: &Ctx) -> Option<String> {
-    if ctx.dry_run {
-        return None;
-    }
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    super::project::pass_readied(ctx, &manifest).await
-}
-
-/// Ready the pass service and ask the engine for its host's addresses before a start
-/// writes the project that runs them, and say why each is left out, where it is.
-async fn beside_readied(ctx: &Ctx) -> (Option<String>, Option<String>) {
-    (pass_readied(ctx).await, fence_readied(ctx).await)
-}
-
-/// Ask the engine for its host's addresses before a start writes a project holding a
-/// fence, and say why none is kept, where none is. A rehearsal asks nothing.
-async fn fence_readied(ctx: &Ctx) -> Option<String> {
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    super::project::fence_readied(ctx, &manifest, lemonfiber_bundled::FENCE).await
 }
 
 /// What a lifecycle command settled before anything runs.

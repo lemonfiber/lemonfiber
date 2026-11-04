@@ -84,6 +84,12 @@
       ],
       "required": true
     },
+    "rendering": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "secured": {
       "type": [
         "null|string"
@@ -121,6 +127,12 @@
       "required": false
     },
     "unfenced": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "unrendered": {
       "type": [
         "array[string]"
       ],

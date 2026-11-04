@@ -117,6 +117,14 @@ pub struct LifecycleReport {
     /// words naming it and why. Empty for every other action.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unfenced: Vec<String>,
+    /// Why the group owning the render devices of the engine's host was not asked or not
+    /// kept, where a service takes `render` and it was not. Absent for every other action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rendering: Option<String>,
+    /// Each service taking `render` a start writes without the host's render devices, in
+    /// words naming it. Empty for every other action.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unrendered: Vec<String>,
 }
 
 /// The operator's own overlay, named because nothing in it was held to the model.

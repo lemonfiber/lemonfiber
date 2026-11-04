@@ -28,7 +28,7 @@ pub(crate) async fn restarted(ctx: &Ctx, restart: Restarting) -> Result<Outcome,
     } = restart;
     answering(ctx, &forms, &Action::Restart(services), offer.as_deref())
         .await
-        .map(Outcome::Lifecycle)
+        .map(Outcome::from)
 }
 
 /// Bring forms up, answering what the start offers to install with `offer`.
@@ -43,7 +43,7 @@ pub(crate) async fn up(
 ) -> Result<Outcome, Box<Problem>> {
     answering(ctx, forms, &Action::Up, offer.as_deref())
         .await
-        .map(Outcome::Lifecycle)
+        .map(Outcome::from)
 }
 
 /// Switch to forms, answering what the start offers to install with `offer`.
@@ -58,7 +58,7 @@ pub(crate) async fn switched(
 ) -> Result<Outcome, Box<Problem>> {
     super::switch(ctx, forms, offer.as_deref())
         .await
-        .map(Outcome::Lifecycle)
+        .map(Outcome::from)
 }
 
 /// A lifecycle action, answering the offer a rehearsal of it made where one is carried

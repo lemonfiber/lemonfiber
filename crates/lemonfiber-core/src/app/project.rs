@@ -10,6 +10,7 @@ mod mounting;
 mod moving;
 mod passing;
 mod profiled;
+mod rendering;
 mod retiring;
 mod secrets;
 mod sweeping;
@@ -37,6 +38,7 @@ pub(crate) use fencing::readied as fence_readied;
 pub(crate) use linking::unlinked;
 pub(crate) use moving::{beneath as moved_beneath, moved};
 pub(crate) use passing::readied as pass_readied;
+pub(crate) use rendering::{readied as render_readied, unrendered};
 pub(crate) use retiring::{retired, still_there};
 pub(crate) use secrets::written as secrets_written;
 pub(crate) use sweeping::{swept, Sweep};
@@ -196,6 +198,12 @@ pub(crate) fn topology(ctx: &Ctx, manifest: &Manifest) -> Result<Topology, Box<P
 pub(crate) fn pinned(ctx: &Ctx) -> Option<String> {
     held_as(ctx, crate::pass::PINNED)
         .and_then(|held| crate::pass::pinned(&held, crate::stack::RUNNING))
+}
+
+/// The group owning the render devices of the engine's host, as the engine last answered
+/// it, where it answered one.
+pub(crate) fn render_group(ctx: &Ctx) -> Option<u32> {
+    held_as(ctx, crate::fence::RENDER_HELD).and_then(|held| crate::fence::group(&held))
 }
 
 /// The addresses of the engine's host, as the engine last answered them for a fence,

@@ -93,6 +93,7 @@ pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{routes as household_routes, stack_routes, taken as label_taken};
 pub use granted::{approval as grant_approval, granting, Grant, Granting};
+pub(crate) use installed::implied;
 pub use installed::{
     answering, spelled_alike, Asking, Installed, Placed, Reached, RequestProof, RunProof,
 };

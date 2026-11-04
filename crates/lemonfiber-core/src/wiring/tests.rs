@@ -1,6 +1,6 @@
 use super::{
-    contested_by, filled, recorded, settle, substitute, unfilled, Chosen, LeftBehind, Reaches,
-    Refused, Settled, Substitution, Unfilled, Whose, FILLS_KEY,
+    recorded, settle, substitute, unfilled, Chosen, LeftBehind, Reaches, Refused, Settled,
+    Substitution, Unfilled, Whose, FILLS_KEY,
 };
 use lemonfiber_manifest::Manifest;
 
@@ -125,6 +125,7 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
         came(manifest, &Chosen::default(), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["server".to_owned()],
             settled: Settled::Outright,
@@ -147,6 +148,7 @@ fn several_claimants_and_no_choice_is_contested_and_names_each() {
         came(manifest, &Chosen::default(), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: Vec::new(),
             settled: Settled::Contested {
@@ -273,6 +275,7 @@ fn an_ask_nothing_fills_names_what_asked_for_it() {
         found,
         Some(vec![Unfilled {
             native: None,
+            files: None,
             by: "asker".to_owned(),
             capability: "media.serve".to_owned(),
         }])
@@ -494,8 +497,9 @@ fn a_stack_with_nothing_chosen_says_nothing_rather_than_an_empty_setting() {
     assert_eq!(Chosen::read(Some("")).setting(), None);
 }
 
-/// Every link the shipped stack declares is answered, and the by-name ones are
-/// the six the manifest says they are.
+/// Every link the shipped stack declares is answered, and so is the one ask no wiring
+/// declares: the torrent client's of the guard whose network it runs inside. The
+/// by-name ones are the six the manifest says they are.
 #[test]
 fn every_link_the_shipped_stack_declares_is_answered() {
     let counted = stack().map(|manifest| {
@@ -504,13 +508,32 @@ fn every_link_the_shipped_stack_declares_is_answered() {
             .iter()
             .filter(|one| matches!(one.reaches, Reaches::ByName { .. }))
             .count();
-        (wired.len(), manifest.wirings.len(), by_name)
+        let guarded = wired
+            .iter()
+            .filter(|one| one.by == "qbittorrent")
+            .map(|one| &one.reaches)
+            .find_map(|reaches| match reaches {
+                Reaches::Asked {
+                    capability,
+                    services,
+                    ..
+                } => Some((capability.clone(), services.clone())),
+                Reaches::ByName { .. } => None,
+            });
+        (wired.len(), manifest.wirings.len(), by_name, guarded)
     });
     assert_eq!(
-        counted.map(|(answered, _, _)| answered),
-        counted.map(|(_, declared, _)| declared)
+        counted.as_ref().map(|(answered, _, _, _)| *answered),
+        counted.as_ref().map(|(_, declared, _, _)| declared + 1)
     );
-    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(6));
+    assert_eq!(counted.as_ref().map(|(_, _, by_name, _)| *by_name), Some(6));
+    assert_eq!(
+        counted.and_then(|(_, _, _, guarded)| guarded),
+        Some((
+            "network.egress-guard".to_owned(),
+            vec!["gluetun".to_owned()]
+        ))
+    );
 }
 
 /// An ask for every filler with nothing to fill it is unfilled, not "every one of
@@ -526,6 +549,7 @@ fn an_ask_for_every_filler_that_nothing_fills_is_unfilled() {
         came(manifest, &Chosen::default(), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "library.curate".to_owned(),
             services: Vec::new(),
             settled: Settled::Unfilled,
@@ -548,6 +572,7 @@ fn a_choice_where_only_one_claims_it_is_reported_as_no_choice_at_all() {
         came(manifest, &Chosen::read(Some("media.serve=server")), "asker"),
         Some(Reaches::Asked {
             native: None,
+            files: None,
             capability: "media.serve".to_owned(),
             services: vec!["server".to_owned()],
             settled: Settled::Outright,
@@ -610,153 +635,9 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
     }
 }
 
-/// One bundled server and one asker, which is the shape a plugin walks into.
-fn one_server() -> Option<Manifest> {
-    written(&format!(
-        "{}{}\n[[wiring]]\nby = \"asker\"\nasks = \"media.serve\"\n",
-        service("asker", ""),
-        service("server", "\"media.serve\"")
-    ))
-}
-
-/// An installed plugin's service that claims what the stack asks for is a candidate
-/// on the same terms as the stack's own, so the ask is contested and refused rather
-/// than settled in the stack's favour by leaving the plugin out — and every claimant
-/// is named beside where it came from.
-#[test]
-fn a_plugin_claiming_what_the_stack_asks_for_contests_it_and_says_whose_each_is() {
-    let installed = [plugin_filling("kavita", "kavita", "media.serve")];
-    let reaches = one_server().and_then(|manifest| {
-        settle(&manifest, &installed, &Chosen::default())
-            .into_iter()
-            .find(|one| one.by == "asker")
-            .map(|one| one.reaches)
-    });
-    let mut origins = bundled(&["server"]);
-    origins.insert(
-        "kavita".to_owned(),
-        crate::origin::Origin::Plugin {
-            named: "kavita".to_owned(),
-        },
-    );
-    assert_eq!(
-        reaches,
-        Some(Reaches::Asked {
-            native: None,
-            capability: "media.serve".to_owned(),
-            services: Vec::new(),
-            settled: Settled::Contested {
-                claimants: vec!["server".to_owned(), "kavita (plugin kavita)".to_owned()],
-            },
-            origins,
-        })
-    );
-}
-
-/// And the operator settles it by choosing the plugin's service, which is then what
-/// the ask reaches — the way a contest between two bundled services is settled.
-#[test]
-fn choosing_a_plugin_s_service_settles_the_contest_it_made() {
-    let installed = [plugin_filling("kavita", "kavita", "media.serve")];
-    let chosen = Chosen::read(Some("media.serve=kavita"));
-    let reached = one_server().and_then(|manifest| {
-        filled(&settle(&manifest, &installed, &chosen))
-            .get("media.serve")
-            .cloned()
-    });
-    assert_eq!(reached, Some(vec!["kavita".to_owned()]));
-}
-
-/// Substitution can choose a plugin's service, and still refuses a name that is
-/// neither the stack's nor any installed plugin's.
-#[test]
-fn a_plugin_s_service_can_be_chosen_and_a_stranger_still_cannot() {
-    let installed = [plugin_filling("kavita", "kavita", "media.serve")];
-    let chose = one_server().map(|manifest| {
-        substitute(
-            &manifest,
-            &installed,
-            &Chosen::default(),
-            "media.serve",
-            "kavita",
-        )
-        .map(|one| one.now)
-    });
-    assert_eq!(chose, Some(Ok("kavita".to_owned())));
-    let stranger = one_server().map(|manifest| {
-        substitute(
-            &manifest,
-            &installed,
-            &Chosen::default(),
-            "media.serve",
-            "nobody",
-        )
-    });
-    assert_eq!(
-        stranger,
-        Some(Err(Refused::NoSuchService("nobody".to_owned())))
-    );
-}
-
-/// What installing a plugin would leave contested is exactly the asks it turns into
-/// contests — not an ask that was already contested before it came, which is not its
-/// doing and is not laid at its door.
-#[test]
-fn what_an_install_leaves_contested_is_only_what_it_turns_into_a_contest() {
-    let first = plugin_filling("kavita", "kavita", "media.serve");
-    let made =
-        one_server().map(|manifest| contested_by(&manifest, &[], &first, &Chosen::default()));
-    assert_eq!(
-        made,
-        Some(vec![super::Contest {
-            by: "asker".to_owned(),
-            capability: "media.serve".to_owned(),
-            claimants: vec!["server".to_owned(), "kavita (plugin kavita)".to_owned()],
-        }])
-    );
-
-    let second = plugin_filling("komga", "komga", "media.serve");
-    let joined = one_server().map(|manifest| {
-        contested_by(
-            &manifest,
-            std::slice::from_ref(&first),
-            &second,
-            &Chosen::default(),
-        )
-    });
-    assert_eq!(joined, Some(Vec::new()), "it was contested already");
-}
-
-/// A plugin's service that fills something else is not a candidate for this.
-#[test]
-fn a_plugin_filling_something_else_is_not_a_candidate() {
-    let installed = [plugin_filling("uptime", "uptime", "status.watch")];
-    let reached = one_server().and_then(|manifest| {
-        filled(&settle(&manifest, &installed, &Chosen::default()))
-            .get("media.serve")
-            .cloned()
-    });
-    assert_eq!(reached, Some(vec!["server".to_owned()]));
-}
-
-/// A link that is neither an ask nor a by-name wiring is nothing this can answer.
-/// The validator refuses one; a reader handed one anyway leaves it out rather than
-/// inventing an end for it.
-#[test]
-fn a_link_that_says_neither_what_it_asks_for_nor_what_it_names_is_left_out() {
-    let manifest = written(&format!(
-        "{}\n[[wiring]]\nby = \"asker\"\n",
-        service("asker", "")
-    ));
-    assert_eq!(came(manifest.clone(), &Chosen::default(), "asker"), None);
-    assert_eq!(
-        manifest.map(|manifest| settle(&manifest, &[], &Chosen::default())),
-        Some(Vec::new())
-    );
-}
-
 mod asking;
 mod carrying;
+mod contesting;
 mod installed;
 mod moved;
 mod native;

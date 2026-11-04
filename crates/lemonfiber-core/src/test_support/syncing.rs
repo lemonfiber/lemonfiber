@@ -27,6 +27,7 @@ pub(crate) fn the_sync(speaking: bool) -> crate::plugin::Installed {
             native: None,
             capability: "library.curate".to_owned(),
             each: true,
+            files: None,
         }];
         if !speaking {
             placed.speaks.clear();

@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use bollard::container::LogOutput;
 use bollard::models::{ContainerSummary, ContainerWaitResponse, MountType};
-use lemonfiber_ports::program::{Configuration, Joined, Run, Unran};
+use lemonfiber_ports::program::{Bound, Joined, Run, Unran};
 
 use lemonfiber_ports::program::LEFT_BEHIND;
 
@@ -22,9 +22,10 @@ fn run() -> Run {
         pids_limit: 1024,
         read_only: true,
         memory: Some(256 * 1024 * 1024),
-        configuration: Some(Configuration {
+        bound: Some(Bound {
             source: PathBuf::from("/tmp/copy"),
             target: "/config".to_owned(),
+            read_only: false,
         }),
         within: Duration::from_secs(30),
         read_at_most: 8,
@@ -102,7 +103,7 @@ fn a_proofs_container_has_no_network_no_shell_and_only_what_the_run_settled() {
 #[test]
 fn a_run_with_no_directory_mounts_nothing() {
     let bare = Run {
-        configuration: None,
+        bound: None,
         user: None,
         memory: None,
         ..run()

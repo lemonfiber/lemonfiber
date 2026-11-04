@@ -11,6 +11,13 @@
       "description": "What it asked for.",
       "type": "string"
     },
+    "files": {
+      "description": "The medium it asked a filler of, where nothing filling it files that medium.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "native": {
       "description": "The upstream's own API it asked in, where no upstream filling it declares that API.",
       "type": [

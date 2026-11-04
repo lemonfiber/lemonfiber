@@ -127,3 +127,39 @@ fn a_variable_lemonfiber_writes_itself_is_refused_naming_it() {
         );
     }
 }
+
+#[test]
+fn a_retired_field_of_a_plugins_service_is_refused_naming_what_replaces_it() {
+    for (field, said) in [
+        (
+            r#"grants = ["NET_ADMIN"]"#,
+            r#"service komga.grants: NET_ADMIN is refused; shape = "egress-guard" grants it"#,
+        ),
+        (
+            r#"capabilities = ["SYS_ADMIN"]"#,
+            "service komga.grants: SYS_ADMIN is refused, and no shape grants it",
+        ),
+        (
+            r#"depends_on = ["gluetun"]"#,
+            r#"service komga.depends_on: gluetun is refused; network = { via = "<capability>" } replaces it"#,
+        ),
+    ] {
+        let manifest = WHOLE.replace(
+            "config_path = \"/config\"\n",
+            &format!("config_path = \"/config\"\n{field}\n"),
+        );
+        let read = Manifest::from_toml(&manifest);
+        let refusals: Vec<String> = read
+            .as_ref()
+            .map(|read| crate::refusing::refusals(read, &[]))
+            .unwrap_or_default()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert!(
+            refusals.iter().any(|refusal| refusal == said),
+            "{field}: {refusals:#?} {:?}",
+            read.err()
+        );
+    }
+}

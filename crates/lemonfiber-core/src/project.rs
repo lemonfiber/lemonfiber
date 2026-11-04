@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-use lemonfiber_manifest::container::{UrlOf, UserMode, Value};
+use lemonfiber_manifest::container::{Shape, UrlOf, UserMode, Value};
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
 use crate::config::storage::Export;
@@ -28,7 +28,7 @@ use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
 pub(crate) use inputs::filler as placed_at;
 use inputs::Inputs;
-pub(crate) use inputs::{declared, moved_in_place, moving, pass_taken, written};
+pub(crate) use inputs::{declared, moved_in_place, moving, pass_taken, written, written_trusting};
 
 /// The file the project is written to, beneath the project directory.
 pub const FILE: &str = "compose.generated.yml";
@@ -106,6 +106,9 @@ pub struct Project {
     /// Each fenced service no fence can be written for, held back under [`UNFENCED`], and
     /// why.
     pub unfenced: Vec<(String, Unfenced)>,
+    /// Each service taking `render` written without the host's render devices, because the
+    /// engine's host answered no group owning them.
+    pub unrendered: Vec<String>,
 }
 
 /// The project `manifest`'s services and `installed`'s come to, wired as `chosen`
@@ -193,6 +196,11 @@ pub fn generated(
         })
         .collect();
     let taken = units.iter().any(|unit| unit.takes_data);
+    let unrendered = units
+        .iter()
+        .filter(|unit| reading.render_group.is_none() && unit.shape == Some(Shape::Render))
+        .map(|unit| unit.id.to_owned())
+        .collect();
     let document = Document {
         name: literal(reading.name),
         services: Services(entries),
@@ -203,6 +211,7 @@ pub fn generated(
         text: document::yaml(&document),
         topology,
         unfenced: fencing.unfenced(),
+        unrendered,
     }
 }
 
@@ -418,29 +427,21 @@ fn address(
     service: &str,
     url: &UrlOf,
 ) -> Option<String> {
-    let candidates: Vec<String> = if url.files.is_some() || url.native.is_some() {
-        inputs::reaching(
-            manifest,
-            installed,
-            &url.url_of,
-            url.files.as_deref(),
-            url.native.is_some(),
-        )
-    } else {
-        inputs
-            .asks
-            .iter()
-            .filter(|(asker, capability, _)| asker == service && *capability == url.url_of)
-            .map(|(_, _, reached)| reached.clone())
-            .collect()
-    };
+    let candidates: Vec<&str> = inputs
+        .asks
+        .iter()
+        .filter(|ask| {
+            ask.asker == service && ask.capability == url.url_of && ask.files == url.files
+        })
+        .map(|ask| ask.reached.as_str())
+        .collect();
     let [reached] = candidates.as_slice() else {
         return None;
     };
     let port = listening(manifest, installed, reached)?;
-    let host = match topology.placed.get(reached.as_str()) {
+    let host = match topology.placed.get(*reached) {
         Some(Placed::Inside(host)) => host.clone(),
-        _ => reached.clone(),
+        _ => (*reached).to_owned(),
     };
     Some(format!("http://{host}:{port}"))
 }

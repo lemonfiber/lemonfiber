@@ -5,14 +5,13 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::validate::{GATEWAY_GRANT, TUNNEL_DEVICE};
-
 mod certified;
 pub mod choices;
 pub mod earlier;
 mod paths;
 mod ports;
 mod record;
+mod shape;
 mod user;
 mod values;
 mod words;
@@ -22,6 +21,7 @@ use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside, shares_a_source};
 pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
 pub use record::Fields;
+pub use shape::Shape;
 pub use user::{IdVariables, UserMode, UserModeName, UserModeWritten};
 use values::{narrowed, unshown};
 pub use values::{
@@ -90,66 +90,12 @@ pub const MEDIA: [&str; 7] = [
 /// The capabilities a service may run inside the network of.
 pub const VIA: [&str; 1] = [EGRESS_GUARD];
 
+/// The fields the service model retired, each still read so it is refused naming what
+/// replaces it.
+pub const RETIRED: [&str; 3] = ["grants", "capabilities", "depends_on"];
+
 /// What separates a setting's or a secret's namespace from its name.
 pub const NAMESPACED: char = ':';
-
-/// A privileged shape lemonfiber writes for a service.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "PluginShape")]
-pub enum Shape {
-    /// `NET_ADMIN` and the tunnel device.
-    EgressGuard,
-    /// The host's render devices and the group that owns them.
-    Render,
-}
-
-impl Shape {
-    /// Every shape lemonfiber writes.
-    pub const ALL: [Self; 2] = [Self::EgressGuard, Self::Render];
-
-    /// The name a manifest and an approval give the shape.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::EgressGuard => "egress-guard",
-            Self::Render => "render",
-        }
-    }
-
-    /// The kernel capabilities the shape adds.
-    #[must_use]
-    pub const fn grants(self) -> &'static [&'static str] {
-        match self {
-            Self::EgressGuard => &[GATEWAY_GRANT],
-            Self::Render => &[],
-        }
-    }
-
-    /// The devices the shape adds.
-    #[must_use]
-    pub const fn devices(self) -> &'static [&'static str] {
-        match self {
-            Self::EgressGuard => &[TUNNEL_DEVICE],
-            Self::Render => &[RENDER_DEVICE],
-        }
-    }
-
-    /// The capability a service declaring the shape provides, or whose adapter fronts it.
-    #[must_use]
-    pub const fn serves(self) -> &'static str {
-        match self {
-            Self::EgressGuard => EGRESS_GUARD,
-            Self::Render => MEDIA_SERVE,
-        }
-    }
-
-    /// What approving this shape for `service` is written as.
-    #[must_use]
-    pub fn approval(self, service: &str) -> String {
-        format!("{}@{service}", self.name())
-    }
-}
 
 /// A further port a service publishes on its tier.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
@@ -270,6 +216,10 @@ pub struct Container<'a> {
     pub provides: &'a [String],
     /// Whether it speaks a capability contract.
     pub speaks: bool,
+    /// Each kernel capability an earlier format granted it.
+    pub grants: &'a [String],
+    /// Each service an earlier format started before it.
+    pub depends_on: &'a [String],
 }
 
 impl Container<'_> {
@@ -295,7 +245,31 @@ impl Container<'_> {
         self.environed(&mut found);
         self.held(&mut found);
         self.routed(&mut found);
+        self.retired(&mut found);
         found
+    }
+
+    /// Each field the service model retired, refused naming what replaces it.
+    fn retired(&self, found: &mut Vec<(String, String)>) {
+        for granted in self.grants {
+            let refusal = match Shape::ALL
+                .into_iter()
+                .find(|shape| shape.grants().contains(&granted.as_str()))
+            {
+                Some(shape) => format!(
+                    "{granted} is refused; shape = \"{}\" grants it",
+                    shape.name()
+                ),
+                None => format!("{granted} is refused, and no shape grants it"),
+            };
+            found.push((self.at("grants"), refusal));
+        }
+        for on in self.depends_on {
+            found.push((
+                self.at("depends_on"),
+                format!("{on} is refused; network = {{ via = \"<capability>\" }} replaces it"),
+            ));
+        }
     }
 
     fn at(&self, field: &str) -> String {
@@ -436,7 +410,16 @@ impl Container<'_> {
                 }),
                 self.settled(&setting.setting),
             ),
-            Value::Url(url) => (None, narrowed(url)),
+            Value::Url(url) => (
+                self.provides.contains(&url.url_of).then(|| {
+                    format!(
+                        "asks for the address of {}, which it provides itself; nothing asks \
+                             itself",
+                        url.url_of
+                    )
+                }),
+                narrowed(url),
+            ),
             Value::Secret(secret) => (
                 None,
                 (!self.declares(&secret.secret)).then(|| {

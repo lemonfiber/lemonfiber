@@ -17,6 +17,7 @@ fn beside_contracted_requests(
             native: None,
             capability: crate::app::targets::IDENTITY.to_owned(),
             each: false,
+            files: None,
         }];
     }
     crate::test_support::stack()

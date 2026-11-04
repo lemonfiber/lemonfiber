@@ -12,7 +12,7 @@ use lemonfiber_manifest::Manifest;
 use super::super::Ctx;
 use crate::config::{store, REACH_REGISTRY_KEY};
 use crate::fence::HELD;
-use crate::ports::program::{Ended, Joined, Run};
+use crate::ports::program::{Bound, Ended, Joined, Run};
 use crate::project::entry::{DROPPED, PROCESSES, SECURITY};
 
 /// The argument the fence image answers its host's addresses under.
@@ -72,9 +72,28 @@ fn fenced(ctx: &Ctx, manifest: &Manifest) -> bool {
 
 /// What `image` answers, run as `fence addresses` on the host's network.
 async fn asked(ctx: &Ctx, image: &str) -> Result<Vec<std::net::IpAddr>, String> {
+    let said = answered(ctx, image, ASKED, (Joined::Host, None), "its addresses").await?;
+    let held = crate::fence::kept(&said);
+    if held.is_empty() {
+        return Err("the engine's host answered no address that can be read".to_owned());
+    }
+    Ok(held)
+}
+
+/// What the fence `image` writes, run once as `fence <command>` on `network` with `bound`
+/// mounted where it is given, every capability dropped and a read-only root filesystem,
+/// and removed once it ends; or why the engine's host, asked for `what`, answered nothing
+/// that can be read.
+pub(super) async fn answered(
+    ctx: &Ctx,
+    image: &str,
+    command: &str,
+    (network, bound): (Joined, Option<Bound>),
+    what: &str,
+) -> Result<String, String> {
     let run = Run {
         image: image.to_owned(),
-        args: vec![ASKED.to_owned()],
+        args: vec![command.to_owned()],
         env: Vec::new(),
         user: None,
         security_opt: SECURITY.map(str::to_owned).to_vec(),
@@ -83,10 +102,10 @@ async fn asked(ctx: &Ctx, image: &str) -> Result<Vec<std::net::IpAddr>, String> 
         pids_limit: i64::from(PROCESSES),
         read_only: true,
         memory: Some(MEMORY),
-        configuration: None,
+        bound,
         within: WITHIN,
         read_at_most: READ_AT_MOST,
-        network: Joined::Host,
+        network,
         pull: ctx.settings.reaching.allows(REACH_REGISTRY_KEY),
     };
     let ran = ctx
@@ -94,38 +113,33 @@ async fn asked(ctx: &Ctx, image: &str) -> Result<Vec<std::net::IpAddr>, String> 
         .program
         .run(&run)
         .await
-        .map_err(|unran| format!("the engine's host was not asked its addresses: {unran}"))?;
+        .map_err(|unran| format!("the engine's host was not asked {what}: {unran}"))?;
     match ran.ended {
         Ended::Exited(0) => {}
         Ended::Exited(status) => {
             return Err(format!(
-                "asked its addresses, the engine's host exited {status} rather than answering"
+                "asked {what}, the engine's host exited {status} rather than answering"
             ))
         }
         Ended::Overran => {
             return Err(format!(
-                "asked its addresses, the engine's host had not answered within {} seconds",
+                "asked {what}, the engine's host had not answered within {} seconds",
                 WITHIN.as_secs()
             ))
         }
     }
     if ran.stdout.len() >= READ_AT_MOST {
         return Err(format!(
-            "the engine's host answered more than the {READ_AT_MOST} bytes read, so the \
-             addresses past them are not known"
+            "the engine's host answered more than the {READ_AT_MOST} bytes read, so what \
+             follows them is not known"
         ));
     }
-    let said = String::from_utf8(ran.stdout)
-        .map_err(|_| "the engine's host answered what is not text".to_owned())?;
-    let held = crate::fence::kept(&said);
-    if held.is_empty() {
-        return Err("the engine's host answered no address that can be read".to_owned());
-    }
-    Ok(held)
+    String::from_utf8(ran.stdout)
+        .map_err(|_| "the engine's host answered what is not text".to_owned())
 }
 
 /// Write `text` to `path` owner-only, or say why it was not written.
-fn kept(path: &Path, text: &str) -> Result<(), String> {
+pub(super) fn kept(path: &Path, text: &str) -> Result<(), String> {
     store::write(path, text).map_err(|failure| failure.to_string())
 }
 

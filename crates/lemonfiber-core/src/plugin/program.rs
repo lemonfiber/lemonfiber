@@ -16,7 +16,7 @@ use super::recorded::RunResult;
 use super::Verdict;
 use crate::app::Ctx;
 use crate::config::{DEFAULT_ZONE, ZONE_KEY};
-use crate::ports::program::{Configuration, Ended, Joined, Program, Run, Unran};
+use crate::ports::program::{Bound, Ended, Joined, Program, Run, Unran};
 use crate::project::entry::{configuration, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY};
 
 pub(crate) use throwaway::{
@@ -183,9 +183,10 @@ pub(crate) fn settled(
         pids_limit,
         read_only,
         memory,
-        configuration: configured.map(|source| Configuration {
+        bound: configured.map(|source| Bound {
             source: source.to_path_buf(),
             target: configuration(&placed.config_path).to_owned(),
+            read_only: false,
         }),
         within: Duration::from_secs(u64::from(limit(run))),
         read_at_most: READ_AT_MOST,

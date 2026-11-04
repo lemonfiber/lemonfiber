@@ -97,12 +97,25 @@ pub(super) fn taking(taken: &[Taking], acted: bool) -> Lines {
         } else {
             format!(" — approve with --approve {}", plain(&one.approval))
         };
+        let given: Vec<String> = one
+            .grants
+            .iter()
+            .map(|grant| format!("the {grant} capability"))
+            .chain(
+                one.devices
+                    .iter()
+                    .map(|device| format!("the {device} device")),
+            )
+            .chain(
+                one.grouped
+                    .then(|| "the group owning it on the engine's host".to_owned()),
+            )
+            .collect();
         lines.put(format!(
-            "      {} takes {}: the {} capability and the {} device{asked}",
+            "      {} takes {}: {}{asked}",
             plain(&one.service),
             one.shape.name(),
-            one.grants.join(", "),
-            one.devices.join(", "),
+            given.join(" and "),
         ));
     }
     lines

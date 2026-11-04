@@ -11,7 +11,7 @@ use super::{
     contained, limit, performed, pinned, recorded, settled, verdict, Asking, Came, Operator,
     Starting, Throwaway,
 };
-use crate::ports::program::{Configuration, Unran};
+use crate::ports::program::{Bound, Unran};
 
 /// A plugin whose one service has no port, proved by running its own program.
 pub(crate) const RUNNING: &str = r#"
@@ -132,10 +132,11 @@ fn a_confined_run_has_no_network_capability_or_writable_root_and_only_the_consta
     assert!(asked.read_only);
     assert_eq!(asked.memory, Some(256 * 1024 * 1024));
     assert_eq!(
-        asked.configuration,
-        Some(Configuration {
+        asked.bound,
+        Some(Bound {
             source: copy.to_path_buf(),
             target: "/config".to_owned(),
+            read_only: false,
         })
     );
     assert_eq!(asked.within, Duration::from_secs(45));
@@ -169,7 +170,7 @@ fn a_standard_run_is_given_back_six_capabilities_and_a_writable_root() {
         .map(str::to_owned)
     );
     assert!(!asked.read_only);
-    assert_eq!(asked.configuration, None);
+    assert_eq!(asked.bound, None);
 }
 
 /// The service of [`RUNNING`], standing rather than confined, written with `shape`.
@@ -293,10 +294,7 @@ async fn a_run_that_said_what_it_declares_passes_and_its_copy_is_gone() {
     )
     .await;
     assert_eq!(verdict(&came, &expecting()), Verdict::Passed);
-    let mounted = program
-        .asked()
-        .first()
-        .and_then(|one| one.configuration.clone());
+    let mounted = program.asked().first().and_then(|one| one.bound.clone());
     assert!(mounted.is_some_and(|mounted| !mounted.source.exists()));
 }
 

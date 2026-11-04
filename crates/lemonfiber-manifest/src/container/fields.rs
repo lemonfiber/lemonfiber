@@ -56,6 +56,16 @@ macro_rules! container_fields {
             /// The certificate lemonfiber makes for it before it first starts.
             #[serde(default)]
             pub certificate: ::std::option::Option<$crate::container::Certificate>,
+            /// Each kernel capability an earlier format granted it, read only to be refused
+            /// naming the shape that grants it.
+            #[serde(default, alias = "capabilities")]
+            #[schemars(skip)]
+            pub grants: ::std::vec::Vec<::std::string::String>,
+            /// Each service an earlier format started before it, read only to be refused
+            /// naming `network.via`.
+            #[serde(default)]
+            #[schemars(skip)]
+            pub depends_on: ::std::vec::Vec<::std::string::String>,
         }
     };
 }

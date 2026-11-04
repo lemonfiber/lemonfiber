@@ -285,7 +285,7 @@ fn a_grant_is_refused_naming_the_shape_that_grants_it() {
         assert!(
             said.iter()
                 .any(|m| m
-                    .contains(r#"grants NET_ADMIN: refused; shape = "egress-guard" grants it"#)),
+                    .contains(r#"grants: NET_ADMIN is refused; shape = "egress-guard" grants it"#)),
             "{spelling}: {said:?}"
         );
     }
@@ -296,7 +296,7 @@ fn a_grant_no_shape_gives_is_refused_saying_so() {
     let said = added(r#"grants = ["SYS_ADMIN"]"#);
     assert!(
         said.iter()
-            .any(|m| m.contains("grants SYS_ADMIN: refused, and no shape grants it")),
+            .any(|m| m.contains("grants: SYS_ADMIN is refused, and no shape grants it")),
         "{said:?}"
     );
 }
@@ -306,7 +306,7 @@ fn an_ordering_edge_is_refused_naming_network_via() {
     let said = added(r#"depends_on = ["gluetun"]"#);
     assert!(
         said.iter().any(|m| m.contains(
-            r#"depends_on gluetun: refused; network = { via = "<capability>" } replaces it"#
+            r#"depends_on: gluetun is refused; network = { via = "<capability>" } replaces it"#
         )),
         "{said:?}"
     );
@@ -772,5 +772,17 @@ fn a_fenced_service_the_host_manages_is_caught() {
             .any(|said| said.contains("network: is fenced and host_managed")),
         "{:?}",
         messages(&managed)
+    );
+}
+
+#[test]
+fn a_stack_ask_for_every_filler_is_refused() {
+    let text =
+        format!("{SHIPPED}\n[[wiring]]\nby = \"bazarr\"\nasks = \"library.curate\"\neach = true\n");
+    assert!(
+        messages(&text).iter().any(|m| m
+            == "wiring by bazarr: asks for every filler; a stack's ask reaches one, and only a plugin's ask may reach each"),
+        "{:?}",
+        messages(&text)
     );
 }

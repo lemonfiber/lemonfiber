@@ -85,7 +85,7 @@ async fn started(ctx: &Ctx) -> Option<LifecycleReport> {
     )
     .await
     {
-        Ok(Outcome::Lifecycle(report)) => Some(report),
+        Ok(Outcome::Lifecycle(report)) => Some(*report),
         _ => None,
     }
 }
