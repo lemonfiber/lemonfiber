@@ -172,7 +172,9 @@ pub(super) fn nearest_existing(path: &Path) -> &Path {
 /// to a mount with.
 pub(super) fn free_bytes(dir: &Path) -> u64 {
     let probe = nearest_existing(dir).to_path_buf();
-    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let disks: Vec<sysinfo::Disk> = sysinfo::Disks::new_with_refreshed_list()
+        .map(Vec::from)
+        .unwrap_or_default();
     disks
         .iter()
         .filter(|disk| probe.starts_with(disk.mount_point()))
