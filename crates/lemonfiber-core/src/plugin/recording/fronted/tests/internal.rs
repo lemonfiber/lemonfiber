@@ -4,11 +4,11 @@ use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::serving::Serves;
 
-use super::{adapter, failed_at, json_at, posted, read_through, source, FRONTED};
+use super::{adapter, failed_at, filing, json_at, posted, read_through, source, FRONTED};
 use crate::ports::http::{Http, Request, Response, Unreachable};
 
 fn serving_media() -> String {
-    FRONTED
+    filing(FRONTED, "movies")
         .replace(
             "speaks      = [\"subtitles.fetch@1\"]",
             "speaks      = [\"media.serve@1\"]",

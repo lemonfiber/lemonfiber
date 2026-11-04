@@ -98,6 +98,61 @@ fn dns_name(host: &str) -> bool {
         })
 }
 
+/// Whether an adapter speaking a contract whose cases are asked once for each media type
+/// fronts an upstream that declares media types, and the ones the adapter declares where it
+/// declares any: its cases are asked for the upstream's, so an upstream declaring none is
+/// asked none of them, and one declaring others is asked other ones.
+pub(super) fn filed(service: &Service, services: &[Service], found: &mut Vec<Violation>) {
+    let Some(upstream) = service
+        .fronts
+        .as_deref()
+        .and_then(|fronted| services.iter().find(|one| one.id == fronted))
+    else {
+        return;
+    };
+    let bound: Vec<String> = lemonfiber_contract::capabilities::all()
+        .iter()
+        .filter(|capability| {
+            service.speaks.iter().any(|spoken| {
+                *spoken == lemonfiber_contract::spoken(capability.name, capability.major)
+            }) && capability
+                .operations
+                .iter()
+                .any(|operation| !operation.filed.is_empty())
+        })
+        .map(|capability| lemonfiber_contract::spoken(capability.name, capability.major))
+        .collect();
+    if bound.is_empty() {
+        return;
+    }
+    let mut theirs = upstream.media_types.clone();
+    let mut ours = service.media_types.clone();
+    theirs.sort();
+    ours.sort();
+    if theirs.is_empty() || (!ours.is_empty() && theirs != ours) {
+        let declared = if theirs.is_empty() {
+            "no media types".to_owned()
+        } else {
+            format!("{theirs:?}")
+        };
+        let wanted = if ours.is_empty() {
+            "the media types it files".to_owned()
+        } else {
+            format!("media_types = {:?}", service.media_types)
+        };
+        found.push(Violation {
+            location: format!("service {}.media_types", upstream.id),
+            message: format!(
+                "declares {declared}, and {} speaks {}, whose cases are asked once for each \
+                 media type the upstream it fronts files: declare {wanted} on the [[service]] {}",
+                service.id,
+                bound.join(" and "),
+                upstream.id
+            ),
+        });
+    }
+}
+
 /// Whether another of `services` fronts `service`.
 fn fronted(service: &Service, services: &[Service]) -> bool {
     services

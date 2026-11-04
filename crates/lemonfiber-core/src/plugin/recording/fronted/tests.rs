@@ -79,6 +79,14 @@ const WATCHING: &str = "conformance/subtitles.fetch@1/watching-answers.json";
 const REFUSES: &str = "conformance/subtitles.fetch@1/refuses-without-the-key.json";
 const MINTED: &str = "0707070707070707070707070707070707070707070707070707070707070707";
 
+/// `manifest` with its upstream declaring that it files `media`.
+pub(in crate::plugin::recording) fn filing(manifest: &str, media: &str) -> String {
+    manifest.replace(
+        "replaces    = \"jellyfin\"\n",
+        &format!("replaces    = \"jellyfin\"\nmedia_types = [\"{media}\"]\n"),
+    )
+}
+
 fn source(name: &str, manifest: &str) -> Scratch {
     let at = Scratch::new(name);
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
@@ -660,7 +668,7 @@ async fn an_upstream_given_its_minted_key_in_its_environment_holds_the_one_its_a
 
 /// The fixture's adapter speaking the curator's contract in place of its own.
 fn curating() -> String {
-    FRONTED
+    filing(FRONTED, "movies")
         .replace(
             "speaks      = [\"subtitles.fetch@1\"]",
             "speaks      = [\"library.curate@1\"]",
@@ -753,6 +761,7 @@ mod checking;
 mod claiming;
 mod identity;
 mod internal;
+mod media_types;
 mod outside;
 mod sharing;
 mod standing_in;
