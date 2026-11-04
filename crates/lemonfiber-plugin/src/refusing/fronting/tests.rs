@@ -10,6 +10,7 @@ name        = "Komga server"
 image       = "docker.io/gotson/komga"
 digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
 tag         = "1.11.0"
+media_types = ["comics"]
 criticality = "important"
 "#;
 
@@ -131,4 +132,80 @@ fn the_host_a_case_reaches_is_a_dns_name() {
             "{host}: {said:?}"
         );
     }
+}
+
+#[test]
+fn an_upstream_filing_what_its_adapter_files_is_asked_each_of_its_cases() {
+    let said = fronting("", "");
+    assert!(said.is_empty(), "{said:?}");
+}
+
+#[test]
+fn an_upstream_declaring_no_media_types_is_refused_naming_where_to_declare_them() {
+    let said = said(
+        &with(&format!(
+            "speaks      = [\"media.serve@1\"]\nlistens     = 8080\ncontract    = 8081\nfronts      = \"{UPSTREAM}\"\n"
+        ))
+        .replace(
+            "[[claim]]\n",
+            &format!(
+                "{}\n[[claim]]\n",
+                UPSTREAM_SERVICE.replace("media_types = [\"comics\"]\n", "")
+            ),
+        )
+        .replace(
+            "[[wiring]]\n",
+            &format!("[[wiring]]\nservice         = \"{ADAPTER}\"\n"),
+        )
+        .replace(
+            "id      = \"komga.serves\"\n",
+            &format!("id      = \"komga.serves\"\nservice = \"{ADAPTER}\"\n"),
+        ),
+    );
+    assert!(
+        names(
+            &said,
+            &[
+                &format!("service {UPSTREAM}.media_types"),
+                "declares no media types",
+                "media.serve@1",
+                "declare media_types = [\"comics\"]",
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn an_upstream_declaring_other_media_types_than_its_adapter_is_refused() {
+    let said = said(
+        &with(&format!(
+            "speaks      = [\"media.serve@1\"]\nlistens     = 8080\ncontract    = 8081\nfronts      = \"{UPSTREAM}\"\n"
+        ))
+        .replace(
+            "[[claim]]\n",
+            &format!(
+                "{}\n[[claim]]\n",
+                UPSTREAM_SERVICE.replace("[\"comics\"]", "[\"books\"]")
+            ),
+        )
+        .replace(
+            "[[wiring]]\n",
+            &format!("[[wiring]]\nservice         = \"{ADAPTER}\"\n"),
+        )
+        .replace(
+            "id      = \"komga.serves\"\n",
+            &format!("id      = \"komga.serves\"\nservice = \"{ADAPTER}\"\n"),
+        ),
+    );
+    assert!(
+        names(
+            &said,
+            &[
+                &format!("service {UPSTREAM}.media_types"),
+                "declares [\"books\"]"
+            ]
+        ),
+        "{said:?}"
+    );
 }

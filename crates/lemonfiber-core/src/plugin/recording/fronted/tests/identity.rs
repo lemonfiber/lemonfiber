@@ -4,7 +4,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use serde_json::json;
 
 use super::super::unfinished;
-use super::{body, engine, failed_at, json_at, posted, recorded, source, FRONTED, MINTED};
+use super::{body, engine, failed_at, filing, json_at, posted, recorded, source, FRONTED, MINTED};
 use crate::ports::http::PROBLEM;
 
 fn identifying() -> String {
@@ -190,7 +190,7 @@ async fn a_first_run_that_does_not_finish_fails_the_service_at_it() {
 
 #[tokio::test]
 async fn a_media_server_listed_before_its_identity_source_is_asked_after_it_its_token_scrubbed() {
-    let manifest = identifying()
+    let manifest = filing(&identifying(), "movies")
         .replace(
             "speaks      = [\"identity.source@1\"]",
             "speaks      = [\"media.serve@1\", \"identity.source@1\"]",

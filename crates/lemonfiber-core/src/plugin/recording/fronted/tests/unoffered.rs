@@ -3,11 +3,11 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use serde_json::json;
 
-use super::{bearer, engine, failed_at, json_at, posted, recorded, source, FRONTED};
+use super::{bearer, engine, failed_at, filing, json_at, posted, recorded, source, FRONTED};
 use crate::ports::http::PROBLEM;
 
 fn serving_alone() -> String {
-    FRONTED
+    filing(FRONTED, "movies")
         .replace(
             "speaks      = [\"subtitles.fetch@1\"]",
             "speaks      = [\"media.serve@1\"]",

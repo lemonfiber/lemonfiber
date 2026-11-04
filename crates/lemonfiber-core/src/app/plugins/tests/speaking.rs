@@ -7,9 +7,15 @@ use lemonfiber_fixtures::support::Reporting;
 
 /// The proving manifest with an adapter beside its service, speaking one contract.
 pub(super) fn speaking() -> String {
-    PROVING.replace(
-        "\n[[proof]]",
-        r#"
+    PROVING
+        .replacen(
+            "takes_data  = true\nconfig_path = \"/app/data\"\n",
+            "takes_data  = true\nmedia_types = [\"comics\"]\nconfig_path = \"/app/data\"\n",
+            1,
+        )
+        .replace(
+            "\n[[proof]]",
+            r#"
 [[service]]
 id          = "komga-adapter"
 name        = "Komga adapter"
@@ -24,7 +30,7 @@ fronts      = "komga"
 
 [[proof]]
 service = "komga""#,
-    )
+        )
 }
 
 /// An install of the speaking manifest whose adapter is published as `published` and

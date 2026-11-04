@@ -117,6 +117,7 @@ name        = "Komga server"
 image       = "docker.io/gotson/komga"
 digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
 tag         = "1.11.0"
+media_types = ["comics"]
 criticality = "important"
 
 "#;
