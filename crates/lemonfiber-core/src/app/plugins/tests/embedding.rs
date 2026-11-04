@@ -123,7 +123,7 @@ fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
 
 /// A rehearsal of an update names every move the bundle offers, the media server's, each
 /// download client's, the subtitle finder's, the listening server's, every curator's, both
-/// indexer aggregators' and the request service's, and takes none.
+/// indexer aggregators', the indexer proxy's and the request service's, and takes none.
 #[tokio::test]
 async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
     let serving = Arc::new(Serving::listing(""));
@@ -147,6 +147,7 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
             "caddy".to_owned(),
             "calibre-web-automated".to_owned(),
             "door".to_owned(),
+            "flaresolverr".to_owned(),
             "gluetun".to_owned(),
             "homepage".to_owned(),
             BUNDLED.to_owned(),
@@ -179,7 +180,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
-        Some((20, 0))
+        Some((21, 0))
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
@@ -205,6 +206,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
             "caddy",
             "calibre-web-automated",
             "door",
+            "flaresolverr",
             "gluetun",
             "homepage",
             "lidarr",
@@ -223,14 +225,16 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
-/// A confirmed update narrowed to another service takes no move: every move stays on
-/// offer and nothing is installed.
+/// A confirmed update narrowed to a part already moved takes no move: its own is no longer
+/// on offer, every other move stays on offer and nothing more is installed.
 #[tokio::test]
-async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
+async fn an_update_narrowed_to_a_part_already_moved_takes_no_move_and_leaves_the_rest_on_offer() {
     let serving = Arc::new(Serving::listing(""));
     let ctx = unmoved("embedded-narrowed", &serving);
+    let moved = crate::update::run::update(&ctx, updating(Some(BUNDLED), true)).await;
+    assert_eq!(counted(reading(&ctx).await), Some(1), "{moved:?}");
 
-    let confirmed = crate::update::run::update(&ctx, updating(Some("flaresolverr"), true)).await;
+    let confirmed = crate::update::run::update(&ctx, updating(Some(BUNDLED), true)).await;
 
     assert_eq!(
         confirmed
@@ -240,7 +244,13 @@ async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
         Some((20, 0)),
         "{confirmed:?}"
     );
-    assert_eq!(counted(reading(&ctx).await), Some(0));
+    assert!(
+        confirmed
+            .as_ref()
+            .is_ok_and(|report| report.moves.iter().all(|one| one.plugin != BUNDLED)),
+        "{confirmed:?}"
+    );
+    assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
 #[tokio::test]

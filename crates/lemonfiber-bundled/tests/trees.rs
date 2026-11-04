@@ -47,3 +47,14 @@ fn an_installed_plugin_carries_the_tree_its_pin_names_and_an_assembled_one_none(
     }
     assert!(installed > 0);
 }
+
+#[test]
+fn every_part_the_bundle_pins_is_installed_through_the_plugin_path() {
+    let assembled: Vec<&str> = lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|pinned| pinned.stage != Some(lemonfiber_bundled::Stage::Installed))
+        .map(|pinned| pinned.first_party.plugin)
+        .collect();
+    assert!(!lemonfiber_bundled::PINNED.is_empty());
+    assert!(assembled.is_empty(), "{assembled:?}");
+}

@@ -72,10 +72,10 @@ networks:
     ipam:
       config:
       - subnet: 10.80.25.136/29
-  own__flaresolverr:
+  own__flaresolverr-fence:
     ipam:
       config:
-      - subnet: 10.80.12.176/29
+      - subnet: 10.80.193.80/29
   own__gluetun:
     ipam:
       config:

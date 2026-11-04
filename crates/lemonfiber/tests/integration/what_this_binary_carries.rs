@@ -122,7 +122,6 @@ fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
                 .collect()
         })
         .unwrap_or_default();
-    assert!(!parts.is_empty(), "the bundle reads no assembled part");
     let held = |path: &str| {
         path.split('/')
             .nth(1)
