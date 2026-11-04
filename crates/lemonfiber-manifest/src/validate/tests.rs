@@ -63,6 +63,25 @@ fn edited(from: &str, to: &str) -> String {
     SHIPPED.replacen(from, to, 1)
 }
 
+/// `text` with the first `from` in the table of the service `id` replaced with `to`.
+fn in_service(text: &str, id: &str, from: &str, to: &str) -> String {
+    let named = format!("id = \"{id}\"");
+    assert!(
+        text.split("[[service]]")
+            .any(|table| table.contains(&named) && table.contains(from)),
+        "the service {id} must hold {from:?}"
+    );
+    text.split_inclusive("[[service]]")
+        .map(|table| {
+            if table.contains(&named) {
+                table.replacen(from, to, 1)
+            } else {
+                table.to_owned()
+            }
+        })
+        .collect()
+}
+
 /// The day these tests use is after everything the stack records.
 ///
 /// Every test validating the committed stack does so against [`crate::TODAY`], and
@@ -205,22 +224,27 @@ fn a_licence_outside_the_osi_list_is_caught() {
 
 #[test]
 fn an_image_lemonfiber_builds_from_its_own_code_carries_lemonfiber_s_licence_and_no_other() {
-    let own = SHIPPED
-        .replacen(
+    let own = in_service(
+        &in_service(
+            SHIPPED,
+            "flaresolverr",
             r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
             r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
-            1,
-        )
-        .replacen(
-            r#"upstream = "https://github.com/FlareSolverr/FlareSolverr""#,
-            r#"upstream = "https://github.com/lemonfiber/flaresolverr""#,
-            1,
-        );
+        ),
+        "flaresolverr",
+        r#"upstream = "https://github.com/FlareSolverr/FlareSolverr""#,
+        r#"upstream = "https://github.com/lemonfiber/flaresolverr""#,
+    );
     assert!(messages(&own).iter().any(|m| m.contains(
         "its image is one lemonfiber builds from its own code, which carries Hippocratic-3.0"
     )));
 
-    let licensed = own.replacen(r#"license = "MIT""#, r#"license = "Hippocratic-3.0""#, 1);
+    let licensed = in_service(
+        &own,
+        "flaresolverr",
+        r#"license = "MIT""#,
+        r#"license = "Hippocratic-3.0""#,
+    );
     assert!(
         !messages(&licensed).iter().any(|m| m.contains("licence")),
         "{:?}",

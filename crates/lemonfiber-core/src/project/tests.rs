@@ -237,7 +237,7 @@ fn an_address_for_what_the_service_asks_is_the_one_service_the_ask_reaches() {
     let project = project(&carried(), &[an_installed("reader", vec![reader])]);
     assert_eq!(
         environment(&entry(&project, "reader"), "SOLVER_URL"),
-        "http://flaresolverr:8191"
+        format!("http://flaresolverr{}:8191", crate::fence::SUFFIX)
     );
 }
 
