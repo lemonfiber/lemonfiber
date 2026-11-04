@@ -41,21 +41,14 @@ pub use forwarding::{Answer, Forwarding};
 use leak::{labelled, Reach};
 use pair::torrent_client;
 pub(crate) use pair::{resolve_pair, Pair};
-use port_forward::{port_forward_offline, Grant};
-use probe::{addresses, exit_country, find, public_address, read_grant};
+pub use port_forward::Grant;
+use probe::{addresses, exit_country, find, public_address};
 
 pub use crate::error::codes::vpn::CLIENT_ISOLATED;
 pub use crate::error::codes::vpn::KILLSWITCH_LEAKS;
 pub(crate) use reading::{read_vpn, VpnReading};
 
-/// Gluetun's own record of the port its provider forwarded, written inside the
-/// container when port forwarding is on. Read from there rather than from the
-/// control server, so no API token is needed and a locked-down control server
-/// cannot be mistaken for an absent port.
-const FORWARDED_PORT_FILE: &str = "/tmp/gluetun/forwarded_port";
-
-/// Why the port-forward check does not apply when the switch is off — shared so
-/// the running and offline paths word it identically.
+/// Why the port-forward check does not apply when the switch is off.
 const NOT_ENABLED: &str = "port forwarding is not enabled, so there is no forwarded port to verify";
 
 /// The VPN leak check: compare the client's egress against the tunnel's.
@@ -66,6 +59,9 @@ pub struct VpnCheck {
     /// What the download client says it is listening on, where it could be asked.
     /// Read by the caller: this check speaks to containers, not to services.
     listening: Option<u16>,
+    /// What the egress guard said it was forwarded, asked by the caller over
+    /// `network.egress-guard` for the same reason.
+    granted: Grant,
     target: Target,
     port_forward: PortForward,
     disruptive: bool,
@@ -83,6 +79,9 @@ pub struct Asked {
     /// What the download client says it is listening on, where it could be asked.
     /// Read by the caller: this check speaks to containers, not to services.
     pub listening: Option<u16>,
+    /// What the egress guard answered asked for its forwarded port, read by the caller
+    /// over `network.egress-guard` for the same reason.
+    pub granted: Grant,
     /// What was asked for around port forwarding.
     pub port_forward: PortForward,
     /// Whether the killswitch may be proven by breaking the tunnel.
@@ -121,6 +120,7 @@ impl VpnCheck {
             protocols,
             echo,
             listening,
+            granted,
             port_forward,
             disruptive,
         } = asked;
@@ -150,6 +150,7 @@ impl VpnCheck {
             project,
             echo,
             listening,
+            granted,
             target,
             port_forward,
             disruptive,
@@ -223,33 +224,30 @@ async fn ran(check: &VpnCheck) -> Vec<Finding> {
         return if check.echo.is_empty() {
             vec![
                 skipped("leak detection is switched off".to_owned()),
-                port_forward_offline(&check.port_forward),
+                check.port_forward_finding(),
             ]
         } else {
-            unreachable_engine(pair, &check.port_forward, check.disruptive)
+            unreachable_engine(pair, check.port_forward_finding(), check.disruptive)
         };
     };
     // Nothing is running, so the whole VPN check collapses to one line rather
     // than repeating "cannot check, nothing is up" for each finding — the
-    // port-forward finding included, since its port lives in a container that
-    // is not there either.
+    // port-forward finding included, since the guard answering it is not there
+    // either.
     if containers.is_empty() {
         return vec![skipped("the stack is not running".to_owned())];
     }
 
     let gateway_container = find(&containers, &pair.gateway);
 
-    // Port forwarding is read from the gateway's own status file rather than
-    // from the IP-echo comparison, so it is established even where the operator
-    // has switched leak detection off.
-    let port_forward = check.port_forward_finding(gateway_container).await;
+    // Port forwarding is what the guard answered rather than the IP-echo
+    // comparison, so it is established even where the operator has switched leak
+    // detection off.
+    let port_forward = check.port_forward_finding();
     // A client on the wrong port is a separate fact from a port having been
     // granted, and fails separately — so it is its own finding rather than a
     // clause inside that one.
-    let mismatch = match (
-        read_grant(check.engine.as_ref(), gateway_container).await,
-        check.listening,
-    ) {
+    let mismatch = match (check.granted, check.listening) {
         (Grant::Port(granted), Some(listening)) if granted != listening => {
             Some(port_mismatch(granted, listening))
         }

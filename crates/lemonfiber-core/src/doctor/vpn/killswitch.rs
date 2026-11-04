@@ -19,10 +19,9 @@
 //! what is left of the budget, and inside it the probe and the restore are each
 //! bounded, so the moment the budget expires is never a moment the tunnel is down.
 //!
-//! The device is discovered rather than named. `gluetun` runs `OpenVPN` over `tun0`
-//! and `WireGuard` over `wg0`, and a fork could run neither; what they all share
-//! is that the tunnel carries the default route, so that is what is read and
-//! that is what is dropped.
+//! The device is discovered rather than named. An egress guard may run `OpenVPN` over
+//! `tun0`, `WireGuard` over `wg0`, or neither; what they all share is that the tunnel
+//! carries the default route, so that is what is read and that is what is dropped.
 
 use std::time::Duration;
 
@@ -192,8 +191,8 @@ pub(super) fn verdict(held: &Held) -> Verdict {
                  which means every torrent would continue in the open the moment the VPN \
                  fails — and a VPN that never fails is not a thing.",
                 Remedy::new(
-                    "Enable the tunnel container's own killswitch — for gluetun, \
-                             FIREWALL=on, which is its default",
+                    "Enable the egress guard's own killswitch, so it stops every packet \
+                     while its tunnel is down",
                 ),
             )
             .or_try(Remedy::new(

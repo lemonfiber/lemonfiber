@@ -58,8 +58,8 @@ pub struct Reporting {
 
 /// What a [`Reporting`] engine answers a VPN exec with: a public address for the
 /// gateway and for the client (told apart by the gateway's service id appearing in
-/// the container), a country, and a forwarded port. A `None` field answers as
-/// absent — the exit code a missing value produces.
+/// the container) and a country. A `None` field answers as absent — the exit code a
+/// missing value produces.
 #[derive(Clone)]
 pub struct Tunnel {
     /// The compose service id of the gateway, which tells its answers from the client's.
@@ -70,8 +70,6 @@ pub struct Tunnel {
     pub client_ip: Option<&'static str>,
     /// The country those addresses resolve to.
     pub country: Option<&'static str>,
-    /// The forwarded port the gateway reports holding.
-    pub port: Option<&'static str>,
     /// What a second address service says the gateway's egress is, where a test
     /// is about the sources contradicting each other. Absent means both agree.
     pub second_opinion: Option<&'static str>,
@@ -381,9 +379,6 @@ fn executed(
             name: container.to_owned(),
         });
     };
-    if argv.first().is_some_and(|arg| arg == "cat") {
-        return Ok(scripted(tunnel.port));
-    }
     if argv.last().is_some_and(|arg| arg.ends_with("/country-iso")) {
         return Ok(ExecOutput {
             status: Some(0),

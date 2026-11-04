@@ -1,26 +1,45 @@
-//! The pure port-forward logic: reading the gateway's status file and deciding
-//! what a missing port can honestly be called.
+//! The pure port-forward logic: what the egress guard said it was forwarded, and what a
+//! missing port can honestly be called.
 
 use super::findings::finding;
-use super::probe::read_grant;
 use super::VpnCheck;
 use super::NOT_ENABLED;
-use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
 use crate::error::codes::vpn::NO_FORWARDED_PORT;
 use crate::error::{Problem, Remedy, State};
-use crate::ports::docker::Container;
 
-/// What the gateway's forwarded-port status file amounted to.
+/// What the egress guard answered asked for the port its provider forwards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Grant {
+pub enum Grant {
     /// A port was granted.
     Port(u16),
-    /// The file was read but names no usable port, so none was granted.
+    /// The guard answered, naming no usable port, so none was granted.
     Absent,
-    /// The file could not be read: the container is down or the engine is
-    /// unreachable, so whether a port exists is unknown rather than absent.
+    /// The guard could not be asked: none fills the stack's egress, it speaks no contract
+    /// or it did not answer, so whether a port exists is unknown rather than absent.
     Unreadable,
+}
+
+impl Grant {
+    /// What `forwarded` came to: the guard's answer where it gave one, a zero read as no
+    /// port, and nothing where it could not be asked.
+    #[must_use]
+    pub fn of(forwarded: Option<Option<u16>>) -> Self {
+        match forwarded {
+            Some(Some(port)) if port != 0 => Self::Port(port),
+            Some(_) => Self::Absent,
+            None => Self::Unreadable,
+        }
+    }
+
+    /// The port granted, where one was.
+    #[must_use]
+    pub const fn port(self) -> Option<u16> {
+        match self {
+            Self::Port(port) => Some(port),
+            Self::Absent | Self::Unreadable => None,
+        }
+    }
 }
 
 /// How much lemonfiber knows about a provider's port forwarding, which decides
@@ -35,19 +54,6 @@ enum Knowledge {
     /// A provider lemonfiber has no port-forwarding knowledge of, so a missing
     /// port cannot be explained without guessing.
     Unknown,
-}
-
-/// Read the status file's contents as a granted port.
-///
-/// A file that is missing makes `cat` exit non-zero with nothing on stdout, and
-/// the release path writes a literal `0`; both are read as no port granted rather
-/// than as a failure to read, because the file was reachable — it simply names no
-/// port. Only an engine or container fault, handled before this, is `Unreadable`.
-pub(super) fn parse_grant(stdout: &str) -> Grant {
-    match stdout.trim().parse::<u16>() {
-        Ok(port) if port != 0 => Grant::Port(port),
-        _ => Grant::Absent,
-    }
 }
 
 /// The verdict for an enabled provider that granted no port.
@@ -129,48 +135,27 @@ fn generic_trap() -> Problem {
     .in_state(State::Guided)
 }
 
-/// The port-forward finding when the gateway cannot be read at all, because the
-/// engine is unreachable: unverified where a port was expected, and still just
-/// not-applicable where forwarding was never enabled.
-pub(super) fn port_forward_offline(port_forward: &PortForward) -> Finding {
-    let verdict = if port_forward.enabled {
-        Verdict::Unverified {
-            reason: "the container engine could not be reached, so the forwarded port \
-                     could not be read"
-                .to_owned(),
-            remedy: Remedy::new("Start the container engine, then run this again"),
-        }
-    } else {
-        Verdict::Skipped {
-            reason: NOT_ENABLED.to_owned(),
-        }
-    };
-    finding("vpn.port-forward", "forwarded port", verdict)
-}
-
 impl VpnCheck {
     /// The port-forward finding: whether a port was granted, where the operator
     /// asked for one.
     ///
-    /// Independent of leak detection — the port is read from the gateway's own
-    /// status file, not from an IP-echo comparison — so it is still established
-    /// where the operator has switched leak detection off. Where the switch is
-    /// off the exec is skipped entirely: there is nothing to read.
+    /// Independent of leak detection — the port is what the egress guard answered, not an
+    /// IP-echo comparison — so it is still established where the operator has switched
+    /// leak detection off.
     ///
-    /// A container that is not running, or an engine that cannot be reached, makes the
-    /// read unknown rather than absent. A file that reads as no port — empty, missing, or
-    /// the zero the release path writes — is a port that was not granted, which for an
+    /// A guard that could not be asked makes the read unknown rather than absent. An
+    /// answer naming no port, or a zero, is a port that was not granted, which for an
     /// enabled provider is the failure this check exists for.
-    pub(super) async fn port_forward_finding(&self, gateway: Option<&Container>) -> Finding {
+    pub(super) fn port_forward_finding(&self) -> Finding {
         let verdict = if self.port_forward.enabled {
-            match read_grant(self.engine.as_ref(), gateway).await {
+            match self.granted {
                 Grant::Port(port) => Verdict::Pass {
                     note: Some(format!("forwarded port {port}")),
                 },
                 Grant::Absent => no_port(self.port_forward.provider.as_deref()),
                 Grant::Unreadable => Verdict::Unverified {
-                    reason: "the VPN container did not return a forwarded port, which the tunnel \
-                             being down and the engine being unreachable both produce"
+                    reason: "the egress guard did not answer which port it was forwarded, which \
+                             its tunnel being down and the guard not running both produce"
                         .to_owned(),
                     remedy: Remedy::new("Confirm the tunnel is up, then run this again"),
                 },

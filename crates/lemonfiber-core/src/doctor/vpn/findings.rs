@@ -7,10 +7,8 @@
 use super::killswitch::{self, not_attempted, Held};
 use super::leak::Reach;
 use super::leak::{egress_verdict, tunnel_verdict};
-use super::port_forward::port_forward_offline;
 use super::Pair;
 use super::{Category, Finding, Verdict};
-use crate::config::PortForward;
 use crate::error::codes::vpn::{NO_TUNNEL, PORT_MISMATCH};
 use crate::error::{Problem, Remedy, State};
 
@@ -155,7 +153,7 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
 /// not run, so they are unverified rather than reported either way.
 pub(super) fn unreachable_engine(
     pair: &Pair,
-    port_forward: &PortForward,
+    port_forward: Finding,
     disruptive: bool,
 ) -> Vec<Finding> {
     let reason = "the container engine could not be reached, so the containers \
@@ -182,7 +180,7 @@ pub(super) fn unreachable_engine(
             disruptive,
             "the container engine could not be reached, so the tunnel could not be dropped",
         )),
-        port_forward_offline(port_forward),
+        port_forward,
     ]
 }
 

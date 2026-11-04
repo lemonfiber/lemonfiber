@@ -1,4 +1,4 @@
-use super::{knowledge, no_port, parse_grant, Grant, Knowledge};
+use super::{knowledge, no_port, Grant, Knowledge};
 use crate::doctor::Verdict;
 
 #[test]
@@ -66,11 +66,12 @@ fn a_provider_is_matched_however_it_is_spelled() {
 }
 
 #[test]
-fn the_status_file_reads_a_released_port_as_no_port_rather_than_a_failure() {
-    // The release path writes a literal zero, and a missing file makes `cat`
-    // exit non-zero with nothing. Both mean no port, not an unreadable one.
-    assert_eq!(parse_grant("51413\n"), Grant::Port(51413));
-    assert_eq!(parse_grant("0"), Grant::Absent);
-    assert_eq!(parse_grant(""), Grant::Absent);
-    assert_eq!(parse_grant("not a port"), Grant::Absent);
+fn the_guards_answer_reads_a_released_port_as_no_port_and_no_answer_as_unknown() {
+    assert_eq!(Grant::of(Some(Some(51413))), Grant::Port(51413));
+    assert_eq!(Grant::of(Some(Some(0))), Grant::Absent);
+    assert_eq!(Grant::of(Some(None)), Grant::Absent);
+    assert_eq!(Grant::of(None), Grant::Unreadable);
+    assert_eq!(Grant::Port(51413).port(), Some(51413));
+    assert_eq!(Grant::Absent.port(), None);
+    assert_eq!(Grant::Unreadable.port(), None);
 }

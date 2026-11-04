@@ -1,9 +1,9 @@
 //! Which two containers this check is about, and whether there are two.
 //!
-//! Resolved from the manifest by the kernel capability a service is granted and by
-//! dependency, rather than by name: a stack whose tunnel is called something other
-//! than gluetun is read the same way, where a check that matched on names would
-//! quietly not apply to it while reporting that everything is fine.
+//! Resolved from the manifest by the shape a service takes and the network it runs
+//! inside, rather than by name: a stack whose tunnel is called anything at all is read
+//! the same way, where a check that matched on names would quietly not apply to it
+//! while reporting that everything is fine.
 //!
 //! The interesting answer is the one that resolves nothing, because it is two
 //! situations wearing the same shape — a client with nothing containing it, and no
@@ -29,12 +29,6 @@ pub(crate) struct Pair {
     pub client_name: String,
 }
 
-/// The tunnel gateway and the download client contained by it, recognised by what
-/// the manifest grants rather than by name, so support is not tied to one provider
-/// or one image.
-///
-/// The gateway is the torrent-profile service granted the routing capability;
-/// the client is the torrent-profile service that depends on it.
 /// Whether this stack declares something that downloads torrents.
 ///
 /// Asked only where no pair resolved, to tell "nothing contains the client" from
@@ -54,6 +48,12 @@ pub(super) fn torrent_client(manifest: &Manifest) -> bool {
         .any(|service| torrent.contains(&service.profile.as_str()) && !service.guards_egress())
 }
 
+/// The tunnel gateway and the download client contained by it, recognised by the
+/// manifest's shapes rather than by name, so support is not tied to one provider or one
+/// image.
+///
+/// The gateway is the torrent-profile service taking the egress guard's shape; the
+/// client is the torrent-profile service running inside its network.
 pub(crate) fn resolve_pair(manifest: &Manifest) -> Option<Pair> {
     let torrent: Vec<&str> = manifest
         .profiles

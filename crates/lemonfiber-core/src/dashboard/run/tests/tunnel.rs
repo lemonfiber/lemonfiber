@@ -162,15 +162,14 @@ async fn port_forwarding_off_reads_no_forwarded_port() {
 
 #[tokio::test]
 async fn a_provider_that_granted_no_port_reads_none() {
-    let tunnel = Tunnel {
-        port: None,
-        ..healthy_tunnel()
-    };
-    let ctx = vpn_ctx(
-        tunnel_engine(true, Some(tunnel)),
-        vec!["https://echo".to_owned()],
-        forwarding(),
-        Protocols::both(),
+    let ctx = guarded_vpn_ctx(
+        tunnel_engine(true, Some(healthy_tunnel())),
+        (
+            vec!["https://echo".to_owned()],
+            forwarding(),
+            Protocols::both(),
+        ),
+        None,
     );
     assert!(matches!(vpn_panel(&ctx).await, Some(Panel::Ready(v)) if v.forwarded_port.is_none()));
 }
@@ -232,7 +231,7 @@ async fn a_torrent_stack_with_no_vpn_pair_does_not_apply() {
         &manifest,
         Protocols::both(),
         vec!["https://echo".to_owned()],
-        true,
+        Some(51413),
     )
     .await;
     assert!(matches!(reading, VpnReading::NotApplicable));

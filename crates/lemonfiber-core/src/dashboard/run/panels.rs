@@ -12,7 +12,7 @@ use crate::app::Ctx;
 use crate::condition::Conditions;
 use crate::dashboard::{eta, Hardlink, Panel, Queue, Reading, Snapshot, Storage, Transfer, Vpn};
 use crate::docker::{survey_beside, Service};
-use crate::doctor::vpn::{read_vpn, VpnReading};
+use crate::doctor::vpn::{read_vpn, Grant, VpnReading};
 use crate::error::Diagnose;
 use crate::health::{observed, Egress, Reach, Summary};
 use crate::model::FrontDoorReport;
@@ -252,10 +252,19 @@ pub(super) async fn transfers(
 /// traffic leaves through it, or the reason none of that could be read. Reuses the
 /// leak check's own containers and exec-reads ([`read_vpn`]) so the panel and the
 /// diagnostic cannot disagree about what the tunnel is doing.
-pub(super) async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Option<Panel<Vpn>> {
+pub(super) async fn vpn(
+    ctx: &Ctx,
+    manifest: Result<&Manifest, &String>,
+    project: Option<&Path>,
+) -> Option<Panel<Vpn>> {
     let manifest = match manifest {
         Ok(manifest) => manifest,
         Err(reason) => return Some(Panel::unavailable(reason.clone())),
+    };
+    let forwarded = if ctx.settings.port_forward.enabled && ctx.settings.protocols.torrent {
+        Grant::of(crate::app::forwarding::forwarded(ctx, manifest, project).await).port()
+    } else {
+        None
     };
     let reading = read_vpn(
         ctx.seams.engine.as_ref(),
@@ -263,7 +272,7 @@ pub(super) async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Opti
         manifest,
         ctx.settings.protocols,
         ctx.settings.ip_echo.clone(),
-        ctx.settings.port_forward.enabled,
+        forwarded,
     )
     .await;
     match reading {

@@ -13,8 +13,7 @@ use crate::ports::docker::Engine;
 
 use super::leak::Reach;
 use super::pair::resolve_pair;
-use super::port_forward::Grant;
-use super::probe::{addresses, exit_country, find, read_grant};
+use super::probe::{addresses, exit_country, find};
 
 /// The dashboard's VPN telemetry, or why it is not available — a small reading the
 /// panel maps directly, kept apart from the leak check's `Verdict`s so the panel
@@ -37,10 +36,11 @@ pub(crate) enum VpnReading {
     },
 }
 
-/// Read what the VPN panel shows: the tunnel's exit address and country, the
-/// forwarded port, and whether the download client's egress matches the tunnel's
-/// — the one thing that proves traffic leaves through it. The same containers and
-/// exec-reads the leak check uses, shaped for a panel rather than a verdict.
+/// Read what the VPN panel shows: the tunnel's exit address and country, beside the
+/// `forwarded` port the caller asked the egress guard for, and whether the download
+/// client's egress matches the tunnel's — the one thing that proves traffic leaves
+/// through it. The same containers and exec-reads the leak check uses, shaped for a
+/// panel rather than a verdict.
 ///
 /// Every read costs a round-trip into a container and a request to each IP-echo
 /// service, so the dashboard reads this at the VPN panel's own pace rather than on
@@ -51,7 +51,7 @@ pub(crate) async fn read_vpn(
     manifest: &Manifest,
     protocols: Protocols,
     echoes: Vec<String>,
-    port_forward_enabled: bool,
+    forwarded: Option<u16>,
 ) -> VpnReading {
     if !protocols.torrent {
         return VpnReading::NotApplicable;
@@ -65,18 +65,6 @@ pub(crate) async fn read_vpn(
         );
     };
     let gateway_container = find(&containers, &pair.gateway);
-
-    // The forwarded port comes from the gateway's status file, independent of the
-    // IP-echo, so it is read even where leak detection is off — but only where the
-    // operator asked for forwarding at all.
-    let forwarded_port = if port_forward_enabled {
-        match read_grant(engine, gateway_container).await {
-            Grant::Port(port) => Some(port),
-            Grant::Absent | Grant::Unreadable => None,
-        }
-    } else {
-        None
-    };
 
     if echoes.is_empty() {
         return VpnReading::Unavailable(
@@ -107,7 +95,7 @@ pub(crate) async fn read_vpn(
             VpnReading::Ready {
                 exit_ip,
                 country,
-                forwarded_port,
+                forwarded_port: forwarded,
                 egress_matches,
             }
         }

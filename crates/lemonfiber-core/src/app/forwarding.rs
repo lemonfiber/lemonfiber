@@ -55,11 +55,7 @@ pub async fn pass(
         return None;
     }
     let fillers = host_fillers(ctx, manifest, project);
-    let answer = reaching::guard(ctx, &fillers)
-        .await?
-        .forwarded()
-        .await
-        .ok()?;
+    let answer = asked(ctx, &fillers).await?;
     let mut pass = Pass {
         answer,
         ..Pass::default()
@@ -152,6 +148,21 @@ async fn told(ctx: &Ctx, pass: &Pass) -> Vec<String> {
         ctx.narrator.say(line).await;
     }
     said
+}
+
+/// The port the guard filling the stack's egress says its provider forwards now, asked
+/// over `network.egress-guard`; nothing where no guard fills it or it cannot be asked.
+pub(crate) async fn forwarded(
+    ctx: &Ctx,
+    manifest: &Manifest,
+    project: Option<&Path>,
+) -> Option<Option<u16>> {
+    asked(ctx, &host_fillers(ctx, manifest, project)).await
+}
+
+/// What the guard among `fillers` answers its `forwarded`.
+async fn asked(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Option<Option<u16>> {
+    reaching::guard(ctx, fillers).await?.forwarded().await.ok()
 }
 
 /// The port the first torrent client inside the guard takes peers on, where it answers.

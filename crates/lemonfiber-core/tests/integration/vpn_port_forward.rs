@@ -7,21 +7,26 @@
 use common::tunnel::*;
 
 use crate::common;
+use lemonfiber_core::doctor::vpn::{Grant, VpnCheck};
 use lemonfiber_core::doctor::{Check, Verdict};
 use lemonfiber_core::error::codes::vpn::NO_FORWARDED_PORT;
 use lemonfiber_core::error::Severity;
 
+/// The tunnel and its client up, port forwarding asked of `provider`, and the egress
+/// guard having answered `granted`.
+fn granting(provider: &str, granted: Grant) -> VpnCheck {
+    asking(Fake::new(vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        Behavior::up("qbittorrent", Some("185.65.1.1")),
+    ]))
+    .forwarding(forwarding(provider))
+    .granted(granted)
+    .check()
+}
+
 #[tokio::test]
 async fn a_granted_port_is_a_verified_forward() {
-    let findings = check_with(
-        vec![
-            gateway_with_port("51413"),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ],
-        forwarding("protonvpn"),
-    )
-    .run()
-    .await;
+    let findings = granting("protonvpn", Grant::Port(51413)).run().await;
     assert!(
         pass_note(&findings, "vpn.port-forward").is_some_and(|note| note.contains("51413")),
         "a granted port passes and states the port it saw"
@@ -33,15 +38,7 @@ async fn no_port_on_protonvpn_names_the_nat_pmp_trap_first() {
     // Tunnel up, but no port granted: ProtonVPN's cause — forwarding not enabled
     // when the config was generated — is the one an operator cannot guess, so it
     // is named as the cause rather than left to them.
-    let findings = check_with(
-        vec![
-            Behavior::up("gluetun", Some("185.65.1.1")),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ],
-        forwarding("protonvpn"),
-    )
-    .run()
-    .await;
+    let findings = granting("protonvpn", Grant::Absent).run().await;
     let problem = problem(&findings, "vpn.port-forward");
     assert_eq!(problem.map(|problem| problem.code), Some(NO_FORWARDED_PORT));
     // Degraded, not broken: nothing is leaking, peers simply cannot connect in.
@@ -61,15 +58,9 @@ async fn no_port_on_protonvpn_names_the_nat_pmp_trap_first() {
 async fn no_port_on_another_forwarding_provider_is_degraded_without_speculation() {
     // A provider that forwards ports but has no lemonfiber-specific trap: still a
     // degraded finding, but it must not borrow ProtonVPN's cause.
-    let findings = check_with(
-        vec![
-            Behavior::up("gluetun", Some("185.65.1.1")),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ],
-        forwarding("private internet access"),
-    )
-    .run()
-    .await;
+    let findings = granting("private internet access", Grant::Absent)
+        .run()
+        .await;
     let problem = problem(&findings, "vpn.port-forward");
     assert_eq!(problem.map(|problem| problem.code), Some(NO_FORWARDED_PORT));
     assert!(
@@ -83,15 +74,7 @@ async fn no_port_on_an_unknown_provider_is_unverified_not_blamed() {
     // lemonfiber has no port-forwarding knowledge of this provider, so it cannot
     // say why a port is missing without guessing — and guessing is what the
     // whole subsystem exists to avoid. Unverified, never a fabricated failure.
-    let findings = check_with(
-        vec![
-            Behavior::up("gluetun", Some("185.65.1.1")),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ],
-        forwarding("some-obscure-vpn"),
-    )
-    .run()
-    .await;
+    let findings = granting("some-obscure-vpn", Grant::Absent).run().await;
     assert!(matches!(
         verdict(&findings, "vpn.port-forward"),
         Some(Verdict::Unverified { .. })
@@ -99,56 +82,29 @@ async fn no_port_on_an_unknown_provider_is_unverified_not_blamed() {
 }
 
 #[tokio::test]
-async fn a_released_port_reads_as_no_port() {
-    // The release path writes a literal 0; that is a port taken back, not a port
-    // granted, so it must be read as absent.
-    let findings = check_with(
-        vec![
-            gateway_with_port("0"),
-            Behavior::up("qbittorrent", Some("185.65.1.1")),
-        ],
-        forwarding("protonvpn"),
-    )
-    .run()
-    .await;
-    assert_eq!(
-        problem(&findings, "vpn.port-forward").map(|problem| problem.code),
-        Some(NO_FORWARDED_PORT)
-    );
-}
-
-#[tokio::test]
-async fn unusable_status_file_contents_read_as_no_port() {
-    // A reachable status file that names no usable port — non-numeric, out of the
-    // u16 a port fits in, or only whitespace — is a port not granted, not a failed
-    // read. For a provider known to forward, that is the degraded finding.
-    for contents in ["not-a-port", "70000", "   "] {
-        let findings = check_with(
-            vec![
-                gateway_with_port(contents),
-                Behavior::up("qbittorrent", Some("185.65.1.1")),
-            ],
-            forwarding("protonvpn"),
-        )
-        .run()
-        .await;
+async fn a_released_port_or_none_answered_reads_as_no_port() {
+    // A guard whose provider took the port back answers zero, or no port at all; both
+    // are a port not granted rather than an unknown one.
+    for answered in [Some(0), None] {
+        let findings = granting("protonvpn", Grant::of(Some(answered))).run().await;
         assert_eq!(
             problem(&findings, "vpn.port-forward").map(|problem| problem.code),
             Some(NO_FORWARDED_PORT),
-            "{contents:?} names no usable port, so it is a port not granted"
+            "{answered:?}"
         );
     }
 }
 
 #[tokio::test]
 async fn port_forwarding_not_enabled_does_not_apply() {
-    // Even with a running tunnel, an operator who did not ask for port forwarding
-    // gets a not-applicable finding, never a fault — and the status file is not
-    // even read.
-    let findings = check(vec![
-        gateway_with_port("51413"),
+    // Even with a running tunnel and a port granted, an operator who did not ask for
+    // port forwarding gets a not-applicable finding, never a fault.
+    let findings = asking(Fake::new(vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
         Behavior::up("qbittorrent", Some("185.65.1.1")),
-    ])
+    ]))
+    .granted(Grant::Port(51413))
+    .check()
     .run()
     .await;
     assert!(matches!(
@@ -159,8 +115,8 @@ async fn port_forwarding_not_enabled_does_not_apply() {
 
 #[tokio::test]
 async fn a_missing_gateway_leaves_the_forward_unverified() {
-    // The stack is up but the tunnel container is not among it, so there is no
-    // status file to read: the port is unknown, not absent.
+    // The stack is up but the tunnel container is not among it, so there is no guard
+    // to answer: the port is unknown, not absent.
     let findings = check_with(
         vec![Behavior::up("qbittorrent", Some("81.2.3.4"))],
         forwarding("protonvpn"),
@@ -174,17 +130,10 @@ async fn a_missing_gateway_leaves_the_forward_unverified() {
 }
 
 #[tokio::test]
-async fn a_gateway_that_cannot_be_read_leaves_the_forward_unverified() {
-    // The tunnel container is up, but the command to read its status file could
-    // not be run at all — unknown, so unverified rather than a port not granted.
-    let mut gluetun = gateway_with_port("51413");
-    gluetun.exec_fails = true;
-    let findings = check_with(
-        vec![gluetun, Behavior::up("qbittorrent", None)],
-        forwarding("protonvpn"),
-    )
-    .run()
-    .await;
+async fn a_guard_that_did_not_answer_leaves_the_forward_unverified() {
+    // The tunnel container is up, but its guard could not be asked — unknown, so
+    // unverified rather than a port not granted.
+    let findings = granting("protonvpn", Grant::Unreadable).run().await;
     assert!(matches!(
         verdict(&findings, "vpn.port-forward"),
         Some(Verdict::Unverified { .. })
@@ -193,8 +142,8 @@ async fn a_gateway_that_cannot_be_read_leaves_the_forward_unverified() {
 
 #[tokio::test]
 async fn a_down_gateway_leaves_the_forward_unverified() {
-    // The port lives in the tunnel container; with it down the port is unknown,
-    // not absent, so the honest answer is unverified rather than a failure.
+    // With the tunnel down its guard answers nothing, so the port is unknown, not
+    // absent, and the honest answer is unverified rather than a failure.
     let mut gluetun = Behavior::up("gluetun", None);
     gluetun.running = false;
     let findings = check_with(vec![gluetun], forwarding("protonvpn"))
@@ -208,16 +157,33 @@ async fn a_down_gateway_leaves_the_forward_unverified() {
 
 #[tokio::test]
 async fn port_forwarding_is_checked_even_with_leak_detection_off() {
-    // The port is read from the container's own file, not from an IP-echo
-    // comparison, so switching leak detection off does not blind this check.
-    let subject = asking(Fake::new(vec![gateway_with_port("51413")]))
+    // The port is what the guard answered, not an IP-echo comparison, so switching
+    // leak detection off does not blind this check.
+    let subject = asking(Fake::new(vec![Behavior::up("gluetun", Some("185.65.1.1"))]))
         .without_leak_detection()
         .forwarding(forwarding("protonvpn"))
+        .granted(Grant::Port(51413))
         .check();
     let findings = subject.run().await;
     assert!(
         pass_note(&findings, "vpn.port-forward").is_some_and(|note| note.contains("51413")),
         "port forwarding is still verified with leak detection off"
+    );
+}
+
+#[tokio::test]
+async fn a_port_the_guard_answered_is_verified_where_the_engine_cannot_be_reached() {
+    let mut engine = Fake::new(vec![]);
+    engine.reachable = false;
+    let findings = asking(engine)
+        .forwarding(forwarding("protonvpn"))
+        .granted(Grant::Port(51413))
+        .check()
+        .run()
+        .await;
+    assert!(
+        pass_note(&findings, "vpn.port-forward").is_some_and(|note| note.contains("51413")),
+        "the port the guard answered does not wait on the engine"
     );
 }
 
@@ -313,14 +279,13 @@ async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corre
     // A diagnosis is only looking: the operator asked what is wrong, not for
     // anything to be changed. Starting the stack applies the same fix, because by
     // then they have asked for an action.
-    let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
-    gateway.forwarded_port = Some("51999");
     let subject = asking(Fake::new(vec![
-        gateway,
+        Behavior::up("gluetun", Some("185.65.1.1")),
         Behavior::up("qbittorrent", Some("185.65.1.1")),
     ]))
     .listening(51413)
     .forwarding(forwarding("proton"))
+    .granted(Grant::Port(51999))
     .check();
     let findings = subject.run().await;
     let mismatch = findings
@@ -337,14 +302,13 @@ async fn a_client_listening_off_the_forwarded_port_is_reported_rather_than_corre
 
 #[tokio::test]
 async fn a_client_already_on_the_forwarded_port_is_not_reported() {
-    let mut gateway = Behavior::up("gluetun", Some("185.65.1.1"));
-    gateway.forwarded_port = Some("51413");
     let subject = asking(Fake::new(vec![
-        gateway,
+        Behavior::up("gluetun", Some("185.65.1.1")),
         Behavior::up("qbittorrent", Some("185.65.1.1")),
     ]))
     .listening(51413)
     .forwarding(forwarding("proton"))
+    .granted(Grant::Port(51413))
     .check();
     assert!(subject
         .run()

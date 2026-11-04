@@ -8,8 +8,6 @@
 
 use super::echo::Seen;
 use super::leak::{is_country_code, looks_like_ip, Reach};
-use super::port_forward::{parse_grant, Grant};
-use super::FORWARDED_PORT_FILE;
 use crate::ports::docker::{Container, Engine, Lifecycle};
 
 /// How many seconds an echo is given to answer from inside the container.
@@ -30,12 +28,6 @@ pub(super) fn wget(url: String) -> Vec<String> {
         "-qO-".to_owned(),
         url,
     ]
-}
-
-/// The command that reads the gateway's forwarded-port status file from inside
-/// the container.
-pub(super) fn read_port() -> Vec<String> {
-    vec!["cat".to_owned(), FORWARDED_PORT_FILE.to_owned()]
 }
 
 /// The container implementing a service, where it is present.
@@ -140,25 +132,6 @@ pub(super) async fn exit_country(
             Some(output.stdout.trim().to_ascii_uppercase())
         }
         _ => None,
-    }
-}
-
-/// Read the granted port from the gateway's own status file. A container that is
-/// not running, or an engine that cannot be reached, makes the answer unknown
-/// rather than absent.
-pub(super) async fn read_grant(engine: &dyn Engine, gateway: Option<&Container>) -> Grant {
-    let Some(container) = gateway else {
-        return Grant::Unreadable;
-    };
-    if container.lifecycle != Lifecycle::Running {
-        return Grant::Unreadable;
-    }
-    // Awaited into a plain value first: a block whose last statement is an await
-    // leaves its own closing brace unmarked by coverage.
-    let result = engine.exec(&container.id, &read_port()).await;
-    match result {
-        Err(_) => Grant::Unreadable,
-        Ok(output) => parse_grant(&output.stdout),
     }
 }
 
