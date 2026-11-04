@@ -261,7 +261,8 @@ async fn a_server_serving_no_internal_port_is_unmatched_and_a_rehearsal_writes_n
     let wiring = seed_internal_tls(&ctx, server(&ctx).as_ref()).await;
     assert!(matches!(
         wiring.map(|one| one.state),
-        Some(State::WouldWire { ours: Some(path), .. }) if path.ends_with("lemonfiber/internal.p12")
+        Some(State::WouldWire { ours: Some(said), .. })
+            if said.contains("lemonfiber/internal.p12") && said.ends_with("may restart to take it up")
     ));
     assert!(handed(&http).is_empty());
 }

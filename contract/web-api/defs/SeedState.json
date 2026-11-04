@@ -60,6 +60,24 @@
       ]
     },
     {
+      "description": "A hand edit to the configuration a preset is held through, left in place: a run\nholding the curators to their preset does not write over it, and only\n`lemonfiber quality reapply` puts the preset back.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The edited configuration, as its upstream's configuration directory names it.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "kept"
+        }
+      },
+      "required": [
+        "state",
+        "path"
+      ]
+    },
+    {
       "description": "Present and still lemonfiber's own value, but behind lemonfiber's intent —\nit should be brought up to date. Reported until an update path applies it,\nand never overwritten in the meantime.",
       "type": "object",
       "properties": {

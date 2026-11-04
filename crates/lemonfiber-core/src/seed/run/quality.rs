@@ -16,7 +16,7 @@ use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::model::StackEdit;
 use crate::ports::media::Kind;
-use crate::ports::service::{Applied, Profiled, Syncing};
+use crate::ports::service::{Applied, Edited, Profiled, Syncing};
 use crate::quality::Selection;
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Filler, Fillers};
@@ -202,6 +202,15 @@ pub(crate) async fn reprofile(
     found
 }
 
+/// What a run holding the preset says of the hand edit `edit` it leaves in place: its file
+/// alone, named as it may be shown, and nothing of what the file holds.
+fn kept(ctx: &Ctx, edit: &Edited) -> State {
+    match masked::held(ctx).and_then(|secrets| masked::named(&edit.path, &secrets)) {
+        Ok(path) => State::Kept { path },
+        Err(detail) => State::Failed { detail },
+    }
+}
+
 /// The curator of `which` at `at`, answering to `api_key`, held to the preset `selection`
 /// chooses for what it files.
 fn profiled(which: Kind, at: &Address, api_key: String, selection: &Selection) -> Profiled {
@@ -214,13 +223,19 @@ fn profiled(which: Kind, at: &Address, api_key: String, selection: &Selection) -
     }
 }
 
-/// Hold one curator to its preset, leaving it alone where the sync already does.
+/// Hold one curator to its preset, leaving it alone where the sync already does and
+/// where a hand edit to its configuration stands.
 ///
 /// Read first, so a sync already holding the preset is not written again to report a
-/// change to nothing. A replaced key reaches it through [`reprofile`], which the key's
-/// replacement runs.
+/// change to nothing, and an edit is put back over only through [`reapplied`]. A
+/// replaced key reaches it through [`reprofile`], which the key's replacement runs.
 async fn hold(ctx: &Ctx, restarting: &Restarting, profiled: &Profiled) -> State {
     let syncer = sync::Adapter(restarting.adapter().clone());
+    match syncer.edited(profiled).await {
+        Ok(Some(edit)) => return kept(ctx, &edit),
+        Ok(None) => {}
+        Err(failure) => return crate::seed::unreached(&failure),
+    }
     let applied = match syncer.applied(profiled.which).await {
         Ok(applied) => applied,
         Err(failure) => return crate::seed::unreached(&failure),

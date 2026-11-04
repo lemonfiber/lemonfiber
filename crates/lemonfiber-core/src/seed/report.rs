@@ -24,6 +24,13 @@ pub enum State {
     AlreadyWired,
     /// Present but operator-changed; preserved.
     Drifted,
+    /// A hand edit to the configuration a preset is held through, left in place: a run
+    /// holding the curators to their preset does not write over it, and only
+    /// `lemonfiber quality reapply` puts the preset back.
+    Kept {
+        /// The edited configuration, as its upstream's configuration directory names it.
+        path: String,
+    },
     /// Present and still lemonfiber's own value, but behind lemonfiber's intent —
     /// it should be brought up to date. Reported until an update path applies it,
     /// and never overwritten in the meantime.
@@ -150,6 +157,7 @@ impl State {
             Self::Wired
                 | Self::AlreadyWired
                 | Self::Drifted
+                | Self::Kept { .. }
                 | Self::Stale
                 | Self::Adopted
                 | Self::Unmanaged

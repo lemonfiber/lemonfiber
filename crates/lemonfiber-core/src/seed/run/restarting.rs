@@ -41,13 +41,7 @@ impl Restarting {
     /// What a rehearsal of writing `ours` over `yours` says: the write, and that the
     /// upstream may restart to take it up.
     pub(super) fn would(&self, yours: Option<String>, ours: &str) -> State {
-        State::WouldWire {
-            yours,
-            ours: Some(format!(
-                "{ours}, and {} may restart to take it up",
-                self.upstream
-            )),
-        }
+        would(yours, ours, &self.upstream)
     }
 
     /// What `applied` comes to: written and in force, or in force once the upstream
@@ -77,6 +71,15 @@ impl Restarting {
         restart(ctx, &self.upstream).await?;
         answering(&self.adapter).await;
         Ok(())
+    }
+}
+
+/// What a rehearsal of writing `ours` over `yours` says, where `upstream` takes it up only
+/// once it starts again where its adapter answers so.
+pub(super) fn would(yours: Option<String>, ours: &str, upstream: &str) -> State {
+    State::WouldWire {
+        yours,
+        ours: Some(format!("{ours}, and {upstream} may restart to take it up")),
     }
 }
 

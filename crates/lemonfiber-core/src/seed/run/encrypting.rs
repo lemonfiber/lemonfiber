@@ -78,22 +78,14 @@ pub(super) async fn seed_internal_tls(ctx: &Ctx, server: Option<&MediaServer>) -
     let server = server?;
     let path = inside(server)?;
     let settled = |state| Some(Wiring::settled(connection(server), state));
+    let rehearsed = || super::restarting::would(None, &path, server.id());
     let Some(client) = server.administering(ctx).await else {
-        return ctx.dry_run.then(|| {
-            Wiring::settled(
-                connection(server),
-                State::WouldWire {
-                    yours: None,
-                    ours: Some(path.clone()),
-                },
-            )
-        });
+        return ctx
+            .dry_run
+            .then(|| Wiring::settled(connection(server), rehearsed()));
     };
     if ctx.dry_run {
-        return settled(State::WouldWire {
-            yours: None,
-            ours: Some(path),
-        });
+        return settled(rehearsed());
     }
     match in_force(ctx, server) {
         Ok(pin) => settled(served(ctx, server, client.as_ref(), (&path, &pin)).await),
