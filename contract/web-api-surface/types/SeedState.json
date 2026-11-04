@@ -13,6 +13,12 @@
       ],
       "required": false
     },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "reason": {
       "type": [
         "string"
@@ -32,6 +38,7 @@
         "const:\"conflicted\"",
         "const:\"drifted\"",
         "const:\"failed\"",
+        "const:\"kept\"",
         "const:\"observed\"",
         "const:\"refused\"",
         "const:\"restarted\"",
@@ -58,6 +65,7 @@
     "\"conflicted\"",
     "\"drifted\"",
     "\"failed\"",
+    "\"kept\"",
     "\"observed\"",
     "\"refused\"",
     "\"restarted\"",
