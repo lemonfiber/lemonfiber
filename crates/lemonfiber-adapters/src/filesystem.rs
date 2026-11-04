@@ -209,9 +209,11 @@ impl Storage for Disk {
 /// mount on the machine, and one that will not answer holds up the answer about a
 /// path that was never on it.
 fn described(path: &Path) -> StorageFacts {
-    let mut disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing());
+    let mut disks: Vec<sysinfo::Disk> =
+        Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing())
+            .map(Vec::from)
+            .unwrap_or_default();
     let chosen = disks
-        .list_mut()
         .iter_mut()
         .filter(|disk| path.starts_with(disk.mount_point()))
         .max_by_key(|disk| disk.mount_point().components().count());
