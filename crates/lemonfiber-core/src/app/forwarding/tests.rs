@@ -43,7 +43,6 @@ fn holding_as(
             gateway_ip: None,
             client_ip: None,
             country: None,
-            port: forwarded,
             second_opinion: None,
         });
     let port = forwarded

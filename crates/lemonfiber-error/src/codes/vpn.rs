@@ -51,8 +51,8 @@ codes! {
         meaning: "The tunnel was dropped on purpose and the download client still reached the \
             internet. Every torrent would continue in the open the moment the VPN fails, and a \
             VPN that never fails is not a thing.",
-        remedy: "Enable the tunnel container's own killswitch. For gluetun that is \
-            FIREWALL=on, which is its default.",
+        remedy: "Enable the egress guard's own killswitch, so it stops every packet while \
+            its tunnel is down.",
     }
     /// The code a stack whose tunnel could not be put back earns.
     TUNNEL_NOT_RESTORED = "VPN-6" {

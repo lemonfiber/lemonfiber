@@ -12,7 +12,7 @@ use crate::ports::filesystem::{FsKind, StorageFacts};
 use crate::ports::http::Http;
 use crate::stack::Source;
 use crate::test_support::{
-    a_context, env_without_password, nowhere, torrent, usenet, Reporting, SeedFs, Tunnel,
+    a_context, env_without_password, guard, nowhere, torrent, usenet, Reporting, SeedFs, Tunnel,
 };
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Renamed;
@@ -68,14 +68,13 @@ const fn filled(
 // ── VPN panel ─────────────────────────────────────────────────
 
 /// A healthy tunnel scripted onto the tunnel and torrent client pair the stack
-/// declares: matching egress, a country, and a forwarded port.
+/// declares: matching egress and a country.
 fn healthy_tunnel() -> Tunnel {
     Tunnel {
         gateway: "gluetun",
         gateway_ip: Some("203.0.113.7"),
         client_ip: Some("203.0.113.7"),
         country: Some("nl"),
-        port: Some("51413"),
         second_opinion: None,
     }
 }
@@ -107,25 +106,45 @@ fn forwarding() -> PortForward {
 }
 
 /// A context that reads the VPN through the given engine, with leak detection
-/// (the IP-echo) and port forwarding as configured.
+/// (the IP-echo) and port forwarding as configured, and the egress guard answering that
+/// its provider forwards 51413.
 fn vpn_ctx(
     engine: Reporting,
     ip_echo: Vec<String>,
     port_forward: PortForward,
     protocols: Protocols,
 ) -> Ctx {
+    guarded_vpn_ctx(engine, (ip_echo, port_forward, protocols), Some(51413))
+}
+
+/// As [`vpn_ctx`], the egress guard answering `forwarded`.
+fn guarded_vpn_ctx(
+    engine: Reporting,
+    (ip_echo, port_forward, protocols): (Vec<String>, PortForward, Protocols),
+    forwarded: Option<u16>,
+) -> Ctx {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let env = env_without_password(&format!(
+        "vpn-panel-{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     let settings = Settings {
         protocols,
         data_root: Some(PathBuf::from("/srv/media")),
         ip_echo,
         port_forward,
+        stack_dir: env.parent().map(|config| config.join("data").join("stack")),
+        env_file: Some(env),
         ..Settings::default()
     };
-    a_context()
-        .engine(Arc::new(engine))
-        .settings(settings)
-        .build()
-        .with_patience(Duration::ZERO)
+    guard::keyed(
+        a_context()
+            .engine(Arc::new(engine.alongside(guard::running())))
+            .settings(settings)
+            .build()
+            .with_patience(Duration::ZERO)
+            .with_http(Fake::by_path(vec![guard::forwarding(forwarded)])),
+    )
 }
 
 /// The VPN panel the way `gather` reads it — the manifest resolved from the
@@ -135,7 +154,9 @@ async fn vpn_panel(ctx: &Ctx) -> Option<Panel<Vpn>> {
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| crate::error::Diagnose::problem(&err).summary);
-    vpn(ctx, manifest.as_ref()).await
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    vpn(ctx, manifest.as_ref(), project.as_deref()).await
 }
 
 // ── Storage: hardlink & exhaustion ────────────────────────────

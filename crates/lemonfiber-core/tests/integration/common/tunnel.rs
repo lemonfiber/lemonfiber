@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_core::config::{PortForward, Protocols};
-use lemonfiber_core::doctor::vpn::Asked;
 use lemonfiber_core::doctor::vpn::VpnCheck;
+use lemonfiber_core::doctor::vpn::{Asked, Grant};
 use lemonfiber_core::doctor::{Finding, Verdict};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::docker::{
@@ -32,8 +32,6 @@ pub struct Behavior {
     pub address: Option<&'static str>,
     /// The country that address resolves to, where the test cares.
     pub country: Option<&'static str>,
-    /// What the container's forwarded-port status file reads, where it has one.
-    pub forwarded_port: Option<&'static str>,
     /// A different answer for a second address service, where the test is about
     /// the sources contradicting each other.
     pub second_opinion: Option<&'static str>,
@@ -49,7 +47,6 @@ impl Behavior {
             running: true,
             address,
             country: None,
-            forwarded_port: None,
             second_opinion: None,
             exec_fails: false,
         }
@@ -249,24 +246,9 @@ impl Engine for Fake {
                 name: container.to_owned(),
             });
         }
-        // The forwarded-port read: `cat` of the status file. A container with a
-        // port answers it; one without makes `cat` exit non-zero with no output,
-        // exactly as a missing file does.
         if argv.first().is_some_and(|arg| arg == "ip") {
             self.dawdle(argv).await;
             return Ok(self.answer_ip(argv));
-        }
-        if argv.first().is_some_and(|arg| arg == "cat") {
-            return Ok(match behavior.forwarded_port {
-                Some(port) => ExecOutput {
-                    status: Some(0),
-                    stdout: format!("{port}\n"),
-                },
-                None => ExecOutput {
-                    status: Some(1),
-                    stdout: String::new(),
-                },
-            });
         }
         let wants_country = argv.last().is_some_and(|arg| arg.ends_with("/country-iso"));
         if wants_country {
@@ -372,6 +354,7 @@ pub fn asking_engine(engine: Arc<Fake>) -> Asking {
             protocols: Protocols::both(),
             echo: vec!["https://ifconfig.me".to_owned()],
             listening: None,
+            granted: Grant::Unreadable,
             port_forward: PortForward::default(),
             disruptive: false,
         },
@@ -409,6 +392,14 @@ impl Asking {
     #[must_use]
     pub const fn listening(mut self, port: u16) -> Self {
         self.asked.listening = Some(port);
+        self
+    }
+
+    /// What the egress guard answered asked for its forwarded port, which the caller
+    /// asks over `network.egress-guard`.
+    #[must_use]
+    pub const fn granted(mut self, granted: Grant) -> Self {
+        self.asked.granted = granted;
         self
     }
 
@@ -511,11 +502,4 @@ pub fn unverified_reason(findings: &[Finding], check: &str) -> Option<String> {
         Some(Verdict::Unverified { reason, .. }) => Some(reason.clone()),
         _ => None,
     }
-}
-
-/// A gluetun behaviour whose status file names a forwarded port.
-pub fn gateway_with_port(port: &'static str) -> Behavior {
-    let mut gluetun = Behavior::up("gluetun", Some("185.65.1.1"));
-    gluetun.forwarded_port = Some(port);
-    gluetun
 }

@@ -117,7 +117,14 @@ fn a_down_tunnel_names_its_service_as_the_operator_knows_it() {
 /// carry the names and the services they would have been about.
 #[test]
 fn an_unreachable_engine_still_names_both_services() {
-    let findings = unreachable_engine(&pair(), &crate::config::PortForward::default(), false);
+    let forward = super::finding(
+        "vpn.port-forward",
+        "forwarded port",
+        crate::doctor::Verdict::Skipped {
+            reason: super::super::NOT_ENABLED.to_owned(),
+        },
+    );
+    let findings = unreachable_engine(&pair(), forward, false);
     let titles: Vec<(&str, Option<&str>)> = findings
         .iter()
         .take(2)

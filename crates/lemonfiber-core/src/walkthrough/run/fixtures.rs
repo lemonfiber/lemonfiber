@@ -314,7 +314,6 @@ pub(super) fn ctx_through_a_tunnel(fake: &Fake) -> Ctx {
             gateway_ip: Some("203.0.113.7"),
             client_ip: Some("203.0.113.7"),
             country: Some("nl"),
-            port: Some("51413"),
             second_opinion: None,
         })
         .alongside(running(&CURATORS)),

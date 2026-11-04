@@ -108,33 +108,34 @@ pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
 /// healthy while its download client's traffic leaves outside the tunnel is the
 /// case this ordering exists for.
 pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
-    let now = ctx.seams.clock.now();
     let mut readings = previous.map(|was| was.readings.clone()).unwrap_or_default();
     let last = previous.map(|was| &was.snapshot);
-    let due = Due::at(&mut readings, now);
+    let due = Due::at(&mut readings, ctx.seams.clock.now());
 
     let configured = ctx.settings.data_root.is_some();
     let manifest = manifest_of(ctx);
     let manifest = manifest.as_ref();
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let directory = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    let project = directory.as_deref();
     let root = ctx.settings.data_root.as_deref();
 
     let (seen, tunnel, household, named, moving, queued, asked, (space, kept, linked), forwarded) = tokio::join!(
         within(PANEL_WITHIN, observe(ctx, manifest)),
-        when(due.is(Paced::Vpn), PANEL_WITHIN, vpn(ctx, manifest)),
+        when(
+            due.is(Paced::Vpn),
+            PANEL_WITHIN,
+            vpn(ctx, manifest, project)
+        ),
         when(due.is(Paced::Household), HOUSEHOLD_WITHIN, waiting_on(ctx)),
         when(due.is(Paced::Door), PANEL_WITHIN, ctx.site.name()),
-        within(
-            PANEL_WITHIN,
-            transfers(ctx, manifest, project.as_deref(), last)
-        ),
+        within(PANEL_WITHIN, transfers(ctx, manifest, project, last)),
         when(
             due.is(Paced::Queues),
             PANEL_WITHIN,
-            queues(ctx, manifest, project.as_deref())
+            queues(ctx, manifest, project)
         ),
         within(PANEL_WITHIN, crate::bandwidth::run::pausing::standing(ctx)),
-        volume(ctx, root, project.as_deref(), &due),
+        volume(ctx, root, project, &due),
         passed_on(ctx, due.is(Paced::Forwarded)),
     );
 

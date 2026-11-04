@@ -206,18 +206,6 @@ const NAMED: &[Named] = &[
         until: Until::Moves("gluetun"),
     },
     Named {
-        file: "crates/lemonfiber-core/src/doctor/vpn.rs",
-        part: "gluetun",
-        count: 1,
-        until: Until::Moves("gluetun"),
-    },
-    Named {
-        file: "crates/lemonfiber-core/src/doctor/vpn/killswitch.rs",
-        part: "gluetun",
-        count: 1,
-        until: Until::Moves("gluetun"),
-    },
-    Named {
         file: "crates/lemonfiber-core/src/seed/run/taken_back.rs",
         part: "seerr",
         count: 1,
@@ -270,12 +258,6 @@ const NAMED: &[Named] = &[
         part: "jellyfin",
         count: 2,
         until: Until::Earlier,
-    },
-    Named {
-        file: "crates/lemonfiber-error/src/codes/vpn.rs",
-        part: "gluetun",
-        count: 1,
-        until: Until::Moves("gluetun"),
     },
 ];
 
