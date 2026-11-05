@@ -63,6 +63,13 @@ fn each_case_is_said_under_its_contract_and_the_whole_is_judged() {
             case("subtitles.fetch@1", "watching-answers", Verdict::Unrecorded),
             case(
                 "subtitles.fetch@1",
+                "refuses-without-the-key",
+                Verdict::Failed {
+                    faults: vec!["answered 200".to_owned(), "unkeyed".to_owned()],
+                },
+            ),
+            case(
+                "subtitles.fetch@1",
                 "watch-answers",
                 Verdict::Unproven {
                     why: "could not be read".to_owned(),
@@ -76,6 +83,7 @@ fn each_case_is_said_under_its_contract_and_the_whole_is_judged() {
         "Refused, 1 violation:",
         "service subber-adapter.fronts — is absent",
         "unrecorded: no recording of it is there",
+        "refuted: answered 200; unkeyed",
         "unproven: could not be read",
         "It does not conform",
     ] {
