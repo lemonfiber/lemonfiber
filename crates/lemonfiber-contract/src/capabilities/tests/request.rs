@@ -126,6 +126,9 @@ impl Requests for Upstream {
         self.tell(format!("relink {at:?} {key}"));
         Ok(())
     }
+    async fn minted_as(&self) -> Result<String, Failure> {
+        Ok("Seerr".to_owned())
+    }
 }
 
 #[async_trait]

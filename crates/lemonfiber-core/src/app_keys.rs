@@ -16,6 +16,15 @@ pub const GATE_APP: &str = "lemonfiber-request-gate";
 /// Every name the core mints a key under.
 pub const MINTED_FOR: &[&str] = &[DECLINE_APP, GATE_APP];
 
+/// Whether `name` is one lemonfiber files keys under, its own or one of its services':
+/// every such name starts with [`OURS`], whatever its case. A name somebody else answers
+/// is never taken to mean one of these, so keys lemonfiber holds are never revoked on
+/// another's word.
+#[must_use]
+pub fn is_ours(name: &str) -> bool {
+    name.trim().to_ascii_lowercase().starts_with(OURS)
+}
+
 /// Revoke the key filed under lemonfiber's own name, where there is one, and answer
 /// whether there was.
 ///

@@ -305,6 +305,17 @@
     },
     {
       "asked": {},
+      "case": "minted_as-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "minted_as",
+      "since": 1
+    },
+    {
+      "asked": {},
       "case": "asking-answers",
       "expect": {
         "conforms": true

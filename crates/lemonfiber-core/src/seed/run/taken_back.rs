@@ -30,10 +30,6 @@ use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Filler, Fillers};
 
-/// What the request service files the key it mints for itself under in the media server,
-/// on the sign-in that sets it up without the request gate in front of the media server.
-const FILED_AS: &str = "Seerr";
-
 /// The request service among `fillers` that may have run before the gate — the stack's
 /// own, or the first-party plugin's moved in place of it, which keeps its settings — as
 /// the service it is, and the service filling `request.intake` for it, which is asked.
@@ -99,9 +95,15 @@ pub(super) async fn seed_taken_back(
     let (filler, asked) = held_before(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
     let media_server = media_server_admin(ctx, fillers).await;
-    let minted = match &media_server {
-        Some((client, ..)) => client.filed_as(FILED_AS).await.unwrap_or_default(),
-        None => Vec::new(),
+    let asking = crate::app::targets::requests_as_owner(ctx, asked).await;
+    let minted = match (&media_server, &asking) {
+        (Some((client, ..)), Some(requests)) => match requests.minted_as().await {
+            Ok(name) if !name.trim().is_empty() && !crate::app_keys::is_ours(&name) => {
+                client.filed_as(&name).await.unwrap_or_default()
+            }
+            Ok(_) | Err(_) => Vec::new(),
+        },
+        _ => Vec::new(),
     };
     let count = owed.len() + minted.len();
     if count == 0 {
@@ -113,7 +115,7 @@ pub(super) async fn seed_taken_back(
             ours: Some("none".to_owned()),
         }));
     }
-    let Some(requests) = crate::app::targets::requests_as_owner(ctx, asked).await else {
+    let Some(requests) = asking else {
         return Some(settled(State::Skipped {
             reason: format!(
                 "{name} could not be asked over its contract, so nothing it held is replaced \

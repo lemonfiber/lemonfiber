@@ -317,5 +317,11 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
             assert_eq!(case.get("since").and_then(serde_json::Value::as_u64), since);
         }
     }
-    assert_eq!(added, vec![("media.serve@1".to_owned(), "astray")]);
+    assert_eq!(
+        added,
+        vec![
+            ("request.intake@1".to_owned(), "minted_as"),
+            ("media.serve@1".to_owned(), "astray"),
+        ]
+    );
 }

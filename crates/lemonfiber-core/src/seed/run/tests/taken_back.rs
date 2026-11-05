@@ -187,7 +187,26 @@ fn linked_household(
     keys: Answer,
     revoked: Answer,
 ) -> Arc<Fake> {
+    named_household(
+        link,
+        (listed, tested),
+        (keys, revoked),
+        requests::answered(&FILED_AS),
+    )
+}
+
+/// The name the request service says it files the key it mints for itself under.
+const FILED_AS: &str = "Seerr";
+
+/// The same, the request service answering what it files its own key under with `filed`.
+fn named_household(
+    link: Answer,
+    (listed, tested): (Answer, Answer),
+    (keys, revoked): (Answer, Answer),
+    filed: Answer,
+) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
+        (requests::intake("minted_as"), vec![filed]),
         (requests::intake("test_fulfilment_target"), vec![tested]),
         (requests::intake("fulfilment_targets"), vec![listed]),
         (requests::intake("media_server_link"), vec![link]),
@@ -440,6 +459,64 @@ async fn one_held_credential_is_counted_as_one() {
             ours: Some("none".to_owned()),
         })
     );
+}
+
+#[tokio::test]
+async fn the_request_services_own_keys_are_asked_for_under_the_name_it_files_them_as() {
+    let http = household(
+        curator_gated(),
+        requests::taken(),
+        keys(true),
+        media::taken(),
+    );
+    let (ctx, project) = taking("filed-as", &http, true);
+    let _ = taken(&ctx, &gated(), &project, Baseline::new()).await;
+    assert_eq!(
+        crate::test_support::adapted::asked_at(&http.requests(), media::serve("filed_as")),
+        vec![serde_json::json!({ "app": FILED_AS })]
+    );
+}
+
+#[tokio::test]
+async fn a_request_service_minting_no_key_of_its_own_has_none_taken_back() {
+    let http = named_household(
+        linked(),
+        (curator_gated(), requests::taken()),
+        (keys(true), media::taken()),
+        crate::test_support::media::refused(lemonfiber_contract::wire::Kind::Unsupported),
+    );
+    let (ctx, project) = taking("minting-none", &http, true);
+    let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
+    assert_eq!(state, None);
+}
+
+/// A request service answering a name lemonfiber files its own keys under, or no name, has
+/// nothing revoked on its word: the keys filed there are the gate's and the decline
+/// service's, not one the request service minted.
+#[tokio::test]
+async fn a_name_lemonfiber_files_its_own_keys_under_is_never_taken_back_on_a_request_services_word()
+{
+    for (case, name) in [
+        ("gate", crate::app_keys::GATE_APP),
+        ("decline", crate::app_keys::DECLINE_APP),
+        ("ours", "Lemonfiber"),
+        ("blank", " "),
+    ] {
+        let http = named_household(
+            linked(),
+            (curator_gated(), requests::taken()),
+            (keys(true), media::taken()),
+            requests::answered(&name),
+        );
+        let (ctx, project) = taking(&format!("minting-{case}"), &http, true);
+        let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
+        assert_eq!(state, None, "{case}");
+        assert!(
+            crate::test_support::adapted::asked_at(&http.requests(), media::serve("filed_as"))
+                .is_empty(),
+            "{case}"
+        );
+    }
 }
 
 #[tokio::test]

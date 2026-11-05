@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "request.intake/v1/openapi.json",
-      "sha256": "a92a0ecc5c25ffde3d6e446fb94e6f6e32b06da961208b4b6231538029500465"
+      "sha256": "57c9638cba7e89f5eb0c2ad63dc0ad449a059a4c28c6979cab973167408fc965"
     },
     {
       "path": "request.intake/v1/operations/establish.json",
@@ -78,6 +78,10 @@
       "sha256": "0bae0c6c11b3c14a955332367842c5e369ae54b0ebf56ff7a0413f52440666ca"
     },
     {
+      "path": "request.intake/v1/operations/minted_as.json",
+      "sha256": "cbba6d34e5f67cc2ad2cee143e2f35fc0711c93fae661398bc39faed60fdd69c"
+    },
+    {
       "path": "request.intake/v1/operations/asking.json",
       "sha256": "7220a180622810e0a7bd7ee1203e2972636a1be65f3e9b4a65fe97c2c9610f83"
     },
@@ -131,7 +135,7 @@
     },
     {
       "path": "request.intake/v1/conformance.json",
-      "sha256": "1c45027ae0b6eb6efffad2331eadf69e5e9a573f873d61603fd1287064de3f06"
+      "sha256": "83e1964d2df57e21c92847f0541efab67862130c76f52879d1718252ae216cb3"
     },
     {
       "path": "request.intake/v1/holds.json",
