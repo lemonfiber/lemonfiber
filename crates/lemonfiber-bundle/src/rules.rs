@@ -102,11 +102,7 @@ fn fenced(fence: &Image, schema: u32, broken: &mut Vec<String>) {
             fence.image
         ));
     }
-    let release = fence
-        .tag
-        .split_once('-')
-        .map_or(fence.tag.as_str(), |(release, _)| release);
-    if !is_release(release) && !is_commit_image(&fence.tag) {
+    if !is_release(&fence.tag) && !is_commit_image(&fence.tag) {
         broken.push(format!(
             "fence.tag {} is not a release the train tags, without its v, nor {COMMIT_IMAGE}<{COMMIT_IMAGE_DIGITS} lowercase hex>",
             fence.tag
