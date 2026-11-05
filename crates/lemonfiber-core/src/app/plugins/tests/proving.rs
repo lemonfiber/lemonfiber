@@ -751,3 +751,37 @@ async fn an_upstream_the_engine_will_not_start_again_fails_a_claim_taken_on_rest
         );
     }
 }
+
+/// A service is installed and started under whichever posture its manifest declares,
+/// confined or standard: the posture is written, and never a reason to refuse.
+#[tokio::test]
+async fn a_service_is_installed_and_started_under_either_posture_and_never_refused_over_it() {
+    use lemonfiber_manifest::container::Posture;
+    for (posture, written) in [
+        ("confined", Posture::Confined),
+        ("standard", Posture::Standard),
+    ] {
+        let name = format!("posture-{posture}");
+        let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+        let ctx = proving(&name, runner.clone(), answering(200));
+        let declared = PROVING.replacen(
+            "config_path = \"/app/data\"\n",
+            &format!("config_path = \"/app/data\"\nposture     = \"{posture}\"\n"),
+            1,
+        );
+
+        let installed = installing(&ctx, &source(&name, &declared)).await;
+
+        assert!(
+            installed.as_ref().is_ok_and(|report| {
+                report
+                    .installed
+                    .iter()
+                    .flat_map(|one| one.services.iter())
+                    .any(|placed| placed.fields.posture == written)
+            }),
+            "{posture}: {installed:?}"
+        );
+        assert!(runner.ran("up"), "{posture}: its service was started");
+    }
+}
