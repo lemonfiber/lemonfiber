@@ -490,6 +490,35 @@ async fn a_request_service_minting_no_key_of_its_own_has_none_taken_back() {
     assert_eq!(state, None);
 }
 
+/// A request service answering a name lemonfiber files its own keys under, or no name, has
+/// nothing revoked on its word: the keys filed there are the gate's and the decline
+/// service's, not one the request service minted.
+#[tokio::test]
+async fn a_name_lemonfiber_files_its_own_keys_under_is_never_taken_back_on_a_request_services_word()
+{
+    for (case, name) in [
+        ("gate", crate::app_keys::GATE_APP),
+        ("decline", crate::app_keys::DECLINE_APP),
+        ("ours", "Lemonfiber"),
+        ("blank", " "),
+    ] {
+        let http = named_household(
+            linked(),
+            (curator_gated(), requests::taken()),
+            (keys(true), media::taken()),
+            requests::answered(&name),
+        );
+        let (ctx, project) = taking(&format!("minting-{case}"), &http, true);
+        let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
+        assert_eq!(state, None, "{case}");
+        assert!(
+            crate::test_support::adapted::asked_at(&http.requests(), media::serve("filed_as"))
+                .is_empty(),
+            "{case}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn a_target_still_reached_directly_holds_everything_back() {
     let http = household(

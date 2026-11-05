@@ -98,8 +98,10 @@ pub(super) async fn seed_taken_back(
     let asking = crate::app::targets::requests_as_owner(ctx, asked).await;
     let minted = match (&media_server, &asking) {
         (Some((client, ..)), Some(requests)) => match requests.minted_as().await {
-            Ok(name) => client.filed_as(&name).await.unwrap_or_default(),
-            Err(_) => Vec::new(),
+            Ok(name) if !name.trim().is_empty() && !crate::app_keys::is_ours(&name) => {
+                client.filed_as(&name).await.unwrap_or_default()
+            }
+            Ok(_) | Err(_) => Vec::new(),
         },
         _ => Vec::new(),
     };
