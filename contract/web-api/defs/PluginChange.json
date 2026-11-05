@@ -7,6 +7,13 @@
       "description": "Where it lands, in full.\n\nIn full rather than relative to the stack, because *what is this about to do\nto my machine* is answered by a path somebody can go and look at — and a\nrelative one is right about a directory the reader has to work out for\nthemselves.",
       "type": "string"
     },
+    "placeholders": {
+      "description": "Each placeholder the file as shipped names a secret by, in the order it holds them:\nnone for anything but a starting file naming a secret, and never a value.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginPlaceholder.json"
+      }
+    },
     "puts": {
       "description": "What lands there.",
       "$ref": "PluginPuts.json"
@@ -14,6 +21,7 @@
   },
   "required": [
     "path",
-    "puts"
+    "puts",
+    "placeholders"
   ]
 }

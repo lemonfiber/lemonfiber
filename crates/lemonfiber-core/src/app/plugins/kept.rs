@@ -61,6 +61,47 @@ pub(crate) fn manifest(
     Ok(read.manifest)
 }
 
+/// Each starting file whose placeholders `would`, from its source at `path`, ships
+/// differently from what was kept for `was`, beneath `stack`. Read off what each version
+/// ships alone, never off the files on the machine, which hold the values.
+pub(crate) fn reshipped(
+    ctx: &Ctx,
+    was: &Installed,
+    would: &Installed,
+    stack: &Path,
+    path: &Path,
+) -> Vec<crate::plugin::Reshipping> {
+    let shipped = |installed: &Installed, source: &Path| {
+        crate::plugin::seeding::shipped_by(installed, source).unwrap_or_default()
+    };
+    let before = root(ctx, &was.plugin)
+        .map(|kept| shipped(was, &kept))
+        .unwrap_or_default();
+    let after = shipped(would, &crate::plugin::root(path));
+    crate::plugin::reshipped(stack, &before, &after)
+}
+
+/// Whether `change` made a starting file of one of `was`'s services beneath `stack`, which
+/// an update leaves in place rather than putting back: the service has rewritten it as it
+/// ran by then, and the new version writes a starting file only where none is yet.
+///
+/// A file beneath a service's configuration directory other than the key it is asked with
+/// and the credentials an adapter reads its upstream's with, both of which every install
+/// writes afresh.
+pub(crate) fn in_place(was: &Installed, stack: &Path, change: &crate::journal::Change) -> bool {
+    let crate::journal::Kind::Made { path } = &change.kind else {
+        return false;
+    };
+    let at = Path::new(path);
+    at.is_file()
+        && was.services.iter().any(|placed| {
+            let directory = crate::plugin::configuration(stack, &placed.service);
+            at.starts_with(&directory)
+                && at != crate::plugin::key_file(stack, &placed.service)
+                && at != directory.join(lemonfiber_contract::adapter::UPSTREAM_FILE)
+        })
+}
+
 /// Take away every starting file kept for `plugin`.
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &str) {
     if let Some(at) = root(ctx, plugin) {

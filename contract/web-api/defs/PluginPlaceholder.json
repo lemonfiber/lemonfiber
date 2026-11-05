@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One placeholder a starting file names a secret by, as the plugin ships it.",
+  "type": "object",
+  "properties": {
+    "form": {
+      "description": "The form its value is written in.",
+      "$ref": "PluginPlaceholderForm.json"
+    },
+    "secret": {
+      "description": "The secret it names, by its id.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "secret",
+    "form"
+  ]
+}

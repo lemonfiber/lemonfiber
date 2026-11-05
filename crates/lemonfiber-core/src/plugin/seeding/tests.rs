@@ -82,7 +82,10 @@ fn a_secret_nothing_holds_is_named_by_its_placeholder_and_never_by_a_value() {
     let refused = written(b"key = {{secret:other}}", &held, &Chance::cycling());
     assert_eq!(
         refused,
-        Err("a placeholder names the secret other, which nothing holds".to_owned())
+        Err(
+            "the placeholder for secret other in the plain form, whose secret nothing holds"
+                .to_owned()
+        )
     );
 }
 

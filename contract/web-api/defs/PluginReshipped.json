@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One starting file whose placeholders an update changes, as the version installed\nshipped it and as the one coming ships it: the placeholders alone, never what the\nfile on the machine holds.",
+  "type": "object",
+  "properties": {
+    "becomes": {
+      "description": "Its placeholders as the version coming ships it, none where it ships none.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginPlaceholder.json"
+      }
+    },
+    "path": {
+      "description": "Where the file is, in full.",
+      "type": "string"
+    },
+    "was": {
+      "description": "Its placeholders as the version installed shipped it, none where it shipped none.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginPlaceholder.json"
+      }
+    }
+  },
+  "required": [
+    "path",
+    "was",
+    "becomes"
+  ]
+}

@@ -91,6 +91,62 @@ async fn a_starting_file_an_update_brings_holding_a_secret_is_owners_alone_and_j
     assert!(made_paths(&ctx)
         .iter()
         .any(|path| path.ends_with("config/komga/added.yml")));
+    let reshipped = updated
+        .ok()
+        .and_then(|one| one.update)
+        .map(|update| update.reshipped)
+        .unwrap_or_default();
+    assert_eq!(
+        reshipped
+            .iter()
+            .map(|one| (one.path.clone(), one.was.len(), one.becomes.len()))
+            .collect::<Vec<_>>(),
+        vec![(added.display().to_string(), 0, 1)]
+    );
+}
+
+#[tokio::test]
+async fn an_update_asking_another_form_states_it_and_leaves_the_file_on_the_machine() {
+    let name = "seeded-updated-reformed";
+    let ctx = seeding(name);
+    let _ = installing(&ctx, &shipped(name)).await;
+    let starting = stack_of(&ctx).join("config/komga/application.yml");
+    let before = format!("{}  remember: true\n", read(&starting));
+    let _ = std::fs::write(&starting, &before);
+    let at = later(name, "added.yml");
+    let _ = std::fs::write(
+        at.join("config/komga/application.yml"),
+        "komga:\n  api-key: {{secret:upstream-key|pbkdf2}}\n",
+    );
+
+    let updated = updating(&ctx, &at).await;
+
+    let reshipped = updated
+        .ok()
+        .and_then(|one| one.update)
+        .map(|update| update.reshipped)
+        .unwrap_or_default();
+    let reformed = reshipped
+        .iter()
+        .find(|one| one.path == starting.display().to_string());
+    assert_eq!(
+        reformed.map(|one| (
+            one.was
+                .iter()
+                .map(crate::plugin::Placeholding::named)
+                .collect::<Vec<_>>(),
+            one.becomes
+                .iter()
+                .map(crate::plugin::Placeholding::named)
+                .collect::<Vec<_>>(),
+        )),
+        Some((
+            vec!["the placeholder for secret upstream-key in the plain form".to_owned()],
+            vec!["the placeholder for secret upstream-key in the pbkdf2 form".to_owned()],
+        )),
+        "{reshipped:?}"
+    );
+    assert_eq!(read(&starting), before);
 }
 
 #[cfg(unix)]

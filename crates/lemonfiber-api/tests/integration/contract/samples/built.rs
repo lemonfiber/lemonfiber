@@ -370,10 +370,20 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
                 lemonfiber_core::plugin::Changing {
                     path: "/opt/lemonfiber/stack/config/komga".to_owned(),
                     puts: lemonfiber_core::plugin::Puts::Directory,
+                    placeholders: Vec::new(),
                 },
                 lemonfiber_core::plugin::Changing {
                     path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
                     puts: lemonfiber_core::plugin::Puts::Document,
+                    placeholders: Vec::new(),
+                },
+                lemonfiber_core::plugin::Changing {
+                    path: "/opt/lemonfiber/stack/config/komga/application.yml".to_owned(),
+                    puts: lemonfiber_core::plugin::Puts::Starting,
+                    placeholders: vec![lemonfiber_core::plugin::Placeholding {
+                        secret: "upstream-key".to_owned(),
+                        form: lemonfiber_core::plugin::Form::Pbkdf2,
+                    }],
                 },
             ],
             proofs: vec![lemonfiber_core::plugin::Proving {

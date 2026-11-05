@@ -194,6 +194,11 @@ pub struct Update {
     /// proved and what the stack's checks made of it — the same one an install gives,
     /// because it is the same work. `recorded` is whether the update holds.
     pub install: Install,
+    /// Each starting file whose placeholders the new version changes, as the installed
+    /// version shipped it and as the new one ships it. The file on the machine is left as
+    /// it is, so this is what it was seeded from set against what the new version would
+    /// seed it from.
+    pub reshipped: Vec<super::Reshipping>,
     /// What stopped the new version before its proofs could be asked, where something
     /// did: a write that would not land, a container that would not start, or a record
     /// that could not be written. A proof or a check that did not hold is in `install`.

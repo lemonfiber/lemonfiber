@@ -444,6 +444,15 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         }),
         "wrote /stack/compose/plugins/komga.yml back as it was"
     );
+    assert_eq!(
+        undone(Action::Reseed {
+            path: "/stack/config/komga/application.yml".to_owned(),
+            plugin: "komga".to_owned(),
+            secret: "upstream-key".to_owned(),
+            written: 0
+        }),
+        "wrote the old value of upstream-key back into /stack/config/komga/application.yml"
+    );
 
     assert_eq!(
         undone(Action::Repin {

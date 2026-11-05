@@ -27,10 +27,9 @@ use crate::ports::filesystem::{Beneath, Readable};
 use crate::seed::State;
 use crate::wiring::{Filler, Fillers};
 
-/// What a rehearsal says about replacing a minted secret.
-const REPLACING: &str = "a real run would mint a new value, write it where the old one stands \
-     in the service's settings, its secrets file and its adapter's upstream.json, and restart \
-     what reads it. Nothing was replaced.";
+/// Where a rehearsal says a minted secret's new value is written beside the starting files
+/// that name it.
+const BESIDE: &str = "the service's secrets file and its adapter's upstream.json";
 
 /// What the egress guard's hold on its control credential is reported as.
 const GUARD_CONTROL: &str = "the egress guard's control server";
@@ -75,9 +74,50 @@ pub(super) async fn rotate(
     amid: &Amid<'_>,
 ) -> Rotation {
     if ctx.dry_run {
-        return would_rotate(held, REPLACING);
+        return would_rotate(held, &replacing(ctx, installed, &secret.id));
     }
     replaced(ctx, &held.name, installed, secret, amid).await
+}
+
+/// What a rehearsal says about replacing `installed`'s minted `secret`: each starting file
+/// that names it, by where it is and each placeholder there, read off the files kept as
+/// the plugin shipped them.
+fn replacing(ctx: &Ctx, installed: &Installed, secret: &str) -> String {
+    let mut written: Vec<String> = crate::app::project::directory(ctx)
+        .zip(crate::app::plugins::kept::root(ctx, &installed.plugin))
+        .and_then(|(stack, kept)| {
+            crate::plugin::seeding::shipped_by(installed, &kept)
+                .ok()
+                .map(|shipped| (stack, shipped))
+        })
+        .map(|(stack, shipped)| {
+            shipped
+                .iter()
+                .filter_map(|file| {
+                    let placeholders: Vec<String> = crate::plugin::placeholding(&file.bytes)
+                        .iter()
+                        .filter(|one| one.secret == secret)
+                        .map(crate::plugin::Placeholding::named)
+                        .collect();
+                    (!placeholders.is_empty()).then(|| {
+                        format!(
+                            "{} at {}",
+                            crate::plugin::configuration(&stack, &file.service)
+                                .join(&file.path)
+                                .display(),
+                            placeholders.join(" and ")
+                        )
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    written.push(BESIDE.to_owned());
+    format!(
+        "a real run would mint a new value, write it where the old one stands in {}, and \
+         restart what reads it. Nothing was replaced.",
+        written.join(", ")
+    )
 }
 
 /// Replace the secret lemonfiber minted as `filler`'s credential, on a run that means it:
@@ -126,7 +166,7 @@ async fn replaced(
         Ok(files) => files,
         Err(detail) => return refused(detail),
     };
-    if let Err(detail) = held_anew(ctx, installed, secret, &value) {
+    if let Err(detail) = held_anew(ctx, installed, (secret, &value), &files) {
         return refused(detail);
     }
     let mut consumers: Vec<Propagation> = files
@@ -280,7 +320,7 @@ fn rewritten(
             service: &placed.service,
         }))?;
         for (path, template) in templates {
-            let at = stack.join("config").join(&placed.service).join(&path);
+            let at = crate::plugin::configuration(stack, &placed.service).join(&path);
             let current = match ctx.seams.confined.read(&at, stack) {
                 Beneath::Read(text) => text,
                 Beneath::Absent => return Err(format!("{} is not there", at.display())),
@@ -305,14 +345,21 @@ fn rewritten(
 }
 
 /// Hold `value` as `installed`'s `secret`, journalled by the fingerprints of the value it
-/// replaces and of itself.
-fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Result<(), String> {
+/// replaces and of itself, with each of `files` about to be written with it, by its
+/// checksum alone, so the record of every file stands before the file is written.
+fn held_anew(
+    ctx: &Ctx,
+    installed: &Installed,
+    (secret, value): (&str, &str),
+    files: &[(String, PathBuf, Vec<u8>)],
+) -> Result<(), String> {
     let at = crate::settings::secrets_at(ctx)
         .zip(crate::app::targets::layout(ctx))
         .ok_or_else(|| crate::config::store::Failure::Nowhere.to_string())?;
     let (secrets, paths) = at;
     let name = crate::settings::named(&installed.plugin, secret);
     let stamp = ctx.stamp();
+    let operation = crate::plugin::owner(&installed.plugin);
     let keeping = [crate::settings::Keeping {
         name: &name,
         value,
@@ -320,11 +367,22 @@ fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Res
         at: ctx.seconds(),
     }];
     crate::settings::kept(&secrets, &keeping, ctx.seams.random.as_ref(), &|replaced| {
+        let seeded = files.iter().map(|(_, path, bytes)| Change {
+            at: stamp.clone(),
+            operation: operation.clone(),
+            target: path.display().to_string(),
+            kind: Kind::Seeded {
+                path: path.display().to_string(),
+                plugin: installed.plugin.clone(),
+                secret: secret.to_owned(),
+                written: crate::materialised::checksum(bytes),
+            },
+        });
         let changes: Vec<Change> = replaced
             .iter()
             .map(|one| Change {
                 at: stamp.clone(),
-                operation: crate::plugin::owner(&installed.plugin),
+                operation: operation.clone(),
                 target: one.name.clone(),
                 kind: Kind::Secret {
                     name: one.name.clone(),
@@ -334,6 +392,7 @@ fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Res
                     filed: None,
                 },
             })
+            .chain(seeded)
             .collect();
         crate::app::recover::journalled(&paths.journal(), &changes)
     })

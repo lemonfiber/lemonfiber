@@ -125,6 +125,12 @@ fn did(kind: &Kind) -> String {
         Kind::Copied { volume, to } => format!("copied the volume {volume} to {to}"),
         Kind::Region { owner, path, .. } => format!("wrote {owner}'s region into {path}"),
         Kind::Rewritten { path, .. } => format!("wrote over {path}"),
+        Kind::Seeded {
+            path,
+            plugin,
+            secret,
+            ..
+        } => format!("wrote the new value of {plugin}'s secret {secret} into {path}"),
         Kind::Pinned {
             previous, current, ..
         } => format!("moved from {previous} to {current}"),

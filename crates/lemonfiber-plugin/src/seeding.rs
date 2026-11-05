@@ -28,7 +28,9 @@ pub const FORMED: char = '|';
 pub const MOST_PLACEHOLDERS: usize = 16;
 
 /// The form a placeholder asks its secret to be written in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "PluginPlaceholderForm")]
 pub enum Form {
     /// The value itself.
     Plain,
@@ -40,6 +42,18 @@ pub enum Form {
 impl Form {
     /// The word a placeholder names [`Form::Pbkdf2`] by.
     pub const PBKDF2: &str = "pbkdf2";
+
+    /// The word [`Form::Plain`] is named by, which a placeholder asking for it leaves out.
+    pub const PLAIN: &str = "plain";
+
+    /// The word this form is named by.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Plain => Self::PLAIN,
+            Self::Pbkdf2 => Self::PBKDF2,
+        }
+    }
 
     /// The form a placeholder's word names, where it names one.
     fn named(word: &str) -> Option<Self> {
@@ -56,6 +70,24 @@ pub struct Placeholder<'a> {
     pub form: Form,
     /// Where it lies in the file, its braces included.
     pub span: Range<usize>,
+}
+
+impl Placeholder<'_> {
+    /// The placeholder as it is named to an operator, as [`named`] names it.
+    #[must_use]
+    pub fn named(&self) -> String {
+        named(self.secret, self.form)
+    }
+}
+
+/// A placeholder naming `secret` in `form`, as it is named to an operator: by its secret
+/// and its form, never quoted.
+#[must_use]
+pub fn named(secret: &str, form: Form) -> String {
+    format!(
+        "the placeholder for secret {secret} in the {} form",
+        form.word()
+    )
 }
 
 /// Every placeholder in `text`, in the order the file holds them.
@@ -82,8 +114,8 @@ pub fn placeholders(text: &str) -> Result<Vec<Placeholder<'_>>, String> {
                 secret,
                 Form::named(word).ok_or_else(|| {
                     format!(
-                        "has a placeholder asking for the form {word}, and the one form a \
-                         placeholder may ask for is {}",
+                        "has the placeholder for secret {secret} asking for the form {word}, and \
+                         the one form a placeholder may ask for is {}",
                         Form::PBKDF2
                     )
                 })?,
@@ -136,19 +168,13 @@ pub fn filled(
 pub fn refused(manifest: &Manifest, service: &str, path: &str, bytes: &[u8]) -> Vec<Violation> {
     let location = format!("config/{service}/{path}");
     let Ok(text) = std::str::from_utf8(bytes) else {
-        return if bytes
-            .windows(OPENS.len())
-            .any(|window| window == OPENS.as_bytes())
-        {
-            vec![Violation {
-                location,
-                message: "names a secret and is not UTF-8, so where its value would be written \
-                          cannot be read"
-                    .to_owned(),
-            }]
-        } else {
-            Vec::new()
-        };
+        return unreadable(bytes)
+            .into_iter()
+            .map(|message| Violation {
+                location: location.clone(),
+                message,
+            })
+            .collect();
     };
     let named = match placeholders(text) {
         Ok(named) => named,
@@ -157,27 +183,54 @@ pub fn refused(manifest: &Manifest, service: &str, path: &str, bytes: &[u8]) -> 
     named
         .iter()
         .filter_map(|placeholder| {
-            owned(manifest, placeholder.secret)
-                .and_then(|()| its_own(manifest, service, placeholder.secret))
-                .err()
-                .map(|message| Violation {
+            unowned(manifest, placeholder.secret)
+                .or_else(|| not_its_own(manifest, service, placeholder.secret))
+                .map(|clause| Violation {
                     location: location.clone(),
-                    message: format!("has a placeholder that {message}"),
+                    message: format!("has {}, whose secret {clause}", placeholder.named()),
                 })
         })
         .collect()
 }
 
-/// Whether the manifest declares `secret`, one of its own, as `service`'s.
-fn its_own(manifest: &Manifest, service: &str, secret: &str) -> Result<(), String> {
-    match manifest.secrets.iter().find(|one| one.id == secret) {
-        Some(declared) if declared.of != service => Err(format!(
-            "names the secret {secret}, which is {}'s rather than {service}'s, and a starting \
-             file holds only its own service's secrets",
-            declared.of
-        )),
-        _ => Ok(()),
+/// What is said of a starting file holding `bytes` that are not UTF-8: one refusal for
+/// each placeholder that can still be read, one for the file where a placeholder opens
+/// and none can, and none where no placeholder opens at all.
+fn unreadable(bytes: &[u8]) -> Vec<String> {
+    const UNREAD: &str = "and is not UTF-8, so where its value would be written cannot be read";
+    if !bytes
+        .windows(OPENS.len())
+        .any(|window| window == OPENS.as_bytes())
+    {
+        return Vec::new();
     }
+    let lossy = String::from_utf8_lossy(bytes);
+    let named: Vec<String> = placeholders(&lossy)
+        .unwrap_or_default()
+        .iter()
+        .filter(|placeholder| !placeholder.secret.contains(char::REPLACEMENT_CHARACTER))
+        .map(|placeholder| format!("has {} {UNREAD}", placeholder.named()))
+        .collect();
+    if named.is_empty() {
+        vec![format!("names a secret {UNREAD}")]
+    } else {
+        named
+    }
+}
+
+/// Why `secret`, which the manifest declares, is not `service`'s own, where it is not.
+fn not_its_own(manifest: &Manifest, service: &str, secret: &str) -> Option<String> {
+    manifest
+        .secrets
+        .iter()
+        .find(|one| one.id == secret && one.of != service)
+        .map(|declared| {
+            format!(
+                "is {}'s rather than {service}'s, and a starting file holds only its own \
+                 service's secrets",
+                declared.of
+            )
+        })
 }
 
 /// Whether the plugin declares `secret` as one of its own services' credentials.
@@ -186,24 +239,28 @@ fn its_own(manifest: &Manifest, service: &str, secret: &str) -> Result<(), Strin
 ///
 /// Why it does not, in words that follow the placeholder or field naming it.
 pub fn owned(manifest: &Manifest, secret: &str) -> Result<(), String> {
+    unowned(manifest, secret).map_or(Ok(()), |clause| {
+        Err(format!("names the secret {secret}, which {clause}"))
+    })
+}
+
+/// Why the plugin does not declare `secret` as one of its own services' credentials, as
+/// what follows the secret, where it does not.
+fn unowned(manifest: &Manifest, secret: &str) -> Option<String> {
     let Some(declared) = manifest.secrets.iter().find(|one| one.id == secret) else {
-        return Err(format!(
-            "names the secret {secret}, which no [[secret]] of this manifest declares"
-        ));
+        return Some("no [[secret]] of this manifest declares".to_owned());
     };
-    if manifest
+    (!manifest
         .services
         .iter()
-        .any(|service| service.id == declared.of)
-    {
-        Ok(())
-    } else {
-        Err(format!(
-            "names the secret {secret}, which is {}'s rather than one of this plugin's own \
-             services', and a credential that crosses stays out of this plugin's files",
+        .any(|service| service.id == declared.of))
+    .then(|| {
+        format!(
+            "is {}'s rather than one of this plugin's own services', and a credential that \
+             crosses stays out of this plugin's files",
             declared.of
-        ))
-    }
+        )
+    })
 }
 
 #[cfg(test)]

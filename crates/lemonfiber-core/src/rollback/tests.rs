@@ -658,3 +658,33 @@ fn a_restart_goes_back_whole() {
         Reversal::Whole
     );
 }
+
+/// A starting file a replacement wrote goes back whole while it holds what was written or
+/// nothing at all, and is refused where it was written since.
+#[test]
+fn a_seeded_file_goes_back_only_while_it_holds_what_was_written() {
+    let seeded = Change {
+        at: "1".to_owned(),
+        operation: "plugin komga".to_owned(),
+        target: "/stack/config/komga/application.yml".to_owned(),
+        kind: Kind::Seeded {
+            path: "/stack/config/komga/application.yml".to_owned(),
+            plugin: "komga".to_owned(),
+            secret: "upstream-key".to_owned(),
+            written: crate::materialised::checksum(b"key: new\n"),
+        },
+    };
+    let judged =
+        |reads: &dyn Fn(&str) -> Option<String>| standing(&seeded, &[], &holding(&[]), reads);
+
+    assert_eq!(
+        judged(&holding_text("key: new\n")).reversal,
+        Reversal::Whole
+    );
+    assert_eq!(judged(&|_: &str| None).reversal, Reversal::Whole);
+    let edited = judged(&holding_text("key: new\nmore: 1\n"));
+    assert_eq!(edited.reversal, Reversal::None);
+    assert!(edited.refusal.is_some_and(|refusal| refusal
+        .because
+        .contains("written since lemonfiber wrote the new value")));
+}

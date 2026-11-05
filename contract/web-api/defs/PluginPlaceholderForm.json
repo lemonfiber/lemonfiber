@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The form a placeholder asks its secret to be written in.",
+  "oneOf": [
+    {
+      "description": "The value itself.",
+      "type": "string",
+      "const": "plain"
+    },
+    {
+      "description": "PBKDF2-HMAC-SHA512 of the value under a fresh salt, as a service keeping only a\nhash of its password reads it.",
+      "type": "string",
+      "const": "pbkdf2"
+    }
+  ]
+}

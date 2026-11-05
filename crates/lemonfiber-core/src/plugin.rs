@@ -113,8 +113,8 @@ pub use reports::{
 };
 pub use source::{unspoken, Source, SPOKEN};
 pub use stating::{
-    asked, changes, overrides, proofs, run_proof, sharing, speaking, taking, Changing, Overriding,
-    Proving, Puts, Sharing, Taking,
+    asked, changes, overrides, placeholding, proofs, reshipped, run_proof, sharing, speaking,
+    taking, Changing, Overriding, Placeholding, Proving, Puts, Reshipping, Sharing, Taking,
 };
 pub use verified::{against, Changed, Verification};
 
@@ -128,6 +128,7 @@ pub use verified::{against, Changed, Verification};
 pub use lemonfiber_plugin::extension::{
     Bounded, Closed, Limits, Occupied, Point, Published as Points, Row,
 };
+pub use lemonfiber_plugin::seeding::Form;
 pub use lemonfiber_plugin::vocabulary::{
     Capability, Constraint, Credential, Declared, Probe, ProbeKind, Published as Capabilities,
     Removed, Requirement, Unpublishable,

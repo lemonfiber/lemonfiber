@@ -293,6 +293,11 @@ async fn a_rehearsed_replacement_says_what_it_would_write_and_replaces_nothing()
         rotated.as_ref().is_some_and(|rotation| matches!(
             &rotation.settled,
             Settled::Rehearsed { detail, .. } if detail.contains("Nothing was replaced")
+                && detail.contains(&format!(
+                    "{} at the placeholder for secret upstream-key in the plain form, the \
+                     service's secrets file",
+                    starting_of(&ctx).display()
+                ))
         )),
         "{rotated:?}"
     );
@@ -401,4 +406,165 @@ async fn a_minted_key_nothing_holds_yet_is_said_to_be_minted_at_install() {
             && held.origin == crate::credential::Origin::Lemonfiber),
         "{held:?}"
     );
+}
+
+/// The journal entry that recorded writing the new key into the upstream's settings.
+fn seeded_in(ctx: &Ctx) -> Option<crate::journal::Change> {
+    journalled(ctx)
+        .into_iter()
+        .rfind(|change| matches!(change.kind, crate::journal::Kind::Seeded { .. }))
+}
+
+/// A context the seeded plugin is installed into and its minted key then replaced twice, a
+/// minute apart, so the second is a run of nothing but the replacement: the key it
+/// replaced and the one that replaced it.
+async fn replaced(name: &str) -> (Ctx, String, String) {
+    let (mut ctx, _) = installed(name).await;
+    ctx.seams.clock = lemonfiber_fixtures::ports::Stopped::into_today(60);
+    let _ = rotating(&ctx).await;
+    let before = minted(&ctx).unwrap_or_default();
+    ctx.seams.clock = lemonfiber_fixtures::ports::Stopped::into_today(120);
+    let _ = rotating(&ctx).await;
+    let after = minted(&ctx).unwrap_or_default();
+    (ctx, before, after)
+}
+
+#[tokio::test]
+async fn a_replacement_records_the_settings_file_it_wrote_by_a_checksum_alone() {
+    let (ctx, _, after) = replaced("seeded-recorded").await;
+
+    let path = starting_of(&ctx).display().to_string();
+    assert_eq!(
+        seeded_in(&ctx).map(|change| change.kind),
+        Some(crate::journal::Kind::Seeded {
+            path,
+            plugin: "komga".to_owned(),
+            secret: "upstream-key".to_owned(),
+            written: crate::materialised::checksum(settled(&after).as_bytes()),
+        })
+    );
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| read(&paths.journal()))
+        .unwrap_or_default();
+    assert!(!journal.is_empty() && !journal.contains(&after));
+}
+
+#[tokio::test]
+async fn a_replacement_put_back_writes_the_old_key_back_where_the_service_keeps_it() {
+    let (ctx, before, after) = replaced("seeded-reseeded").await;
+    assert_ne!(after, before);
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(reversal.is_ok(), "{reversal:?}");
+    assert_eq!(minted(&ctx), Some(before.clone()));
+    assert_eq!(read(&starting_of(&ctx)), settled(&before));
+    assert_eq!(
+        read(&stack_of(&ctx).join("config/komga-adapter/upstream.json")),
+        format!(r#"{{"api_key":"{before}"}}"#)
+    );
+}
+
+#[tokio::test]
+async fn a_settings_file_written_since_the_replacement_is_not_written_over_putting_it_back() {
+    let (ctx, _, after) = replaced("seeded-reseeded-since").await;
+    let since = format!("{}  theme: dark\n", settled(&after));
+    let _ = std::fs::write(starting_of(&ctx), &since);
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(
+        reversal.as_ref().err().is_some_and(|problem| problem
+            .meaning
+            .contains("written since lemonfiber wrote the new value")),
+        "{reversal:?}"
+    );
+    assert_eq!(read(&starting_of(&ctx)), since);
+    assert_eq!(minted(&ctx), Some(after));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_settings_file_that_became_a_link_is_not_written_through_putting_it_back() {
+    let (ctx, _, after) = replaced("seeded-reseeded-linked").await;
+    let elsewhere = lemonfiber_fixtures::scratch::Scratch::new("seeded-reseeded-elsewhere");
+    let target = elsewhere.path().join("application.yml");
+    let _ = std::fs::write(&target, settled(&after));
+    let _ = std::fs::remove_file(starting_of(&ctx));
+    let _ = std::os::unix::fs::symlink(&target, starting_of(&ctx));
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(
+        reversal
+            .as_ref()
+            .err()
+            .and_then(|problem| problem.detail.as_deref())
+            .is_some_and(|said| said.contains("reached through a link")),
+        "{reversal:?}"
+    );
+    assert_eq!(read(&target), settled(&after));
+}
+
+#[tokio::test]
+async fn a_settings_file_gone_since_the_replacement_is_left_gone_putting_it_back() {
+    let (ctx, before, _) = replaced("seeded-reseeded-gone").await;
+    let _ = std::fs::remove_file(starting_of(&ctx));
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(reversal.is_ok(), "{reversal:?}");
+    assert_eq!(minted(&ctx), Some(before));
+    assert!(!starting_of(&ctx).exists());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_settings_file_that_cannot_be_written_back_is_named_putting_it_back() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (ctx, _, after) = replaced("seeded-reseeded-unwritable").await;
+    let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o400));
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o600));
+
+    assert!(
+        reversal.as_ref().err().is_some_and(|problem| problem.code
+            == crate::error::codes::setup::NOT_REWOUND
+            && problem
+                .detail
+                .as_deref()
+                .is_some_and(|said| said.contains("application.yml"))),
+        "{reversal:?}"
+    );
+    assert_eq!(read(&starting_of(&ctx)), settled(&after));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_settings_file_whose_kept_starting_files_cannot_be_read_is_named_putting_it_back() {
+    let (ctx, _, after) = replaced("seeded-reseeded-unkept").await;
+    let kept = crate::app::plugins::kept::root(&ctx, "komga").unwrap_or_default();
+    let _ = std::os::unix::fs::symlink(
+        kept.join("config/komga/application.yml"),
+        kept.join("config/komga/linked.yml"),
+    );
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(
+        reversal
+            .as_ref()
+            .err()
+            .and_then(|problem| problem.detail.as_deref())
+            .is_some_and(|said| said.contains("no starting file may be either")),
+        "{reversal:?}"
+    );
+    assert_eq!(read(&starting_of(&ctx)), settled(&after));
 }

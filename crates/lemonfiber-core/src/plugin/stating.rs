@@ -18,12 +18,16 @@
 //! list [`super::placing::writes`] derives, so what an install would say can be put in
 //! front of a test without a stack directory under it.
 
+use std::path::Path;
+
+use lemonfiber_plugin::seeding::{placeholders, Form};
 use lemonfiber_plugin::{Manifest, Shape};
 use serde::Serialize;
 
 use super::claimed::Verdict;
 use super::installed::Installed;
-use super::placing::{Lands, Write};
+use super::placing::{configuration, Lands, Write};
+use super::seeding::Shipped;
 
 /// What an install puts at one path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -42,7 +46,7 @@ pub enum Puts {
     /// A service's own secrets file, readable by its owner alone, its values never shown.
     Secrets,
     /// A file the plugin ships for one of its services, written where none is yet; one
-    /// naming a secret is readable by its owner alone and shown with the secret's name.
+    /// naming a secret is readable by its owner alone and shown with its placeholders.
     Starting,
     /// The credentials an adapter reads its upstream's with, readable by its owner alone,
     /// their values never shown.
@@ -66,6 +70,93 @@ pub struct Changing {
     pub path: String,
     /// What lands there.
     pub puts: Puts,
+    /// Each placeholder the file as shipped names a secret by, in the order it holds them:
+    /// none for anything but a starting file naming a secret, and never a value.
+    pub placeholders: Vec<Placeholding>,
+}
+
+/// One placeholder a starting file names a secret by, as the plugin ships it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginPlaceholder")]
+pub struct Placeholding {
+    /// The secret it names, by its id.
+    pub secret: String,
+    /// The form its value is written in.
+    pub form: Form,
+}
+
+impl Placeholding {
+    /// The placeholder as it is named to an operator.
+    #[must_use]
+    pub fn named(&self) -> String {
+        lemonfiber_plugin::seeding::named(&self.secret, self.form)
+    }
+}
+
+/// Each placeholder `bytes` name a secret by, in the order they hold them; none where
+/// they are not text or a placeholder in them cannot be read.
+#[must_use]
+pub fn placeholding(bytes: &[u8]) -> Vec<Placeholding> {
+    std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|text| placeholders(text).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|placeholder| Placeholding {
+            secret: placeholder.secret.to_owned(),
+            form: placeholder.form,
+        })
+        .collect()
+}
+
+/// One starting file whose placeholders an update changes, as the version installed
+/// shipped it and as the one coming ships it: the placeholders alone, never what the
+/// file on the machine holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginReshipped")]
+pub struct Reshipping {
+    /// Where the file is, in full.
+    pub path: String,
+    /// Its placeholders as the version installed shipped it, none where it shipped none.
+    pub was: Vec<Placeholding>,
+    /// Its placeholders as the version coming ships it, none where it ships none.
+    pub becomes: Vec<Placeholding>,
+}
+
+/// Each starting file beneath `stack` whose placeholders differ between what the version
+/// installed shipped, `was`, and what the one coming ships, `becomes`, in path order.
+#[must_use]
+pub fn reshipped(stack: &Path, was: &[Shipped], becomes: &[Shipped]) -> Vec<Reshipping> {
+    let named = |files: &[Shipped]| -> std::collections::BTreeMap<String, Vec<Placeholding>> {
+        files
+            .iter()
+            .map(|file| {
+                (
+                    configuration(stack, &file.service)
+                        .join(&file.path)
+                        .display()
+                        .to_string(),
+                    placeholding(&file.bytes),
+                )
+            })
+            .collect()
+    };
+    let (was, becomes) = (named(was), named(becomes));
+    let mut paths: Vec<&String> = was.keys().chain(becomes.keys()).collect();
+    paths.sort();
+    paths.dedup();
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            let before = was.get(path).cloned().unwrap_or_default();
+            let after = becomes.get(path).cloned().unwrap_or_default();
+            (before != after).then(|| Reshipping {
+                path: path.clone(),
+                was: before,
+                becomes: after,
+            })
+        })
+        .collect()
 }
 
 /// One proof that has to hold before a plugin is reported installed.
@@ -220,6 +311,11 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
                 Lands::Secrets(_) => Puts::Secrets,
                 Lands::Starting { .. } => Puts::Starting,
                 Lands::Upstream { .. } => Puts::Upstream,
+            },
+            placeholders: if let Lands::Starting { bytes, .. } = &write.lands {
+                placeholding(bytes)
+            } else {
+                Vec::new()
             },
         })
         .collect()

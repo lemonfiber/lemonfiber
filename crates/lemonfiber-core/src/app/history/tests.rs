@@ -27,6 +27,22 @@ fn a_file_written_over_reads_as_which_file_it_was() {
     );
 }
 
+/// A starting file a replacement wrote reads as whose secret went into which file, never
+/// as what it holds.
+#[test]
+fn a_seeded_file_reads_as_whose_secret_went_into_which_file() {
+    assert_eq!(
+        did(&crate::journal::Kind::Seeded {
+            path: "/stack/config/komga/application.yml".to_owned(),
+            plugin: "komga".to_owned(),
+            secret: "upstream-key".to_owned(),
+            written: 0,
+        }),
+        "wrote the new value of komga's secret upstream-key into \
+         /stack/config/komga/application.yml"
+    );
+}
+
 /// State moved into a mount tree, and a volume copied into one, read as what they were.
 #[test]
 fn a_move_and_a_copy_read_as_where_each_went() {

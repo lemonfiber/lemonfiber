@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "becomes": {
+      "type": [
+        "array[ref:PluginPlaceholder]"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "was": {
+      "type": [
+        "array[ref:PluginPlaceholder]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -25,6 +25,7 @@ use super::Ctx;
 mod carried;
 mod journal;
 mod refusing;
+mod reseeding;
 
 use refusing::Fault;
 
@@ -179,7 +180,8 @@ pub(crate) fn carrying_out(
 }
 
 /// Every secrets file that reads a secret or setting `carried` put back, written again
-/// with the value it holds now.
+/// with the value it holds now, and every starting file it put back given the value its
+/// secret holds now.
 ///
 /// # Errors
 ///
@@ -195,6 +197,17 @@ pub(crate) fn reheld(ctx: &Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
         _ => None,
     }) {
         crate::settings::files::reread_now(ctx, &holding)?;
+    }
+    for undo in &carried.done {
+        if let Action::Reseed {
+            path,
+            plugin,
+            secret,
+            written,
+        } = &undo.action
+        {
+            reseeding::reseeded(ctx, path, plugin, secret, *written)?;
+        }
     }
     Ok(())
 }
@@ -229,7 +242,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         Action::Delete { path } => remove(Path::new(path)),
         Action::MoveBack { from, to } => moved_back(confined, Path::new(from), Path::new(to)),
         Action::RenameBack { from, to } => renamed_back(env_file, from, to),
-        Action::KeepCopy { .. } => Ok(Step::Done),
+        Action::KeepCopy { .. } | Action::Reseed { .. } => Ok(Step::Done),
         Action::Withdraw {
             path,
             key,

@@ -144,6 +144,21 @@ async fn a_rehearsal_states_the_seeded_files_and_mints_nothing() {
         crate::plugin::Puts::Starting,
         "config/komga/application.yml"
     ));
+    assert_eq!(
+        changes
+            .iter()
+            .filter(|change| change.puts == crate::plugin::Puts::Starting)
+            .map(|change| change
+                .placeholders
+                .iter()
+                .map(crate::plugin::Placeholding::named)
+                .collect::<Vec<_>>())
+            .collect::<Vec<_>>(),
+        vec![
+            vec!["the placeholder for secret upstream-key in the plain form".to_owned()],
+            Vec::new(),
+        ]
+    );
     assert!(stated(
         crate::plugin::Puts::Upstream,
         "config/komga-adapter/upstream.json"
@@ -169,7 +184,9 @@ async fn a_starting_file_naming_a_secret_the_plugin_does_not_hold_is_refused_bef
     assert_eq!(code, Some(crate::error::codes::plugin::REFUSED.to_string()));
     assert!(
         said.contains("config/komga/application.yml")
-            && said.contains("names the secret nobody, which no [[secret]]"),
+            && said.contains(
+                "the placeholder for secret nobody in the plain form, whose secret no [[secret]]"
+            ),
         "{said}"
     );
     assert_eq!(minted(&ctx), None);
@@ -302,9 +319,9 @@ fn a_seeded_write_naming_a_secret_nothing_holds_writes_nothing() {
     );
 
     assert!(
-        starting
-            .as_deref()
-            .is_some_and(|said| said.contains("nobody, which nothing holds")),
+        starting.as_deref().is_some_and(
+            |said| said.contains("secret nobody in the plain form, whose secret nothing holds")
+        ),
         "{starting:?}"
     );
     assert!(

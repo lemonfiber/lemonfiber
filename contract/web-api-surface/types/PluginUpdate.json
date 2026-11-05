@@ -24,6 +24,12 @@
       ],
       "required": true
     },
+    "reshipped": {
+      "type": [
+        "array[ref:PluginReshipped]"
+      ],
+      "required": true
+    },
     "restored": {
       "type": [
         "anyOf(null,ref:PluginRestored)"

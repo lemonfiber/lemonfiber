@@ -504,6 +504,30 @@ fn a_file_written_over_is_said_as_written_back() {
     );
 }
 
+/// A starting file a replacement wrote reads as given the old value back, naming the
+/// secret and the file and never the value.
+#[test]
+fn a_seeded_file_put_back_is_said_by_its_secret_and_its_file() {
+    let undos = vec![Undo {
+        target: "/stack/config/komga/application.yml".to_owned(),
+        action: Action::Reseed {
+            path: "/stack/config/komga/application.yml".to_owned(),
+            plugin: "komga".to_owned(),
+            secret: "upstream-key".to_owned(),
+            written: 0,
+        },
+    }];
+
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+
+    assert!(
+        said.contains(
+            "the old value of upstream-key written back into /stack/config/komga/application.yml"
+        ),
+        "{said}"
+    );
+}
+
 #[test]
 fn a_device_key_put_back_is_said_by_its_name() {
     let undos = vec![
