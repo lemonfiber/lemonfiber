@@ -163,7 +163,7 @@ async fn an_adapter_that_speaks_otherwise_or_cannot_be_reached_is_not_installed(
 async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
     let told = about(r#"["media.serve@1"]"#, UPSTREAM);
     let http = Fake::by_path_in_turn(vec![
-        turned(crate::test_support::media::declares()),
+        turned(declares()),
         (
             "/api/v1/libraries",
             vec![lemonfiber_fixtures::http::Answer::reply(200, "[]")],
@@ -267,7 +267,7 @@ fn claiming() -> String {
 fn claimed_as(name: &str, claimed: lemonfiber_fixtures::http::Answer) -> Ctx {
     let refused = || lemonfiber_fixtures::http::Answer::reply(401, "");
     let http = Fake::by_path(vec![
-        crate::test_support::media::declares(),
+        declares(),
         (
             "/api/v1/libraries",
             lemonfiber_fixtures::http::Answer::reply(200, "[]"),
@@ -352,7 +352,7 @@ async fn an_install_whose_part_stays_open_for_want_of_its_code_says_so_naming_th
         )]
     };
     let http = Fake::by_path_in_turn(vec![
-        turned(crate::test_support::media::declares()),
+        turned(declares()),
         ("/api/v1/libraries", reply(200, "[]")),
         (
             "/lemonfiber/adapter/v1/about",
@@ -403,7 +403,7 @@ async fn an_install_whose_claim_is_taken_on_restart_starts_the_upstream_again_an
         )]
     };
     let http = Fake::by_path_in_turn(vec![
-        turned(crate::test_support::media::declares()),
+        turned(declares()),
         ("/api/v1/libraries", reply(200, "[]")),
         (
             "/lemonfiber/adapter/v1/about",
@@ -458,7 +458,7 @@ async fn an_adapter_handed_a_captured_secret_is_given_it_once_the_recipe_capture
         lemonfiber_fixtures::http::Answer::reply(401, ""),
     )
     .with_http(Fake::by_path(vec![
-        crate::test_support::media::declares(),
+        declares(),
         (
             "/api/v1/libraries",
             lemonfiber_fixtures::http::Answer::reply(200, "[]"),
@@ -568,4 +568,13 @@ fn turned(
     (at, answer): (&'static str, lemonfiber_fixtures::http::Answer),
 ) -> (&'static str, Vec<lemonfiber_fixtures::http::Answer>) {
     (at, vec![answer])
+}
+
+/// Where a media server's declaration is asked, answered with one a guard can enforce, as
+/// an install asks it of an adapter speaking `media.serve`.
+pub(super) fn declares() -> (&'static str, lemonfiber_fixtures::http::Answer) {
+    (
+        crate::test_support::media::serve("declared"),
+        crate::test_support::media::answered(&lemonfiber_fixtures::declaring::enforceable()),
+    )
 }
