@@ -538,7 +538,7 @@ fn a_copy_naming_a_secret_is_refused_where_the_machine_supplies_no_random_bytes(
     );
     assert!(refused
         .as_ref()
-        .is_err_and(|why| why.contains("which nothing holds")));
+        .is_err_and(|why| why.contains("whose secret nothing holds")));
 }
 
 #[test]

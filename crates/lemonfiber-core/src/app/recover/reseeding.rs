@@ -5,29 +5,28 @@
 //! holds it again once its own change is put back, and the shipped file says which line
 //! it stands on.
 
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use crate::error::Problem;
 use crate::ports::filesystem::{Beneath, Readable};
 
 use super::refusing::Fault;
-use super::{Ctx, Step};
+use super::Ctx;
 
-/// What the starting file at `path` comes to: put back where it still holds what was
-/// written, its checksum `written`, or nothing to do where it is gone, and somebody's
-/// own where it holds anything else.
-pub(super) fn unseeded(path: &Path, written: u32) -> Result<Step, Fault> {
-    match std::fs::read(path) {
-        Ok(holds) if crate::materialised::checksum(&holds) == written => Ok(Step::Done),
-        Ok(_) => Ok(Step::TheirsNow(path.display().to_string())),
-        Err(why) if why.kind() == std::io::ErrorKind::NotFound => Ok(Step::Done),
-        Err(why) => Err(not_rewound(path, why.to_string())),
-    }
-}
+/// What is said of a starting file reached through a link.
+const LINKED: &str = "it is reached through a link";
+
+/// What is said where the file as the plugin shipped it is no longer kept.
+const UNKEPT: &str = "the file as its plugin shipped it is no longer kept, so where the value \
+     stands in it cannot be found";
+
+/// What is said where the secret store holds no value of the secret to write back.
+const UNHELD: &str = "the secret store holds no value of its secret to write back";
 
 /// The starting file at `path` written with the value the secret store holds of
 /// `plugin`'s `secret` where the shipped file puts its placeholder, while it still holds
-/// what was written, its checksum `written`.
+/// what was written, its checksum `written`; nothing where it is gone or holds anything
+/// else.
 ///
 /// # Errors
 ///
@@ -40,54 +39,66 @@ pub(super) fn reseeded(
     written: u32,
 ) -> Result<(), Box<Problem>> {
     let at = Path::new(path);
-    let refused = |reason: String| Box::new(not_rewound(at, reason).problem());
-    let Some((stack, kept)) =
-        crate::app::project::directory(ctx).zip(crate::app::plugins::kept::root(ctx, plugin))
-    else {
-        return Ok(());
+    let refused = |reason: String| {
+        Box::new(
+            Fault::NotRewound {
+                path: at.to_path_buf(),
+                reason,
+            }
+            .problem(),
+        )
     };
-    let Some((service, file)) = beneath(&stack, at) else {
-        return Ok(());
-    };
-    let current = match ctx.seams.confined.read(at, &stack) {
-        Beneath::Read(text) => text,
-        Beneath::Absent => return Ok(()),
-        Beneath::Escaped => return Err(refused("it is reached through a link".to_owned())),
-    };
-    let value = crate::settings::Stores::of(ctx)
-        .secrets
-        .value(&crate::settings::named(plugin, secret))
-        .map(str::to_owned);
-    let shipped = crate::plugin::program::shipped(Some(crate::plugin::program::Starting {
-        root: &kept,
-        service: &service,
-    }))
-    .map_err(&refused)?;
-    let template = shipped
-        .into_iter()
-        .find_map(|(named, bytes)| (Path::new(&named) == file).then_some(bytes));
-    let (Some(value), Some(template)) = (value, template) else {
-        return Ok(());
-    };
-    if crate::materialised::checksum(current.as_bytes()) != written {
-        return Ok(());
-    }
-    let replaced = crate::plugin::seeding::replaced(
-        &template,
-        current.as_bytes(),
-        secret,
-        &value,
-        ctx.seams.random.as_ref(),
-    )
-    .map_err(&refused)?;
-    match replaced {
-        Some(bytes) => ctx
+    match rewritten(ctx, at, (plugin, secret), written) {
+        Some(Ok((stack, bytes))) => ctx
             .seams
             .confined
             .written(at, &stack, &bytes, Readable::Owner)
             .map_err(|fault| refused(fault.message)),
+        Some(Err(reason)) => Err(refused(reason)),
         None => Ok(()),
     }
+}
+
+/// What the starting file at `at` holds once `plugin`'s `secret` is written back into it,
+/// and the stack it lies beneath: nothing where there is no stack, it is gone or it holds
+/// other than what was written, and why where it cannot be worked out.
+fn rewritten(
+    ctx: &Ctx,
+    at: &Path,
+    (plugin, secret): (&str, &str),
+    written: u32,
+) -> Option<Result<(PathBuf, Vec<u8>), String>> {
+    let stack = crate::app::project::directory(ctx)?;
+    let kept = crate::app::plugins::kept::root(ctx, plugin)?;
+    let (service, file) = beneath(&stack, at)?;
+    let current = match ctx.seams.confined.read(at, &stack) {
+        Beneath::Read(text) => text,
+        Beneath::Absent => return None,
+        Beneath::Escaped => return Some(Err(LINKED.to_owned())),
+    };
+    (crate::materialised::checksum(current.as_bytes()) == written).then_some(())?;
+    let value = crate::settings::Stores::of(ctx)
+        .secrets
+        .value(&crate::settings::named(plugin, secret))
+        .map(str::to_owned);
+    let starting = crate::plugin::program::Starting {
+        root: &kept,
+        service: &service,
+    };
+    let rewritten = crate::plugin::program::shipped(Some(starting))
+        .and_then(|shipped| {
+            shipped
+                .into_iter()
+                .find_map(|(named, bytes)| (Path::new(&named) == file).then_some(bytes))
+                .ok_or_else(|| UNKEPT.to_owned())
+        })
+        .and_then(|template| {
+            let value = value.ok_or_else(|| UNHELD.to_owned())?;
+            let random = ctx.seams.random.as_ref();
+            crate::plugin::seeding::replaced(&template, current.as_bytes(), secret, &value, random)
+        })
+        .map(|bytes| (stack, bytes.unwrap_or_else(|| current.into_bytes())));
+    Some(rewritten)
 }
 
 /// The service whose configuration directory beneath `stack` holds `at`, and where it is
@@ -97,16 +108,9 @@ fn beneath<'a>(stack: &Path, at: &'a Path) -> Option<(String, &'a Path)> {
         .strip_prefix(stack.join(crate::project::entry::CONFIGURATION_TREE))
         .ok()?;
     let mut components = within.components();
-    let Some(Component::Normal(service)) = components.next() else {
-        return None;
-    };
-    Some((service.to_str()?.to_owned(), components.as_path()))
-}
-
-/// What is said of the starting file at `path` that could not be written back, and why.
-fn not_rewound(path: &Path, reason: String) -> Fault {
-    Fault::NotRewound {
-        path: path.to_path_buf(),
-        reason,
-    }
+    let service = Some(components.next()?).filter(|first| matches!(first, Component::Normal(_)))?;
+    Some((
+        service.as_os_str().to_str()?.to_owned(),
+        components.as_path(),
+    ))
 }

@@ -242,7 +242,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         Action::Delete { path } => remove(Path::new(path)),
         Action::MoveBack { from, to } => moved_back(confined, Path::new(from), Path::new(to)),
         Action::RenameBack { from, to } => renamed_back(env_file, from, to),
-        Action::KeepCopy { .. } => Ok(Step::Done),
+        Action::KeepCopy { .. } | Action::Reseed { .. } => Ok(Step::Done),
         Action::Withdraw {
             path,
             key,
@@ -272,7 +272,6 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             previous,
             written,
         } => rewind(Path::new(path), previous, *written, env_file),
-        Action::Reseed { path, written, .. } => reseeding::unseeded(Path::new(path), *written),
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
         // reversal that took the second for an ordinary setting would write the field's

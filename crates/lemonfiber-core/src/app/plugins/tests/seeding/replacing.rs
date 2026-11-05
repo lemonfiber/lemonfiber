@@ -508,3 +508,16 @@ async fn a_settings_file_that_became_a_link_is_not_written_through_putting_it_ba
     );
     assert_eq!(read(&target), settled(&after));
 }
+
+#[tokio::test]
+async fn a_settings_file_gone_since_the_replacement_is_left_gone_putting_it_back() {
+    let (ctx, before, _) = replaced("seeded-reseeded-gone").await;
+    let _ = std::fs::remove_file(starting_of(&ctx));
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(reversal.is_ok(), "{reversal:?}");
+    assert_eq!(minted(&ctx), Some(before));
+    assert!(!starting_of(&ctx).exists());
+}

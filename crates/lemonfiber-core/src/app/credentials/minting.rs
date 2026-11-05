@@ -166,35 +166,21 @@ async fn replaced(
         Ok(files) => files,
         Err(detail) => return refused(detail),
     };
-    let stamp = ctx.stamp();
-    if let Err(detail) = held_anew(ctx, installed, secret, &value, &stamp) {
+    if let Err(detail) = held_anew(ctx, installed, (secret, &value), &files) {
         return refused(detail);
     }
-    let mut consumers = Vec::new();
-    let mut seeded = Vec::new();
-    for (service, path, bytes) in &files {
-        let written = ctx
-            .seams
-            .confined
-            .written(path, &stack, bytes, Readable::Owner)
-            .err()
-            .map(|fault| fault.message);
-        if written.is_none() {
-            seeded.push(Change {
-                at: stamp.clone(),
-                operation: crate::plugin::owner(&installed.plugin),
-                target: path.display().to_string(),
-                kind: Kind::Seeded {
-                    path: path.display().to_string(),
-                    plugin: installed.plugin.clone(),
-                    secret: secret.to_owned(),
-                    written: crate::materialised::checksum(bytes),
-                },
-            });
-        }
-        consumers.push(reached(service, written));
-    }
-    consumers.extend(recorded(ctx, &seeded));
+    let mut consumers: Vec<Propagation> = files
+        .iter()
+        .map(|(service, path, bytes)| {
+            let written = ctx
+                .seams
+                .confined
+                .written(path, &stack, bytes, Readable::Owner)
+                .err()
+                .map(|fault| fault.message);
+            reached(service, written)
+        })
+        .collect();
     let setting = crate::settings::named(&installed.plugin, secret);
     let (readers, unwritten) = read_anew(ctx, installed, &setting);
     consumers.extend(
@@ -358,39 +344,22 @@ fn rewritten(
     Ok(files)
 }
 
-/// What journalling the starting files `seeded` names came to: nothing where they are
-/// recorded, and why putting the replacement back will leave them where they are not.
-fn recorded(ctx: &Ctx, seeded: &[Change]) -> Option<Propagation> {
-    if seeded.is_empty() {
-        return None;
-    }
-    let why = match crate::app::targets::layout(ctx) {
-        Some(paths) => crate::app::recover::journalled(&paths.journal(), seeded).err()?,
-        None => crate::config::store::Failure::Nowhere,
-    };
-    Some(Propagation::pending(
-        "the journal",
-        &format!(
-            "the settings files it wrote are not recorded, so putting the replacement back \
-             leaves them holding the new value: {why}"
-        ),
-    ))
-}
-
-/// Hold `value` as `installed`'s `secret`, journalled at `stamp` by the fingerprints of the
-/// value it replaces and of itself.
+/// Hold `value` as `installed`'s `secret`, journalled by the fingerprints of the value it
+/// replaces and of itself, with each of `files` about to be written with it, by its
+/// checksum alone, so the record of every file stands before the file is written.
 fn held_anew(
     ctx: &Ctx,
     installed: &Installed,
-    secret: &str,
-    value: &str,
-    stamp: &str,
+    (secret, value): (&str, &str),
+    files: &[(String, PathBuf, Vec<u8>)],
 ) -> Result<(), String> {
     let at = crate::settings::secrets_at(ctx)
         .zip(crate::app::targets::layout(ctx))
         .ok_or_else(|| crate::config::store::Failure::Nowhere.to_string())?;
     let (secrets, paths) = at;
     let name = crate::settings::named(&installed.plugin, secret);
+    let stamp = ctx.stamp();
+    let operation = crate::plugin::owner(&installed.plugin);
     let keeping = [crate::settings::Keeping {
         name: &name,
         value,
@@ -398,11 +367,22 @@ fn held_anew(
         at: ctx.seconds(),
     }];
     crate::settings::kept(&secrets, &keeping, ctx.seams.random.as_ref(), &|replaced| {
+        let seeded = files.iter().map(|(_, path, bytes)| Change {
+            at: stamp.clone(),
+            operation: operation.clone(),
+            target: path.display().to_string(),
+            kind: Kind::Seeded {
+                path: path.display().to_string(),
+                plugin: installed.plugin.clone(),
+                secret: secret.to_owned(),
+                written: crate::materialised::checksum(bytes),
+            },
+        });
         let changes: Vec<Change> = replaced
             .iter()
             .map(|one| Change {
-                at: stamp.to_owned(),
-                operation: crate::plugin::owner(&installed.plugin),
+                at: stamp.clone(),
+                operation: operation.clone(),
                 target: one.name.clone(),
                 kind: Kind::Secret {
                     name: one.name.clone(),
@@ -412,6 +392,7 @@ fn held_anew(
                     filed: None,
                 },
             })
+            .chain(seeded)
             .collect();
         crate::app::recover::journalled(&paths.journal(), &changes)
     })
