@@ -21,12 +21,34 @@ fn shipped(
         .unwrap_or_default()
 }
 
-/// The stack with its media server and request service moved into their plugins.
+/// The stack with its media server, request service and request gate moved into their
+/// plugins.
 fn moved() -> Vec<Installed> {
     crate::test_support::media::moved()
         .into_iter()
         .chain(crate::test_support::requests::REQUESTS.installed())
+        .chain(the_gate())
         .collect()
+}
+
+/// The request gate, moved into its plugin as the bundle pins it.
+fn the_gate() -> Option<Installed> {
+    crate::test_support::guards::GATE.installed()
+}
+
+/// [`the_gate`], its ask of the identity source naming `native` as the API it talks in.
+fn the_gate_asking_in(native: Option<&str>) -> Option<Installed> {
+    the_gate().map(|mut gate| {
+        for ask in gate
+            .services
+            .iter_mut()
+            .flat_map(|placed| placed.asks.iter_mut())
+            .filter(|ask| ask.capability == super::IDENTITY)
+        {
+            ask.native = native.map(str::to_owned);
+        }
+        gate
+    })
 }
 
 /// A moved server is asked at its adapter and served under the stack's names: its id,
@@ -179,16 +201,16 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
     );
 }
 
-/// A contracted media server whose upstream answers in the API the request gate speaks is
+/// A contracted media server whose upstream answers in the API the request gate asks in is
 /// routed to at that upstream, forwarding to the upstream's majors, never at its adapter.
 #[test]
 fn the_gate_routes_to_a_contracted_servers_upstream_where_it_speaks_its_api() {
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
-    let fillers = shipped(
-        &[a_contracted_media_server(Some(ApiKind::Jellyfin.name()))],
-        &chosen,
-        |_| (),
-    );
+    let installed: Vec<Installed> = [a_contracted_media_server(Some(ApiKind::Jellyfin.name()))]
+        .into_iter()
+        .chain(the_gate())
+        .collect();
+    let fillers = shipped(&installed, &chosen, |_| ());
     let server = MediaServer::of(&fillers);
 
     assert_eq!(
@@ -202,16 +224,16 @@ fn the_gate_routes_to_a_contracted_servers_upstream_where_it_speaks_its_api() {
 
 /// A contracted media server is spoken to over its contracts alone, and another service
 /// signs the household in through the upstream its adapter fronts, in the API that
-/// upstream names; the request gate, which speaks no API of that name, answers no route
-/// for it.
+/// upstream names; the request gate, which asks the identity source in no API of that
+/// name, answers no route for it.
 #[test]
 fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream() {
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
-    let fillers = shipped(
-        &[a_contracted_media_server(Some("upstream"))],
-        &chosen,
-        |_| (),
-    );
+    let installed: Vec<Installed> = [a_contracted_media_server(Some("upstream"))]
+        .into_iter()
+        .chain(the_gate())
+        .collect();
+    let fillers = shipped(&installed, &chosen, |_| ());
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_UPSTREAM));
@@ -391,4 +413,25 @@ fn a_contracted_servers_password_is_handed_to_its_adapter() {
     assert_eq!(mode.ok(), Some(0o600));
     assert!(nowhere.is_some_and(|recorded| recorded.is_err()));
     assert!(unwritten.is_some_and(|recorded| recorded.is_err()));
+}
+
+/// The request gate answers a route only in the API its ask of the identity source names:
+/// none where it names none or another, and none where the stack's own gate runs, whose
+/// asks are its plugin's to make.
+#[test]
+fn the_gate_routes_only_in_the_api_its_ask_names() {
+    let routed = |gate: Option<Installed>| {
+        let installed: Vec<Installed> = crate::test_support::media::moved()
+            .into_iter()
+            .chain(crate::test_support::requests::REQUESTS.installed())
+            .chain(gate)
+            .collect();
+        MediaServer::of(&shipped(&installed, &Chosen::default(), |_| ()))
+            .is_some_and(|server| server.gates())
+    };
+
+    assert!(routed(the_gate_asking_in(Some(ApiKind::Jellyfin.name()))));
+    assert!(!routed(the_gate_asking_in(None)));
+    assert!(!routed(the_gate_asking_in(Some("plex"))));
+    assert!(!routed(None));
 }

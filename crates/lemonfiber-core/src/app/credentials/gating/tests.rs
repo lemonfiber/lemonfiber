@@ -285,15 +285,19 @@ async fn a_key_not_there_yet_or_a_gate_not_asked_is_absent_and_says_how_to_get_o
         gate(None),
         serving((200, "fresh"), &["kept"], 204, 204),
     );
-    let unfilled = held(&ctx, &stack(true), &filling(stack(false), Some(&at))).await;
     let unreached = held(&ctx, &stack(true), &filling(stack(true), None)).await;
+    let unfilled = held(&ctx, &stack(true), &filling(stack(false), Some(&at))).await;
 
-    for listed in [Some(listed(&ctx, &at).await), unfilled, unreached] {
+    for listed in [Some(listed(&ctx, &at).await), unreached] {
         assert_eq!(listed.as_ref().map(|one| one.state), Some(State::Absent));
         assert!(listed
             .and_then(|one| one.advisory)
             .is_some_and(|said| said.contains("lemonfiber seed")));
     }
+    assert_eq!(
+        unfilled, None,
+        "nothing fills the gate, so nothing routes the server"
+    );
 }
 
 #[tokio::test]

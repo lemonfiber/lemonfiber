@@ -58,7 +58,9 @@ mod gating;
 pub(crate) mod syncing;
 pub(crate) use contracting::{contracted_context, declined, gated};
 pub(crate) use declining::{a_contracted_decline, DECLINE_TRUSTED};
-pub(crate) use gating::{a_contracted_gate, unaskable_gates, GATE_TRUSTED};
+pub(crate) use gating::{
+    a_contracted_gate, asking_the_server_as_the_gate, unaskable_gates, GATE_TRUSTED,
+};
 
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.
 ///

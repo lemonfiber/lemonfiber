@@ -28,31 +28,32 @@ use crate::seed::{State, Wiring};
 /// What the report calls this connection.
 const CONNECTION: &str = "The request gate's routes";
 
-/// Hold the gate to a route for each fulfilling curator and, where it speaks the media
-/// server's API, one for the media server under a key of its own — or, where the stack no
-/// longer runs the gate, to no key at all.
+/// Hold the gate to a route for each fulfilling curator and, where it asks the media
+/// server in the API the server is paired in and may hold its key, one for the media
+/// server under a key of its own — or, where it cannot route the server, to no key at all.
 pub(super) async fn seed_gate_routes(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     server: Option<&MediaServer>,
 ) -> Vec<Wiring> {
-    let routed = server.and_then(|server| server.gated().map(|pairing| (server, pairing)));
-    match routed {
-        Some((server, pairing)) if gating::may_hold(fillers, server.filler.holder()) => {
+    let Some(server) = server else {
+        return curators_alone(ctx, services, fillers).await;
+    };
+    match server.gated() {
+        Some(pairing) if gating::may_hold(fillers, server.filler.holder()) => {
             with_the_media_server(ctx, services, fillers, (server, pairing)).await
         }
-        Some((server, _)) => {
+        _ => {
             let mut wirings = curators_alone(ctx, services, fillers).await;
             wirings.extend(withheld(ctx, server).await);
             wirings
         }
-        None => curators_alone(ctx, services, fillers).await,
     }
 }
 
-/// Every key filed under the gate's name in `server`, revoked: the service filling
-/// `request.gate` is not one the server's credentials may be handed to, so nothing holds
+/// Every key filed under the gate's name in `server`, revoked: no gate routes the server,
+/// or the one filling `request.gate` may not be handed its credentials, so nothing holds
 /// them.
 async fn withheld(ctx: &Ctx, server: &MediaServer) -> Option<Wiring> {
     let client = server.administering(ctx).await?;
