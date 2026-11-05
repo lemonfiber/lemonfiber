@@ -20,6 +20,7 @@
         "const:\"remove\"",
         "const:\"rename-back\"",
         "const:\"repin\"",
+        "const:\"reseed\"",
         "const:\"resettle\"",
         "const:\"restore\"",
         "const:\"revoke\"",
@@ -134,6 +135,12 @@
       ],
       "required": true
     },
+    "secret": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "service": {
       "type": [
         "string"
@@ -184,6 +191,7 @@
     "\"remove\"",
     "\"rename-back\"",
     "\"repin\"",
+    "\"reseed\"",
     "\"resettle\"",
     "\"restore\"",
     "\"revoke\"",

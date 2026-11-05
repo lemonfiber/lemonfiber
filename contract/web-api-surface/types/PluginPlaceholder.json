@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "form": {
+      "type": [
+        "ref:PluginPlaceholderForm"
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

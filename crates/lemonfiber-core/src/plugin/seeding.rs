@@ -20,6 +20,7 @@ use lemonfiber_ports::random::Random;
 
 use super::placing::{configuration, Lands, Write};
 use super::program::{shipped as held, Starting};
+use super::stating::placeholding;
 
 /// How many random bytes a minted secret is made of, each written as two of its
 /// [`MINTED_HEX`] hexadecimal digits.
@@ -164,7 +165,7 @@ fn covered(manifest: &Manifest, shipped: &[Shipped]) -> Vec<Violation> {
 fn crowded(shipped: &[Shipped]) -> Vec<Violation> {
     let mut counted: BTreeMap<&str, usize> = BTreeMap::new();
     for file in shipped {
-        *counted.entry(&file.service).or_default() += named(&file.bytes);
+        *counted.entry(&file.service).or_default() += placeholding(&file.bytes).len();
     }
     counted
         .into_iter()
@@ -179,21 +180,10 @@ fn crowded(shipped: &[Shipped]) -> Vec<Violation> {
         .collect()
 }
 
-/// How many placeholders `bytes` hold, none where they are not text or cannot be read.
-fn named(bytes: &[u8]) -> usize {
-    std::str::from_utf8(bytes)
-        .ok()
-        .and_then(|text| placeholders(text).ok())
-        .map_or(0, |named| named.len())
-}
-
 /// Whether `bytes` name a secret, and so are written with its value, owner-only.
 #[must_use]
 pub fn seeded(bytes: &[u8]) -> bool {
-    std::str::from_utf8(bytes)
-        .ok()
-        .and_then(|text| placeholders(text).ok())
-        .is_some_and(|named| !named.is_empty())
+    !placeholding(bytes).is_empty()
 }
 
 /// A write for each shipped file whose place in the stack `present` does not already hold.
@@ -371,12 +361,8 @@ pub(crate) fn written(
         _ => return Ok(bytes.to_vec()),
     };
     filled(text, |placeholder| {
-        let held = value(placeholder.secret).ok_or_else(|| {
-            format!(
-                "a placeholder names the secret {}, which nothing holds",
-                placeholder.secret
-            )
-        })?;
+        let held = value(placeholder.secret)
+            .ok_or_else(|| format!("{}, whose secret nothing holds", placeholder.named()))?;
         match placeholder.form {
             Form::Plain => Ok(held),
             Form::Pbkdf2 => hashed(&held, random).ok_or_else(|| UNMINTED.to_owned()),
@@ -425,8 +411,8 @@ pub(crate) fn replaced(
             .unwrap_or_default();
         if before.trim().is_empty() && after.trim().is_empty() {
             return Err(format!(
-                "the placeholder for {secret} stands alone on its line, so nothing finds where its \
-                 value is now"
+                "{} stands alone on its line, so nothing finds where its value is now",
+                placeholder.named()
             ));
         }
         let written = match placeholder.form {

@@ -303,18 +303,22 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
                 Changing {
                     path: key.to_owned(),
                     puts: Puts::Key,
+                    placeholders: Vec::new(),
                 },
                 Changing {
                     path: "/home/op/.config/lemonfiber/env/komga.env".to_owned(),
                     puts: Puts::Secrets,
+                    placeholders: Vec::new(),
                 },
                 Changing {
                     path: "/opt/lemonfiber/stack/config/komga/application.yml".to_owned(),
                     puts: Puts::Starting,
+                    placeholders: Vec::new(),
                 },
                 Changing {
                     path: "/opt/lemonfiber/stack/config/komga-adapter/upstream.json".to_owned(),
                     puts: Puts::Upstream,
+                    placeholders: Vec::new(),
                 },
             ],
             ..install(one, false)

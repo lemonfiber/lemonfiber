@@ -25,6 +25,7 @@ use super::Ctx;
 mod carried;
 mod journal;
 mod refusing;
+mod reseeding;
 
 use refusing::Fault;
 
@@ -179,7 +180,8 @@ pub(crate) fn carrying_out(
 }
 
 /// Every secrets file that reads a secret or setting `carried` put back, written again
-/// with the value it holds now.
+/// with the value it holds now, and every starting file it put back given the value its
+/// secret holds now.
 ///
 /// # Errors
 ///
@@ -195,6 +197,17 @@ pub(crate) fn reheld(ctx: &Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
         _ => None,
     }) {
         crate::settings::files::reread_now(ctx, &holding)?;
+    }
+    for undo in &carried.done {
+        if let Action::Reseed {
+            path,
+            plugin,
+            secret,
+            written,
+        } = &undo.action
+        {
+            reseeding::reseeded(ctx, path, plugin, secret, *written)?;
+        }
     }
     Ok(())
 }
@@ -259,6 +272,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             previous,
             written,
         } => rewind(Path::new(path), previous, *written, env_file),
+        Action::Reseed { path, written, .. } => reseeding::unseeded(Path::new(path), *written),
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
         // reversal that took the second for an ordinary setting would write the field's

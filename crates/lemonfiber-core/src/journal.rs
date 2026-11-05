@@ -128,6 +128,22 @@ pub enum Kind {
         /// The checksum of what was written in its place.
         written: u32,
     },
+    /// A starting file a plugin's service reads one of its minted secrets from was written
+    /// with a new value of it. Undoing writes the value the secret store holds back where
+    /// the shipped file puts the placeholder.
+    ///
+    /// Only while the file still holds what was written, kept here as a checksum, and never
+    /// what it held: the file holds the secret.
+    Seeded {
+        /// The file that was written.
+        path: String,
+        /// The plugin the secret is of.
+        plugin: String,
+        /// The secret, by its id.
+        secret: String,
+        /// The checksum of what was written.
+        written: u32,
+    },
     /// A service's state was moved from one path to another, beneath the project
     /// directory. Undoing moves it back, only where nothing has taken its old place.
     Moved {

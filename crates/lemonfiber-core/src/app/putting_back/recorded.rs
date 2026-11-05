@@ -116,6 +116,7 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::Copied { .. }
         | Kind::Region { .. }
         | Kind::Rewritten { .. }
+        | Kind::Seeded { .. }
         | Kind::Pinned { .. }
         | Kind::KeyRevoked { .. }
         | Kind::DeviceKeyRevoked { .. }

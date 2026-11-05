@@ -13,6 +13,38 @@ impl Action {
         }
     }
 
+    /// Take `owner`'s region out of `path`, recorded under `key`, where it still holds what
+    /// was written, its checksum `written`.
+    fn withdraw(path: &str, key: &str, owner: &str, written: u32) -> Self {
+        Self::Withdraw {
+            path: path.to_owned(),
+            key: key.to_owned(),
+            owner: owner.to_owned(),
+            written,
+        }
+    }
+
+    /// Write `previous` back into `path`, where it still holds what was written, its
+    /// checksum `written`.
+    fn rewind(path: &str, previous: &str, written: u32) -> Self {
+        Self::Rewind {
+            path: path.to_owned(),
+            previous: previous.to_owned(),
+            written,
+        }
+    }
+
+    /// Write the value the store holds of `plugin`'s `secret` back into `path`, where it
+    /// still holds what was written, its checksum `written`.
+    fn reseed(path: &str, plugin: &str, secret: &str, written: u32) -> Self {
+        Self::Reseed {
+            path: path.to_owned(),
+            plugin: plugin.to_owned(),
+            secret: secret.to_owned(),
+            written,
+        }
+    }
+
     /// Start `service` where `running`, and stop it otherwise.
     fn run(service: &str, running: bool) -> Self {
         Self::Run {
@@ -77,21 +109,18 @@ impl Change {
                 key,
                 owner,
                 written,
-            } => Action::Withdraw {
-                path: path.clone(),
-                key: key.clone(),
-                owner: owner.clone(),
-                written: *written,
-            },
+            } => Action::withdraw(path, key, owner, *written),
             Kind::Rewritten {
                 path,
                 previous,
                 written,
-            } => Action::Rewind {
-                path: path.clone(),
-                previous: previous.clone(),
-                written: *written,
-            },
+            } => Action::rewind(path, previous, *written),
+            Kind::Seeded {
+                path,
+                plugin,
+                secret,
+                written,
+            } => Action::reseed(path, plugin, secret, *written),
             Kind::Copied { volume, to } => Action::KeepCopy {
                 volume: volume.clone(),
                 to: to.clone(),

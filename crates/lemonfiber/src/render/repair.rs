@@ -123,6 +123,9 @@ fn restoring(action: &Action) -> String {
         Action::Delete { path } => format!("{path} removed"),
         Action::Withdraw { owner, path, .. } => format!("{owner}'s region taken out of {path}"),
         Action::Rewind { path, .. } => format!("{path} written back as it was"),
+        Action::Reseed { path, secret, .. } => {
+            format!("the old value of {secret} written back into {path}")
+        }
         Action::MoveBack { from, .. } => format!("{from} moved back"),
         Action::RenameBack { from, to } => format!("{to} moved back to {from}"),
         Action::KeepCopy { to, .. } => format!("{to} kept; the volume it came from is as it was"),

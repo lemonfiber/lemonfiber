@@ -2,10 +2,15 @@ use std::path::Path;
 
 use lemonfiber_plugin::{Manifest, Shape};
 
+use lemonfiber_plugin::seeding::Form;
+
 use super::{
-    asked, changes, overrides, proofs, taking, Changing, Overriding, Proving, Puts, Taking,
+    asked, changes, overrides, placeholding, proofs, reshipped, taking, Changing, Overriding,
+    Placeholding, Proving, Puts, Taking,
 };
 use crate::plugin::installed::Installed;
+use crate::plugin::placing::{Lands, Write};
+use crate::plugin::seeding::Shipped;
 
 /// A manifest declaring one service, one proof and one override.
 const MANIFEST: &str = r#"
@@ -99,10 +104,12 @@ fn every_write_is_stated_as_a_path_and_what_goes_at_it() {
             Changing {
                 path: "/opt/lemonfiber/stack/config/komga".to_owned(),
                 puts: Puts::Directory,
+                placeholders: Vec::new(),
             },
             Changing {
                 path: "/opt/lemonfiber/stack/compose.generated.yml".to_owned(),
                 puts: Puts::Document,
+                placeholders: Vec::new(),
             },
         ]
     );
@@ -141,6 +148,7 @@ fn an_adapter_service_states_its_key_by_path() {
         vec![Changing {
             path: "/opt/lemonfiber/stack/config/komga/lemonfiber.key".to_owned(),
             puts: Puts::Key,
+            placeholders: Vec::new(),
         }]
     );
 }
@@ -298,4 +306,89 @@ fn an_adapter_sharing_its_upstreams_configuration_is_stated_with_where() {
             at: "/upstream".to_owned(),
         }]
     );
+}
+
+/// One placeholder naming `secret` in `form`.
+fn placeholder(secret: &str, form: Form) -> Placeholding {
+    Placeholding {
+        secret: secret.to_owned(),
+        form,
+    }
+}
+
+/// A starting file is stated with each placeholder the file as shipped names, by its
+/// secret and its form, and a file that is not text with none.
+#[test]
+fn a_starting_file_is_stated_with_its_placeholders() {
+    let starting = |bytes: &[u8]| Write {
+        path: stack().join("config/komga/application.yml"),
+        lands: Lands::Starting {
+            bytes: bytes.to_vec(),
+            seeded: true,
+        },
+    };
+    let stated = changes(&[
+        starting(b"key: {{secret:api-key}}\nhash: {{secret:password|pbkdf2}}\n"),
+        starting(b"\xff{{secret:api-key}}"),
+    ]);
+    assert_eq!(
+        stated.first().map(|one| one.placeholders.clone()),
+        Some(vec![
+            placeholder("api-key", Form::Plain),
+            placeholder("password", Form::Pbkdf2),
+        ])
+    );
+    assert_eq!(stated.get(1).map(|one| one.placeholders.len()), Some(0));
+    assert_eq!(
+        placeholder("password", Form::Pbkdf2).named(),
+        "the placeholder for secret password in the pbkdf2 form"
+    );
+}
+
+/// An update states each starting file whose placeholders it changes, as each version
+/// ships it, and nothing of a file whose placeholders it leaves as they were.
+#[test]
+fn an_update_states_the_starting_files_whose_placeholders_it_changes() {
+    let file = |path: &str, bytes: &str| Shipped {
+        service: "komga".to_owned(),
+        path: path.to_owned(),
+        bytes: bytes.as_bytes().to_vec(),
+    };
+    let was = [
+        file("application.yml", "key: {{secret:api-key}}\n"),
+        file("kept.yml", "key: {{secret:api-key}}\n"),
+        file("gone.yml", "key: {{secret:api-key}}\n"),
+    ];
+    let becomes = [
+        file("application.yml", "key: {{secret:api-key|pbkdf2}}\n"),
+        file("kept.yml", "port: 1\nkey: {{secret:api-key}}\n"),
+        file("new.yml", "theme: dark\n"),
+        file("added.yml", "key: {{secret:api-key}}\n"),
+    ];
+    let stated = reshipped(stack(), &was, &becomes);
+    let at = |name: &str| format!("/opt/lemonfiber/stack/config/komga/{name}");
+    assert_eq!(
+        stated
+            .iter()
+            .map(|one| (one.path.clone(), one.was.clone(), one.becomes.clone()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                at("added.yml"),
+                Vec::new(),
+                vec![placeholder("api-key", Form::Plain)]
+            ),
+            (
+                at("application.yml"),
+                vec![placeholder("api-key", Form::Plain)],
+                vec![placeholder("api-key", Form::Pbkdf2)],
+            ),
+            (
+                at("gone.yml"),
+                vec![placeholder("api-key", Form::Plain)],
+                Vec::new()
+            ),
+        ]
+    );
+    assert_eq!(placeholding(b"theme: dark\n"), Vec::new());
 }

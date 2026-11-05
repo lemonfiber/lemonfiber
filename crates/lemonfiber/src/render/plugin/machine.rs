@@ -161,6 +161,12 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
             },
             one.path
         ));
+        for placeholder in &one.placeholders {
+            lines.put(format!(
+                "                     holding {}",
+                placeholder.named()
+            ));
+        }
     }
     lines
 }
@@ -361,6 +367,9 @@ fn undone(undo: &Undo) -> String {
         Action::Delete { path } => format!("removed {path}"),
         Action::Withdraw { owner, path, .. } => format!("took {owner}'s region out of {path}"),
         Action::Rewind { path, .. } => format!("wrote {path} back as it was"),
+        Action::Reseed { path, secret, .. } => {
+            format!("wrote the old value of {secret} back into {path}")
+        }
         Action::MoveBack { from, .. } => format!("moved {from} back"),
         Action::KeepCopy { to, .. } => format!("kept {to}"),
         // Every other shape is a change a plugin install never makes: it writes files

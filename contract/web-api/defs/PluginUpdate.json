@@ -22,6 +22,13 @@
       "description": "The plugin this is about.",
       "type": "string"
     },
+    "reshipped": {
+      "description": "Each starting file whose placeholders the new version changes, as the installed\nversion shipped it and as the new one ships it. The file on the machine is left as\nit is, so this is what it was seeded from set against what the new version would\nseed it from.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginReshipped.json"
+      }
+    },
     "restored": {
       "description": "Where the update did not hold, what putting the version it replaced back came\nto. Absent on a rehearsal and on an update that held.",
       "anyOf": [
@@ -55,6 +62,7 @@
     "to",
     "interrupts",
     "went_back",
-    "install"
+    "install",
+    "reshipped"
   ]
 }

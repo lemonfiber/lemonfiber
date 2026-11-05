@@ -27,10 +27,9 @@ use crate::ports::filesystem::{Beneath, Readable};
 use crate::seed::State;
 use crate::wiring::{Filler, Fillers};
 
-/// What a rehearsal says about replacing a minted secret.
-const REPLACING: &str = "a real run would mint a new value, write it where the old one stands \
-     in the service's settings, its secrets file and its adapter's upstream.json, and restart \
-     what reads it. Nothing was replaced.";
+/// Where a rehearsal says a minted secret's new value is written beside the starting files
+/// that name it.
+const BESIDE: &str = "the service's secrets file and its adapter's upstream.json";
 
 /// What the egress guard's hold on its control credential is reported as.
 const GUARD_CONTROL: &str = "the egress guard's control server";
@@ -75,9 +74,50 @@ pub(super) async fn rotate(
     amid: &Amid<'_>,
 ) -> Rotation {
     if ctx.dry_run {
-        return would_rotate(held, REPLACING);
+        return would_rotate(held, &replacing(ctx, installed, &secret.id));
     }
     replaced(ctx, &held.name, installed, secret, amid).await
+}
+
+/// What a rehearsal says about replacing `installed`'s minted `secret`: each starting file
+/// that names it, by where it is and each placeholder there, read off the files kept as
+/// the plugin shipped them.
+fn replacing(ctx: &Ctx, installed: &Installed, secret: &str) -> String {
+    let mut written: Vec<String> = crate::app::project::directory(ctx)
+        .zip(crate::app::plugins::kept::root(ctx, &installed.plugin))
+        .and_then(|(stack, kept)| {
+            crate::plugin::seeding::shipped_by(installed, &kept)
+                .ok()
+                .map(|shipped| (stack, shipped))
+        })
+        .map(|(stack, shipped)| {
+            shipped
+                .iter()
+                .filter_map(|file| {
+                    let placeholders: Vec<String> = crate::plugin::placeholding(&file.bytes)
+                        .iter()
+                        .filter(|one| one.secret == secret)
+                        .map(crate::plugin::Placeholding::named)
+                        .collect();
+                    (!placeholders.is_empty()).then(|| {
+                        format!(
+                            "{} at {}",
+                            crate::plugin::configuration(&stack, &file.service)
+                                .join(&file.path)
+                                .display(),
+                            placeholders.join(" and ")
+                        )
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    written.push(BESIDE.to_owned());
+    format!(
+        "a real run would mint a new value, write it where the old one stands in {}, and \
+         restart what reads it. Nothing was replaced.",
+        written.join(", ")
+    )
 }
 
 /// Replace the secret lemonfiber minted as `filler`'s credential, on a run that means it:
@@ -126,21 +166,35 @@ async fn replaced(
         Ok(files) => files,
         Err(detail) => return refused(detail),
     };
-    if let Err(detail) = held_anew(ctx, installed, secret, &value) {
+    let stamp = ctx.stamp();
+    if let Err(detail) = held_anew(ctx, installed, secret, &value, &stamp) {
         return refused(detail);
     }
-    let mut consumers: Vec<Propagation> = files
-        .iter()
-        .map(|(service, path, bytes)| {
-            let written = ctx
-                .seams
-                .confined
-                .written(path, &stack, bytes, Readable::Owner)
-                .err()
-                .map(|fault| fault.message);
-            reached(service, written)
-        })
-        .collect();
+    let mut consumers = Vec::new();
+    let mut seeded = Vec::new();
+    for (service, path, bytes) in &files {
+        let written = ctx
+            .seams
+            .confined
+            .written(path, &stack, bytes, Readable::Owner)
+            .err()
+            .map(|fault| fault.message);
+        if written.is_none() {
+            seeded.push(Change {
+                at: stamp.clone(),
+                operation: crate::plugin::owner(&installed.plugin),
+                target: path.display().to_string(),
+                kind: Kind::Seeded {
+                    path: path.display().to_string(),
+                    plugin: installed.plugin.clone(),
+                    secret: secret.to_owned(),
+                    written: crate::materialised::checksum(bytes),
+                },
+            });
+        }
+        consumers.push(reached(service, written));
+    }
+    consumers.extend(recorded(ctx, &seeded));
     let setting = crate::settings::named(&installed.plugin, secret);
     let (readers, unwritten) = read_anew(ctx, installed, &setting);
     consumers.extend(
@@ -280,7 +334,7 @@ fn rewritten(
             service: &placed.service,
         }))?;
         for (path, template) in templates {
-            let at = stack.join("config").join(&placed.service).join(&path);
+            let at = crate::plugin::configuration(stack, &placed.service).join(&path);
             let current = match ctx.seams.confined.read(&at, stack) {
                 Beneath::Read(text) => text,
                 Beneath::Absent => return Err(format!("{} is not there", at.display())),
@@ -304,15 +358,39 @@ fn rewritten(
     Ok(files)
 }
 
-/// Hold `value` as `installed`'s `secret`, journalled by the fingerprints of the value it
-/// replaces and of itself.
-fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Result<(), String> {
+/// What journalling the starting files `seeded` names came to: nothing where they are
+/// recorded, and why putting the replacement back will leave them where they are not.
+fn recorded(ctx: &Ctx, seeded: &[Change]) -> Option<Propagation> {
+    if seeded.is_empty() {
+        return None;
+    }
+    let why = match crate::app::targets::layout(ctx) {
+        Some(paths) => crate::app::recover::journalled(&paths.journal(), seeded).err()?,
+        None => crate::config::store::Failure::Nowhere,
+    };
+    Some(Propagation::pending(
+        "the journal",
+        &format!(
+            "the settings files it wrote are not recorded, so putting the replacement back \
+             leaves them holding the new value: {why}"
+        ),
+    ))
+}
+
+/// Hold `value` as `installed`'s `secret`, journalled at `stamp` by the fingerprints of the
+/// value it replaces and of itself.
+fn held_anew(
+    ctx: &Ctx,
+    installed: &Installed,
+    secret: &str,
+    value: &str,
+    stamp: &str,
+) -> Result<(), String> {
     let at = crate::settings::secrets_at(ctx)
         .zip(crate::app::targets::layout(ctx))
         .ok_or_else(|| crate::config::store::Failure::Nowhere.to_string())?;
     let (secrets, paths) = at;
     let name = crate::settings::named(&installed.plugin, secret);
-    let stamp = ctx.stamp();
     let keeping = [crate::settings::Keeping {
         name: &name,
         value,
@@ -323,7 +401,7 @@ fn held_anew(ctx: &Ctx, installed: &Installed, secret: &str, value: &str) -> Res
         let changes: Vec<Change> = replaced
             .iter()
             .map(|one| Change {
-                at: stamp.clone(),
+                at: stamp.to_owned(),
                 operation: crate::plugin::owner(&installed.plugin),
                 target: one.name.clone(),
                 kind: Kind::Secret {

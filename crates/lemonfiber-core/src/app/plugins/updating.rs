@@ -77,6 +77,7 @@ pub(crate) async fn update(
     let (acting, taking) =
         super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;
     let mut account = started(&was, &would, &read.manifest, changes, wiring, taking);
+    account.reshipped = super::kept::reshipped(ctx, &was, &would, stack, path);
     account.install.waiting =
         super::standing::waiting(ctx, &stack_manifest, without.installed(), &would);
     let at = crate::plugin::owner(&was.plugin);
@@ -84,6 +85,7 @@ pub(crate) async fn update(
         crate::plugin::owns(&was.plugin, change)
             && !super::super::project::holds(ctx, change)
             && !carried_across(change)
+            && !super::kept::in_place(&was, stack, change)
     };
 
     // A reading and a rehearsal ask the reversal what it would put back, which judges it
@@ -181,11 +183,15 @@ pub(crate) async fn update(
     Ok(answering(held.installed().to_vec(), account, offer))
 }
 
-/// Whether `change` kept a value in the secret store, which an update carries to the new
-/// version rather than putting back: what the plugin's services were started with already
-/// holds it, and the new version's install keeps a value the store holds.
+/// Whether `change` kept a value in the secret store or wrote one into a starting file,
+/// which an update carries to the new version rather than putting back: what the plugin's
+/// services were started with already holds it, and the new version's install keeps a
+/// value the store holds.
 fn carried_across(change: &crate::journal::Change) -> bool {
-    matches!(change.kind, crate::journal::Kind::Secret { .. })
+    matches!(
+        change.kind,
+        crate::journal::Kind::Secret { .. } | crate::journal::Kind::Seeded { .. }
+    )
 }
 
 /// Record the new version in place of the one it replaced, and put the front door in
@@ -257,6 +263,7 @@ fn started(
             waiting: Vec::new(),
             secured: None,
         },
+        reshipped: Vec::new(),
         stopped: None,
         restored: None,
     }

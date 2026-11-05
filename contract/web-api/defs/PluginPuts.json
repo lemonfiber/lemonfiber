@@ -23,7 +23,7 @@
       "const": "secrets"
     },
     {
-      "description": "A file the plugin ships for one of its services, written where none is yet; one\nnaming a secret is readable by its owner alone and shown with the secret's name.",
+      "description": "A file the plugin ships for one of its services, written where none is yet; one\nnaming a secret is readable by its owner alone and shown with its placeholders.",
       "type": "string",
       "const": "starting"
     },

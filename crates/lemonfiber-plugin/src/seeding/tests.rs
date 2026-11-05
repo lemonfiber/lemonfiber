@@ -27,7 +27,10 @@ fn a_placeholder_that_never_closes_names_no_secret_or_asks_another_form_is_refus
     for (text, says) in [
         ("key = {{secret:one", "never closes"),
         ("key = {{secret:}}", "names no secret"),
-        ("key = {{secret:one|sha1}}", "the form sha1"),
+        (
+            "key = {{secret:one|sha1}}",
+            "the placeholder for secret one asking for the form sha1",
+        ),
     ] {
         let refused = placeholders(text).err().unwrap_or_default();
         assert!(refused.contains(says), "{text}: {refused}");
@@ -60,14 +63,22 @@ fn a_starting_file_names_only_secrets_its_own_service_holds() {
     for (bytes, says) in [
         (
             &b"key = {{secret:missing}}"[..],
-            "no [[secret]] of this manifest declares",
+            "the placeholder for secret missing in the plain form, whose secret no [[secret]] of \
+             this manifest declares",
         ),
         (
-            &b"key = {{secret:curator}}"[..],
-            "a credential that crosses",
+            &b"key = {{secret:curator|pbkdf2}}"[..],
+            "the placeholder for secret curator in the pbkdf2 form, whose secret is sonarr's",
         ),
         (&b"key = {{secret:api-key|md5}}"[..], "the form md5"),
-        (&b"\xff{{secret:api-key}}"[..], "not UTF-8"),
+        (
+            &b"\xff{{secret:api-key|pbkdf2}}"[..],
+            "has the placeholder for secret api-key in the pbkdf2 form and is not UTF-8",
+        ),
+        (
+            &b"\xff{{secret:api\xffkey}}"[..],
+            "names a secret and is not UTF-8",
+        ),
     ] {
         let said = refused(&manifest, "komga", "app.ini", bytes);
         assert!(
@@ -86,9 +97,9 @@ fn a_starting_file_names_only_secrets_its_own_service_holds() {
         beside
             .iter()
             .any(|one| one.location == "config/komga-adapter/app.ini"
-                && one
-                    .message
-                    .contains("which is komga's rather than komga-adapter's")),
+                && one.message.contains(
+                    "in the plain form, whose secret is komga's rather than komga-adapter's"
+                )),
         "{beside:?}"
     );
 }

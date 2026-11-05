@@ -74,6 +74,21 @@ pub enum Action {
         /// for writing the old text back to be undoing lemonfiber's own work.
         written: u32,
     },
+    /// Write the value the secret store holds of a plugin's minted secret back into a
+    /// starting file, where the shipped file puts the placeholder.
+    ///
+    /// Only where it still holds what was written. One written since is somebody else's
+    /// work now, and is left exactly as it is.
+    Reseed {
+        /// The file to write back.
+        path: String,
+        /// The plugin the secret is of.
+        plugin: String,
+        /// The secret, by its id.
+        secret: String,
+        /// The checksum of what lemonfiber wrote, which has to still be what is there.
+        written: u32,
+    },
     /// Move a service's state back to where it was.
     ///
     /// Only where nothing has taken its old place, and only from where it was moved to.

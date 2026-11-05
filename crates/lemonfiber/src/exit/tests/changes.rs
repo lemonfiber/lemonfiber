@@ -552,6 +552,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
                     waiting: Vec::new(),
                     secured: None,
                 },
+                reshipped: Vec::new(),
                 stopped: None,
                 restored: restored.then(|| lemonfiber_core::plugin::Restored {
                     version: "1.2.0".to_owned(),

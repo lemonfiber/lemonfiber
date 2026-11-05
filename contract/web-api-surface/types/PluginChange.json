@@ -6,6 +6,12 @@
       ],
       "required": true
     },
+    "placeholders": {
+      "type": [
+        "array[ref:PluginPlaceholder]"
+      ],
+      "required": true
+    },
     "puts": {
       "type": [
         "ref:PluginPuts"

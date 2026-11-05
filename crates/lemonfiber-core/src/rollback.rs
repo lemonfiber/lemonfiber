@@ -277,6 +277,7 @@ pub fn standing(
             previous,
             written,
         } => overwritten(path, previous, *written, reads),
+        Kind::Seeded { path, written, .. } => reseeded(path, *written, reads),
         // A setting, a path, one field of a service's record, or a key to revoke — each
         // reversed by something this product actually does.
         Kind::Set { .. }
@@ -428,6 +429,23 @@ fn overwritten(
                      it held would discard that"
                 ),
                 Some("write it back by hand if that change is not wanted"),
+            )
+        }
+        _ => Standing::whole(),
+    }
+}
+
+/// Whether the starting file at `path` still holds what writing a new value of its secret
+/// into it left, `written` being the checksum of that.
+fn reseeded(path: &str, written: u32, reads: &dyn Fn(&str) -> Option<String>) -> Standing {
+    match reads(path) {
+        Some(text) if crate::materialised::checksum(text.as_bytes()) != written => {
+            Standing::refused(
+                &format!(
+                    "{path} has been written since lemonfiber wrote the new value into it, and \
+                     writing the old one back would discard that"
+                ),
+                Some("write the value back by hand if that change is not wanted"),
             )
         }
         _ => Standing::whole(),

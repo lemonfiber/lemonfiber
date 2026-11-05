@@ -139,6 +139,41 @@
       ]
     },
     {
+      "description": "Write the value the secret store holds of a plugin's minted secret back into a\nstarting file, where the shipped file puts the placeholder.\n\nOnly where it still holds what was written. One written since is somebody else's\nwork now, and is left exactly as it is.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "reseed"
+        },
+        "path": {
+          "description": "The file to write back.",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "The plugin the secret is of.",
+          "type": "string"
+        },
+        "secret": {
+          "description": "The secret, by its id.",
+          "type": "string"
+        },
+        "written": {
+          "description": "The checksum of what lemonfiber wrote, which has to still be what is there.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "does",
+        "path",
+        "plugin",
+        "secret",
+        "written"
+      ]
+    },
+    {
       "description": "Move a service's state back to where it was.\n\nOnly where nothing has taken its old place, and only from where it was moved to.",
       "type": "object",
       "properties": {

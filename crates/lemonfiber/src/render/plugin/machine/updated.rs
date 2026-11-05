@@ -6,7 +6,7 @@
 //! — is drawn by the same pieces that draw a removal and an install, so the three verbs
 //! cannot describe the same work in different words.
 
-use lemonfiber_core::plugin::{Restored, Update};
+use lemonfiber_core::plugin::{Placeholding, Reshipping, Restored, Update};
 
 use super::super::super::Lines;
 
@@ -32,6 +32,7 @@ pub(super) fn updated(one: &Update) -> Lines {
     ));
     lines.extend(super::asking(&one.install.asks, one.install.recorded));
     lines.extend(super::changes(&one.install.changes, acted));
+    lines.extend(reshipped(&one.reshipped));
     lines.extend(super::answering::recipes(&one.install.would.recipes));
     lines.extend(super::answering::taking(&one.install.taking, acted));
     lines.extend(super::answering::sharing(&one.install.sharing, acted));
@@ -58,6 +59,31 @@ pub(super) fn updated(one: &Update) -> Lines {
     }
     if let Some(back) = &one.restored {
         lines.spaced(restoring(&one.plugin, back));
+    }
+    lines
+}
+
+/// Each starting file the new version ships with other placeholders than the one it
+/// replaces, which the file on the machine, left as it is, was seeded from.
+fn reshipped(files: &[Reshipping]) -> Lines {
+    let mut lines = Lines::default();
+    if files.is_empty() {
+        return lines;
+    }
+    lines.spaced("    Starting files it ships naming secrets differently, left as they are:");
+    for file in files {
+        lines.put(format!("      {}", file.path));
+        for (which, placeholders) in [("was", &file.was), ("now", &file.becomes)] {
+            let named: Vec<String> = placeholders.iter().map(Placeholding::named).collect();
+            lines.put(format!(
+                "        {which}: {}",
+                if named.is_empty() {
+                    "no placeholder".to_owned()
+                } else {
+                    named.join(", ")
+                }
+            ));
+        }
     }
     lines
 }

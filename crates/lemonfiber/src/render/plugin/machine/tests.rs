@@ -1,8 +1,8 @@
 use lemonfiber_core::app::putting_back::Reversal;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
-    Changing, Evidence, Install, Installed, Installs, Overriding, Placed, Proving, Puts, Reached,
-    Removal, Restored, Unfilled, Update, Verdict, Verification,
+    Changing, Evidence, Form, Install, Installed, Installs, Overriding, Placed, Placeholding,
+    Proving, Puts, Reached, Removal, Reshipping, Restored, Unfilled, Update, Verdict, Verification,
 };
 
 use super::{installs, stood};
@@ -97,10 +97,12 @@ fn writes() -> Vec<Changing> {
         Changing {
             path: "/opt/lemonfiber/stack/config/komga".to_owned(),
             puts: Puts::Directory,
+            placeholders: Vec::new(),
         },
         Changing {
             path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
             puts: Puts::Document,
+            placeholders: Vec::new(),
         },
     ]
 }
@@ -153,6 +155,7 @@ fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> 
                 reversed: restored.as_ref().map(|_| Reversal::default()),
                 ..install(next, recorded)
             },
+            reshipped: Vec::new(),
             stopped: stopped.map(str::to_owned),
             restored,
         })),
@@ -241,3 +244,50 @@ fn a_guard_restarted_to_take_up_its_control_credential_is_said_to_have_been() {
 mod installed;
 mod proven;
 mod reversed;
+
+/// One placeholder naming `secret` in `form`.
+fn placeholder(secret: &str, form: Form) -> Placeholding {
+    Placeholding {
+        secret: secret.to_owned(),
+        form,
+    }
+}
+
+/// A starting file is drawn with each placeholder it names, and an update with each
+/// starting file it ships naming secrets differently, as it was and as it is now.
+#[test]
+fn a_starting_files_placeholders_are_drawn_and_an_updates_changed_ones_set_side_by_side() {
+    let mut report = moving(false, None, None);
+    if let Some(update) = report.update.as_mut() {
+        update.install.changes.push(Changing {
+            path: "/opt/lemonfiber/stack/config/komga/application.yml".to_owned(),
+            puts: Puts::Starting,
+            placeholders: vec![placeholder("api-key", Form::Pbkdf2)],
+        });
+        update.reshipped = vec![Reshipping {
+            path: "/opt/lemonfiber/stack/config/komga/application.yml".to_owned(),
+            was: vec![placeholder("api-key", Form::Plain)],
+            becomes: vec![placeholder("api-key", Form::Pbkdf2)],
+        }];
+    }
+    let said = installs(&report).text();
+    for line in [
+        "a file       /opt/lemonfiber/stack/config/komga/application.yml",
+        "holding the placeholder for secret api-key in the pbkdf2 form",
+        "Starting files it ships naming secrets differently, left as they are:",
+        "was: the placeholder for secret api-key in the plain form",
+        "now: the placeholder for secret api-key in the pbkdf2 form",
+    ] {
+        assert!(said.contains(line), "{line}: {said}");
+    }
+
+    if let Some(update) = report.update.as_mut() {
+        if let Some(file) = update.reshipped.first_mut() {
+            file.becomes = Vec::new();
+        }
+    }
+    assert!(installs(&report).text().contains("now: no placeholder"));
+    assert!(!installs(&moving(false, None, None))
+        .text()
+        .contains("naming secrets differently"));
+}
