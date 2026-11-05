@@ -105,8 +105,8 @@
         1
       ],
       "openapi": "request.intake/v1/openapi.json",
-      "operations": 31,
-      "sha256": "4c29dfd0f50427789aa7a11de2167771fc17fc44498a199ee88de3d4a5e658f7"
+      "operations": 32,
+      "sha256": "1f9b916323257c76819c8e4976787a04c0f9e56a790b19602f090373e7c3f14e"
     },
     {
       "capability": "identity.source",

@@ -247,6 +247,8 @@ crate::contract! {
             fn media_server_link() -> MediaServerLink where asks = Asked {};
             /// Reach the identity source somewhere else, with a new key.
             fn link_media_server(refer at: &Endpoint as Endpoint, str key: &str) -> () where asks = Asked { at: identity_endpoint(), key: Placeholder::Minted.written() };
+            /// The name it files a media server key it mints for itself under.
+            fn minted_as() -> String where since = 1, asks = Asked {};
         }
         impl Approving {
             /// What the household may ask for where nobody chose otherwise.

@@ -334,6 +334,14 @@ pub trait Requests: Send + Sync {
     /// Returns [`Failure`] when it is unreachable, refuses, or the media server does
     /// not answer to the pair.
     async fn link_media_server(&self, at: &Endpoint, key: &str) -> Result<(), Failure>;
+
+    /// The name the service files a media server key it mints for itself under.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses, and
+    /// [`Failure::Unsupported`] where it mints none.
+    async fn minted_as(&self) -> Result<String, Failure>;
 }
 
 /// Where the request service reaches the media server, and the key it presents there.

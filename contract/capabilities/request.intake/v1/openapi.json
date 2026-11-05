@@ -144,6 +144,9 @@
     "/lemonfiber/request.intake/v1/member_for": {
       "$ref": "operations/member_for.json"
     },
+    "/lemonfiber/request.intake/v1/minted_as": {
+      "$ref": "operations/minted_as.json"
+    },
     "/lemonfiber/request.intake/v1/move_fulfilment_target": {
       "$ref": "operations/move_fulfilment_target.json"
     },

@@ -184,6 +184,9 @@ impl Requests for FakeReq {
     ) -> Result<(), Failure> {
         Ok(())
     }
+    async fn minted_as(&self) -> Result<String, Failure> {
+        Ok("Seerr".to_owned())
+    }
 
     async fn test_fulfilment_target(
         &self,
