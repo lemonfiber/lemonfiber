@@ -1,31 +1,5 @@
 name: lemonfiber
 services:
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
-    profiles:
-    - search
-    restart: unless-stopped
-    environment:
-      LOG_LEVEL: info
-      TZ: Europe/Amsterdam
-    ports:
-    - 127.0.0.1:8191:8191
-    volumes:
-    - ./config/flaresolverr:/config
-    networks:
-    - own__flaresolverr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
     profiles:
@@ -215,6 +189,29 @@ services:
     - ALL
     pids_limit: 1024
     read_only: true
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
+    profiles:
+    - lemonfiber.unfenced
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: info
+      TZ: Europe/Amsterdam
+    volumes:
+    - ./config/flaresolverr:/config
+    network_mode: none
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
   gluetun:
     image: qmcgaw/gluetun@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
     profiles:

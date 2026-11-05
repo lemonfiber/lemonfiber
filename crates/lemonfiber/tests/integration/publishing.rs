@@ -30,6 +30,9 @@ const NARROWED: &str = "192.0.2.7";
 /// it.
 const SETTING: &str = "LAN_BIND";
 
+/// The host's one address, as the fence this build pins is handed it.
+const HOST: [IpAddr; 1] = [IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1))];
+
 /// The services published beyond loopback, and why each one is.
 ///
 /// Everything else in the stack is an admin surface, opened from the machine
@@ -175,6 +178,8 @@ fn generated_reading(operator: &dyn Fn(&str) -> Option<String>) -> serde_norway:
         &lemonfiber_core::wiring::Chosen::read(None),
         &lemonfiber_core::project::Reading {
             operator,
+            fence: lemonfiber_bundled::FENCE,
+            host: &HOST,
             ..lemonfiber_core::project::Reading::bare()
         },
     );

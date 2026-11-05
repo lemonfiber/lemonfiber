@@ -12,15 +12,23 @@ use crate::ports::program::{Joined, Program};
 const IMAGE: &str =
     "ghcr.io/lemonfiber/fence:0.18.0@sha256:9e1d000000000000000000000000000000000000000000000000000000000000";
 
+/// The stack's own service that runs fenced.
+const FENCED_PART: &str = "flaresolverr";
+
 /// A machine running the stack this build carries with a plugin's service installed
-/// beside it, fenced where `fenced`, its engine running the fence as `program` answers;
-/// answers where the project is.
+/// beside it, both fenced where `fenced` and neither otherwise, its engine running the
+/// fence as `program` answers; answers where the project is.
 fn machine(name: &str, fenced: bool, program: &Arc<Proving>) -> (Ctx, PathBuf) {
     let env = crate::test_support::env_without_password(name);
     let mut ctx = crate::test_support::a_context()
         .over(crate::test_support::embedded())
         .build()
         .with_program(Arc::clone(program) as Arc<dyn Program>);
+    if !fenced {
+        let fork = env.with_file_name("unfenced-stack");
+        lemonfiber_fixtures::stack::manifest_without(&fork, FENCED_PART);
+        ctx.stack = crate::stack::Source::External(Box::leak(fork.into_boxed_path()));
+    }
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
     ctx.settings.env_file = Some(env);
     let mut service = crate::test_support::a_placed("solver", &[], None);

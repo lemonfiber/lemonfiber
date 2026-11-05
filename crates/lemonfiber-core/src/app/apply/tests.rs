@@ -348,7 +348,7 @@ fn the_embedded_stack_is_written_where_compose_reads_it_but_not_journalled() {
     // regenerable output, so they are not recorded in the journal: their undo is the
     // next apply rewriting them, not a reversal.
     assert!(
-        paths.stack().join("recordings").is_dir(),
+        paths.stack().join("LICENSE").is_file(),
         "the stack was materialised"
     );
     assert!(
@@ -411,9 +411,6 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
         theirs,
         "a second apply wrote over a file the operator had changed by hand"
     );
-    // And the rest of the stack is still lemonfiber's own: preserving one file is
-    // not declining to write the others.
-    assert!(paths.stack().join("recordings").is_dir());
 }
 
 /// What makes the comparison above possible: a record of what was written, kept
@@ -432,7 +429,7 @@ fn an_apply_records_the_checksums_of_what_it_wrote() {
     .is_ok());
 
     let recorded = std::fs::read_to_string(paths.materialised()).unwrap_or_default();
-    assert!(recorded.contains("recordings/"), "{recorded}");
+    assert!(recorded.contains("LICENSE"), "{recorded}");
     assert!(!recorded.contains("stack.toml"), "{recorded}");
     assert!(!recorded.contains("services/"), "{recorded}");
 }

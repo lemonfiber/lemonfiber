@@ -157,7 +157,8 @@ fn a_key_the_gate_does_not_let_cross_is_said_unmatched() {
     );
 }
 
-/// A service the stack writes reading another's key is said as the plugins' are; a key of
+/// A service the stack writes, a part not yet moved into its plugin, reading another's key
+/// is said as the plugins' are; a key of
 /// a service that is not here is left to what reports filling nothing, and one the service
 /// declares and does not read is not said.
 #[test]
@@ -201,7 +202,10 @@ fn a_stack_service_reading_a_key_is_said_and_one_of_nothing_here_is_not() {
             }
             manifest
         });
-    let parts = crate::test_support::adapted::installed_parts();
+    let parts: Vec<Installed> = crate::test_support::adapted::installed_parts()
+        .into_iter()
+        .filter(|part| part.plugin != "flaresolverr")
+        .collect();
 
     let said = manifest
         .map(|manifest| {

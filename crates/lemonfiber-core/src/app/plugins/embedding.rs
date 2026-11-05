@@ -37,8 +37,12 @@ pub(crate) async fn from_this_build(
 
 /// The plugin of this id the bundle installs, where it pins one.
 pub(super) fn pinned(id: &str) -> Option<&'static Pinned> {
-    PINNED
-        .iter()
+    installed_among(PINNED, id)
+}
+
+/// The plugin of this id among `pins` pinned as installed.
+fn installed_among<'a>(pins: &'a [Pinned], id: &str) -> Option<&'a Pinned> {
+    pins.iter()
         .find(|one| one.first_party.plugin == id && one.stage == Some(Stage::Installed))
 }
 

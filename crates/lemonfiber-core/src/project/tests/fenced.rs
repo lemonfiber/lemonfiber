@@ -136,7 +136,14 @@ fn a_fenced_service_no_fence_can_be_written_for_is_held_back_on_no_network() {
         assert_eq!(sequence(&solver, "profiles"), [UNFENCED], "{why:?}");
         assert_eq!(text(&solver, "network_mode"), "none", "{why:?}");
         assert!(ports(&solver).is_empty(), "{why:?}");
-        assert_eq!(project.unfenced, vec![("solver".to_owned(), why)]);
+        assert_eq!(
+            project
+                .unfenced
+                .iter()
+                .filter(|(service, _)| service == "solver")
+                .collect::<Vec<_>>(),
+            vec![&("solver".to_owned(), why)]
+        );
         assert_ne!(
             text(&entry(&project, "solver-fence"), "image"),
             FENCE,

@@ -2,9 +2,20 @@ use super::{outermost_missing, pinned, taken_away, written};
 
 #[test]
 fn only_a_plugin_the_bundle_installs_is_read_from_this_build() {
-    assert!(pinned("jellyfin").is_some());
-    assert!(pinned("flaresolverr").is_none());
+    let Some(jellyfin) = pinned("jellyfin") else {
+        unreachable!("the bundle installs jellyfin");
+    };
+    let assembled = [lemonfiber_bundled::Pinned {
+        stage: Some(lemonfiber_bundled::Stage::Assembled),
+        ..*jellyfin
+    }];
+
     assert!(pinned("no-such-plugin").is_none());
+    assert!(super::installed_among(&assembled, "jellyfin").is_none());
+    assert_eq!(
+        super::installed_among(&[*jellyfin], "jellyfin"),
+        Some(jellyfin)
+    );
 }
 
 #[test]
