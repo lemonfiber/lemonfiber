@@ -44,6 +44,16 @@ pub fn serve(operation: &str) -> &'static str {
     path_of(serve::CAPABILITY, serve::MAJOR, operation)
 }
 
+/// Where a media server's declaration is asked, answered with one a guard can enforce, as
+/// an install asks it of an adapter speaking `media.serve`.
+#[must_use]
+pub fn declares() -> (&'static str, Answer) {
+    (
+        serve("declared"),
+        answered(&lemonfiber_fixtures::declaring::enforceable()),
+    )
+}
+
 /// Jellyfin's plugin as the bundle pins it, recorded as installed from its embedded tree.
 #[must_use]
 pub fn moved() -> Option<Installed> {

@@ -362,3 +362,42 @@ async fn a_pull_hands_each_line_the_engine_writes_to_the_narrator() {
     assert_eq!(produced.map(|report| report.status), Some(Some(0)));
     assert_eq!(heard.pull_lines(), ["library Pulling", "library Pulled"]);
 }
+
+#[tokio::test]
+async fn a_start_hands_the_narrator_the_lines_it_writes_while_pulling_and_no_others() {
+    let heard = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx = a_context()
+        .runner(Arc::new(Scripted(Ok(Output {
+            status: Some(1),
+            stdout: " jellyfin Pulling\n 4f53cda18c2b Downloading [==>  ]\n jellyfin Pulled\n \
+                     Network lemonfiber_default Created\n Container jellyfin Started\n"
+                .to_owned(),
+            stderr: String::new(),
+        }))))
+        .engine(Arc::new(Reporting::default()))
+        .settings(Settings {
+            protocols: crate::config::Protocols::both(),
+            ..Settings::default()
+        })
+        .build()
+        .with_patience(std::time::Duration::ZERO)
+        .with_narrator(Arc::<lemonfiber_fixtures::heard::Heard>::clone(&heard));
+
+    let _ = dispatch(
+        Command::Start {
+            forms: vec!["library".to_owned()],
+            services: vec!["jellyfin".to_owned()],
+        },
+        &ctx,
+    )
+    .await;
+
+    assert_eq!(
+        heard.pull_lines(),
+        [
+            " jellyfin Pulling",
+            " 4f53cda18c2b Downloading [==>  ]",
+            " jellyfin Pulled"
+        ]
+    );
+}

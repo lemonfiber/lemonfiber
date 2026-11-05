@@ -76,7 +76,26 @@ fn answering_as(
     told: &str,
     unkeyed: lemonfiber_fixtures::http::Answer,
 ) -> Ctx {
+    declaring_as(
+        name,
+        published,
+        (told, unkeyed),
+        &lemonfiber_fixtures::declaring::enforceable(),
+    )
+}
+
+/// As [`answering_as`], the adapter declaring `declared` over `media.serve`.
+fn declaring_as(
+    name: &str,
+    published: &[(&str, &str, u16)],
+    (told, unkeyed): (&str, lemonfiber_fixtures::http::Answer),
+    declared: &crate::ports::service::Declared,
+) -> Ctx {
     let http = Fake::by_path(vec![
+        (
+            crate::test_support::media::serve("declared"),
+            crate::test_support::media::answered(declared),
+        ),
         (
             "/api/v1/libraries",
             lemonfiber_fixtures::http::Answer::reply(200, "[]"),
@@ -144,6 +163,7 @@ async fn an_adapter_that_speaks_otherwise_or_cannot_be_reached_is_not_installed(
 async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
     let told = about(r#"["media.serve@1"]"#, UPSTREAM);
     let http = Fake::by_path_in_turn(vec![
+        turned(crate::test_support::media::declares()),
         (
             "/api/v1/libraries",
             vec![lemonfiber_fixtures::http::Answer::reply(200, "[]")],
@@ -247,6 +267,7 @@ fn claiming() -> String {
 fn claimed_as(name: &str, claimed: lemonfiber_fixtures::http::Answer) -> Ctx {
     let refused = || lemonfiber_fixtures::http::Answer::reply(401, "");
     let http = Fake::by_path(vec![
+        crate::test_support::media::declares(),
         (
             "/api/v1/libraries",
             lemonfiber_fixtures::http::Answer::reply(200, "[]"),
@@ -331,6 +352,7 @@ async fn an_install_whose_part_stays_open_for_want_of_its_code_says_so_naming_th
         )]
     };
     let http = Fake::by_path_in_turn(vec![
+        turned(crate::test_support::media::declares()),
         ("/api/v1/libraries", reply(200, "[]")),
         (
             "/lemonfiber/adapter/v1/about",
@@ -381,6 +403,7 @@ async fn an_install_whose_claim_is_taken_on_restart_starts_the_upstream_again_an
         )]
     };
     let http = Fake::by_path_in_turn(vec![
+        turned(crate::test_support::media::declares()),
         ("/api/v1/libraries", reply(200, "[]")),
         (
             "/lemonfiber/adapter/v1/about",
@@ -435,6 +458,7 @@ async fn an_adapter_handed_a_captured_secret_is_given_it_once_the_recipe_capture
         lemonfiber_fixtures::http::Answer::reply(401, ""),
     )
     .with_http(Fake::by_path(vec![
+        crate::test_support::media::declares(),
         (
             "/api/v1/libraries",
             lemonfiber_fixtures::http::Answer::reply(200, "[]"),
@@ -507,4 +531,41 @@ async fn an_adapter_whose_recordings_do_not_answer_every_case_is_refused_naming_
         "{detail}"
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
+}
+
+/// An adapter whose declaration admits a byte path no question guards is refused at
+/// install, naming why, rather than first met by the guard.
+#[tokio::test]
+async fn an_adapter_declaring_what_no_guard_could_enforce_is_not_installed() {
+    let name = "adapter-undeclarable";
+    let unguarded = crate::ports::service::Declared {
+        question: None,
+        ..lemonfiber_fixtures::declaring::enforceable()
+    };
+    let ctx = declaring_as(
+        name,
+        &[("komga-adapter", "127.0.0.1", 8080)],
+        (
+            &about(r#"["media.serve@1"]"#, UPSTREAM),
+            lemonfiber_fixtures::http::Answer::reply(401, ""),
+        ),
+        &unguarded,
+    );
+    let outcome = installing(&ctx, &source(name, &speaking())).await;
+    let verdicts = verdicts(outcome);
+    assert!(
+        matches!(
+            verdicts.last().and_then(Option::as_ref),
+            Some(Verdict::Failed { faults })
+                if faults.iter().any(|fault| fault.contains("media.serve@1: its declaration was refused"))
+        ),
+        "{verdicts:?}"
+    );
+}
+
+/// One scripted answer, given at every turn.
+fn turned(
+    (at, answer): (&'static str, lemonfiber_fixtures::http::Answer),
+) -> (&'static str, Vec<lemonfiber_fixtures::http::Answer>) {
+    (at, vec![answer])
 }

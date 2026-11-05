@@ -6,5 +6,5 @@ requirement = [
   { id = "OPS-R35", state = "open" },
   { id = "OPS-R44", state = "open" },
   { id = "OPS-R54", state = "open" },
-  { id = "OPS-R94", state = "partial" },
+  { id = "OPS-R94", state = "partial", evidence = ["crates/lemonfiber-bundle/src/rules.rs", "crates/lemonfiber-bundle/src/tests/second/fenced.rs::a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape"] },
 ]

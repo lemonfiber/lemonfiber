@@ -17,7 +17,7 @@ use super::{compose, fell_short_into, readied, settled_into, Ctx};
 use crate::error::{Diagnose, Problem};
 use crate::model::LifecycleReport;
 use crate::ports::docker::{LogLine, LogQuery};
-use crate::ports::process::Progress;
+use crate::ports::process::{Failure, Output, Progress};
 use crate::stack::closure::resolve;
 use crate::stack::compose::Action;
 
@@ -243,4 +243,44 @@ fn aimed(services: &[String]) -> Action {
     } else {
         Action::Start(services.to_vec())
     }
+}
+
+/// What Compose writes while it pulls an image, in every line of a start that is about
+/// pulling and in none that is about a container, a network or a volume.
+const PULLING: [&str; 9] = [
+    "Pulling",
+    "Pulled",
+    "Waiting",
+    "Downloading",
+    "Download complete",
+    "Verifying Checksum",
+    "Extracting",
+    "Pull complete",
+    "Already exists",
+];
+
+/// Run `command`, handing the narrator each line the engine writes while pulling as it
+/// arrives and keeping none of them: every line of a pull, and of a start those
+/// [`PULLING`] names.
+pub(super) async fn narrated(
+    ctx: &Ctx,
+    command: &[String],
+    starting: bool,
+) -> Result<Output, Failure> {
+    let mut progress = ctx.seams.runner.stream(command).await?;
+    let mut output = Output {
+        status: None,
+        stdout: String::new(),
+        stderr: String::new(),
+    };
+    while let Some(event) = progress.recv().await {
+        match event {
+            Progress::Line(line) if !starting || PULLING.iter().any(|word| line.contains(word)) => {
+                ctx.narrator.pulled(&line).await;
+            }
+            Progress::Line(_) => {}
+            Progress::Ended(status) => output.status = status,
+        }
+    }
+    Ok(output)
 }
