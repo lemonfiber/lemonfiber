@@ -8,7 +8,8 @@
 //! not take — reads that text, and a stack the manifest reader refuses is refused
 //! here, while it is still a compile error. The pins and the first-party set the core
 //! trusts are written out beside it, so neither is typed by hand, and so is what runs
-//! of the stack (`build/carried.rs`), which the binary embeds.
+//! of the stack (`build/carried.rs`), which the binary embeds. Before any of it, every
+//! pinned copy is held to its own recordings (`build/conforming.rs`).
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -16,6 +17,8 @@ use std::process::exit;
 
 #[path = "build/carried.rs"]
 mod carried;
+#[path = "build/conforming.rs"]
+mod conforming;
 
 /// Where the catalogue holding the default bundle lives, from this crate.
 const CATALOGUE: &str = "../../assets/plugins";
@@ -27,6 +30,18 @@ fn main() {
     let out = PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
     let catalogue = Path::new(env!("CARGO_MANIFEST_DIR")).join(CATALOGUE);
     let held = bundle(&catalogue, &out);
+    let unpassed = conforming::unpassed(
+        &catalogue.join(lemonfiber_bundle::COPIES),
+        held.iter().map(|one| one.pin.id.as_str()),
+    );
+    if !unpassed.is_empty() {
+        eprintln!(
+            "error: a plugin the bundle pins does not answer every case of the contracts it \
+             speaks\n\n{}\n",
+            unpassed.join("\n")
+        );
+        exit(1);
+    }
     let text = stack(&catalogue, &held, &out);
     carried::stack(
         &catalogue,

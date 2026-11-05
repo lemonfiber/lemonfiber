@@ -24,6 +24,10 @@ lemonfiber-manifest = { workspace = true }
 lemonfiber-bundle = { workspace = true }
 # Reading which recordings the stack's claims name, to carry what runs and nothing else.
 toml = { workspace = true }
+# Every pinned copy held to its own recordings, by the judge install and update use, and
+# the contracts it judges them against.
+lemonfiber-conformance = { workspace = true }
+lemonfiber-contract = { workspace = true }
 
 [lints]
 workspace = true
@@ -31,4 +35,7 @@ workspace = true
 [dev-dependencies]
 lemonfiber-manifest = { workspace = true }
 lemonfiber-bundle = { workspace = true }
+lemonfiber-conformance = { workspace = true }
+lemonfiber-contract = { workspace = true }
+serde_json = { workspace = true }
 toml = { workspace = true }

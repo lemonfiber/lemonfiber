@@ -19,8 +19,10 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 
 mod confined;
+mod named;
 
 pub use confined::{Confined, Lying, Readable};
+pub use named::beneath;
 
 /// A filesystem's own identity for a path: which underlying file it names, and
 /// how many names currently point at it.

@@ -8,8 +8,9 @@
 use std::path::{Path, PathBuf};
 
 use crate::doctor::BUNDLED_CHECKS;
-use crate::error::Problem;
-use crate::plugin::{Install, Installed, Installs, Register};
+use crate::error::codes::plugin::UNCONFORMING;
+use crate::error::{Problem, Remedy, State};
+use crate::plugin::{CaseVerdict, Install, Installed, Installs, Register};
 
 use super::super::Ctx;
 use super::fetching::Fetched;
@@ -63,7 +64,7 @@ pub(super) async fn install(
     from: Option<&Fetched<'_>>,
     consent: &Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let read = accepted(path, from)?;
+    let read = accepted(path, from).await?;
 
     // One stamp for the run, taken before anything is decided, so the record says it
     // was installed at the moment its changes are journalled under. A plugin fetched
@@ -333,8 +334,9 @@ pub(super) struct Accepted {
     pub(super) tree: String,
 }
 
-/// The manifest at this path, read and held to everything this build refuses, and the
-/// SHA-256 of the bytes it was read from.
+/// The manifest at this path, read and held to everything this build refuses and every
+/// case of the contracts its adapters speak to the recordings it ships, and the SHA-256
+/// of the bytes it was read from.
 ///
 /// One gate for an install and an update, so a version an update brings on is refused
 /// for exactly what an install of it would be. A refusal is total: none of a refused
@@ -345,8 +347,12 @@ pub(super) struct Accepted {
 /// # Errors
 ///
 /// Where the path holds no manifest this build can read, where the catalogue vouched
-/// for a different one, or where this build refuses it.
-pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accepted, Box<Problem>> {
+/// for a different one, where this build refuses it, or where a case of a contract it
+/// speaks is not answered by a recording it ships.
+pub(super) async fn accepted(
+    path: &Path,
+    from: Option<&Fetched<'_>>,
+) -> Result<Accepted, Box<Problem>> {
     let crate::plugin::Digested {
         manifest,
         digest,
@@ -374,13 +380,43 @@ pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accept
         manifest.services.iter().map(|service| service.id.as_str()),
         &crate::plugin::root(path),
     ));
-    if refusals.is_empty() {
-        Ok(Accepted {
-            manifest,
-            digest,
-            tree,
-        })
-    } else {
-        Err(Box::new(refused(&manifest, &refusals)))
+    if !refusals.is_empty() {
+        return Err(Box::new(refused(&manifest, &refusals)));
     }
+    let unpassed: Vec<String> = lemonfiber_conformance::judged(
+        &crate::plugin::root(path),
+        &crate::plugin::conforming::speakers(&manifest),
+        &lemonfiber_contract::capabilities::all(),
+    )
+    .await
+    .iter()
+    .filter(|judged| judged.verdict != CaseVerdict::Passed)
+    .map(ToString::to_string)
+    .collect();
+    if !unpassed.is_empty() {
+        return Err(Box::new(unconforming(&manifest, &unpassed)));
+    }
+    Ok(Accepted {
+        manifest,
+        digest,
+        tree,
+    })
+}
+
+/// A plugin a case of whose contracts is not answered by a recording it ships, each such
+/// case named in `unpassed`.
+fn unconforming(manifest: &lemonfiber_plugin::Manifest, unpassed: &[String]) -> Problem {
+    Problem::new(
+        UNCONFORMING,
+        format!(
+            "{}'s adapters do not answer every case of the contracts they speak",
+            manifest.plugin.id
+        ),
+        "Nothing was installed and nothing was written. A plugin fills a capability only where \
+         a recording it ships answers each case of the contract, and these do not.",
+        Remedy::new("Take it up with whoever published the plugin, naming each case")
+            .with_detail("lemonfiber plugin conform shows what every case came to"),
+    )
+    .in_state(State::Guided)
+    .with_detail(unpassed.join("; "))
 }

@@ -246,15 +246,48 @@ fn the_decline_service_asks_what_it_acts_on() {
     );
 }
 
+/// Every capability asked by a service of the stack or of a part the bundle pins.
+fn asked_in_the_bundle() -> BTreeSet<String> {
+    stack()
+        .wirings
+        .iter()
+        .filter_map(|wiring| wiring.asks.clone())
+        .chain(
+            lemonfiber_testing::adapted::installed_parts()
+                .into_iter()
+                .flat_map(|installed| installed.services)
+                .flat_map(|placed| placed.asks)
+                .map(|ask| ask.capability),
+        )
+        .collect()
+}
+
 #[test]
-fn nothing_asks_what_only_the_core_asks() {
-    let manifest = stack();
-    for capability in [
-        "quality.sync",
-        "archive.extract",
-        "stream.guard",
-        "invite.decline",
-    ] {
-        assert!(askers(&manifest, capability).is_empty(), "{capability}");
+fn nothing_in_the_bundle_asks_what_only_the_core_asks() {
+    let asked = asked_in_the_bundle();
+    for capability in lemonfiber_core::filling::ASKED_BY_THE_CORE_ALONE {
+        assert!(!asked.contains(capability), "{capability}");
     }
+}
+
+/// Every capability the vocabulary names has a contract, and is asked: by something the
+/// bundle carries, or by the core over that contract.
+#[test]
+fn every_capability_the_vocabulary_names_has_a_contract_and_is_asked() {
+    let contracts: BTreeSet<&str> = lemonfiber_contract::capabilities::all()
+        .iter()
+        .map(|one| one.name)
+        .collect();
+    let asked = asked_in_the_bundle();
+    let unasked: Vec<&str> = lemonfiber_plugin::vocabulary::carried()
+        .iter()
+        .map(|one| one.name)
+        .filter(|name| {
+            !contracts.contains(name)
+                || !(asked.contains(*name)
+                    || lemonfiber_core::filling::ASKED_BY_THE_CORE_ALONE.contains(name))
+        })
+        .collect();
+
+    assert!(unasked.is_empty(), "{unasked:?}");
 }

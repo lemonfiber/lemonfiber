@@ -1,9 +1,9 @@
 //! What a plugin's recordings say about the contracts its adapters speak, on a terminal.
 
-use lemonfiber_core::plugin::Conformed;
+use lemonfiber_core::plugin::{CaseVerdict, Conformed};
 
 use super::super::Lines;
-use super::{came_to, counted, document};
+use super::{counted, document};
 
 /// What judging a plugin's conformance recordings came to, in whichever form was asked.
 pub(crate) fn conformed(read: &Conformed, json: bool) -> Option<Lines> {
@@ -49,6 +49,16 @@ fn judged(read: &Conformed) -> Lines {
          none of that capability."
     });
     lines
+}
+
+/// What one case's recording came to, in a few words.
+fn came_to(verdict: &CaseVerdict) -> String {
+    match verdict {
+        CaseVerdict::Passed => "the recording answers it".to_owned(),
+        CaseVerdict::Failed { faults } => format!("refuted: {}", faults.join("; ")),
+        CaseVerdict::Unrecorded => "unrecorded: no recording of it is there".to_owned(),
+        CaseVerdict::Unproven { why } => format!("unproven: {why}"),
+    }
 }
 
 #[cfg(test)]

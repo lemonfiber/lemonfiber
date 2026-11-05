@@ -23,7 +23,7 @@ pub mod bundled;
 pub mod catalogue;
 mod claimed;
 mod compact;
-mod conforming;
+pub(crate) mod conforming;
 // A record's services as the generated project writes them, rather than anything read
 // out of a manifest.
 mod container;
@@ -85,7 +85,7 @@ pub use claimed::{
     claimed, read, read_digested, root, Asserted, Assertion, Claimed, Claiming, Contributed,
     Digested, Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
 };
-pub use conforming::{conformed, Conformed, Judged};
+pub use conforming::{conformed, CaseVerdict, Conformed, Judged};
 pub(crate) use container::{
     holding, is_a_plugins, own_secret, secrets_file, services_of, unit, user_of, variables,
 };

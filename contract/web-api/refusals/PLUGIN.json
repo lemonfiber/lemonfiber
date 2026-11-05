@@ -204,6 +204,11 @@
     "status": 400,
     "description": "The plugin is installed already."
   },
+  "PLUGIN-50": {
+    "name": "UNCONFORMING",
+    "status": 400,
+    "description": "Raised when a case of a contract a plugin's adapter speaks fails, or no recording the plugin ships answers it."
+  },
   "PLUGIN-6": {
     "name": "NOWHERE",
     "status": 500,

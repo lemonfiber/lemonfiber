@@ -255,12 +255,14 @@ fn staging_of(record: &Path) -> PathBuf {
     record.with_file_name(name)
 }
 
-/// A plugin source written to a scratch directory.
+/// A plugin source written to a scratch directory, with every recording its adapters owe
+/// answered inside their contracts.
 fn source(named: &str, manifest: &str) -> PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("installing-{named}")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
+    crate::test_support::recordings_owed(&at);
     at
 }
 

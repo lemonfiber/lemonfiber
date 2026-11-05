@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use lemonfiber_fixtures::scratch::Scratch;
 
+use super::CaseVerdict as Verdict;
 use super::{conformed, conformed_to, Conformed};
-use crate::plugin::claimed::Verdict;
 
 /// A plugin whose adapter speaks `subtitles.fetch@1` in front of its own finder.
 const MANIFEST: &str = r#"
@@ -171,7 +171,7 @@ async fn an_answer_outside_the_contract_fails_its_case_and_a_declared_refusal_pa
 }
 
 #[tokio::test]
-async fn a_recording_absent_of_another_build_or_of_another_request_is_unproven() {
+async fn a_recording_of_another_build_or_another_request_is_unproven_and_one_absent_unrecorded() {
     let recorded = vec![
         (
             "refuses-without-the-key",
@@ -200,7 +200,7 @@ async fn a_recording_absent_of_another_build_or_of_another_request_is_unproven()
     let said = |at: usize, words: &str| whys.get(at).is_some_and(|why| why.contains(words));
     assert!(said(0, "is pinned at"), "{whys:?}");
     assert!(said(1, "and the case asks POST"), "{whys:?}");
-    assert!(said(2, "could not be read"), "{whys:?}");
+    assert!(said(2, "Unrecorded"), "{whys:?}");
 }
 
 #[tokio::test]
@@ -344,8 +344,9 @@ async fn a_recording_of_an_added_operation_holds_the_adapter_to_every_one_at_its
 
     assert!(!read.conforms, "{read:?}");
     assert!(
-        read.cases.iter().any(|one| one.case == "watching-answers"
-            && matches!(&one.verdict, Verdict::Unproven { why } if why.contains("could not be read"))),
+        read.cases
+            .iter()
+            .any(|one| one.case == "watching-answers" && one.verdict == Verdict::Unrecorded),
         "{:?}",
         verdicts(&read)
     );
@@ -366,7 +367,7 @@ async fn a_case_of_an_operation_the_major_was_published_with_is_held_unrecorded(
     assert_eq!(
         read.cases
             .iter()
-            .filter(|one| matches!(one.verdict, Verdict::Unproven { .. }))
+            .filter(|one| one.verdict == Verdict::Unrecorded)
             .map(|one| one.case.as_str())
             .collect::<Vec<_>>(),
         vec!["watching-answers"]

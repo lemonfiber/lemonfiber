@@ -17,6 +17,20 @@
 //! false, and one whose probes could not be run is unproven — and unproven is not
 //! satisfied, or the word would mean nothing.
 
+/// The capabilities the core asks over their contracts and nothing the bundle carries
+/// asks: each is filled for the core's own use. It holds the curators to their quality
+/// preset, points the subtitle finder at them, unpacks what a download client finished,
+/// guards the household's streams, opens the request service, and hands an invitation's
+/// refusal to the service that declines it.
+pub const ASKED_BY_THE_CORE_ALONE: [&str; 6] = [
+    lemonfiber_contract::capabilities::quality::sync::CAPABILITY,
+    lemonfiber_contract::capabilities::subtitles::fetch::CAPABILITY,
+    lemonfiber_contract::capabilities::archive::extract::CAPABILITY,
+    lemonfiber_contract::capabilities::stream::guard::CAPABILITY,
+    lemonfiber_contract::capabilities::request::intake::CAPABILITY,
+    lemonfiber_contract::capabilities::invite::decline::CAPABILITY,
+];
+
 /// How far a claim has been shown.
 ///
 /// The four the vocabulary's own states name. `Claimed` is not a weaker

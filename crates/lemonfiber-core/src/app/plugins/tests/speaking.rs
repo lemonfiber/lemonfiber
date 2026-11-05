@@ -476,3 +476,35 @@ async fn an_adapter_handed_a_captured_secret_is_given_it_once_the_recipe_capture
     let handed = stack_of(&ctx).join("config/komga-adapter/upstream.json");
     assert_eq!(read(&handed), r#"{"api_token":"t0k3n"}"#);
 }
+
+#[tokio::test]
+async fn an_adapter_whose_recordings_do_not_answer_every_case_is_refused_naming_each() {
+    let name = "adapter-unrecorded";
+    let ctx = adapting(
+        name,
+        &[("komga-adapter", "127.0.0.1", 8080)],
+        r#"["media.serve@1"]"#,
+    );
+    let at = source(name, &speaking());
+    let cases = at.join("conformance").join("media.serve@1");
+    let _ = std::fs::remove_file(cases.join("signed_in-answers.json"));
+    let _ = std::fs::write(
+        cases.join("refuses-without-the-key.json"),
+        "not a recording",
+    );
+
+    let outcome = installing(&ctx, &at).await;
+
+    let detail = outcome
+        .as_ref()
+        .err()
+        .and_then(|problem| problem.detail.clone())
+        .unwrap_or_default();
+    assert_eq!(refusal(outcome), "PLUGIN-50");
+    assert!(
+        detail.contains("media.serve@1/signed_in-answers — no recording answers it")
+            && detail.contains("media.serve@1/refuses-without-the-key — unproven:"),
+        "{detail}"
+    );
+    assert_eq!(counted(reading(&ctx).await), Some(0));
+}
