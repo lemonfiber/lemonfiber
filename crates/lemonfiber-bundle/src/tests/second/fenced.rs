@@ -46,11 +46,6 @@ fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
             .map(|image| image.reference()),
         Some(format!("ghcr.io/lemonfiber/fence:0.18.0@{digest}"))
     );
-    let pre = read(&catalogued(
-        "fence-pre",
-        &with(&fence("ghcr.io/lemonfiber/fence", "0.18.0-beta.1", &digest)),
-    ));
-    assert!(pre.is_ok(), "{pre:?}");
     let commit = read(&catalogued(
         "fence-commit",
         &with(&fence(
@@ -71,6 +66,16 @@ fn a_fenced_part_needs_the_fence_image_pinned_and_held_to_its_shape() {
             "fence-tag",
             fence("ghcr.io/lemonfiber/fence", "v0.18.0", &digest),
             "fence.tag v0.18.0 is not a release",
+        ),
+        (
+            "fence-pre",
+            fence("ghcr.io/lemonfiber/fence", "0.18.0-beta.1", &digest),
+            "fence.tag 0.18.0-beta.1 is not a release",
+        ),
+        (
+            "fence-release-suffixed",
+            fence("ghcr.io/lemonfiber/fence", "0.18.0-anything", &digest),
+            "fence.tag 0.18.0-anything is not a release",
         ),
         (
             "fence-short-commit",

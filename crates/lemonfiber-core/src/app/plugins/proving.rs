@@ -26,6 +26,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
+use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_plugin::Manifest;
 
@@ -33,6 +34,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
+use crate::ports::service::Declaring as _;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 pub(in crate::app::plugins) use restarting::Restarted;
@@ -332,6 +334,7 @@ async fn held_to(
             }
         }
     }
+    faults.extend(undeclarable(adapter, placed).await);
     if !faults.is_empty() {
         return Verdict::Failed { faults };
     }
@@ -343,6 +346,26 @@ async fn held_to(
         adapter,
     };
     claiming(ctx, adapter, (installed, placed), &restarted).await
+}
+
+/// Why the declaration an adapter speaking `media.serve` gives does not hold, where it
+/// does not: one that admits a byte path without a question, or whose template host is
+/// not its base, is refused at install rather than first met by the guard.
+async fn undeclarable(
+    adapter: &lemonfiber_contract::Contracted,
+    placed: &crate::plugin::Placed,
+) -> Option<String> {
+    let spoken = lemonfiber_contract::spoken(serve::CAPABILITY, serve::MAJOR);
+    if !placed.speaks.contains(&spoken) {
+        return None;
+    }
+    match serve::Adapter(adapter.clone()).declared().await {
+        Ok(declared) => declared
+            .checked()
+            .err()
+            .map(|refused| format!("{spoken}: its declaration was refused: {refused}")),
+        Err(failure) => Some(format!("{spoken}: declared: {failure}")),
+    }
 }
 
 /// What claiming the part an adapter speaking `owner.claim` stands in front of came to:

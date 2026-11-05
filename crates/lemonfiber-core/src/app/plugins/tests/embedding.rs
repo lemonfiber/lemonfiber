@@ -72,6 +72,7 @@ pub(super) fn ran(stack: &Path, service: &str) {
 pub(super) fn unmoved(name: &str, serving: &Arc<Serving>) -> Ctx {
     use lemonfiber_fixtures::http::Answer;
     let http = lemonfiber_fixtures::http::Fake::by_path(vec![
+        super::speaking::declares(),
         (
             "/System/Info/Public",
             Answer::reply(
