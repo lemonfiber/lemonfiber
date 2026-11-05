@@ -49,7 +49,7 @@ fn filling_writes_each_placeholder_and_leaves_everything_else_as_it_was() {
 }
 
 #[test]
-fn a_starting_file_names_only_secrets_of_the_plugins_own_services() {
+fn a_starting_file_names_only_secrets_its_own_service_holds() {
     let read = manifest();
     assert!(read.is_some(), "the fixture is not a manifest");
     let Some(manifest) = read else {
@@ -76,6 +76,21 @@ fn a_starting_file_names_only_secrets_of_the_plugins_own_services() {
             "{says}: {said:?}"
         );
     }
+    let beside = refused(
+        &manifest,
+        "komga-adapter",
+        "app.ini",
+        b"key = {{secret:api-key}}\n",
+    );
+    assert!(
+        beside
+            .iter()
+            .any(|one| one.location == "config/komga-adapter/app.ini"
+                && one
+                    .message
+                    .contains("which is komga's rather than komga-adapter's")),
+        "{beside:?}"
+    );
 }
 
 #[test]

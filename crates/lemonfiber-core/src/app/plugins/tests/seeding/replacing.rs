@@ -163,6 +163,50 @@ async fn a_replacement_whose_settings_file_is_a_link_is_refused_and_writes_nothi
     assert_eq!(read(&target), settled(&before));
 }
 
+/// A settings file whose directory is a link the service planted is not written through,
+/// however ordinary the file at its end.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_replacement_whose_settings_directory_is_a_link_is_refused_and_writes_nothing_through_it()
+{
+    let (ctx, before) = installed("seeded-replaced-linked-directory").await;
+    let elsewhere = lemonfiber_fixtures::scratch::Scratch::new("seeded-replaced-directory");
+    let _ = std::fs::write(elsewhere.path().join("application.yml"), settled(&before));
+    let config = stack_of(&ctx).join("config/komga");
+    let _ = std::fs::remove_dir_all(&config);
+    let _ = std::os::unix::fs::symlink(elsewhere.path(), &config);
+
+    let rotated = rotating(&ctx).await;
+
+    assert!(refusal(rotated.as_ref()).is_some(), "{rotated:?}");
+    assert_eq!(minted(&ctx), Some(before.clone()));
+    assert_eq!(
+        read(&elsewhere.path().join("application.yml")),
+        settled(&before)
+    );
+}
+
+/// A settings file a replacement writes the new key into is the service owner's alone.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_settings_file_a_replacement_writes_is_its_owners_alone() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (ctx, before) = installed("seeded-replaced-mode").await;
+    let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o644));
+
+    let rotated = rotating(&ctx).await;
+
+    let after = minted(&ctx).unwrap_or_default();
+    assert_ne!(after, before, "{rotated:?}");
+    assert_eq!(read(&starting_of(&ctx)), settled(&after));
+    assert_eq!(
+        std::fs::metadata(starting_of(&ctx))
+            .map(|held| held.permissions().mode() & 0o777)
+            .ok(),
+        Some(0o600)
+    );
+}
+
 #[tokio::test]
 async fn a_service_reading_the_key_from_its_environment_is_handed_it_in_its_secrets_file() {
     let name = "seeded-replaced-environment";
