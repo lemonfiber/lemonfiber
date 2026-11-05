@@ -206,12 +206,6 @@ const NAMED: &[Named] = &[
         until: Until::Moves("gluetun"),
     },
     Named {
-        file: "crates/lemonfiber-core/src/seed/run/taken_back.rs",
-        part: "seerr",
-        count: 1,
-        until: Until::Earlier,
-    },
-    Named {
         file: "crates/lemonfiber-core/src/settings/legacy.rs",
         part: "flaresolverr",
         count: 2,
