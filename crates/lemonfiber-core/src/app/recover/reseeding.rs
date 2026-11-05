@@ -16,17 +16,10 @@ use super::Ctx;
 /// What is said of a starting file reached through a link.
 const LINKED: &str = "it is reached through a link";
 
-/// What is said where the file as the plugin shipped it is no longer kept.
-const UNKEPT: &str = "the file as its plugin shipped it is no longer kept, so where the value \
-     stands in it cannot be found";
-
-/// What is said where the secret store holds no value of the secret to write back.
-const UNHELD: &str = "the secret store holds no value of its secret to write back";
-
 /// The starting file at `path` written with the value the secret store holds of
 /// `plugin`'s `secret` where the shipped file puts its placeholder, while it still holds
-/// what was written, its checksum `written`; nothing where it is gone or holds anything
-/// else.
+/// what was written, its checksum `written`; nothing where it is gone, holds anything
+/// else, or the store or the files kept for the plugin no longer say what to write.
 ///
 /// # Errors
 ///
@@ -79,26 +72,23 @@ fn rewritten(
     (crate::materialised::checksum(current.as_bytes()) == written).then_some(())?;
     let value = crate::settings::Stores::of(ctx)
         .secrets
-        .value(&crate::settings::named(plugin, secret))
-        .map(str::to_owned);
+        .value(&crate::settings::named(plugin, secret))?
+        .to_owned();
     let starting = crate::plugin::program::Starting {
         root: &kept,
         service: &service,
     };
-    let rewritten = crate::plugin::program::shipped(Some(starting))
-        .and_then(|shipped| {
-            shipped
-                .into_iter()
-                .find_map(|(named, bytes)| (Path::new(&named) == file).then_some(bytes))
-                .ok_or_else(|| UNKEPT.to_owned())
-        })
-        .and_then(|template| {
-            let value = value.ok_or_else(|| UNHELD.to_owned())?;
-            let random = ctx.seams.random.as_ref();
-            crate::plugin::seeding::replaced(&template, current.as_bytes(), secret, &value, random)
-        })
-        .map(|bytes| (stack, bytes.unwrap_or_else(|| current.into_bytes())));
-    Some(rewritten)
+    let template = match crate::plugin::program::shipped(Some(starting)) {
+        Ok(shipped) => shipped
+            .into_iter()
+            .find_map(|(named, bytes)| (Path::new(&named) == file).then_some(bytes))?,
+        Err(why) => return Some(Err(why)),
+    };
+    let random = ctx.seams.random.as_ref();
+    let bytes =
+        crate::plugin::seeding::replaced(&template, current.as_bytes(), secret, &value, random)
+            .transpose()?;
+    Some(bytes.map(|bytes| (stack, bytes)))
 }
 
 /// The service whose configuration directory beneath `stack` holds `at`, and where it is

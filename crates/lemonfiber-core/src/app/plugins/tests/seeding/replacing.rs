@@ -521,3 +521,50 @@ async fn a_settings_file_gone_since_the_replacement_is_left_gone_putting_it_back
     assert_eq!(minted(&ctx), Some(before));
     assert!(!starting_of(&ctx).exists());
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_settings_file_that_cannot_be_written_back_is_named_putting_it_back() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (ctx, _, after) = replaced("seeded-reseeded-unwritable").await;
+    let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o400));
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o600));
+
+    assert!(
+        reversal.as_ref().err().is_some_and(|problem| problem.code
+            == crate::error::codes::setup::NOT_REWOUND
+            && problem
+                .detail
+                .as_deref()
+                .is_some_and(|said| said.contains("application.yml"))),
+        "{reversal:?}"
+    );
+    assert_eq!(read(&starting_of(&ctx)), settled(&after));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_settings_file_whose_kept_starting_files_cannot_be_read_is_named_putting_it_back() {
+    let (ctx, _, after) = replaced("seeded-reseeded-unkept").await;
+    let kept = crate::app::plugins::kept::root(&ctx, "komga").unwrap_or_default();
+    let _ = std::os::unix::fs::symlink(
+        kept.join("config/komga/application.yml"),
+        kept.join("config/komga/linked.yml"),
+    );
+
+    let run = seeded_in(&ctx).map(|change| change.at);
+    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+
+    assert!(
+        reversal
+            .as_ref()
+            .err()
+            .and_then(|problem| problem.detail.as_deref())
+            .is_some_and(|said| said.contains("no starting file may be either")),
+        "{reversal:?}"
+    );
+    assert_eq!(read(&starting_of(&ctx)), settled(&after));
+}
