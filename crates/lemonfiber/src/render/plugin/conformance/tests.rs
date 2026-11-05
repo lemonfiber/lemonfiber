@@ -1,4 +1,4 @@
-use lemonfiber_core::plugin::{Conformed, Judged, Verdict, Violation};
+use lemonfiber_core::plugin::{CaseVerdict as Verdict, Conformed, Judged, Violation};
 
 use super::conformed;
 
@@ -59,19 +59,31 @@ fn each_case_is_said_under_its_contract_and_the_whole_is_judged() {
             location: "service subber-adapter.fronts".to_owned(),
             message: "is absent".to_owned(),
         }],
-        vec![case(
-            "subtitles.fetch@1",
-            "watch-answers",
-            Verdict::Unproven {
-                why: "could not be read".to_owned(),
-            },
-        )],
+        vec![
+            case("subtitles.fetch@1", "watching-answers", Verdict::Unrecorded),
+            case(
+                "subtitles.fetch@1",
+                "refuses-without-the-key",
+                Verdict::Failed {
+                    faults: vec!["answered 200".to_owned(), "unkeyed".to_owned()],
+                },
+            ),
+            case(
+                "subtitles.fetch@1",
+                "watch-answers",
+                Verdict::Unproven {
+                    why: "could not be read".to_owned(),
+                },
+            ),
+        ],
         false,
     );
     let text = said(&failing);
     for expected in [
         "Refused, 1 violation:",
         "service subber-adapter.fronts — is absent",
+        "unrecorded: no recording of it is there",
+        "refuted: answered 200; unkeyed",
         "unproven: could not be read",
         "It does not conform",
     ] {

@@ -45,7 +45,7 @@ pub(crate) async fn update(
     from: Option<&super::fetching::Fetched<'_>>,
     consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let read = super::installing::accepted(path, from)?;
+    let read = super::installing::accepted(path, from).await?;
     // The plugin named and the plugin the source holds have to be the one plugin: an
     // update asked for one and carried out on another would replace something nobody
     // named with something nobody read.

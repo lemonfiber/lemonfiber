@@ -23,22 +23,12 @@ fn written(pinned: &Pinned) -> Scratch {
     root
 }
 
-/// Each case that did not pass, as `plugin contract/case: verdict`.
+/// Each refusal and each case that did not pass, as `plugin contract/case — verdict`.
 fn unpassed(plugin: &str, read: &Conformed) -> Vec<String> {
     read.refusals
         .iter()
         .map(|refused| format!("{plugin} {}: {}", refused.location, refused.message))
-        .chain(
-            read.cases
-                .iter()
-                .filter(|judged| judged.verdict != lemonfiber_core::plugin::Verdict::Passed)
-                .map(|judged| {
-                    format!(
-                        "{plugin} {}/{}: {:?}",
-                        judged.contract, judged.case, judged.verdict
-                    )
-                }),
-        )
+        .chain(read.not_passed().map(|judged| format!("{plugin} {judged}")))
         .collect()
 }
 

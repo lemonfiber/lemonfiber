@@ -1,31 +1,16 @@
-//! Whether a plugin's adapters answer the contracts they speak, judged from the
-//! recordings the plugin ships and nothing else.
-//!
-//! Each case of each contract an adapter speaks has one recording beside the manifest,
-//! at `conformance/<capability>@<major>/<case>.json`, taken against the upstream the
-//! adapter `fronts` at the digest the manifest pins it by. A recorded answer is read by
-//! the very client the core asks a running adapter with, so what passes here is what
-//! the core would read and what fails is what it would refuse.
+//! Whether a plugin's adapters answer the contracts they speak, as the core reports it:
+//! [`lemonfiber_conformance`]'s verdict on every case, beside the refusals the manifest
+//! draws, which no recording can make up for.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex, PoisonError};
 
-use async_trait::async_trait;
-use lemonfiber_contract::client::Witness;
-use lemonfiber_contract::conformance::{filed, Case, Expect, UNKEYED};
-use lemonfiber_contract::Contracted;
-use lemonfiber_plugin::{Manifest, Service, Violation};
+use lemonfiber_conformance::Speaker;
+pub use lemonfiber_conformance::{Judged, Verdict as CaseVerdict};
+pub(crate) use lemonfiber_conformance::{ASKED_WITH, RECORDINGS};
+use lemonfiber_plugin::{Manifest, Violation};
 
-use super::claimed::{sourced, Unreadable, Verdict};
-use super::recorded::{self, Recording};
+use super::claimed::{sourced, Unreadable};
 use crate::doctor::BUNDLED_CHECKS;
-use crate::ports::http::{Http, Request, Response, Unreachable, JSON};
-
-/// Where a plugin's conformance recordings sit, beneath its source.
-pub(crate) const RECORDINGS: &str = "conformance";
-
-/// The method every operation is asked with.
-pub(crate) const ASKED_WITH: &str = "POST";
 
 /// What a plugin's recordings say about the contracts its adapters speak.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -40,17 +25,13 @@ pub struct Conformed {
     pub conforms: bool,
 }
 
-/// One case, as its recording answered it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct Judged {
-    /// The contract it is a case of, as `capability@major`.
-    pub contract: String,
-    /// The case.
-    pub case: String,
-    /// Where its recording is, beneath the plugin's source.
-    pub recording: String,
-    /// What it came to.
-    pub verdict: Verdict,
+impl Conformed {
+    /// Every case that did not pass.
+    pub fn not_passed(&self) -> impl Iterator<Item = &Judged> {
+        self.cases
+            .iter()
+            .filter(|one| one.verdict != CaseVerdict::Passed)
+    }
 }
 
 /// What the plugin whose source is at this path conforms to, judged from its recordings.
@@ -69,222 +50,36 @@ async fn conformed_to(
 ) -> Result<Conformed, Unreadable> {
     let (root, manifest) = sourced(path)?;
     let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
-    let mut judged = Vec::new();
-    for service in manifest
-        .services
-        .iter()
-        .filter(|one| !one.speaks.is_empty())
-    {
-        let pinned = upstream(&manifest, service);
-        let files: Vec<String> = manifest
-            .upstream_of(service)
-            .map(|one| one.media_types.clone())
-            .unwrap_or_default();
-        for named in &service.speaks {
-            let Some(spoken) = published
-                .iter()
-                .find(|one| lemonfiber_contract::spoken(one.name, one.major) == *named)
-            else {
-                continue;
-            };
-            let cases = filed(spoken, &files);
-            let recorded_at = recorded_minor(&root, named, &cases);
-            for case in cases {
-                let recording = recording_of(named, &case);
-                let verdict = match recorded::read(&root, &recording) {
-                    Err(_)
-                        if !root.join(&recording).exists()
-                            && case.operation.since > recorded_at =>
-                    {
-                        Verdict::Passed
-                    }
-                    Err(unrunnable) => Verdict::Unproven { why: unrunnable.0 },
-                    Ok(recorded) => {
-                        let asked = Asked {
-                            service,
-                            case: &case,
-                            pinned: pinned.as_deref(),
-                        };
-                        asked.judged(&recorded).await
-                    }
-                };
-                judged.push(Judged {
-                    contract: named.clone(),
-                    case: case.case.clone(),
-                    recording,
-                    verdict,
-                });
-            }
-        }
-    }
-    let conforms = refusals.is_empty() && judged.iter().all(|one| one.verdict == Verdict::Passed);
+    let cases = lemonfiber_conformance::judged(&root, &speakers(&manifest), published).await;
+    let conforms =
+        refusals.is_empty() && cases.iter().all(|one| one.verdict == CaseVerdict::Passed);
     Ok(Conformed {
         id: manifest.plugin.id.clone(),
         refusals,
-        cases: judged,
+        cases,
         conforms,
     })
 }
 
-/// The highest minor among the operations of `contract` the plugin holds a recording for:
-/// the minor of the core it was recorded against. A case of an operation added after it is
-/// answered `unsupported` by an adapter built before the operation existed.
-fn recorded_minor(root: &Path, contract: &str, cases: &[Case<'_>]) -> u32 {
-    cases
-        .iter()
-        .filter(|case| root.join(recording_of(contract, case)).exists())
-        .map(|case| case.operation.since)
-        .max()
-        .unwrap_or_default()
-}
-
-/// Where the recording of `case` of `contract` sits, beneath the plugin's source.
-fn recording_of(contract: &str, case: &Case<'_>) -> String {
-    format!("{RECORDINGS}/{contract}/{}.json", case.case)
-}
-
-/// The image the service a speaker answers for is pinned by, as a recording names it:
-/// the one it fronts, or its own where it fronts none.
-fn upstream(manifest: &Manifest, speaker: &Service) -> Option<String> {
+/// Each service of `manifest` that speaks a contract, as the judge asks of it: what it
+/// speaks, and what the upstream it answers for is pinned at and files.
+pub(crate) fn speakers(manifest: &Manifest) -> Vec<Speaker> {
     manifest
-        .upstream_of(speaker)
-        .map(|one| format!("{}@{}", one.image, one.digest))
-}
-
-/// One case of one contract an adapter speaks, as its recording is judged against.
-struct Asked<'a> {
-    service: &'a Service,
-    case: &'a Case<'a>,
-    pinned: Option<&'a str>,
-}
-
-impl Asked<'_> {
-    /// What the recording comes to for this case.
-    async fn judged(&self, recording: &Recording) -> Verdict {
-        let Some(pinned) = self.pinned else {
-            return unproven("the adapter names no upstream it was recorded against");
-        };
-        if recording.recorded_from != pinned {
-            return unproven(&format!(
-                "was recorded from {}, and the upstream it fronts is pinned at {pinned}",
-                recording.recorded_from
-            ));
-        }
-        let operation = self.case.operation;
-        let recorded::Of::Request {
-            request: asked,
-            response,
-        } = &recording.of
-        else {
-            return unproven(&format!(
-                "records a run, {}, and a contract's case is asked over a request",
-                recorded::of(recording)
-            ));
-        };
-        let path = operation.path();
-        if asked.method != ASKED_WITH || asked.path != path || asked.accept.as_deref() != Some(JSON)
-        {
-            return unproven(&format!(
-                "records {}, and the case asks {}",
-                recorded::said(&asked.method, &asked.path, asked.accept.as_deref()),
-                recorded::said(ASKED_WITH, &path, Some(JSON))
-            ));
-        }
-        match self.case.expect {
-            Expect::Status(statuses) if statuses.contains(&response.status) => Verdict::Passed,
-            Expect::Status(statuses) => Verdict::Failed {
-                faults: vec![format!(
-                    "answered {}, and a call without the key is refused with {statuses:?}",
-                    response.status
-                )],
-            },
-            Expect::Conforms if UNKEYED.contains(&response.status) => Verdict::Failed {
-                faults: vec!["refused the plugin's own key".to_owned()],
-            },
-            Expect::Conforms => {
-                let told = Arc::new(Told::default());
-                let client = Contracted::new(
-                    Arc::new(Replayed(answered(response))),
-                    "http://recorded",
-                    &self.service.id,
-                    "recorded",
-                )
-                .witnessed_by(told.clone());
-                let _ = operation.judged(&client).await;
-                verdict(told.said())
+        .services
+        .iter()
+        .filter(|service| !service.speaks.is_empty())
+        .map(|service| {
+            let upstream = manifest.upstream_of(service);
+            Speaker {
+                service: service.id.clone(),
+                speaks: service.speaks.clone(),
+                pinned: upstream.map(|one| format!("{}@{}", one.image, one.digest)),
+                files: upstream
+                    .map(|one| one.media_types.clone())
+                    .unwrap_or_default(),
             }
-        }
-    }
-}
-
-/// A case's verdict from what was told of reading its answer.
-///
-/// An answer the contract declares passes, a refusal it declares included, as an upstream
-/// refusing the credential the adapter holds for it. One outside the contract fails with
-/// what was outside it.
-fn verdict(told: Vec<String>) -> Verdict {
-    if told.is_empty() {
-        Verdict::Passed
-    } else {
-        Verdict::Failed { faults: told }
-    }
-}
-
-/// Unproven, for `why`.
-fn unproven(why: &str) -> Verdict {
-    Verdict::Unproven {
-        why: why.to_owned(),
-    }
-}
-
-/// The recorded answer, as a transport hands it back.
-fn answered(answer: &recorded::Answer) -> Response {
-    Response {
-        status: answer.status,
-        headers: answer
-            .headers
-            .iter()
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect(),
-        body: answer
-            .json
-            .as_ref()
-            .map(ToString::to_string)
-            .or_else(|| answer.body_starts_with.clone())
-            .unwrap_or_default(),
-    }
-}
-
-/// A transport answering every request with one recorded answer.
-struct Replayed(Response);
-
-#[async_trait]
-impl Http for Replayed {
-    async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-        Ok(self.0.clone())
-    }
-}
-
-/// Everything the client said was outside the contract.
-#[derive(Default)]
-struct Told(Mutex<Vec<String>>);
-
-impl Told {
-    fn said(&self) -> Vec<String> {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
-}
-
-impl Witness for Told {
-    fn nonconforming(&self, _operation: &str, why: &str) {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push(why.to_owned());
-    }
+        })
+        .collect()
 }
 
 #[cfg(test)]

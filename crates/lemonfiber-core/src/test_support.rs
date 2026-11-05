@@ -51,11 +51,13 @@ mod crossing;
 mod typing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader, crossing_stack};
 pub(crate) use typing::Typing;
+mod conforming;
 mod contracting;
 mod declining;
 pub(crate) mod egress;
 mod gating;
 pub(crate) mod syncing;
+pub(crate) use conforming::recordings_owed;
 pub(crate) use contracting::{contracted_context, declined, gated};
 pub(crate) use declining::{a_contracted_decline, DECLINE_TRUSTED};
 pub(crate) use gating::{

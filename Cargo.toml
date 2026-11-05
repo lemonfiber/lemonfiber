@@ -22,6 +22,7 @@ lemonfiber-adapters = { path = "crates/lemonfiber-adapters" }
 lemonfiber-api = { path = "crates/lemonfiber-api" }
 lemonfiber-bundle = { path = "crates/lemonfiber-bundle" }
 lemonfiber-bundled = { path = "crates/lemonfiber-bundled" }
+lemonfiber-conformance = { path = "crates/lemonfiber-conformance" }
 lemonfiber-contract = { path = "crates/lemonfiber-contract" }
 lemonfiber-core = { path = "crates/lemonfiber-core" }
 lemonfiber-error = { path = "crates/lemonfiber-error" }

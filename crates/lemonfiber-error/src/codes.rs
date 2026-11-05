@@ -127,7 +127,7 @@ families! {
     migrate => "MIGRATE": "taking over a setup already here",
     pair => "PAIR": "pairing a phone with the stack",
     play => "PLAY": "playing what the household holds",
-    plugin => "PLUGIN": "installing and running plugins" [pinned],
+    plugin => "PLUGIN": "installing and running plugins" [pinned, conforming],
     proc => "PROC": "the program underneath",
     provider => "PROVIDER": "accounts and indexers",
     qual => "QUAL": "quality against what is available",
