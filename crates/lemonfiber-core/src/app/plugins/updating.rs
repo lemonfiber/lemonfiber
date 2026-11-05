@@ -81,7 +81,9 @@ pub(crate) async fn update(
         super::standing::waiting(ctx, &stack_manifest, without.installed(), &would);
     let at = crate::plugin::owner(&was.plugin);
     let whose = |change: &crate::journal::Change| {
-        crate::plugin::owns(&was.plugin, change) && !super::super::project::holds(ctx, change)
+        crate::plugin::owns(&was.plugin, change)
+            && !super::super::project::holds(ctx, change)
+            && !carried_across(change)
     };
 
     // A reading and a rehearsal ask the reversal what it would put back, which judges it
@@ -177,6 +179,13 @@ pub(crate) async fn update(
     account.install.reversed = Some(super::reversing(ctx, &would, stack, &stamp).await);
     account.restored = Some(restored(ctx, &was, stack, &stamp).await);
     Ok(answering(held.installed().to_vec(), account, offer))
+}
+
+/// Whether `change` kept a value in the secret store, which an update carries to the new
+/// version rather than putting back: what the plugin's services were started with already
+/// holds it, and the new version's install keeps a value the store holds.
+fn carried_across(change: &crate::journal::Change) -> bool {
+    matches!(change.kind, crate::journal::Kind::Secret { .. })
 }
 
 /// Record the new version in place of the one it replaced, and put the front door in

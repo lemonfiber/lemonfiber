@@ -131,7 +131,7 @@ pub fn filled(
 /// What is wrong with the starting file at `path` of `service`, holding `bytes`.
 ///
 /// A file naming no placeholder may be anything. One that names one is text, and each
-/// placeholder names a secret the manifest declares as one of its own services'.
+/// placeholder names a secret the manifest declares as `service`'s own.
 #[must_use]
 pub fn refused(manifest: &Manifest, service: &str, path: &str, bytes: &[u8]) -> Vec<Violation> {
     let location = format!("config/{service}/{path}");
@@ -158,6 +158,7 @@ pub fn refused(manifest: &Manifest, service: &str, path: &str, bytes: &[u8]) -> 
         .iter()
         .filter_map(|placeholder| {
             owned(manifest, placeholder.secret)
+                .and_then(|()| its_own(manifest, service, placeholder.secret))
                 .err()
                 .map(|message| Violation {
                     location: location.clone(),
@@ -165,6 +166,18 @@ pub fn refused(manifest: &Manifest, service: &str, path: &str, bytes: &[u8]) -> 
                 })
         })
         .collect()
+}
+
+/// Whether the manifest declares `secret`, one of its own, as `service`'s.
+fn its_own(manifest: &Manifest, service: &str, secret: &str) -> Result<(), String> {
+    match manifest.secrets.iter().find(|one| one.id == secret) {
+        Some(declared) if declared.of != service => Err(format!(
+            "names the secret {secret}, which is {}'s rather than {service}'s, and a starting \
+             file holds only its own service's secrets",
+            declared.of
+        )),
+        _ => Ok(()),
+    }
 }
 
 /// Whether the plugin declares `secret` as one of its own services' credentials.
