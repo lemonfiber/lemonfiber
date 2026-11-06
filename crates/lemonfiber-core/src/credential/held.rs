@@ -193,7 +193,7 @@ const VPN: Entry = Entry {
     name: "VPN private key",
     setting: VPN_PRIVATE_KEY,
     consumers: &[Consumer::from_its_environment(
-        "Gluetun, the tunnel every torrent leaves through",
+        "the egress guard, the tunnel every torrent leaves through",
         "lemonfiber restart torrent",
     )],
     origin: Origin::Operator,
