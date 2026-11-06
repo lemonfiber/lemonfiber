@@ -2,11 +2,6 @@
 
 use std::fmt::Write as _;
 
-/// The header a service of the Servarr shape authenticates with — the setup validator
-/// sends a key in it, and a first run presents the key it read in it, so its name is
-/// written once.
-pub(crate) const API_KEY_HEADER: &str = "X-Api-Key";
-
 /// The header a service that takes a scheme and a credential reads them from.
 pub(crate) const AUTHORIZATION: &str = "Authorization";
 

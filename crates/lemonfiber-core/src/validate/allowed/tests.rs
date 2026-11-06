@@ -46,24 +46,17 @@ fn a_provider() -> Credential {
     }
 }
 
-fn a_service() -> Credential {
-    Credential::Service {
-        url: "http://127.0.0.1:8989/api/v3/system/status".to_owned(),
-        key: "k".repeat(20),
-    }
-}
-
 #[tokio::test]
 async fn a_credential_the_operator_allows_is_proven_as_it_always_was() {
     let inner = Arc::new(Asked::default());
     let allowed = Allowed::new(inner.clone(), Reaching::default());
-    for credential in [an_indexer(), a_provider(), a_service()] {
+    for credential in [an_indexer(), a_provider()] {
         assert!(matches!(
             allowed.validate(&credential).await,
             Validation::Valid { .. }
         ));
     }
-    assert_eq!(inner.count(), 3);
+    assert_eq!(inner.count(), 2);
 }
 
 #[tokio::test]
@@ -101,13 +94,11 @@ async fn a_provider_the_operator_refuses_is_never_asked() {
 async fn one_switch_refuses_one_credential_and_leaves_the_others_alone() {
     let inner = Arc::new(Asked::default());
     let allowed = Allowed::new(inner.clone(), Reaching::without(REACH_INDEXER_KEY));
-    for credential in [a_provider(), a_service()] {
-        assert!(matches!(
-            allowed.validate(&credential).await,
-            Validation::Valid { .. }
-        ));
-    }
-    assert_eq!(inner.count(), 2);
+    assert!(matches!(
+        allowed.validate(&a_provider()).await,
+        Validation::Valid { .. }
+    ));
+    assert_eq!(inner.count(), 1);
 }
 
 #[tokio::test]
