@@ -44,8 +44,6 @@ const OWNED: [(&str, &str); 3] = [
 /// What takes a name off [`NAMED`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Until {
-    /// The part moving to the plugin path with its adapter, whose code then goes.
-    Moves(&'static str),
     /// A journalled migration renaming a setting, a secret, a directory or an answer an
     /// earlier lemonfiber wrote, which keeps reading the old name.
     Migrated,
@@ -200,12 +198,6 @@ const NAMED: &[Named] = &[
         until: Until::Migrated,
     },
     Named {
-        file: "crates/lemonfiber-core/src/credential/held.rs",
-        part: "gluetun",
-        count: 1,
-        until: Until::Moves("gluetun"),
-    },
-    Named {
         file: "crates/lemonfiber-core/src/settings/legacy.rs",
         part: "flaresolverr",
         count: 2,
@@ -357,21 +349,26 @@ fn found() -> BTreeMap<(String, String), usize> {
 #[test]
 fn no_part_is_named_in_the_core_beyond_what_waits_on_its_removal() {
     let found = found();
-    let listed: BTreeMap<(String, String), usize> = NAMED
+    let listed: BTreeMap<(String, String), (usize, Until)> = NAMED
         .iter()
-        .map(|named| ((named.file.to_owned(), named.part.to_owned()), named.count))
+        .map(|named| {
+            (
+                (named.file.to_owned(), named.part.to_owned()),
+                (named.count, named.until),
+            )
+        })
         .collect();
     let new: Vec<String> = found
         .iter()
-        .filter(|(at, count)| listed.get(*at).is_none_or(|allowed| *count > allowed))
+        .filter(|(at, count)| listed.get(*at).is_none_or(|(allowed, _)| *count > allowed))
         .map(|((file, part), count)| format!("{file} names {part} {count} time(s)"))
         .collect();
     let stale: Vec<String> = listed
         .iter()
-        .filter(|(at, allowed)| found.get(*at).is_none_or(|count| count < allowed))
-        .map(|((file, part), allowed)| {
+        .filter(|(at, (allowed, _))| found.get(*at).is_none_or(|count| count < allowed))
+        .map(|((file, part), (allowed, until))| {
             format!(
-                "{file} names {part} {} time(s), and the list allows {allowed}",
+                "{file} names {part} {} time(s), and the list allows {allowed} as {until:?}",
                 found
                     .get(&(file.clone(), part.clone()))
                     .copied()
@@ -406,14 +403,6 @@ fn every_entry_names_a_part_the_bundle_pins_once() {
             named.file,
             named.part
         );
-        if let Until::Moves(part) = named.until {
-            assert!(
-                lemonfiber_bundled::PINNED
-                    .iter()
-                    .any(|pinned| pinned.first_party.plugin == part),
-                "{part} is no part the bundle pins"
-            );
-        }
         assert!(
             seen.insert((named.file, named.part)),
             "{} {} is listed twice",
