@@ -119,8 +119,9 @@ pub struct IdentitySource {
     pub at: String,
     /// The protocol it is spoken to in.
     pub protocol: Protocol,
-    /// The credential that administers it.
-    pub credential: Credential,
+    /// The credential the request service's owner signs in with, where one is carried:
+    /// none where the operator signs that owner in through the request service's own page.
+    pub credential: Option<Credential>,
 }
 
 /// What one member may ask for on the request service.

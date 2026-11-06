@@ -75,9 +75,12 @@ pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use filing::{Filed, Filing};
-pub use fronting::{AppKeys, Astray, Dated, Fronted};
+pub use fronting::{AppKeys, Astray, Dated, Fronted, OutsideAccount, OutsideServer};
 pub use furnishing::{FiledAt, Furnished, Furnishing};
-pub use gating::{Admitted, GateEntry, GateOutcome, GateRecord, Gated, Gating, Target};
+pub use gating::{
+    Admitted, GateEntry, GateOutcome, GateRecord, Gated, Gating, PlexLink, PlexMember, Target,
+    PLEX_PORT,
+};
 pub use guarding::{Guarded, Guarding, Presented};
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Playback, Session,

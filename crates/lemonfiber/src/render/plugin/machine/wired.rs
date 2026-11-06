@@ -51,7 +51,12 @@ pub(super) fn asking(asks: &[lemonfiber_core::wiring::Wired], recorded: bool) ->
                     "      {} asks for {capability}{}{}, reaching {}",
                     link.by,
                     super::super::super::wiring::filing(files.as_deref()),
-                    super::super::super::wiring::talking(native.as_deref()),
+                    super::super::super::wiring::talking(
+                        native
+                            .as_ref()
+                            .map(lemonfiber_core::wiring::Apis::said)
+                            .as_deref()
+                    ),
                     super::super::super::wiring::reached(services, origins)
                 ));
                 for said in super::super::super::wiring::settling(settled) {

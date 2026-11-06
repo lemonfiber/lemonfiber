@@ -674,3 +674,10 @@ fn a_refusal_is_read_off_the_artefact_by_its_code_and_status() {
     let surface = read(&described, 1);
     assert_eq!(surface.refusals, one_refusal("ADMIT-4", 403).refusals);
 }
+
+/// The surface is held to its shape from lemonfiber's 1.0 on, and not before.
+#[test]
+fn the_surface_is_held_to_its_shape_from_one_point_oh() {
+    let major = env!("CARGO_PKG_VERSION").split('.').next();
+    assert_eq!(super::held(), major != Some("0"));
+}

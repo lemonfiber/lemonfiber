@@ -94,7 +94,7 @@ pub(super) fn would_link(asker: &Filler, server: &MediaServer) -> Wiring {
 }
 
 /// The connection from the request service `asker` to `server`, resting in `state`.
-fn settled(asker: &Filler, server: &MediaServer, state: State) -> Wiring {
+pub(super) fn settled(asker: &Filler, server: &MediaServer, state: State) -> Wiring {
     Wiring::settled(
         format!("{}'s {} connection", asker.name, server.name()),
         state,

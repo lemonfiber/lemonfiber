@@ -29,6 +29,10 @@ impl Ownership for Answering {
         })
     }
 
+    async fn claimed_by(&self) -> Result<Option<String>, Failure> {
+        Ok(None)
+    }
+
     async fn claim(&self) -> Result<crate::ports::service::Claim, Failure> {
         Err(Failure::Refused {
             service: "part".to_owned(),

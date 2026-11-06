@@ -20,7 +20,7 @@
     },
     "native": {
       "type": [
-        "null|string"
+        "anyOf(null,ref:Apis)"
       ],
       "required": false
     }

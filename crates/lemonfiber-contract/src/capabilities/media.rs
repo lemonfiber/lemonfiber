@@ -12,8 +12,8 @@
 use lemonfiber_ports::media::{Kind, MEDIA};
 use lemonfiber_ports::service::{
     AppKeys, Applied, Astray, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
-    Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture, Playback,
-    Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
+    Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
+    OutsideServer, Picture, Playback, Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
 use serde_json::Value;
 
@@ -136,6 +136,10 @@ crate::contract! {
             fn revoke(str key: &str) -> () where asks = Asked { key: minted() };
             /// What it holds under an app's name that is no key it made.
             fn astray(str app: &str) -> Vec<Astray> where since = 1, asks = Asked { app: APP.to_owned() };
+            /// The account of the key filed under an app's name, as the outside service holding the server's accounts knows it.
+            fn account(str app: &str) -> OutsideAccount where since = 2, asks = Asked { app: APP.to_owned() };
+            /// The server as the outside service holding its accounts lists it.
+            fn listed_as() -> OutsideServer where since = 2, asks = Asked {};
         }
         impl Fronted {
             /// The addresses trusted to name the client.

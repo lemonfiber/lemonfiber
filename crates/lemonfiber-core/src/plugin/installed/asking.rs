@@ -45,7 +45,10 @@ pub(crate) fn merged(
         Value::Url(url) => Some(Asking {
             capability: url.url_of.clone(),
             each: false,
-            native: url.native.clone(),
+            native: url
+                .native
+                .as_deref()
+                .map(lemonfiber_manifest::container::Apis::one),
             files: url.files.clone(),
         }),
         _ => None,
@@ -79,9 +82,10 @@ pub struct Asking {
     /// Whether every service that fills it is reached rather than one.
     #[serde(default)]
     pub each: bool,
-    /// The upstream's own API it talks in, which it reaches in place of the adapter.
+    /// The upstream's own API it talks in, or every API it talks in any of, which it
+    /// reaches in place of the adapter.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub native: Option<String>,
+    pub native: Option<lemonfiber_manifest::container::Apis>,
     /// The medium the filler it reaches files, where it narrows the ask to one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub files: Option<String>,

@@ -276,8 +276,8 @@ fn reached(
         trusted,
     );
     let (services, settled) = asked(wiring, capability, &held, chosen, (installed, trusted));
-    let (services, settled) = match ask.native.as_deref() {
-        Some(api) => in_native(installed, &services, settled, api),
+    let (services, settled) = match ask.native.as_ref() {
+        Some(apis) => in_native(installed, &services, settled, apis),
         None => (services, settled),
     };
     Reaches::Asked {
@@ -290,18 +290,19 @@ fn reached(
     }
 }
 
-/// What an ask in the API `api` settles on: the upstream each adapter in `services`
-/// fronts, where that upstream declares `api`, each other service as itself, where it
-/// declares `api` or no API of its own, and unfilled where none is left.
+/// What an ask in any of the APIs `apis` settles on: the upstream each adapter in
+/// `services` fronts, where that upstream declares one of them, each other service as
+/// itself, where it declares one of them or no API of its own, and unfilled where none is
+/// left.
 fn in_native(
     installed: &[Installed],
     services: &[String],
     settled: Settled,
-    api: &str,
+    apis: &lemonfiber_manifest::container::Apis,
 ) -> (Vec<String>, Settled) {
     let spoken: Vec<String> = services
         .iter()
-        .filter_map(|service| spoken_by(installed, service, api))
+        .filter_map(|service| spoken_by(installed, service, apis))
         .collect();
     if spoken.is_empty() && !services.is_empty() {
         (spoken, Settled::Unfilled)
@@ -310,11 +311,20 @@ fn in_native(
     }
 }
 
-/// What of `service` an ask in the API `api` reaches: the upstream it fronts where it is
-/// an adapter and that upstream declares `api`, and `service` itself where it fronts
-/// nothing and declares `api` or no API of its own.
-fn spoken_by(installed: &[Installed], service: &str, api: &str) -> Option<String> {
-    let speaks = |placed: &Placed| placed.native.as_deref().is_none_or(|own| own == api);
+/// What of `service` an ask in any of the APIs `apis` reaches: the upstream it fronts
+/// where it is an adapter and that upstream declares one of them, and `service` itself
+/// where it fronts nothing and declares one of them or no API of its own.
+fn spoken_by(
+    installed: &[Installed],
+    service: &str,
+    apis: &lemonfiber_manifest::container::Apis,
+) -> Option<String> {
+    let speaks = |placed: &Placed| {
+        placed
+            .native
+            .as_deref()
+            .is_none_or(|own| apis.names_any(own))
+    };
     let Some((one, placed)) = installed.iter().find_map(|one| {
         one.services
             .iter()
@@ -327,7 +337,13 @@ fn spoken_by(installed: &[Installed], service: &str, api: &str) -> Option<String
         Some(upstream) => one
             .services
             .iter()
-            .find(|placed| placed.service == upstream && placed.native.as_deref() == Some(api))
+            .find(|placed| {
+                placed.service == upstream
+                    && placed
+                        .native
+                        .as_deref()
+                        .is_some_and(|own| apis.names_any(own))
+            })
             .map(|placed| placed.service.clone()),
         None => speaks(placed).then(|| service.to_owned()),
     }

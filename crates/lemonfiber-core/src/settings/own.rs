@@ -14,7 +14,12 @@ pub(crate) const DEFAULT_DOMAIN: &str = "home.local";
 /// The domain the household's names are under.
 pub(crate) const DOMAIN: &str = lemonfiber_manifest::container::DOMAIN;
 
-pub(crate) const CORE: [&str; 3] = [DEVICE_KEY_APPS, DASHBOARD_SEARCH, DOMAIN];
+pub(crate) const CORE: [&str; 4] = [
+    DEVICE_KEY_APPS,
+    DASHBOARD_SEARCH,
+    DOMAIN,
+    crate::plex_link::SETTING,
+];
 
 const OWN_PREFIX: &str = "LEMONFIBER_";
 
@@ -27,6 +32,9 @@ pub(crate) fn is_configs(name: &str) -> bool {
 }
 
 pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
+    if name == crate::plex_link::SETTING {
+        return crate::plex_link::refusal(value);
+    }
     if name == DOMAIN {
         return (!is_domain(value)).then(|| {
             format!(

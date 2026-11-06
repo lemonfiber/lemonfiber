@@ -10,7 +10,7 @@
 
 use std::path::Path;
 
-use lemonfiber_api::contract::stability::{rendered, Surface, SURFACE_DIR};
+use lemonfiber_api::contract::stability::{held, rendered, Surface, SURFACE_DIR};
 use lemonfiber_api::contract::{layout, Contract};
 
 fn main() {
@@ -25,7 +25,13 @@ fn main() {
         .unwrap_or_default();
 
     let broken = Surface::refused(&before, &fresh);
-    if !broken.is_empty() {
+    if !broken.is_empty() && !held() {
+        eprintln!(
+            "this surface drops what the committed one describes, which lemonfiber allows under \
+             an unchanged api_version until it tags 1.0:\n{}",
+            rendered(&broken)
+        );
+    } else if !broken.is_empty() {
         eprintln!(
             "this surface drops what the committed one describes, under an unchanged \
              api_version:\n{}\nEither put them back, declare each in \

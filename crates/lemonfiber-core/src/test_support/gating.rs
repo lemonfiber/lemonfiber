@@ -27,7 +27,9 @@ pub(crate) fn asking_the_server_as_the_gate(
         placed.asks.push(crate::plugin::Asking {
             capability: crate::app::targets::IDENTITY.to_owned(),
             each: false,
-            native: Some(lemonfiber_manifest::ApiKind::Jellyfin.name().to_owned()),
+            native: Some(lemonfiber_manifest::container::Apis::one(
+                lemonfiber_manifest::ApiKind::Jellyfin.name(),
+            )),
             files: None,
         });
     }

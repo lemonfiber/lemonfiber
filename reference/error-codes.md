@@ -520,6 +520,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETTING-6` | `ALREADY_HOLDS` | advisory | 1 | 400 | 0.18.0 | Raised where the setting already holds what the change asks for. |
 | `SETTING-7` | `OUTSIDE_ITS_CHOICES` | error | 5 | 400 | 0.18.0 | Raised where a change would leave a setting holding a value outside its choices. |
 | `SETTING-8` | `HELD_BACK` | warning | 1 | 409 | 0.18.0 | Raised where a service is held back until the operator gives what it needs to start. |
+| `SETTING-9` | `OWNER_SET_UP` | error | 5 | 409 | 0.18.0 | Raised where `PLEX_LINK_MODE` would enter or leave `owner` for a request service already set up. |
+| `SETTING-10` | `OWNER_HELD` | warning | 1 | 409 | 0.18.0 | Raised on every diagnosis while `PLEX_LINK_MODE` is `owner`, as a standing notice. |
 
 ## `SETUP` — the first run
 

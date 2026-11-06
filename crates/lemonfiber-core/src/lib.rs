@@ -97,6 +97,7 @@ pub mod overlay;
 pub mod pass;
 pub(crate) mod patience;
 pub mod platform;
+pub(crate) mod plex_link;
 pub use crate::error::plural;
 pub mod network;
 pub mod news;

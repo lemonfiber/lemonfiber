@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod apis;
 mod certified;
 pub mod choices;
 pub mod earlier;
@@ -16,6 +17,7 @@ mod user;
 mod values;
 mod words;
 
+pub use apis::Apis;
 pub use certified::{Certificate, MOST_NAMES};
 use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside, shares_a_source};

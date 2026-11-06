@@ -724,6 +724,7 @@ mod intake;
 mod linking;
 mod owning;
 mod passes;
+mod plex;
 mod proxies;
 mod publishing;
 mod quality;

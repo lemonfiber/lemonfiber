@@ -259,6 +259,30 @@
       "since": 1
     },
     {
+      "asked": {
+        "app": "lemonfiber-conformance"
+      },
+      "case": "account-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "account",
+      "since": 2
+    },
+    {
+      "asked": {},
+      "case": "listed_as-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "listed_as",
+      "since": 2
+    },
+    {
       "asked": {},
       "case": "known_proxies-answers",
       "expect": {

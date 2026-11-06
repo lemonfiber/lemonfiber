@@ -38,6 +38,7 @@ pub mod narrowing;
 pub mod overlay;
 pub mod owned;
 pub mod permissions;
+pub(crate) mod plex_link;
 pub(crate) mod proved;
 pub mod providers;
 pub mod releases;

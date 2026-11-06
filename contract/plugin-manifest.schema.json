@@ -64,6 +64,15 @@
   "additionalProperties": false,
   "required": ["schema_version", "plugin"],
   "$defs": {
+    "Apis": {
+      "anyOf": [
+        {"type": "string"},
+        {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      ]
+    },
     "Capture": {
       "description": "A value taken out of an answer.",
       "type": "object",
@@ -357,8 +366,11 @@
         "capability": {"description": "The core capability asked for.", "type": "string"},
         "each": {"description": "Whether every service that fills it is reached rather than one.", "type": "boolean", "default": false},
         "native": {
-          "description": "The upstream's own API the service talks in, which the ask then reaches in place\nof the adapter fronting it.",
-          "type": ["string", "null"],
+          "description": "The upstream's own API the service talks in, or every API it talks in any of,\nwhich the ask then reaches in place of the adapter fronting it.",
+          "anyOf": [
+            {"$ref": "#/$defs/Apis"},
+            {"type": "null"}
+          ],
           "default": null
         },
         "service": {

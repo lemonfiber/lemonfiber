@@ -69,6 +69,19 @@ impl AppKeys for Server {
         self.called(format!("revoke {key}"));
         Ok(())
     }
+    async fn account(&self, app: &str) -> Result<crate::ports::service::OutsideAccount, Failure> {
+        Err(Failure::Unsupported {
+            service: "media".to_owned(),
+            detail: format!("no outside service holds {app}"),
+        })
+    }
+    async fn listed_as(&self) -> Result<crate::ports::service::OutsideServer, Failure> {
+        Err(Failure::Unsupported {
+            service: "media".to_owned(),
+            detail: "no outside service holds its accounts".to_owned(),
+        })
+    }
+
     async fn astray(&self, app: &str) -> Result<Vec<Astray>, Failure> {
         self.called(format!("astray {app}"));
         match self

@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 32,
-      "sha256": "1f9b916323257c76819c8e4976787a04c0f9e56a790b19602f090373e7c3f14e"
+      "sha256": "8c35d9bd4ad053190d2fba84fa6802c525e1f8810d66d4ff3b4561fa2e049a2e"
     },
     {
       "capability": "identity.source",
@@ -129,8 +129,8 @@
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 26,
-      "sha256": "f95d55c092403de4ae089f580b25d8f2d0f24fcd107c21b2d5de8d09d1024e32"
+      "operations": 28,
+      "sha256": "9541825648c8b759c988bb505304e5a2caf3b395fc9c20f2ebc36ed515bf423a"
     },
     {
       "capability": "proxy.front",
@@ -214,7 +214,7 @@
       ],
       "openapi": "request.gate/v1/openapi.json",
       "operations": 4,
-      "sha256": "0be5865596400413e679e1eaae34317c151f8e362040f3b3a3de5d327fd97580"
+      "sha256": "21f7d8b5d67f84d2130712adaec157fdde6ac8f35ab51e1bc7050791c99e74cb"
     },
     {
       "capability": "owner.claim",
@@ -225,8 +225,8 @@
         1
       ],
       "openapi": "owner.claim/v1/openapi.json",
-      "operations": 2,
-      "sha256": "76f54846c6b40417d018a0959681fe88a2910239bd376def97c8fa7c3ec7f30c"
+      "operations": 3,
+      "sha256": "37394816eb55be5416f6c18f8d9b7099ee90cfaed21b168f8b8a9fa4cd743468"
     }
   ]
 }

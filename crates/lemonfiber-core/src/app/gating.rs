@@ -47,6 +47,16 @@ pub(crate) fn may_hold(fillers: &Fillers, owner: crate::wiring::Holder<'_>) -> b
         .is_some_and(|(filler, _)| crate::wiring::crosses(owner, filler.holder()))
 }
 
+/// The certificates the route reaching `target` accepts from the media server, in its own
+/// API or Plex's: nothing for a curator's route.
+pub(crate) fn media_pins(target: &crate::ports::service::Target) -> Option<&[String]> {
+    match target {
+        crate::ports::service::Target::MediaServer { pins }
+        | crate::ports::service::Target::Plex { pins, .. } => Some(pins),
+        crate::ports::service::Target::Curator { .. } => None,
+    }
+}
+
 /// The kind of video the curator a route reaching `target` fetches, or `None` for the media
 /// server's route or a curator of anything else.
 pub(crate) fn fetched(target: &crate::ports::service::Target) -> Option<media::Kind> {
@@ -54,7 +64,8 @@ pub(crate) fn fetched(target: &crate::ports::service::Target) -> Option<media::K
         crate::ports::service::Target::Curator { media_type } => {
             media::Kind::for_media_type(media_type)
         }
-        crate::ports::service::Target::MediaServer { .. } => None,
+        crate::ports::service::Target::MediaServer { .. }
+        | crate::ports::service::Target::Plex { .. } => None,
     }
 }
 

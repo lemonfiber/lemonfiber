@@ -60,8 +60,15 @@
                     "type": "string"
                   },
                   "credential": {
-                    "$ref": "#/$defs/Credential",
-                    "description": "The credential that administers it."
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Credential"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The credential the request service's owner signs in with, where one is carried:\nnone where the operator signs that owner in through the request service's own page."
                   },
                   "protocol": {
                     "$ref": "#/$defs/Protocol",
@@ -70,8 +77,7 @@
                 },
                 "required": [
                   "at",
-                  "protocol",
-                  "credential"
+                  "protocol"
                 ],
                 "type": "object"
               },

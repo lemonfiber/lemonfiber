@@ -85,7 +85,7 @@ pub(super) async fn held(ctx: &Ctx, services: &[Service], fillers: &Fillers) -> 
         Some(gate) => gate.admitted().await.is_ok_and(|admitted| {
             admitted
                 .iter()
-                .any(|route| matches!(route.target, Target::MediaServer { .. }))
+                .any(|route| gating::media_pins(&route.target).is_some())
         }),
         None => false,
     };
@@ -193,7 +193,7 @@ fn restated(
         .iter()
         .map(|route| {
             let credential = match route.target {
-                Target::MediaServer { .. } => Some(key),
+                Target::MediaServer { .. } | Target::Plex { .. } => Some(key),
                 Target::Curator { .. } => curators
                     .iter()
                     .find(|curator| {
@@ -226,7 +226,7 @@ fn presenting(routes: &[Gated], key: &str) -> Vec<Gated> {
     routes
         .iter()
         .map(|route| match route.target {
-            Target::MediaServer { .. } => Gated {
+            Target::MediaServer { .. } | Target::Plex { .. } => Gated {
                 credential: key.to_owned(),
                 ..route.clone()
             },
@@ -239,9 +239,9 @@ fn presenting(routes: &[Gated], key: &str) -> Vec<Gated> {
 async fn holds(gate: &dyn Gating, key: &str) -> bool {
     let hash = sha256(key);
     gate.admitted().await.is_ok_and(|admitted| {
-        admitted.iter().any(|route| {
-            matches!(route.target, Target::MediaServer { .. }) && route.credential == hash
-        })
+        admitted
+            .iter()
+            .any(|route| gating::media_pins(&route.target).is_some() && route.credential == hash)
     })
 }
 

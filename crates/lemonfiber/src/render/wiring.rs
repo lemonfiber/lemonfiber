@@ -57,7 +57,12 @@ fn entry(link: &Wired) -> Lines {
                 "  {} asks for {capability}{}{}",
                 asker(link),
                 filing(files.as_deref()),
-                talking(native.as_deref())
+                talking(
+                    native
+                        .as_ref()
+                        .map(lemonfiber_core::wiring::Apis::said)
+                        .as_deref()
+                )
             ));
             lines.put(format!("    reaches  {}", reached(services, origins)));
             for said in settling(settled) {

@@ -65,6 +65,16 @@ mod declared;
 
 pub use declared::{Declared, DECLARED};
 
+/// Whether the surface holds the contract to its shape under an unchanged wire version.
+///
+/// Not before lemonfiber tags `1.0`: until then the contract may change shape under the
+/// version it has, and what a change drops is said rather than refused. From `1.0`
+/// every break moves the wire version or is declared.
+#[must_use]
+pub fn held() -> bool {
+    !env!("CARGO_PKG_VERSION").starts_with("0.")
+}
+
 /// Where the committed surface is kept, relative to the workspace root: a directory
 /// holding an index and one file per type.
 pub const SURFACE_DIR: &str = "contract/web-api-surface";

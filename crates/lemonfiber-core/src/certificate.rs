@@ -25,6 +25,7 @@ use lemonfiber_manifest::container::Certificate;
 use crate::ports::filesystem::{Confined, Readable};
 
 pub mod declared;
+pub mod fronted;
 pub mod internal;
 
 /// The certificate, as it is written down.

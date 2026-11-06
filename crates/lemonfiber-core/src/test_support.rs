@@ -56,6 +56,7 @@ mod contracting;
 mod declining;
 pub(crate) mod egress;
 mod gating;
+pub(crate) mod plexing;
 pub(crate) mod syncing;
 pub(crate) use conforming::recordings_owed;
 pub(crate) use contracting::{contracted_context, declined, gated};

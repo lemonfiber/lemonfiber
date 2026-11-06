@@ -20,10 +20,14 @@
       ]
     },
     "native": {
-      "description": "The upstream's own API it talks in, which it reaches in place of the adapter.",
-      "type": [
-        "string",
-        "null"
+      "description": "The upstream's own API it talks in, or every API it talks in any of, which it\nreaches in place of the adapter.",
+      "anyOf": [
+        {
+          "$ref": "Apis.json"
+        },
+        {
+          "type": "null"
+        }
       ]
     }
   },

@@ -87,4 +87,32 @@ codes! {
         remedy: "Give each setting the message names with lemonfiber settings set; the act that \
             gives the last thing a service waits for starts it.",
     }
+    /// Raised where `PLEX_LINK_MODE` would enter or leave `owner` for a request service already
+    /// set up.
+    OWNER_SET_UP = "SETTING-9" {
+        severity: Error,
+        status: 409,
+        leaves: Validation,
+        since: "0.18.0",
+        meaning: "PLEX_LINK_MODE would enter or leave owner, which changes which Plex account \
+            the request service's owner is, and the request service is already set up. It \
+            keeps the owner it was set up with and lemonfiber never sets it up again, so \
+            nothing was changed.",
+        remedy: "Keep the mode, or move between managed and fronted, which share an owner. \
+            Entering or leaving owner takes setting the request service up again.",
+    }
+    /// Raised on every diagnosis while `PLEX_LINK_MODE` is `owner`, as a standing notice.
+    OWNER_HELD = "SETTING-10" {
+        severity: Warning,
+        status: 409,
+        since: "0.18.0",
+        meaning: "PLEX_LINK_MODE is owner, so the request service, a household-tier service, \
+            holds a token of your own Plex account. Anything that took the request service \
+            over could act as that account at plex.tv, claiming and sharing servers and \
+            reading the account. You chose this, and it is said on every diagnosis while it \
+            stands.",
+        remedy: "Signing the request service's device out at plex.tv takes the token back. \
+            Only before the request service is set up can the mode move to managed or \
+            fronted, which hold no token of yours.",
+    }
 }

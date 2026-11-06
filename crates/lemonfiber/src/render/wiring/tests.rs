@@ -52,7 +52,7 @@ fn an_ask_in_an_upstreams_own_api_names_the_api_after_the_capability() {
         Settled::Outright,
     );
     if let Reaches::Asked { native, .. } = &mut link.reaches {
-        *native = Some("servarr".to_owned());
+        *native = Some(lemonfiber_core::wiring::Apis::one("servarr"));
     }
     let said = shown(&WiringReport {
         wired: vec![link],

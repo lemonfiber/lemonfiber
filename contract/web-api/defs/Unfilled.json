@@ -19,10 +19,14 @@
       ]
     },
     "native": {
-      "description": "The upstream's own API it asked in, where no upstream filling it declares that API.",
-      "type": [
-        "string",
-        "null"
+      "description": "The upstream's own API it asked in, or every API it asked in any of, where no\nupstream filling it declares one of them.",
+      "anyOf": [
+        {
+          "$ref": "Apis.json"
+        },
+        {
+          "type": "null"
+        }
       ]
     }
   },

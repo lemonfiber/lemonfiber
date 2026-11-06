@@ -17,6 +17,7 @@
 //! and the kernel grants a container is given — are different sets with no name in
 //! common.
 
+pub use lemonfiber_manifest::container::Apis;
 use std::collections::{BTreeMap, BTreeSet};
 
 use lemonfiber_manifest::Manifest;
@@ -138,10 +139,10 @@ pub enum Reaches {
         /// reaches nothing and is exactly where an operator most needs to know which of
         /// the names in front of them is not the stack's.
         origins: BTreeMap<String, crate::origin::Origin>,
-        /// The upstream's own API the ask talks in, where it reaches the upstream an
-        /// adapter fronts rather than the adapter.
+        /// The upstream's own API the ask talks in, or every API it talks in any of,
+        /// where it reaches the upstream an adapter fronts rather than the adapter.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        native: Option<String>,
+        native: Option<lemonfiber_manifest::container::Apis>,
         /// The medium the filler it reaches files, where the ask is narrowed to one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         files: Option<String>,
@@ -191,9 +192,10 @@ pub struct Unfilled {
     pub by: String,
     /// What it asked for.
     pub capability: String,
-    /// The upstream's own API it asked in, where no upstream filling it declares that API.
+    /// The upstream's own API it asked in, or every API it asked in any of, where no
+    /// upstream filling it declares one of them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub native: Option<String>,
+    pub native: Option<lemonfiber_manifest::container::Apis>,
     /// The medium it asked a filler of, where nothing filling it files that medium.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub files: Option<String>,
@@ -207,10 +209,12 @@ impl std::fmt::Display for Unfilled {
             .map(|medium| format!(" filing {medium}"))
             .unwrap_or_default();
         match &self.native {
-            Some(api) => write!(
+            Some(apis) => write!(
                 f,
                 "{} asks for {}{filing} in {api} and nothing filling it talks {api}",
-                self.by, self.capability
+                self.by,
+                self.capability,
+                api = apis.said()
             ),
             None => write!(
                 f,

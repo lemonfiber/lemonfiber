@@ -90,6 +90,9 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/lemonfiber/media.serve/v1/account": {
+      "$ref": "operations/account.json"
+    },
     "/lemonfiber/media.serve/v1/allow_only": {
       "$ref": "operations/allow_only.json"
     },
@@ -122,6 +125,9 @@
     },
     "/lemonfiber/media.serve/v1/known_proxies": {
       "$ref": "operations/known_proxies.json"
+    },
+    "/lemonfiber/media.serve/v1/listed_as": {
+      "$ref": "operations/listed_as.json"
     },
     "/lemonfiber/media.serve/v1/mint": {
       "$ref": "operations/mint.json"

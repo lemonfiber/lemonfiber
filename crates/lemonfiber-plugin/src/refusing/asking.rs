@@ -50,9 +50,10 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
                 ),
             });
         }
-        if let Some(api) = ask
+        for api in ask
             .native
-            .as_deref()
+            .iter()
+            .flat_map(lemonfiber_manifest::container::Apis::names)
             .filter(|api| !lemonfiber_manifest::container::is_api_name(api))
         {
             found.push(Violation {

@@ -49,6 +49,8 @@ mod taken_back;
 // The request service's connection to the media server, held at the request gate's route
 // to it.
 mod linking;
+// The request service linked to Plex in the mode PLEX_LINK_MODE names.
+mod plex_linking;
 // The request gate's tokens, one per route, held raw by the request service alone.
 pub(crate) mod tokens;
 use fulfilment::{fulfilling, seed_fulfilment_targets};
@@ -423,6 +425,10 @@ async fn seed_media_server(
 
     // The decline service's key, minted in the server the decline service names.
     wirings.extend(decline::seed_decline_key(ctx, services, fillers).await);
+
+    // What the request service trusts for plex.tv in fronted mode, ahead of the gate's
+    // routes, which answer for plex.tv under it.
+    wirings.extend(plex_linking::seed_fronting(ctx, fillers).await);
 
     // The request gate's routes, with the same session.
     wirings.extend(Box::pin(gate::seed_gate_routes(ctx, services, fillers, server)).await);
