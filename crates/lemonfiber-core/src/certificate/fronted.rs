@@ -70,8 +70,7 @@ pub struct Beneath<'a> {
 ///
 /// [`Unkept::Unmade`] where either cannot be made.
 pub fn made() -> Result<Fronted, Unkept> {
-    let unmade = |why: rcgen::Error| super::unmade(&why);
-    let mut authority = CertificateParams::new(Vec::<String>::new()).map_err(unmade)?;
+    let mut authority = CertificateParams::new(Vec::<String>::new())?;
     authority.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
     authority
         .distinguished_name
@@ -81,13 +80,13 @@ pub fn made() -> Result<Fronted, Unkept> {
         permitted_subtrees: vec![GeneralSubtree::DnsName(DOMAIN.to_owned())],
         excluded_subtrees: Vec::new(),
     });
-    let signing = KeyPair::generate().map_err(unmade)?;
-    let signed_authority = authority.self_signed(&signing).map_err(unmade)?;
+    let signing = KeyPair::generate()?;
+    let signed_authority = authority.self_signed(&signing)?;
     let issuer = Issuer::new(authority, signing);
-    let mut leaf = CertificateParams::new(HOSTS.map(str::to_owned).to_vec()).map_err(unmade)?;
+    let mut leaf = CertificateParams::new(HOSTS.map(str::to_owned).to_vec())?;
     leaf.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
-    let key = KeyPair::generate().map_err(unmade)?;
-    let certificate = leaf.signed_by(&key, &issuer).map_err(unmade)?;
+    let key = KeyPair::generate()?;
+    let certificate = leaf.signed_by(&key, &issuer)?;
     Ok(Fronted {
         authority: pem(CERTIFIED, signed_authority.der()),
         certificate: pem(CERTIFIED, certificate.der()),

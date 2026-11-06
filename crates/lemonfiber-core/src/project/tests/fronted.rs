@@ -57,8 +57,8 @@ fn fronted_has_the_gate_answer_to_plex_tv_and_the_request_service_trust_its_auth
         assert!(gate.iter().any(|alias| alias == host), "{host}: {gate:?}");
     }
     let trusted = environment(&entry(&project, "seerr"), TRUSTED);
-    assert!(trusted.ends_with(&format!("/{AUTHORITY}")), "{trusted}");
-    assert!(trusted.starts_with('/'), "{trusted}");
+    assert!(trusted.ends_with(&format!("/{AUTHORITY}")));
+    assert!(trusted.starts_with('/'));
 }
 
 #[test]

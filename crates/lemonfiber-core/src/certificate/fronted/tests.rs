@@ -184,3 +184,11 @@ fn a_file_reached_through_a_link_is_neither_read_written_nor_taken_away() {
     ));
     assert!(std::fs::read_dir(&elsewhere).is_ok_and(|mut entries| entries.next().is_none()));
 }
+
+#[test]
+fn an_authority_that_cannot_be_made_is_said_to_be_unmade() {
+    assert!(matches!(
+        super::Unkept::from(rcgen::Error::RingUnspecified),
+        super::Unkept::Unmade(why) if why.starts_with("a certificate could not be made: ")
+    ));
+}

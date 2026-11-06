@@ -369,6 +369,24 @@ async fn a_held_key_with_owner_unclaimed_or_a_mode_naming_none_hands_no_route() 
     assert!(matches!(unnamed, Some(State::Failed { .. })), "{unnamed:?}");
 }
 
+#[tokio::test]
+async fn owner_where_plex_cannot_say_who_claimed_it_hands_no_route() {
+    let http = plex(
+        &[],
+        None,
+        vec![(
+            crate::test_support::adapted::claiming("claimed_by"),
+            vec![media::refusing()],
+        )],
+    );
+    let (ctx, at, gate) = plex_ctx("plex-claim-unread", Some("owner"), Gate::default(), http);
+
+    let state = routed(&ctx, &at).await;
+
+    assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
+    assert!(gate.routes().is_empty());
+}
+
 mod fronting;
 mod linking;
 mod signing;

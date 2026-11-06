@@ -243,6 +243,12 @@ fn made(
     Kept::read(&certificate, &key, laid)
 }
 
+impl From<rcgen::Error> for Unkept {
+    fn from(why: rcgen::Error) -> Self {
+        unmade(&why)
+    }
+}
+
 /// Why a certificate could not be made, as it is reported.
 fn unmade(why: &rcgen::Error) -> Unkept {
     Unkept::Unmade(format!("a certificate could not be made: {why}"))
