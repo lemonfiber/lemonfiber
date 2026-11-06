@@ -45,7 +45,7 @@ fn the_gate_asking_in(native: Option<&str>) -> Option<Installed> {
             .flat_map(|placed| placed.asks.iter_mut())
             .filter(|ask| ask.capability == super::IDENTITY)
         {
-            ask.native = native.map(str::to_owned);
+            ask.native = native.map(lemonfiber_manifest::container::Apis::one);
         }
         gate
     })

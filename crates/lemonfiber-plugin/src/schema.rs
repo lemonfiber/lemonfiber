@@ -356,10 +356,10 @@ pub struct Ask {
     /// Whether every service that fills it is reached rather than one.
     #[serde(default)]
     pub each: bool,
-    /// The upstream's own API the service talks in, which the ask then reaches in place
-    /// of the adapter fronting it.
+    /// The upstream's own API the service talks in, or every API it talks in any of,
+    /// which the ask then reaches in place of the adapter fronting it.
     #[serde(default)]
-    pub native: Option<String>,
+    pub native: Option<lemonfiber_manifest::container::Apis>,
 }
 
 /// Where one service's own entry goes, once the manifest's defaults are taken.

@@ -17,6 +17,7 @@ use crate::doctor::declining::{Dating, Decline, DeclineKeyCheck, KeyDates};
 use crate::doctor::deferred::Deferred;
 use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::owned::{OwnedCheck, Part};
+use crate::doctor::plex_link::{Linked, PlexLinkCheck};
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::seasons::SeasonsCheck;
@@ -131,6 +132,51 @@ pub(super) fn astray(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Def
             )) as Box<dyn Check>
         }
     })
+}
+
+/// How the request service is linked to Plex, built when it runs, so the media server is
+/// asked over its contracts for whose account the request service's owner is.
+pub(super) fn plex_link(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    Deferred::new(Category::Services, CHECK_BUDGET, move || {
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
+        async move { Box::new(PlexLinkCheck::new(linked(&ctx, &manifest).await)) as Box<dyn Check> }
+    })
+}
+
+/// How the request service is linked to Plex, where Plex is the media server the request
+/// gate routes to: asking the media server only what the mode recorded needs.
+async fn linked(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Option<Linked> {
+    crate::app::gating::service(&manifest.services)?;
+    let fillers = crate::app::targets::fillers_here(ctx, manifest);
+    let server = crate::app::targets::MediaServer::of(&fillers)
+        .filter(crate::app::targets::MediaServer::plex)?;
+    let requests = server.asked_by.as_ref()?.id.clone();
+    let recorded = crate::settings::recorded_value(ctx, crate::plex_link::SETTING);
+    let (own, claimed_by) = match crate::plex_link::Mode::held(recorded.as_deref()) {
+        Some(crate::plex_link::Mode::Owner) => (None, claiming_account(ctx, &server).await),
+        Some(crate::plex_link::Mode::Managed | crate::plex_link::Mode::Fronted) => {
+            (own_account(ctx, &server).await, None)
+        }
+        None => (None, None),
+    };
+    Some(Linked {
+        requests,
+        recorded,
+        own,
+        claimed_by,
+    })
+}
+
+/// The plex.tv id of the account that claimed `server`, where it can be read.
+async fn claiming_account(ctx: &Ctx, server: &crate::app::targets::MediaServer) -> Option<String> {
+    server.owning(ctx).await?.claimed_by().await.ok().flatten()
+}
+
+/// The name of the request service's own account in `server`, where it can be read.
+async fn own_account(ctx: &Ctx, server: &crate::app::targets::MediaServer) -> Option<String> {
+    let client = server.administering(ctx).await?;
+    Some(client.account(crate::app_keys::GATE_APP).await.ok()?.title)
 }
 
 /// What the request gate refused and removed since the last diagnosis, built when it runs.

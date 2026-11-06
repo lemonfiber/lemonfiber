@@ -8,6 +8,7 @@
 pub(crate) mod document;
 pub mod entry;
 mod fencing;
+mod fronting;
 mod inputs;
 pub mod overlay;
 
@@ -184,6 +185,12 @@ pub fn generated(
             inside.entry(host).or_default().push(unit.id.to_owned());
         }
     }
+    let fronting = fronting::Fronting::of(
+        (manifest, installed, chosen),
+        reading.setting,
+        &topology,
+        &|id| fencing.placed(id, &topology),
+    );
     let entries: Vec<(String, _)> = units
         .iter()
         .map(|unit| {
@@ -192,15 +199,14 @@ pub fn generated(
             let mut written = entry(unit, &placed, &values);
             written.ports.extend(hosted.remove(&id).unwrap_or_default());
             written.answer_for(inside.get(unit.id).map_or(&[], Vec::as_slice));
+            if let Some(fronting) = &fronting {
+                fronting.written(unit, &mut written);
+            }
             (id, written)
         })
         .collect();
     let taken = units.iter().any(|unit| unit.takes_data);
-    let unrendered = units
-        .iter()
-        .filter(|unit| reading.render_group.is_none() && unit.shape == Some(Shape::Render))
-        .map(|unit| unit.id.to_owned())
-        .collect();
+    let unrendered = unrendered(&units, reading);
     let document = Document {
         name: literal(reading.name),
         services: Services(entries),
@@ -213,6 +219,16 @@ pub fn generated(
         unfenced: fencing.unfenced(),
         unrendered,
     }
+}
+
+/// Each of `units` taking `render` written without the host's render devices, because
+/// `reading` answers no group owning them.
+fn unrendered(units: &[Unit<'_>], reading: &Reading<'_>) -> Vec<String> {
+    units
+        .iter()
+        .filter(|unit| reading.render_group.is_none() && unit.shape == Some(Shape::Render))
+        .map(|unit| unit.id.to_owned())
+        .collect()
 }
 
 /// The entries the project writes for `installed`'s services beside the stack this build

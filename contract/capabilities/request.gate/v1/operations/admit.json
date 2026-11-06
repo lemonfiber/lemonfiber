@@ -53,6 +53,143 @@
                 ],
                 "type": "object"
               },
+              "OutsideAccount": {
+                "additionalProperties": false,
+                "description": "An account as the outside service that holds the media server's accounts knows it, as\nplex.tv knows a Plex account, and never its token.",
+                "properties": {
+                  "id": {
+                    "description": "The id the outside service holds it by, in decimal digits.",
+                    "type": "string"
+                  },
+                  "title": {
+                    "description": "The name it is shown under.",
+                    "type": "string"
+                  },
+                  "username": {
+                    "description": "The name it signs in under.",
+                    "type": "string"
+                  },
+                  "uuid": {
+                    "description": "Its uuid at the outside service.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "uuid",
+                  "username",
+                  "title"
+                ],
+                "type": "object"
+              },
+              "OutsideServer": {
+                "additionalProperties": false,
+                "description": "The media server as the outside service that holds its accounts lists it, as plex.tv\nlists a Plex server.",
+                "properties": {
+                  "id": {
+                    "description": "The identifier the outside service and the server hold it by: on Plex, its machine\nidentifier.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "The name it is listed under.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "PlexLink": {
+                "description": "How the request service is linked to Plex, as `PLEX_LINK_MODE` names it.",
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Its owner is its own managed account, whose token is the one the route admits.",
+                    "properties": {
+                      "mode": {
+                        "const": "managed",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "mode"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Its owner is the operator's own Plex account, signed in on its own page.",
+                    "properties": {
+                      "account": {
+                        "description": "The plex.tv account id of the account that claimed Plex: the gate admits a\ntoken plex.tv answers as it.",
+                        "type": "string"
+                      },
+                      "mode": {
+                        "const": "owner",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "account"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Its owner is its own managed account, holding a gate token, and its plex.tv calls\nreach the gate.",
+                    "properties": {
+                      "account": {
+                        "$ref": "#/$defs/OutsideAccount",
+                        "description": "The request service's own account, as plex.tv knows it."
+                      },
+                      "members": {
+                        "description": "The household's Plex accounts with this server's libraries shared with them.",
+                        "items": {
+                          "$ref": "#/$defs/PlexMember"
+                        },
+                        "type": "array"
+                      },
+                      "mode": {
+                        "const": "fronted",
+                        "type": "string"
+                      },
+                      "server": {
+                        "$ref": "#/$defs/OutsideServer",
+                        "description": "This server, as plex.tv lists it."
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "account",
+                      "members",
+                      "server"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "PlexMember": {
+                "additionalProperties": false,
+                "description": "A member of the household with this server's libraries shared with them, as the gate\nanswers plex.tv's users for the request service.",
+                "properties": {
+                  "id": {
+                    "description": "The id plex.tv holds their account by.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "The name their account goes by.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "type": "object"
+              },
               "Target": {
                 "description": "What a route reaches.",
                 "oneOf": [
@@ -102,6 +239,37 @@
                     },
                     "required": [
                       "media-server"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Plex as the media server, answered in its own API at [`PLEX_PORT`] with no path\nsegment, and reached at its internal TLS port.",
+                    "properties": {
+                      "plex": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "link": {
+                            "$ref": "#/$defs/PlexLink",
+                            "description": "How the request service is linked to Plex, which says what the gate admits on\nthe route and what it answers for plex.tv."
+                          },
+                          "pins": {
+                            "description": "The SHA-256 of each certificate that port may present, in lower-case\nhexadecimal: the only ones the gate accepts.",
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "pins",
+                          "link"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "plex"
                     ],
                     "type": "object"
                   }

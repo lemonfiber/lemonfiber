@@ -343,6 +343,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let gate = deferring::gated(ctx, manifest);
     let decline = deferring::declined(ctx, manifest);
     let astray = deferring::astray(ctx, manifest);
+    let plex_link = deferring::plex_link(ctx, manifest);
     let moves = crate::doctor::moving::MovesCheck::new(Arc::new(
         crate::app::plugins::moving_in::Offering::of(ctx, manifest),
     ));
@@ -386,6 +387,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(gate),
         Box::new(decline),
         Box::new(astray),
+        Box::new(plex_link),
         Box::new(moves),
         Box::new(waiting),
         Box::new(permissions),

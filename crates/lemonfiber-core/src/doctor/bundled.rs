@@ -49,6 +49,7 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "services.astray.",
     "services.decline-key",
     "services.move-offered",
+    "services.plex-link",
     "services.quality-guides",
     "services.releases",
     "services.releases.",

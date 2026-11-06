@@ -157,10 +157,10 @@ fn identity() -> IdentitySource {
     IdentitySource {
         at: format!("http://{IDENTITY_HOST}:{IDENTITY_PORT}"),
         protocol: Protocol(IDENTITY_PROTOCOL.to_owned()),
-        credential: Credential::UserPass {
+        credential: Some(Credential::UserPass {
             username: NAMED.to_owned(),
             password: Placeholder::Minted.written(),
-        },
+        }),
     }
 }
 

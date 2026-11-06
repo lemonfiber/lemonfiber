@@ -13,6 +13,7 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::capabilities::identity::source;
 use lemonfiber_contract::capabilities::media::serve;
+use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_contract::capabilities::request::{gate, intake};
 use lemonfiber_manifest::Manifest;
 
@@ -63,9 +64,9 @@ pub(crate) struct MediaServer {
     /// The setting the administrator's password lemonfiber minted for the server is kept
     /// under.
     pub setting: String,
-    /// The API the request gate asks the identity source in, where its ask names one: the
-    /// one API it answers a route to the server in.
-    pub gate_asks: Option<Protocol>,
+    /// Every API the request gate asks the identity source in, where its ask names any:
+    /// the APIs it answers a route to the server in.
+    pub gate_asks: Vec<Protocol>,
 }
 
 /// The request service among the services asking `filler` for an identity: the one
@@ -161,7 +162,31 @@ impl MediaServer {
     pub(crate) fn gated(&self) -> Option<&Pairing> {
         self.pairing
             .as_ref()
-            .filter(|pairing| self.gate_asks.as_ref() == Some(&pairing.protocol))
+            .filter(|pairing| self.gate_asks.contains(&pairing.protocol))
+    }
+
+    /// Whether the server is claimed over `owner.claim`, against an account its adapter
+    /// signs in as itself, so lemonfiber holds no administrator's password for it.
+    #[must_use]
+    pub(crate) fn claimed(&self) -> bool {
+        self.filler.contracted(claim::CAPABILITY, claim::MAJOR)
+    }
+
+    /// Whether the request gate's route for it is answered in Plex's own API: where the
+    /// API the gate reaches it in is Plex's.
+    #[must_use]
+    pub(crate) fn plex(&self) -> bool {
+        self.gated()
+            .is_some_and(|pairing| pairing.protocol.0 == crate::plex_link::API)
+    }
+
+    /// The server over `owner.claim`, as who claimed it is read: nothing where it cannot
+    /// be asked over it.
+    pub(crate) async fn owning(&self, ctx: &Ctx) -> Option<claim::Adapter> {
+        match Box::pin(spoken(ctx, &self.filler, claim::CAPABILITY, claim::MAJOR)).await {
+            Spoken::Over(adapter) => Some(claim::Adapter(adapter)),
+            Spoken::Unanswered | Spoken::Not => None,
+        }
     }
 
     /// Whether a rehearsal stands where the identity step mints this server's
@@ -238,16 +263,19 @@ impl MediaServer {
     }
 }
 
-/// The API the service filling `request.gate` asks the identity source in, where its ask
-/// names one.
-fn gate_asks(fillers: &Fillers) -> Option<Protocol> {
-    let (gate, _) = fillers.filling(gate::CAPABILITY)?;
+/// Every API the service filling `request.gate` asks the identity source in, where its
+/// ask names any.
+fn gate_asks(fillers: &Fillers) -> Vec<Protocol> {
+    let Some((gate, _)) = fillers.filling(gate::CAPABILITY) else {
+        return Vec::new();
+    };
     fillers
         .asks()
         .iter()
         .find(|ask| ask.capability == IDENTITY && ask.by == gate.id)
-        .and_then(|ask| ask.native.clone())
-        .map(Protocol)
+        .and_then(|ask| ask.native.as_ref())
+        .map(|apis| apis.names().iter().cloned().map(Protocol).collect())
+        .unwrap_or_default()
 }
 
 /// Where the upstream the adapter `filler` fronts answers the services beside it, in the

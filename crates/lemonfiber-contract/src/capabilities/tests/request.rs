@@ -244,10 +244,10 @@ async fn script<R: Requests + Approving + Addressing + Noticing + Searching>(
     let source = IdentitySource {
         at: "http://server:8096".to_owned(),
         protocol: Protocol("jellyfin".to_owned()),
-        credential: Credential::UserPass {
+        credential: Some(Credential::UserPass {
             username: "admin".to_owned(),
             password: "admin-password".to_owned(),
-        },
+        }),
     };
     let telling = Telling {
         enabled: true,

@@ -5,7 +5,6 @@
 //! variables written here are the only substitutions an entry carries.
 
 use std::collections::BTreeMap;
-use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
 use lemonfiber_manifest::container::choices;
@@ -13,12 +12,14 @@ use lemonfiber_manifest::container::{
     is_source, is_target, lies_inside, shares_a_source, Mount, Posture, Shape, UrlOf, UserMode,
     Value, CONFIGURATION,
 };
-use serde::ser::SerializeMap;
 use serde::Serialize;
 
 use crate::config::storage::Export;
 use crate::config::{DATA_ROOT_KEY, DEFAULT_ZONE, LAN_BIND_KEY, PGID_KEY, PUID_KEY, ZONE_KEY};
 use crate::topology::Placed;
+use joined::Joined;
+
+mod joined;
 
 /// Where the library is kept while the operator's environment file names nowhere.
 pub(crate) const LIBRARY: &str = "./data";
@@ -220,54 +221,19 @@ impl Entry {
     /// network as well as to its own, so whatever reaches those services by name reaches
     /// them through it.
     pub(crate) fn answer_for(&mut self, inside: &[String]) {
-        self.networks.aliases = inside.iter().map(|id| literal(id)).collect();
+        self.networks.answer_for(inside);
     }
-}
 
-/// The networks a service joins: by name alone where none fixes its address and nothing
-/// else answers through it, and otherwise each with the address it holds where one does
-/// and the names of the services running inside its network.
-struct Joined {
-    /// Each network, with the address it holds there where fixed.
-    at: BTreeMap<String, Option<Ipv4Addr>>,
-    /// The ids of the services running inside its network, which answer through it.
-    aliases: Vec<String>,
-}
-
-impl Joined {
-    /// Whether it joins none.
-    fn is_empty(&self) -> bool {
-        self.at.is_empty()
+    /// Answer on the network `network`, where it joins it, to each of `hosts` as well, so
+    /// whatever on that network resolves them reaches it.
+    pub(crate) fn answer_as(&mut self, network: &str, hosts: &[&str]) {
+        self.networks.answer_as(network, hosts);
     }
-}
 
-impl Serialize for Joined {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.aliases.is_empty() && self.at.values().all(Option::is_none) {
-            return serializer.collect_seq(self.at.keys());
-        }
-        let mut map = serializer.serialize_map(Some(self.at.len()))?;
-        for (name, address) in &self.at {
-            let holds = Holds {
-                ipv4_address: *address,
-                aliases: &self.aliases,
-            };
-            map.serialize_entry(name, &holds)?;
-        }
-        map.end()
+    /// Hold `name` in its environment at `value`.
+    pub(crate) fn hold(&mut self, name: &str, value: &str) {
+        self.environment.insert(name.to_owned(), literal(value));
     }
-}
-
-/// One network's settings for a service: the address it holds there, where fixed, and the
-/// names it answers to for the services inside it.
-#[derive(Serialize)]
-struct Holds<'a> {
-    /// Its fixed address.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    ipv4_address: Option<Ipv4Addr>,
-    /// The ids of the services running inside its network.
-    #[serde(skip_serializing_if = "<[String]>::is_empty")]
-    aliases: &'a [String],
 }
 
 /// What a service waits for in the one it depends on.
@@ -335,13 +301,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         tmpfs: tmpfs(unit.tmpfs, unit.takes_data)
             .map(|path| literal(path))
             .collect(),
-        networks: Joined {
-            at: networks
-                .into_iter()
-                .map(|(name, at)| (literal(&name), at))
-                .collect(),
-            aliases: Vec::new(),
-        },
+        networks: Joined::on(networks),
         network_mode,
         depends_on,
         security_opt: SECURITY,

@@ -60,7 +60,7 @@ pub(crate) use services::{
 };
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_media_server_admin,
-    wire_request_identity, Keep, IDENTITY,
+    wire_request_identity, wire_request_source, Keep, IDENTITY,
 };
 
 use std::collections::BTreeMap;

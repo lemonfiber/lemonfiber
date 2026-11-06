@@ -14,6 +14,8 @@ crate::contract! {
             fn owner() -> Owner where asks = Asked {};
             /// Claim it with the credential the adapter holds where nobody holds it, changing nothing where somebody does.
             fn claim() -> Claim where asks = Asked {};
+            /// The id of the outside account the part is held through, once it is ours.
+            fn claimed_by() -> Option<String> where since = 1, asks = Asked {};
         }
     }
 }

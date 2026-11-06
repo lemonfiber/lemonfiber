@@ -93,6 +93,9 @@
     "/lemonfiber/owner.claim/v1/claim": {
       "$ref": "operations/claim.json"
     },
+    "/lemonfiber/owner.claim/v1/claimed_by": {
+      "$ref": "operations/claimed_by.json"
+    },
     "/lemonfiber/owner.claim/v1/owner": {
       "$ref": "operations/owner.json"
     }

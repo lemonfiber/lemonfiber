@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use futures_util::future::OptionFuture;
+
 use crate::app::plugins::writing;
 use crate::app::Ctx;
 use crate::config::paths::SETTINGS;
 use crate::device_keys::run::apps_changed;
-use crate::error::codes::setting::{ALREADY_HOLDS, SETTINGS_MOVED};
+use crate::error::codes::setting::{ALREADY_HOLDS, OWNER_SET_UP, SETTINGS_MOVED};
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::journal::{Change, Kind};
 use crate::model::{SettingChange, SettingMove, SettingsReport, Waiting};
@@ -56,6 +58,12 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     if changing.is_empty() {
         return Err(Box::new(already(&asked.changing)));
     }
+    if let Some(value) = changing.get(crate::plex_link::SETTING) {
+        let was = held(crate::plex_link::SETTING);
+        if crate::plex_link::crosses_owner(was.as_deref(), *value) && set_up(ctx, &manifest).await {
+            return Err(Box::new(owner_set_up()));
+        }
+    }
     let outside = super::choosing::outside(&manifest, installed, &changing, &held);
     if !outside.is_empty() {
         return Err(Box::new(super::choosing::refused(&outside)));
@@ -69,13 +77,11 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
             consequence: consequence(ctx, setting, *value),
         })
         .collect();
-    let regenerates = readers::services(
-        &changing
-            .keys()
-            .filter_map(|setting| readers.settings.get(*setting))
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>(),
+    let regenerates = regenerating(
+        ctx,
+        &manifest,
+        &changing,
+        (&readers, held(crate::plex_link::SETTING).as_deref()),
     );
     let after = Resolved::of(ctx, Some(&manifest), installed).changed(&changing);
     let overwrites = writing::regenerated(
@@ -166,6 +172,9 @@ async fn written(
     if changing.contains_key(super::own::DOMAIN) {
         let _ = crate::seed::run::refront(ctx).await;
     }
+    if changing.contains_key(crate::plex_link::SETTING) {
+        let _ = Box::pin(crate::seed::run::seed(ctx, false)).await;
+    }
     change.applied = true;
     change.unrestarted = restarting::restarted(
         ctx,
@@ -198,6 +207,9 @@ fn journalled(one: &SettingMove, stamp: &str) -> Change {
 }
 
 fn consequence(ctx: &Ctx, setting: &str, value: Option<&str>) -> Option<String> {
+    if setting == crate::plex_link::SETTING {
+        return crate::plex_link::consequence(value);
+    }
     let key = legacy::setting_key(setting)?;
     let held = ctx
         .settings
@@ -207,6 +219,58 @@ fn consequence(ctx: &Ctx, setting: &str, value: Option<&str>) -> Option<String> 
         .map(|file| legacy::overlaid(ctx, file))
         .unwrap_or_default();
     crate::app::configuring::consequence(ctx, &held, key, value.unwrap_or_default())
+}
+
+/// The services whose entries `changing` writes anew: each reading a setting it moves, and
+/// the gate and the request service where `PLEX_LINK_MODE` moves into or out of `fronted`
+/// from `linked`.
+fn regenerating(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    changing: &BTreeMap<&str, Option<&str>>,
+    (readers, linked): (&Readers, Option<&str>),
+) -> Vec<String> {
+    let mut regenerates = readers::services(
+        &changing
+            .keys()
+            .filter_map(|setting| readers.settings.get(*setting))
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    if let Some(value) = changing.get(crate::plex_link::SETTING) {
+        let fillers = crate::app::targets::fillers_here(ctx, manifest);
+        regenerates.extend(crate::plex_link::regenerating(&fillers, linked, *value));
+        regenerates.sort();
+        regenerates.dedup();
+    }
+    regenerates
+}
+
+/// Whether the request service says it is already set up; not where there is none or it
+/// cannot be asked, since one that never answered was never set up by lemonfiber.
+async fn set_up(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> bool {
+    let fillers = crate::app::targets::fillers_here(ctx, manifest);
+    let asked = crate::app::targets::request_service(&fillers)
+        .map(|asked| crate::app::targets::requests_as_owner(ctx, asked));
+    let requests = OptionFuture::from(asked).await.flatten();
+    let initialized = OptionFuture::from(requests.as_ref().map(|one| one.initialized())).await;
+    initialized.is_some_and(|answer| answer.unwrap_or(false))
+}
+
+/// The refusal of entering or leaving `owner` for a request service already set up.
+fn owner_set_up() -> Problem {
+    Problem::new(
+        OWNER_SET_UP,
+        format!(
+            "{} cannot enter or leave owner for a request service already set up",
+            crate::plex_link::SETTING
+        ),
+        "The request service keeps the Plex account it was set up with as its owner, and \
+         lemonfiber never sets it up again, so nothing was changed.",
+        Remedy::new("Keep the mode, or move between managed and fronted, which share an owner"),
+    )
+    .in_state(State::Guided)
 }
 
 /// Every service `before` holds back that `after` no longer does.

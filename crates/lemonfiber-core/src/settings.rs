@@ -35,13 +35,14 @@ use crate::plugin::Installed;
 pub(crate) const OPERATION: &str = "settings";
 
 /// Every refusal a change to a setting answers with before it is weighed.
-pub const REFUSALS: [crate::error::Code; 6] = [
+pub const REFUSALS: [crate::error::Code; 7] = [
     crate::error::codes::setting::NO_SUCH_SETTING,
     crate::error::codes::setting::A_SECRET,
     crate::error::codes::setting::TAKEN_ELSEWHERE,
     crate::error::codes::setting::UNWRITABLE_VALUE,
     crate::error::codes::setting::ALREADY_HOLDS,
     crate::error::codes::setting::OUTSIDE_ITS_CHOICES,
+    crate::error::codes::setting::OWNER_SET_UP,
 ];
 
 pub(crate) fn named(namespace: &str, id: &str) -> String {
@@ -85,6 +86,11 @@ pub(crate) fn dashboard_search(ctx: &Ctx) -> Result<String, String> {
         return Ok(own::DEFAULT_SEARCH.to_owned());
     };
     own::refusal(own::DASHBOARD_SEARCH, value).map_or_else(|| Ok(value.to_owned()), Err)
+}
+
+/// What the setting `name` holds, where it holds anything.
+pub(crate) fn recorded_value(ctx: &Ctx, name: &str) -> Option<String> {
+    recorded::Recorded::of(ctx).value(name).map(str::to_owned)
 }
 
 /// The domain the household's names are under: the one recorded, or the default where

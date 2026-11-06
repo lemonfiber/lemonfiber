@@ -390,6 +390,10 @@ impl crate::ports::service::Ownership for Part {
         Ok(self.holder)
     }
 
+    async fn claimed_by(&self) -> Result<Option<String>, crate::ports::service::Failure> {
+        Ok(None)
+    }
+
     async fn claim(&self) -> Result<crate::ports::service::Claim, crate::ports::service::Failure> {
         self.claims
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);

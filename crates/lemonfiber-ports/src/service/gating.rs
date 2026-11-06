@@ -22,6 +22,58 @@ pub enum Target {
         /// hexadecimal: the only ones the gate accepts.
         pins: Vec<String>,
     },
+    /// Plex as the media server, answered in its own API at [`PLEX_PORT`] with no path
+    /// segment, and reached at its internal TLS port.
+    Plex {
+        /// The SHA-256 of each certificate that port may present, in lower-case
+        /// hexadecimal: the only ones the gate accepts.
+        pins: Vec<String>,
+        /// How the request service is linked to Plex, which says what the gate admits on
+        /// the route and what it answers for plex.tv.
+        link: PlexLink,
+    },
+}
+
+/// The port the gate answers its Plex route on, inside the stack's network.
+pub const PLEX_PORT: u16 = 32400;
+
+/// How the request service is linked to Plex, as `PLEX_LINK_MODE` names it.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case", tag = "mode", deny_unknown_fields)]
+pub enum PlexLink {
+    /// Its owner is its own managed account, whose token is the one the route admits.
+    Managed,
+    /// Its owner is the operator's own Plex account, signed in on its own page.
+    Owner {
+        /// The plex.tv account id of the account that claimed Plex: the gate admits a
+        /// token plex.tv answers as it.
+        account: String,
+    },
+    /// Its owner is its own managed account, holding a gate token, and its plex.tv calls
+    /// reach the gate.
+    Fronted {
+        /// The request service's own account, as plex.tv knows it.
+        account: super::OutsideAccount,
+        /// The household's Plex accounts with this server's libraries shared with them.
+        members: Vec<PlexMember>,
+        /// This server, as plex.tv lists it.
+        server: super::OutsideServer,
+    },
+}
+
+/// A member of the household with this server's libraries shared with them, as the gate
+/// answers plex.tv's users for the request service.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct PlexMember {
+    /// The id plex.tv holds their account by.
+    pub id: String,
+    /// The name their account goes by.
+    pub name: String,
 }
 
 /// One route the gate admits, as it is applied.

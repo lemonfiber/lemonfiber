@@ -164,7 +164,7 @@ pub struct Ask {
     /// What it asks for.
     pub capability: String,
     /// The upstream's own API it talks in, where it names one.
-    pub native: Option<String>,
+    pub native: Option<lemonfiber_manifest::container::Apis>,
     /// Whatever answers, as settled — empty where nothing fills it or a contest stands.
     pub fillers: Vec<Filler>,
 }

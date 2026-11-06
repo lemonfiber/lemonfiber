@@ -20,7 +20,6 @@ use crate::app::targets::MediaServer;
 use crate::app::{gating, invite::declining};
 use crate::certificate::internal;
 use crate::journal::{Change, Kind};
-use crate::ports::service::Target;
 use crate::seed::{State, Wiring};
 
 /// The operation a replacement is journalled under.
@@ -117,7 +116,8 @@ async fn gate_holds(ctx: &Ctx, fillers: &crate::wiring::Fillers, pin: &str) -> b
         .is_some_and(|admitted| {
             admitted.is_ok_and(|admitted| {
                 !admitted.iter().any(|route| {
-                    matches!(&route.target, Target::MediaServer { pins } if !pins.iter().any(|one| one == pin))
+                    gating::media_pins(&route.target)
+                        .is_some_and(|pins| !pins.iter().any(|one| one == pin))
                 })
             })
         })

@@ -322,6 +322,9 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
         vec![
             ("request.intake@1".to_owned(), "minted_as"),
             ("media.serve@1".to_owned(), "astray"),
+            ("media.serve@1".to_owned(), "account"),
+            ("media.serve@1".to_owned(), "listed_as"),
+            ("owner.claim@1".to_owned(), "claimed_by"),
         ]
     );
 }

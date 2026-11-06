@@ -10,8 +10,8 @@ use super::{
 };
 use crate::ports::media::Kind;
 use crate::ports::service::{
-    Credential, Endpoint, FulfilmentTarget, IdentitySource, Protocol, RegisteredApplication,
-    RegisteredTarget,
+    Credential, Endpoint, Failure, FulfilmentTarget, IdentitySource, Protocol,
+    RegisteredApplication, RegisteredTarget,
 };
 use crate::secret;
 
@@ -351,19 +351,42 @@ pub async fn wire_request_identity(
     let source = IdentitySource {
         at: server_url.to_owned(),
         protocol,
-        credential: Credential::UserPass {
+        credential: Some(Credential::UserPass {
             username: ADMIN.to_owned(),
             password: password.to_owned(),
-        },
+        }),
     };
-    let state = configure_requests(requests, &source, rehearsing).await;
+    wire_request_source(requests, &source, rehearsing).await
+}
+
+/// The request service signed in through the identity source `source`, which on a fresh
+/// request service also creates its owner: the second half, for any credential or none.
+pub async fn wire_request_source(
+    requests: &dyn Requests,
+    source: &IdentitySource,
+    rehearsing: bool,
+) -> Wiring {
+    let state = configure_requests(requests, source, rehearsing).await;
     Wiring::settled(IDENTITY.to_owned(), state)
+}
+
+/// What a refused sign-in through `source` leaves the identity in: waiting, where `source`
+/// carries no credential and its owner signs in themself, and unreached otherwise.
+fn unestablished(failure: &Failure, source: &IdentitySource) -> State {
+    match failure {
+        Failure::Refused { detail, .. } if source.credential.is_none() => State::Skipped {
+            reason: detail.clone(),
+        },
+        _ => unreached(failure),
+    }
 }
 
 /// Point the request service at the media server, unless it is already initialised — which is
 /// left untouched, whether lemonfiber initialised it on an earlier run or the
 /// household set it up with accounts of its own. A fresh request service is signed in and
-/// then read back: it must report itself initialised, or the write did not land.
+/// then read back: it must report itself initialised, or the write did not land. A source
+/// carrying no credential is one whose owner signs in themself, so its refusal is that
+/// sign-in not made yet, which the run waits on rather than fails over.
 async fn configure_requests(
     requests: &dyn Requests,
     source: &IdentitySource,
@@ -371,7 +394,7 @@ async fn configure_requests(
 ) -> State {
     if !rehearsing {
         if let Err(failure) = requests.establish(source).await {
-            return unreached(&failure);
+            return unestablished(&failure, source);
         }
     }
     let initialized = match requests.initialized().await {

@@ -12,14 +12,24 @@ use super::Ctx;
 use crate::app::credentials::Replacing;
 use crate::app::targets::MediaServer;
 
-/// The media server's administrator, as the first half of the identity left it: the
-/// password to go on with, or the state the identity rests in without one, and the
-/// request service that asked for it.
+/// The media server's administrator, as the first half of the identity left it: how the
+/// request service's owner signs in, or the state the identity rests in without a way to,
+/// and the request service that asked for it.
 pub(super) struct Admin {
-    /// The password, or the state the identity rests in without one.
-    administered: Result<String, crate::seed::State>,
+    /// How the request service's owner signs in, or the state the identity rests in
+    /// without a way to.
+    administered: Result<Signing, crate::seed::State>,
     /// The request service that asks for the server, as the gate cleared it.
     requests: crate::wiring::Filler,
+}
+
+/// How the request service's owner signs in through the media server.
+enum Signing {
+    /// As the server's administrator, with the password lemonfiber holds for it.
+    Administrator(String),
+    /// At the request gate's route, as the server is claimed over `owner.claim` and
+    /// lemonfiber holds no administrator for it.
+    Claimed,
 }
 
 /// The first half of making whatever fills the identity source the one the request
@@ -38,6 +48,12 @@ pub(super) async fn seed_media_server_admin(
 ) -> Option<Admin> {
     let server = server?;
     let requests = server.asked_by.clone()?;
+    if server.claimed() {
+        return Some(Admin {
+            administered: Ok(Signing::Claimed),
+            requests,
+        });
+    }
     let Some(client) = server.identifying(ctx).await else {
         return Some(Admin {
             administered: Err(crate::seed::State::Skipped {
@@ -59,7 +75,8 @@ pub(super) async fn seed_media_server_admin(
         &keep,
     )
     .await
-    .and_then(|password| handed(ctx, server, recorded.as_deref(), password));
+    .and_then(|password| handed(ctx, server, recorded.as_deref(), password))
+    .map(Signing::Administrator);
     Some(Admin {
         administered,
         requests,
@@ -130,8 +147,12 @@ pub(super) async fn seed_request_identity(
     let Some(client) = crate::app::targets::requests_as_owner(ctx, answering).await else {
         return (Vec::new(), records);
     };
+    let claimed = matches!(administered, Ok(Signing::Claimed));
     let wiring = match administered {
-        Ok(password) => {
+        Ok(Signing::Claimed) => {
+            super::plex_linking::signed_in(ctx, fillers, client.as_ref(), server, gate).await
+        }
+        Ok(Signing::Administrator(password)) => {
             crate::seed::wire_request_identity(
                 client.as_ref(),
                 pairing.protocol.clone(),
@@ -151,7 +172,11 @@ pub(super) async fn seed_request_identity(
         .await
         .unwrap_or(client);
 
+    let plex = claimed && server.plex();
     let linked = match (gate, &wiring.state) {
+        (true, state) if plex => {
+            super::plex_linking::held_to_route(ctx, owner.as_ref(), &requests, server, state).await
+        }
         (true, crate::seed::State::WouldWire { .. }) => {
             Some(super::linking::would_link(&requests, server))
         }
@@ -171,7 +196,7 @@ pub(super) async fn seed_request_identity(
     // The run that set the request service up is the one that showed it the
     // administrator's password, so that password is changed straight after it and the
     // one the request service saw opens nothing.
-    let changed = (wiring.state == crate::seed::State::Wired && !ctx.dry_run)
+    let changed = (!claimed && wiring.state == crate::seed::State::Wired && !ctx.dry_run)
         .then(|| changed_after_setup(ctx, server));
     let changed = match changed {
         Some(changing) => Some(changing.await),

@@ -62,4 +62,13 @@ pub trait Ownership: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn claim(&self) -> Result<Claim, Failure>;
+
+    /// The id, at the outside service it was claimed against, of the account a part is
+    /// `Ours` through, and none before it is.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses, and
+    /// [`Failure::Unsupported`] for a part claimed with the plugin's own secret.
+    async fn claimed_by(&self) -> Result<Option<String>, Failure>;
 }

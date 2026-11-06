@@ -35,6 +35,17 @@
       "live": false,
       "operation": "claim",
       "since": 0
+    },
+    {
+      "asked": {},
+      "case": "claimed_by-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "claimed_by",
+      "since": 1
     }
   ],
   "major": 1

@@ -23,6 +23,10 @@ impl Ownership for Restarting {
         }
     }
 
+    async fn claimed_by(&self) -> Result<Option<String>, crate::ports::service::Failure> {
+        Ok(None)
+    }
+
     async fn claim(&self) -> Result<Claim, Failure> {
         Ok(Claim::ON_RESTART)
     }

@@ -723,6 +723,7 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
 }
 
 mod fenced;
+mod fronted;
 mod inside;
 mod pass;
 mod replaced;

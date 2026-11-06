@@ -17,12 +17,14 @@
 
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::media::serve;
+
 use super::minted;
 use super::Ctx;
 use crate::app::gating;
 use crate::app::targets::{MediaServer, Pairing};
 use crate::app_keys::GATE_APP;
-use crate::ports::service::{Admitted, AppKeys, Gated, Gating, Target};
+use crate::ports::service::{Admitted, AppKeys, Gated, Gating, PlexLink, Target};
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
@@ -195,36 +197,53 @@ async fn with_the_media_server(
     let (curators, unrouted) = routing(ctx, fillers);
     let state = match held(&admitted, &filed) {
         Some(key) => {
-            let wanted = kept_tokens(with(&curators, to_media(routed, &key)), &admitted);
+            let wanted = match wanted(ctx, &curators, routed, (client, &key), &admitted).await {
+                Ok(wanted) => wanted,
+                Err(state) => return said_with(state, unrouted),
+            };
             let others: Vec<&String> = filed.iter().filter(|one| **one != key).collect();
             kept(ctx, client, gate.as_ref(), &admitted, &wanted, others).await
         }
         None if ctx.dry_run => State::WouldWire {
             yours: Some(listed(&admitted)),
-            ours: Some(named(&with(&curators, to_media(routed, "")))),
+            ours: Some(named(&with(&curators, to_media(routed, "", None)))),
         },
-        None => {
-            let key = match minted::mint(client, GATE_APP).await {
-                Ok(key) => key,
-                Err(state) => return said_with(state, unrouted),
-            };
-            let wanted = kept_tokens(with(&curators, to_media(routed, &key)), &admitted);
-            if let Err(failure) = gate.admit(&wanted).await {
-                let _ = client.revoke(&key).await;
-                return said_with(
-                    State::Failed {
-                        detail: format!(
-                            "the routes could not be handed to the request gate, so the new \
-                             key was revoked again: {failure}"
-                        ),
-                    },
-                    unrouted,
-                );
-            }
-            minted::revoking(client, &filed).await
-        }
+        None => match minted_into(ctx, (client, gate.as_ref()), &curators, routed, &admitted).await
+        {
+            Ok(()) => minted::revoking(client, &filed).await,
+            Err(state) => state,
+        },
     };
     said_with(state, unrouted)
+}
+
+/// A key minted for the gate alone, handed to it on its route to the media server beside
+/// `curators`' routes; revoked again where the routes could not be handed over.
+async fn minted_into(
+    ctx: &Ctx,
+    (client, gate): (&dyn serve::Fills, &dyn Gating),
+    curators: &[Gated],
+    routed: &Routed<'_>,
+    admitted: &[Admitted],
+) -> Result<(), State> {
+    let key = minted::mint(client, GATE_APP).await?;
+    let wanted = match wanted(ctx, curators, routed, (client, &key), admitted).await {
+        Ok(wanted) => wanted,
+        Err(state) => {
+            let _ = client.revoke(&key).await;
+            return Err(state);
+        }
+    };
+    if let Err(failure) = gate.admit(&wanted).await {
+        let _ = client.revoke(&key).await;
+        return Err(State::Failed {
+            detail: format!(
+                "the routes could not be handed to the request gate, so the new key was \
+                 revoked again: {failure}"
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// The key filed under the gate's name that the gate presents on its media server route,
@@ -232,11 +251,36 @@ async fn with_the_media_server(
 pub(crate) fn held(admitted: &[Admitted], filed: &[String]) -> Option<String> {
     let presented = admitted
         .iter()
-        .find(|route| matches!(route.target, Target::MediaServer { .. }))?;
+        .find(|route| gating::media_pins(&route.target).is_some())?;
     filed
         .iter()
         .find(|key| crate::ports::digest::sha256(key) == presented.credential)
         .cloned()
+}
+
+/// The routes the gate is to admit: `curators`, and the route to the media server
+/// presenting `key`, each holding the tokens it admits now, save a Plex route, which holds
+/// those its link admits.
+async fn wanted(
+    ctx: &Ctx,
+    curators: &[Gated],
+    routed: &Routed<'_>,
+    (client, key): (&dyn serve::Fills, &str),
+    admitted: &[Admitted],
+) -> Result<Vec<Gated>, State> {
+    let link = if routed.server.plex() {
+        Some(super::plex_linking::link(ctx, routed.server, client).await?)
+    } else {
+        None
+    };
+    let mut all = kept_tokens(
+        with(curators, to_media(routed, key, link.clone())),
+        admitted,
+    );
+    if let (Some(link), Some(media)) = (&link, all.last_mut()) {
+        media.tokens = super::plex_linking::admitting(link, key, &media.tokens);
+    }
+    Ok(all)
 }
 
 /// `wanted`, each holding the tokens the gate admits on its route now.
@@ -388,11 +432,14 @@ struct Routed<'a> {
 /// The route to the media server, named by its id, reaching the API other services sign
 /// the household in through it in at its internal TLS port, accepting only the
 /// certificates it may present, forwarding to the majors of it the stack supports and
-/// presenting `key`.
-fn to_media(routed: &Routed<'_>, key: &str) -> Gated {
+/// presenting `key`: a Plex route holding `link` where there is one, which the gate
+/// answers at a port of its own rather than under the name.
+fn to_media(routed: &Routed<'_>, key: &str, link: Option<PlexLink>) -> Gated {
+    let pins = routed.pins.clone();
     Gated {
-        target: Target::MediaServer {
-            pins: routed.pins.clone(),
+        target: match link {
+            Some(link) => Target::Plex { pins, link },
+            None => Target::MediaServer { pins },
         },
         path: routed.server.id().to_owned(),
         address: routed.pairing.at.encrypted_at(routed.internal),

@@ -25,6 +25,7 @@ use lemonfiber_manifest::container::Certificate;
 use crate::ports::filesystem::{Confined, Readable};
 
 pub mod declared;
+pub mod fronted;
 pub mod internal;
 
 /// The certificate, as it is written down.
@@ -240,6 +241,12 @@ fn made(
             })?;
     }
     Kept::read(&certificate, &key, laid)
+}
+
+impl From<rcgen::Error> for Unkept {
+    fn from(why: rcgen::Error) -> Self {
+        unmade(&why)
+    }
 }
 
 /// Why a certificate could not be made, as it is reported.

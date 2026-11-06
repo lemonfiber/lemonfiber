@@ -42,6 +42,37 @@ pub struct Astray {
     pub removed_in: String,
 }
 
+/// An account as the outside service that holds the media server's accounts knows it, as
+/// plex.tv knows a Plex account, and never its token.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct OutsideAccount {
+    /// The id the outside service holds it by, in decimal digits.
+    pub id: String,
+    /// Its uuid at the outside service.
+    pub uuid: String,
+    /// The name it signs in under.
+    pub username: String,
+    /// The name it is shown under.
+    pub title: String,
+}
+
+/// The media server as the outside service that holds its accounts lists it, as plex.tv
+/// lists a Plex server.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct OutsideServer {
+    /// The name it is listed under.
+    pub name: String,
+    /// The identifier the outside service and the server hold it by: on Plex, its machine
+    /// identifier.
+    pub id: String,
+}
+
 /// Which address names the client, which origin a browser may read the server from, and
 /// starting it again so it reads them.
 #[async_trait]
@@ -135,4 +166,21 @@ pub trait AppKeys: Send + Sync {
     ///
     /// Returns [`Failure`] where the server is unreachable or answers unreadably.
     async fn astray(&self, app: &str) -> Result<Vec<Astray>, Failure>;
+
+    /// The account of the key filed under `app` as the outside service that holds the
+    /// media server's accounts knows it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where the server is unreachable, holds no key under `app`, and
+    /// [`Failure::Unsupported`] where no outside service holds its accounts.
+    async fn account(&self, app: &str) -> Result<OutsideAccount, Failure>;
+
+    /// The media server as the outside service that holds its accounts lists it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where the server is unreachable, and [`Failure::Unsupported`]
+    /// where no outside service holds its accounts.
+    async fn listed_as(&self) -> Result<OutsideServer, Failure>;
 }

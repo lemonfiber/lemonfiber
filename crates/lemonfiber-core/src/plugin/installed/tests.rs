@@ -205,7 +205,7 @@ fn a_variable_asking_an_address_is_an_ask_once_for_each_medium_it_files() {
         files: None,
     };
     let curating = |files: Option<&str>, native: Option<&str>| super::Asking {
-        native: native.map(str::to_owned),
+        native: native.map(lemonfiber_manifest::container::Apis::one),
         files: files.map(str::to_owned),
         ..asked("library.curate")
     };

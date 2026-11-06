@@ -43,9 +43,10 @@ fn a_claim_that_collects_nothing_is_listed_as_unauthorised() {
 
 /// The codes at a status of the client's own making that no request on this surface is
 /// answered with: an arrangement for closing requests is made at a shell, and a check a
-/// plugin contributed, a proof that runs a plugin's image or asks its service, and a move
-/// in place on offer are each said inside a diagnosis rather than refusing one.
-const ANSWERED_ELSEWHERE: [Code; 7] = [
+/// plugin contributed, a proof that runs a plugin's image or asks its service, a move in
+/// place on offer and the standing notice of the Plex link's `owner` mode are each said
+/// inside a diagnosis rather than refusing one.
+const ANSWERED_ELSEWHERE: [Code; 8] = [
     quota::NOTHING_AGREED,
     quota::TOO_SOON,
     plugin::CONTRIBUTED_FAILED,
@@ -53,6 +54,7 @@ const ANSWERED_ELSEWHERE: [Code; 7] = [
     plugin::PROOF_ASKED_FAILED,
     plugin::MOVE_OFFERED,
     setting::HELD_BACK,
+    setting::OWNER_HELD,
 ];
 
 /// A code at a status of the client's own making is one a client branches on, so each

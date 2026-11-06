@@ -7,9 +7,9 @@ use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
     EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
-    Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, Picture,
-    Playback, Ports, Presentation, Question, Screening, SeasonDetail, SeriesHeld, Statuses, Token,
-    Upkeep,
+    Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, OutsideAccount,
+    OutsideServer, Picture, Playback, Ports, Presentation, Question, Screening, SeasonDetail,
+    SeriesHeld, Statuses, Token, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -180,6 +180,20 @@ impl AppKeys for Upstream {
             name: app.to_owned(),
             removed_in: "Settings".to_owned(),
         }])
+    }
+    async fn account(&self, app: &str) -> Result<OutsideAccount, Failure> {
+        Ok(OutsideAccount {
+            id: "4815162342".to_owned(),
+            uuid: "a1b2c3d4e5f60718".to_owned(),
+            username: app.to_owned(),
+            title: app.to_owned(),
+        })
+    }
+    async fn listed_as(&self) -> Result<OutsideServer, Failure> {
+        Ok(OutsideServer {
+            name: "Living room".to_owned(),
+            id: "0f1e2d3c4b5a69788796a5b4c3d2e1f0".to_owned(),
+        })
     }
 }
 

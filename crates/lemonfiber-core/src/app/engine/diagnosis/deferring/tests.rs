@@ -1,6 +1,6 @@
 //! Each deferred check declares the family and budget of the check it builds.
 
-use super::{astray, owned, providing, seasons, stored, tunnel, wired, Stack};
+use super::{astray, owned, plex_link, providing, seasons, stored, tunnel, wired, Stack};
 use crate::doctor::deferred::Deferred;
 use crate::doctor::Check;
 use crate::test_support::a_context;
@@ -42,6 +42,7 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
             seasons(&ctx, manifest),
             astray(&ctx, manifest),
             owned(&ctx, manifest),
+            plex_link(&ctx, manifest),
         ] {
             assert!(
                 declared_what_it_built(&deferred).await,
@@ -97,5 +98,122 @@ async fn the_claimed_check_asks_every_installed_part_claimed_first_over_its_cont
             .any(|finding| finding.check == "config.claimed.claimed-part"
                 && matches!(finding.verdict, crate::doctor::Verdict::Pass { .. })),
         "{findings:?}"
+    );
+}
+
+/// The plex link check's findings over the stack this build carries beside Plex, with
+/// `mode` recorded as the link mode where it names one, the media server answering over
+/// `http` where it is `running`.
+async fn plex_findings(
+    name: &str,
+    mode: Option<&str>,
+    running: bool,
+    http: std::sync::Arc<lemonfiber_fixtures::http::Fake>,
+) -> Vec<crate::doctor::Finding> {
+    use crate::test_support::media;
+    let env = crate::test_support::env_without_password(name);
+    if let Some(mode) = mode {
+        assert!(crate::settings::store::recorded(
+            &env.with_file_name(crate::config::paths::SETTINGS),
+            &[(crate::plex_link::SETTING, Some(mode))].into(),
+        )
+        .is_ok());
+    }
+    let ctx = a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env),
+            ..crate::config::Settings::default()
+        })
+        .build()
+        .with_http(http);
+    let mut register = crate::plugin::Register::empty();
+    let installed = crate::test_support::plexing::plexed()
+        .into_iter()
+        .chain(
+            crate::test_support::guards::GATE
+                .installed()
+                .map(crate::test_support::plexing::asking_in_plex_too),
+        )
+        .chain(crate::test_support::requests::REQUESTS.installed());
+    for one in installed {
+        assert!(register.record(one).is_ok());
+    }
+    assert!(
+        crate::app::record::keep(crate::app::plugins::kept_at(&ctx).as_deref(), &register).is_ok()
+    );
+    let ctx = if running { media::asking(ctx) } else { ctx };
+    let manifests: Vec<_> = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .into_iter()
+        .collect();
+    let mut findings = Vec::new();
+    for manifest in &manifests {
+        findings.extend(plex_link(&ctx, manifest).run().await);
+    }
+    findings
+}
+
+/// The verdict the plex link check gives among `findings`.
+fn plex_verdict(findings: &[crate::doctor::Finding]) -> Option<&crate::doctor::Verdict> {
+    findings
+        .iter()
+        .find(|finding| finding.check == crate::doctor::plex_link::CHECK)
+        .map(|finding| &finding.verdict)
+}
+
+/// Where Plex is the media server the gate routes to, the link check names the request
+/// service's own Plex account as the media server answers it.
+#[tokio::test]
+async fn the_plex_link_check_names_the_request_services_own_account() {
+    use crate::test_support::media;
+    let account = crate::ports::service::OutsideAccount {
+        id: "1001".to_owned(),
+        uuid: "a1b2c3".to_owned(),
+        username: "lemonfiber-gate".to_owned(),
+        title: "lemonfiber-gate".to_owned(),
+    };
+    let http = lemonfiber_fixtures::http::Fake::by_path(vec![(
+        media::serve("account"),
+        media::answered(&account),
+    )]);
+
+    let findings = plex_findings("deferring-plex", None, true, http).await;
+
+    assert!(
+        matches!(plex_verdict(&findings), Some(crate::doctor::Verdict::Pass { note: Some(note) })
+            if note.contains("lemonfiber-gate")),
+        "{findings:?}"
+    );
+}
+
+/// In `owner`, the check names the account that claimed Plex where Plex answers, and the
+/// operator's own account alone where it cannot be asked.
+#[tokio::test]
+async fn the_plex_link_check_names_the_claiming_account_where_plex_answers() {
+    use crate::test_support::media;
+    let claimed = || {
+        lemonfiber_fixtures::http::Fake::by_path(vec![(
+            crate::test_support::adapted::claiming("claimed_by"),
+            media::answered(&Some("4815162342")),
+        )])
+    };
+
+    let answered = plex_findings("deferring-plex-owner", Some("owner"), true, claimed()).await;
+    let unasked = plex_findings("deferring-plex-unasked", Some("owner"), false, claimed()).await;
+    let unnamed = plex_findings("deferring-plex-unnamed", Some("shared"), true, claimed()).await;
+
+    let warned = |findings: &[crate::doctor::Finding], id: bool| {
+        matches!(plex_verdict(findings), Some(crate::doctor::Verdict::Warn(problem))
+            if problem.summary.contains("4815162342") == id)
+    };
+    assert!(warned(&answered, true), "{answered:?}");
+    assert!(warned(&unasked, false), "{unasked:?}");
+    assert!(
+        matches!(
+            plex_verdict(&unnamed),
+            Some(crate::doctor::Verdict::Unverified { .. })
+        ),
+        "{unnamed:?}"
     );
 }

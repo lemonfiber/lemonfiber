@@ -58,6 +58,7 @@ fn claiming(claims: Vec<Answer>) -> Arc<Fake> {
             ],
         ),
         ("/watch", vec![json("null")]),
+        ("/claimed_by", vec![json("null")]),
         ("/claim", claims),
         (
             "/owner",

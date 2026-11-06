@@ -33,5 +33,10 @@
     "name": "OUTSIDE_ITS_CHOICES",
     "status": 400,
     "description": "Raised where a change would leave a setting holding a value outside its choices."
+  },
+  "SETTING-9": {
+    "name": "OWNER_SET_UP",
+    "status": 409,
+    "description": "Raised where `PLEX_LINK_MODE` would enter or leave `owner` for a request service already set up."
   }
 }
