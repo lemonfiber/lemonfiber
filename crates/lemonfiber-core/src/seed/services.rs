@@ -370,6 +370,17 @@ pub async fn wire_request_source(
     Wiring::settled(IDENTITY.to_owned(), state)
 }
 
+/// What a refused sign-in through `source` leaves the identity in: waiting, where `source`
+/// carries no credential and its owner signs in themself, and unreached otherwise.
+fn unestablished(failure: &Failure, source: &IdentitySource) -> State {
+    match failure {
+        Failure::Refused { detail, .. } if source.credential.is_none() => State::Skipped {
+            reason: detail.clone(),
+        },
+        _ => unreached(failure),
+    }
+}
+
 /// Point the request service at the media server, unless it is already initialised — which is
 /// left untouched, whether lemonfiber initialised it on an earlier run or the
 /// household set it up with accounts of its own. A fresh request service is signed in and
@@ -382,12 +393,8 @@ async fn configure_requests(
     rehearsing: bool,
 ) -> State {
     if !rehearsing {
-        match requests.establish(source).await {
-            Ok(()) => {}
-            Err(Failure::Refused { detail, .. }) if source.credential.is_none() => {
-                return State::Skipped { reason: detail };
-            }
-            Err(failure) => return unreached(&failure),
+        if let Err(failure) = requests.establish(source).await {
+            return unestablished(&failure, source);
         }
     }
     let initialized = match requests.initialized().await {

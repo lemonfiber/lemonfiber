@@ -174,11 +174,8 @@ pub(super) async fn seed_request_identity(
 
     let plex = claimed && server.plex();
     let linked = match (gate, &wiring.state) {
-        (true, crate::seed::State::WouldWire { .. }) if plex => {
-            Some(super::plex_linking::would_link(&requests, server))
-        }
-        (true, crate::seed::State::Wired | crate::seed::State::AlreadyWired) if plex => {
-            Some(super::plex_linking::linked(ctx, owner.as_ref(), &requests, server).await)
+        (true, state) if plex => {
+            super::plex_linking::held_to_route(ctx, owner.as_ref(), &requests, server, state).await
         }
         (true, crate::seed::State::WouldWire { .. }) => {
             Some(super::linking::would_link(&requests, server))

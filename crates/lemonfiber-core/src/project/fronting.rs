@@ -68,12 +68,11 @@ impl Fronting {
             }
         }
         if unit.id == self.requests {
-            if let Some(config) = unit.config_path {
-                entry.hold(
-                    crate::plex_link::TRUSTED,
-                    &format!("{}/{AUTHORITY}", config.trim_end_matches('/')),
-                );
-            }
+            let config = unit.config_path.unwrap_or_default().trim_end_matches('/');
+            entry.hold(crate::plex_link::TRUSTED, &format!("{config}/{AUTHORITY}"));
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

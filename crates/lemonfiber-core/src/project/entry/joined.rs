@@ -44,15 +44,13 @@ impl Joined {
         self.aliases = inside.iter().map(|id| literal(id)).collect();
     }
 
-    /// Answer on the network `network`, where it joins it, to each of `hosts` as well.
+    /// Answer on the network `network` to each of `hosts` as well: written where it joins
+    /// that network.
     pub(super) fn answer_as(&mut self, network: &str, hosts: &[&str]) {
-        let network = literal(network);
-        if self.at.contains_key(&network) {
-            self.answers
-                .entry(network)
-                .or_default()
-                .extend(hosts.iter().map(|host| literal(host)));
-        }
+        self.answers
+            .entry(literal(network))
+            .or_default()
+            .extend(hosts.iter().map(|host| literal(host)));
     }
 }
 

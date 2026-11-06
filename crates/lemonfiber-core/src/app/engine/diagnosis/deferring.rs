@@ -153,30 +153,30 @@ async fn linked(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Option<L
         .filter(crate::app::targets::MediaServer::plex)?;
     let requests = server.asked_by.as_ref()?.id.clone();
     let recorded = crate::settings::recorded_value(ctx, crate::plex_link::SETTING);
-    let (mut own, mut claimed_by) = (None, None);
-    match crate::plex_link::Mode::held(recorded.as_deref()) {
-        Some(crate::plex_link::Mode::Owner) => {
-            if let Some(owning) = server.owning(ctx).await {
-                claimed_by = owning.claimed_by().await.ok().flatten();
-            }
-        }
+    let (own, claimed_by) = match crate::plex_link::Mode::held(recorded.as_deref()) {
+        Some(crate::plex_link::Mode::Owner) => (None, claiming_account(ctx, &server).await),
         Some(crate::plex_link::Mode::Managed | crate::plex_link::Mode::Fronted) => {
-            if let Some(client) = server.administering(ctx).await {
-                own = client
-                    .account(crate::app_keys::GATE_APP)
-                    .await
-                    .ok()
-                    .map(|account| account.title);
-            }
+            (own_account(ctx, &server).await, None)
         }
-        None => {}
-    }
+        None => (None, None),
+    };
     Some(Linked {
         requests,
         recorded,
         own,
         claimed_by,
     })
+}
+
+/// The plex.tv id of the account that claimed `server`, where it can be read.
+async fn claiming_account(ctx: &Ctx, server: &crate::app::targets::MediaServer) -> Option<String> {
+    server.owning(ctx).await?.claimed_by().await.ok().flatten()
+}
+
+/// The name of the request service's own account in `server`, where it can be read.
+async fn own_account(ctx: &Ctx, server: &crate::app::targets::MediaServer) -> Option<String> {
+    let client = server.administering(ctx).await?;
+    Some(client.account(crate::app_keys::GATE_APP).await.ok()?.title)
 }
 
 /// What the request gate refused and removed since the last diagnosis, built when it runs.

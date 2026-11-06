@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use futures_util::future::OptionFuture;
+
 use crate::app::plugins::writing;
 use crate::app::Ctx;
 use crate::config::paths::SETTINGS;
@@ -249,13 +251,11 @@ fn regenerating(
 /// cannot be asked, since one that never answered was never set up by lemonfiber.
 async fn set_up(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> bool {
     let fillers = crate::app::targets::fillers_here(ctx, manifest);
-    let Some(asked) = crate::app::targets::request_service(&fillers) else {
-        return false;
-    };
-    match crate::app::targets::requests_as_owner(ctx, asked).await {
-        Some(requests) => requests.initialized().await.unwrap_or(false),
-        None => false,
-    }
+    let asked = crate::app::targets::request_service(&fillers)
+        .map(|asked| crate::app::targets::requests_as_owner(ctx, asked));
+    let requests = OptionFuture::from(asked).await.flatten();
+    let initialized = OptionFuture::from(requests.as_ref().map(|one| one.initialized())).await;
+    initialized.is_some_and(|answer| answer.unwrap_or(false))
 }
 
 /// The refusal of entering or leaving `owner` for a request service already set up.

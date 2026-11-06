@@ -7,12 +7,14 @@
 //! Plex; with a gate token minted for it alone in `fronted`; and by the operator's own
 //! sign-in on its page in `owner`, where lemonfiber carries nothing.
 
+use futures_util::future::OptionFuture;
 use lemonfiber_contract::capabilities::media::serve;
 
 use super::tokens::{Kept, Presented};
 use super::Ctx;
 use crate::app::targets::MediaServer;
 use crate::app_keys::GATE_APP;
+use crate::certificate::fronted::{kept, kept_or_made, withdrawn, Beneath, HOSTS};
 use crate::plex_link::Mode;
 use crate::ports::digest::sha256;
 use crate::ports::service::{
@@ -25,47 +27,81 @@ use crate::wiring::{Filler, Fillers};
 /// What the report calls plex.tv answered by the request gate.
 const FRONTING: &str = "plex.tv answered by the request gate";
 
+/// What is said where the request service is linked to a claimed server without the
+/// gate's Plex route.
+const UNROUTED: &str = "the media server is claimed against an account outside the house, \
+                        and the request service is linked to it only through the request \
+                        gate's Plex route, which this stack does not answer";
+
+/// What is said where the gate holds no account of the request service's own yet.
+const UNHELD: &str = "the request gate holds no account of the request service's own in the \
+                      media server yet, so the request service is not signed in";
+
+/// What is said where the account that claimed Plex cannot be named.
+const UNCLAIMED: &str = "the media server names no account that claimed it yet, so the \
+                         request gate is handed no Plex route";
+
+/// What is said where the household cannot be read.
+const UNREAD: &str = "the media server cannot be asked who is in its household, so the \
+                      request gate is handed no Plex route";
+
 /// The authority the request service trusts for plex.tv and the certificate the gate
 /// answers for it under, kept in `fronted` mode and taken away in every other; the gate
 /// and the request service started again where they are written anew, so each reads them.
 pub(super) async fn seed_fronting(ctx: &Ctx, fillers: &Fillers) -> Option<Wiring> {
-    use crate::certificate::fronted::{kept, kept_or_made, withdrawn, HOSTS};
     let parts = crate::plex_link::fronting(fillers)?;
     let at = crate::plex_link::beneath(&parts)?;
     let confined = ctx.seams.confined.as_ref();
-    let rests = |state| Wiring::settled(FRONTING.to_owned(), state);
-    let failed = |why: crate::certificate::Unkept| {
-        rests(State::Failed {
-            detail: why.to_string(),
-        })
-    };
     if crate::plex_link::mode(ctx) != Some(Mode::Fronted) {
-        if ctx.dry_run {
-            return None;
-        }
-        return withdrawn(confined, at).err().map(failed);
+        let left = (!ctx.dry_run).then(|| withdrawn(confined, at));
+        return left?.err().map(|why| fronting_rests(failed(&why)));
     }
-    if ctx.dry_run {
-        return Some(match kept(confined, at) {
-            Ok(true) => rests(State::AlreadyWired),
-            Ok(false) => rests(State::WouldWire {
-                yours: None,
-                ours: Some(HOSTS.join(", ")),
-            }),
-            Err(why) => failed(why),
-        });
+    let state = if ctx.dry_run {
+        kept(confined, at)
+            .map(rehearsed)
+            .map_err(|why| why.to_string())
+    } else {
+        written_anew(ctx, &parts, at).await
+    };
+    Some(fronting_rests(state.unwrap_or_else(|why| failed(&why))))
+}
+
+/// What a rehearsal says of the files, where they are `held` already.
+fn rehearsed(held: bool) -> State {
+    let ours = Some(HOSTS.join(", "));
+    if held {
+        State::AlreadyWired
+    } else {
+        State::WouldWire { yours: None, ours }
     }
-    match kept_or_made(confined, at) {
-        Ok(false) => Some(rests(State::AlreadyWired)),
-        Ok(true) => {
-            for id in [&parts.gate.id, &parts.requests.id] {
-                if let Err(detail) = super::restarting::restart(ctx, id).await {
-                    return Some(rests(State::Failed { detail }));
-                }
-            }
-            Some(rests(State::Wired))
-        }
-        Err(why) => Some(failed(why)),
+}
+
+/// The files beneath `at` kept, or written anew and the gate and the request service
+/// `parts` names started again so each reads them.
+async fn written_anew(
+    ctx: &Ctx,
+    parts: &crate::plex_link::Fronting<'_>,
+    at: Beneath<'_>,
+) -> Result<State, String> {
+    let written = kept_or_made(ctx.seams.confined.as_ref(), at).map_err(|why| why.to_string())?;
+    if !written {
+        return Ok(State::AlreadyWired);
+    }
+    for id in [&parts.gate.id, &parts.requests.id] {
+        super::restarting::restart(ctx, id).await?;
+    }
+    Ok(State::Wired)
+}
+
+/// plex.tv's front, resting in `state`.
+fn fronting_rests(state: State) -> Wiring {
+    Wiring::settled(FRONTING.to_owned(), state)
+}
+
+/// A failure, as the report says it.
+fn failed(why: &impl std::fmt::Display) -> State {
+    State::Failed {
+        detail: why.to_string(),
     }
 }
 
@@ -88,91 +124,96 @@ pub(super) async fn signed_in(
     server: &MediaServer,
     gate: bool,
 ) -> Wiring {
-    let rests = |state| Wiring::settled(crate::seed::IDENTITY.to_owned(), state);
-    if !gate || !server.plex() {
-        return rests(State::Skipped {
-            reason: format!(
-                "{} is claimed against an account outside the house, and the request service \
-                 is linked to it only through the request gate's Plex route, which this stack \
-                 does not answer",
-                server.name()
-            ),
-        });
-    }
-    let Some(mode) = crate::plex_link::mode(ctx) else {
-        return rests(unnamed(ctx));
+    let state = if gate && server.plex() {
+        signing(ctx, fillers, requests, server).await
+    } else {
+        skipped(UNROUTED)
     };
-    match mode {
-        Mode::Owner => crate::seed::wire_request_source(requests, &source(None), ctx.dry_run).await,
-        Mode::Managed => match held_key(ctx, fillers, server).await {
-            Some(key) => {
-                let signing = source(Some(Credential::ApiKey(key)));
-                crate::seed::wire_request_source(requests, &signing, ctx.dry_run).await
-            }
-            None => rests(unheld(server)),
+    Wiring::settled(crate::seed::IDENTITY.to_owned(), state)
+}
+
+/// What signing the request service in at the gate's Plex route comes to.
+async fn signing(
+    ctx: &Ctx,
+    fillers: &Fillers,
+    requests: &dyn Requests,
+    server: &MediaServer,
+) -> State {
+    match crate::plex_link::mode(ctx) {
+        Some(Mode::Owner) => signed(requests, None, ctx.dry_run).await,
+        Some(Mode::Managed) => match held_key(ctx, fillers, server).await {
+            Some(key) => signed(requests, Some(Credential::ApiKey(key)), ctx.dry_run).await,
+            None => skipped(UNHELD),
         },
-        Mode::Fronted => fronted(ctx, fillers, requests, server).await,
+        Some(Mode::Fronted) => fronted(ctx, fillers, requests, server)
+            .await
+            .unwrap_or_else(|state| state),
+        None => unnamed(ctx),
     }
 }
 
 /// The request service signed in with the gate token, minted where the gate's Plex route
 /// admits none, so its owner holds it; and with no credential where the route already
 /// admits one, which only its owner holds.
+///
+/// # Errors
+///
+/// What the identity rests in where no token could be minted or handed to the gate.
 async fn fronted(
     ctx: &Ctx,
     fillers: &Fillers,
     requests: &dyn Requests,
     server: &MediaServer,
-) -> Wiring {
-    let rests = |state| Wiring::settled(crate::seed::IDENTITY.to_owned(), state);
-    let (Some(kept), Some(key)) = (
-        Kept::read(ctx, fillers).await,
-        held_key(ctx, fillers, server).await,
-    ) else {
-        return rests(unheld(server));
+) -> Result<State, State> {
+    let held = held_key(ctx, fillers, server).await;
+    let (Some(kept), Some(key)) = (Kept::read(ctx, fillers).await, held) else {
+        return Ok(skipped(UNHELD));
     };
     let route = server.id();
-    if !gate_tokens(kept.admitted(), route, &key).is_empty() {
-        return crate::seed::wire_request_source(requests, &source(None), ctx.dry_run).await;
-    }
-    if ctx.dry_run {
-        return rests(State::WouldWire {
+    let admitted = gate_tokens(kept.admitted(), route, &key);
+    if ctx.dry_run && admitted.is_empty() {
+        return Ok(State::WouldWire {
             yours: None,
             ours: Some(url()),
         });
     }
-    let Some(token) = crate::secret::generate(ctx.seams.random.as_ref()) else {
-        return rests(State::Failed {
-            detail: crate::secret::NO_RANDOMNESS_FOR_TOKEN.to_owned(),
-        });
-    };
+    if !admitted.is_empty() {
+        return Ok(signed(requests, None, ctx.dry_run).await);
+    }
+    let unwritten = |reason: String| failed(&Kept::unwritten(&reason));
+    let random = ctx.seams.random.as_ref();
+    let token = crate::secret::generate(random)
+        .ok_or_else(|| failed(&crate::secret::NO_RANDOMNESS_FOR_TOKEN))?;
     let presented = [Presented {
         route: route.to_owned(),
         token: token.clone(),
     }];
-    let beside = match kept.beside(&presented).await {
-        Ok(beside) => beside,
-        Err(reason) => {
-            return rests(State::Failed {
-                detail: Kept::unwritten(&reason),
-            })
-        }
-    };
-    let wiring =
-        crate::seed::wire_request_source(requests, &source(Some(Credential::ApiKey(token))), false)
-            .await;
-    let signed = matches!(wiring.state, State::Wired | State::AlreadyWired);
-    let handed = if signed {
+    let beside = kept.beside(&presented).await.map_err(unwritten)?;
+    let state = signed(requests, Some(Credential::ApiKey(token)), false).await;
+    let took = matches!(state, State::Wired | State::AlreadyWired);
+    let handed = if took {
         kept.only(&beside, &presented, &[true]).await
     } else {
         kept.restore().await
     };
-    match handed {
-        Ok(()) => wiring,
-        Err(reason) => rests(State::Failed {
-            detail: Kept::unwritten(&reason),
-        }),
-    }
+    handed.map_err(unwritten)?;
+    Ok(state)
+}
+
+/// The request service signed in with `credential`, or none.
+async fn signed(
+    requests: &dyn Requests,
+    credential: Option<Credential>,
+    rehearsing: bool,
+) -> State {
+    let source = IdentitySource {
+        at: url(),
+        protocol: Protocol(crate::plex_link::API.to_owned()),
+        credential,
+    };
+    crate::seed::wire_request_source(requests, &source, rehearsing)
+        .await
+        .state
 }
 
 /// What the gate's Plex route holds of the link in the mode recorded: the account that
@@ -184,44 +225,22 @@ pub(super) async fn link(
     client: &dyn serve::Fills,
 ) -> Result<PlexLink, State> {
     let unreached = |failure: Failure| crate::seed::unreached(&failure);
-    match crate::plex_link::mode(ctx).ok_or_else(|| unnamed(ctx))? {
-        Mode::Managed => Ok(PlexLink::Managed),
-        Mode::Owner => {
-            let owning = server.owning(ctx).await.ok_or_else(|| State::Skipped {
-                reason: format!(
-                    "{} cannot be asked over owner.claim who claimed it, so the request gate \
-                     is handed no Plex route",
-                    server.name()
-                ),
-            })?;
-            match owning.claimed_by().await.map_err(unreached)? {
-                Some(account) => Ok(PlexLink::Owner { account }),
-                None => Err(State::Skipped {
-                    reason: format!(
-                        "{} names no account that claimed it yet, so the request gate is \
-                         handed no Plex route",
-                        server.name()
-                    ),
-                }),
-            }
+    match crate::plex_link::mode(ctx) {
+        Some(Mode::Managed) => Ok(PlexLink::Managed),
+        Some(Mode::Owner) => {
+            let owning = server.owning(ctx).await;
+            let asked = OptionFuture::from(owning.as_ref().map(Ownership::claimed_by)).await;
+            let account = asked.transpose().map_err(unreached)?.flatten();
+            account
+                .map(|account| PlexLink::Owner { account })
+                .ok_or(skipped(UNCLAIMED))
         }
-        Mode::Fronted => {
+        Some(Mode::Fronted) => {
             let account = client.account(GATE_APP).await.map_err(unreached)?;
             let listed = client.listed_as().await.map_err(unreached)?;
-            let household = server
-                .identifying(ctx)
-                .await
-                .ok_or_else(|| State::Skipped {
-                    reason: format!(
-                        "{} cannot be asked over identity.source for its household, so the \
-                     request gate is handed no Plex route",
-                        server.name()
-                    ),
-                })?;
+            let source = server.identifying(ctx).await.ok_or(skipped(UNREAD))?;
+            let household = source.household().await.map_err(unreached)?;
             let members = household
-                .household()
-                .await
-                .map_err(unreached)?
                 .into_iter()
                 .map(|member| PlexMember {
                     id: member.id,
@@ -234,6 +253,7 @@ pub(super) async fn link(
                 server: listed,
             })
         }
+        None => Err(unnamed(ctx)),
     }
 }
 
@@ -280,38 +300,39 @@ async fn held_key(ctx: &Ctx, fillers: &Fillers, server: &MediaServer) -> Option<
     super::gate::held(&admitted, &filed)
 }
 
-/// The identity source the request service's owner signs in through: Plex's API at the
-/// gate's Plex route, carrying `credential`.
-fn source(credential: Option<Credential>) -> IdentitySource {
-    IdentitySource {
-        at: url(),
-        protocol: Protocol(crate::plex_link::API.to_owned()),
-        credential,
-    }
-}
-
 /// Where the request service is told Plex is: the gate's Plex route.
 fn url() -> String {
     let at = route();
     format!("http://{}:{}", at.host, at.port)
 }
 
-/// What is said where the gate holds no Plex account of the request service's own yet.
-fn unheld(server: &MediaServer) -> State {
+/// Skipped, for `reason`.
+fn skipped(reason: &str) -> State {
     State::Skipped {
-        reason: format!(
-            "the request gate holds no account of the request service's own in {} yet, so \
-             the request service is not signed in",
-            server.name()
-        ),
+        reason: reason.to_owned(),
     }
 }
 
 /// What is said where the mode recorded names none.
 fn unnamed(ctx: &Ctx) -> State {
     let held = crate::settings::recorded_value(ctx, crate::plex_link::SETTING);
-    State::Failed {
-        detail: crate::plex_link::refusal(held.as_deref().unwrap_or_default()).unwrap_or_default(),
+    failed(&crate::plex_link::refusal(held.as_deref().unwrap_or_default()).unwrap_or_default())
+}
+
+/// The request service `asker` is held to the gate's Plex route, as the identity resting
+/// in `state` leaves it: said as a rehearsal where it would be set up, held where it is,
+/// and nothing where it is not.
+pub(super) async fn held_to_route(
+    ctx: &Ctx,
+    requests: &dyn Requests,
+    asker: &Filler,
+    server: &MediaServer,
+    state: &State,
+) -> Option<Wiring> {
+    match state {
+        State::WouldWire { .. } => Some(would_link(asker, server)),
+        State::Wired | State::AlreadyWired => Some(linked(ctx, requests, asker, server).await),
+        _ => None,
     }
 }
 
@@ -323,38 +344,36 @@ pub(super) async fn linked(
     asker: &Filler,
     server: &MediaServer,
 ) -> Wiring {
-    let rests = |state| super::linking::settled(asker, server, state);
-    let at = route();
-    let link = match requests.media_server_link().await {
-        Ok(link) => link,
-        Err(failure) => return rests(crate::seed::unreached(&failure)),
+    let state = match requests.media_server_link().await {
+        Ok(link) => relinked(ctx, requests, &link.at).await,
+        Err(failure) => crate::seed::unreached(&failure),
     };
-    if link.at == at {
-        return rests(State::AlreadyWired);
+    super::linking::settled(asker, server, state)
+}
+
+/// The request service, reaching Plex at `was`, held to the gate's Plex route.
+async fn relinked(ctx: &Ctx, requests: &dyn Requests, was: &Endpoint) -> State {
+    let at = route();
+    if *was == at {
+        return State::AlreadyWired;
     }
     if ctx.dry_run {
-        return rests(State::WouldWire {
-            yours: (!link.at.host.is_empty()).then(|| crate::seed::reached_at(&link.at)),
-            ours: Some(crate::seed::reached_at(&at)),
-        });
+        let yours = (!was.host.is_empty()).then(|| crate::seed::reached_at(was));
+        let ours = Some(crate::seed::reached_at(&at));
+        return State::WouldWire { yours, ours };
     }
-    match requests.link_media_server(&at, "").await {
-        Ok(()) => rests(State::Wired),
-        Err(failure) => rests(crate::seed::unreached(&failure)),
-    }
+    let written = requests.link_media_server(&at, "").await;
+    written.map_or_else(
+        |failure| crate::seed::unreached(&failure),
+        |()| State::Wired,
+    )
 }
 
 /// What a rehearsal says where the request service is not set up yet: it would be
 /// pointed at the gate's Plex route once it is.
 pub(super) fn would_link(asker: &Filler, server: &MediaServer) -> Wiring {
-    super::linking::settled(
-        asker,
-        server,
-        State::WouldWire {
-            yours: None,
-            ours: Some(crate::seed::reached_at(&route())),
-        },
-    )
+    let ours = Some(crate::seed::reached_at(&route()));
+    super::linking::settled(asker, server, State::WouldWire { yours: None, ours })
 }
 
 #[cfg(test)]

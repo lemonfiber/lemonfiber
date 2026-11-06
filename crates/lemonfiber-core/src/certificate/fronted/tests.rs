@@ -116,3 +116,71 @@ fn leaving_takes_every_file_away_and_finding_none_is_no_fault() {
     }
     assert_eq!(withdrawn(&Disk, at), Ok(()));
 }
+
+#[test]
+fn what_is_printed_of_one_is_that_it_is_one() {
+    let printed = made().map(|one| format!("{one:?}")).unwrap_or_default();
+
+    assert_eq!(printed, "Fronted { .. }");
+}
+
+#[test]
+fn an_authority_that_is_none_or_a_certificate_naming_more_is_not_kept() {
+    let scratch = Scratch::new("fronted-unkept");
+    let (gate, requests) = directories(&scratch);
+    let at = Beneath {
+        gate: &gate,
+        requests: &requests,
+    };
+    assert_eq!(kept_or_made(&Disk, at), Ok(true));
+    let authority = requests.join(AUTHORITY);
+    let held = std::fs::read_to_string(&authority).unwrap_or_default();
+
+    for unread in [
+        "not a certificate".to_owned(),
+        "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n".to_owned(),
+    ] {
+        let _ = std::fs::write(&authority, unread);
+        assert_eq!(kept(&Disk, at), Ok(false));
+    }
+    let _ = std::fs::write(&authority, held);
+    let mut wider = rcgen::CertificateParams::new(vec!["plex.tv".to_owned()]).ok();
+    if let Some(params) = wider.as_mut() {
+        params
+            .subject_alt_names
+            .push(rcgen::SanType::IpAddress(std::net::IpAddr::from([
+                127, 0, 0, 1,
+            ])));
+    }
+    let signed = wider
+        .zip(rcgen::KeyPair::generate().ok())
+        .and_then(|(params, key)| params.self_signed(&key).ok())
+        .map(|one| super::pem(super::CERTIFIED, one.der()))
+        .unwrap_or_default();
+    let _ = std::fs::write(gate.join(CERTIFICATE), signed);
+    assert_eq!(kept(&Disk, at), Ok(false));
+}
+
+#[test]
+fn a_file_reached_through_a_link_is_neither_read_written_nor_taken_away() {
+    let scratch = Scratch::new("fronted-linked");
+    let (gate, requests) = directories(&scratch);
+    let elsewhere = scratch.path().join("elsewhere");
+    let _ = std::fs::create_dir_all(&elsewhere);
+    assert!(std::os::unix::fs::symlink(&elsewhere, requests.join("plex-tv")).is_ok());
+    let at = Beneath {
+        gate: &gate,
+        requests: &requests,
+    };
+
+    assert!(matches!(kept(&Disk, at), Err(super::Unkept::Unreadable(_))));
+    assert!(matches!(
+        made().map(|one| written(&Disk, at, &one)),
+        Ok(Err(super::Unkept::Unmade(_)))
+    ));
+    assert!(matches!(
+        withdrawn(&Disk, at),
+        Err(super::Unkept::Unmade(_))
+    ));
+    assert!(std::fs::read_dir(&elsewhere).is_ok_and(|mut entries| entries.next().is_none()));
+}
