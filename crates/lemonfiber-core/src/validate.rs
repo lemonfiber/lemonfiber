@@ -25,7 +25,6 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
-use crate::endpoint::API_KEY_HEADER;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::nntp::{Endpoint, Nntp};
 
@@ -38,14 +37,6 @@ pub enum Credential {
         /// The indexer's API base URL, as the operator gave it.
         url: String,
         /// The API key the indexer authenticates the query with.
-        key: String,
-    },
-    /// An existing service to adopt — a curator-shape API reached with its key,
-    /// asked to read back its own identity.
-    Service {
-        /// The service's base URL.
-        url: String,
-        /// The API key it authenticates with, sent as `X-Api-Key`.
         key: String,
     },
     /// A Usenet provider, reached over NNTP and asked to accept a login.
@@ -296,35 +287,13 @@ impl Live {
             other => other,
         }
     }
-
-    /// Prove an existing service by reaching its API with the key and reading what
-    /// it says about itself — a refusal is a wrong key, an answer that is not the
-    /// service's own points at the URL.
-    async fn service(&self, url: &str, key: &str) -> Validation {
-        let request = Request {
-            method: Method::Get,
-            url: url.to_owned(),
-            headers: vec![(API_KEY_HEADER.to_owned(), key.to_owned())],
-            body: None,
-            pinned: None,
-        };
-
-        let started = Instant::now();
-        match self.http.send(&request).await {
-            Ok(response) => interpret_service(response.status, &response.body),
-            Err(unreachable) => {
-                let said = persisting(&unreachable);
-                self.not_reached(&said, &unreachable.reason, started.elapsed())
-            }
-        }
-    }
 }
 
 mod allowed;
 mod reading;
 
 pub use allowed::Allowed;
-use reading::{interpret_indexer, interpret_service, interpret_usenet, persisting};
+use reading::{interpret_indexer, interpret_usenet, persisting};
 
 #[async_trait]
 impl Validator for Live {
@@ -336,7 +305,6 @@ impl Validator for Live {
 async fn validated(live: &Live, credential: &Credential) -> Validation {
     let came_to = match credential {
         Credential::Indexer { url, key } => live.indexer(url, key).await,
-        Credential::Service { url, key } => live.service(url, key).await,
         Credential::Usenet {
             host,
             port,

@@ -112,26 +112,6 @@ pub(crate) fn not_reached(
     }
 }
 
-/// A refusing status is the key being wrong; a well-formed identity proves it and
-/// carries what the service said about itself as the observed capability; any
-/// other answer came from something that is not the service's API, which points
-/// at the URL rather than the key.
-pub(crate) fn interpret_service(status: u16, body: &str) -> Validation {
-    if status == UNAUTHORIZED || status == FORBIDDEN {
-        return Validation::Rejected {
-            detail: format!("the service answered {status} — the key was refused"),
-        };
-    }
-    if (200..300).contains(&status) {
-        return Validation::Valid {
-            observed: identity(body),
-        };
-    }
-    Validation::Unreachable {
-        detail: format!("the service answered {status}, not as a reachable API — check the URL"),
-    }
-}
-
 /// Read a provider's replies to a login into an outcome.
 ///
 /// The reply to the password is what decides it: accepted proves the login,
@@ -208,28 +188,6 @@ pub(crate) fn code(line: &str) -> Option<u16> {
         digits.parse().ok()
     } else {
         None
-    }
-}
-
-/// What a service says about itself, from the identity it answered with.
-///
-/// A curator status names the instance and its version; either alone is worth
-/// reporting, and where neither is there the fact that the key was accepted is
-/// still the observation.
-pub(crate) fn identity(body: &str) -> String {
-    let parsed = serde_json::from_str::<serde_json::Value>(body).ok();
-    let field = |name: &str| {
-        parsed
-            .as_ref()
-            .and_then(|value| value.get(name))
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-    };
-    match (field("instanceName"), field("version")) {
-        (Some(name), Some(version)) => format!("reached {name}, version {version}"),
-        (Some(name), None) => format!("reached {name}"),
-        (None, Some(version)) => format!("the service accepted the key — version {version}"),
-        (None, None) => "the service accepted the key".to_owned(),
     }
 }
 

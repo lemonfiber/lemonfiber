@@ -363,14 +363,6 @@ async fn nothing_answering_at_all_is_unreachable_with_the_transports_reason() {
     ));
 }
 
-/// The service credential the tests prove.
-fn service() -> Credential {
-    Credential::Service {
-        url: "http://sonarr.test:8989/api/v3/system/status".to_owned(),
-        key: "abc".to_owned(),
-    }
-}
-
 /// An NNTP transport that answers `converse` with scripted reply lines, or
 /// with nothing at all where the connection could not be made.
 struct Dialogue(Result<Vec<String>, crate::ports::nntp::Unreachable>);
@@ -551,93 +543,6 @@ async fn a_plaintext_provider_is_left_unproven_rather_than_exposing_the_password
         Validation::Unreachable { detail }
             if detail.contains("TLS") && detail.contains("in the clear")
     ));
-}
-
-#[tokio::test]
-async fn a_service_that_answers_its_identity_is_proven_and_names_itself() {
-    let body = r#"{"instanceName":"Sonarr","version":"4.0.1"}"#;
-    let outcome = answering(body).validate(&service()).await;
-    assert!(matches!(
-        outcome,
-        Validation::Valid { observed } if observed.contains("Sonarr") && observed.contains("4.0.1")
-    ));
-}
-
-#[tokio::test]
-async fn a_service_that_answers_without_naming_itself_is_still_proven() {
-    // A 2xx with no recognisable identity still proves the key was accepted.
-    let outcome = answering("{}").validate(&service()).await;
-    assert!(matches!(
-        outcome,
-        Validation::Valid { observed } if observed.contains("accepted the key")
-    ));
-}
-
-#[tokio::test]
-async fn a_service_that_gives_only_a_version_reports_that() {
-    let outcome = answering(r#"{"version":"4.0.1"}"#)
-        .validate(&service())
-        .await;
-    assert!(matches!(
-        outcome,
-        Validation::Valid { observed } if observed.contains("version 4.0.1")
-    ));
-}
-
-#[tokio::test]
-async fn a_service_that_refuses_the_key_is_rejected() {
-    let outcome = Live::new(Fake::always(Answer::reply(401, String::new())))
-        .validate(&service())
-        .await;
-    assert!(matches!(
-        outcome,
-        Validation::Rejected { detail } if detail.contains("401")
-    ));
-}
-
-#[tokio::test]
-async fn a_service_url_that_answers_as_something_else_points_at_the_url() {
-    let outcome = Live::new(Fake::always(Answer::reply(
-        404,
-        "<html>not found</html>".to_owned(),
-    )))
-    .validate(&service())
-    .await;
-    assert!(matches!(
-        outcome,
-        Validation::Unreachable { detail } if detail.contains("check the URL")
-    ));
-}
-
-#[tokio::test]
-async fn a_service_that_does_not_answer_is_unreachable() {
-    let outcome = Live::new(Fake::silent()).validate(&service()).await;
-    assert!(matches!(
-        outcome,
-        Validation::Unreachable { detail } if detail.contains("connection refused")
-    ));
-}
-
-#[tokio::test]
-async fn a_service_is_reached_with_its_key_in_the_api_header() {
-    let recording = Fake::always(Answer::reply(200, r#"{"instanceName":"Radarr"}"#));
-    let outcome = Live::new(recording.clone()).validate(&service()).await;
-
-    assert!(matches!(outcome, Validation::Valid { .. }));
-    let asked = recording.request();
-    assert!(
-        asked
-            .as_ref()
-            .is_some_and(|request| request.url.contains("system/status")),
-        "the identity endpoint is reached"
-    );
-    assert!(
-        asked.is_some_and(|request| request
-            .headers
-            .iter()
-            .any(|(name, value)| name == "X-Api-Key" && value == "abc")),
-        "the key authenticates the request as a header, not a query param"
-    );
 }
 
 #[tokio::test]
