@@ -1,105 +1,11 @@
 {
   "capability": "request.gate",
+  "major": 1,
   "cases": [
-    {
-      "asked": {},
-      "case": "refuses-without-the-key",
-      "expect": {
-        "status": [
-          401
-        ]
-      },
-      "keyed": false,
-      "live": true,
-      "operation": "admit",
-      "since": 0
-    },
-    {
-      "asked": {
-        "routes": [
-          {
-            "address": "http://conformance-curator:58989",
-            "credential": "{minted}",
-            "majors": [],
-            "path": "tv",
-            "target": {
-              "curator": {
-                "media_type": "tv"
-              }
-            },
-            "tokens": [
-              "0000000000000000000000000000000000000000000000000000000000000000"
-            ]
-          },
-          {
-            "address": "https://conformance-media-server:8920",
-            "credential": "{minted}",
-            "majors": [
-              10
-            ],
-            "path": "media-server",
-            "target": {
-              "media-server": {
-                "pins": [
-                  "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                ]
-              }
-            },
-            "tokens": [
-              "0000000000000000000000000000000000000000000000000000000000000000"
-            ]
-          }
-        ]
-      },
-      "case": "admit-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "admit",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "admitted-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "admitted",
-      "since": 0
-    },
-    {
-      "asked": {
-        "route": "tv",
-        "tokens": [
-          "0000000000000000000000000000000000000000000000000000000000000000"
-        ]
-      },
-      "case": "admit_tokens-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "admit_tokens",
-      "since": 0
-    },
-    {
-      "asked": {
-        "after": 0
-      },
-      "case": "record-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "record",
-      "since": 0
-    }
-  ],
-  "major": 1
+    {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"admit","since":0},
+    {"asked":{"routes":[{"address":"http://conformance-curator:58989","credential":"{minted}","majors":[],"path":"tv","target":{"curator":{"media_type":"tv"}},"tokens":["0000000000000000000000000000000000000000000000000000000000000000"]},{"address":"https://conformance-media-server:8920","credential":"{minted}","majors":[10],"path":"media-server","target":{"media-server":{"pins":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"]}},"tokens":["0000000000000000000000000000000000000000000000000000000000000000"]}]},"case":"admit-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"admit","since":0},
+    {"asked":{},"case":"admitted-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"admitted","since":0},
+    {"asked":{"route":"tv","tokens":["0000000000000000000000000000000000000000000000000000000000000000"]},"case":"admit_tokens-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"admit_tokens","since":0},
+    {"asked":{"after":0},"case":"record-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"record","since":0}
+  ]
 }

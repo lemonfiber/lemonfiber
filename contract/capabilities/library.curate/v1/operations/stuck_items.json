@@ -106,6 +106,21 @@
                   "additionalProperties": false,
                   "description": "A stuck item the queue is holding — one queue health reports so it can be traced. Its\ntitle is the human term a trace searches by, so \"3 items stuck\" leads straight to the\nper-item explanation rather than to a count the operator must go and investigate.",
                   "properties": {
+                    "queued": {
+                      "description": "The curator's id for its queue entry, from minor 2.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "release": {
+                      "description": "The release's fingerprint, the SHA-256 of the curator's own identity for it in\nlower-case hexadecimal, from minor 2.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "stage": {
                       "$ref": "#/$defs/Stage",
                       "description": "The stage its download is stuck at."
@@ -113,6 +128,14 @@
                     "title": {
                       "description": "The item's title, as a person would name it — the term its trace is searched by.",
                       "type": "string"
+                    },
+                    "title_id": {
+                      "description": "The curator's id for the title, from minor 2.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
                     }
                   },
                   "required": [

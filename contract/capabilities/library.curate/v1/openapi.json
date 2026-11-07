@@ -114,6 +114,9 @@
     "/lemonfiber/library.curate/v1/find_items": {
       "$ref": "operations/find_items.json"
     },
+    "/lemonfiber/library.curate/v1/grab": {
+      "$ref": "operations/grab.json"
+    },
     "/lemonfiber/library.curate/v1/hardlinks": {
       "$ref": "operations/hardlinks.json"
     },
@@ -188,6 +191,9 @@
     },
     "/lemonfiber/library.curate/v1/titles": {
       "$ref": "operations/titles.json"
+    },
+    "/lemonfiber/library.curate/v1/unqueue": {
+      "$ref": "operations/unqueue.json"
     },
     "/lemonfiber/library.curate/v1/update_download_client": {
       "$ref": "operations/update_download_client.json"

@@ -62,12 +62,12 @@
       "sha256": "6ca371710e1bf4deedd429559df76995f8e2c20375fe1dd03bcf3d2dd29739ed"
     },
     {
-      "path": "download.torrent/v1/conformance.json",
-      "sha256": "7e6282b92e46a83eb1d029dd89fb1373ec646ee61ba53cf403654cabe32f4e8b"
-    },
-    {
       "path": "download.torrent/v1/holds.json",
       "sha256": "f44661416f19bac0a05448418aed86231578dc3dad7c2f74f5d4318095d6d1f8"
+    },
+    {
+      "path": "download.torrent/v1/conformance.json",
+      "sha256": "dddf701f291d79d61a36494c39747fd94e53a7ecf737b3a94f4d59ca215d0f33"
     }
   ],
   "major": 1

@@ -50,12 +50,12 @@
       "sha256": "b137e003b433736a54560d344412b223da82f3bb7d42eee83cdf7516c549f19e"
     },
     {
-      "path": "download.usenet/v1/conformance.json",
-      "sha256": "e5c89abadf8c33deb448eac6f5e9424f15c225dd6c157d159265ca2487c4afe9"
-    },
-    {
       "path": "download.usenet/v1/holds.json",
       "sha256": "6fb352a9ef684716be39480f8604c302cafe9d5fdeb8b60d67dafefee8f75047"
+    },
+    {
+      "path": "download.usenet/v1/conformance.json",
+      "sha256": "9c85a515ae31822ea91227a9628c4fef55cc323c552f548bc23054265f80b69b"
     }
   ],
   "major": 1

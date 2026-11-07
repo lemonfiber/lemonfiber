@@ -18,12 +18,12 @@
       "sha256": "67ad903a96111b385b8bcf97e777a0581d0c47c4dbb8006793534a31661993ec"
     },
     {
-      "path": "stream.guard/v1/conformance.json",
-      "sha256": "727523b5b00e8c660c5cf0c624234e4c2b4214c395d26998ede4a819a7dedfb9"
-    },
-    {
       "path": "stream.guard/v1/holds.json",
       "sha256": "40bfc3c15bf548774b7013e62ec2124e6b044ee7a7766627c604818ba40c72aa"
+    },
+    {
+      "path": "stream.guard/v1/conformance.json",
+      "sha256": "996f45c7f70d4cbcb8d6a15823b53512969cb4a381f9b68998621e2c10073785"
     }
   ],
   "major": 1

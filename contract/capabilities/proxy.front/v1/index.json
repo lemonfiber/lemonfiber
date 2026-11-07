@@ -18,12 +18,12 @@
       "sha256": "2d53a85015e498f4447b00048205364ff5b4a03d0a17bbda607a3fb073f47a6f"
     },
     {
-      "path": "proxy.front/v1/conformance.json",
-      "sha256": "760df27c1b4d7c157790818ef934fdf72cb6d5fa9c168179bb50c223bce74fa2"
-    },
-    {
       "path": "proxy.front/v1/holds.json",
       "sha256": "17466c2ba86ec0eaecc5f0f1c4a32a6028c51767d2324d609a32920034eb567c"
+    },
+    {
+      "path": "proxy.front/v1/conformance.json",
+      "sha256": "87ab4581e38537216334da2f3c122518e438bf1d60b30825ec6c488e269e2209"
     }
   ],
   "major": 1

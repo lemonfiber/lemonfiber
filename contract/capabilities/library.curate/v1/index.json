@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "library.curate/v1/openapi.json",
-      "sha256": "91d74d3fe06868a2d3a695826ff1d4fdd52b35c211a183dfe5e60420b38ce94d"
+      "sha256": "922fe625fc223f053cfa4e6f3186eb14d398e0228c17bbf11f890f0c10c897b8"
     },
     {
       "path": "library.curate/v1/operations/identity.json",
@@ -115,7 +115,7 @@
     },
     {
       "path": "library.curate/v1/operations/stuck_items.json",
-      "sha256": "3c2f2533429c4a4c736e2f5f89c44e2433d916498cbc6b00538641b729317260"
+      "sha256": "817e9015d2dcbb7a1ccbb90b389d61e03eba6798d144e52072cac281febcb73b"
     },
     {
       "path": "library.curate/v1/operations/catalogued.json",
@@ -146,12 +146,20 @@
       "sha256": "258b2b807286da16d5db5eed757a4dde4b8bcbd8650d8dae2371dc11bdf31bdd"
     },
     {
-      "path": "library.curate/v1/conformance.json",
-      "sha256": "b8f843e8ad8dbe8ed3e93b48de04825a92b054a0b141a2ec197d29bc7ae28623"
+      "path": "library.curate/v1/operations/unqueue.json",
+      "sha256": "610cbf9c57ca934a47c763de34b5b92918e6dfa120346c73d51f5df57baaba87"
+    },
+    {
+      "path": "library.curate/v1/operations/grab.json",
+      "sha256": "acead4062adb508734ef1a9486b6f191145ca067a19cd85fc7e369048254573a"
     },
     {
       "path": "library.curate/v1/holds.json",
       "sha256": "8a7d3d8a60bbdce030c0687527bfe434999553978a7d86f5a600221c591eea92"
+    },
+    {
+      "path": "library.curate/v1/conformance.json",
+      "sha256": "fba33e41f8e0b55411aeb3844a8d924901ecea00ae8a4903a2055dad7bb49222"
     }
   ],
   "major": 1

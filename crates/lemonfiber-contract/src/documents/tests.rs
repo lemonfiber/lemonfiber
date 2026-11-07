@@ -327,6 +327,8 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
             ("library.curate@1".to_owned(), "search"),
             ("library.curate@1".to_owned(), "remove"),
             ("library.curate@1".to_owned(), "downloading"),
+            ("library.curate@1".to_owned(), "unqueue"),
+            ("library.curate@1".to_owned(), "grab"),
             ("request.intake@1".to_owned(), "minted_as"),
             ("media.serve@1".to_owned(), "astray"),
             ("media.serve@1".to_owned(), "account"),

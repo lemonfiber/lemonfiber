@@ -10,7 +10,7 @@
       ],
       "openapi": "download.usenet/v1/openapi.json",
       "operations": 11,
-      "sha256": "1d957955584386c233fff168c6f61dcba45dd99f5bc6239bf5d6e484c9606a4f"
+      "sha256": "c764a53db5f82ad448ef4fb90ad0cd7c5e905dce900675c1d58a0a7d8340bd3d"
     },
     {
       "capability": "download.torrent",
@@ -22,7 +22,7 @@
       ],
       "openapi": "download.torrent/v1/openapi.json",
       "operations": 14,
-      "sha256": "cc58e81356b7555726f75994c2bd5162690c0ef81a8b0b3948df006139dfc3aa"
+      "sha256": "16c3fc74def5fa0244610154ec4edfbd0238a2d1a02641521d279ad2c241412d"
     },
     {
       "capability": "network.egress-guard",
@@ -34,7 +34,7 @@
       ],
       "openapi": "network.egress-guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "6cc6ad092460b7bfae1527089bd0b2a302e1d195889a26cc5e208b79b8220790"
+      "sha256": "53e7141813e843049d3b0cecae1a420fcd43a226f8a008f73e00df2e1154833e"
     },
     {
       "capability": "library.curate",
@@ -45,8 +45,8 @@
         1
       ],
       "openapi": "library.curate/v1/openapi.json",
-      "operations": 35,
-      "sha256": "792a828e5b70afbfabc883e2c54e118245b6a6b6ace0eaad46739b90739642a6"
+      "operations": 37,
+      "sha256": "ace4da267f581e8c2b20d65f78c2c0dcbb132209874ea70a216795ccefcec660"
     },
     {
       "capability": "indexer.search",
@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "df9fade707c5b7ca886d80f6a13ec2ebc2a02cc229efdb5ea9f14d2576727d4c"
+      "sha256": "8ee74c4dfc4919c9c9595be68f7e6c43cdaa0daaf12a1e9f7e5f5949be88b6e9"
     },
     {
       "capability": "indexer.pull",
@@ -70,7 +70,7 @@
       ],
       "openapi": "indexer.pull/v1/openapi.json",
       "operations": 2,
-      "sha256": "078073a367a0a24e989d4897107cc92b8228656faaaa15e805556e9c7b1cd004"
+      "sha256": "2e4ebc22c7332ee5d9260374cf6cf14c9c9a342b92e760ce0c34e2ae72c8b7ec"
     },
     {
       "capability": "indexer.proxy",
@@ -82,7 +82,7 @@
       ],
       "openapi": "indexer.proxy/v1/openapi.json",
       "operations": 2,
-      "sha256": "8fac6d37e66512064ff7bb4a1e77c1fecdd4ac6738e3f7e574cb350e9b5e07c2"
+      "sha256": "ac58504f99717eb1e35a7de3f00d0f8885690d44c019abe562c06d28ae664c31"
     },
     {
       "capability": "subtitles.fetch",
@@ -94,7 +94,7 @@
       ],
       "openapi": "subtitles.fetch/v1/openapi.json",
       "operations": 2,
-      "sha256": "9fb037a577b730ac576baab35f3196e59a91884b014f051d034b397ec018e81c"
+      "sha256": "5742e2feac3a6933cee3e001824093ae6336c0e3fc906a58a4c0fdcebb993518"
     },
     {
       "capability": "request.intake",
@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 32,
-      "sha256": "8c35d9bd4ad053190d2fba84fa6802c525e1f8810d66d4ff3b4561fa2e049a2e"
+      "sha256": "492f3aa2d5a786aef5034fffdfda839f82a9c24511f9f050800cfee5897edba9"
     },
     {
       "capability": "identity.source",
@@ -118,7 +118,7 @@
       ],
       "openapi": "identity.source/v1/openapi.json",
       "operations": 19,
-      "sha256": "c49e77806202d01536c6e4dd3451fdacc3bbc6b606a5a67bdb7bafc959171d07"
+      "sha256": "7e2885c8a3fa915ebdd587ae529a4217863d4a0cb27c4205ab08fe249cc10248"
     },
     {
       "capability": "media.serve",
@@ -130,7 +130,7 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 28,
-      "sha256": "9541825648c8b759c988bb505304e5a2caf3b395fc9c20f2ebc36ed515bf423a"
+      "sha256": "83cbd08d5145194e42cd0a04744fbddbace86edd59ae599fd558d8de94ec1e0c"
     },
     {
       "capability": "proxy.front",
@@ -142,7 +142,7 @@
       ],
       "openapi": "proxy.front/v1/openapi.json",
       "operations": 3,
-      "sha256": "76b1f761c52ce874366539acdeaf8a7dca4f64ff4c9b18fc8e50cae10d99c4b7"
+      "sha256": "96731c1f54d3bef83af1543728df4ab52a84913d3901ca02db65fa7df3d29b2f"
     },
     {
       "capability": "quality.sync",
@@ -154,7 +154,7 @@
       ],
       "openapi": "quality.sync/v1/openapi.json",
       "operations": 4,
-      "sha256": "9faab433552b7ceae64a17f39358f48354e74ec6c3004de80f063900fe0fa844"
+      "sha256": "a9d7e30833c3347373458627d9ba7f64dd75de3cfd6aa781746ff086dbcee344"
     },
     {
       "capability": "dashboard.show",
@@ -166,7 +166,7 @@
       ],
       "openapi": "dashboard.show/v1/openapi.json",
       "operations": 2,
-      "sha256": "f1fd5d627a9b199a81df1f39822017d1bdf7b133d25c01b2d57194cb797464e3"
+      "sha256": "56f01a13e20c91f17551097f13774d7aff9396731cb5ba9b455e16c004ae8403"
     },
     {
       "capability": "archive.extract",
@@ -178,7 +178,7 @@
       ],
       "openapi": "archive.extract/v1/openapi.json",
       "operations": 2,
-      "sha256": "b6cc816ab83a52073e733cda9bd1af0ee5d1accb097ad4be35918cb2b6e1d7bb"
+      "sha256": "b209dafaa52e7570ebd275c61aab1b9a39ad80001b5bff0543b939d4a1ccc2f8"
     },
     {
       "capability": "stream.guard",
@@ -190,7 +190,7 @@
       ],
       "openapi": "stream.guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "0c165e1edbf8fb751e63b8b72c6b2e4a9c8fb679beb51223ac2e53209fede539"
+      "sha256": "e993b8e33e8659f8ff5747404befc8784860cca84d2b2c4f68eda77cf598a561"
     },
     {
       "capability": "invite.decline",
@@ -202,7 +202,7 @@
       ],
       "openapi": "invite.decline/v1/openapi.json",
       "operations": 6,
-      "sha256": "1d38842212cec4bc9a7cf0af0edad921074e3f3aeb1313abc580c052f4c49d59"
+      "sha256": "9c7eedce2515a7ae8c9c77559c31c64ac64ca297186e876c30e06b8c9ab21e94"
     },
     {
       "capability": "request.gate",
@@ -214,7 +214,7 @@
       ],
       "openapi": "request.gate/v1/openapi.json",
       "operations": 4,
-      "sha256": "e0eed27cfc12f0abe33c00d44a9dd341495cb3c9d47deb142366004f9820263e"
+      "sha256": "6384399cf956295e5629faf55cb0fb7840974db496a64735cdc132faa384ecae"
     },
     {
       "capability": "owner.claim",
@@ -226,7 +226,7 @@
       ],
       "openapi": "owner.claim/v1/openapi.json",
       "operations": 3,
-      "sha256": "37394816eb55be5416f6c18f8d9b7099ee90cfaed21b168f8b8a9fa4cd743468"
+      "sha256": "13fd3996dc07444a42919986db8d0c2d6b0e40335ef9fe67e6aa05daa509b05b"
     }
   ]
 }

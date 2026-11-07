@@ -30,12 +30,12 @@
       "sha256": "ad3f13b3c91844fbc6f36eb74369a931ce46edaa355ec1d3f2e19c98aa871fba"
     },
     {
-      "path": "invite.decline/v1/conformance.json",
-      "sha256": "09407113809b72e164a1e8c22767045925633538ce4ce30adeb4700fc150f2b2"
-    },
-    {
       "path": "invite.decline/v1/holds.json",
       "sha256": "706384428a8db50194338f0191dcb2952e7bdee267be69b6edcdf1cc54935ede"
+    },
+    {
+      "path": "invite.decline/v1/conformance.json",
+      "sha256": "fdb7f305d7908f6bc16b41c757a7f9a936d1a231d44280fced49cac6a66f7f12"
     }
   ],
   "major": 1

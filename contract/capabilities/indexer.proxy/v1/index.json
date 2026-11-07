@@ -14,12 +14,12 @@
       "sha256": "cc56c13b0b882fe5797a589df6bb84d422a1966345dc725bd85d51d0aa415acb"
     },
     {
-      "path": "indexer.proxy/v1/conformance.json",
-      "sha256": "9172a95d3dd9a778a689a26dd9119eae8a4b219a3b92ed6f4b1ac6b657d9eab0"
-    },
-    {
       "path": "indexer.proxy/v1/holds.json",
       "sha256": "2b069dd0a88748a5b0437f13f462752aab200da6d2866bb471f40370502db80b"
+    },
+    {
+      "path": "indexer.proxy/v1/conformance.json",
+      "sha256": "116368f8593a8c20d703fe9bc030e96bb3e210ffbf5807625b0e072047b0e7be"
     }
   ],
   "major": 1

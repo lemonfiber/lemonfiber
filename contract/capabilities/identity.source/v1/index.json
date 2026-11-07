@@ -82,12 +82,12 @@
       "sha256": "b76d62b81e0def4f67b62d12ef54b8e85a260b512b1d730b4c934235299845a3"
     },
     {
-      "path": "identity.source/v1/conformance.json",
-      "sha256": "82414d7932bc33fcf444874320296888c341bcf7bd16ad06241d73fef778e948"
-    },
-    {
       "path": "identity.source/v1/holds.json",
       "sha256": "021029113130e4e73895b36cbb0386919fff431d18664ad6cca60ba37de0c827"
+    },
+    {
+      "path": "identity.source/v1/conformance.json",
+      "sha256": "ec48ada54be3a6324e8a6c650a46ac4d4499c2ca7e1b27197e001b9e9cf2773a"
     }
   ],
   "major": 1
