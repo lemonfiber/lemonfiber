@@ -280,9 +280,9 @@ impl Waking {
             let path = path.to_path_buf();
             tokio::spawn(async move {
                 delivered(&ctx, &path, &name).await;
-                if let Ok(mut delivering) = delivering.lock() {
-                    delivering.remove(&name);
-                }
+                let _ = delivering
+                    .lock()
+                    .map(|mut delivering| delivering.remove(&name));
             });
         }
     }

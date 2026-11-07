@@ -552,6 +552,13 @@ fn a_machine_keeping_no_configuration_keeps_no_endpoint() {
     let ctx = crate::test_support::a_context().build();
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_err());
     assert!(asked(&ctx, Asked::List).is_err());
+    assert!(asked(
+        &ctx,
+        Asked::Remove {
+            name: "pixel".to_owned()
+        }
+    )
+    .is_err());
 }
 
 /// A removal the journal cannot record is refused, and the endpoint stays.
@@ -570,4 +577,52 @@ fn a_removal_the_journal_cannot_record_is_refused() {
     };
     assert!(asked(&ctx, removal).is_err());
     assert_eq!(names(&ctx), ["pixel"]);
+}
+
+/// A record that cannot be read refuses every request, rehearsed or not, and is left as it
+/// was.
+#[test]
+fn a_record_that_cannot_be_read_refuses_every_request() {
+    let (ctx, _distributor) = machine("push-unreadable", 201);
+    let path = super::at(&ctx).unwrap_or_default();
+    assert!(std::fs::write(&path, "{ not a record").is_ok());
+    let removal = || Asked::Remove {
+        name: "pixel".to_owned(),
+    };
+
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_err());
+    assert!(asked(&ctx, Asked::List).is_err());
+    assert!(asked(&ctx, removal()).is_err());
+    assert!(asked(&ctx.clone().rehearsing(), removal()).is_err());
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap_or_default(),
+        "{ not a record"
+    );
+}
+
+/// Removing one endpoint of two keeps what the other has been sent, so it is not sent
+/// it again.
+#[test]
+fn removing_one_endpoint_of_two_keeps_what_was_sent() {
+    let (ctx, _distributor) = machine("push-one-of-two", 201);
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
+    assert!(asked(&ctx, registering("tablet", "https://push.example/b")).is_ok());
+    let path = super::at(&ctx).unwrap_or_default();
+    let written = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
+        kept.told = Some(vec!["service.sonarr#1 started".to_owned()]);
+        Ok(())
+    });
+    assert!(written.is_ok());
+
+    assert!(asked(
+        &ctx,
+        Asked::Remove {
+            name: "pixel".to_owned()
+        }
+    )
+    .is_ok());
+
+    let kept = super::read(&path).unwrap_or_default();
+    assert_eq!(kept.told, Some(vec!["service.sonarr#1 started".to_owned()]));
+    assert_eq!(names(&ctx), ["tablet"]);
 }
