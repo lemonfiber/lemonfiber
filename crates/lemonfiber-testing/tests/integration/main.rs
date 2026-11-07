@@ -75,3 +75,17 @@ fn a_live_context_reads_the_clock_on_the_wall() {
         "{apart:?} from the wall clock"
     );
 }
+
+/// The request gate's key written on an adapter is where the core reads it, with the line
+/// ending a key file ends on.
+#[test]
+fn a_gate_key_lands_where_the_adapters_keys_are() {
+    let project = lemonfiber_fixtures::scratch::Scratch::named("gate-key");
+    let adapted = lemonfiber_testing::curators::TELEVISION;
+
+    adapted.gate_key(project.path(), "the-key");
+
+    let at = lemonfiber_core::plugin::key_file(project.path(), adapted.adapter)
+        .with_file_name(lemonfiber_contract::adapter::REQUEST_KEY_FILE);
+    assert_eq!(std::fs::read_to_string(at).unwrap_or_default(), "the-key\n");
+}

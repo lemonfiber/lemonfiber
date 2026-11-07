@@ -159,6 +159,54 @@ async fn a_gate_that_cannot_be_asked_leaves_the_line_absent() {
     assert_eq!(line.map(|one| one.state), Some(State::Absent));
 }
 
+/// A key on a curator's adapter is never printed, however confirmed the asking.
+#[tokio::test]
+async fn a_request_key_is_not_printed_however_confirmed() {
+    let (ctx, at, _gate) = scene(
+        "requesting-unprinted",
+        true,
+        accepting(&["token"], &["linked"]),
+        taking("held", "linked"),
+        true,
+    );
+
+    let revealed = crate::app::credentials::revealing::reveal(
+        &ctx,
+        &naming("tv"),
+        true,
+        &fillers(true, Some(&at)),
+    )
+    .await;
+
+    assert_eq!(revealed.value, None);
+    assert_eq!(revealed.warning, super::UNPRINTED);
+}
+
+/// A rotation asked for by the line reaches the rotation of the gate's key on the adapter.
+#[tokio::test]
+async fn a_rotation_of_the_line_replaces_the_key_on_the_adapter() {
+    let (ctx, at, _gate) = scene(
+        "requesting-dispatched",
+        true,
+        accepting(&["token"], &["linked"]),
+        taking("held", "linked"),
+        true,
+    );
+
+    let rotation = crate::app::credentials::rotating::rotate(
+        &ctx,
+        &naming("tv"),
+        &stack(true),
+        &fillers(true, Some(&at)),
+    )
+    .await;
+
+    assert!(
+        matches!(rotation.settled, Settled::Replaced { .. }),
+        "{rotation:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_rotation_lands_once_the_request_service_proves_the_new_key_and_retires_the_old() {
     let (ctx, at, gate) = scene(

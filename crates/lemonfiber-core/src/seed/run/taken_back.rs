@@ -24,7 +24,7 @@ use super::fulfilment::fulfilling;
 use super::tokens::{route_of, through_the_gate, Kept};
 use super::Ctx;
 use crate::baseline::Baseline;
-use crate::credential::{Reach, Settled};
+use crate::credential::{Propagation, Reach, Settled};
 use crate::ports::media::Kind;
 use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
@@ -69,13 +69,11 @@ pub(super) async fn note_held(
         return;
     };
     for fulfils in fulfilling(fillers) {
-        let Some(own) = fulfils.filler.address.as_ref() else {
-            continue;
-        };
-        if held
-            .iter()
-            .any(|one| one.at.host == own.host && one.at.port == own.port)
-        {
+        let reached_itself = fulfils.filler.address.as_ref().is_some_and(|own| {
+            held.iter()
+                .any(|one| one.at.host == own.host && one.at.port == own.port)
+        });
+        if reached_itself {
             baseline.record(
                 &filler.id,
                 &format!("{HELD_KEY}{}", fulfils.filler.id),
@@ -196,16 +194,7 @@ async fn replaced(
     };
     if matches!(rotation.settled, Settled::Replaced { .. }) {
         baseline.forget(owed_by, &field);
-        return rotation
-            .consumers
-            .iter()
-            .filter_map(|one| match &one.reach {
-                Reach::Failed { detail } => {
-                    Some(format!("{} could not be given it: {detail}.", one.consumer))
-                }
-                Reach::Updated | Reach::Pending { .. } => None,
-            })
-            .collect();
+        return not_given(&rotation.consumers);
     }
     let detail = rotation.settled.detail().unwrap_or_default();
     vec![format!(
@@ -292,3 +281,19 @@ fn held_count(count: usize) -> String {
 fn settled(state: State) -> Wiring {
     Wiring::settled(CONNECTION.to_owned(), state)
 }
+
+/// What is said of each consumer a replacement could not reach.
+fn not_given(consumers: &[Propagation]) -> Vec<String> {
+    consumers
+        .iter()
+        .filter_map(|one| match &one.reach {
+            Reach::Failed { detail } => {
+                Some(format!("{} could not be given it: {detail}.", one.consumer))
+            }
+            Reach::Updated | Reach::Pending { .. } => None,
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests;
