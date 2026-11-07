@@ -43,6 +43,9 @@ pub struct Record {
     pub auth: String,
     /// When it was registered.
     pub registered: String,
+    /// How many messages it is owed, at most as many alerts as a returning stream replays.
+    #[serde(default)]
+    pub owed: usize,
 }
 
 /// Every endpoint this machine keeps, and which alerts have woken them.

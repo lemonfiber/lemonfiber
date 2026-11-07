@@ -1,4 +1,6 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -6,7 +8,7 @@ use base64::Engine as _;
 use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
 use ring::rand::SystemRandom;
 
-use super::{any_waiting, asked, woken, Asked};
+use super::{any_waiting, asked, Asked, Waking};
 use crate::alert::{Alert, Moment, Notification};
 use crate::app::{Ctx, Outcome};
 use crate::config::Settings;
@@ -15,6 +17,7 @@ use crate::error::codes::push::{
 };
 use crate::error::Severity;
 use crate::ports::http::{Http, Request, Response, Unreachable};
+use crate::push::Kept;
 
 /// An address sent to, with the headers and the bytes it was sent.
 type Took = (String, Vec<(String, String)>, Vec<u8>);
@@ -243,6 +246,25 @@ fn a_rehearsed_registration_keeps_nothing() {
     );
 }
 
+/// Whether `settled` comes true soon.
+async fn soon(settled: impl Fn() -> bool) -> bool {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !settled() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .is_ok()
+}
+
+/// What is owed each endpoint, as kept.
+fn owed(ctx: &Ctx) -> Vec<usize> {
+    super::at(ctx)
+        .and_then(|path| super::read(&path).ok())
+        .map(|kept| kept.endpoints.iter().map(|one| one.owed).collect())
+        .unwrap_or_default()
+}
+
 /// What was said before the first reading is not sent, and each onset and each resolution
 /// after it is sent once to every endpoint, as encrypted octets.
 #[tokio::test]
@@ -250,28 +272,29 @@ async fn each_onset_and_resolution_is_sent_once_to_every_endpoint() {
     let (ctx, distributor) = machine("push-wakes", 201);
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
     assert!(asked(&ctx, registering("tablet", "https://push.example/b")).is_ok());
+    let ctx = Arc::new(ctx);
+    let waking = Waking::default();
 
     let before = [alert("service.sonarr", Moment::Onset)];
-    woken(&ctx, &before).await;
-    assert_eq!(distributor.took(), 0, "said before anybody was told");
-
-    woken(&ctx, &before).await;
-    assert_eq!(distributor.took(), 0, "still the same alert");
+    waking.owing(&ctx, &before);
+    waking.owing(&ctx, &before);
+    assert_eq!(owed(&ctx), [0, 0], "said before anybody was told");
 
     let onset = [
         alert("service.radarr", Moment::Onset),
         alert("service.sonarr", Moment::Onset),
     ];
-    woken(&ctx, &onset).await;
-    assert_eq!(distributor.took(), 2);
+    waking.owing(&ctx, &onset);
+    assert!(soon(|| distributor.took() == 2).await);
 
     let resolved = [
         alert("service.radarr", Moment::Resolved),
         alert("service.radarr", Moment::Onset),
         alert("service.sonarr", Moment::Onset),
     ];
-    woken(&ctx, &resolved).await;
-    assert_eq!(distributor.took(), 4);
+    waking.owing(&ctx, &resolved);
+    assert!(soon(|| distributor.took() == 4).await);
+    assert!(soon(|| owed(&ctx) == [0, 0]).await);
 
     let took = distributor
         .took
@@ -287,44 +310,214 @@ async fn each_onset_and_resolution_is_sent_once_to_every_endpoint() {
     }));
 }
 
-/// An endpoint its distributor says is gone is forgotten and journaled.
+/// An endpoint its distributor says is gone is forgotten, journaled, and sent nothing more.
 #[tokio::test]
 async fn an_endpoint_its_distributor_says_is_gone_is_forgotten() {
     for status in [404, 410] {
-        let (ctx, _distributor) = machine(&format!("push-gone-{status}"), status);
+        let (ctx, distributor) = machine(&format!("push-gone-{status}"), status);
         assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
-        woken(&ctx, &[]).await;
+        let ctx = Arc::new(ctx);
+        let waking = Waking::default();
+        waking.owing(&ctx, &[]);
         assert!(any_waiting(&ctx));
 
-        woken(&ctx, &[alert("service.sonarr", Moment::Onset)]).await;
+        waking.owing(
+            &ctx,
+            &[
+                alert("service.radarr", Moment::Onset),
+                alert("service.sonarr", Moment::Onset),
+            ],
+        );
 
+        assert!(soon(|| !any_waiting(&ctx)).await, "{status}");
         assert!(names(&ctx).is_empty(), "{status}");
-        assert!(!any_waiting(&ctx));
+        assert_eq!(distributor.took(), 1, "{status}");
         assert!(journal(&ctx).contains("pixel"));
     }
 }
 
-/// An endpoint that answers anything else, or nothing, stays.
+/// An endpoint that answers anything else stays, each message tried once.
 #[tokio::test]
 async fn an_endpoint_that_answers_anything_else_stays() {
     let (ctx, distributor) = machine("push-stays", 500);
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
-    woken(&ctx, &[]).await;
-    woken(&ctx, &[alert("service.sonarr", Moment::Onset)]).await;
-    assert_eq!(distributor.took(), 1);
+    let ctx = Arc::new(ctx);
+    let waking = Waking::default();
+    waking.owing(&ctx, &[]);
+    waking.owing(&ctx, &[alert("service.sonarr", Moment::Onset)]);
+    assert!(soon(|| distributor.took() == 1).await);
+    assert!(soon(|| owed(&ctx) == [0]).await);
     assert_eq!(names(&ctx), ["pixel"]);
 }
 
-/// Nothing is read or sent where nothing may leave the machine.
+/// Nothing is owed or sent where waking is switched off.
 #[tokio::test]
-async fn nothing_is_sent_where_nothing_may_leave() {
+async fn nothing_is_sent_where_waking_is_switched_off() {
     let (mut ctx, distributor) = machine("push-offline", 201);
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
     assert!(any_waiting(&ctx));
-    woken(&ctx, &[]).await;
-
     ctx.settings.reaching = crate::config::Reaching::without(crate::config::REACH_WAKING_KEY);
     assert!(!any_waiting(&ctx));
-    woken(&ctx, &[alert("service.sonarr", Moment::Onset)]).await;
+    let ctx = Arc::new(ctx);
+    let waking = Waking::default();
+    waking.owing(&ctx, &[]);
+    waking.owing(&ctx, &[alert("service.sonarr", Moment::Onset)]);
+    tokio::task::yield_now().await;
     assert_eq!(distributor.took(), 0);
+    assert_eq!(owed(&ctx), [0]);
+}
+
+/// A transport on which a message hangs, but for one to an address saying it answers.
+struct Hanging {
+    /// How many messages reached an address that hangs.
+    reached: AtomicUsize,
+    /// What takes a message to an address that answers.
+    answering: Arc<Distributor>,
+}
+
+#[async_trait]
+impl Http for Hanging {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        Err(Unreachable::once(&request.url, "only octets go to a phone"))
+    }
+
+    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
+        if request.url.contains("answers") {
+            return self.answering.send_octets(request, octets).await;
+        }
+        self.reached.fetch_add(1, Ordering::SeqCst);
+        std::future::pending().await
+    }
+}
+
+/// A machine whose transport hangs, with each of `endpoints` registered by name and address.
+fn hanging_machine(name: &str, endpoints: &[(&str, &str)]) -> (Arc<Ctx>, Arc<Hanging>) {
+    let (ctx, answering) = machine(name, 201);
+    let hanging = Arc::new(Hanging {
+        reached: AtomicUsize::new(0),
+        answering,
+    });
+    let ctx = ctx.with_http(Arc::clone(&hanging) as Arc<dyn Http>);
+    for (endpoint, address) in endpoints {
+        assert!(asked(&ctx, registering(endpoint, address)).is_ok());
+    }
+    (Arc::new(ctx), hanging)
+}
+
+/// `count` alerts, each new.
+fn alerts(count: usize) -> Vec<Alert> {
+    (0..count)
+        .map(|one| alert(&format!("service.{one}"), Moment::Onset))
+        .collect()
+}
+
+/// What is owed an endpoint that hangs stops growing at the most a stream replays, and is
+/// worked through one message per wait.
+#[tokio::test(start_paused = true)]
+async fn what_is_owed_behind_a_hanging_endpoint_is_bounded_and_worked_through() {
+    let (ctx, hanging) = hanging_machine("push-bound", &[("pixel", "https://push.example/a")]);
+    let waking = Waking::default();
+    waking.owing(&ctx, &[]);
+
+    let many = crate::alert::KEPT + 50;
+    waking.owing(&ctx, &alerts(many));
+    tokio::task::yield_now().await;
+    assert_eq!(hanging.reached.load(Ordering::SeqCst), 1);
+    assert_eq!(owed(&ctx), [crate::alert::KEPT - 1]);
+
+    tokio::time::sleep(super::WAITED_FOR + Duration::from_millis(1)).await;
+    assert_eq!(hanging.reached.load(Ordering::SeqCst), 2);
+}
+
+/// An endpoint that hangs holds up no other endpoint's messages.
+#[tokio::test]
+async fn an_endpoint_that_hangs_holds_up_no_other() {
+    let (ctx, hanging) = hanging_machine(
+        "push-apart",
+        &[
+            ("pixel", "https://push.example/hangs"),
+            ("tablet", "https://push.example/answers"),
+        ],
+    );
+    let waking = Waking::default();
+    waking.owing(&ctx, &[]);
+    waking.owing(&ctx, &alerts(3));
+
+    assert!(soon(|| hanging.answering.took() == 3).await);
+    assert_eq!(hanging.reached.load(Ordering::SeqCst), 1);
+}
+
+/// A second reading while a delivery is under way starts no second delivery to that endpoint.
+#[tokio::test]
+async fn a_delivery_under_way_is_not_started_again() {
+    let (ctx, hanging) = hanging_machine("push-once", &[("pixel", "https://push.example/a")]);
+    let waking = Waking::default();
+    waking.owing(&ctx, &[]);
+    waking.owing(&ctx, &alerts(1));
+    assert!(soon(|| hanging.reached.load(Ordering::SeqCst) == 1).await);
+
+    waking.owing(&ctx, &alerts(2));
+    tokio::task::yield_now().await;
+    assert_eq!(hanging.reached.load(Ordering::SeqCst), 1);
+    assert_eq!(owed(&ctx), [1]);
+}
+
+/// What is still owed survives the run that owed it: a new run delivers it at its first
+/// reading.
+#[tokio::test]
+async fn what_is_owed_is_delivered_by_the_next_run() {
+    let (ctx, distributor) = machine("push-resumes", 201);
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
+    let path = super::at(&ctx).unwrap_or_default();
+    let written = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
+        kept.told = Some(Vec::new());
+        for one in &mut kept.endpoints {
+            one.owed = 2;
+        }
+        Ok(())
+    });
+    assert!(written.is_ok());
+
+    Waking::default().owing(&Arc::new(ctx), &[]);
+
+    assert!(soon(|| distributor.took() == 2).await);
+}
+
+/// An endpoint removed while it is owed messages is sent none of them.
+#[test]
+fn an_endpoint_removed_is_owed_nothing() {
+    let (ctx, _distributor) = machine("push-removed-owed", 201);
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
+    let path = super::at(&ctx).unwrap_or_default();
+    assert!(asked(
+        &ctx,
+        Asked::Remove {
+            name: "pixel".to_owned()
+        }
+    )
+    .is_ok());
+    assert!(super::next_owed(&path, "pixel").is_none());
+}
+
+/// Keys a record no longer holds readably send nothing, and the endpoint stays.
+#[tokio::test]
+async fn keys_that_cannot_be_read_send_nothing() {
+    let (ctx, distributor) = machine("push-broken", 201);
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
+    let path = super::at(&ctx).unwrap_or_default();
+    let written = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
+        for one in &mut kept.endpoints {
+            one.p256dh = "broken".to_owned();
+        }
+        Ok(())
+    });
+    assert!(written.is_ok());
+    let ctx = Arc::new(ctx);
+    let waking = Waking::default();
+    waking.owing(&ctx, &[]);
+    waking.owing(&ctx, &[alert("service.sonarr", Moment::Onset)]);
+
+    assert!(soon(|| owed(&ctx) == [0]).await);
+    assert_eq!(distributor.took(), 0);
+    assert_eq!(names(&ctx), ["pixel"]);
 }

@@ -313,6 +313,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::device_keys,
     },
     Entry {
+        accessor: "push_endpoints",
+        what: "the phones that asked to be woken",
+        why: "The address each phone's distributor gave, the keys a message is encrypted to, \
+              and how many it is owed. Without it no phone hears of an alert until it is \
+              opened.",
+        secret: true,
+        at: Paths::push_endpoints,
+    },
+    Entry {
         accessor: "invitations",
         what: "when each invitation was offered",
         why: "When each account nobody has claimed yet was offered. The media server's own \

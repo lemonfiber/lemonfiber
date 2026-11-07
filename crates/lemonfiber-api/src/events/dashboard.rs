@@ -55,6 +55,8 @@ pub struct Dashboard {
     alerted: Mutex<Option<BTreeSet<(String, Moment)>>>,
     /// When what is playing was last read, and what was last said of it.
     playing: Mutex<(Option<Instant>, Option<String>)>,
+    /// What is being delivered to the phones that asked to be woken.
+    waking: lemonfiber_core::push::run::Waking,
 }
 
 impl Dashboard {
@@ -68,6 +70,7 @@ impl Dashboard {
             told: Mutex::new(None),
             alerted: Mutex::new(None),
             playing: Mutex::new((None, None)),
+            waking: lemonfiber_core::push::run::Waking::default(),
         }
     }
 }
@@ -95,7 +98,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
             .collect();
     said.extend(newly(dashboard, snapshot, joined).await);
     said.extend(alerted(dashboard, &snapshot.alerts).await);
-    lemonfiber_core::push::run::woken(&dashboard.ctx, &snapshot.alerts).await;
+    dashboard.waking.owing(&dashboard.ctx, &snapshot.alerts);
     said.extend(playing(dashboard, joined).await);
     *last = Some(gathered);
     said
