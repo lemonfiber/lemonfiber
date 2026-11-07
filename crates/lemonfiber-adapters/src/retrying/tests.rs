@@ -172,3 +172,15 @@ async fn a_fetch_is_handed_to_what_it_wraps() {
     );
     assert_eq!(asked.load(Ordering::SeqCst), 1);
 }
+
+/// Octets are handed to what is wrapped once, as a create is: a message sent twice would
+/// wake a phone twice.
+#[tokio::test]
+async fn octets_are_handed_on_once() {
+    let (transport, asked) = failing(0);
+    let sent = transport
+        .send_octets(&request(Method::Post), b"sealed")
+        .await;
+    assert_eq!(sent.map(|answered| answered.status), Ok(200));
+    assert_eq!(asked.load(Ordering::SeqCst), 1);
+}

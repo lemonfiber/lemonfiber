@@ -105,6 +105,23 @@ fn a_device_key_reads_as_its_name() {
     );
 }
 
+/// A push endpoint is named by its name, registered or removed.
+#[test]
+fn a_push_endpoint_reads_as_its_name() {
+    assert_eq!(
+        did(&crate::journal::Kind::PushEndpointRegistered {
+            name: "pixel".to_owned(),
+        }),
+        "registered the push endpoint pixel"
+    );
+    assert_eq!(
+        did(&crate::journal::Kind::PushEndpointRemoved {
+            name: "pixel".to_owned(),
+        }),
+        "removed the push endpoint pixel"
+    );
+}
+
 /// A change to the operator's overlay reads as seen, changed or taken away.
 #[test]
 fn the_overlay_reads_as_changed_or_taken_away() {

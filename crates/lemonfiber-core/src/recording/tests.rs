@@ -312,3 +312,23 @@ async fn a_fetch_that_went_somewhere_is_written_down_there() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Octets that went somewhere are written down as a send is, and what came back.
+#[tokio::test]
+async fn octets_that_went_somewhere_are_written_down_there() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("octets");
+    let _ = std::fs::remove_dir_all(&dir);
+    let at = dir.join("outbound.log");
+    let transport = Recording::around(
+        Shared(Fake::always(Answer::Reply(201, String::new()))),
+        Some(at.clone()),
+        Stopped::at(1),
+    );
+
+    let sent = transport.send_octets(&asking(), b"sealed").await;
+    assert_eq!(sent.map(|answered| answered.status), Ok(201));
+    let written = std::fs::read_to_string(&at).unwrap_or_default();
+    assert!(written.starts_with("1 Get ") && written.trim_end().ends_with(" 201"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

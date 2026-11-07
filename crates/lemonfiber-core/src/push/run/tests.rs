@@ -521,3 +521,53 @@ async fn keys_that_cannot_be_read_send_nothing() {
     assert_eq!(distributor.took(), 0);
     assert_eq!(names(&ctx), ["pixel"]);
 }
+
+/// What was asked of the endpoints prints no key and no address.
+#[test]
+fn what_was_asked_prints_no_key_and_no_address() {
+    let asking = Asked::Register {
+        name: "pixel".to_owned(),
+        endpoint: "https://push.example/the-address".to_owned(),
+        p256dh: "the-public-key".to_owned(),
+        auth: "the-secret".to_owned(),
+    };
+    let said = format!("{asking:?}");
+    assert!(said.contains("pixel"), "{said}");
+    for withheld in ["the-address", "the-public-key", "the-secret"] {
+        assert!(!said.contains(withheld), "{said}");
+    }
+    assert_eq!(format!("{:?}", Asked::List), "List");
+    assert!(format!(
+        "{:?}",
+        Asked::Remove {
+            name: "pixel".to_owned()
+        }
+    )
+    .contains("pixel"));
+}
+
+/// A machine keeping no configuration has nowhere to keep an endpoint.
+#[test]
+fn a_machine_keeping_no_configuration_keeps_no_endpoint() {
+    let ctx = crate::test_support::a_context().build();
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_err());
+    assert!(asked(&ctx, Asked::List).is_err());
+}
+
+/// A removal the journal cannot record is refused, and the endpoint stays.
+#[test]
+fn a_removal_the_journal_cannot_record_is_refused() {
+    let (ctx, _distributor) = machine("push-unjournalled", 201);
+    assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::remove_file(&journal);
+    assert!(std::fs::create_dir_all(&journal).is_ok());
+
+    let removal = Asked::Remove {
+        name: "pixel".to_owned(),
+    };
+    assert!(asked(&ctx, removal).is_err());
+    assert_eq!(names(&ctx), ["pixel"]);
+}

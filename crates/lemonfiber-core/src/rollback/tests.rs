@@ -489,6 +489,19 @@ fn a_mint_goes_back_and_a_revoke_does_not() {
     assert!(device_revoked.refusal.is_some_and(|refusal| refusal
         .because
         .contains("a revoked device key is never made good again")));
+    for kind in [
+        Kind::PushEndpointRegistered {
+            name: "pixel".to_owned(),
+        },
+        Kind::PushEndpointRemoved {
+            name: "pixel".to_owned(),
+        },
+    ] {
+        let pushed = standing(&key(kind), &[], &holding(&[]), &unread);
+        assert!(pushed.refusal.is_some_and(|refusal| refusal
+            .because
+            .contains("only the phone holds the keys of the push endpoint pixel")));
+    }
     let overlaid = standing(
         &key(Kind::Overlaid {
             path: "/cfg/overlay.yml".to_owned(),

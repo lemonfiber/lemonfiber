@@ -523,6 +523,12 @@ fn a_device_key_put_back_is_said_by_its_name() {
         "made the device key pixel good again"
     );
     assert_eq!(
+        undone(Action::PushEndpoint {
+            name: "pixel".to_owned()
+        }),
+        "left the push endpoint pixel as it stands"
+    );
+    assert_eq!(
         undone(Action::Leave {
             path: "/cfg/overlay.yml".to_owned()
         }),

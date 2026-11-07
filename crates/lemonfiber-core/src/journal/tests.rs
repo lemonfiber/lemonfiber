@@ -559,6 +559,21 @@ fn a_device_key_change_is_reversed_by_name() {
             name: "pixel".to_owned()
         }
     );
+    for kind in [
+        Kind::PushEndpointRegistered {
+            name: "pixel".to_owned(),
+        },
+        Kind::PushEndpointRemoved {
+            name: "pixel".to_owned(),
+        },
+    ] {
+        assert_eq!(
+            change(kind).undo().action,
+            Action::PushEndpoint {
+                name: "pixel".to_owned()
+            }
+        );
+    }
 }
 
 #[test]

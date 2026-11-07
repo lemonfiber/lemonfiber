@@ -718,6 +718,10 @@ fn a_key_is_left_standing_and_named() {
             "the device key ha",
         ),
         (
+            Action::PushEndpoint { name: name() },
+            "the push endpoint ha",
+        ),
+        (
             Action::Leave {
                 path: "/cfg/overlay.yml".to_owned(),
             },
