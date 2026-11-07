@@ -56,6 +56,8 @@ jobs:
             contract/* | assets/plugins | substitutes.toml | crates/lemonfiber/tests/substitutes/* | .github/workflows/substitutes.yml)
               proves=true
               ;;
+            *)
+              ;;
             esac
           done <<< "${changed}"
           echo "proves=${proves}" >> "$GITHUB_OUTPUT"
