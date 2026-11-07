@@ -202,6 +202,7 @@ fn alert_for(condition: &Condition, told: Option<u32>) -> Option<Alert> {
         id: Some(Alert::named(&condition.check, condition.recurrences)),
         check: condition.check.clone(),
         kind: condition.kind.clone(),
+        notification: super::Notification::of(&condition.kind, condition.severity),
         moment: Moment::Onset,
         severity: condition.severity,
         summary: format!(

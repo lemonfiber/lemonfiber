@@ -53,7 +53,7 @@ const KILLSWITCH: &str = "vpn.killswitch";
 /// A disturbing run, as the fields a request carries.
 fn disturbing(only: Option<&str>) -> Arguments {
     Arguments {
-        only: only.map(str::to_owned),
+        only: only.map(|name| lemonfiber_api::actions::Only::One(name.to_owned())),
         disruptive: true.into(),
         ..Arguments::default()
     }
@@ -154,7 +154,7 @@ fn a_narrowed_run_that_disturbs_nothing_is_refused_for_the_widening_it_lacks() {
         refusal(
             DIAGNOSE,
             Arguments {
-                only: Some("vpn".to_owned()),
+                only: Some(lemonfiber_api::actions::Only::One("vpn".to_owned())),
                 ..Arguments::default()
             }
         ),

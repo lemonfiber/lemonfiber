@@ -652,3 +652,21 @@ async fn a_request_held_to_checked_addresses_follows_no_redirect() {
     assert_eq!(response.ok().map(|answer| answer.status), Some(302));
     assert!(reached.is_empty(), "the hop was followed: {reached:?}");
 }
+
+/// Octets are sent as the body, in place of any text the request holds.
+#[tokio::test]
+async fn octets_are_sent_as_the_body() {
+    let server = serve(Reply::Whole(201, "")).await;
+    let mut request = asking(&server.base);
+    request.method = Method::Post;
+    let response = Web::new()
+        .send_octets(&request, b"sealed-octets")
+        .await
+        .ok();
+    let sent = server.request();
+    server.stop().await;
+
+    assert_eq!(response.map(|answer| answer.status), Some(201));
+    assert!(sent.starts_with("POST "), "{sent:?}");
+    assert!(sent.ends_with("sealed-octets"), "{sent:?}");
+}

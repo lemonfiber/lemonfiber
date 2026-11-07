@@ -130,6 +130,7 @@ families! {
     plugin => "PLUGIN": "installing and running plugins" [pinned, conforming],
     proc => "PROC": "the program underneath",
     provider => "PROVIDER": "accounts and indexers",
+    push => "PUSH": "waking a phone that asked to be woken",
     qual => "QUAL": "quality against what is available",
     quota => "QUOTA": "what the household may ask for",
     rate => "RATE": "holding the stack to a share of the line",

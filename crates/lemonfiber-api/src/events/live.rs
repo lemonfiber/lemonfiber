@@ -48,6 +48,11 @@ pub trait Gathers: Send + Sync {
     /// opened since the last gather: a source that says something only when it
     /// changes owes a listener that has just arrived the current value all the same.
     async fn gather(&self, joined: bool) -> Vec<Rendered>;
+
+    /// Whether this source is worth gathering with nobody listening.
+    fn wanted_unheard(&self) -> bool {
+        false
+    }
 }
 
 /// What every listener hears, and what a returning one is caught up with.
@@ -169,7 +174,7 @@ impl Live {
     /// and until the caller stops.
     pub async fn gathering(self: Arc<Self>, source: Arc<dyn Gathers>) {
         loop {
-            self.heard().await;
+            self.heard(source.as_ref()).await;
             self.refresh(source.as_ref()).await;
             tokio::select! {
                 () = tokio::time::sleep(TICK) => {}
@@ -178,12 +183,17 @@ impl Live {
         }
     }
 
-    /// Wait until there is somebody to hear a gather.
+    /// Say that a source may now be worth gathering with nobody listening.
+    pub fn roused(&self) {
+        self.arrived.notify_one();
+    }
+
+    /// Wait until there is somebody to hear a gather, or `source` wants one all the same.
     ///
     /// A listener that opened while nothing was waiting leaves its arrival stored,
     /// so one that opens between the count and the wait is not missed.
-    async fn heard(&self) {
-        while self.said.receiver_count() == 0 {
+    async fn heard(&self, source: &dyn Gathers) {
+        while self.said.receiver_count() == 0 && !source.wanted_unheard() {
             self.arrived.notified().await;
         }
     }

@@ -50,7 +50,7 @@
 //! the answer — the rule the five actions on their own keys build their subjects by,
 //! rather than a refusal produced after somebody has agreed to something.
 
-use lemonfiber_api::actions::{named, Arguments, Disturbing};
+use lemonfiber_api::actions::{named, Arguments, Disturbing, Only};
 use lemonfiber_api::read::table::{CHECKS, TRACE};
 use lemonfiber_core::app::Command;
 
@@ -116,7 +116,11 @@ pub(super) fn every() -> impl Iterator<Item = &'static Widened> {
 fn narrowing(said: &[String]) -> Arguments {
     Arguments {
         disruptive: Disturbing::Included,
-        only: said.first().filter(|word| !word.is_empty()).cloned(),
+        only: said
+            .first()
+            .filter(|word| !word.is_empty())
+            .cloned()
+            .map(Only::One),
         ..Arguments::default()
     }
 }

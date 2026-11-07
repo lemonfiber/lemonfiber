@@ -1,4 +1,4 @@
-//! The ten requests lemonfiber makes on its own account.
+//! The eleven requests lemonfiber makes on its own account.
 //!
 //! Each answers four questions, and the answers are prose because the reader is a
 //! person deciding whether they are comfortable with it. *Where* it goes is read
@@ -14,14 +14,14 @@ use super::{Outbound, Reach};
 use crate::config::{
     Settings, IP_ECHO_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY,
     REACH_INDEXER_KEY, REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY,
-    REACH_UPDATES_KEY, REACH_USENET_KEY,
+    REACH_UPDATES_KEY, REACH_USENET_KEY, REACH_WAKING_KEY,
 };
 use lemonfiber_manifest::Service;
 
 /// Every request lemonfiber makes, in the order an operator meets them: what the
 /// stack is built from, what keeps it current, the three that prove something, the
-/// one that carries a sentence to somebody who lives here, the one that shows them
-/// a title's poster, the one this program makes about itself, the one that fetches a
+/// one that carries a sentence to somebody who lives here, the one that wakes a phone,
+/// the one that shows them a title's poster, the one this program makes about itself, the one that fetches a
 /// plugin from where its operator pointed, and the one that resolves a plugin's name
 /// through the catalogue.
 pub const EVERY: &[Reach] = &[
@@ -31,6 +31,7 @@ pub const EVERY: &[Reach] = &[
     Reach::Indexer,
     Reach::Usenet,
     Reach::Household,
+    Reach::Waking,
     Reach::Posters,
     Reach::Updates,
     Reach::PluginSource,
@@ -58,6 +59,10 @@ pub const PUSHOVER: &str = "https://api.pushover.net/1/messages.json";
 
 /// Where a member who is reached on Pushbullet is reached.
 pub const PUSHBULLET: &str = "https://api.pushbullet.com/v2/pushes";
+
+/// Where a phone that asked to be woken is reached, each address being one its distributor
+/// gave rather than one of this machine's settings.
+pub const WAKING: &str = "the address each registered phone's distributor gave";
 
 /// Where the catalogue the request service names titles from publishes their posters, at
 /// the width a phone shows them.
@@ -139,6 +144,7 @@ fn destination(
             .as_ref()
             .map_or_else(Vec::new, |host| vec![host.clone()]),
         Reach::Household => vec![PUSHOVER.to_owned(), PUSHBULLET.to_owned()],
+        Reach::Waking => vec![WAKING.to_owned()],
         Reach::Posters => vec![POSTERS.to_owned()],
         Reach::Updates => vec![RELEASE_LIST.to_owned()],
         Reach::PluginSource => sources(installed),
@@ -216,6 +222,11 @@ pub fn purpose(reach: Reach) -> &'static str {
              a reason — so a refusal that reached them alone is the silent one this exists \
              to prevent."
         }
+        Reach::Waking => {
+            "Tell a phone that asked to be woken that this stack has something to say, so it \
+             hears of an alert while it is closed. Made only for a phone registered here, on \
+             each alert's onset and resolution, while the web surface is serving."
+        }
         Reach::Posters => {
             "Show a member the poster of a title their search found and the house does not \
              hold yet. Their client is handed the picture by this machine, so their own \
@@ -274,6 +285,11 @@ pub fn sends(reach: Reach) -> &'static str {
              where that member already told the request service to reach them, and only if \
              they left refusals switched on there."
         }
+        Reach::Waking => {
+            "One message per alert to the address the phone's distributor gave, encrypted to \
+             that phone. It says only that the stack has something to say, so the distributor \
+             learns when this stack spoke and from what address, and never what it said."
+        }
         Reach::Posters => {
             "One unauthenticated request for one title's poster, from this machine's address. \
              No credential and nothing about the member, who is never named, but the address \
@@ -311,6 +327,7 @@ pub fn switch(reach: Reach) -> &'static str {
         Reach::Indexer => REACH_INDEXER_KEY,
         Reach::Usenet => REACH_USENET_KEY,
         Reach::Household => REACH_HOUSEHOLD_KEY,
+        Reach::Waking => REACH_WAKING_KEY,
         Reach::Posters => REACH_POSTERS_KEY,
         Reach::Updates => REACH_UPDATES_KEY,
         Reach::PluginSource => REACH_PLUGIN_SOURCE_KEY,
@@ -348,6 +365,10 @@ pub fn cost(reach: Reach) -> &'static str {
              service sends that — so somebody is told no and never told why, and passing the \
              words on becomes yours to do by hand. The reason is still written down here and \
              still said back to you when you turn a request down."
+        }
+        Reach::Waking => {
+            "A phone hears of an alert only when it is opened. The alert is kept and shown then, \
+             and everything else works exactly as before."
         }
         Reach::Posters => {
             "A member's search shows each title by its name and year alone. Searching and \

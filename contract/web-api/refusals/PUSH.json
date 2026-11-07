@@ -1,0 +1,27 @@
+{
+  "PUSH-1": {
+    "name": "NOT_A_PUSH_NAME",
+    "status": 400,
+    "description": "Raised when a push endpoint is registered under a word that cannot name one."
+  },
+  "PUSH-2": {
+    "name": "PUSH_NAME_TAKEN",
+    "status": 409,
+    "description": "Raised when a push endpoint is registered under a name another holds."
+  },
+  "PUSH-3": {
+    "name": "PUSH_NOT_HTTPS",
+    "status": 400,
+    "description": "Raised when a push endpoint's address is not an `https` address."
+  },
+  "PUSH-4": {
+    "name": "PUSH_KEYS_UNREADABLE",
+    "status": 400,
+    "description": "Raised when the keys a push endpoint gave cannot be encrypted to."
+  },
+  "PUSH-5": {
+    "name": "PUSH_NOT_REGISTERED",
+    "status": 404,
+    "description": "Raised when no push endpoint holds the name asked about."
+  }
+}

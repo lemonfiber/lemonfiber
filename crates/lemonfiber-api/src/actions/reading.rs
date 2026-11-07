@@ -21,6 +21,7 @@ use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::quality::{self, Preset};
 use lemonfiber_core::repair::run::Consent;
 
+use super::asked::Only;
 use super::Refused;
 
 /// What a diagnosis was narrowed to, or why the name it was given narrows to
@@ -123,9 +124,48 @@ pub(super) fn widening(action: &str, widened: bool) -> Result<(), Refused> {
     })
 }
 
+/// The one name a diagnosis is narrowed to, where it is narrowed.
+fn one_name(only: Option<Only>) -> Result<Option<String>, Refused> {
+    match only {
+        None => Ok(None),
+        Some(Only::One(name)) => Ok(Some(name)),
+        Some(Only::Several(_)) => Err(Refused::Unrecognised {
+            argument: "only".to_owned(),
+            offered: "a diagnosis narrows to one group of checks or one check".to_owned(),
+        }),
+    }
+}
+
+/// The account of the disk, answered with `offer` where it was, of the categories `only`
+/// names where it names any: a narrowing with no offer to narrow, and a list naming nothing,
+/// are refused rather than read as the whole offer.
+pub(super) fn spacing(offer: Option<String>, only: Option<Only>) -> Result<Command, Refused> {
+    let only = match only {
+        None => Vec::new(),
+        Some(Only::One(category)) => vec![category],
+        Some(Only::Several(categories)) if !categories.is_empty() => categories,
+        Some(Only::Several(_)) => {
+            return Err(Refused::Unrecognised {
+                argument: "only".to_owned(),
+                offered: "a list of at least one of the categories the offer holds".to_owned(),
+            })
+        }
+    };
+    if offer.is_none() && !only.is_empty() {
+        return Err(Refused::Missing {
+            action: "space".to_owned(),
+            argument: "offer".to_owned(),
+        });
+    }
+    Ok(Command::Space {
+        agreement: offer,
+        only,
+    })
+}
+
 /// The diagnosis a widened run asks for, narrowed as the reading it follows was.
-pub(super) fn diagnosing(only: Option<String>) -> Result<Command, Refused> {
-    narrowed(only).map(|narrowing| {
+pub(super) fn diagnosing(only: Option<Only>) -> Result<Command, Refused> {
+    narrowed(one_name(only)?).map(|narrowing| {
         Command::Doctor(Diagnosing {
             narrowing,
             disruptive: true,

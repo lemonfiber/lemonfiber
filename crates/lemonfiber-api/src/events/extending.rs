@@ -109,6 +109,10 @@ impl Gathers for Together {
     async fn gather(&self, joined: bool) -> Vec<Rendered> {
         each(&self.0, joined).await
     }
+
+    fn wanted_unheard(&self) -> bool {
+        self.0.iter().any(|source| source.wanted_unheard())
+    }
 }
 
 /// What each source says, in the order given.

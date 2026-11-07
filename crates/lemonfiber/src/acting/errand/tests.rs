@@ -426,6 +426,7 @@ fn the_yes_to_reclaiming_room_is_the_name_the_account_gave_itself() {
         answered,
         Some(Ok(Command::Space {
             agreement: Some(account.agreement),
+            only: Vec::new(),
         })),
         "the account that was read is what the yes names"
     );

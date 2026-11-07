@@ -413,16 +413,18 @@ pub enum Command {
     /// Account for the disk: where the room went, when it runs out, and what could
     /// be got back.
     ///
-    /// One argument, and it is the shape a stop-seeding takes: unanswered it reports
-    /// and offers, naming the offer; answered with that name it takes what the report
-    /// named as costing nothing. There is no argument choosing *what* to reclaim, because
-    /// the answer to that is never a caller's — a seeding torrent's removal has a
-    /// consequence outside this machine and is named and left, and something the
-    /// operator asked to be left alone is not on offer at any level of fullness.
+    /// The shape a stop-seeding takes: unanswered it reports and offers, naming the offer;
+    /// answered with that name it takes what the report named as costing nothing, or the
+    /// categories of it `only` names. Nothing else can be chosen: a seeding torrent's
+    /// removal has a consequence outside this machine and is named and left, and something
+    /// the operator asked to be left alone is not on offer at any level of fullness.
     Space {
         /// The offer being answered, as the run that made it named itself; without
         /// one, nothing is removed.
         agreement: Option<String>,
+        /// The categories of what the offer holds as costing nothing to take, as a line's
+        /// `of` spells them; all it holds where none is named.
+        only: Vec<String>,
     },
     /// Ask the download client to let one completed download go, files and all.
     ///
@@ -456,6 +458,8 @@ pub enum Command {
     Keys(crate::keys::run::Asked),
     /// Register, list or revoke the keys a phone proves the operator with.
     DeviceKeys(crate::device_keys::run::Asked),
+    /// Register, list or remove the phones that asked to be woken.
+    PushEndpoints(crate::push::run::Asked),
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///

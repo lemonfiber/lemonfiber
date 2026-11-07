@@ -52,6 +52,10 @@ impl<H: Http> Http for Retrying<H> {
         sent(&self.inner, request).await
     }
 
+    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
+        self.inner.send_octets(request, octets).await
+    }
+
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
         self.inner.fetch(request, most).await
     }

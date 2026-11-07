@@ -129,6 +129,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::admission::routes())
         .merge(crate::keys::routes())
         .merge(crate::device_keys::routes())
+        .merge(crate::push_endpoints::routes())
         .merge(crate::capabilities::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming))

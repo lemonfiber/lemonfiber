@@ -24,6 +24,11 @@
     "status": 409,
     "description": "Raised where an install a start was agreed to did not hold."
   },
+  "LIFE-15": {
+    "name": "OFFLINE_INSTALL_UNREAD",
+    "status": 409,
+    "description": "Raised where a start would install a part whose install could not be read."
+  },
   "LIFE-3": {
     "name": "ALREADY_WORKING",
     "status": 409,

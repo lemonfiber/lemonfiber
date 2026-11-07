@@ -147,6 +147,17 @@ impl<H: Http + Send + Sync> Http for Recording<H> {
         answer
     }
 
+    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
+        let answer = self.inner.send_octets(request, octets).await;
+        noted(
+            self,
+            request,
+            answer.as_ref().ok().map(|answered| answered.status),
+        )
+        .await;
+        answer
+    }
+
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
         let answer = self.inner.fetch(request, most).await;
         noted(

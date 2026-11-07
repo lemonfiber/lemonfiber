@@ -6,6 +6,7 @@
 
 use lemonfiber_core::device_keys;
 use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, State};
+use lemonfiber_core::push;
 
 use super::{qr, Lines};
 
@@ -170,6 +171,45 @@ pub(super) fn devices(report: &device_keys::Listing) -> Lines {
             key.registered
         ));
         lines.put(format!("    fingerprint  {}", key.fingerprint));
+    }
+    lines
+}
+
+/// A push endpoint registered.
+pub(super) fn pushed(report: &push::Registered) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(if report.rehearsed {
+        format!("Registering would wake the push endpoint {}.", report.name)
+    } else {
+        format!(
+            "Registered the push endpoint {}. It is woken when this stack has something to say.",
+            report.name
+        )
+    });
+    lines
+}
+
+/// Every push endpoint, and what became of a removal.
+pub(super) fn pushes(report: &push::Listing) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(name) = report.removed.as_deref() {
+        lines.put(if report.rehearsed {
+            format!("Removing would stop waking the push endpoint {name}.")
+        } else {
+            format!("Removed the push endpoint {name}. Its phone is not woken from now on.")
+        });
+        lines.put(String::new());
+    }
+    if report.endpoints.is_empty() {
+        lines.put("No push endpoint has been registered on this machine.");
+        return lines;
+    }
+    lines.put("Push endpoints:");
+    for one in &report.endpoints {
+        lines.put(format!(
+            "  {}  {}  registered {}",
+            one.name, one.endpoint, one.registered
+        ));
     }
     lines
 }

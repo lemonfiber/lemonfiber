@@ -133,6 +133,7 @@ fn restoring(action: &Action) -> String {
         Action::Revoke { name } => format!("the key {name} revoked"),
         Action::Reinstate { name } => format!("the key {name} good again"),
         Action::RevokeDevice { name } => format!("the device key {name} revoked"),
+        Action::PushEndpoint { name } => format!("the push endpoint {name} left as it stands"),
         Action::ReinstateDevice { name } => format!("the device key {name} good again"),
         Action::Resettle {
             name,

@@ -44,13 +44,27 @@ pub struct Argument {
     pub shape: Value,
 }
 
+/// The shape `only` takes on `space`, where the carrier publishes the one a diagnosis takes.
+fn categories() -> Value {
+    serde_json::json!({
+        "default": [],
+        "description": "The categories of what the offer holds as costing nothing to take, orphaned \
+            or extracted; all it holds where none is named.",
+        "items": { "type": "string" },
+        "type": "array",
+    })
+}
+
 /// Every action this surface offers, in the order it offers them, each with the
 /// arguments it takes and the consent it asks for; `rehearsable` says which take a
 /// rehearsal, as the core decides for the command each reaches.
 #[must_use]
 pub fn every(rehearsable: impl Fn(&str) -> bool) -> Vec<Action> {
     let carrier = serde_json::to_value(schemars::schema_for!(Arguments)).ok();
-    let typed = |name: &str| {
+    let typed = |action: &str, name: &str| {
+        if action == "space" && name == "only" {
+            return categories();
+        }
         carrier
             .as_ref()
             .and_then(|schema| schema.get("properties"))
@@ -66,7 +80,7 @@ pub fn every(rehearsable: impl Fn(&str) -> bool) -> Vec<Action> {
                 .filter(|taken| taken.takers.contains(action))
                 .map(|taken| Argument {
                     name: taken.name,
-                    shape: typed(taken.name),
+                    shape: typed(action, taken.name),
                 })
                 .collect();
             Action {

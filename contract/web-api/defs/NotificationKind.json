@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What sort of thing an alert tells the operator.",
+  "oneOf": [
+    {
+      "description": "A condition at warning or worse, at onset and resolution.",
+      "type": "string",
+      "const": "problem"
+    },
+    {
+      "description": "Work the operator asked for finishing.",
+      "type": "string",
+      "const": "completion"
+    },
+    {
+      "description": "An update to the stack or lemonfiber being available.",
+      "type": "string",
+      "const": "update"
+    },
+    {
+      "description": "A backup that succeeded.",
+      "type": "string",
+      "const": "backup"
+    },
+    {
+      "description": "A household member's request newly waiting on the operator.",
+      "type": "string",
+      "const": "request"
+    },
+    {
+      "description": "An invitation accepted, declined or lapsed.",
+      "type": "string",
+      "const": "member"
+    }
+  ]
+}

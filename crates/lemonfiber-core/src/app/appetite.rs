@@ -80,6 +80,7 @@ pub fn alerts(ctx: &Ctx, action: AlertAction) -> Result<AlertReport, Box<Problem
                 wanted,
             })
             .collect(),
+        kinds: crate::alert::RAISED.to_vec(),
         changed,
         rehearsed: ctx.dry_run,
     })

@@ -22,6 +22,7 @@ use lemonfiber_core::keys::Minter;
 use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::ports::media::offered;
 use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::push::run::Asked as Pushing;
 use lemonfiber_core::quality::{self, Preset};
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
@@ -30,9 +31,9 @@ use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
     AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
-    HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, QualityCommand, RawBandwidth,
-    RawCompanion, RawDownloads, RawKey, RawRemoval, RawRemoving, RawRestart, UpdateCommand,
-    WiringCommand,
+    HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, PushEndpointCommand,
+    QualityCommand, RawBandwidth, RawCompanion, RawDownloads, RawKey, RawPushEndpoint, RawRemoval,
+    RawRemoving, RawRestart, UpdateCommand, WiringCommand,
 };
 use lemonfiber_core::app::Restarting;
 
@@ -399,6 +400,14 @@ pub(crate) const fn paired(asked: &RawCompanion) -> Command {
     Command::Companion(match asked.action {
         CompanionCommand::Pair => Paired::Pair,
         CompanionCommand::Certificate { confirm } => Paired::Certificate { confirm },
+    })
+}
+
+/// What was asked of the push endpoints, as the operator at this machine's terminal asks it.
+pub(crate) fn pushing(asked: RawPushEndpoint) -> Command {
+    Command::PushEndpoints(match asked.action {
+        PushEndpointCommand::List => Pushing::List,
+        PushEndpointCommand::Remove { name } => Pushing::Remove { name },
     })
 }
 

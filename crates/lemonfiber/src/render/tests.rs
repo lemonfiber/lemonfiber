@@ -71,6 +71,17 @@ fn every_outcome() -> Vec<Outcome> {
     every.extend(the_migrations());
     every.extend(the_rest_of_them());
     every.extend(the_keys());
+    every.push(Outcome::PushEndpoint(lemonfiber_core::push::Registered {
+        name: "pixel".to_owned(),
+        endpoint: "https://push.example/abc".to_owned(),
+        registered: "2026-11-07T00:00:00Z".to_owned(),
+        rehearsed: false,
+    }));
+    every.push(Outcome::PushEndpoints(lemonfiber_core::push::Listing {
+        endpoints: Vec::new(),
+        removed: None,
+        rehearsed: false,
+    }));
     every.push(Outcome::Settings(lemonfiber_core::model::SettingsReport {
         settings: Vec::new(),
         secrets: Vec::new(),
@@ -231,6 +242,7 @@ fn the_first_of_them() -> Vec<Outcome> {
                 kind: "storage.space".to_owned(),
                 wanted: true,
             }],
+            kinds: Vec::new(),
             changed: true,
             rehearsed: false,
         }),

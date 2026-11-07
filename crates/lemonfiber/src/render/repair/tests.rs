@@ -543,10 +543,20 @@ fn a_device_key_put_back_is_said_by_its_name() {
                 name: "pixel".to_owned(),
             },
         },
+        Undo {
+            target: "tablet".to_owned(),
+            action: Action::PushEndpoint {
+                name: "tablet".to_owned(),
+            },
+        },
     ];
     let said = reversed(&putting_back(undos, Vec::new())).text();
     assert!(said.contains("the device key pixel revoked"), "{said}");
     assert!(said.contains("the device key pixel good again"), "{said}");
+    assert!(
+        said.contains("the push endpoint tablet left as it stands"),
+        "{said}"
+    );
 }
 
 #[test]

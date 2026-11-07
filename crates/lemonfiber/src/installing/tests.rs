@@ -67,7 +67,7 @@ async fn an_install_on_offer_is_asked_and_a_yes_answers_its_offer() {
         .await
         .ok()
         .flatten()
-        .map(|offline| offline.offer);
+        .and_then(|offline| offline.offer);
     assert!(standing.is_some());
 
     let (yes, put) = asked(&ctx, true, "y").await;
@@ -98,6 +98,27 @@ async fn forms_that_do_not_resolve_answer_no_offer() {
     .await;
 
     assert_eq!(offer, None);
+}
+
+/// An install that could not be read is not put to the operator: no yes can take it.
+#[tokio::test]
+async fn an_install_that_could_not_be_read_is_not_asked() {
+    let ctx = never_ran("installing-unread");
+    let data = ctx
+        .settings
+        .stack_dir
+        .as_ref()
+        .and_then(|stack| stack.parent())
+        .map(std::path::Path::to_path_buf);
+    let _ = data.map(|data| {
+        let _ = std::fs::create_dir_all(&data);
+        std::fs::write(data.join("checkouts"), "in the way")
+    });
+
+    let (agreed, put) = asked(&ctx, true, "y").await;
+
+    assert_eq!(agreed, Some(Agreed::No));
+    assert!(put.is_empty(), "{put:?}");
 }
 
 /// An install whose reading could not be made says why, and the offer names the command

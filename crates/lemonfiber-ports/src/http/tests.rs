@@ -135,3 +135,28 @@ async fn a_fetched_answer_says_its_success_and_headers_as_a_response_does() {
     };
     assert!(!refused.is_success() && refused.header("content-type").is_none());
 }
+
+/// A transport standing in for HTTP answers octets as it answers the request alone, and a
+/// shared handle to one hands them to it.
+#[tokio::test]
+async fn octets_reach_a_stand_in_through_a_shared_handle() {
+    struct Answering;
+
+    #[async_trait]
+    impl Http for Answering {
+        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
+            Ok(answered(202))
+        }
+    }
+
+    let shared: std::sync::Arc<dyn Http> = std::sync::Arc::new(Answering);
+    let request = Request {
+        method: Method::Post,
+        url: "https://push.example/a".to_owned(),
+        headers: Vec::new(),
+        body: None,
+        pinned: None,
+    };
+    let sent = shared.send_octets(&request, b"sealed").await;
+    assert_eq!(sent.map(|answered| answered.status), Ok(202));
+}

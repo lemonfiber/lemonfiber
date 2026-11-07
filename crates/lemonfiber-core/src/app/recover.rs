@@ -292,6 +292,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         Action::RevokeDevice { name } | Action::ReinstateDevice { name } => {
             Ok(Step::BeyondReach(format!("the device key {name}")))
         }
+        Action::PushEndpoint { name } => Ok(Step::BeyondReach(format!("the push endpoint {name}"))),
         Action::Leave { path } => Ok(Step::BeyondReach(format!("the overlay {path}"))),
         Action::Run { service, .. } => Ok(Step::BeyondReach(service.clone())),
         Action::Unreplaced { service } => Ok(Step::BeyondReach(format!(

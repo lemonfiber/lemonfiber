@@ -538,6 +538,21 @@ async fn a_boot_starts_the_rest_and_says_which_part_waits_for_its_install() {
     );
 }
 
+/// What a boot says waits names the offer `lemonfiber up` gives, and where no offer
+/// stands, that it says why instead.
+#[test]
+fn what_waits_says_what_an_up_will_answer() {
+    let mut report = super::nothing_started("it waits");
+    report.installing = vec![crate::app::InstallOffered {
+        plugin: "jellyfin".to_owned(),
+        offer: None,
+        why: Some("its tree could not be written".to_owned()),
+    }];
+    assert!(super::waits(&report).ends_with("lemonfiber up says why it could not be read"));
+    report.offer = Some("the-offer".to_owned());
+    assert!(super::waits(&report).ends_with("lemonfiber up offers the install"));
+}
+
 /// A stack that came back without its tunnel is a failed boot, not a successful one.
 ///
 /// The half of a restart that does not look after itself. Containers come back

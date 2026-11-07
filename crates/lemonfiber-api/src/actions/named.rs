@@ -43,7 +43,7 @@ mod viewing;
 mod wishing;
 
 use super::asked::{unwanted, Arguments, Disturbing};
-use super::reading::{consent, diagnosing, following, listing, widening};
+use super::reading::{consent, diagnosing, following, listing, spacing, widening};
 use super::Refused;
 
 /// Every action this surface offers, in the order they are worth reading.
@@ -337,7 +337,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // The same reading twice, over the operator's own disk: unconfirmed it is the
         // account `/api/space` answers with, and confirmed it takes only what that
         // account named as costing nothing.
-        "space" => Ok(Command::Space { agreement: offer }),
+        "space" => spacing(offer, only),
         // The one thing that account names and leaves alone, asked for on its own.
         "stop-seeding" => stopping(download, offer),
         // Unconfirmed it is the listing `/api/uninstall` answers with, so what a
@@ -517,16 +517,21 @@ fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
     if let Some(refused) = unwanted(action, given, OFFERED) {
         return Some(refused);
     }
-    // Two arguments, two requests. A teardown that waits and a stop of named
-    // services are different things to ask for, and a run given both would have to
-    // drop one of them.
-    (action == "down" && given.wait == Waiting::ForTheDownloads && !given.services.is_empty()).then(
-        || Refused::Together {
+    // Two arguments, two requests. A teardown that waits and a stop of named services are
+    // different things to ask for, as are a start answering an install and a start of named
+    // services, which installs nothing, and a run given both would have to drop one of them.
+    let asked_alongside = match action {
+        "down" if given.wait == Waiting::ForTheDownloads => Some("wait"),
+        "up" if given.offer.is_some() => Some("offer"),
+        _ => None,
+    };
+    asked_alongside
+        .filter(|_| !given.services.is_empty())
+        .map(|argument| Refused::Together {
             action: action.to_owned(),
-            argument: "wait".to_owned(),
+            argument: argument.to_owned(),
             alongside: "services".to_owned(),
-        },
-    )
+        })
 }
 
 #[cfg(test)]

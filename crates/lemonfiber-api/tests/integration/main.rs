@@ -25,6 +25,7 @@ mod what_a_member_is_shown;
 mod what_a_member_may_ask_for;
 mod what_a_mint_takes;
 mod what_a_plugin_action_means;
+mod what_a_push_endpoint_is;
 mod what_a_read_answers;
 mod what_a_read_refuses;
 mod what_a_rehearsal_answers;

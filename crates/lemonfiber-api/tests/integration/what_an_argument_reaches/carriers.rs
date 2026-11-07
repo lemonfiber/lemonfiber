@@ -5,7 +5,7 @@ use super::acting::{
     HOURS, ITEM, KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON,
     REMOVAL, SEASON, SHARE, STAMP, UNRATED, WAITING, WARNED,
 };
-use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
+use lemonfiber_api::actions::{named, Arguments, Disturbing, Only, Refused, OFFERED};
 use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::Restarting;
@@ -208,6 +208,13 @@ fn carries_offer(command: &Command) -> bool {
         })
         | Command::Space {
             agreement: Some(named),
+            ..
+        }
+        | Command::Up {
+            offer: Some(named), ..
+        }
+        | Command::Switch {
+            offer: Some(named), ..
         } => named == OFFER,
         // And the removal that reaches the library, where the offer's own name is the
         // only yes it takes: dropped, it is a removal nobody could ask for; kept
@@ -531,11 +538,11 @@ fn carries_narrowing(command: &Command) -> bool {
             narrowing: Narrowing::Check(id),
             ..
         }) if id == NARROWED
-    )
+    ) || matches!(command, Command::Space { only, .. } if only == &[NARROWED])
 }
 
 fn give_narrowing(given: &mut Arguments) {
-    given.only = Some(NARROWED.to_owned());
+    given.only = Some(Only::One(NARROWED.to_owned()));
 }
 
 fn give_disruption(given: &mut Arguments) {

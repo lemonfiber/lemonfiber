@@ -253,6 +253,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Keys(_)
         | Outcome::DeviceKey(_)
         | Outcome::DeviceKeys(_)
+        | Outcome::PushEndpoint(_)
+        | Outcome::PushEndpoints(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)

@@ -168,6 +168,14 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
                 by: lemonfiber_core::keys::Minter::Operator,
             }),
         ),
+        // The removal rather than the listing: one that leaked through would stop waking a
+        // phone that asked to be woken.
+        (
+            "push-endpoint",
+            Command::PushEndpoints(lemonfiber_core::push::run::Asked::Remove {
+                name: "pixel".to_owned(),
+            }),
+        ),
         ("outbound", Command::Outbound),
         ("provenance", Command::Provenance),
         ("catalogue", Command::Catalogue),
@@ -239,6 +247,7 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
             "space",
             Command::Space {
                 agreement: Some("anything".to_owned()),
+                only: Vec::new(),
             },
         ),
         (
