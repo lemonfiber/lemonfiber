@@ -1,11 +1,15 @@
 //! Registering, listing and removing push endpoints, and waking them.
 //!
+//! Reading the stack only says what is owed: each endpoint's delivery runs on its own, so an
+//! endpoint that hangs costs that read nothing, and what is owed behind it is bounded.
+//!
 //! Every registration and removal is journaled by name alone, an endpoint's distributor
 //! answering that it is gone among them. Nothing reverses one: only the phone holds what a
 //! registration is made from.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -28,8 +32,11 @@ use crate::ports::http::{Method, Request};
 /// a returning stream is replayed.
 const HELD_FOR_SECONDS: &str = "86400";
 
-/// How long one endpoint is waited for, so one that hangs delays a gather no longer.
-const WAITED_FOR: Duration = Duration::from_secs(10);
+/// How long one endpoint is waited for on one message.
+pub const WAITED_FOR: Duration = Duration::from_secs(10);
+
+/// The most messages an endpoint is owed: as many alerts as a returning stream replays.
+const MOST_OWED: usize = crate::alert::KEPT;
 
 /// The operation every journal entry about a push endpoint is written under.
 const OPERATION: &str = "push-endpoint";
@@ -121,6 +128,7 @@ fn register(
         p256dh,
         auth,
         registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+        owed: 0,
     };
     let answer = Registered {
         name: record.name.clone(),
@@ -204,50 +212,109 @@ fn listing(ctx: &Ctx, removed: Option<String>) -> Result<Listing, Box<Problem>> 
     })
 }
 
-/// Whether any endpoint is waiting to be woken, so the stack is worth reading with nobody
-/// listening: none where waking is switched off, or where the record cannot be read.
-#[must_use]
-pub fn any_waiting(ctx: &Ctx) -> bool {
-    ctx.settings.reaching.allows(REACH_WAKING_KEY)
-        && at(ctx)
-            .and_then(|path| read(&path).ok())
-            .is_some_and(|kept| !kept.endpoints.is_empty())
+/// Where the record of the endpoints waiting to be woken is, where any are: nowhere where
+/// waking is switched off, or where the record cannot be read.
+fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
+    at(ctx)
+        .filter(|_| ctx.settings.reaching.allows(REACH_WAKING_KEY))
+        .filter(|path| read(path).is_ok_and(|kept| !kept.endpoints.is_empty()))
 }
 
-/// Send every endpoint one message for each alert in `alerts` none has been sent, and
-/// forget each endpoint its distributor answers is gone.
-pub async fn woken(ctx: &Ctx, alerts: &[Alert]) {
-    if !any_waiting(ctx) {
-        return;
-    }
-    let Some(path) = at(ctx) else {
-        return;
-    };
-    let carried: BTreeSet<String> = alerts.iter().filter_map(said_as).collect();
-    let mut owed = 0;
-    let mut endpoints = Vec::new();
-    let written = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
-        let before: Option<BTreeSet<&String>> =
-            kept.told.as_ref().map(|told| told.iter().collect());
-        owed = before.map_or(0, |before| {
-            carried.iter().filter(|one| !before.contains(one)).count()
+/// Whether any endpoint is waiting to be woken, so the stack is worth reading with nobody
+/// listening.
+#[must_use]
+pub fn any_waiting(ctx: &Ctx) -> bool {
+    waiting_at(ctx).is_some()
+}
+
+/// The deliveries under way, one to an endpoint, each apart from whatever reads the stack
+/// and from every other endpoint's, so one that hangs delays nothing but itself.
+#[derive(Debug, Clone, Default)]
+pub struct Waking {
+    /// The name of each endpoint a delivery is under way to.
+    delivering: Arc<Mutex<BTreeSet<String>>>,
+}
+
+impl Waking {
+    /// Owe every endpoint one message for each alert in `alerts` none has been owed, and
+    /// start delivering to each endpoint owed any. Waits on no endpoint.
+    pub fn owing(&self, ctx: &Arc<Ctx>, alerts: &[Alert]) {
+        let Some(path) = waiting_at(ctx) else {
+            return;
+        };
+        let carried: BTreeSet<String> = alerts.iter().filter_map(said_as).collect();
+        let mut owing = Vec::new();
+        let written = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
+            let new = kept.told.as_ref().map_or(0, |told| {
+                carried.iter().filter(|one| !told.contains(one)).count()
+            });
+            kept.told = Some(carried.iter().cloned().collect());
+            for one in &mut kept.endpoints {
+                one.owed = one.owed.saturating_add(new).min(MOST_OWED);
+            }
+            owing = kept
+                .endpoints
+                .iter()
+                .filter(|one| one.owed > 0)
+                .map(|one| one.name.clone())
+                .collect();
+            Ok(())
         });
-        kept.told = Some(carried.iter().cloned().collect());
-        endpoints.clone_from(&kept.endpoints);
+        for name in owing.into_iter().filter(|_| written.is_ok()) {
+            self.delivering_to(ctx, &path, name);
+        }
+    }
+
+    /// Deliver what `name` is owed, unless a delivery to it is already under way.
+    ///
+    /// One that has just found nothing owed can miss what is owed a moment later, and the
+    /// next reading starts another for it.
+    fn delivering_to(&self, ctx: &Arc<Ctx>, path: &Path, name: String) {
+        let started = self
+            .delivering
+            .lock()
+            .is_ok_and(|mut delivering| delivering.insert(name.clone()));
+        if started {
+            let delivering = Arc::clone(&self.delivering);
+            let ctx = Arc::clone(ctx);
+            let path = path.to_path_buf();
+            tokio::spawn(async move {
+                delivered(&ctx, &path, &name).await;
+                if let Ok(mut delivering) = delivering.lock() {
+                    delivering.remove(&name);
+                }
+            });
+        }
+    }
+}
+
+/// Send `name` everything it is owed, one message at a time, and forget it if its
+/// distributor answers that it is gone.
+async fn delivered(ctx: &Ctx, path: &Path, name: &str) {
+    while let Some(record) = next_owed(path, name) {
+        if woke(ctx, &record).await {
+            forget(ctx, path, name);
+            return;
+        }
+    }
+}
+
+/// `name`'s record, with the message about to be sent no longer owed: nothing where it owes
+/// none, has been removed, or the record cannot be written, so nothing is sent twice.
+fn next_owed(path: &Path, name: &str) -> Option<Record> {
+    let mut next = None;
+    let written = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
+        next = kept
+            .endpoints
+            .iter_mut()
+            .find(|one| one.name == name && one.owed > 0)
+            .map(|one| {
+                one.owed -= 1;
+                one.clone()
+            });
         Ok(())
     });
-    if written.is_err() || owed == 0 {
-        return;
-    }
-    let sends = endpoints.iter().map(|record| woke(ctx, record, owed));
-    let answered = futures_util::future::join_all(sends).await;
-    let gone: Vec<&str> = endpoints
-        .iter()
-        .zip(answered)
-        .filter(|(_, gone)| *gone)
-        .map(|(record, _)| record.name.as_str())
-        .collect();
-    forget_all(ctx, &path, &gone);
+    written.ok().and(next)
 }
 
 /// What names an alert and which way it went, where anything does.
@@ -255,13 +322,16 @@ fn said_as(alert: &Alert) -> Option<String> {
     Some(format!("{} {}", alert.id.as_ref()?, alert.moment.said()))
 }
 
-/// Send `record` `owed` messages, and whether its distributor answered that it is gone.
-async fn woke(ctx: &Ctx, record: &Record, owed: usize) -> bool {
-    let keys = URL_SAFE_NO_PAD
-        .decode(&record.p256dh)
-        .ok()
-        .zip(URL_SAFE_NO_PAD.decode(&record.auth).ok());
-    let Some((public, secret)) = keys else {
+/// The message that wakes `record`, where its keys can be read.
+fn sealed_for(record: &Record) -> Option<Vec<u8>> {
+    let public = URL_SAFE_NO_PAD.decode(&record.p256dh).ok()?;
+    let secret = URL_SAFE_NO_PAD.decode(&record.auth).ok()?;
+    sealing::sealed(&public, &secret)
+}
+
+/// Send `record` one message, and whether its distributor answered that it is gone.
+async fn woke(ctx: &Ctx, record: &Record) -> bool {
+    let Some(sealed) = sealed_for(record) else {
         return false;
     };
     let request = Request {
@@ -279,29 +349,14 @@ async fn woke(ctx: &Ctx, record: &Record, owed: usize) -> bool {
         body: None,
         pinned: None,
     };
-    for _ in 0..owed {
-        let Some(sealed) = sealing::sealed(&public, &secret) else {
-            return false;
-        };
-        let sent = tokio::time::timeout(WAITED_FOR, ctx.seams.http.send_octets(&request, &sealed));
-        if let Ok(Ok(answered)) = sent.await {
-            if GONE.contains(&answered.status) {
-                return true;
-            }
-        }
-    }
-    false
+    let sent = tokio::time::timeout(WAITED_FOR, ctx.seams.http.send_octets(&request, &sealed));
+    matches!(sent.await, Ok(Ok(answered)) if GONE.contains(&answered.status))
 }
 
-/// Forget each of `gone`, best effort: one still kept is told again and answers again.
-fn forget_all(ctx: &Ctx, path: &Path, gone: &[&str]) {
-    if gone.is_empty() {
-        return;
-    }
+/// Forget `name`, best effort: one still kept is told again and answers again.
+fn forget(ctx: &Ctx, path: &Path, name: &str) {
     let _ = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        for name in gone {
-            let _ = forgotten(ctx, kept, name);
-        }
+        let _ = forgotten(ctx, kept, name);
         Ok(())
     });
 }

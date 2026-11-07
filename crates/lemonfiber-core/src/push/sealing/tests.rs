@@ -1,7 +1,7 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use ring::agreement::{self, EphemeralPrivateKey, UnparsedPublicKey, ECDH_P256};
-use ring::rand::SystemRandom;
+use ring::rand::{self, SystemRandom};
 use ring::{aead, hkdf};
 
 use super::{composed, readable, sealed, Long, Parties, WAKE};
@@ -69,7 +69,9 @@ fn a_phone_reads_what_was_sealed_to_it_and_it_says_only_to_wake() {
     let (Ok(phone), Some(public)) = (phone, public) else {
         return;
     };
-    let secret = [7_u8; 16];
+    let secret = rand::generate::<[u8; 16]>(&random)
+        .map(rand::Random::expose)
+        .unwrap_or_default();
     let coded = sealed(public.as_ref(), &secret).unwrap_or_default();
 
     let salt = coded.get(..16).unwrap_or_default();

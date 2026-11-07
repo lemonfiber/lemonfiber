@@ -6,6 +6,13 @@ use lemonfiber_fixtures::ports::Chance;
 use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
 use ring::rand::SystemRandom;
 
+use lemonfiber_api::events::dashboard::Dashboard;
+use lemonfiber_api::events::live::Gathers as _;
+use lemonfiber_core::alert::{Alert, Moment, Notification, Outbox};
+use lemonfiber_core::error::Severity;
+use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use lemonfiber_core::push::run::{asked, Asked, WAITED_FOR};
+
 use crate::door::*;
 use crate::what_a_key_admits::{code, presented, sent, HERE, NEXT_DOOR};
 
@@ -163,4 +170,108 @@ async fn a_registration_does_not_cross_a_network_in_the_clear() {
     .await;
     assert!(crossed.status.is_client_error(), "{}", crossed.body);
     assert!(!code(&crossed).starts_with("PUSH"), "{}", crossed.body);
+}
+
+/// A distributor that takes every message and never answers.
+#[derive(Default)]
+struct Hanging {
+    /// Whether a message has reached it.
+    reached: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl Http for Hanging {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        Err(Unreachable::once(
+            &request.url,
+            "nothing else is asked here",
+        ))
+    }
+
+    async fn send_octets(
+        &self,
+        _request: &Request,
+        _octets: &[u8],
+    ) -> Result<Response, Unreachable> {
+        self.reached.store(true, Ordering::SeqCst);
+        std::future::pending().await
+    }
+}
+
+/// The outbox beside `env`, holding one alert said.
+fn an_alert_said(env: &std::path::Path) {
+    let mut outbox = Outbox::new();
+    outbox.owe([Alert {
+        id: Some(Alert::named("service.sonarr", 1)),
+        check: "service.sonarr".to_owned(),
+        kind: "service.down".to_owned(),
+        notification: Notification::Problem,
+        moment: Moment::Onset,
+        severity: Severity::Warning,
+        summary: "it broke".to_owned(),
+        meaning: "nothing works".to_owned(),
+        remedies: Vec::new(),
+        affected: vec!["service.sonarr".to_owned()],
+        exit: None,
+    }]);
+    let _ = fs::write(
+        env.with_file_name("outbox.json"),
+        serde_json::to_string(&outbox).unwrap_or_default(),
+    );
+}
+
+/// A read answers in the time it took before while a message it owed is still hanging at
+/// the endpoint, which is reached all the same.
+#[tokio::test]
+async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
+    let env = a_directory("push-hanging").join(".env");
+    if let Some(dir) = env.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    let hanging = Arc::new(Hanging::default());
+    let ctx = lemonfiber_testing::a_context()
+        .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
+        .settings(lemonfiber_core::config::Settings {
+            env_file: Some(env.clone()),
+            stack_dir: env.parent().map(|dir| dir.join("stack")),
+            ..lemonfiber_core::config::Settings::default()
+        })
+        .build()
+        .with_http(Arc::clone(&hanging) as Arc<dyn Http>);
+    let registered = asked(
+        &ctx,
+        Asked::Register {
+            name: "pixel".to_owned(),
+            endpoint: "https://push.example/abc".to_owned(),
+            p256dh: read(&registering("pixel", "x"), "/p256dh"),
+            auth: read(&registering("pixel", "x"), "/auth"),
+        },
+    );
+    assert!(registered.is_ok());
+    let dashboard = Dashboard::against(Arc::new(ctx));
+
+    let started = std::time::Instant::now();
+    dashboard.gather(false).await;
+    let alone = started.elapsed();
+    assert!(
+        !hanging.reached.load(Ordering::SeqCst),
+        "nothing is owed yet"
+    );
+
+    an_alert_said(&env);
+    let started = std::time::Instant::now();
+    dashboard.gather(false).await;
+    let hung = started.elapsed();
+
+    let reached = tokio::time::timeout(Duration::from_secs(5), async {
+        while !hanging.reached.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    assert!(reached.is_ok(), "the message was never sent");
+    assert!(
+        hung < alone + WAITED_FOR / 2,
+        "{hung:?} beside {alone:?}: the read waited on the endpoint"
+    );
 }

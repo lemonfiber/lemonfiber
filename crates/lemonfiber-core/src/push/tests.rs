@@ -9,6 +9,7 @@ fn a_listing_holds_no_key() {
         p256dh: "the-public-key".to_owned(),
         auth: "the-secret".to_owned(),
         registered: "2026-11-07T00:00:00Z".to_owned(),
+        owed: 0,
     };
     let shown = serde_json::to_string(&Listed::from(&record)).unwrap_or_default();
     assert!(shown.contains("pixel"), "{shown}");
