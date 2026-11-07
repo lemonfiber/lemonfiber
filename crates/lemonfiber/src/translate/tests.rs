@@ -28,6 +28,28 @@ mod machine;
 
 /// The three key commands reach the core as the operator at this terminal asks them.
 #[test]
+fn the_push_endpoint_commands_reach_the_core_as_the_operator_asks_them() {
+    use lemonfiber::cli::{PushEndpointCommand, RawPushEndpoint};
+    use lemonfiber_core::push::run::Asked;
+    assert_eq!(
+        super::pushing(RawPushEndpoint {
+            action: PushEndpointCommand::List,
+        }),
+        Command::PushEndpoints(Asked::List)
+    );
+    assert_eq!(
+        super::pushing(RawPushEndpoint {
+            action: PushEndpointCommand::Remove {
+                name: "pixel".to_owned(),
+            },
+        }),
+        Command::PushEndpoints(Asked::Remove {
+            name: "pixel".to_owned(),
+        })
+    );
+}
+
+#[test]
 fn the_key_commands_reach_the_core_as_the_operator_asks_them() {
     use lemonfiber::cli::{KeyCommand, RawKey};
     use lemonfiber_core::keys::run::Asked as Keyed;

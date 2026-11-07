@@ -186,6 +186,23 @@ pub trait Http: Send + Sync {
     /// refusal — is a [`Response`], never an error.
     async fn send(&self, request: &Request) -> Result<Response, Unreachable>;
 
+    /// Send a request with `octets` as its body, in place of any text it holds, and read the
+    /// response.
+    ///
+    /// A transport that speaks HTTP for real carries them. This default, for one that stands
+    /// in for it, answers as it answers the request alone.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Unreachable`] when nothing answered.
+    async fn send_octets(
+        &self,
+        request: &Request,
+        _octets: &[u8],
+    ) -> Result<Response, Unreachable> {
+        self.send(request).await
+    }
+
     /// Send a request and read the body as bytes, holding no more than `most` of them.
     ///
     /// # Errors
@@ -211,6 +228,10 @@ pub trait Http: Send + Sync {
 impl Http for std::sync::Arc<dyn Http> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
         (**self).send(request).await
+    }
+
+    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
+        (**self).send_octets(request, octets).await
     }
 
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {

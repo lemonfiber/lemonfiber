@@ -81,6 +81,10 @@ kinds! {
     DEVICE_KEY = "device-key",
     /// Every device key this machine has registered, and what became of a revoke.
     DEVICE_KEYS = "device-keys",
+    /// A push endpoint registered, to wake a phone.
+    PUSH_ENDPOINT = "push-endpoint",
+    /// Every push endpoint, and what became of a removal.
+    PUSH_ENDPOINTS = "push-endpoints",
     /// What the diagnostic checks found.
     DOCTOR = "doctor",
     /// A command could not do what was asked.

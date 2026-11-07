@@ -289,17 +289,79 @@ async fn a_streamed_start_of_named_services_installs_nothing() {
         })));
 }
 
+/// Puts something in the way of every install's tree, so none can be read.
+fn unreadable(ctx: &Ctx) {
+    let data = crate::app::targets::layout(ctx).map(|paths| paths.data_dir().to_path_buf());
+    let _ = data.map(|data| {
+        let _ = std::fs::create_dir_all(&data);
+        std::fs::write(data.join("checkouts"), "in the way")
+    });
+}
+
+/// A start whose install could not be read says why, offers no yes, and refuses one.
+#[tokio::test]
+async fn an_up_whose_install_could_not_be_read_offers_no_yes_and_says_why() {
+    let serving = watching();
+    let ctx = fresh("offline-no-yes", &serving);
+    unreadable(&ctx);
+
+    let unanswered = up(&ctx, None).await.ok();
+    assert_eq!(
+        unanswered.as_ref().map(|report| report.offer.clone()),
+        Some(None)
+    );
+    assert!(
+        unanswered.is_some_and(|report| !report.installing.is_empty()
+            && report.installing.iter().all(|one| one.why.is_some()))
+    );
+
+    let rehearsed = up(&ctx.clone().rehearsing(), None).await.ok();
+    assert_eq!(
+        rehearsed.as_ref().map(|report| report.offer.clone()),
+        Some(None)
+    );
+    assert!(rehearsed.is_some_and(|report| report.installing.iter().all(|one| one.why.is_some())));
+
+    let refused = up(&ctx, Some("any-offer".to_owned())).await.err();
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code),
+        Some(crate::error::codes::life::OFFLINE_INSTALL_UNREAD)
+    );
+    assert!(refused.is_some_and(|problem| problem.meaning.contains(PART)));
+    assert!(!serving.started());
+    assert_eq!(counted(reading(&ctx).await), Some(0));
+}
+
+/// A switch and a streamed start hold an install that could not be read as an up does.
+#[tokio::test]
+async fn a_switch_and_a_streamed_start_refuse_a_yes_no_offer_stands_for() {
+    let serving = watching();
+    let ctx = fresh("offline-no-yes-either", &serving);
+    unreadable(&ctx);
+
+    let unanswered = switch(&ctx, None).await.ok();
+    assert_eq!(unanswered.map(|report| report.offer), Some(None));
+    let refused = switch(&ctx, Some("any-offer".to_owned())).await.err();
+    assert_eq!(
+        refused.map(|problem| problem.code),
+        Some(crate::error::codes::life::OFFLINE_INSTALL_UNREAD)
+    );
+
+    let opened = crate::app::start_progress(&ctx, &library(), &[], None).await;
+    assert_eq!(
+        opened.err().map(|problem| problem.code),
+        Some(crate::error::codes::life::OFFLINE_INSTALL_UNREAD)
+    );
+    assert!(!serving.started());
+}
+
 /// Nothing is offered where the record of what is installed cannot be read, and an
 /// install whose reading cannot be made is offered with why.
 #[tokio::test]
 async fn an_unread_record_offers_nothing_and_an_unread_install_says_why() {
     let serving = watching();
     let ctx = fresh("offline-unread", &serving);
-    let data = crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().to_path_buf());
-    let _ = data.map(|data| {
-        let _ = std::fs::create_dir_all(&data);
-        std::fs::write(data.join("checkouts"), "in the way")
-    });
+    unreadable(&ctx);
 
     let unread = crate::app::offline(&ctx, &library()).await;
 

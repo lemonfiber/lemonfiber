@@ -146,6 +146,8 @@ fn did(kind: &Kind) -> String {
             format!("registered the device key {name}, held in {backing}")
         }
         Kind::DeviceKeyRevoked { name } => format!("revoked the device key {name}"),
+        Kind::PushEndpointRegistered { name } => format!("registered the push endpoint {name}"),
+        Kind::PushEndpointRemoved { name } => format!("removed the push endpoint {name}"),
         Kind::Setting {
             name,
             current: Some(current),

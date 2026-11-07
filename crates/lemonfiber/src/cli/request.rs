@@ -16,8 +16,8 @@ use clap::{Args, Subcommand};
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawRemoving, RawRestart, RawSetup,
-    RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand,
+    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawPushEndpoint, RawRemoving, RawRestart,
+    RawSetup, RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -407,6 +407,10 @@ pub enum Request {
         /// The offer being answered, as the account printed it.
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
+        /// Take only this category of what the offer costs nothing to take: `orphaned` or
+        /// `extracted`. May be repeated.
+        #[arg(long, value_name = "CATEGORY", requires = "offer")]
+        only: Vec<String>,
     },
     /// Stop seeding one completed download, and let its files go with it.
     ///
@@ -511,6 +515,8 @@ pub enum Request {
     Companion(RawCompanion),
     /// Mint, list or revoke the keys another program reaches the web interface with.
     Key(RawKey),
+    /// List or remove the phones that asked to be woken when this stack has something to say.
+    PushEndpoint(RawPushEndpoint),
     /// Restore your configuration from a backup archive.
     ///
     /// Verifies the archive and lists what it holds before anything is

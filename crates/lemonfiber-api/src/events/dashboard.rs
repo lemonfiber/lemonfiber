@@ -77,6 +77,10 @@ impl Gathers for Dashboard {
     async fn gather(&self, joined: bool) -> Vec<Rendered> {
         gathered(self, joined).await
     }
+
+    fn wanted_unheard(&self) -> bool {
+        lemonfiber_core::push::run::any_waiting(&self.ctx)
+    }
 }
 
 /// The dashboard rendered, with the snapshot it was made from kept for the next one,
@@ -91,6 +95,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
             .collect();
     said.extend(newly(dashboard, snapshot, joined).await);
     said.extend(alerted(dashboard, &snapshot.alerts).await);
+    lemonfiber_core::push::run::woken(&dashboard.ctx, &snapshot.alerts).await;
     said.extend(playing(dashboard, joined).await);
     *last = Some(gathered);
     said

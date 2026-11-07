@@ -265,13 +265,10 @@ pub fn standing(
             &format!("the key {name} was revoked, and a revoked key is never made good again"),
             Some("mint a new key for whatever still needs one"),
         ),
-        Kind::DeviceKeyRevoked { name } => Standing::refused(
-            &format!(
-                "the device key {name} was revoked, and a revoked device key is never made good \
-                 again"
-            ),
-            Some("register a new device key from the phone"),
-        ),
+        Kind::DeviceKeyRevoked { name } => device_key_revoked(name),
+        Kind::PushEndpointRegistered { name } | Kind::PushEndpointRemoved { name } => {
+            only_the_phone(name)
+        }
         Kind::Rewritten {
             path,
             previous,
@@ -295,6 +292,24 @@ pub fn standing(
         | Kind::Ran { .. }
         | Kind::Restarted { .. } => Standing::whole(),
     }
+}
+
+/// Why a revoke of the device key `name` is not put back.
+fn device_key_revoked(name: &str) -> Standing {
+    Standing::refused(
+        &format!(
+            "the device key {name} was revoked, and a revoked device key is never made good again"
+        ),
+        Some("register a new device key from the phone"),
+    )
+}
+
+/// Why a registration or a removal of the push endpoint `name` is not put back.
+fn only_the_phone(name: &str) -> Standing {
+    Standing::refused(
+        &format!("only the phone holds the keys of the push endpoint {name}"),
+        Some("turn waking on or off from the phone, or use lemonfiber push-endpoint remove"),
+    )
 }
 
 /// Why a change to the overlay at `path` is not put back: the file is the operator's.

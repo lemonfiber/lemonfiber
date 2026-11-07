@@ -89,7 +89,7 @@ async fn answered(
     if ctx.dry_run {
         if let Some(offline) = Box::pin(super::installing::offered(ctx, &report.plan)).await {
             report.installing = offline.installs;
-            report.offer = Some(offline.offer);
+            report.offer = offline.offer;
         }
     }
     Ok(report)

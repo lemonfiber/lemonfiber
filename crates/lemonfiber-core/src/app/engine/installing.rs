@@ -16,6 +16,7 @@ use crate::app::plugins::Consent;
 use crate::app::Ctx;
 use crate::error::codes::life::{
     OFFLINE_INSTALL_MOVED, OFFLINE_INSTALL_UNANSWERED, OFFLINE_INSTALL_UNHELD,
+    OFFLINE_INSTALL_UNREAD,
 };
 use crate::error::{Problem, Remedy, State};
 use crate::model::LifecycleReport;
@@ -23,7 +24,11 @@ use crate::stack::closure::Plan;
 
 /// Every refusal a start answering what it offers to install may meet, beside the offer
 /// that moved.
-pub const REFUSALS: [crate::error::Code; 2] = [OFFLINE_INSTALL_UNANSWERED, OFFLINE_INSTALL_UNHELD];
+pub const REFUSALS: [crate::error::Code; 3] = [
+    OFFLINE_INSTALL_UNANSWERED,
+    OFFLINE_INSTALL_UNHELD,
+    OFFLINE_INSTALL_UNREAD,
+];
 
 /// An install of a part the bundle installs that a start offers, by the plugin and the
 /// offer its install reads as.
@@ -45,8 +50,9 @@ pub struct InstallOffered {
 pub struct Offline {
     /// Each install on offer.
     pub installs: Vec<InstallOffered>,
-    /// The offer the start answers: each plugin, by its install's offer.
-    pub offer: String,
+    /// The offer the start answers, each plugin by its install's offer: none where an
+    /// install could not be read, which no yes can take.
+    pub offer: Option<String>,
 }
 
 /// Every part the bundle installs that `plan` holds, whose plugin is not installed and
@@ -92,16 +98,18 @@ pub(crate) async fn offered(ctx: &Ctx, plan: &Plan) -> Option<Offline> {
     if installs.is_empty() {
         return None;
     }
-    let words: Vec<&str> = installs
-        .iter()
-        .flat_map(|one| {
-            [
-                one.plugin.as_str(),
-                one.offer.as_deref().unwrap_or_default(),
-            ]
-        })
-        .collect();
-    let offer = over(&words);
+    let offer = installs.iter().all(|one| one.why.is_none()).then(|| {
+        let words: Vec<&str> = installs
+            .iter()
+            .flat_map(|one| {
+                [
+                    one.plugin.as_str(),
+                    one.offer.as_deref().unwrap_or_default(),
+                ]
+            })
+            .collect();
+        over(&words)
+    });
     Some(Offline { installs, offer })
 }
 
@@ -124,13 +132,13 @@ pub(crate) async fn pending(ctx: &Ctx, forms: &[String]) -> Option<Offline> {
 }
 
 /// Answer the installs `offline` offers with `answered`: every install taken where it
-/// names the offer standing now, refused where it names another, and still on offer,
-/// handed back, where it names none.
+/// names the offer standing now, refused where it names another or where no offer stands,
+/// and still on offer, handed back, where it names none.
 ///
 /// # Errors
 ///
-/// Where `answered` names an offer that has moved, where an install refuses, and where one
-/// does not hold.
+/// Where `answered` names an offer that has moved, where an install could not be read,
+/// where one refuses, and where one does not hold.
 pub(crate) async fn answer(
     ctx: &Ctx,
     offline: Offline,
@@ -139,8 +147,11 @@ pub(crate) async fn answer(
     let Some(answered) = answered else {
         return Ok(Some(offline));
     };
-    if answered != offline.offer {
-        return Err(Box::new(moved(answered, &offline)));
+    let Some(standing) = offline.offer.as_deref() else {
+        return Err(Box::new(unread(&offline)));
+    };
+    if answered != standing {
+        return Err(Box::new(moved(answered, standing, &offline)));
     }
     for one in &offline.installs {
         let consent = Consent {
@@ -240,7 +251,7 @@ pub fn unstarted(action: &str, plan: Plan, offline: Offline) -> LifecycleReport 
         secured: None,
         switched: None,
         held: None,
-        offer: Some(offline.offer),
+        offer: offline.offer,
         unvetted: None,
         moves: Vec::new(),
         installing: offline.installs,
@@ -257,6 +268,9 @@ pub fn unstarted(action: &str, plan: Plan, offline: Offline) -> LifecycleReport 
 /// A start that would install a part and was given no yes to it.
 #[must_use]
 pub(crate) fn unanswered(offline: &Offline) -> Problem {
+    if offline.offer.is_none() {
+        return unread(offline);
+    }
     Problem::new(
         OFFLINE_INSTALL_UNANSWERED,
         format!(
@@ -270,7 +284,7 @@ pub(crate) fn unanswered(offline: &Offline) -> Problem {
 }
 
 /// A start answering an offer that is not the one standing now.
-fn moved(answered: &str, offline: &Offline) -> Problem {
+fn moved(answered: &str, standing: &str, offline: &Offline) -> Problem {
     Problem::new(
         OFFLINE_INSTALL_MOVED,
         "That agreement was given for a different install",
@@ -278,9 +292,32 @@ fn moved(answered: &str, offline: &Offline) -> Problem {
             "It answered {answered}, and a start now would install {}, which is offered as {}. \
              Nothing was installed, written or started.",
             plugins(offline),
-            offline.offer
+            standing
         ),
         Remedy::new("Rehearse the start again, and answer the offer it gives now"),
+    )
+    .in_state(State::Guided)
+}
+
+/// A start answering an offer while an install it would take could not be read, so no
+/// offer stands.
+fn unread(offline: &Offline) -> Problem {
+    let why: Vec<String> = offline
+        .installs
+        .iter()
+        .filter_map(|one| one.why.as_ref().map(|why| format!("{}: {why}", one.plugin)))
+        .collect();
+    Problem::new(
+        OFFLINE_INSTALL_UNREAD,
+        format!(
+            "Starting this installs {}, and no yes can take an install that could not be read",
+            plugins(offline)
+        ),
+        format!(
+            "{}. Nothing was installed, written or started.",
+            why.join("; ")
+        ),
+        Remedy::new("Put right what stopped the read, and rehearse the start again"),
     )
     .in_state(State::Guided)
 }

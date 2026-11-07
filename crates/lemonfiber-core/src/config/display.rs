@@ -141,6 +141,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          explains a search whose titles show no picture",
     ),
     (
+        super::REACH_WAKING_KEY,
+        "whether the phones that asked to be woken may be, which explains a phone that hears \
+         nothing until it is opened",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

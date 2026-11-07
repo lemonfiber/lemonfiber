@@ -56,6 +56,16 @@ impl Category {
         }
     }
 
+    /// The category of what costs nothing that `word` names, as a line's `of` spells it.
+    #[must_use]
+    pub fn costing_nothing(word: &str) -> Option<Self> {
+        match word {
+            "orphaned" => Some(Self::Orphaned),
+            "extracted" => Some(Self::Extracted),
+            _ => None,
+        }
+    }
+
     /// What getting this line's room back would cost.
     #[must_use]
     pub const fn reclaim(&self) -> Reclaim {

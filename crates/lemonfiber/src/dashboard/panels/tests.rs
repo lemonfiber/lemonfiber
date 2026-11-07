@@ -613,6 +613,7 @@ fn an_alert(summary: &str, moment: lemonfiber_core::alert::Moment) -> Alert {
         id: None,
         check: "service.sonarr".to_owned(),
         kind: "service.down".to_owned(),
+        notification: lemonfiber_core::alert::Notification::Problem,
         moment,
         severity: lemonfiber_core::error::Severity::Warning,
         summary: summary.to_owned(),

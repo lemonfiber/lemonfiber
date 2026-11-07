@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A push endpoint registered.",
+  "type": "object",
+  "properties": {
+    "endpoint": {
+      "description": "The `https` address its distributor gave.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name it was registered under.",
+      "type": "string"
+    },
+    "registered": {
+      "description": "When it was registered.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what registering would come to, with nothing kept.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "endpoint",
+    "registered",
+    "rehearsed"
+  ]
+}

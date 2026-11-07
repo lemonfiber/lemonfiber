@@ -83,6 +83,8 @@ fn settings_of(
             | Outcome::Keys(_)
             | Outcome::DeviceKey(_)
             | Outcome::DeviceKeys(_)
+            | Outcome::PushEndpoint(_)
+            | Outcome::PushEndpoints(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)

@@ -12,6 +12,7 @@ fn an_alert(check: &str, recurrence: u32, moment: Moment) -> Alert {
         id: Some(Alert::named(check, recurrence)),
         check: check.to_owned(),
         kind: "service.down".to_owned(),
+        notification: lemonfiber_core::alert::Notification::Problem,
         moment,
         severity: Severity::Critical,
         summary: format!("{check} stopped"),
@@ -133,4 +134,15 @@ async fn what_is_playing_unchanged_is_not_said_again() {
     let _ = playing(&dashboard, true).await;
     dashboard.playing.lock().await.0 = None;
     assert_eq!(playing(&dashboard, false).await, None);
+}
+
+/// A dashboard with no phone waiting to be woken is not gathered for nobody, alone or
+/// beside the other sources.
+#[test]
+fn with_no_phone_waiting_nothing_is_gathered_for_nobody() {
+    use crate::events::extending::Together;
+    use crate::events::live::Gathers as _;
+    assert!(!a_dashboard().wanted_unheard());
+    let ctx = Arc::new(lemonfiber_testing::a_context().build());
+    assert!(!Together::in_a_run(&ctx).wanted_unheard());
 }
