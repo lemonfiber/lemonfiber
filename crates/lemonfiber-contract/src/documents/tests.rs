@@ -320,6 +320,13 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
     assert_eq!(
         added,
         vec![
+            ("library.curate@1".to_owned(), "catalogued"),
+            ("library.curate@1".to_owned(), "titles"),
+            ("library.curate@1".to_owned(), "held_title"),
+            ("library.curate@1".to_owned(), "request"),
+            ("library.curate@1".to_owned(), "search"),
+            ("library.curate@1".to_owned(), "remove"),
+            ("library.curate@1".to_owned(), "downloading"),
             ("request.intake@1".to_owned(), "minted_as"),
             ("media.serve@1".to_owned(), "astray"),
             ("media.serve@1".to_owned(), "account"),

@@ -13,6 +13,11 @@ use crate::Refusal;
 /// The file in an adapter's configuration directory the core writes the plugin's key to.
 pub const KEY_FILE: &str = "lemonfiber.key";
 
+/// The file in an adapter's configuration directory the core writes the request gate's
+/// keys on that adapter to, one to a line: each admitted on the operations a curator
+/// answers the gate, and on no other.
+pub const REQUEST_KEY_FILE: &str = "request.key";
+
 /// The file in an adapter's configuration directory the core writes its upstream's
 /// credential to, as a JSON object of named strings.
 pub const UPSTREAM_FILE: &str = "upstream.json";

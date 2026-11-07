@@ -102,14 +102,23 @@
     "/lemonfiber/library.curate/v1/carry": {
       "$ref": "operations/carry.json"
     },
+    "/lemonfiber/library.curate/v1/catalogued": {
+      "$ref": "operations/catalogued.json"
+    },
     "/lemonfiber/library.curate/v1/download_clients": {
       "$ref": "operations/download_clients.json"
+    },
+    "/lemonfiber/library.curate/v1/downloading": {
+      "$ref": "operations/downloading.json"
     },
     "/lemonfiber/library.curate/v1/find_items": {
       "$ref": "operations/find_items.json"
     },
     "/lemonfiber/library.curate/v1/hardlinks": {
       "$ref": "operations/hardlinks.json"
+    },
+    "/lemonfiber/library.curate/v1/held_title": {
+      "$ref": "operations/held_title.json"
     },
     "/lemonfiber/library.curate/v1/identity": {
       "$ref": "operations/identity.json"
@@ -150,8 +159,17 @@
     "/lemonfiber/library.curate/v1/register_root_folder": {
       "$ref": "operations/register_root_folder.json"
     },
+    "/lemonfiber/library.curate/v1/remove": {
+      "$ref": "operations/remove.json"
+    },
+    "/lemonfiber/library.curate/v1/request": {
+      "$ref": "operations/request.json"
+    },
     "/lemonfiber/library.curate/v1/root_folders": {
       "$ref": "operations/root_folders.json"
+    },
+    "/lemonfiber/library.curate/v1/search": {
+      "$ref": "operations/search.json"
     },
     "/lemonfiber/library.curate/v1/search_upgrades": {
       "$ref": "operations/search_upgrades.json"
@@ -167,6 +185,9 @@
     },
     "/lemonfiber/library.curate/v1/test_download_clients": {
       "$ref": "operations/test_download_clients.json"
+    },
+    "/lemonfiber/library.curate/v1/titles": {
+      "$ref": "operations/titles.json"
     },
     "/lemonfiber/library.curate/v1/update_download_client": {
       "$ref": "operations/update_download_client.json"

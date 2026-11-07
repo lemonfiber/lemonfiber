@@ -20,6 +20,11 @@ pub(crate) const UNASKED: &str = "the request gate is not one the stack's creden
                                   handed to, or cannot be asked over its contract, so no token \
                                   was handed to it";
 
+/// The route the gate answers the curator fetching `kind` under: the media type it files.
+pub(crate) const fn route_of(kind: crate::ports::media::Kind) -> &'static str {
+    kind.media_type()
+}
+
 /// Where the request service reaches `route` through the gate.
 pub(crate) fn through_the_gate(route: &str) -> Endpoint {
     Endpoint {
@@ -61,13 +66,12 @@ impl Kept {
         let mut gated = Vec::new();
         let mut refused = Vec::new();
         for target in wanted {
-            let route = target.at.host.clone();
-            let at = through_the_gate(&route);
+            let route = route_of(target.kind);
             let holding = held
                 .iter()
-                .find(|have| have.at == at && have.kind == target.kind)
+                .find(|have| have.at == target.at && have.kind == target.kind)
                 .map(|have| have.key.clone())
-                .filter(|key| self.accepts(&route, key));
+                .filter(|key| self.accepts(route, key));
             let Some(key) = holding.or_else(|| crate::secret::generate(ctx.seams.random.as_ref()))
             else {
                 refused.push(Wiring::settled(
@@ -78,12 +82,7 @@ impl Kept {
                 ));
                 continue;
             };
-            gated.push(FulfilmentTarget {
-                moved_from: Some(target.at.clone()),
-                at,
-                key,
-                ..target
-            });
+            gated.push(FulfilmentTarget { key, ..target });
         }
         (gated, refused)
     }
@@ -129,6 +128,11 @@ impl Kept {
             }
         }
         self.changed(beside, &only).await
+    }
+
+    /// The gate, as it was asked.
+    pub(crate) fn gate(&self) -> &dyn Gating {
+        self.gate.as_ref()
     }
 
     /// Every route the gate admits now.

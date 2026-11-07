@@ -54,10 +54,7 @@ async fn a_guard_whose_credential_was_replaced_is_asked_to_hold_it_and_said_wher
     let reached = |name: &'static str, answer: Answer| async move {
         let ctx = machine(name, answering(answer), ran(), true);
         let fillers = fillers(&ctx, &[guard()]);
-        let amid = Amid {
-            services: &[],
-            fillers: &fillers,
-        };
+        let amid = Amid { fillers: &fillers };
         secured(&ctx, &guard(), &amid).await
     };
 

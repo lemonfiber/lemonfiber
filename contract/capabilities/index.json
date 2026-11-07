@@ -45,8 +45,8 @@
         1
       ],
       "openapi": "library.curate/v1/openapi.json",
-      "operations": 28,
-      "sha256": "d77631c22c975ba7183dc4b8da630cb8b55ff993dac97b7e3694698abe015cfa"
+      "operations": 35,
+      "sha256": "792a828e5b70afbfabc883e2c54e118245b6a6b6ace0eaad46739b90739642a6"
     },
     {
       "capability": "indexer.search",
@@ -214,7 +214,7 @@
       ],
       "openapi": "request.gate/v1/openapi.json",
       "operations": 4,
-      "sha256": "21f7d8b5d67f84d2130712adaec157fdde6ac8f35ab51e1bc7050791c99e74cb"
+      "sha256": "e0eed27cfc12f0abe33c00d44a9dd341495cb3c9d47deb142366004f9820263e"
     },
     {
       "capability": "owner.claim",

@@ -36,6 +36,13 @@ pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool, fillers: &Fi
             warning: super::tokening::UNPRINTED.to_owned(),
         };
     }
+    if super::requesting::is_request_key(held) {
+        return Revealed {
+            name: held.name.clone(),
+            value: None,
+            warning: super::requesting::UNPRINTED.to_owned(),
+        };
+    }
     if let Some(plugin) = held.plugins() {
         let value = crate::settings::Stores::of(ctx)
             .secrets

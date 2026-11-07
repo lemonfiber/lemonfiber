@@ -200,7 +200,7 @@ async fn a_replacement_taken_up_again_stops_where_a_holder_or_the_certificate_we
                 },
                 ..route
             },
-            Target::Curator { .. } | Target::Plex { .. } => route,
+            Target::Curator { .. } | Target::Emby { .. } | Target::Plex { .. } => route,
         })
         .collect();
     let _ = crate::ports::service::Gating::admit(gate.as_ref(), &unpinned).await;

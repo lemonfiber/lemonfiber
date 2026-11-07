@@ -55,7 +55,7 @@ pub(crate) async fn rotate(
                 held,
                 installed,
                 secret,
-                &super::minting::Amid { services, fillers },
+                &super::minting::Amid { fillers },
             )
             .await;
         }
@@ -75,6 +75,9 @@ pub(crate) async fn rotate(
         }
         Origin::Lemonfiber if super::tokening::is_token(held) => {
             super::tokening::rotate(ctx, held, services, fillers).await
+        }
+        Origin::Lemonfiber if super::requesting::is_request_key(held) => {
+            super::requesting::rotate(ctx, held, fillers).await
         }
         Origin::Lemonfiber if held.setting == config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await

@@ -4,10 +4,12 @@
 //! [`Kit`]. The kit answers every request the core makes: each operation at its
 //! contract's path, `about` and `ready`, and every one of them only under the plugin's
 //! key, which the core wrote to the adapter's configuration directory before it started,
-//! save the guard's question about an item, which carries the member's token alone.
+//! save the guard's question about an item, which carries the member's token alone, and
+//! the operations a curator answers the request gate, which its own keys open too.
 
 pub mod credential;
 pub mod endpoint;
+mod gate;
 pub mod members;
 pub mod picture;
 pub mod settings;
@@ -16,7 +18,7 @@ pub mod web;
 
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -42,6 +44,7 @@ pub struct Kit {
     ready: Readiness,
     served: Vec<Served>,
     members: Option<members::Members>,
+    gate: Option<PathBuf>,
 }
 
 impl Kit {
@@ -55,6 +58,7 @@ impl Kit {
             ready: Arc::new(|| Box::pin(async { true })),
             served: Vec::new(),
             members: None,
+            gate: None,
         }
     }
 
@@ -68,6 +72,15 @@ impl Kit {
         asking: members::Asking,
     ) -> Self {
         self.members = Some(members::Members { presented, asking });
+        self
+    }
+
+    /// The same adapter, also answering the request gate under each key the core wrote
+    /// for it beside `configuration`, read again on every request, on the operations a
+    /// curator answers the gate alone.
+    #[must_use]
+    pub fn asked_by_the_gate(mut self, configuration: impl Into<PathBuf>) -> Self {
+        self.gate = Some(configuration.into());
         self
     }
 
@@ -175,18 +188,20 @@ pub async fn serving(
 
 /// What the adapter says it is.
 async fn about(State(kit): State<Arc<Kit>>, headers: HeaderMap) -> Response {
-    if !keyed(&kit, &headers) {
-        return unkeyed();
+    match gate::caller(&kit, &headers) {
+        gate::Caller::Core => json(&kit.about),
+        gate::Caller::Gate => refused(&gate::disallowed("about")),
+        gate::Caller::Nobody => unkeyed(),
     }
-    json(&kit.about)
 }
 
 /// Whether its upstream answers.
 async fn ready(State(kit): State<Arc<Kit>>, headers: HeaderMap) -> Response {
-    if !keyed(&kit, &headers) {
-        return unkeyed();
+    match gate::caller(&kit, &headers) {
+        gate::Caller::Core => json(&(kit.ready)().await),
+        gate::Caller::Gate => refused(&gate::disallowed("ready")),
+        gate::Caller::Nobody => unkeyed(),
     }
-    json(&(kit.ready)().await)
 }
 
 /// One operation of one capability, served from what fills it.
@@ -196,8 +211,11 @@ async fn operation(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    if !keyed(&kit, &headers) {
-        return unkeyed();
+    match gate::caller(&kit, &headers) {
+        gate::Caller::Core => {}
+        gate::Caller::Gate if gate::admits(&capability, &major, &operation) => {}
+        gate::Caller::Gate => return refused(&gate::disallowed(&operation)),
+        gate::Caller::Nobody => return unkeyed(),
     }
     let Some(served) = kit
         .served
@@ -213,15 +231,13 @@ async fn operation(
     }
 }
 
-/// Whether a request carries the plugin's key, compared in time that does not depend on
-/// where the two first differ.
-fn keyed(kit: &Kit, headers: &HeaderMap) -> bool {
-    let offered = headers
+/// The key a request carries as its bearer, or nothing.
+fn offered(headers: &HeaderMap) -> &str {
+    headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .unwrap_or_default();
-    same_secret(&kit.key, offered)
+        .unwrap_or_default()
 }
 
 /// Whether `offered` is the secret `mine`, compared in a time that does not depend on

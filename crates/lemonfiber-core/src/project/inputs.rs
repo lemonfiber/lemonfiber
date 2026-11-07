@@ -2,7 +2,9 @@
 //! settled between them, every link by name, and the service that guards the household's
 //! streams.
 
+use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_contract::capabilities::proxy::front;
+use lemonfiber_contract::capabilities::request::gate as request_gate;
 use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::container::{Network, Posture};
 use lemonfiber_manifest::{Manifest, Service};
@@ -207,15 +209,29 @@ fn inside(
 }
 
 /// Each settled ask as a network its asker joins, but the ask of the capability a
-/// service runs inside the network of, and each link by name.
+/// service runs inside the network of, a curator asked of by a service the request gate
+/// stands in front of, which has no other path to it, and each link by name.
 fn joined(
     settled: Vec<crate::wiring::Wired>,
     vias: &[(&str, &str)],
 ) -> (Vec<Ask>, Vec<(String, String)>) {
+    let gated: Vec<String> = settled
+        .iter()
+        .filter(|wired| {
+            matches!(
+                &wired.reaches,
+                Reaches::Asked { capability, services, .. }
+                    if capability == request_gate::CAPABILITY && !services.is_empty()
+            )
+        })
+        .map(|wired| wired.by.clone())
+        .collect();
     let mut asks = Vec::new();
     let mut links = Vec::new();
     for wired in settled {
         match wired.reaches {
+            Reaches::Asked { capability, .. }
+                if capability == curate::CAPABILITY && gated.contains(&wired.by) => {}
             Reaches::Asked {
                 capability,
                 services,
@@ -394,3 +410,6 @@ fn upstream_of(installed: &[Installed], service: &str) -> String {
         .and_then(|placed| placed.fronts.clone())
         .unwrap_or_else(|| service.to_owned())
 }
+
+#[cfg(test)]
+mod tests;

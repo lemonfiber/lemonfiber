@@ -75,7 +75,7 @@ pub(super) async fn held(
     let Some(kept) = Kept::read(ctx, fillers).await else {
         return Vec::new();
     };
-    let routes = routes(&kept, services);
+    let routes = routes(&kept, services, fillers);
     if routes.is_empty() {
         return Vec::new();
     }
@@ -158,7 +158,7 @@ pub(super) async fn rotate(
     let Some(kept) = Kept::read(ctx, fillers).await else {
         return unproven(held, &not_handed(&held.name));
     };
-    let Some(route) = routes(&kept, services)
+    let Some(route) = routes(&kept, services, fillers)
         .into_iter()
         .find(|route| route.id == id)
     else {
@@ -251,16 +251,31 @@ async fn relinked(requests: &dyn Requests, route: &Route, token: &str) -> Result
         .map_err(|_| unreached(route))
 }
 
-/// Whether the token for `route` may be handed to the request service `filler`: the
-/// service behind the route is one the trust gate lets a credential cross from to it.
+/// Whether the token for `route` may be handed to the request service `filler`: a token
+/// on a curator's route is the stack's and opens only what the gate answers there, and any
+/// other route's holds only where the service behind it lets a credential cross to it.
 fn handable(
     fillers: &crate::wiring::Fillers,
     filler: &crate::wiring::Filler,
     route: &Route,
 ) -> bool {
-    fillers
-        .service(&route.id)
+    if gating::fetched(&route.target).is_some()
+        && crate::wiring::crosses(crate::wiring::Holder::Stack, filler.holder())
+    {
+        return true;
+    }
+    behind(fillers, &route.id)
         .is_some_and(|upstream| crate::wiring::crosses(upstream.holder(), filler.holder()))
+}
+
+/// The service behind the route answered under `id`: the curator a curator's route is
+/// named for the media of, or the service the route is named for.
+fn behind<'a>(fillers: &'a crate::wiring::Fillers, id: &str) -> Option<&'a crate::wiring::Filler> {
+    crate::seed::run::gate::routed_curators(fillers)
+        .into_iter()
+        .find(|(route, ..)| *route == id)
+        .map(|(_, curator, _)| curator)
+        .or_else(|| fillers.service(id))
 }
 
 /// What is said where the token for `route` may not be handed to the request service
@@ -321,14 +336,19 @@ fn consumer(route: &Route) -> String {
 }
 
 /// Every route the gate admits, each named as the household calls the service behind it.
-fn routes(kept: &Kept, services: &[Service]) -> Vec<Route> {
+fn routes(kept: &Kept, services: &[Service], fillers: &crate::wiring::Fillers) -> Vec<Route> {
     kept.admitted()
         .iter()
         .map(|route| Route {
-            name: services
-                .iter()
-                .find(|service| service.id == route.path)
-                .map_or_else(|| route.path.clone(), |service| service.name.clone()),
+            name: behind(fillers, &route.path)
+                .map(|filler| filler.name.clone())
+                .or_else(|| {
+                    services
+                        .iter()
+                        .find(|service| service.id == route.path)
+                        .map(|service| service.name.clone())
+                })
+                .unwrap_or_else(|| route.path.clone()),
             id: route.path.clone(),
             target: route.target.clone(),
         })
@@ -336,4 +356,4 @@ fn routes(kept: &Kept, services: &[Service]) -> Vec<Route> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

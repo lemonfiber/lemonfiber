@@ -18,16 +18,20 @@ use lemonfiber_manifest::Service;
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::ports::media::Kind;
-use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
+use crate::ports::service::{
+    Client as _, Endpoint, FulfilmentTarget, QualityProfile, RegisteredTarget, Requests,
+};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Filler, Fillers};
 
-/// One curator the request service hands requests to: which it is, where the request
-/// service reaches it, and whether it fetches television rather than film.
+/// One curator the request service hands requests to: which it is, the service the
+/// request gate asks it through, and whether it fetches television rather than film.
 pub(super) struct Fulfils<'a> {
     /// The curator.
     pub(super) filler: &'a Filler,
-    /// Where the request service reaches it beside the others.
+    /// The service speaking `library.curate` for it, which the request gate asks.
+    pub(super) adapter: &'a Filler,
+    /// Where the request gate reaches that service beside the others.
     pub(super) at: &'a Address,
     /// The kind of video it fetches.
     pub(super) kind: Kind,
@@ -44,6 +48,7 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
         .filter_map(|pairing| match pairing.made {
             Ok((Connection::Fulfilment { kind }, at, asker)) => Some(Fulfils {
                 filler: pairing.filler,
+                adapter: super::connecting::curators_adapter(fillers, pairing.filler)?,
                 at,
                 kind,
                 asker,
@@ -53,8 +58,8 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
         .collect()
 }
 
-/// Every curator the request service should hand requests to, and the wiring for each
-/// whose credential file was refused, said on the target it would have been.
+/// Every curator the request service should hand requests to, each at the request gate's
+/// route for the kind of video it fetches.
 ///
 /// Each is read rather than assumed: the profile it fetches at and the folder it
 /// files into are asked of the curator itself over `library.curate`, through the adapter
@@ -69,14 +74,11 @@ async fn wanted_targets(
     ctx: &Ctx,
     fillers: &Fillers,
     curators: &[Fulfils<'_>],
-) -> (Vec<FulfilmentTarget>, Vec<Wiring>) {
+    held: &[RegisteredTarget],
+) -> Vec<FulfilmentTarget> {
     let mut wanted = Vec::new();
-    let refused = Vec::new();
     for fulfils in curators {
         let filler = fulfils.filler;
-        let Some(key) = super::keys::minted_key(ctx, filler) else {
-            continue;
-        };
         let Some(client) = super::curating::curated(ctx, fillers, filler).await else {
             continue;
         };
@@ -86,24 +88,31 @@ async fn wanted_targets(
         let Some(folder) = first_folder(&client).await else {
             continue;
         };
-        // Reached at its own address, and moved back there from the gate where the stack
-        // no longer runs one; [`seed_fulfilment_targets`] turns it to the gate where it does.
-        let moved_from = Some(super::tokens::through_the_gate(&fulfils.at.host));
         wanted.push(FulfilmentTarget {
             name: filler.name.clone(),
-            at: Endpoint {
-                host: fulfils.at.host.clone(),
-                port: fulfils.at.port,
-                base: String::new(),
-            },
-            moved_from,
-            key,
+            at: super::tokens::through_the_gate(super::tokens::route_of(fulfils.kind)),
+            moved_from: from_before(filler, fulfils.kind, held),
+            key: String::new(),
             kind: fulfils.kind,
             profile,
             folder,
         });
     }
-    (wanted, refused)
+    wanted
+}
+
+/// Where the request service holds `filler` from before it reached it at the route for its
+/// media: at the gate's route under its id, or at its own address, holding its own key.
+fn from_before(filler: &Filler, kind: Kind, held: &[RegisteredTarget]) -> Option<Endpoint> {
+    let own = filler.address.as_ref().map(|at| Endpoint {
+        host: at.host.clone(),
+        port: at.port,
+        base: String::new(),
+    });
+    [Some(super::tokens::through_the_gate(&filler.id)), own]
+        .into_iter()
+        .flatten()
+        .find(|before| held.iter().any(|one| one.at == *before && one.kind == kind))
 }
 
 /// The profile requests are fetched at.
@@ -168,19 +177,37 @@ async fn handed(
     else {
         return Vec::new();
     };
-    let (wanted, refused) = wanted_targets(ctx, fillers, curators).await;
-    if wanted.is_empty() {
-        return refused;
+    if crate::app::gating::service(services).is_none() {
+        return curators
+            .iter()
+            .map(|fulfils| {
+                Wiring::settled(
+                    format!("{} into {}", fulfils.filler.name, asker.name),
+                    State::Unmatched {
+                        reason: UNGATED.to_owned(),
+                    },
+                )
+            })
+            .collect();
     }
-    let requests = requests.as_ref();
-    let mut wirings = if crate::app::gating::service(services).is_some() {
-        Box::pin(through_the_gate(ctx, fillers, requests, wanted)).await
-    } else {
-        wired(ctx, requests, &wanted).await
-    };
-    wirings.extend(refused);
-    wirings
+    let held = requests.fulfilment_targets().await.unwrap_or_default();
+    let wanted = wanted_targets(ctx, fillers, curators, &held).await;
+    if wanted.is_empty() {
+        return Vec::new();
+    }
+    Box::pin(through_the_gate(
+        ctx,
+        fillers,
+        requests.as_ref(),
+        wanted,
+        &held,
+    ))
+    .await
 }
+
+/// Why a curator is handed to no request service in a stack without the request gate.
+const UNGATED: &str = "the request service reaches a curator only through the request gate, \
+                       and the stack runs none";
 
 /// Hand the request service `wanted` as they are.
 async fn wired(ctx: &Ctx, requests: &dyn Requests, wanted: &[FulfilmentTarget]) -> Vec<Wiring> {
@@ -196,6 +223,7 @@ async fn through_the_gate(
     fillers: &Fillers,
     requests: &dyn Requests,
     wanted: Vec<FulfilmentTarget>,
+    held: &[RegisteredTarget],
 ) -> Vec<Wiring> {
     let Some(kept) = super::tokens::Kept::read(ctx, fillers).await else {
         return wanted
@@ -210,8 +238,7 @@ async fn through_the_gate(
             })
             .collect();
     };
-    let held = requests.fulfilment_targets().await.unwrap_or_default();
-    let (gated, mut wirings) = kept.targets(ctx, wanted, &held);
+    let (gated, mut wirings) = kept.targets(ctx, wanted, held);
     if ctx.dry_run {
         wirings.extend(wired(ctx, requests, &gated).await);
         return wirings;

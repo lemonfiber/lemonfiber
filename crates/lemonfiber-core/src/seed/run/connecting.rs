@@ -145,6 +145,9 @@ pub(super) enum Unmade {
     /// Nothing in this table connects the contract the asker speaks to what the filler
     /// speaks.
     Unpaired,
+    /// The filler is a curator the request gate would ask, and nothing in front of it
+    /// speaks the curator's contract.
+    Uncontracted,
     /// The filler's application sync serves the media the asker files, so the filler is
     /// told about the asker rather than the asker about the filler.
     Synced,
@@ -227,9 +230,6 @@ fn connection(
                 .map(Connection::Application)
                 .ok_or(Unmade::Files)
         }
-        (intake::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
-            .map(|kind| Connection::Fulfilment { kind })
-            .ok_or(Unmade::Files),
         (fetch::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Subtitles)
             .ok_or(Unmade::Files),
@@ -291,11 +291,24 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
 /// What one asker, asked through `answering` and paired by `contract`, and one filler come
 /// to.
 fn made<'a>(
-    fillers: &Fillers,
+    fillers: &'a Fillers,
     (asker, answering, contract): (&'a Filler, &'a Filler, &'static str),
     ask: &Ask,
     filler: &'a Filler,
 ) -> Result<(Connection, &'a Address, Cleared<'a>), Unmade> {
+    let cleared = Cleared {
+        named: asker,
+        answering,
+    };
+    if contract == intake::CAPABILITY && ask.capability == CURATES {
+        if !fillers.hands(filler, answering)
+            && !crate::wiring::crosses(Holder::Stack, answering.holder())
+        {
+            return Err(Unmade::Asked);
+        }
+        let (made, at) = fulfilment(fillers, filler)?;
+        return Ok((made, at, cleared));
+    }
     if !fillers.hands(filler, answering) {
         return Err(Unmade::Asked);
     }
@@ -313,14 +326,32 @@ fn made<'a>(
     {
         return Err(Unmade::Withheld);
     }
-    Ok((
-        made,
-        at,
-        Cleared {
-            named: asker,
-            answering,
-        },
-    ))
+    Ok((made, at, cleared))
+}
+
+/// What a curator comes to in the request service: the requests for the kind of video it
+/// files, which the request gate asks of it over `library.curate`, reached at the adapter
+/// that speaks it, so whatever API the curator itself answers in. The request service is
+/// handed a token of the gate's and nothing of the curator's, so whose the curator is
+/// decides nothing the stack's credential reaching the request service does not.
+fn fulfilment<'a>(
+    fillers: &'a Fillers,
+    filler: &'a Filler,
+) -> Result<(Connection, &'a Address), Unmade> {
+    let kind = Kind::of_declared(&filler.media_types).ok_or(Unmade::Files)?;
+    let adapter = curators_adapter(fillers, filler).ok_or(Unmade::Uncontracted)?;
+    let at = adapter.address.as_ref().ok_or(Unmade::NoPort)?;
+    Ok((Connection::Fulfilment { kind }, at))
+}
+
+/// The service speaking `library.curate` for the curator `filler`: the adapter of its
+/// plugin in front of it, or the curator itself where it speaks it.
+pub(super) fn curators_adapter<'a>(fillers: &'a Fillers, filler: &'a Filler) -> Option<&'a Filler> {
+    let speaking = |one: &&Filler| one.contracted(curate::CAPABILITY, curate::MAJOR);
+    fillers
+        .fronting(filler)
+        .filter(speaking)
+        .or_else(|| Some(filler).filter(speaking))
 }
 
 /// Every pairing that comes to nothing, each reported naming what fills and what asked.
@@ -373,6 +404,10 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
         Unmade::Unpaired => format!(
             "{fills} and nothing in lemonfiber tells {asker} about a service answering in \
              {filler}'s API"
+        ),
+        Unmade::Uncontracted => format!(
+            "{fills} and nothing in front of it speaks {CURATES}, which the request gate asks a \
+             curator over"
         ),
         Unmade::Synced => format!(
             "{fills} and syncs the media {asker} files to it itself, so {filler} is told about \

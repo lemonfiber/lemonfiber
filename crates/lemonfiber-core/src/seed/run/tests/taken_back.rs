@@ -113,7 +113,7 @@ impl Storage for Taking {
 /// The gate reaching the curator under [`OLD_KEY`] and the media server, accepting
 /// [`CURATOR_TOKEN`] on the one and [`LINK_TOKEN`] on the other.
 fn the_gate() -> Arc<Gate> {
-    let mut curator = gated_route("sonarr", Some("tv"), OLD_KEY);
+    let mut curator = gated_route("tv", Some("tv"), OLD_KEY);
     curator.tokens = vec![sha256(CURATOR_TOKEN)];
     let mut media_server = gated_route("jellyfin", None, "gates-key");
     media_server.tokens = vec![sha256(LINK_TOKEN)];
@@ -146,7 +146,7 @@ fn curator_direct() -> Answer {
 
 /// The curator held by the request service at the gate, under the token it accepts there.
 fn curator_gated() -> Answer {
-    listing(reached("request-gate", PORT, "/sonarr"), CURATOR_TOKEN)
+    listing(reached("request-gate", PORT, "/tv"), CURATOR_TOKEN)
 }
 
 /// The request service's media-server link, at the gate under the token it accepts.

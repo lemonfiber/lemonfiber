@@ -83,6 +83,9 @@ fn standing_in_for(filler: &Filler, capability: &str) -> Installed {
     let mut placed = crate::test_support::a_placed(STAND_IN, &[capability], Some(ITS_PORT));
     placed.native.clone_from(&filler.native);
     placed.media_types.clone_from(&filler.media_types);
+    if capability == lemonfiber_contract::capabilities::library::curate::CAPABILITY {
+        placed.speaks = vec![capability.to_owned() + "@1"];
+    }
     let mut installed = crate::test_support::an_installed(PLUGIN, vec![placed]);
     installed.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     installed.tree = crate::test_support::A_TREE.to_owned();

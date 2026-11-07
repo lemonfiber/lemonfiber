@@ -1,0 +1,221 @@
+{
+  "post": {
+    "operationId": "downloading",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "DownloadState": {
+                  "description": "Where one download stands.",
+                  "oneOf": [
+                    {
+                      "const": "queued",
+                      "description": "Waiting for the client to start it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "paused",
+                      "description": "Held by the client.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "downloading",
+                      "description": "Coming down now.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "completed",
+                      "description": "Down, and being filed.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "warning",
+                      "description": "Not progressing, as the curator tracks it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "failed",
+                      "description": "Given up on.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "DownloadedEpisode": {
+                  "additionalProperties": false,
+                  "description": "The episode one download is for.",
+                  "properties": {
+                    "number": {
+                      "description": "Its number in that season.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "season": {
+                      "description": "The season it is in.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "title": {
+                      "description": "What it is called.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "season",
+                    "number",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "Downloading": {
+                  "additionalProperties": false,
+                  "description": "One download a curator is tracking for a title it holds.",
+                  "properties": {
+                    "bytes": {
+                      "description": "Its size, in bytes.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "download_id": {
+                      "description": "The download client's own id for it, where the curator knows one.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "episode": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/DownloadedEpisode"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The episode it is for, where it is for one."
+                    },
+                    "expected": {
+                      "description": "When it is expected to complete, in seconds since the Unix epoch, where the client\nsays.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "left": {
+                      "description": "What is left of it, in bytes.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "release": {
+                      "description": "The release's name.",
+                      "type": "string"
+                    },
+                    "state": {
+                      "$ref": "#/$defs/DownloadState",
+                      "description": "Where it stands."
+                    },
+                    "title_id": {
+                      "description": "The curator's own id for the title.",
+                      "format": "int64",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "title_id",
+                    "release",
+                    "bytes",
+                    "left",
+                    "state"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Downloading"
+              },
+              "title": "Array_of_Downloading",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576,
+    "x-lemonfiber-since": 1
+  }
+}

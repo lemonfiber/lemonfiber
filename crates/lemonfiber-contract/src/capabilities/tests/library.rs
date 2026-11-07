@@ -6,9 +6,11 @@ use async_trait::async_trait;
 use lemonfiber_ports::media::{Format, Kind};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, DownloadClient, Failure, FoundItem, Identity, Importing, ItemPart, Maintenance,
+    Credential, CuratedSeason, CuratedTitle, DownloadClient, DownloadState, DownloadedEpisode,
+    Downloading, Failure, FoundItem, Fulfilling, Identity, Importing, ItemPart, Maintenance,
     MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue, QueueItem, Queues,
-    Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TraceEvent,
+    Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest,
+    TraceEvent,
 };
 use lemonfiber_ports::Client;
 
@@ -194,6 +196,76 @@ impl Pipeline for Upstream {
     }
 }
 
+/// A series held as `id`, its first season monitored and filed whole.
+fn held(reference: i64, id: Option<i64>) -> CuratedTitle {
+    CuratedTitle {
+        reference,
+        id,
+        title: "The Office".to_owned(),
+        year: Some(2005),
+        monitored: true,
+        files: 6,
+        seasons: vec![CuratedSeason {
+            number: 1,
+            monitored: true,
+            files: 6,
+            episodes: 6,
+        }],
+    }
+}
+
+#[async_trait]
+impl Fulfilling for Upstream {
+    async fn catalogued(
+        &self,
+        kind: Kind,
+        reference: i64,
+    ) -> Result<Option<CuratedTitle>, Failure> {
+        self.tell(format!("catalogued {kind:?} {reference}"));
+        Ok((reference != 0).then(|| held(reference, None)))
+    }
+    async fn titles(&self, kind: Kind) -> Result<Vec<CuratedTitle>, Failure> {
+        self.tell(format!("titles {kind:?}"));
+        Ok(vec![held(73244, Some(9))])
+    }
+    async fn held_title(&self, kind: Kind, id: i64) -> Result<Option<CuratedTitle>, Failure> {
+        self.tell(format!("held {kind:?} {id}"));
+        Ok(None)
+    }
+    async fn request(&self, kind: Kind, request: &TitleRequest) -> Result<CuratedTitle, Failure> {
+        self.tell(format!("request {kind:?} {}", json(request)));
+        Ok(held(request.reference, Some(9)))
+    }
+    async fn search(&self, kind: Kind, id: i64) -> Result<(), Failure> {
+        self.tell(format!("search {kind:?} {id}"));
+        Ok(())
+    }
+    async fn remove(&self, kind: Kind, id: i64) -> Result<(), Failure> {
+        self.tell(format!("remove {kind:?} {id}"));
+        Err(Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: "it holds no title 0".to_owned(),
+        })
+    }
+    async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure> {
+        self.tell(format!("downloading {kind:?}"));
+        Ok(vec![Downloading {
+            title_id: 9,
+            release: "The.Office.S01E02".to_owned(),
+            bytes: 1000,
+            left: 250,
+            expected: Some(1_800_000_000),
+            state: DownloadState::Downloading,
+            download_id: Some("SABnzbd_nzo_1".to_owned()),
+            episode: Some(DownloadedEpisode {
+                season: 1,
+                number: 2,
+                title: "Diversity Day".to_owned(),
+            }),
+        }])
+    }
+}
+
 /// Every operation of the capability, once, each answer written down.
 async fn script<C>(curator: &C) -> Vec<String>
 where
@@ -205,7 +277,8 @@ where
         + Queues
         + QualityReleases
         + MusicQuality
-        + Pipeline,
+        + Pipeline
+        + Fulfilling,
 {
     let client = DownloadClient {
         name: "fetcher".to_owned(),
@@ -240,6 +313,15 @@ where
     let plan = AddPlan {
         root_folder: "/films".to_owned(),
         quality_profile: 4,
+    };
+    let request = TitleRequest {
+        reference: 73244,
+        root_folder: "/tv".to_owned(),
+        quality_profile: 4,
+        seasons: vec![1, 2],
+        anime: false,
+        later_seasons: true,
+        search: true,
     };
     vec![
         format!("{:?}", curator.identity().await),
@@ -279,6 +361,14 @@ where
         format!("{:?}", curator.item_parts(Kind::Tv, 14, Some(2)).await),
         format!("{:?}", curator.item_parts(Kind::Tv, 14, None).await),
         format!("{:?}", curator.stuck_items(Kind::Movies).await),
+        format!("{:?}", curator.catalogued(Kind::Tv, 73244).await),
+        format!("{:?}", curator.catalogued(Kind::Movies, 0).await),
+        format!("{:?}", curator.titles(Kind::Tv).await),
+        format!("{:?}", curator.held_title(Kind::Movies, 3).await),
+        format!("{:?}", curator.request(Kind::Tv, &request).await),
+        format!("{:?}", curator.search(Kind::Tv, 9).await),
+        format!("{:?}", curator.remove(Kind::Movies, 0).await),
+        format!("{:?}", curator.downloading(Kind::Tv).await),
     ]
 }
 
@@ -304,7 +394,15 @@ async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process(
             "queued",
             "parts",
             "parts",
-            "stuck"
+            "stuck",
+            "catalogued",
+            "catalogued",
+            "titles",
+            "held",
+            "request",
+            "search",
+            "remove",
+            "downloading"
         ]
     );
 }

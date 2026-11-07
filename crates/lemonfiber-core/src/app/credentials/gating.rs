@@ -177,23 +177,24 @@ async fn asked(ctx: &Ctx, fillers: &Fillers, server: &MediaServer) -> Option<Arc
 }
 
 /// Every route of `admitted` as it is applied, each presenting the credential the core
-/// holds for it: `key` on the media server's, and the key minted for each curator on its.
+/// holds for it: `key` on the media server's, and the gate's key on its adapter on each
+/// curator's.
 ///
 /// # Errors
 ///
 /// The route whose credential the core holds no copy of.
-fn restated(
+pub(super) fn restated(
     ctx: &Ctx,
     fillers: &Fillers,
     admitted: &[Admitted],
     key: &str,
 ) -> Result<Vec<Gated>, String> {
-    let curators = crate::seed::run::gate::curator_routes(ctx, fillers);
+    let curators = crate::seed::run::gate::curator_routes(ctx, fillers, admitted);
     admitted
         .iter()
         .map(|route| {
             let credential = match route.target {
-                Target::MediaServer { .. } | Target::Plex { .. } => Some(key),
+                Target::MediaServer { .. } | Target::Emby { .. } | Target::Plex { .. } => Some(key),
                 Target::Curator { .. } => curators
                     .iter()
                     .find(|curator| {
@@ -226,7 +227,7 @@ fn presenting(routes: &[Gated], key: &str) -> Vec<Gated> {
     routes
         .iter()
         .map(|route| match route.target {
-            Target::MediaServer { .. } | Target::Plex { .. } => Gated {
+            Target::MediaServer { .. } | Target::Emby { .. } | Target::Plex { .. } => Gated {
                 credential: key.to_owned(),
                 ..route.clone()
             },

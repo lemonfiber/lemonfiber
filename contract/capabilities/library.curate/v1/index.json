@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "library.curate/v1/openapi.json",
-      "sha256": "dde71d5e7abb67efe976b0f6f43d719ec9ae09229d3389e48e45c0ee0d032b28"
+      "sha256": "91d74d3fe06868a2d3a695826ff1d4fdd52b35c211a183dfe5e60420b38ce94d"
     },
     {
       "path": "library.curate/v1/operations/identity.json",
@@ -118,8 +118,36 @@
       "sha256": "3c2f2533429c4a4c736e2f5f89c44e2433d916498cbc6b00538641b729317260"
     },
     {
+      "path": "library.curate/v1/operations/catalogued.json",
+      "sha256": "eb0c0894b38316a96a6613289fdcd3fa61e1c522849f20346378d43afc3ab8d4"
+    },
+    {
+      "path": "library.curate/v1/operations/titles.json",
+      "sha256": "808e53eb09a88c901a129f23262b6eb02a93dfb7a45037f7ac88971583c4be6d"
+    },
+    {
+      "path": "library.curate/v1/operations/held_title.json",
+      "sha256": "b18ae4fab9eb0745dff2df1cc8c8c8821ee4c125f4d1f9b5c275e36d9148b99f"
+    },
+    {
+      "path": "library.curate/v1/operations/request.json",
+      "sha256": "4bc86bd56e491aa898f9463fe8c7a39dd069796a2d6450115d8326d7a0ca66a3"
+    },
+    {
+      "path": "library.curate/v1/operations/search.json",
+      "sha256": "007762bd5071a975f119e42f8e3f09751d708322ddbd68dc02b918a43b48d19f"
+    },
+    {
+      "path": "library.curate/v1/operations/remove.json",
+      "sha256": "773c84f9ba6bca121633d1c033c67c0992c121a25837598b2301821408bb0760"
+    },
+    {
+      "path": "library.curate/v1/operations/downloading.json",
+      "sha256": "258b2b807286da16d5db5eed757a4dde4b8bcbd8650d8dae2371dc11bdf31bdd"
+    },
+    {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "d04b40a969aaf4f98b372ae80e7bacb6728413efc00f0abced9ba01136d1ce07"
+      "sha256": "b8f843e8ad8dbe8ed3e93b48de04825a92b054a0b141a2ec197d29bc7ae28623"
     },
     {
       "path": "library.curate/v1/holds.json",

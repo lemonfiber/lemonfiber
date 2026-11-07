@@ -74,6 +74,6 @@ async fn a_media_server_declaring_no_internal_port_is_given_no_route() {
         "{wirings:?}"
     );
     assert_eq!(route(&gate, "jellyfin"), None);
-    assert!(route(&gate, "sonarr").is_some());
+    assert!(route(&gate, "tv").is_some());
     assert!(!minted_on(&http));
 }

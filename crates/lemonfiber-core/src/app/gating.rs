@@ -19,6 +19,10 @@ pub(crate) const PORT: u16 = 5057;
 /// The request gate's id in the stack manifest.
 pub(crate) const SERVICE: &str = "request-gate";
 
+/// The API Emby answers in, as a media server declares it natively: the gate answers its
+/// route in it.
+pub(crate) const EMBY_API: &str = "emby";
+
 /// The request gate, where the stack runs one.
 pub(crate) fn service(
     services: &[lemonfiber_manifest::Service],
@@ -52,6 +56,7 @@ pub(crate) fn may_hold(fillers: &Fillers, owner: crate::wiring::Holder<'_>) -> b
 pub(crate) fn media_pins(target: &crate::ports::service::Target) -> Option<&[String]> {
     match target {
         crate::ports::service::Target::MediaServer { pins }
+        | crate::ports::service::Target::Emby { pins }
         | crate::ports::service::Target::Plex { pins, .. } => Some(pins),
         crate::ports::service::Target::Curator { .. } => None,
     }
@@ -65,6 +70,7 @@ pub(crate) fn fetched(target: &crate::ports::service::Target) -> Option<media::K
             media::Kind::for_media_type(media_type)
         }
         crate::ports::service::Target::MediaServer { .. }
+        | crate::ports::service::Target::Emby { .. }
         | crate::ports::service::Target::Plex { .. } => None,
     }
 }

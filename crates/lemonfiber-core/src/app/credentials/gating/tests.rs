@@ -63,7 +63,7 @@ fn service(id: &str, port: u16) -> lemonfiber_manifest::Service {
     }
 }
 
-/// The key lemonfiber minted for the curator, which the gate presents on its route.
+/// The gate's key on the curator's adapter, which it presents on the route.
 const CURATOR_KEY: &str = "sonarrs";
 
 /// The media server, the request service, a curator and, where `gating`, the request gate.
@@ -126,11 +126,11 @@ fn routes(key: &str) -> Vec<Gated> {
             target: Target::Curator {
                 media_type: "tv".to_owned(),
             },
-            path: "sonarr".to_owned(),
-            address: "http://sonarr:8989".to_owned(),
+            path: "tv".to_owned(),
+            address: "http://sonarr-adapter:8080".to_owned(),
             majors: Vec::new(),
             credential: CURATOR_KEY.to_owned(),
-            tokens: vec![sha256("sonarr")],
+            tokens: vec![sha256("tv")],
         },
         Gated {
             target: Target::MediaServer { pins: Vec::new() },
@@ -181,7 +181,7 @@ fn scene(
         })
         .build()
         .with_http(Arc::new(Serving::beside(http).gate(&gate)));
-    TELEVISION.minted(&ctx, curator);
+    TELEVISION.gate_key(&at, curator);
     (ctx, at, gate)
 }
 
@@ -374,8 +374,8 @@ async fn a_rotation_lands_only_once_the_gate_holds_the_key_and_the_media_server_
     );
     assert_eq!(gate.routes(), routes("fresh"));
     assert_eq!(
-        (gate.tokens("sonarr"), gate.tokens("jellyfin")),
-        (Some(vec![sha256("sonarr")]), Some(vec![sha256("jellyfin")])),
+        (gate.tokens("tv"), gate.tokens("jellyfin")),
+        (Some(vec![sha256("tv")]), Some(vec![sha256("jellyfin")])),
         "the tokens moved"
     );
     assert_eq!(revoked(&http), vec!["old".to_owned(), "stray".to_owned()]);
@@ -469,7 +469,7 @@ async fn a_route_whose_credential_lemonfiber_holds_no_copy_of_mints_nothing() {
     let rotation = rotated(&ctx, &listed, &at).await;
 
     assert!(
-        unproven(&rotation.settled).is_some_and(|said| said.contains("route sonarr")),
+        unproven(&rotation.settled).is_some_and(|said| said.contains("route tv")),
         "{rotation:?}"
     );
     assert!(!minted(&http));

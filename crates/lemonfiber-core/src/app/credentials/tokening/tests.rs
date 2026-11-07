@@ -19,10 +19,10 @@ use crate::test_support::requests::{
 };
 
 /// The key lemonfiber minted for the curator, which the gate presents on its route.
-const CURATOR_KEY: &str = "sonarrs";
+pub(in crate::app::credentials) const CURATOR_KEY: &str = "sonarrs";
 
 /// What the fixed randomness renders to, which is every token minted here.
-fn minted() -> String {
+pub(in crate::app::credentials) fn minted() -> String {
     crate::secret::render(&[0xab; crate::secret::SECRET_BYTES])
 }
 
@@ -75,7 +75,10 @@ fn service(id: &str, name: &str, port: u16) -> lemonfiber_manifest::Service {
 }
 
 /// The stack's fillers with `stack(gating)` as its services, written at `project`.
-fn fillers(gating: bool, project: Option<&std::path::Path>) -> crate::wiring::Fillers {
+pub(in crate::app::credentials) fn fillers(
+    gating: bool,
+    project: Option<&std::path::Path>,
+) -> crate::wiring::Fillers {
     fillers_from(stack(gating), project)
 }
 
@@ -113,7 +116,7 @@ fn fillers_beside(
 }
 
 /// The media server, the request service, a curator and, where `gating`, the request gate.
-fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
+pub(in crate::app::credentials) fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut media_server = service("jellyfin", "Jellyfin", 8096);
     media_server.provides = vec!["media.serve".to_owned(), "identity.source".to_owned()];
     media_server.listens = Some(8096);
@@ -134,14 +137,16 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
 
 /// The gate's routes, the curator's admitting `curator` and the media server's admitting
 /// `media_server`, each a token's hash.
-fn routes((curator, media_server): (Vec<String>, Vec<String>)) -> Vec<Gated> {
+pub(in crate::app::credentials) fn routes(
+    (curator, media_server): (Vec<String>, Vec<String>),
+) -> Vec<Gated> {
     vec![
         Gated {
             target: Target::Curator {
                 media_type: "tv".to_owned(),
             },
-            path: "sonarr".to_owned(),
-            address: "http://sonarr:8989".to_owned(),
+            path: "tv".to_owned(),
+            address: "http://sonarr-adapter:8080".to_owned(),
             majors: Vec::new(),
             credential: CURATOR_KEY.to_owned(),
             tokens: curator,
@@ -159,7 +164,10 @@ fn routes((curator, media_server): (Vec<String>, Vec<String>)) -> Vec<Gated> {
 
 /// The hashes of `curator` on the curator's route and of `media_server` on the media
 /// server's, as the gate accepts them.
-fn accepting(curator: &[&str], media_server: &[&str]) -> (Vec<String>, Vec<String>) {
+pub(in crate::app::credentials) fn accepting(
+    curator: &[&str],
+    media_server: &[&str],
+) -> (Vec<String>, Vec<String>) {
     let hashed = |tokens: &[&str]| tokens.iter().map(|token| sha256(token)).collect();
     (hashed(curator), hashed(media_server))
 }
@@ -167,14 +175,14 @@ fn accepting(curator: &[&str], media_server: &[&str]) -> (Vec<String>, Vec<Strin
 /// What `gate` accepts on the curator's route and on the media server's.
 fn accepted(gate: &Gate) -> (Vec<String>, Vec<String>) {
     (
-        gate.tokens("sonarr").unwrap_or_default(),
+        gate.tokens("tv").unwrap_or_default(),
         gate.tokens("jellyfin").unwrap_or_default(),
     )
 }
 
 /// A stack directory beside `gate`, and a context over `http` with randomness where
 /// `random`.
-fn scene_beside(
+pub(in crate::app::credentials) fn scene_beside(
     name: &str,
     gate: Gate,
     http: Arc<Fake>,
@@ -207,14 +215,14 @@ fn scene_beside(
         .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(
             random.then(|| vec![0xab; crate::secret::SECRET_BYTES]),
         )));
-    TELEVISION.minted(&ctx, CURATOR_KEY);
+    TELEVISION.gate_key(&at, CURATOR_KEY);
     let gate = Arc::new(gate);
     (crate::test_support::gated(ctx, &at, &gate), at, gate)
 }
 
 /// A stack directory beside a gate answering its routes where `routed`, accepting
 /// `accepted` there, and a context over `http` with randomness where `random`.
-fn scene(
+pub(in crate::app::credentials) fn scene(
     name: &str,
     routed: bool,
     accepted: (Vec<String>, Vec<String>),
@@ -232,7 +240,7 @@ fn scene(
 /// The request service: the curator held at the gate with `curator`, the media server
 /// linked at the gate with `media_server`; answering a move with `moved`, its own test with
 /// each of `tested` in turn, and a new link with `linked`.
-fn serving(
+pub(in crate::app::credentials) fn serving(
     curator: &str,
     media_server: &str,
     moved: Answer,
@@ -249,7 +257,7 @@ fn serving(
             intake("fulfilment_targets"),
             vec![answered(&[RegisteredTarget {
                 id: "1".to_owned(),
-                at: through("/sonarr"),
+                at: through("/tv"),
                 key: curator.to_owned(),
                 kind: crate::ports::media::Kind::Tv,
             }])],
@@ -268,7 +276,7 @@ fn serving(
 }
 
 /// [`serving`], taking every write and proving every target.
-fn taking(curator: &str, media_server: &str) -> Arc<Fake> {
+pub(in crate::app::credentials) fn taking(curator: &str, media_server: &str) -> Arc<Fake> {
     serving(curator, media_server, taken(), vec![taken()], taken())
 }
 
@@ -470,28 +478,21 @@ async fn a_token_is_never_printed() {
 #[tokio::test]
 async fn a_route_for_a_service_the_stack_no_longer_names_is_called_by_its_route() {
     let http = taking("held", "linked");
-    let (ctx, at, _) = scene(
-        "tokens-unnamed",
-        true,
-        accepting(&["held"], &[]),
-        http,
-        true,
-    );
-    let without_curator: Vec<_> = stack(true)
-        .into_iter()
-        .filter(|service| service.id != "sonarr")
-        .collect();
+    let gate = Gate::admitting(vec![Gated {
+        target: Target::MediaServer { pins: Vec::new() },
+        path: "gone".to_owned(),
+        address: "http://gone:80".to_owned(),
+        majors: Vec::new(),
+        credential: "kept".to_owned(),
+        tokens: Vec::new(),
+    }]);
+    let (ctx, at, _) = scene_beside("tokens-unnamed", gate, http, true);
 
-    let lines = held(
-        &ctx,
-        &without_curator,
-        &fillers_from(without_curator.clone(), Some(&at)),
-    )
-    .await;
+    let lines = held(&ctx, &stack(true), &fillers_from(stack(true), Some(&at))).await;
 
     assert_eq!(
-        named(&lines, "Request gate token for sonarr").state,
-        State::Active
+        named(&lines, "Request gate token for gone").state,
+        State::Absent
     );
 }
 

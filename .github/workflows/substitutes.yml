@@ -1,0 +1,116 @@
+name: substitutes
+# Each capability `F14-R14` names, proved by the substitute `substitutes.toml` pins for
+# it, standing in for the bundle's choice: one job per arm, in parallel.
+#
+# Every push to main runs it, and every night, since a substitute's upstream moves under
+# a pin that does not. A pull request runs it where its change reaches what an arm reads:
+# a contract, the bundle's pin, a substitute's pin, the arms themselves or this file. Any
+# other pull request skips every arm, and a skipped job reports, so each arm can be a
+# required check.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: what the arms read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      proves: ${{ steps.changed.outputs.proves }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
+      - id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT}" != pull_request ] && [ "${EVENT}" != merge_group ]; then
+            echo "proves=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${BASE}" ] || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "proves=true" >> "$GITHUB_OUTPUT"
+            echo "No commit to compare against, so every arm runs."
+            exit 0
+          fi
+          changed="$(git diff --no-renames --name-only "${BASE}" HEAD)"
+          proves=false
+          while IFS= read -r path; do
+            case "${path}" in
+            contract/* | assets/plugins | substitutes.toml | crates/lemonfiber/tests/substitutes/* | .github/workflows/substitutes.yml)
+              proves=true
+              ;;
+            esac
+          done <<< "${changed}"
+          echo "proves=${proves}" >> "$GITHUB_OUTPUT"
+          if [ "${proves}" = false ]; then
+            echo "Nothing an arm reads changed, so every arm is skipped."
+          fi
+
+  arm:
+    name: ${{ matrix.arm }}
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.proves == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        arm:
+          - indexer-search
+          - media-serve-music
+          - media-serve-audiobooks
+          - media-serve-plex-unclaimed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Where the arm's substitute is pinned
+        id: pinned
+        env:
+          ARM: ${{ matrix.arm }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, re, sys, tomllib
+          with open("substitutes.toml", "rb") as file:
+              arms = tomllib.load(file)["substitute"]
+          one = next(arm for arm in arms if arm["arm"] == os.environ["ARM"])
+          repository = one["origin"].removeprefix("https://github.com/")
+          if not re.fullmatch(r"lemonfiber/plugin-[a-z0-9-]+", repository):
+              sys.exit(f"{one['arm']}: {one['origin']} is not a first-party plugin's repository")
+          if not re.fullmatch(r"[0-9a-f]{40}", one["revision"]):
+              sys.exit(f"{one['arm']}: {one['revision']} is not a full commit")
+          print(f"repository={repository}")
+          print(f"revision={one['revision']}")
+          PY
+      - name: The substitute, at its pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.pinned.outputs.repository }}
+          ref: ${{ steps.pinned.outputs.revision }}
+          path: .substitute
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: The arm
+        env:
+          SUBSTITUTE_ARM: ${{ matrix.arm }}
+          SUBSTITUTE_TREE: ${{ github.workspace }}/.substitute
+        run: cargo test -p lemonfiber --test substitutes
