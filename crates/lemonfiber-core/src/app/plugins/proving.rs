@@ -274,9 +274,12 @@ pub(super) async fn spoken(
 }
 
 /// Every way an adapter's account of itself and its live cases depart from what its
-/// plugin declares: the contracts it speaks, a release at the digest its upstream is
-/// pinned by and none at any other, since that digest is the one its recordings were
-/// taken from, and each live case of each contract answered as the contract says.
+/// plugin declares: the contracts it speaks, a release at the digest the upstream it
+/// fronts is pinned by and none at any other, since that digest is the one its recordings
+/// were taken from, and each live case of each contract answered as the contract says.
+///
+/// A service that speaks for itself is its own upstream, and an image cannot name its own
+/// digest, so it may list no release; one it does list is held to its own pin.
 async fn held_to(
     ctx: &Ctx,
     stack: &Path,
@@ -294,10 +297,11 @@ async fn held_to(
     }
     let upstream = installed.upstream_of(placed);
     if let Some(upstream) = upstream.filter(|upstream| {
-        !about
-            .releases
-            .iter()
-            .any(|release| release.digest == upstream.digest)
+        placed.fronts.is_some()
+            && !about
+                .releases
+                .iter()
+                .any(|release| release.digest == upstream.digest)
     }) {
         faults.push(format!(
             "it lists no release recorded at {}, the digest {} is pinned by",

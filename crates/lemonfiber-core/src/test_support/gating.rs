@@ -31,6 +31,7 @@ pub(crate) fn asking_the_server_as_the_gate(
                 lemonfiber_manifest::ApiKind::Jellyfin.name(),
             )),
             files: None,
+            media_types: Vec::new(),
         });
     }
     installed

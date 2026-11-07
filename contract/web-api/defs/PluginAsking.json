@@ -19,6 +19,13 @@
         "null"
       ]
     },
+    "media_types": {
+      "description": "The media it asks a filler of, where it narrows the ask to the fillers of those.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "native": {
       "description": "The upstream's own API it talks in, or every API it talks in any of, which it\nreaches in place of the adapter.",
       "anyOf": [

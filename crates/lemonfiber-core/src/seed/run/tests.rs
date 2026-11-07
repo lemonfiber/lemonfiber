@@ -519,6 +519,7 @@ fn asking_every_curator(mut installed: crate::plugin::Installed) -> crate::plugi
             each: true,
             native: None,
             files: None,
+            media_types: Vec::new(),
         }];
     }
     installed

@@ -400,6 +400,7 @@ fn a_plugin_asker_is_connected_to_nothing() {
         each: true,
         native: None,
         files: None,
+        media_types: Vec::new(),
     }];
     let installed = vec![
         an_installed("asking", vec![asker]),

@@ -365,6 +365,12 @@
       "properties": {
         "capability": {"description": "The core capability asked for.", "type": "string"},
         "each": {"description": "Whether every service that fills it is reached rather than one.", "type": "boolean", "default": false},
+        "media_types": {
+          "description": "The media, in the stack manifest's vocabulary, it asks a filler of; every filler\nwhere none are named.",
+          "type": ["array", "null"],
+          "default": null,
+          "items": {"type": "string"}
+        },
         "native": {
           "description": "The upstream's own API the service talks in, or every API it talks in any of,\nwhich the ask then reaches in place of the adapter fronting it.",
           "anyOf": [

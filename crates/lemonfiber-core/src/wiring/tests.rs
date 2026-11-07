@@ -130,6 +130,7 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
             services: vec!["server".to_owned()],
             settled: Settled::Outright,
             origins: bundled(&["server"]),
+            media_types: Vec::new(),
         })
     );
 }
@@ -155,6 +156,7 @@ fn several_claimants_and_no_choice_is_contested_and_names_each() {
                 claimants: vec!["one".to_owned(), "two".to_owned()],
             },
             origins: bundled(&["one", "two"]),
+            media_types: Vec::new(),
         })
     );
 }
@@ -278,6 +280,7 @@ fn an_ask_nothing_fills_names_what_asked_for_it() {
             files: None,
             by: "asker".to_owned(),
             capability: "media.serve".to_owned(),
+            media_types: Vec::new(),
         }])
     );
     assert_eq!(
@@ -554,6 +557,7 @@ fn an_ask_for_every_filler_that_nothing_fills_is_unfilled() {
             services: Vec::new(),
             settled: Settled::Unfilled,
             origins: bundled(&[]),
+            media_types: Vec::new(),
         })
     );
 }
@@ -577,6 +581,7 @@ fn a_choice_where_only_one_claims_it_is_reported_as_no_choice_at_all() {
             services: vec!["server".to_owned()],
             settled: Settled::Outright,
             origins: bundled(&["server"]),
+            media_types: Vec::new(),
         })
     );
 }

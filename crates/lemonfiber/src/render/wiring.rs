@@ -52,11 +52,12 @@ fn entry(link: &Wired) -> Lines {
             origins,
             native,
             files,
+            media_types,
         } => {
             lines.spaced(format!(
                 "  {} asks for {capability}{}{}",
                 asker(link),
-                filing(files.as_deref()),
+                lemonfiber_core::wiring::filing(files.as_deref(), media_types),
                 talking(
                     native
                         .as_ref()
@@ -75,11 +76,6 @@ fn entry(link: &Wired) -> Lines {
         }
     }
     lines
-}
-
-/// The medium an ask narrows its filler to, as the words following what it asks for.
-pub(super) fn filing(files: Option<&str>) -> String {
-    files.map_or_else(String::new, |medium| format!(" filing {medium}"))
 }
 
 /// The upstream's own API an ask talks in, as the words following what it asks for.

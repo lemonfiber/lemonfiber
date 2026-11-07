@@ -160,7 +160,13 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
 /// the settings this process started with predate what it just applied, and
 /// starting the stack against the stale set would run the wrong thing.
 pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
-    let env_file = configuration_file();
+    settings_at(run, here().as_ref())
+}
+
+/// The settings kept beneath `paths`, the run's own records laid over the file's where
+/// `run` is given: what a run that has just written its settings there reads them back from.
+pub(crate) fn settings_at(run: Option<&Ctx>, paths: Option<&Paths>) -> Settings {
+    let env_file = paths.map(Paths::env_file);
     let recorded = env_file
         .as_deref()
         .and_then(|path| store::read(path).ok())
@@ -178,12 +184,12 @@ pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
         nfs: lemonfiber_core::config::nfs_from_env(&recorded),
-        storage_state: here().map(|paths| paths.storage_state()),
+        storage_state: paths.map(Paths::storage_state),
         service_user: service_user_from_env(&recorded),
         port_forward: port_forward_from_env(&recorded),
         indexer: indexer_from_env(&recorded),
-        admission: here().map(|paths| paths.admission()),
-        companion: here().map(|paths| paths.companion()),
+        admission: paths.map(Paths::admission),
+        companion: paths.map(Paths::companion),
         household_host: household_host_from_env(&recorded),
         household_domain: lemonfiber_core::config::household_domain_from_env(&recorded),
         exposed: exposed_from_env(&recorded),
@@ -195,7 +201,7 @@ pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
         // can say. Absent where the platform will not, which hosting refuses on rather
         // than installing a service against a guessed path.
         program: std::env::current_exe().ok(),
-        hosted: here().map(|paths| paths.hosted()),
+        hosted: paths.map(Paths::hosted),
         // Where the tools that install programs leave a record of having done so,
         // which is the only thing this is read for.
         home: home_directory(),
@@ -221,7 +227,7 @@ pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
             .get(AUTOSTART_ON_BATTERY_KEY)
             .is_some_and(reads_as_on),
         env_file,
-        stack_dir: stack_directory(),
+        stack_dir: paths.map(Paths::stack),
     }
 }
 
@@ -320,18 +326,4 @@ pub(crate) fn here() -> Option<Paths> {
         config.unwrap_or(&platform_config),
         data.unwrap_or(&platform_data),
     ))
-}
-
-/// The operator's settings file, whether or not it exists yet.
-///
-/// Named even when absent, because `config set` has to be able to create it —
-/// refusing to name a file until it exists would make setting the first setting
-/// impossible.
-pub(crate) fn configuration_file() -> Option<PathBuf> {
-    here().map(|paths| paths.env_file())
-}
-
-/// Where an embedded stack is written so Compose can read it.
-pub(crate) fn stack_directory() -> Option<PathBuf> {
-    here().map(|paths| paths.stack())
 }

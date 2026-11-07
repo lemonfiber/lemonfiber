@@ -143,6 +143,7 @@ fn what_this_stack_wires_to_what_and_one_change_to_it_render_apart() {
                     services: vec!["jellyfin".to_owned()],
                     settled: lemonfiber_core::wiring::Settled::Outright,
                     origins: std::collections::BTreeMap::new(),
+                    media_types: Vec::new(),
                 },
             }],
             unfilled: Vec::new(),

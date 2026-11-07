@@ -378,6 +378,7 @@ fn puller(media: &str) -> crate::plugin::Installed {
         each: false,
         native: None,
         files: None,
+        media_types: Vec::new(),
     }];
     let mut adapter = crate::test_support::a_placed(
         PULLER_ADAPTER,

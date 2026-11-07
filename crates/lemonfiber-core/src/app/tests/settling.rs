@@ -161,6 +161,31 @@ async fn a_service_that_never_becomes_usable_stops_the_start_and_says_which() {
     );
 }
 
+/// A service the engine holds no container for once the start is done is said to have
+/// none, rather than to have not finished starting.
+#[tokio::test]
+async fn a_service_with_no_container_is_said_to_have_none() {
+    let others: Vec<&str> = LIBRARY
+        .into_iter()
+        .filter(|service| *service != "jellyfin")
+        .collect();
+    let engine = Reporting::holding(&others, Lifecycle::Running, Health::Healthy);
+    let ctx = watching(engine).with_patience(Duration::ZERO);
+    let command = Command::Up {
+        forms: vec!["library".to_owned()],
+        offer: None,
+    };
+
+    let refused = dispatch(command, &ctx).await.err();
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.summary.as_str()),
+        Some("jellyfin is not running: the engine holds no container for it")
+    );
+    assert!(refused.is_some_and(|problem| problem
+        .meaning
+        .contains("The engine holds no container for jellyfin at all")));
+}
+
 #[tokio::test]
 async fn a_service_that_will_not_start_and_says_nothing_still_reports_which() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);

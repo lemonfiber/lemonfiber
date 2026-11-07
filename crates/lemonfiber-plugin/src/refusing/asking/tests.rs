@@ -198,3 +198,35 @@ fn an_ask_names_the_upstreams_own_api_as_one_lowercase_word() {
         "{spaced:?}"
     );
 }
+
+#[test]
+fn an_ask_narrowed_to_media_in_the_vocabulary_is_refused_nothing() {
+    let said = asking(
+        "[[ask]]\ncapability = \"library.curate\"\neach = true\nmedia_types = [\"tv\", \"movies\"]\n",
+    );
+    assert_eq!(said, Vec::<String>::new());
+}
+
+#[test]
+fn an_ask_naming_no_medium_an_unknown_one_or_one_twice_is_refused_naming_each() {
+    let empty = asking("[[ask]]\ncapability = \"library.curate\"\nmedia_types = []\n");
+    assert!(
+        names(&empty, &["ask #1.media_types", "names no medium"]),
+        "got: {empty:?}"
+    );
+    let wrong = asking(
+        "[[ask]]\ncapability = \"library.curate\"\nmedia_types = [\"tv\", \"films\", \"tv\"]\n",
+    );
+    assert!(
+        names(
+            &wrong,
+            &["ask #1.media_types", "\"films\"", "not one of", "movies"]
+        ),
+        "got: {wrong:?}"
+    );
+    assert!(
+        names(&wrong, &["ask #1.media_types", "names tv twice"]),
+        "got: {wrong:?}"
+    );
+    assert_eq!(wrong.len(), 2, "got: {wrong:?}");
+}

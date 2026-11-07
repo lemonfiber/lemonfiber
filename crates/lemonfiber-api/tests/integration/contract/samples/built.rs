@@ -157,6 +157,7 @@ pub(super) fn what_is_wired() -> WiringReport {
                         lemonfiber_core::origin::Origin::Bundled,
                     ))
                     .collect(),
+                    media_types: Vec::new(),
                 },
             },
             Wired {
@@ -183,6 +184,7 @@ pub(super) fn what_is_wired() -> WiringReport {
                         lemonfiber_core::origin::Origin::Bundled,
                     ))
                     .collect(),
+                    media_types: Vec::new(),
                 },
             },
         ],
@@ -191,6 +193,7 @@ pub(super) fn what_is_wired() -> WiringReport {
             files: None,
             by: "bazarr".to_owned(),
             capability: "library.curate".to_owned(),
+            media_types: Vec::new(),
         }],
     }
 }
@@ -212,6 +215,7 @@ pub(super) fn a_substitution() -> SubstitutionReport {
                 files: None,
                 by: "bindery".to_owned(),
                 capability: "indexer.proxy".to_owned(),
+                media_types: Vec::new(),
             }],
             leaves_behind: vec![lemonfiber_core::wiring::LeftBehind {
                 capability: "indexer.search".to_owned(),

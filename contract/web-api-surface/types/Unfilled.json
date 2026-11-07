@@ -18,6 +18,12 @@
       ],
       "required": false
     },
+    "media_types": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "native": {
       "type": [
         "anyOf(null,ref:Apis)"

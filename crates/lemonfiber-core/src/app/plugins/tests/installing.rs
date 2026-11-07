@@ -401,6 +401,7 @@ async fn an_install_says_what_its_services_would_ask_for_and_reach() {
                     capability: "library.curate".to_owned(),
                     each: true,
                     files: None,
+                    media_types: Vec::new(),
                 }];
             });
             would

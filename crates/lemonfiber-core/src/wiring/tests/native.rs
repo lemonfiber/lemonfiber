@@ -16,6 +16,7 @@ fn an_asker_in(native: Option<lemonfiber_manifest::container::Apis>) -> Installe
         each: false,
         native,
         files: None,
+        media_types: Vec::new(),
     }];
     crate::test_support::an_installed("finder", vec![placed])
 }
@@ -77,6 +78,7 @@ fn an_ask_in_an_api_no_upstream_talks_is_unfilled_naming_the_api() {
             capability: "library.curate".to_owned(),
             native: Some(lemonfiber_manifest::container::Apis::one("sabnzbd")),
             files: None,
+            media_types: Vec::new(),
         }]
     );
     assert_eq!(

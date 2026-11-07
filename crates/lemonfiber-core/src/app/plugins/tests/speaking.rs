@@ -200,6 +200,48 @@ async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
     );
 }
 
+/// A service that speaks for itself may list no release, since no image can know its own
+/// digest, and a release it does list at a digest other than its own pin is refused.
+#[tokio::test]
+async fn a_service_speaking_for_itself_lists_no_release_or_its_own_pin_alone() {
+    for (name, releases, came) in [
+        ("adapter-speaks-for-itself", "", ["passed", "passed"]),
+        (
+            "adapter-speaks-for-itself-elsewhere",
+            r#"{"version":"1.0.0","digest":"sha256:1111"}"#,
+            ["passed", "failed"],
+        ),
+    ] {
+        let ctx = answering_as(
+            name,
+            &[("komga-adapter", "127.0.0.1", 8080)],
+            &format!(
+                r#"{{"speaks":["media.serve@1"],"upstream":"Komga adapter","releases":[{releases}]}}"#
+            ),
+            lemonfiber_fixtures::http::Answer::reply(401, ""),
+        );
+        let itself = speaking().replace("fronts      = \"komga\"\n", "");
+        let said = verdicts(installing(&ctx, &source(name, &itself)).await);
+        assert_eq!(
+            said.iter()
+                .map(|verdict| came_to(verdict.as_ref()))
+                .collect::<Vec<_>>(),
+            came,
+            "{name}: {said:?}"
+        );
+        assert!(
+            came[1] == "passed"
+                || said.last().is_some_and(|verdict| matches!(
+                    verdict,
+                    Some(Verdict::Failed { faults }) if faults.iter().any(|one| one.contains(
+                        "it lists release 1.0.0 at sha256:1111, and its recordings were taken from sha256:4f53"
+                    ))
+                )),
+            "{name}: {said:?}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn an_adapter_not_recorded_at_its_upstream_or_answering_without_the_key_is_not_installed() {
     for (name, told, unkeyed, fault) in [

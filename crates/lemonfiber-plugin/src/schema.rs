@@ -10,6 +10,7 @@
 //! plugin whose stated behaviour is narrower than its actual one, which is undetected
 //! reach rather than a missing feature.
 
+mod asking;
 mod evidence;
 mod recipe;
 
@@ -19,6 +20,7 @@ use serde::Deserialize;
 use crate::conforming::nonconforming;
 use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
+pub use asking::Ask;
 pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT,
@@ -341,25 +343,6 @@ pub struct Wiring {
     /// Whether it has no entry on the bundled dashboard.
     #[serde(default)]
     pub dashboard_hidden: bool,
-}
-
-/// One capability a plugin's service asks for.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginAsk")]
-pub struct Ask {
-    /// The plugin's own service that asks; optional where the plugin declares one.
-    #[serde(default)]
-    pub service: Option<String>,
-    /// The core capability asked for.
-    pub capability: String,
-    /// Whether every service that fills it is reached rather than one.
-    #[serde(default)]
-    pub each: bool,
-    /// The upstream's own API the service talks in, or every API it talks in any of,
-    /// which the ask then reaches in place of the adapter fronting it.
-    #[serde(default)]
-    pub native: Option<lemonfiber_manifest::container::Apis>,
 }
 
 /// Where one service's own entry goes, once the manifest's defaults are taken.

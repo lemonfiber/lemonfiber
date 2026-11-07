@@ -178,6 +178,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             capability: "indexer.search".to_owned(),
             each: false,
             files: None,
+            media_types: Vec::new(),
         }],
         ..with(Fields {
             env,

@@ -33,11 +33,12 @@ use super::{Chosen, Contest, Reaches, Settled, Unfilled, Whose, Wired};
 pub(super) fn claimants(
     manifest: &Manifest,
     installed: &[Installed],
-    (capability, files): (&str, Option<&str>),
+    (capability, narrowed_to): (&str, &[&str]),
     trusted: &[FirstParty],
 ) -> Vec<Claimant> {
-    let filing =
-        |media: &[String]| files.is_none_or(|medium| media.iter().any(|one| one == medium));
+    let filing = |media: &[String]| {
+        narrowed_to.is_empty() || media.iter().any(|one| narrowed_to.contains(&one.as_str()))
+    };
     let bundled = manifest
         .services
         .iter()
@@ -53,7 +54,7 @@ pub(super) fn claimants(
         one.services
             .iter()
             .filter(|placed| placed.provides.iter().any(|named| named == capability))
-            .filter(|placed| filing(&placed.media_types))
+            .filter(|placed| filing(&one.upstream_of(placed).unwrap_or(placed).media_types))
             .map(|placed| Claimant {
                 service: placed.service.clone(),
                 plugin: Some(one.plugin.clone()),
@@ -256,6 +257,7 @@ fn stack_ask(capability: &str) -> Asking {
         each: false,
         native: None,
         files: None,
+        media_types: Vec::new(),
     }
 }
 
@@ -272,7 +274,7 @@ fn reached(
     let held = claimants(
         manifest,
         installed,
-        (capability, ask.files.as_deref()),
+        (capability, &ask.narrowed_to()),
         trusted,
     );
     let (services, settled) = asked(wiring, capability, &held, chosen, (installed, trusted));
@@ -287,6 +289,7 @@ fn reached(
         origins: origins(&held),
         native: ask.native.clone(),
         files: ask.files.clone(),
+        media_types: ask.media_types.clone(),
     }
 }
 
@@ -395,12 +398,14 @@ pub fn unfilled(wired: &[Wired]) -> Vec<Unfilled> {
                 settled: Settled::Unfilled,
                 native,
                 files,
+                media_types,
                 ..
             } => Some(Unfilled {
                 by: one.by.clone(),
                 capability: capability.clone(),
                 native: native.clone(),
                 files: files.clone(),
+                media_types: media_types.clone(),
             }),
             _ => None,
         })

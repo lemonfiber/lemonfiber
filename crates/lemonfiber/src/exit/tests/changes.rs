@@ -627,6 +627,7 @@ fn a_listing_with_an_ask_nothing_fills_exits_as_a_configuration_problem() {
             files: None,
             by: "seerr".to_owned(),
             capability: "identity.source".to_owned(),
+            media_types: Vec::new(),
         }],
     };
     assert_eq!(

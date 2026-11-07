@@ -25,11 +25,11 @@ fn library() -> Vec<String> {
 }
 
 /// The git source an install reads, beside every other command run, each recorded.
-struct Watching {
+pub(super) struct Watching {
     /// What answers git.
-    serving: Arc<Serving>,
+    pub(super) serving: Arc<Serving>,
     /// Every command run, git or not.
-    seen: std::sync::Mutex<Vec<Vec<String>>>,
+    pub(super) seen: std::sync::Mutex<Vec<Vec<String>>>,
 }
 
 impl Watching {
@@ -53,7 +53,7 @@ impl Runner for Watching {
 }
 
 /// A runner answering git as an install's source does, recording everything run.
-fn watching() -> Arc<Watching> {
+pub(super) fn watching() -> Arc<Watching> {
     Arc::new(Watching {
         serving: Arc::new(Serving::listing("")),
         seen: std::sync::Mutex::new(Vec::new()),

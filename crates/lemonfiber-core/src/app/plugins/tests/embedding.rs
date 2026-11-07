@@ -112,6 +112,61 @@ async fn a_plugin_the_bundle_installs_moves_in_place_of_the_stack_service_it_rep
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
+/// A move in place whose install is put back starts the stack's own service again where
+/// the rest of the stack is running, and leaves a stopped stack stopped.
+#[tokio::test]
+async fn a_move_put_back_starts_the_stack_service_again_where_the_stack_runs() {
+    for (name, running) in [
+        ("embedded-put-back", true),
+        ("embedded-put-back-stopped", false),
+    ] {
+        let watching = super::offline::watching();
+        let mut ctx = unmoved(name, &watching.serving).with_http(
+            lemonfiber_fixtures::http::Fake::by_path(vec![
+                super::speaking::declares(),
+                (
+                    "/lemonfiber/adapter/v1/about",
+                    lemonfiber_fixtures::http::Answer::reply(200, ABOUT),
+                ),
+                ("", lemonfiber_fixtures::http::Answer::reply(500, "")),
+            ]),
+        );
+        let others: &[&str] = if running {
+            &[BUNDLED, ADAPTER, "sonarr"]
+        } else {
+            &[BUNDLED, ADAPTER]
+        };
+        ctx.seams.runner = watching.clone();
+        ctx.seams.engine = Arc::new(
+            Reporting::holding(others, Lifecycle::Running, Health::Healthy)
+                .publishing(&[(BUNDLED, "127.0.0.1", 8095), (ADAPTER, "127.0.0.1", 8080)]),
+        );
+
+        let recorded = report(from_git(&ctx, BUNDLED).await)
+            .and_then(|one| one.install)
+            .map(|install| install.recorded);
+        assert_eq!(recorded, Some(false), "{name}");
+
+        let asked = watching
+            .seen
+            .lock()
+            .map(|seen| seen.clone())
+            .unwrap_or_default();
+        let taken_off = asked
+            .iter()
+            .position(|argv| argv.iter().any(|word| word == "rm"));
+        let started_again = asked.iter().rposition(|argv| {
+            argv.iter().any(|word| word == "up") && argv.last().map(String::as_str) == Some(BUNDLED)
+        });
+        assert!(taken_off.is_some(), "{name}: {asked:?}");
+        assert_eq!(
+            started_again.is_some_and(|at| taken_off.is_some_and(|off| at > off)),
+            running,
+            "{name}: {asked:?}"
+        );
+    }
+}
+
 /// An update of `service`, or of every service where absent, confirmed or only shown.
 fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
     crate::update::run::Asked {
