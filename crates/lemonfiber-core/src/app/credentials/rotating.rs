@@ -22,6 +22,8 @@ use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
 use crate::ports::service::Failure;
 
+use super::requesting::{self, is_request_key};
+
 mod replacing;
 pub(crate) use replacing::replace_admin_password;
 
@@ -76,9 +78,7 @@ pub(crate) async fn rotate(
         Origin::Lemonfiber if super::tokening::is_token(held) => {
             super::tokening::rotate(ctx, held, services, fillers).await
         }
-        Origin::Lemonfiber if super::requesting::is_request_key(held) => {
-            super::requesting::rotate(ctx, held, fillers).await
-        }
+        Origin::Lemonfiber if is_request_key(held) => requesting::rotate(ctx, held, fillers).await,
         Origin::Lemonfiber if held.setting == config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await
         }

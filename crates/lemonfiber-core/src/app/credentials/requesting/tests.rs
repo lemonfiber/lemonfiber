@@ -273,6 +273,27 @@ async fn a_new_key_the_request_service_cannot_prove_is_taken_out_and_the_old_rou
     assert_eq!(gate.routes(), before);
 }
 
+/// A request service that will not say what it holds has proved nothing, so the old key is
+/// handed back.
+#[tokio::test]
+async fn a_request_service_that_will_not_say_what_it_holds_proves_nothing() {
+    let http = super::super::tokening::tests::beside_the_gates_key(vec![(
+        crate::test_support::requests::intake("fulfilment_targets"),
+        vec![refusing()],
+    )]);
+    let (ctx, at, gate) = scene("requesting-unread", true, accepting(&[], &[]), http, true);
+    let before = gate.routes();
+
+    let rotation = rotate(&ctx, &naming("tv"), &fillers(true, Some(&at))).await;
+
+    assert!(
+        unproven(&rotation.settled).is_some_and(|said| said.contains("could not reach Sonarr")),
+        "{rotation:?}"
+    );
+    assert_eq!(written(&at), format!("{CURATOR_KEY}\n"));
+    assert_eq!(gate.routes(), before);
+}
+
 #[tokio::test]
 async fn a_new_key_the_gate_will_not_take_is_taken_out() {
     let told = Gate::admitting(routes(accepting(&[], &[]))).refusing(&["admit"]);

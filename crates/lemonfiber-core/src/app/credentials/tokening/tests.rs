@@ -282,7 +282,9 @@ pub(in crate::app::credentials) fn taking(curator: &str, media_server: &str) -> 
 
 /// A household answering the media server's keys filed under the gate's name, through
 /// which a rotation finds the key the gate presents on its route there, and then `routes`.
-fn beside_the_gates_key(routes: Vec<(&'static str, Vec<Answer>)>) -> Arc<Fake> {
+pub(in crate::app::credentials) fn beside_the_gates_key(
+    routes: Vec<(&'static str, Vec<Answer>)>,
+) -> Arc<Fake> {
     let mut answering = vec![(
         crate::test_support::media::serve("filed_as"),
         vec![Answer::reply(200, crate::test_support::json(&["gates"]))],
@@ -492,6 +494,31 @@ async fn a_route_for_a_service_the_stack_no_longer_names_is_called_by_its_route(
 
     assert_eq!(
         named(&lines, "Request gate token for gone").state,
+        State::Absent
+    );
+}
+
+/// A route for a service the stack names and no capability routes to it through is called
+/// as the household calls that service.
+#[tokio::test]
+async fn a_route_for_a_service_the_stack_names_is_called_by_its_name() {
+    let http = taking("held", "linked");
+    let gate = Gate::admitting(vec![Gated {
+        target: Target::MediaServer { pins: Vec::new() },
+        path: "kept-apart".to_owned(),
+        address: "http://kept-apart:80".to_owned(),
+        majors: Vec::new(),
+        credential: "kept".to_owned(),
+        tokens: Vec::new(),
+    }]);
+    let (ctx, at, _) = scene_beside("tokens-named", gate, http, true);
+    let mut services = stack(true);
+    services.push(service("kept-apart", "Kept Apart", 80));
+
+    let lines = held(&ctx, &services, &fillers_from(stack(true), Some(&at))).await;
+
+    assert_eq!(
+        named(&lines, "Request gate token for Kept Apart").state,
         State::Absent
     );
 }

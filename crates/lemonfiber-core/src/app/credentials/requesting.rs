@@ -235,12 +235,10 @@ async fn proved(requests: &dyn Requests, one: &Routed<'_>) -> Result<(), String>
             one.curator.name
         )
     };
-    let targets = requests
-        .fulfilment_targets()
-        .await
-        .map_err(|_| unreached())?;
+    let targets = requests.fulfilment_targets().await;
     let target = targets
         .iter()
+        .flatten()
         .find(|target| target.at == at)
         .ok_or_else(unreached)?;
     requests
