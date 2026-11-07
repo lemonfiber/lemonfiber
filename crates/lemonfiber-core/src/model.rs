@@ -13,6 +13,7 @@ pub const API_VERSION: u32 = 1;
 
 mod alerts;
 mod asking;
+mod booted;
 mod catalogue;
 mod checking;
 mod door;
@@ -42,6 +43,7 @@ mod wishing;
 
 pub use alerts::*;
 pub use asking::*;
+pub use booted::*;
 pub use catalogue::*;
 pub use checking::*;
 pub use door::*;

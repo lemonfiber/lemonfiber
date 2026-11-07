@@ -26,6 +26,7 @@ use clap::{CommandFactory, Parser};
 
 mod request;
 mod settings;
+mod shelf;
 mod under;
 mod whom;
 mod wiring;
@@ -58,8 +59,9 @@ pub use whom::RawWhom;
 // Re-exported so that `cli::Request` still names it: where the subcommands are
 // written down is this file's business, and moving them would otherwise be a change
 // at every call site that matches on one.
-pub use request::{RawShelf, Request};
+pub use request::Request;
 pub use settings::SettingsCommand;
+pub use shelf::RawShelf;
 pub use wiring::WiringCommand;
 
 /// Set up and run your media stack.

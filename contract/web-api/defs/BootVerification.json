@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one run at boot that reached the stack came to.",
+  "type": "object",
+  "properties": {
+    "against": {
+      "description": "When the machine started that the run came after, where it said.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "at": {
+      "description": "When the run finished.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "not_back": {
+      "description": "Each service that did not come back.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "outcome": {
+      "description": "What it came to.",
+      "$ref": "BootOutcome.json"
+    },
+    "port": {
+      "description": "The forwarded port before the start and after it, where the stack forwards one.",
+      "anyOf": [
+        {
+          "$ref": "Forwarded.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "said": {
+      "description": "The sentence the run raised, where it raised one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tunnel": {
+      "description": "Whether the tunnel came back with the stack.",
+      "$ref": "BootTunnel.json"
+    }
+  },
+  "required": [
+    "at",
+    "outcome",
+    "tunnel"
+  ]
+}

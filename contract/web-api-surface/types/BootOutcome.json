@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"failed\"",
+    "\"passed\"",
+    "\"waiting-for-install\""
+  ]
+}

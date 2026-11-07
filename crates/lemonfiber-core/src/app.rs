@@ -197,15 +197,13 @@ async fn inventoried(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> 
 /// Offer somebody an account, which is the one request this table takes apart.
 ///
 /// Named apart for the reason [`lifecycle`] is: every other row here passes what it was
-/// given straight along in one line, and an invitation carries three things. Spelling
-/// them out in the table would make the request this file does least with the longest
-/// arm in it.
-async fn invited(
-    ctx: &Ctx,
-    name: String,
-    allowance: Allowance,
-    confirm: bool,
-) -> Result<Outcome, Box<Problem>> {
+/// given straight along in one line, and an invitation carries three things.
+async fn invited(ctx: &Ctx, inviting: Inviting) -> Result<Outcome, Box<Problem>> {
+    let Inviting {
+        name,
+        allowance,
+        confirm,
+    } = inviting;
     invite::offer(ctx, name, allowance, confirm)
         .await
         .map(Outcome::Invitation)
@@ -465,14 +463,11 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::News => Ok(Outcome::News(crate::news::run::news(ctx).await)),
         Command::Companion(asked) => crate::companion::asked(ctx, asked).await,
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
+        Command::Boot => boot::booted(ctx).await.map(Outcome::Boot),
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
         Command::Clients => Ok(guided(ctx)),
-        Command::Invite(Inviting {
-            name,
-            allowance: to,
-            confirm,
-        }) => invited(ctx, name, to, confirm).await,
+        Command::Invite(inviting) => invited(ctx, inviting).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
         Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
         Command::Remove { name, agreement } => removed(ctx, name, agreement).await,

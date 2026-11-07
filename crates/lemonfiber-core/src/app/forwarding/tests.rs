@@ -93,7 +93,11 @@ async fn passed(ctx: &Ctx, asking: Asking) -> Option<super::Pass> {
 
 async fn started(ctx: &Ctx) -> Option<Option<String>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    Some(after_start(ctx, &manifest).await)
+    Some(
+        after_start(ctx, &manifest)
+            .await
+            .and_then(|pass| pass.sentence()),
+    )
 }
 
 fn last(ctx: &Ctx) -> Last {
@@ -395,4 +399,41 @@ async fn the_port_a_client_inside_the_guard_takes_peers_on_is_the_one_it_says() 
     };
 
     assert_eq!(listening, Some(51413));
+}
+
+#[tokio::test]
+async fn a_start_reports_the_port_before_and_after_and_whether_every_client_took_it() {
+    let forwarded = |was, now, pushed| Some(crate::model::Forwarded { was, now, pushed });
+    for (name, answer, clients, was, expected) in [
+        (
+            "forwarded-held",
+            Some("51413"),
+            vec![holds(Some(51413))],
+            Some(51413),
+            forwarded(Some(51413), Some(51413), true),
+        ),
+        (
+            "forwarded-refused",
+            Some("51999"),
+            vec![holds(Some(51413)), sets(torrent::refusing())],
+            Some(51413),
+            forwarded(Some(51413), Some(51999), false),
+        ),
+        ("forwarded-never", None, Vec::new(), None, None),
+    ] {
+        let (ctx, _) = holding(name, answer, clients);
+        if was.is_some() {
+            remember(&ctx, was);
+        }
+        let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+        let pass = match manifest {
+            Some(manifest) => after_start(&ctx, &manifest).await,
+            None => None,
+        };
+        assert_eq!(
+            pass.as_ref().and_then(super::Pass::forwarded),
+            expected,
+            "{name}"
+        );
+    }
 }

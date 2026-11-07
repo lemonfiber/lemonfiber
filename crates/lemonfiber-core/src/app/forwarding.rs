@@ -56,11 +56,13 @@ pub async fn pass(
     }
     let fillers = host_fillers(ctx, manifest, project);
     let answer = asked(ctx, &fillers).await?;
+    let last: Last = super::record::beside(ctx, RECORD);
     let mut pass = Pass {
+        was: last.port,
         answer,
         ..Pass::default()
     };
-    if !acts(asking, answer, super::record::beside(ctx, RECORD)) {
+    if !acts(asking, answer, last) {
         return Some(pass);
     }
     for inside in reaching::inside(ctx, &fillers).await {
@@ -179,11 +181,10 @@ pub(crate) async fn listening_port(
 
 /// What starting the stack does about the forwarded port: one pass afresh, raised where a
 /// client did not take it.
-pub(crate) async fn after_start(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
+pub(crate) async fn after_start(ctx: &Ctx, manifest: &Manifest) -> Option<Pass> {
     let pass = on_disk(ctx, manifest, Asking::Afresh).await?;
     raised(ctx, &pass);
-    let said = pass.said();
-    (!said.is_empty()).then(|| said.join("; "))
+    Some(pass)
 }
 
 /// What a diagnosis does about the forwarded port once its VPN check ran against a

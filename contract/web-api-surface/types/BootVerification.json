@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "against": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "at": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "not_back": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "outcome": {
+      "type": [
+        "ref:BootOutcome"
+      ],
+      "required": true
+    },
+    "port": {
+      "type": [
+        "anyOf(null,ref:Forwarded)"
+      ],
+      "required": false
+    },
+    "said": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "tunnel": {
+      "type": [
+        "ref:BootTunnel"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

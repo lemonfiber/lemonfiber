@@ -150,6 +150,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("history", Command::History),
         ("undo", Command::Undo { run: None }),
         ("stuck", Command::Stuck),
+        ("boot", Command::Boot),
         ("front-door", Command::FrontDoor),
         ("news", Command::News),
         // The verb that writes rather than the one refused outright: pairing material is

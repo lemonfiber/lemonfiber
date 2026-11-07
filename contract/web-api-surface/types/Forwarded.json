@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "now": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    },
+    "pushed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "was": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

@@ -268,6 +268,9 @@ pub enum Command {
     /// List the items whose downloads are stuck, each named so it links to its own
     /// trace — the landing point for "N items stuck".
     Stuck,
+    /// Say when this machine last started, what the post-boot verification after it came
+    /// to, and since when the stack has failed to come back.
+    Boot,
     /// Name the one address to hand somebody who lives here, and say where it stands —
     /// including that there is none, where this stack runs nothing they could begin at.
     FrontDoor,

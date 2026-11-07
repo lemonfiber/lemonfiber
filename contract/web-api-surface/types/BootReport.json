@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "booted_at": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "declined": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "failed_boots": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "failing_since": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "last_verified": {
+      "type": [
+        "anyOf(null,ref:BootVerification)"
+      ],
+      "required": false
+    },
+    "verified": {
+      "type": [
+        "anyOf(null,ref:BootVerification)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

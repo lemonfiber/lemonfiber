@@ -48,9 +48,9 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::read::table::{
-    named, ALERTS, BANDWIDTH, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR,
-    HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY, REQUESTS,
-    STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
+    named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS,
+    FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY,
+    REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -326,6 +326,13 @@ static AFTER: &[Question] = &[
             asks: "which removal — stop, services, configuration or media",
             narrows: Narrows::Removal,
         }]),
+    },
+    Question {
+        name: "what the last restart left",
+        about: "when this machine last started, and whether the stack, its tunnel and its \
+                forwarded port came back after it",
+        read: BOOT,
+        needs: Needed::Nothing,
     },
 ];
 

@@ -103,6 +103,8 @@ impl Client {
 /// One pass of the forwarded port.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Pass {
+    /// The port every client last took, as the pass found it.
+    pub was: Option<u16>,
     /// What the guard answered.
     pub answer: Option<u16>,
     /// Every client the answer was passed to, empty where the pass did not act.
@@ -119,6 +121,24 @@ impl Pass {
             .clients
             .iter()
             .any(|client| matches!(client.came_to, CameTo::Refused { .. }))
+    }
+
+    /// What it said, as one sentence, where it said anything.
+    #[must_use]
+    pub fn sentence(&self) -> Option<String> {
+        let said = self.said();
+        (!said.is_empty()).then(|| said.join("; "))
+    }
+
+    /// The port before the pass and after it, and whether every client takes it; nothing
+    /// where neither is a port.
+    #[must_use]
+    pub fn forwarded(&self) -> Option<crate::model::Forwarded> {
+        (self.was.is_some() || self.answer.is_some()).then(|| crate::model::Forwarded {
+            was: self.was,
+            now: self.answer,
+            pushed: self.passed(),
+        })
     }
 
     /// What was set, as the journal records it.

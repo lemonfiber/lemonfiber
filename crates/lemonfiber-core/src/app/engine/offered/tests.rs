@@ -42,6 +42,7 @@ fn report(services: &[&str]) -> LifecycleReport {
         rendering: None,
         unrendered: Vec::new(),
         guards: Vec::new(),
+        forwarded: None,
     }
 }
 

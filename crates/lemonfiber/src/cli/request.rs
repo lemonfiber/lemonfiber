@@ -11,13 +11,13 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
     RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawPushEndpoint, RawRemoving, RawRestart,
-    RawSetup, RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand,
+    RawSetup, RawShelf, RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -245,6 +245,9 @@ pub enum Request {
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.
     Stuck,
+    /// Say when this machine last started, and whether the stack, its tunnel and its
+    /// forwarded port came back after it.
+    Boot,
     /// Name the one address to send somebody who lives here.
     ///
     /// The stack publishes several things to your network and only one of them is
@@ -532,19 +535,4 @@ pub enum Request {
         #[arg(long)]
         repoint: bool,
     },
-}
-
-/// How much of a shelf to show, or which part of it.
-#[derive(Debug, Clone, Default, Args)]
-pub struct RawShelf {
-    /// How many to show, newest first.
-    #[arg(long)]
-    pub most: Option<u32>,
-    /// Show one title instead: what it is, its seasons and episodes, and where it is
-    /// served — named by the id the shelf lists it under.
-    #[arg(long, conflicts_with_all = ["most", "part_way"])]
-    pub title: Option<String>,
-    /// Show what they were part-way through instead, and how far.
-    #[arg(long, conflicts_with = "defaults")]
-    pub part_way: bool,
 }

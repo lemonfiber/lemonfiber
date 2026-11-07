@@ -154,6 +154,8 @@ outcomes! {
     News(crate::news::News) => NEWS_ITEMS,
     /// The items whose downloads are stuck, each linkable to its trace.
     Stuck(StuckReport) => STUCK,
+    /// When this machine last started, and what the run after it came to.
+    Boot(crate::model::BootReport) => BOOT,
     /// What one of this product's words means.
     Word(Term) => WORD,
     /// Every word this product explains.

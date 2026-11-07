@@ -181,6 +181,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/stuck",
     },
     Reach {
+        request: "boot",
+        through: "/api/boot",
+    },
+    Reach {
         request: "outbound",
         through: "/api/outbound",
     },

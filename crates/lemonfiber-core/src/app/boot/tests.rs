@@ -20,9 +20,9 @@ use lemonfiber_fixtures::http::Fake;
 
 /// A machine that says when it started and where its power comes from, or will
 /// not say — both of which are facts no test could otherwise arrange.
-struct Machine {
-    at: Option<u64>,
-    power: Option<Power>,
+pub(super) struct Machine {
+    pub(super) at: Option<u64>,
+    pub(super) power: Option<Power>,
 }
 
 #[async_trait]
@@ -58,7 +58,7 @@ const LIBRARY: [&str; 8] = [
 ];
 
 /// An engine that answers listings straight away and holds nothing.
-fn awake() -> Arc<Reporting> {
+pub(super) fn awake() -> Arc<Reporting> {
     Arc::new(Reporting::holding(&[], Lifecycle::Running, Health::Healthy))
 }
 
@@ -73,7 +73,7 @@ fn waking_after(refusals: usize) -> Arc<Reporting> {
 }
 
 /// One that never turns up, however long it is waited for.
-fn never_there() -> Arc<Reporting> {
+pub(super) fn never_there() -> Arc<Reporting> {
     Arc::new(Reporting::absent())
 }
 
@@ -92,7 +92,7 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 }
 
 /// Settings keeping their records in an emptied scratch directory.
-fn settings_at(name: &str) -> Settings {
+pub(super) fn settings_at(name: &str) -> Settings {
     let dir = scratch(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     Settings {
@@ -107,7 +107,7 @@ fn settings_at(name: &str) -> Settings {
 /// than after the minutes a real one is allowed. The transport answers nothing, so
 /// the trust checks run after a start that came back resolve to unreachable rather
 /// than reaching the real network from a test.
-fn ctx_answering(
+pub(super) fn ctx_answering(
     settings: Settings,
     machine: Machine,
     engine: Arc<Reporting>,
@@ -136,7 +136,7 @@ fn ctx_with(settings: Settings, machine: Machine, engine: Arc<Reporting>) -> Ctx
 }
 
 /// A context over an emptied scratch directory, with the machine a test scripted.
-fn ctx_at(name: &str, machine: Machine, engine: Arc<Reporting>) -> Ctx {
+pub(super) fn ctx_at(name: &str, machine: Machine, engine: Arc<Reporting>) -> Ctx {
     ctx_with(settings_at(name), machine, engine)
 }
 
@@ -146,7 +146,7 @@ fn ctx_at(name: &str, machine: Machine, engine: Arc<Reporting>) -> Ctx {
 /// start actually brings a stack back — which is what the two questions behind the
 /// start are asked about. The settings are the caller's, because the protocols in
 /// them are what decide whether there is a tunnel to ask after at all.
-fn ctx_coming_back(settings: Settings) -> Ctx {
+pub(super) fn ctx_coming_back(settings: Settings) -> Ctx {
     ctx_answering(
         settings,
         plugged_in(1_000),
@@ -166,7 +166,7 @@ fn tried_it(ctx: &Ctx) -> bool {
 }
 
 /// A machine plugged in, that started at a fixed moment.
-const fn plugged_in(at: u64) -> Machine {
+pub(super) const fn plugged_in(at: u64) -> Machine {
     Machine {
         at: Some(at),
         power: Some(Power::Mains),
@@ -174,7 +174,7 @@ const fn plugged_in(at: u64) -> Machine {
 }
 
 /// The run, driven with no waiting at all.
-async fn run(ctx: &Ctx) -> Result<LifecycleReport, Box<Problem>> {
+pub(super) async fn run(ctx: &Ctx) -> Result<LifecycleReport, Box<Problem>> {
     waited(ctx, 2, Duration::ZERO, 2, Duration::ZERO).await
 }
 
@@ -184,7 +184,7 @@ fn held(outcome: &Result<LifecycleReport, Box<Problem>>) -> Option<String> {
 }
 
 /// Record what the operator asked for about starting on boot.
-fn asked(ctx: &Ctx, returning: &Returning) {
+pub(super) fn asked(ctx: &Ctx, returning: &Returning) {
     crate::autostart::run::save(ctx, returning);
 }
 
@@ -193,7 +193,7 @@ fn asked(ctx: &Ctx, returning: &Returning) {
 /// Named rather than left to the empty list, which means every form: bringing back
 /// nineteen services would need nineteen of them reported healthy to settle, and
 /// what these tests are about is not how many.
-fn asked_for_the_library(ctx: &Ctx) {
+pub(super) fn asked_for_the_library(ctx: &Ctx) {
     let mut returning = Returning::default().answering(true);
     returning.started(&["library".to_owned()]);
     asked(ctx, &returning);

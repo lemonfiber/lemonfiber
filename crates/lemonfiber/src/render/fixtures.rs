@@ -275,5 +275,6 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         rendering: None,
         unrendered: Vec::new(),
         guards: Vec::new(),
+        forwarded: None,
     }
 }

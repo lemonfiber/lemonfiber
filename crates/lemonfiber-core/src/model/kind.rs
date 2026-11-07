@@ -61,6 +61,8 @@ kinds! {
     BANDWIDTH = "bandwidth",
     /// What standing lemonfiber beside an existing setup came to.
     BESIDE = "beside",
+    /// When this machine last started, and what the run after it came to.
+    BOOT = "boot",
     /// What a support bundle would hold, or where one went.
     BUNDLE = "bundle",
     /// What this stack can do, as the credential that asked may do it.

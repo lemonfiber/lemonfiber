@@ -26,13 +26,11 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-
 use crate::alert::{Alert, Moment};
 use crate::condition::{Condition, Fault};
 use crate::doctor::{Category, Narrowing, Verdict};
 use crate::error::{Problem, Severity};
-use crate::model::LifecycleReport;
+use crate::model::{BootOutcome, BootTunnel, LifecycleReport};
 use crate::ports::machine::Power;
 use crate::stack::closure::Plan;
 use crate::stack::compose::Action;
@@ -82,20 +80,9 @@ const LOOKS: u32 = 60;
 /// How long it leaves between those.
 const AGAIN: Duration = Duration::from_secs(2);
 
-/// Which restart of this machine has already been acted on.
-///
-/// So a login that fires twice, a service manager that restarts its agent, and an
-/// operator running the command by hand do not each re-verify and re-report the same
-/// boot. Written after the run rather than before it, so a run that was killed
-/// part-way is tried again rather than counted as done.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct Acted {
-    /// The moment this machine started, as the run that acted on it read it.
-    #[serde(default)]
-    at: Option<u64>,
-}
+mod kept;
 
-use crate::config::paths::BOOT as RECORD;
+pub(crate) use kept::booted;
 
 /// Bring back what this machine was running, if anything should come back at all.
 ///
@@ -119,9 +106,15 @@ async fn waited(
     tries: u32,
     between: Duration,
 ) -> Result<LifecycleReport, Box<Problem>> {
+    if already(ctx).await {
+        return Ok(nothing_started(ALREADY_DONE));
+    }
     let forms = match asked_for(ctx).await {
         Ok(forms) => forms,
-        Err(held) => return Ok(nothing_started(&held)),
+        Err(held) => {
+            kept::declined(ctx, &held).await;
+            return Ok(nothing_started(&held));
+        }
     };
 
     // The engine first, because on two of the four platforms it is a desktop
@@ -130,22 +123,31 @@ async fn waited(
     // again, and the operator running anything at all is when it gets tried.
     if !reachable(ctx, looks, again).await {
         raised(ctx, ENGINE_NEVER_CAME, NOTHING_CAME_BACK);
+        kept::declined(ctx, ENGINE_NEVER_CAME).await;
         return Ok(nothing_started(ENGINE_NEVER_CAME));
     }
 
     let outcome = tried(ctx, &forms, tries, between).await;
-    acted(ctx).await;
+    kept::acted(ctx).await;
     match outcome {
         Err(problem) => {
             raised(ctx, &problem.summary, NOTHING_CAME_BACK);
+            let said = Some(problem.summary.as_str());
+            kept::verified(ctx, BootOutcome::Failed, None, BootTunnel::NotChecked, said).await;
             Err(problem)
         }
         Ok(outcome) if !came_up(&outcome) && !outcome.installing.is_empty() => {
-            raised(ctx, &waits(&outcome), NOTHING_CAME_BACK);
+            let said = waits(&outcome);
+            raised(ctx, &said, NOTHING_CAME_BACK);
+            let waiting = BootOutcome::WaitingForInstall;
+            let tunnel = BootTunnel::NotChecked;
+            kept::verified(ctx, waiting, Some(&outcome), tunnel, Some(&said)).await;
             Ok(outcome)
         }
         Ok(outcome) if !came_up(&outcome) => {
             raised(ctx, COMPOSE_REFUSED, NOTHING_CAME_BACK);
+            let (failed, tunnel) = (BootOutcome::Failed, BootTunnel::NotChecked);
+            kept::verified(ctx, failed, Some(&outcome), tunnel, Some(COMPOSE_REFUSED)).await;
             Ok(outcome)
         }
         Ok(outcome) => {
@@ -183,9 +185,6 @@ fn on_battery_said() -> String {
 /// costs nothing and asking about the battery costs a process, so a machine that was
 /// never asked to start anything never asks its battery about it.
 async fn asked_for(ctx: &Ctx) -> Result<Vec<String>, String> {
-    if already(ctx).await {
-        return Err(ALREADY_DONE.to_owned());
-    }
     let returning = super::autostart::load(ctx);
     let forms = match returning.at_boot() {
         Ok(forms) => forms.to_vec(),
@@ -206,21 +205,7 @@ async fn already(ctx: &Ctx) -> bool {
     let Some(at) = ctx.started.at().await else {
         return false;
     };
-    super::record::beside::<Acted>(ctx, RECORD).at == Some(at)
-}
-
-/// Write down which restart this run acted on.
-///
-/// A rehearsal writes nothing, here and in the two below it. What it is being asked
-/// is what a login would come to, and a rehearsal that recorded the boot as acted on
-/// would make the real run that followed it decline — which is the one way a
-/// rehearsal of this could change the thing it was rehearsing.
-async fn acted(ctx: &Ctx) {
-    if ctx.dry_run {
-        return;
-    }
-    let at = ctx.started.at().await;
-    super::record::keep_beside(ctx, RECORD, &Acted { at });
+    kept::held(ctx).at == Some(at)
 }
 
 /// Whether this machine is on its battery and nobody said to start anyway.
@@ -320,11 +305,23 @@ fn came_up(report: &LifecycleReport) -> bool {
 ///
 /// A part left waiting for its install is said where nothing more pressing is.
 async fn confirmed(ctx: &Ctx, report: &LifecycleReport) {
-    match wrong(ctx).await {
-        Some(said) => raised(ctx, &said, TUNNEL_UNPROVEN),
-        None if !report.installing.is_empty() => raised(ctx, &waits(report), WAITING_COSTS),
-        None => observed(ctx, None),
-    }
+    let (outcome, tunnel, said) = match tunnel(ctx).await {
+        BootTunnel::NotEstablished { said } => {
+            raised(ctx, &said, TUNNEL_UNPROVEN);
+            let tunnel = BootTunnel::NotEstablished { said: said.clone() };
+            (BootOutcome::Failed, tunnel, Some(said))
+        }
+        tunnel if !report.installing.is_empty() => {
+            let said = waits(report);
+            raised(ctx, &said, WAITING_COSTS);
+            (BootOutcome::WaitingForInstall, tunnel, Some(said))
+        }
+        tunnel => {
+            observed(ctx, None);
+            (BootOutcome::Passed, tunnel, None)
+        }
+    };
+    kept::verified(ctx, outcome, Some(report), tunnel, said.as_deref()).await;
 }
 
 /// What a boot that left parts waiting for their install says.
@@ -351,31 +348,42 @@ const WAITING_COSTS: &str =
     "the rest of the stack is back, and what the waiting part fills stays unfilled until the \
      install is agreed to";
 
-/// What the trust checks found wrong after the stack came back, if anything.
+/// What the trust checks found of the tunnel after the stack came back.
 ///
 /// Narrowed to the tunnel, because that is the part of a restart that does not look
 /// after itself: containers come back under their own restart policies, and a tunnel
 /// comes back with a new address and, commonly, a different forwarded port. An
-/// unreadable stack leaves this unanswered rather than wrong — a diagnosis that could
+/// unreadable stack leaves this unchecked rather than wrong — a diagnosis that could
 /// not run has established nothing, and reporting that as a failed boot would be the
-/// comfortable falsehood.
-async fn wrong(ctx: &Ctx) -> Option<String> {
-    let report = super::engine::diagnose(ctx, &Narrowing::Category(Category::Vpn), false)
-        .await
-        .ok()?;
+/// comfortable falsehood — and held needs a check of it that passed.
+async fn tunnel(ctx: &Ctx) -> BootTunnel {
+    let Ok(report) = super::engine::diagnose(ctx, &Narrowing::Category(Category::Vpn), false).await
+    else {
+        return BootTunnel::NotChecked;
+    };
     let named: Vec<&str> = report
         .findings
         .iter()
         .filter(|finding| matches!(finding.verdict, Verdict::Fail(_) | Verdict::Warn(_)))
         .map(|finding| finding.check.as_str())
         .collect();
-    if named.is_empty() {
-        return None;
+    if !named.is_empty() {
+        return BootTunnel::NotEstablished {
+            said: format!(
+                "the stack came back and its tunnel did not: {}",
+                named.join(", ")
+            ),
+        };
     }
-    Some(format!(
-        "the stack came back and its tunnel did not: {}",
-        named.join(", ")
-    ))
+    if report
+        .findings
+        .iter()
+        .any(|finding| matches!(finding.verdict, Verdict::Pass { .. }))
+    {
+        BootTunnel::Held
+    } else {
+        BootTunnel::NotChecked
+    }
 }
 
 /// Record that this boot did not come back, with the reason and what it costs.
@@ -444,6 +452,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         // teardown reports and reads the same way: no clash was found.
         port_conflicts: Vec::new(),
         forwarding: None,
+        forwarded: None,
         secured: None,
         switched: None,
         held: Some(reason.to_owned()),
