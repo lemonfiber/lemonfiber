@@ -275,3 +275,39 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
         "{hung:?} beside {alone:?}: the read waited on the endpoint"
     );
 }
+
+/// A key of any scope is refused at all three routes.
+#[tokio::test]
+async fn a_key_may_not_keep_push_endpoints() {
+    let keys = crate::what_a_key_admits::keeping_keys("push");
+    let admitting = Arc::new(Admitting {
+        keys: lemonfiber_api::admission::Keyring::at(
+            Some(keys.kept.clone()),
+            Some(keys.used.clone()),
+        ),
+        ..Admitting::default()
+    });
+    let (router, _) = surface(world(None, Chance::cycling()), &admitting);
+    let body = registering("pixel", "https://push.example/abc");
+    for (method, path, body) in [
+        ("GET", "/api/push-endpoints", "{}"),
+        ("POST", "/api/push-endpoints", body.as_str()),
+        ("DELETE", "/api/push-endpoints/pixel", "{}"),
+    ] {
+        let (answer, _) = sent(
+            router.clone(),
+            method,
+            path,
+            keys.act.as_str(),
+            Some((HERE, false)),
+            body,
+        )
+        .await;
+        assert_eq!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{method} {}",
+            answer.body
+        );
+    }
+}

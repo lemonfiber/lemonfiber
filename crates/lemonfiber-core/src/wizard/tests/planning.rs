@@ -682,6 +682,18 @@ fn a_device_key_is_named_as_a_key_is() {
         "the revoke of the device key pixel"
     );
     assert_eq!(
+        described(&change(Kind::PushEndpointRegistered {
+            name: "pixel".to_owned(),
+        })),
+        "the push endpoint pixel"
+    );
+    assert_eq!(
+        described(&change(Kind::PushEndpointRemoved {
+            name: "pixel".to_owned(),
+        })),
+        "the removal of the push endpoint pixel"
+    );
+    assert_eq!(
         described(&change(Kind::Overlaid {
             path: "/cfg/overlay.yml".to_owned(),
             previous: None,
