@@ -1,4 +1,7 @@
 use super::{made, pairings, unmatched, Connection, Unmade};
+use lemonfiber_contract::capabilities::library::curate;
+use lemonfiber_contract::capabilities::request::intake;
+
 use crate::ports::media::Kind;
 use crate::ports::service::{ApplicationKind, Protocol};
 use crate::seed::State;
@@ -490,8 +493,6 @@ type Crossing = (
 /// Every kind of connection the table makes, once each.
 fn crossing_kinds() -> [Crossing; 6] {
     use lemonfiber_contract::capabilities::indexer::{pull, search};
-    use lemonfiber_contract::capabilities::library::curate;
-    use lemonfiber_contract::capabilities::request::intake;
     use lemonfiber_contract::capabilities::subtitles::fetch;
     use lemonfiber_manifest::ApiKind;
     let curating = (curate::CAPABILITY, curate::MAJOR);
@@ -582,7 +583,14 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
         for (filler_is, asker_is, refused, refused_both_ways) in &rows {
             let mut asker = an_asker("asker", asker_is, speaks);
             asker.media_types = vec![files.to_owned()];
-            let filler = a_service("filler", filler_is, fills);
+            let filler = crate::wiring::Filler {
+                contracts: vec![lemonfiber_contract::spoken(
+                    curate::CAPABILITY,
+                    curate::MAJOR,
+                )],
+                media_types: vec!["tv".to_owned()],
+                ..a_service("filler", filler_is, fills)
+            };
             let ask = crate::wiring::Ask {
                 by: asker.id.clone(),
                 capability: capability.to_owned(),
@@ -621,6 +629,70 @@ fn every_connection_hands_a_credential_only_where_the_gate_lets_it_cross() {
         kinds.len(),
         "a connection kind was never made: {seen:?}"
     );
+}
+
+/// **A third-party curator reaches a first-party request service.** The request service
+/// is handed a token of the gate's and nothing of the curator's, so the curator's own key
+/// crossing to it is not what the pairing turns on. A third-party request service is handed
+/// no gate token for a curator not its own, and a curator speaking no contract is said.
+#[test]
+fn a_curator_of_any_plugin_reaches_a_request_service_the_stacks_token_may_reach() {
+    use crate::origin::Origin;
+    use lemonfiber_manifest::ApiKind;
+
+    let stranger = Origin::Plugin {
+        named: "stranger".to_owned(),
+    };
+    let moved = Origin::Plugin {
+        named: "moved".to_owned(),
+    };
+    let curating = |speaks: bool| crate::wiring::Filler {
+        contracts: if speaks {
+            vec![lemonfiber_contract::spoken(
+                curate::CAPABILITY,
+                curate::MAJOR,
+            )]
+        } else {
+            Vec::new()
+        },
+        media_types: vec!["tv".to_owned()],
+        ..a_service("filler", &stranger, ApiKind::Servarr)
+    };
+    let asking = |origin: &Origin, first_party: bool| crate::wiring::Filler {
+        first_party,
+        ..an_asker("asker", origin, (intake::CAPABILITY, intake::MAJOR))
+    };
+    let other = Origin::Plugin {
+        named: "other".to_owned(),
+    };
+    for (filler, asker, expected) in [
+        (curating(true), asking(&moved, true), None),
+        (
+            curating(false),
+            asking(&moved, true),
+            Some(Unmade::Uncontracted),
+        ),
+        (curating(true), asking(&other, false), Some(Unmade::Asked)),
+    ] {
+        let ask = crate::wiring::Ask {
+            by: asker.id.clone(),
+            capability: "library.curate".to_owned(),
+            native: None,
+            fillers: vec![filler.clone()],
+        };
+        let fillers = crate::wiring::Fillers::holding(vec![asker.clone(), filler.clone()]);
+        let came = made(
+            &fillers,
+            (&asker, &asker, intake::CAPABILITY),
+            &ask,
+            &filler,
+        )
+        .map(|(connection, ..)| connection);
+        match expected {
+            None => assert_eq!(came, Ok(Connection::Fulfilment { kind: Kind::Tv })),
+            Some(why) => assert_eq!(came, Err(why)),
+        }
+    }
 }
 
 #[test]

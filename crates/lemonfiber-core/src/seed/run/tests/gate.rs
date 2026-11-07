@@ -44,13 +44,42 @@ fn routed_at(
     guarded_beside(services, &installed, project)
 }
 
-/// `key` kept in `ctx`'s secret store as the key lemonfiber minted for the curator
-/// `curator` moved into its plugin.
-fn minted_for(ctx: &Ctx, curator: &str, key: &str) {
+/// The adapter in front of the curator `curator` moved into its plugin.
+fn adapter_of(curator: &str) -> &'static str {
     crate::test_support::curators::ALL
         .iter()
-        .filter(|moved| moved.plugin == curator)
-        .for_each(|moved| moved.minted(ctx, key));
+        .find(|moved| moved.plugin == curator)
+        .map_or("", |moved| moved.adapter)
+}
+
+/// Where the gate's key is written beside `curator`'s adapter, in the stack at `project`.
+fn request_key_at(project: &std::path::Path, curator: &str) -> std::path::PathBuf {
+    crate::plugin::key_file(project, adapter_of(curator))
+        .with_file_name(lemonfiber_contract::adapter::REQUEST_KEY_FILE)
+}
+
+/// `key` written as the gate's key beside `curator`'s adapter, in the stack at `project`.
+fn written_for(project: &std::path::Path, curator: &str, key: &str) {
+    let at = request_key_at(project, curator);
+    let _ = std::fs::create_dir_all(at.parent().unwrap_or(project));
+    let _ = std::fs::write(at, format!("{key}\n"));
+}
+
+/// The gate's key written beside each of `curators`' adapters now, in the stack at
+/// `project`.
+fn keys_written(project: &std::path::Path, curators: &[&str]) -> Vec<(String, String)> {
+    curators
+        .iter()
+        .map(|curator| {
+            (
+                (*curator).to_owned(),
+                std::fs::read_to_string(request_key_at(project, curator))
+                    .unwrap_or_default()
+                    .trim()
+                    .to_owned(),
+            )
+        })
+        .collect()
 }
 
 /// The internal TLS port the media server declares.
@@ -140,7 +169,7 @@ fn gate_ctx_beside(
         .build()
         .with_http(http);
     for (curator, key) in curators {
-        minted_for(&ctx, curator, key);
+        written_for(&at, curator, key);
     }
     let ctx = if administered {
         media::asking(ctx)
@@ -153,21 +182,25 @@ fn gate_ctx_beside(
 
 /// The routes the gate should hold where lemonfiber minted each of `curators` its key and
 /// `key` is its media server key, in the order the gate is handed them.
-fn holding(curators: &[(&str, &str)], key: &str) -> Vec<Gated> {
+fn holding<C: AsRef<str>, K: AsRef<str>>(curators: &[(C, K)], key: &str) -> Vec<Gated> {
     let mut routes: Vec<Gated> = curators
         .iter()
-        .map(|(curator, credential)| Gated {
-            target: Target::Curator {
-                media_type: if *curator == "sonarr" { "tv" } else { "movies" }.to_owned(),
-            },
-            path: (*curator).to_owned(),
-            address: format!(
-                "http://{curator}:{}",
-                if *curator == "sonarr" { 8989 } else { 7878 }
-            ),
-            majors: Vec::new(),
-            credential: (*credential).to_owned(),
-            tokens: Vec::new(),
+        .map(|(curator, credential)| {
+            let media_type = if curator.as_ref() == "sonarr" {
+                "tv"
+            } else {
+                "movies"
+            };
+            Gated {
+                target: Target::Curator {
+                    media_type: media_type.to_owned(),
+                },
+                path: media_type.to_owned(),
+                address: format!("http://{}:8080", adapter_of(curator.as_ref())),
+                majors: Vec::new(),
+                credential: credential.as_ref().to_owned(),
+                tokens: Vec::new(),
+            }
         })
         .collect();
     routes.push(Gated {
@@ -182,7 +215,7 @@ fn holding(curators: &[(&str, &str)], key: &str) -> Vec<Gated> {
 }
 
 /// [`holding`] without the media server's route: the curators' alone.
-fn curators_holding(curators: &[(&str, &str)]) -> Vec<Gated> {
+fn curators_holding<C: AsRef<str>, K: AsRef<str>>(curators: &[(C, K)]) -> Vec<Gated> {
     let mut routes = holding(curators, "");
     routes.retain(|route| matches!(route.target, Target::Curator { .. }));
     routes
@@ -226,15 +259,19 @@ fn revoked(http: &Fake) -> Vec<String> {
         .collect()
 }
 
-/// Both curators, with the keys lemonfiber minted for them.
+/// Both curators, with the gate's key written beside each one's adapter.
 const CURATORS: &[(&str, &str)] = &[("sonarr", "sonarrs"), ("radarr", "radarrs")];
 
-/// The movie curator alone: the stack before lemonfiber minted the TV curator a key.
+/// The movie curator alone.
 const MOVIES_ONLY: &[(&str, &str)] = &[("radarr", "radarrs")];
 
+/// Both curators, by name.
+const BOTH: [&str; 2] = ["sonarr", "radarr"];
+
 /// A stack whose gate holds nothing has a key minted for it, and is handed a route for
-/// each curator, with the key lemonfiber minted for it, and one for the media server, with
-/// the new key.
+/// each curator, named for the media it files and reaching its adapter under a key minted
+/// for the gate there in place of whatever the adapter held, and one for the media server,
+/// with the new key.
 #[tokio::test]
 async fn the_routes_are_written_with_a_key_of_the_gates_own() {
     let http = serving(&[], "fresh", true, true);
@@ -242,8 +279,12 @@ async fn the_routes_are_written_with_a_key_of_the_gates_own() {
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
+    let keys = keys_written(&at, &BOTH);
     assert_eq!(state, Some(State::Wired));
-    assert_eq!(gate.routes(), holding(CURATORS, "fresh"));
+    assert_eq!(gate.routes(), holding(&keys, "fresh"));
+    for ((_, key), (_, before)) in keys.iter().zip(CURATORS) {
+        assert!(!key.is_empty() && key != before, "{key}");
+    }
     // The gate forwards to the majors of the API the plugin's server answers in, and to
     // nothing else.
     assert!(!moved_majors().is_empty());
@@ -278,9 +319,9 @@ async fn routes_that_hold_are_left_alone() {
     assert!(revoked.is_empty(), "{revoked:?}");
 }
 
-/// A curator key minted anew reaches the gate on the next pass, under the same media
-/// server key, and a key filed under the gate's name that the routes do not hold is
-/// revoked.
+/// A curator's adapter holding no key the gate presents is given one written in place of
+/// what it held, which reaches the gate under the same media server key, and a key filed
+/// under the gate's name that the routes do not hold is revoked.
 #[tokio::test]
 async fn a_moved_curator_key_is_written_and_strays_revoked() {
     let http = serving(&["stray", "kept"], "fresh", true, true);
@@ -291,13 +332,23 @@ async fn a_moved_curator_key_is_written_and_strays_revoked() {
         Some("kept"),
         http.clone(),
     );
-    let moved = [("sonarr", "regenerated"), ("radarr", "radarrs")];
-    minted_for(&ctx, "sonarr", "regenerated");
+    written_for(&at, "sonarr", "regenerated");
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
+    let keys = keys_written(&at, &BOTH);
     assert_eq!(state, Some(State::Wired));
-    assert_eq!(gate.routes(), holding(&moved, "kept"));
+    assert_eq!(gate.routes(), holding(&keys, "kept"));
+    let of = |curator: &str| {
+        keys.iter()
+            .find(|(named, _)| named == curator)
+            .map(|(_, key)| key.as_str())
+    };
+    assert!(
+        of("sonarr").is_some_and(|key| !["regenerated", "sonarrs"].contains(&key)),
+        "{keys:?}"
+    );
+    assert_eq!(of("radarr"), Some("radarrs"));
     assert_eq!(revoked, vec!["stray".to_owned()]);
 }
 
@@ -313,26 +364,38 @@ async fn unrouted(ctx: &Ctx, project: &std::path::Path) -> Vec<(String, State)> 
         .collect()
 }
 
-/// A curator lemonfiber holds no minted key for has no route, and the pass says it is
-/// skipped.
+/// A curator whose adapter keeps something other than a plain file of its own where the
+/// gate's key is written has no route, and the pass says why; the other is routed.
 #[tokio::test]
-async fn a_curator_holding_no_minted_key_has_no_route() {
+async fn a_curator_whose_adapter_cannot_hold_the_gates_key_has_no_route() {
     let http = serving(&[], "fresh", true, true);
     let (ctx, at, gate) = gate_ctx("gate-routes-keyless", true, MOVIES_ONLY, None, http.clone());
+    let elsewhere = at.join("elsewhere");
+    let _ = std::fs::write(&elsewhere, "not-the-gates\n");
+    let linked = request_key_at(&at, "sonarr");
+    let _ = std::fs::create_dir_all(linked.parent().unwrap_or(&at));
+    let _ = std::os::unix::fs::symlink(&elsewhere, &linked);
 
     let said = unrouted(&ctx, &at).await;
 
-    assert_eq!(gate.routes(), holding(MOVIES_ONLY, "fresh"));
+    assert_eq!(
+        gate.routes(),
+        holding(&keys_written(&at, &["radarr"]), "fresh")
+    );
     assert_eq!(
         said,
         vec![(
             "Sonarr routed through the request gate".to_owned(),
-            State::Skipped {
-                reason: "lemonfiber holds no key it minted for Sonarr; a run once it holds one \
-                         completes it"
+            State::Failed {
+                detail: "the request gate's key on Sonarr adapter is not a plain file of its \
+                         own, so it was left as it is"
                     .to_owned()
             }
         )]
+    );
+    assert_eq!(
+        std::fs::read_to_string(&elsewhere).ok().as_deref(),
+        Some("not-the-gates\n")
     );
 }
 
@@ -381,7 +444,7 @@ async fn removing_the_gate_revokes_its_key() {
 /// by their names, never their credentials, or the keys where only they would.
 #[tokio::test]
 async fn a_rehearsal_mints_writes_and_revokes_nothing() {
-    let routed = "routes to sonarr, radarr, jellyfin".to_owned();
+    let routed = "routes to tv, movies, jellyfin".to_owned();
     for (name, keys, held_now, moved, expected) in [
         (
             "gate-routes-would-mint",
@@ -399,7 +462,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
             Some("kept"),
             true,
             State::WouldWire {
-                yours: Some("routes to radarr, jellyfin".to_owned()),
+                yours: Some("routes to movies, jellyfin".to_owned()),
                 ours: Some(routed.clone()),
             },
         ),
@@ -418,10 +481,11 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
         let written = if moved { MOVIES_ONLY } else { CURATORS };
         let (mut ctx, at, gate) = gate_ctx(name, true, written, held_now, http.clone());
         if moved {
-            minted_for(&ctx, "sonarr", "sonarrs");
+            written_for(&at, "sonarr", "sonarrs");
         }
         ctx.dry_run = true;
         let before = gate.routes();
+        let keys = keys_written(&at, &BOTH);
 
         let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
@@ -429,6 +493,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
         assert!(revoked.is_empty(), "{name}: {revoked:?}");
         assert!(!minted_on(&http), "{name}");
         assert_eq!(gate.routes(), before, "{name}");
+        assert_eq!(keys_written(&at, &BOTH), keys, "{name}");
     }
 }
 
@@ -489,7 +554,10 @@ async fn without_a_media_server_the_curators_are_still_routed() {
         wiring.into_iter().next().map(|one| one.state),
         Some(State::Wired)
     );
-    assert_eq!(gate.routes(), curators_holding(&curators));
+    assert_eq!(
+        gate.routes(),
+        curators_holding(&keys_written(&project, &["sonarr"]))
+    );
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
@@ -550,7 +618,10 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
         curators_seeded(&ctx, &services, &fillers).await,
         Some(State::AlreadyWired)
     );
-    assert_eq!(gate.routes(), curators_holding(&curators));
+    assert_eq!(
+        gate.routes(),
+        curators_holding(&keys_written(&project, &["sonarr"]))
+    );
 
     let (refusing, project, _) = gate_ctx_beside(
         "gate-routes-curators-refused",

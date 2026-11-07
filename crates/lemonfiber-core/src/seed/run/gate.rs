@@ -1,15 +1,14 @@
 //! The request gate's routes: each upstream it answers for, and what it presents there.
 //!
-//! The gate holds the credentials the request service would otherwise hold: each
-//! fulfilling curator's key, the one lemonfiber minted for it, and a key minted for the
-//! gate alone in the media server, whichever service fills the identity source, and filed
-//! under its name. They are handed over through `request.gate`, never its environment,
-//! and again whenever what they should hold has moved — a curator key minted anew reaches
-//! the gate on the next pass.
+//! The gate holds a key of its own on each fulfilling curator's adapter, which opens only
+//! the operations a curator answers the gate, under the route named for the media the
+//! curator files, and a key minted for the gate alone in the media server, whichever
+//! service fills the identity source, and filed under its name. They are handed over
+//! through `request.gate`, never its environment, and again whenever what they should hold
+//! has moved.
 //!
 //! **A curator the request service fulfils through that the gate holds no route to is
-//! said**, on a line of its own beside the gate's: one whose credential the gate may not
-//! hold, and one lemonfiber holds no minted key for.
+//! said**, on a line of its own beside the gate's, with why its key could not be written.
 //!
 //! **The gate is what holds the media server's key.** A key filed under the gate's name
 //! whose SHA-256 the gate does not answer is one nothing holds, and is revoked, as the
@@ -103,7 +102,7 @@ async fn curators_alone(
         Ok(asked) => asked,
         Err(state) => return vec![settled(state)],
     };
-    let (routes, unrouted) = routing(ctx, fillers);
+    let (routes, unrouted) = routing(ctx, fillers, &admitted, Minting::Minted);
     let wanted = kept_tokens(routes, &admitted);
     let state = if holds(&admitted, &wanted) {
         State::AlreadyWired
@@ -194,7 +193,7 @@ async fn with_the_media_server(
         Ok(asked) => asked,
         Err(state) => return vec![settled(state)],
     };
-    let (curators, unrouted) = routing(ctx, fillers);
+    let (curators, unrouted) = routing(ctx, fillers, &admitted, Minting::Minted);
     let state = match held(&admitted, &filed) {
         Some(key) => {
             let wanted = match wanted(ctx, &curators, routed, (client, &key), &admitted).await {
@@ -314,31 +313,6 @@ fn unadmitted(failure: &crate::ports::service::Failure) -> State {
     }
 }
 
-/// Write the gate's routes again after the curator `curator_id` replaced its key, so its
-/// route presents the new one: what replacing that key owes the gate.
-///
-/// Nothing where the stack runs no gate or the request service does not fulfil
-/// through `curator_id`.
-pub(crate) async fn reroute(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    fillers: &crate::wiring::Fillers,
-    curator_id: &str,
-) -> Option<State> {
-    gating::service(services)?;
-    let routed = super::fulfilling(fillers)
-        .iter()
-        .any(|fulfils| fulfils.filler.id == curator_id);
-    routed.then_some(())?;
-    // Boxed, because it is carried across the routes being written.
-    let server = crate::app::targets::MediaServer::of(fillers).map(Box::new);
-    seed_gate_routes(ctx, services, fillers, server.as_deref())
-        .await
-        .into_iter()
-        .next()
-        .map(|wiring| wiring.state)
-}
-
 /// The gate already holds a key the media server lists: bring its routes up to what they
 /// should be, and revoke whatever else is filed under its name.
 async fn kept(
@@ -374,50 +348,106 @@ async fn kept(
     minted::revoking(client, others).await
 }
 
-/// A route for each curator the request service fulfils through, with the key lemonfiber
-/// minted for it. A curator holding no minted key has no route.
-pub(crate) fn curator_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Gated> {
-    routing(ctx, fillers).0
+/// A route for each curator the request service fulfils through, presenting the key on
+/// its adapter the gate presents now, as `admitted` says; a curator whose adapter holds no
+/// such key has no route.
+pub(crate) fn curator_routes(
+    ctx: &Ctx,
+    fillers: &crate::wiring::Fillers,
+    admitted: &[Admitted],
+) -> Vec<Gated> {
+    routing(ctx, fillers, admitted, Minting::Never).0
 }
 
-/// [`curator_routes`], and a line for each curator the request service fulfils through
-/// that the gate is handed no route to, saying why: one whose credential the gate may not
-/// hold, and one holding no minted key.
-fn routing(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> (Vec<Gated>, Vec<Wiring>) {
+/// Each curator the gate routes to: the route it answers under, the curator, and the
+/// service speaking `library.curate` for it, which the gate asks.
+pub(crate) fn routed_curators(
+    fillers: &crate::wiring::Fillers,
+) -> Vec<(&'static str, &crate::wiring::Filler, &crate::wiring::Filler)> {
+    super::fulfilling(fillers)
+        .into_iter()
+        .map(|fulfils| {
+            (
+                super::tokens::route_of(fulfils.kind),
+                fulfils.filler,
+                fulfils.adapter,
+            )
+        })
+        .collect()
+}
+
+/// Whether a curator's route whose adapter holds no key the gate presents is given one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Minting {
+    /// It is given a key minted for it, written beside the adapter's configuration.
+    Minted,
+    /// It is given none, and has no route.
+    Never,
+}
+
+/// The routes [`curator_routes`] answers, minting a key where `minting` says, and a line
+/// for each curator the request service fulfils through that the gate is handed no route
+/// to, saying why.
+fn routing(
+    ctx: &Ctx,
+    fillers: &crate::wiring::Fillers,
+    admitted: &[Admitted],
+    minting: Minting,
+) -> (Vec<Gated>, Vec<Wiring>) {
     let mut routes = Vec::new();
     let mut unrouted = Vec::new();
     for fulfils in super::fulfilling(fillers) {
-        let filler = fulfils.filler;
-        let connection = format!("{} routed through the request gate", filler.name);
-        if !gating::may_hold(fillers, filler.holder()) {
-            unrouted.push(Wiring::settled(
-                connection,
-                State::Unmatched {
-                    reason: format!(
-                        "{} is a third-party plugin's service, whose credential is not handed \
-                         to the service filling request.gate",
-                        filler.name
-                    ),
-                },
-            ));
-            continue;
-        }
-        let Some(key) = super::keys::minted_key(ctx, filler) else {
-            unrouted.push(super::skipped(connection, &filler.name));
-            continue;
+        let path = super::tokens::route_of(fulfils.kind);
+        let connection = format!("{} routed through the request gate", fulfils.filler.name);
+        let presented = admitted
+            .iter()
+            .find(|route| route.path == path)
+            .map(|route| route.credential.as_str());
+        let credential = match curators_key(ctx, fulfils.adapter, presented, minting) {
+            Ok(Some(credential)) => credential,
+            Ok(None) => continue,
+            Err(detail) => {
+                unrouted.push(Wiring::settled(connection, State::Failed { detail }));
+                continue;
+            }
         };
+        let at = fulfils.at;
         routes.push(Gated {
             target: Target::Curator {
                 media_type: fulfils.kind.media_type().to_owned(),
             },
-            path: filler.id.clone(),
-            address: fulfils.at.url(),
+            path: path.to_owned(),
+            address: format!(
+                "http://{}:{}",
+                at.host,
+                fulfils.adapter.contract.unwrap_or(at.port)
+            ),
             majors: Vec::new(),
-            credential: key,
+            credential,
             tokens: Vec::new(),
         });
     }
     (routes, unrouted)
+}
+
+/// The key the gate is to present to `adapter`: the one written there whose SHA-256 the
+/// gate presents now, or, where `minting` allows, a new one written beside the rest; none
+/// where it allows none, and nothing written on a rehearsal, which presents no key.
+fn curators_key(
+    ctx: &Ctx,
+    adapter: &crate::wiring::Filler,
+    presented: Option<&str>,
+    minting: Minting,
+) -> Result<Option<String>, String> {
+    let mut keys = super::request_keys::Keys::of(ctx, adapter)?;
+    if let Some(key) = presented.and_then(|presented| keys.presented(presented)) {
+        return Ok(Some(key.to_owned()));
+    }
+    match minting {
+        Minting::Never => Ok(None),
+        Minting::Minted if ctx.dry_run => Ok(Some(String::new())),
+        Minting::Minted => keys.fresh(ctx).map(Some),
+    }
 }
 
 /// The media server as the gate routes to it: where the API it speaks is answered, the
@@ -439,6 +469,7 @@ fn to_media(routed: &Routed<'_>, key: &str, link: Option<PlexLink>) -> Gated {
     Gated {
         target: match link {
             Some(link) => Target::Plex { pins, link },
+            None if routed.pairing.protocol.0 == gating::EMBY_API => Target::Emby { pins },
             None => Target::MediaServer { pins },
         },
         path: routed.server.id().to_owned(),

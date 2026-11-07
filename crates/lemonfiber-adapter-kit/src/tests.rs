@@ -12,7 +12,7 @@ use tower::ServiceExt as _;
 
 use super::{key_in, same_secret, serve, serving, upstream_in, Kit, UPSTREAM_MOST};
 
-const KEY: &str = "the-plugins-key";
+pub(crate) const KEY: &str = "the-plugins-key";
 
 /// A subtitle finder watching nothing.
 struct Finding;
@@ -43,13 +43,13 @@ fn about() -> About {
     }
 }
 
-fn kit() -> Kit {
+pub(crate) fn kit() -> Kit {
     Kit::new(KEY, about()).serving(fetch::served(Arc::new(Finding)))
 }
 
 /// What the kit answers `method` at `path`, carrying `key`, as its status, its type and
 /// its body.
-async fn asked(
+pub(crate) async fn asked(
     kit: Kit,
     method: &str,
     path: &str,

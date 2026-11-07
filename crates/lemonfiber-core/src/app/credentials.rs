@@ -21,6 +21,7 @@ mod minting;
 pub(crate) use minting::upstream_anew;
 pub(crate) mod pending;
 mod reading;
+mod requesting;
 mod revealing;
 mod rotating;
 mod tokening;

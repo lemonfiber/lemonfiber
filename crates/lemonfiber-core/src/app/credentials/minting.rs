@@ -15,8 +15,6 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_manifest::Service;
-
 use super::rotating::would_rotate;
 use crate::app::Ctx;
 use crate::credential::{fingerprint, Held, Propagation, Reach, Rotation, Settled};
@@ -55,11 +53,9 @@ pub(super) fn minted<'a>(
         })
 }
 
-/// What a minted secret is replaced amid: the stack's services and where it is written,
-/// and who fills what, which say which other services hold a copy of it.
+/// What a minted secret is replaced amid: who fills what, which says which other services
+/// hold a copy of it.
 pub(crate) struct Amid<'a> {
-    /// The services the stack declares.
-    pub(crate) services: &'a [Service],
     /// Who fills each ask, and where each is reached.
     pub(crate) fillers: &'a Fillers,
 }
@@ -247,9 +243,9 @@ fn read_anew(ctx: &Ctx, installed: &Installed, setting: &str) -> (Vec<String>, O
 /// Every other service holding a copy of the key of the service `of`, each given the new
 /// one.
 ///
-/// Only the copies this stack has: no indexer, no subtitle finder, no quality sync, or no
-/// gate in front of the request service is a consumer that is not there rather than one
-/// left behind.
+/// Only the copies this stack has: no indexer, no subtitle finder or no quality sync is a
+/// consumer that is not there rather than one left behind. The request gate holds a key of
+/// its own on the curator's adapter, and no copy of this one.
 async fn copies(ctx: &Ctx, of: &str, amid: &Amid<'_>) -> Vec<Propagation> {
     let named = amid
         .fillers
@@ -274,12 +270,6 @@ async fn copies(ctx: &Ctx, of: &str, amid: &Amid<'_>) -> Vec<Propagation> {
         for (holder, state) in holders {
             copies.push(copy(format!("{holder}, which {what}"), state));
         }
-    }
-    if let Some(state) = crate::seed::run::reroute(ctx, amid.services, amid.fillers, of).await {
-        copies.push(copy(
-            format!("the request gate, which reaches {named} for the request service"),
-            state,
-        ));
     }
     copies
 }

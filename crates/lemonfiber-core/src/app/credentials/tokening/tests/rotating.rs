@@ -129,7 +129,7 @@ fn beside_contracted_requests(
 fn curator_line() -> Held {
     Held {
         name: CURATOR_LINE.to_owned(),
-        setting: "request-gate/tokens.json#sonarr".to_owned(),
+        setting: "request-gate/tokens.json#tv".to_owned(),
         consumers: Vec::new(),
         location: String::new(),
         origin: crate::credential::Origin::Lemonfiber,
@@ -160,7 +160,7 @@ fn not_proven(said: &str) -> String {
 async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
     let target = serde_json::json!([{
         "id": "1",
-        "at": { "host": crate::app::gating::SERVICE, "port": PORT, "base": "/sonarr" },
+        "at": { "host": crate::app::gating::SERVICE, "port": PORT, "base": "/tv" },
         "key": "held",
         "kind": "tv",
     }])

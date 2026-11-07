@@ -16,8 +16,15 @@ pub enum Target {
         /// The media type it files.
         media_type: String,
     },
-    /// The media server, reached at its internal TLS port.
+    /// The media server, answered in Jellyfin's API and reached at its internal TLS port.
     MediaServer {
+        /// The SHA-256 of each certificate that port may present, in lower-case
+        /// hexadecimal: the only ones the gate accepts.
+        pins: Vec<String>,
+    },
+    /// Emby as the media server, answered in its own API and reached at its internal TLS
+    /// port.
+    Emby {
         /// The SHA-256 of each certificate that port may present, in lower-case
         /// hexadecimal: the only ones the gate accepts.
         pins: Vec<String>,
@@ -87,7 +94,7 @@ pub struct Gated {
     /// Where the gate reaches it.
     pub address: String,
     /// The upstream's majors the stack supports, the only ones the gate forwards to; none
-    /// where the gate knows the upstream's one supported interface itself.
+    /// on a curator's route, which speaks `library.curate`.
     pub majors: Vec<u32>,
     /// The credential the gate presents to it.
     pub credential: String,

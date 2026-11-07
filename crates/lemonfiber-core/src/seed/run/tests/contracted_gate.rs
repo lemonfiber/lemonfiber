@@ -116,12 +116,19 @@ async fn a_first_party_gate_speaking_the_contract_is_handed_its_routes_over_it()
     assert!(http.requests().iter().all(|one| one
         .url
         .starts_with("http://127.0.0.1:8080/lemonfiber/request.gate/v1/")));
+    let routes = admitted_routes(&http);
     assert_eq!(
-        admitted_routes(&http),
-        vec![
-            ("sonarr".to_owned(), "the-key".to_owned()),
-            ("radarr".to_owned(), "the-key".to_owned()),
-        ]
+        routes
+            .iter()
+            .map(|(path, _)| path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["tv", "movies"]
+    );
+    assert!(
+        routes
+            .iter()
+            .all(|(_, key)| !key.is_empty() && key != "the-key"),
+        "{routes:?}"
     );
 }
 
@@ -135,6 +142,7 @@ fn beside_a_stranger(
     let mut stranger = crate::test_support::a_placed("kept", &["library.curate"], Some(8990));
     stranger.media_types = vec!["movies".to_owned()];
     stranger.native = Some("servarr".to_owned());
+    stranger.speaks = vec!["library.curate@1".to_owned()];
     let requests = REQUESTS.installed().map(|mut one| {
         granted.clone_into(&mut one.granted);
         one
@@ -155,47 +163,39 @@ fn beside_a_stranger(
     )
 }
 
-/// A curator a third-party plugin brought is not routed through a first-party gate: its
-/// key may not be handed to another plugin's service. Where the operator granted it to the
-/// request service, so the request service fulfils through it, the gate's pass says it
-/// holds no route to it and why.
+/// A curator a third-party plugin brought is routed through a first-party gate, under a
+/// key of the gate's own written beside its adapter, and its own key never reaches the gate.
 #[tokio::test]
-async fn a_third_party_curators_key_is_never_handed_to_the_gate() {
+async fn a_third_party_curator_is_routed_under_a_key_of_the_gates_own() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("gate-stranger-curator");
     let http = admitting_nothing();
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
-    let ungranted = beside_a_stranger(&project, &[]);
-    let credential = ungranted
-        .service("kept")
-        .and_then(|kept| ungranted.credential(kept))
-        .unwrap_or_default();
-    let granted = beside_a_stranger(
-        &project,
-        &[crate::plugin::Grant {
-            credential,
-            of: "kept".to_owned(),
-            serves: "request.intake".to_owned(),
-            at: String::new(),
-        }],
-    );
 
-    let alone = super::super::gate::seed_gate_routes(&ctx, &standing_in(), &ungranted, None).await;
-    let said = super::super::gate::seed_gate_routes(&ctx, &standing_in(), &granted, None).await;
+    let wirings = super::super::gate::seed_gate_routes(
+        &ctx,
+        &standing_in(),
+        &beside_a_stranger(&project, &[]),
+        None,
+    )
+    .await;
 
+    assert_eq!(states(&wirings), vec![&State::Wired]);
+    let routes = admitted_routes(&http);
     assert_eq!(
-        admitted_routes(&http),
-        vec![
-            ("sonarr".to_owned(), "the-key".to_owned()),
-            ("sonarr".to_owned(), "the-key".to_owned())
-        ]
+        routes
+            .iter()
+            .map(|(path, _)| path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["movies", "tv"]
     );
-    assert_eq!(states(&alone), vec![&State::Wired]);
-    assert!(
-        matches!(said.as_slice(), [_, unrouted]
-            if unrouted.connection == "kept the stand-in routed through the request gate"
-                && matches!(&unrouted.state, State::Unmatched { reason }
-                    if reason.starts_with("kept the stand-in is a third-party plugin's service"))),
-        "{said:?}"
+    let written = std::fs::read_to_string(
+        crate::plugin::key_file(&project, "kept")
+            .with_file_name(lemonfiber_contract::adapter::REQUEST_KEY_FILE),
+    )
+    .unwrap_or_default();
+    assert_eq!(
+        routes.first().map(|(_, key)| key.as_str()),
+        Some(written.trim())
     );
 }
 

@@ -162,6 +162,14 @@ impl Adapted {
         let _ = std::fs::write(into.join(lemonfiber_bundle::MANIFEST), pinned.copy);
     }
 
+    /// `key` written as the request gate's key on the adapter, in the stack at `project`.
+    pub fn gate_key(self, project: &std::path::Path, key: &str) {
+        let at = lemonfiber_core::plugin::key_file(project, self.adapter)
+            .with_file_name(lemonfiber_contract::adapter::REQUEST_KEY_FILE);
+        let _ = std::fs::create_dir_all(at.parent().unwrap_or(project));
+        let _ = std::fs::write(at, format!("{key}\n"));
+    }
+
     /// Each secret the plugin mints held as `value` in the secret store beside the env file
     /// `ctx`'s settings name, beside everything held there before, the store stamped as an
     /// earlier lemonfiber wrote it. Nothing where `ctx` names no env file.

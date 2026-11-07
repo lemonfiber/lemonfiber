@@ -1,0 +1,235 @@
+{
+  "post": {
+    "operationId": "request",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "TitleRequest": {
+                "additionalProperties": false,
+                "description": "A household's request for one title, as the curator is asked to take it.",
+                "properties": {
+                  "anime": {
+                    "description": "Whether a series is numbered as anime is.",
+                    "type": "boolean"
+                  },
+                  "later_seasons": {
+                    "description": "Whether the seasons of a series that air later are monitored too.",
+                    "type": "boolean"
+                  },
+                  "quality_profile": {
+                    "description": "The quality profile a title it does not hold is fetched at.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "reference": {
+                    "description": "The title's catalogue reference.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "root_folder": {
+                    "description": "The root folder a title it does not hold is filed under.",
+                    "type": "string"
+                  },
+                  "search": {
+                    "description": "Whether it searches for what it then wants.",
+                    "type": "boolean"
+                  },
+                  "seasons": {
+                    "description": "The seasons of a series asked for; none for a film.",
+                    "items": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "reference",
+                  "root_folder",
+                  "quality_profile",
+                  "seasons",
+                  "anime",
+                  "later_seasons",
+                  "search"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              },
+              "request": {
+                "$ref": "#/$defs/TitleRequest",
+                "description": "The port's `request`."
+              }
+            },
+            "required": [
+              "kind",
+              "request"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "CuratedSeason": {
+                  "additionalProperties": false,
+                  "description": "One season of a series a curator holds or knows.",
+                  "properties": {
+                    "episodes": {
+                      "description": "How many episodes it has.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "files": {
+                      "description": "How many of its episodes have a file.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "monitored": {
+                      "description": "Whether the curator is monitoring it.",
+                      "type": "boolean"
+                    },
+                    "number": {
+                      "description": "Its number; season zero is where a curator files specials.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "monitored",
+                    "files",
+                    "episodes"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "A title as a curator holds it, or as its catalogue knows it where it holds none.",
+              "properties": {
+                "files": {
+                  "description": "How many files of it the curator holds.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "The curator's own id for it, where it holds it.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "monitored": {
+                  "description": "Whether the curator is monitoring it.",
+                  "type": "boolean"
+                },
+                "reference": {
+                  "description": "Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "seasons": {
+                  "description": "Each season of a series; none for a film.",
+                  "items": {
+                    "$ref": "#/$defs/CuratedSeason"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "description": "What it is called.",
+                  "type": "string"
+                },
+                "year": {
+                  "description": "The year it came out, where the catalogue gives one.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "reference",
+                "title",
+                "monitored",
+                "files",
+                "seasons"
+              ],
+              "title": "CuratedTitle",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576,
+    "x-lemonfiber-since": 1
+  }
+}

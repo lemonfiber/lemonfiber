@@ -28,17 +28,18 @@ const MINTED: &str = "sonarr upstream-key";
 /// The byte every value minted here is made of.
 const RANDOM: u8 = 0xcd;
 
-/// The gate's routes: the curator's presenting [`OLD_KEY`], and the media server's.
+/// The gate's routes: the curator's presenting a key of the gate's own, and the media
+/// server's.
 fn gate_routes() -> Vec<Gated> {
     vec![
         Gated {
             target: Target::Curator {
                 media_type: "tv".to_owned(),
             },
-            path: "sonarr".to_owned(),
-            address: "http://sonarr:8989".to_owned(),
+            path: "tv".to_owned(),
+            address: "http://sonarr-adapter:8080".to_owned(),
             majors: Vec::new(),
-            credential: OLD_KEY.to_owned(),
+            credential: "the-gates-own".to_owned(),
             tokens: Vec::new(),
         },
         Gated {
@@ -236,7 +237,6 @@ async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
         "sonarr-adapter",
         "Prowlarr, which supplies Sonarr with indexers",
         "Bazarr, which finds subtitles for Sonarr",
-        "the request gate, which reaches Sonarr for the request service",
     ] {
         assert_eq!(reach(copy), Some(Reach::Updated), "{copy}: {consumers:?}");
     }
@@ -246,14 +246,7 @@ async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
         format!("SONARR_KEY={new_key}\n"),
         "the plugin kept the old key"
     );
-    assert_eq!(
-        gate.routes()
-            .into_iter()
-            .find(|route| route.path == "sonarr")
-            .map(|route| route.credential),
-        Some(new_key.clone()),
-        "the gate's route kept the old key"
-    );
+    assert_eq!(gate.routes(), gate_routes(), "the gate holds none of it");
     let registered: Vec<String> =
         lemonfiber_testing::adapted::asked_at(&http.requests(), searching("register_application"))
             .into_iter()

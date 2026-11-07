@@ -233,7 +233,7 @@
                     },
                     {
                       "additionalProperties": false,
-                      "description": "The media server, reached at its internal TLS port.",
+                      "description": "The media server, answered in Jellyfin's API and reached at its internal TLS port.",
                       "properties": {
                         "media-server": {
                           "additionalProperties": false,
@@ -254,6 +254,32 @@
                       },
                       "required": [
                         "media-server"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "description": "Emby as the media server, answered in its own API and reached at its internal TLS\nport.",
+                      "properties": {
+                        "emby": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "pins": {
+                              "description": "The SHA-256 of each certificate that port may present, in lower-case\nhexadecimal: the only ones the gate accepts.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "pins"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "emby"
                       ],
                       "type": "object"
                     },

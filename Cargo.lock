@@ -1561,6 +1561,7 @@ dependencies = [
  "ratatui",
  "rpassword",
  "rustls",
+ "serde",
  "serde_json",
  "serde_norway",
  "syn 3.0.9",

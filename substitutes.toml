@@ -1,0 +1,60 @@
+# The substitute each capability `F14-R14` names is proved by, end to end against its
+# pinned upstream, standing in for the bundle's choice of that capability for one media
+# type: installed, its first run, conformance, substitution, the capability's features
+# and undo. The substitutes job reads this file, one job for each arm.
+#
+# One [[substitute]] table per arm:
+#
+#   arm            the name of the arm, which its job and its line in the report carry.
+#   capability     the capability the arm proves.
+#   plugin         the substitute's `[plugin].id`.
+#   origin         the substitute's repository, as an https URL.
+#   revision       the full 40-hex commit it is proved at, on the origin's default
+#                  branch. The train moves it on its rolling pin pull request.
+#   stands_in_for  the plugin the bundle fills the capability with, which it replaces.
+#   media_type     the media type the arm exercises the capability for.
+#   claimed        `false` where the substitute's upstream is claimed against an account
+#                  outside the house and runs unclaimed, so its arm proves install and the
+#                  reading that names it `Open` alone.
+
+schema = 1
+
+[[substitute]]
+arm           = "indexer-search"
+capability    = "indexer.search"
+plugin        = "nzbhydra2"
+origin        = "https://github.com/lemonfiber/plugin-nzbhydra2"
+revision      = "8bcefe043e070ce27aaa77ea85f80997c149bb60"
+stands_in_for = "prowlarr"
+media_type    = "tv"
+claimed       = true
+
+[[substitute]]
+arm           = "media-serve-music"
+capability    = "media.serve"
+plugin        = "navidrome"
+origin        = "https://github.com/lemonfiber/plugin-navidrome"
+revision      = "39368429bfa530eb9fd29cee2c97d97eaeb83136"
+stands_in_for = "jellyfin"
+media_type    = "music"
+claimed       = true
+
+[[substitute]]
+arm           = "media-serve-audiobooks"
+capability    = "media.serve"
+plugin        = "audiobookshelf"
+origin        = "https://github.com/lemonfiber/plugin-audiobookshelf"
+revision      = "14dfdcf314658d5555c9ee0e9d206cd7d3de7af2"
+stands_in_for = "jellyfin"
+media_type    = "audiobooks"
+claimed       = true
+
+[[substitute]]
+arm           = "media-serve-plex-unclaimed"
+capability    = "media.serve"
+plugin        = "plex"
+origin        = "https://github.com/lemonfiber/plugin-plex"
+revision      = "93efbedde3ab37384cdeb63cc3763d8c608bcc62"
+stands_in_for = "jellyfin"
+media_type    = "movies"
+claimed       = false

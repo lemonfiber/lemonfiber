@@ -21,10 +21,10 @@ use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_manifest::Service;
 
 use super::fulfilment::fulfilling;
-use super::tokens::{through_the_gate, Kept};
+use super::tokens::{route_of, through_the_gate, Kept};
 use super::Ctx;
 use crate::baseline::Baseline;
-use crate::credential::{Reach, Settled};
+use crate::credential::{Propagation, Reach, Settled};
 use crate::ports::media::Kind;
 use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
@@ -69,10 +69,11 @@ pub(super) async fn note_held(
         return;
     };
     for fulfils in fulfilling(fillers) {
-        if held
-            .iter()
-            .any(|one| one.at.host == fulfils.at.host && one.at.port == fulfils.at.port)
-        {
+        let reached_itself = fulfils.filler.address.as_ref().is_some_and(|own| {
+            held.iter()
+                .any(|one| one.at.host == own.host && one.at.port == own.port)
+        });
+        if reached_itself {
             baseline.record(
                 &filler.id,
                 &format!("{HELD_KEY}{}", fulfils.filler.id),
@@ -144,7 +145,7 @@ pub(super) async fn seed_taken_back(
     }
     let mut unsettled = Vec::new();
     for curator in owed {
-        unsettled.extend(replaced(ctx, services, fillers, &filler.id, &curator, baseline).await);
+        unsettled.extend(replaced(ctx, fillers, &filler.id, &curator, baseline).await);
     }
     if let Some((client, _, server)) = &media_server {
         for key in &minted {
@@ -173,7 +174,6 @@ pub(super) async fn seed_taken_back(
 /// whose key lemonfiber did not mint stays owed, since nothing here can replace it.
 async fn replaced(
     ctx: &Ctx,
-    services: &[Service],
     fillers: &Fillers,
     owed_by: &str,
     curator: &str,
@@ -184,7 +184,7 @@ async fn replaced(
         baseline.forget(owed_by, &field);
         return Vec::new();
     };
-    let amid = crate::app::credentials::Amid { services, fillers };
+    let amid = crate::app::credentials::Amid { fillers };
     let Some(rotation) = crate::app::credentials::reminted(ctx, held, &amid).await else {
         return vec![format!(
             "{}'s key could not be replaced: lemonfiber replaces a key only where it minted it, \
@@ -194,16 +194,7 @@ async fn replaced(
     };
     if matches!(rotation.settled, Settled::Replaced { .. }) {
         baseline.forget(owed_by, &field);
-        return rotation
-            .consumers
-            .iter()
-            .filter_map(|one| match &one.reach {
-                Reach::Failed { detail } => {
-                    Some(format!("{} could not be given it: {detail}.", one.consumer))
-                }
-                Reach::Updated | Reach::Pending { .. } => None,
-            })
-            .collect();
+        return not_given(&rotation.consumers);
     }
     let detail = rotation.settled.detail().unwrap_or_default();
     vec![format!(
@@ -233,8 +224,8 @@ async fn still_direct(
     }
     let held = requests.fulfilment_targets().await?;
     for fulfils in fulfilling(fillers) {
-        let host = &fulfils.at.host;
-        if !gated_target(requests, &held, kept.as_ref(), host, fulfils.kind).await {
+        let route = route_of(fulfils.kind);
+        if !gated_target(requests, &held, kept.as_ref(), route, fulfils.kind).await {
             direct.push(fulfils.filler.name.clone());
         }
     }
@@ -246,20 +237,20 @@ fn accepted(kept: Option<&Kept>, route: &str, token: &str) -> bool {
     kept.is_some_and(|kept| kept.accepts(route, token))
 }
 
-/// Whether the request service holds the curator reached at `host` at the gate, under a
-/// token the gate accepts, and passes its own test of it there.
+/// Whether the request service holds the curator the gate answers under `route` at the
+/// gate, under a token the gate accepts, and passes its own test of it there.
 async fn gated_target(
     requests: &dyn Requests,
     held: &[RegisteredTarget],
     kept: Option<&Kept>,
-    host: &str,
+    route: &str,
     kind: Kind,
 ) -> bool {
-    let at = through_the_gate(host);
+    let at = through_the_gate(route);
     let Some(one) = held.iter().find(|one| one.at == at && one.kind == kind) else {
         return false;
     };
-    accepted(kept, host, &one.key)
+    accepted(kept, route, &one.key)
         && requests
             .test_fulfilment_target(kind, &one.at, &one.key)
             .await
@@ -290,3 +281,19 @@ fn held_count(count: usize) -> String {
 fn settled(state: State) -> Wiring {
     Wiring::settled(CONNECTION.to_owned(), state)
 }
+
+/// What is said of each consumer a replacement could not reach.
+fn not_given(consumers: &[Propagation]) -> Vec<String> {
+    consumers
+        .iter()
+        .filter_map(|one| match &one.reach {
+            Reach::Failed { detail } => {
+                Some(format!("{} could not be given it: {detail}.", one.consumer))
+            }
+            Reach::Updated | Reach::Pending { .. } => None,
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests;

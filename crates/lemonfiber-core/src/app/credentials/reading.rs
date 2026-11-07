@@ -39,6 +39,7 @@ pub(crate) async fn taken(
     taken.extend(super::declining::held(ctx, services, fillers).await);
     taken.extend(super::gating::held(ctx, services, fillers).await);
     taken.extend(super::tokening::held(ctx, services, fillers).await);
+    taken.extend(super::requesting::held(ctx, services, fillers).await);
     taken.extend(super::certifying::held(
         ctx,
         crate::seed::run::replacing::Stack { services, fillers },

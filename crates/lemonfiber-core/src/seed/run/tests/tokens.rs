@@ -46,7 +46,7 @@ fn project(name: &str, accepted: &[&str]) -> (std::path::PathBuf, Arc<Gate>) {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
-    let mut route = gated_route("sonarr", Some("tv"), MINTED_CURATOR_KEY);
+    let mut route = gated_route("tv", Some("tv"), MINTED_CURATOR_KEY);
     route.tokens = accepting(accepted);
     (at, Arc::new(Gate::admitting(vec![route])))
 }
@@ -58,7 +58,7 @@ fn accepting(tokens: &[&str]) -> Vec<String> {
 
 /// What `gate` accepts on the curator's route.
 fn accepted(gate: &Gate) -> Vec<String> {
-    gate.tokens("sonarr").unwrap_or_default()
+    gate.tokens("tv").unwrap_or_default()
 }
 
 /// Where the request service reaches the curator: at `host` and `port` under `base`.
@@ -83,12 +83,12 @@ fn listed(host: &str, port: u16, base: &str, key: &str) -> Answer {
 
 /// Where the gate answers for the curator.
 fn the_gate() -> Endpoint {
-    reached("request-gate", PORT, "/sonarr")
+    reached("request-gate", PORT, "/tv")
 }
 
 /// The curator held at the gate with `key`.
 fn at_the_gate(key: &str) -> Answer {
-    listed("request-gate", PORT, "/sonarr", key)
+    listed("request-gate", PORT, "/tv", key)
 }
 
 /// The request service listing nothing.
@@ -262,10 +262,10 @@ async fn a_curator_held_at_its_own_address_is_moved_to_the_gate() {
     assert!(added(&http).is_empty());
 }
 
-/// A stack that no longer runs the gate moves the curator back to its own address, with
-/// the key lemonfiber minted for it.
+/// Removing the gate leaves the request service holding what it held, and says it hands
+/// it no curator: nothing but the gate is a way to one.
 #[tokio::test]
-async fn removing_the_gate_moves_a_curator_back() {
+async fn removing_the_gate_hands_no_curator_over_and_says_so() {
     let (at, gate) = project("tokens-ungated", &[]);
     let http = serving(
         vec![at_the_gate("held")],
@@ -275,11 +275,33 @@ async fn removing_the_gate_moves_a_curator_back() {
 
     let wirings = seeded(&stack(false), (&at, &gate), &http, true, false).await;
 
-    assert_eq!(states(&wirings), vec![State::Wired]);
-    assert_eq!(
-        moves(&http),
-        vec![(reached("sonarr", 8989, ""), MINTED_CURATOR_KEY.to_owned())]
+    assert!(
+        matches!(states(&wirings).as_slice(), [State::Unmatched { .. }]),
+        "{wirings:?}"
     );
+    assert!(!written(&http));
+}
+
+/// A curator the request service holds at the gate's route under the curator's id is moved
+/// to the route for the media it files, not registered a second time.
+#[tokio::test]
+async fn a_curator_held_at_its_old_route_is_moved_to_the_route_for_its_media() {
+    let (at, gate) = project("tokens-old-route", &[]);
+    let http = serving(
+        vec![
+            listed("request-gate", PORT, "/sonarr", "held"),
+            listed("request-gate", PORT, "/sonarr", "held"),
+            at_the_gate(&minted()),
+        ],
+        requests::taken(),
+        requests::taken(),
+    );
+
+    let wirings = seeded(&stack(true), (&at, &gate), &http, true, false).await;
+
+    assert_eq!(states(&wirings), vec![State::Wired]);
+    assert_eq!(moves(&http), vec![(the_gate(), minted())]);
+    assert!(added(&http).is_empty());
 }
 
 /// A rehearsal says where the curator would move, and writes nothing to either side.
@@ -351,8 +373,8 @@ async fn a_curator_the_gate_has_no_route_to_is_given_to_nobody() {
         states(&wirings),
         vec![State::Failed {
             detail: "the tokens could not be handed to the request gate: it admits no route \
-                     sonarr"
-                .to_owned(),
+                     tv"
+            .to_owned(),
         }]
     );
     assert!(!written(&http));
@@ -363,9 +385,8 @@ async fn a_curator_the_gate_has_no_route_to_is_given_to_nobody() {
 #[tokio::test]
 async fn tokens_that_cannot_be_written_are_given_to_nobody() {
     let (at, _) = project("tokens-unwritable", &[]);
-    let gate = Arc::new(
-        admitting(&[("sonarr", Some("tv"), MINTED_CURATOR_KEY)]).refusing(&["admit_tokens"]),
-    );
+    let gate =
+        Arc::new(admitting(&[("tv", Some("tv"), MINTED_CURATOR_KEY)]).refusing(&["admit_tokens"]));
     let http = serving(vec![nothing()], requests::taken(), requests::taken());
 
     let wirings = seeded(&stack(true), (&at, &gate), &http, true, false).await;
@@ -390,7 +411,7 @@ async fn tokens_that_cannot_be_written_are_given_to_nobody() {
 #[tokio::test]
 async fn an_old_token_that_cannot_be_retired_is_said() {
     let (at, _) = project("tokens-unretired", &[]);
-    let mut route = gated_route("sonarr", Some("tv"), MINTED_CURATOR_KEY);
+    let mut route = gated_route("tv", Some("tv"), MINTED_CURATOR_KEY);
     route.tokens = accepting(&["held", "older"]);
     let gate = Arc::new(Gate::admitting(vec![route]).refusing(&["admit_tokens"]));
     let http = serving(
@@ -442,7 +463,7 @@ async fn without_randomness_no_token_is_minted() {
 #[tokio::test]
 async fn a_route_presenting_a_credential_lemonfiber_does_not_know_keeps_it() {
     let (at, _) = project("tokens-unvouched", &[]);
-    let gate = Arc::new(admitting(&[("sonarr", Some("tv"), "a-key-nobody-wrote")]));
+    let gate = Arc::new(admitting(&[("tv", Some("tv"), "a-key-nobody-wrote")]));
     let http = serving(
         vec![nothing(), nothing(), at_the_gate(&minted())],
         requests::taken(),

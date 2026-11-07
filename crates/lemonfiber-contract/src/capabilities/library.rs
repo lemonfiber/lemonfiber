@@ -9,9 +9,10 @@
 use lemonfiber_ports::media::{Format, Kind, BOOKS, MUSIC};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, DownloadClient, FoundItem, Identity, Importing, ItemPart, Maintenance,
-    MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue, QueueItem, Queues,
-    Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TraceEvent,
+    Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Identity,
+    Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile,
+    QualityReleases, Queue, QueueItem, Queues, Record, RegisteredClient, RegisteredFolder,
+    ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
 };
 use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
@@ -43,7 +44,7 @@ const ASKED_BY: &str = "mode";
 const CLIENT_PROTOCOL: &str = "sabnzbd";
 
 /// Every operation that takes a `Kind`, each asked once for each kind.
-const BY_KIND: [&str; 11] = [
+const BY_KIND: [&str; 18] = [
     "search_upgrades",
     "lookup",
     "add_plan",
@@ -55,6 +56,27 @@ const BY_KIND: [&str; 11] = [
     "item_queue",
     "item_parts",
     "stuck_items",
+    "catalogued",
+    "titles",
+    "held_title",
+    "request",
+    "search",
+    "remove",
+    "downloading",
+];
+
+/// The operations the request gate asks a curator under its request key, and no other.
+pub const REQUESTED: [&str; 10] = [
+    "catalogued",
+    "titles",
+    "held_title",
+    "request",
+    "search",
+    "remove",
+    "downloading",
+    "quality_profiles",
+    "root_folders",
+    "lookup",
 ];
 
 /// Every operation that takes a `Record` sort, each asked once for each media type's.
@@ -261,6 +283,33 @@ crate::contract! {
             fn item_parts(value kind: Kind, value id: i64, value season: Option<u32>) -> Vec<ItemPart> where asks = Asked { kind: Kind::Tv, id: NO_ITEM, season: None };
             /// What of one kind is stuck.
             fn stuck_items(value kind: Kind) -> Vec<StuckItem> where asks = Asked { kind: Kind::Tv };
+        }
+        impl Fulfilling {
+            /// The title of one kind its catalogue holds by a reference, or none.
+            fn catalogued(value kind: Kind, value reference: i64) -> Option<CuratedTitle> where since = 1, asks = Asked { kind: Kind::Tv, reference: NO_ITEM };
+            /// Every title of one kind it holds.
+            fn titles(value kind: Kind) -> Vec<CuratedTitle> where since = 1, asks = Asked { kind: Kind::Tv };
+            /// One title of one kind it holds, or none.
+            fn held_title(value kind: Kind, value id: i64) -> Option<CuratedTitle> where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
+            /// Take a household's request for one title.
+            fn request(value kind: Kind, refer request: &TitleRequest as TitleRequest) -> CuratedTitle where since = 1, asks = Asked {
+                kind: Kind::Tv,
+                request: TitleRequest {
+                    reference: NO_ITEM,
+                    root_folder: FOLDER.to_owned(),
+                    quality_profile: i64::from(PROFILE),
+                    seasons: vec![1],
+                    anime: false,
+                    later_seasons: false,
+                    search: false,
+                },
+            };
+            /// Search for what it wants of one title it holds.
+            fn search(value kind: Kind, value id: i64) -> () where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
+            /// Remove one title it holds, with its files.
+            fn remove(value kind: Kind, value id: i64) -> () where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
+            /// What it is downloading of one kind.
+            fn downloading(value kind: Kind) -> Vec<Downloading> where since = 1, asks = Asked { kind: Kind::Tv };
         }
     }
 }

@@ -26,6 +26,7 @@ mod failure;
 mod fetching;
 mod filing;
 mod fronting;
+mod fulfilling;
 mod furnishing;
 mod gating;
 mod guarding;
@@ -76,6 +77,10 @@ pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use filing::{Filed, Filing};
 pub use fronting::{AppKeys, Astray, Dated, Fronted, OutsideAccount, OutsideServer};
+pub use fulfilling::{
+    CuratedSeason, CuratedTitle, DownloadState, DownloadedEpisode, Downloading, Fulfilling,
+    TitleRequest,
+};
 pub use furnishing::{FiledAt, Furnished, Furnishing};
 pub use gating::{
     Admitted, GateEntry, GateOutcome, GateRecord, Gated, Gating, PlexLink, PlexMember, Target,

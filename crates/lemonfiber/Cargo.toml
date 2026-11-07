@@ -77,6 +77,8 @@ tokio = { workspace = true, features = ["test-util"] }
 # TOML, and a hand-rolled reader for either would be a second opinion about what
 # they say. Already in the tree via the manifest parser.
 toml = { workspace = true }
+# The pins the substitutes job reads, read as the arms they declare.
+serde = { workspace = true }
 # Reading the NAS templates, which are Compose files, so what each one runs and mounts
 # is checked as a document rather than matched as text. Already in the tree via the
 # core's reading of the stack.

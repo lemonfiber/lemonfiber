@@ -748,6 +748,232 @@
       "media_type": "movies",
       "operation": "stuck_items",
       "since": 0
+    },
+    {
+      "asked": {
+        "kind": "tv",
+        "reference": 0
+      },
+      "case": "catalogued-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "catalogued",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "movies",
+        "reference": 0
+      },
+      "case": "catalogued-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "catalogued",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "tv"
+      },
+      "case": "titles-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "titles",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "titles-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "titles",
+      "since": 1
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "tv"
+      },
+      "case": "held_title-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "held_title",
+      "since": 1
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "movies"
+      },
+      "case": "held_title-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "held_title",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "tv",
+        "request": {
+          "anime": false,
+          "later_seasons": false,
+          "quality_profile": 1,
+          "reference": 0,
+          "root_folder": "/data/conformance",
+          "search": false,
+          "seasons": [
+            1
+          ]
+        }
+      },
+      "case": "request-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "request",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "movies",
+        "request": {
+          "anime": false,
+          "later_seasons": false,
+          "quality_profile": 1,
+          "reference": 0,
+          "root_folder": "/data/conformance",
+          "search": false,
+          "seasons": [
+            1
+          ]
+        }
+      },
+      "case": "request-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "request",
+      "since": 1
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "tv"
+      },
+      "case": "search-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "search",
+      "since": 1
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "movies"
+      },
+      "case": "search-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "search",
+      "since": 1
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "tv"
+      },
+      "case": "remove-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "remove",
+      "since": 1
+    },
+    {
+      "asked": {
+        "id": 0,
+        "kind": "movies"
+      },
+      "case": "remove-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "remove",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "tv"
+      },
+      "case": "downloading-answers-tv",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "tv",
+      "operation": "downloading",
+      "since": 1
+    },
+    {
+      "asked": {
+        "kind": "movies"
+      },
+      "case": "downloading-answers-movies",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "media_type": "movies",
+      "operation": "downloading",
+      "since": 1
     }
   ],
   "major": 1

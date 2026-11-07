@@ -1,11 +1,9 @@
 //! The request service: reached through its adapter, and handed the curators.
 
 use super::*;
-use crate::ports::service::{
-    Endpoint, FulfilmentTarget, QualityProfile, RegisteredFolder, RegisteredTarget,
-};
+use crate::ports::service::{FulfilmentTarget, QualityProfile, RegisteredFolder, RegisteredTarget};
 use crate::test_support::curators::{curating as curated_by, TELEVISION};
-use crate::test_support::requests::{answered, intake, taken, told, unavailable, REQUESTS};
+use crate::test_support::requests::{answered, intake, told, unavailable, REQUESTS};
 
 /// The shipped stack's `services` with its television curator and its request service
 /// moved into their plugins, each plugin as `shape` leaves it.
@@ -22,14 +20,19 @@ fn moved(
     fillers_beside(services, &installed, stack_root())
 }
 
-/// The services of `plugin` that file media.
+/// [`moved`], beside the request gate.
+fn gated(shape: fn(&mut crate::plugin::Installed)) -> crate::wiring::Fillers {
+    moved(vec![request_gate()], shape)
+}
+
+/// The services of `plugin` speaking `library.curate`.
 fn curators(
     plugin: &mut crate::plugin::Installed,
 ) -> impl Iterator<Item = &mut crate::plugin::Placed> {
     plugin
         .services
         .iter_mut()
-        .filter(|placed| !placed.media_types.is_empty())
+        .filter(|placed| placed.speaks.iter().any(|one| one == "library.curate@1"))
 }
 
 /// A context over `http` asking `adapted`, the television curator's minted key kept, with
@@ -63,38 +66,12 @@ fn television_folder() -> Answer {
     }])
 }
 
-/// Where the request service reaches the television curator.
-fn sonarr() -> Endpoint {
-    Endpoint {
-        host: "sonarr".to_owned(),
-        port: 8989,
-        base: String::new(),
-    }
-}
-
-/// The moved request service is handed the moved curator over its contract, at the
-/// address it reaches it on and with the key lemonfiber minted for the curator.
+/// A stack with no request gate hands the request service no curator, and says why: it
+/// reaches a curator through the gate and no other way.
 #[tokio::test]
-async fn the_moved_request_service_is_handed_each_moved_curator_with_its_minted_key() {
-    let mut routes = a_curator(television_folder());
-    routes.extend([
-        (
-            intake("fulfilment_targets"),
-            vec![
-                answered(&Vec::<RegisteredTarget>::new()),
-                answered(&[RegisteredTarget {
-                    id: "1".to_owned(),
-                    at: sonarr(),
-                    key: MINTED_CURATOR_KEY.to_owned(),
-                    kind: crate::ports::media::Kind::Tv,
-                }]),
-            ],
-        ),
-        (intake("add_fulfilment_target"), vec![taken()]),
-        (intake("test_fulfilment_target"), vec![taken()]),
-    ]);
-    let http = Fake::by_path_in_turn(routes);
-    let ctx = asking("targets", http.clone(), &[TELEVISION, REQUESTS]);
+async fn without_the_gate_no_curator_is_handed_over_and_it_is_said() {
+    let http = Fake::by_path_in_turn(a_curator(television_folder()));
+    let ctx = asking("targets-ungated", http.clone(), &[TELEVISION, REQUESTS]);
 
     let wirings =
         super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
@@ -102,49 +79,20 @@ async fn the_moved_request_service_is_handed_each_moved_curator_with_its_minted_
     assert_eq!(
         wirings
             .iter()
-            .map(|wiring| &wiring.state)
+            .map(|wiring| (wiring.connection.as_str(), &wiring.state))
             .collect::<Vec<_>>(),
-        vec![&crate::seed::State::Wired],
-        "{wirings:?}"
-    );
-    assert_eq!(
-        told::<FulfilmentTarget>(&http.requests(), "add_fulfilment_target", "target")
-            .iter()
-            .map(|target| (
-                target.at.clone(),
-                target.key.as_str(),
-                target.folder.as_str()
-            ))
-            .collect::<Vec<_>>(),
-        vec![(sonarr(), MINTED_CURATOR_KEY, "/data/media/tv")]
-    );
-}
-
-/// A rehearsal names where it would hand the curator over, and hands over nothing.
-#[tokio::test]
-async fn a_rehearsed_pass_names_the_curator_and_writes_nothing() {
-    let mut routes = a_curator(television_folder());
-    routes.push((
-        intake("fulfilment_targets"),
-        vec![answered(&Vec::<RegisteredTarget>::new())],
-    ));
-    let http = Fake::by_path_in_turn(routes);
-    let ctx = asking("targets-rehearsed", http.clone(), &[TELEVISION, REQUESTS]).rehearsing();
-
-    let wirings =
-        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
-
-    assert_eq!(
-        wirings.first().map(|wiring| &wiring.state),
-        Some(&crate::seed::State::WouldWire {
-            yours: None,
-            ours: Some("at sonarr:8989".to_owned()),
-        }),
+        vec![(
+            "Sonarr into Seerr",
+            &crate::seed::State::Unmatched {
+                reason: "the request service reaches a curator only through the request gate, \
+                         and the stack runs none"
+                    .to_owned(),
+            }
+        )],
         "{wirings:?}"
     );
     assert!(
-        told::<FulfilmentTarget>(&http.requests(), "add_fulfilment_target", "target").is_empty(),
-        "a rehearsal handed a curator over"
+        told::<FulfilmentTarget>(&http.requests(), "add_fulfilment_target", "target").is_empty()
     );
 }
 
@@ -202,7 +150,7 @@ async fn a_curator_that_will_not_say_where_it_files_is_left_out() {
     );
 
     let wirings =
-        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
+        super::super::seed_fulfilment_targets(&ctx, &[request_gate()], &gated(|_| {})).await;
 
     assert!(
         wirings.is_empty(),
@@ -233,7 +181,7 @@ async fn a_curator_with_no_quality_profile_is_left_out() {
     );
 
     let wirings =
-        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
+        super::super::seed_fulfilment_targets(&ctx, &[request_gate()], &gated(|_| {})).await;
 
     assert!(
         wirings.is_empty(),
@@ -241,31 +189,7 @@ async fn a_curator_with_no_quality_profile_is_left_out() {
     );
 }
 
-/// A curator its plugin mints no key for, whose key is read from no file, has no key
-/// to hand over.
-#[tokio::test]
-async fn a_curator_with_no_key_to_read_is_left_out() {
-    let ctx = asking(
-        "targets-keyless",
-        Fake::by_path_in_turn(a_curator(television_folder())),
-        &[TELEVISION, REQUESTS],
-    );
-
-    let wirings = super::super::seed_fulfilment_targets(
-        &ctx,
-        &[],
-        &moved(Vec::new(), |plugin| {
-            for secret in &mut plugin.declared.secrets {
-                secret.minted = false;
-            }
-        }),
-    )
-    .await;
-
-    assert!(wirings.is_empty(), "{wirings:?}");
-}
-
-/// A curator listening on no port has no endpoint to hand over.
+/// A curator whose adapter listens on no port has no route to hand over.
 #[tokio::test]
 async fn a_curator_publishing_no_port_is_left_out() {
     let ctx = asking(
@@ -276,8 +200,8 @@ async fn a_curator_publishing_no_port_is_left_out() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[],
-        &moved(Vec::new(), |plugin| {
+        &[request_gate()],
+        &gated(|plugin| {
             curators(plugin).for_each(|placed| placed.listens = None);
         }),
     )
@@ -315,7 +239,7 @@ async fn a_curator_that_cannot_be_read_is_not_handed_over_half_configured() {
     let ctx = asking("targets-unread", http.clone(), &[REQUESTS]);
 
     let wirings =
-        super::super::seed_fulfilment_targets(&ctx, &[], &moved(Vec::new(), |_| {})).await;
+        super::super::seed_fulfilment_targets(&ctx, &[request_gate()], &gated(|_| {})).await;
 
     assert!(
         wirings.is_empty(),
