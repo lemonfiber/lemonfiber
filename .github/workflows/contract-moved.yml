@@ -37,7 +37,7 @@ jobs:
       contents: read
     uses: lemonfiber/spec/.github/workflows/tell.yml@1cbf3e262ca3cb3cd5afe227f36bbe98ff929895 # v1.0.139
     with:
-      repos: sdk-ts sdk-php sdk-python
+      repos: sdk-ts sdk-php sdk-python sdk-rust
       workflow: contract-bump.yml
       environment: release
     secrets:

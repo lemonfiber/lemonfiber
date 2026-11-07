@@ -22,6 +22,9 @@ Options:
       --dry-run
           Say what would happen, and change nothing
 
+      --only <CATEGORY>
+          Take only this category of what the offer costs nothing to take: `orphaned` or `extracted`. May be repeated
+
       --force
           Take the stack from a run that claimed it and did not give it back
 

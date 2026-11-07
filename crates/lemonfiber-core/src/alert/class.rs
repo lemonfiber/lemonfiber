@@ -23,7 +23,7 @@ pub enum Class {
 ///
 /// A short list because it is a short idea: these are the ones an operator means
 /// when they say they would like to hear when something arrives.
-const COMPLETIONS: [&str; 2] = ["download.completed", "import.succeeded"];
+pub(super) const COMPLETIONS: [&str; 2] = ["download.completed", "import.succeeded"];
 
 impl Class {
     /// Which class an event falls in.

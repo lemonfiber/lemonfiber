@@ -159,6 +159,8 @@ pub fn described(change: &Change) -> String {
         Kind::KeyRevoked { name, .. } => format!("the revoke of the key {name}"),
         Kind::DeviceKeyRegistered { name, .. } => format!("the device key {name}"),
         Kind::DeviceKeyRevoked { name } => format!("the revoke of the device key {name}"),
+        Kind::PushEndpointRegistered { name } => format!("the push endpoint {name}"),
+        Kind::PushEndpointRemoved { name } => format!("the removal of the push endpoint {name}"),
         Kind::Setting { name, .. } => format!("the setting {name}"),
         Kind::Secret { name, .. } => format!("the secret {name}"),
         Kind::Granted { plugin, grant, .. } => {

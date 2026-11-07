@@ -42,6 +42,12 @@
       ],
       "required": true
     },
+    "notification": {
+      "type": [
+        "oneOf(const:\"backup\",const:\"completion\",const:\"member\",const:\"problem\",const:\"request\",const:\"update\")"
+      ],
+      "required": false
+    },
     "remedies": {
       "type": [
         "array[string]"
@@ -61,5 +67,12 @@
       "required": true
     }
   },
-  "variants": []
+  "variants": [
+    "\"backup\"",
+    "\"completion\"",
+    "\"member\"",
+    "\"problem\"",
+    "\"request\"",
+    "\"update\""
+  ]
 }

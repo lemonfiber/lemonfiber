@@ -255,6 +255,18 @@ pub enum Kind {
         /// The device key's name.
         name: String,
     },
+    /// A push endpoint was registered. Nothing undoes it from here: removing one is its own
+    /// act, and says so.
+    PushEndpointRegistered {
+        /// The endpoint's name.
+        name: String,
+    },
+    /// A push endpoint was removed. Nothing undoes it: only the phone holds what a
+    /// registration is made from.
+    PushEndpointRemoved {
+        /// The endpoint's name.
+        name: String,
+    },
     /// A setting in the settings store was recorded or cleared.
     Setting {
         /// The setting's name.

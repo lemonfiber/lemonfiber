@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every push endpoint, and what became of a removal.",
+  "type": "object",
+  "properties": {
+    "endpoints": {
+      "description": "In the order they were registered.",
+      "type": "array",
+      "items": {
+        "$ref": "ListedPushEndpoint.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what removing would come to, with nothing removed.",
+      "type": "boolean"
+    },
+    "removed": {
+      "description": "The endpoint this request removed, where it removed one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "endpoints",
+    "rehearsed"
+  ]
+}

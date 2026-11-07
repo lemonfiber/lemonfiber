@@ -503,10 +503,11 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // The one write here, and it is the same answer twice: unconfirmed it lists
         // what would go, confirmed it goes.
         Command::Forget { confirm } => stored::forget(ctx, confirm).await.map(Outcome::Stored),
-        // The same shape, over the operator's own disk rather than over lemonfiber's
-        // files: unconfirmed it accounts and offers, confirmed it takes what the
-        // account named as costing nothing.
-        Command::Space { agreement } => space::space(ctx, agreement).await.map(Outcome::Space),
+        // The same shape, over the operator's own disk: unconfirmed it accounts and offers,
+        // confirmed it takes what the account named as costing nothing.
+        Command::Space { agreement, only } => space::space(ctx, agreement, &only)
+            .await
+            .map(Outcome::Space),
         // The one download the account leaves with the operator, asked for by name and
         // answered by the offer's own name. Apart from the account rather than an
         // argument to it, because a yes to reclaiming what costs nothing is not a yes
@@ -521,6 +522,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Downloads { asked, offer } => bandwidth::pausing::paused(ctx, asked, offer).await,
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
         Command::DeviceKeys(asked) => crate::device_keys::run::asked(ctx, asked).await,
+        Command::PushEndpoints(asked) => crate::push::run::asked(ctx, asked),
         Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.

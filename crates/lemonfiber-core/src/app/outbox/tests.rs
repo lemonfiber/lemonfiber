@@ -23,6 +23,7 @@ fn alert(check: &str) -> Alert {
         id: None,
         check: check.to_owned(),
         kind: "service.down".to_owned(),
+        notification: crate::alert::Notification::Problem,
         moment: Moment::Onset,
         severity: crate::error::Severity::Warning,
         summary: "something happened".to_owned(),

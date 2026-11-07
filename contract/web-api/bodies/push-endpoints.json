@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PushEndpointRegistering",
+  "description": "What a registration is asked with.",
+  "type": "object",
+  "properties": {
+    "auth": {
+      "description": "The phone's `WebPush` secret, in base64url.",
+      "type": "string"
+    },
+    "endpoint": {
+      "description": "The `https` address the phone's `UnifiedPush` distributor gave.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What to call it: lower-case letters, digits, dots, dashes and underscores.",
+      "type": "string"
+    },
+    "p256dh": {
+      "description": "The phone's `WebPush` public key, in base64url.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "endpoint",
+    "p256dh",
+    "auth"
+  ]
+}

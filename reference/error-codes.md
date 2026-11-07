@@ -271,6 +271,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `LIFE-12` | `OFFLINE_INSTALL_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where an `up` or a `switch` names an offer that is not the install a fresh look at the stack offers. |
 | `LIFE-13` | `OFFLINE_INSTALL_UNANSWERED` | warning | 1 | 409 | 0.18.0 | Raised where a start would install a part this build carries and nobody said yes. |
 | `LIFE-14` | `OFFLINE_INSTALL_UNHELD` | error | 1 | 409 | 0.18.0 | Raised where an install a start was agreed to did not hold. |
+| `LIFE-15` | `OFFLINE_INSTALL_UNREAD` | warning | 1 | 409 | 0.18.0 | Raised where a start would install a part whose install could not be read. |
 
 ## `MIGRATE` — taking over a setup already here
 
@@ -377,6 +378,16 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PROVIDER-7` | `PROVIDER_SILENT` | warning | 1 | 500 | 0.7.0 | Raised when an account has stopped answering the client entirely. |
 | `PROVIDER-8` | `PROVIDER_CROWDED` | warning | 1 | 500 | 0.7.0 | Raised when the client is set to open more connections than an account allows. |
 | `PROVIDER-9` | `INDEXER_CAPPED` | warning | 1 | 500 | 0.7.0 | Raised when an indexer has spent the allowance recorded against it. |
+
+## `PUSH` — waking a phone that asked to be woken
+
+| Code | Name | Severity | Exit | Status | Since | Summary |
+| ---- | ---- | -------- | ---- | ------ | ----- | ------- |
+| `PUSH-1` | `NOT_A_PUSH_NAME` | error | 1 | 400 | 0.18.0 | Raised when a push endpoint is registered under a word that cannot name one. |
+| `PUSH-2` | `PUSH_NAME_TAKEN` | error | 1 | 409 | 0.18.0 | Raised when a push endpoint is registered under a name another holds. |
+| `PUSH-3` | `PUSH_NOT_HTTPS` | error | 1 | 400 | 0.18.0 | Raised when a push endpoint's address is not an `https` address. |
+| `PUSH-4` | `PUSH_KEYS_UNREADABLE` | error | 1 | 400 | 0.18.0 | Raised when the keys a push endpoint gave cannot be encrypted to. |
+| `PUSH-5` | `PUSH_NOT_REGISTERED` | error | 1 | 404 | 0.18.0 | Raised when no push endpoint holds the name asked about. |
 
 ## `QUAL` — quality against what is available
 
@@ -555,6 +566,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SPACE-5` | `NOT_HELD` | error | 1 | 400 | 0.12.0 | Raised when the client answers and is holding nothing of the name given. |
 | `SPACE-6` | `ANOTHER_OFFER` | error | 1 | 400 | 0.12.0 | Raised when an agreement names an offer that is not the one standing now. |
 | `SPACE-7` | `STILL_HELD` | error | 1 | 500 | 0.12.0 | Raised when the client could not be reached, or would not let a download go. |
+| `SPACE-8` | `NOT_ON_OFFER` | error | 1 | 400 | 0.18.0 | Raised when an answer narrows to a category its offer does not hold as costing nothing. |
 
 ## `STACK` — the stack description
 

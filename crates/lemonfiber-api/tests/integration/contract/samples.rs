@@ -383,6 +383,21 @@ fn keeping() -> Vec<Outcome> {
         Outcome::Keys(every_key()),
         Outcome::DeviceKey(a_device_key()),
         Outcome::DeviceKeys(every_device_key()),
+        Outcome::PushEndpoint(lemonfiber_core::push::Registered {
+            name: "pixel".to_owned(),
+            endpoint: "https://push.example/abc".to_owned(),
+            registered: "2026-11-07T00:00:00Z".to_owned(),
+            rehearsed: false,
+        }),
+        Outcome::PushEndpoints(lemonfiber_core::push::Listing {
+            endpoints: vec![lemonfiber_core::push::Listed {
+                name: "pixel".to_owned(),
+                endpoint: "https://push.example/abc".to_owned(),
+                registered: "2026-11-07T00:00:00Z".to_owned(),
+            }],
+            removed: Some("tablet".to_owned()),
+            rehearsed: false,
+        }),
     ]
 }
 

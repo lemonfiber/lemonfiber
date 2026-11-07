@@ -8,6 +8,7 @@ fn alert(check: &str, moment: Moment) -> Alert {
         id: None,
         check: check.to_owned(),
         kind: "service.stopped".to_owned(),
+        notification: crate::alert::Notification::Problem,
         moment,
         severity: Severity::Warning,
         summary: "it broke".to_owned(),

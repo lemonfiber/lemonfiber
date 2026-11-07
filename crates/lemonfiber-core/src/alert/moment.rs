@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::notification::Notification;
 use crate::condition::Condition;
 use crate::error::Severity;
 
@@ -48,6 +49,11 @@ pub struct Alert {
     pub check: String,
     /// What kind of event it is, shared by every instance of it.
     pub kind: String,
+    /// Which of the closed list of notification kinds this alert is, so a client can
+    /// offer a switch for it. A problem on an alert recorded before alerts carried one.
+    #[serde(default)]
+    #[schemars(required)]
+    pub notification: Notification,
     /// Which way it went.
     pub moment: Moment,
     /// How much it matters. A resolution takes the severity of what resolved,
@@ -92,6 +98,7 @@ impl Alert {
             id: Some(Self::named(&condition.check, condition.recurrences)),
             check: condition.check.clone(),
             kind: condition.kind.clone(),
+            notification: Notification::of(&condition.kind, condition.severity),
             moment,
             severity: condition.severity,
             summary: condition.summary.clone(),

@@ -1,8 +1,8 @@
 //! Which of the requests lemonfiber makes on its own account this operator allows.
 //!
 //! Every one of them is off by one setting, and all of them are off by one more.
-//! The blanket switch is not a convenience over the nine: an operator who wants
-//! nothing to leave this machine wants *nothing* to, and asking them to find nine
+//! The blanket switch is not a convenience over the ten: an operator who wants
+//! nothing to leave this machine wants *nothing* to, and asking them to find ten
 //! settings is asking them to miss one — which they would then find out about from
 //! a packet capture rather than from here.
 //!
@@ -58,6 +58,9 @@ pub const REACH_CATALOGUE_KEY: &str = "LEMONFIBER_REACH_CATALOGUE";
 /// found.
 pub const REACH_POSTERS_KEY: &str = "LEMONFIBER_REACH_POSTERS";
 
+/// The setting that stops lemonfiber waking the phones that asked to be woken.
+pub const REACH_WAKING_KEY: &str = "LEMONFIBER_REACH_WAKING";
+
 /// Every setting that switches one request off.
 ///
 /// The leak check's own source is not among them: it is named rather than switched,
@@ -74,6 +77,7 @@ pub const SWITCHES: &[&str] = &[
     REACH_PLUGIN_SOURCE_KEY,
     REACH_CATALOGUE_KEY,
     REACH_POSTERS_KEY,
+    REACH_WAKING_KEY,
 ];
 
 /// Whether this operator has asked that nothing leave the machine.

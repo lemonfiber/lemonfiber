@@ -14,6 +14,13 @@
         "$ref": "ExceptionReport.json"
       }
     },
+    "kinds": {
+      "description": "The notification kinds this stack raises as it is configured, so a client offers a\nswitch for each of those and for nothing else.",
+      "type": "array",
+      "items": {
+        "$ref": "NotificationKind.json"
+      }
+    },
     "means": {
       "description": "What that preset means, in the operator's terms.",
       "type": "string"
@@ -31,6 +38,7 @@
     "preset",
     "means",
     "exceptions",
+    "kinds",
     "changed",
     "rehearsed"
   ]

@@ -152,6 +152,9 @@ impl Change {
             Kind::KeyRevoked { name, .. } => Action::Reinstate { name: name.clone() },
             Kind::DeviceKeyRegistered { name, .. } => Action::RevokeDevice { name: name.clone() },
             Kind::DeviceKeyRevoked { name } => Action::ReinstateDevice { name: name.clone() },
+            Kind::PushEndpointRegistered { name } | Kind::PushEndpointRemoved { name } => {
+                Action::PushEndpoint { name: name.clone() }
+            }
             Kind::Setting {
                 name,
                 previous,

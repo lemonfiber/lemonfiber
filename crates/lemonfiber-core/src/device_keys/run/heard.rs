@@ -194,6 +194,7 @@ async fn raised(
         id: Some(Alert::named(check, happened)),
         check: check.to_owned(),
         kind: ALERT_KIND.to_owned(),
+        notification: crate::alert::Notification::Problem,
         moment: Moment::Onset,
         severity: Severity::Warning,
         summary,

@@ -274,7 +274,7 @@ async fn tried(
                 super::engine::plugins_of(offline)
             ));
             report.installing.clone_from(&offline.installs);
-            report.offer = Some(offline.offer.clone());
+            report.offer.clone_from(&offline.offer);
             return Ok(report);
         }
     }
@@ -298,7 +298,7 @@ async fn tried(
     outcome.map(|mut report| {
         if let Some((_, offline)) = waiting {
             report.installing = offline.installs;
-            report.offer = Some(offline.offer);
+            report.offer = offline.offer;
         }
         report
     })
@@ -320,12 +320,10 @@ fn came_up(report: &LifecycleReport) -> bool {
 ///
 /// A part left waiting for its install is said where nothing more pressing is.
 async fn confirmed(ctx: &Ctx, report: &LifecycleReport) {
-    match (wrong(ctx).await, report.offer.as_ref()) {
-        (Some(said), _) => raised(ctx, &said, TUNNEL_UNPROVEN),
-        (None, Some(_)) if !report.installing.is_empty() => {
-            raised(ctx, &waits(report), WAITING_COSTS);
-        }
-        (None, _) => observed(ctx, None),
+    match wrong(ctx).await {
+        Some(said) => raised(ctx, &said, TUNNEL_UNPROVEN),
+        None if !report.installing.is_empty() => raised(ctx, &waits(report), WAITING_COSTS),
+        None => observed(ctx, None),
     }
 }
 
@@ -338,8 +336,13 @@ fn waits(report: &LifecycleReport) -> String {
         .collect();
     format!(
         "{} waits for its install from this build, so it and what runs through it did not \
-         start; lemonfiber up offers the install",
-        plugins.join(", ")
+         start; lemonfiber up {}",
+        plugins.join(", "),
+        if report.offer.is_some() {
+            "offers the install"
+        } else {
+            "says why it could not be read"
+        }
     )
 }
 
@@ -497,6 +500,7 @@ fn owed(condition: &Condition) -> Alert {
         id: Some(Alert::named(CHECK, condition.recurrences)),
         check: CHECK.to_owned(),
         kind: condition.kind.clone(),
+        notification: crate::alert::Notification::of(&condition.kind, condition.severity),
         moment: Moment::Onset,
         severity: condition.severity,
         summary: condition.summary.clone(),
