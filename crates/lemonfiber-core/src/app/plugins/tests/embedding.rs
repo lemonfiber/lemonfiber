@@ -113,14 +113,16 @@ async fn a_plugin_the_bundle_installs_moves_in_place_of_the_stack_service_it_rep
 }
 
 /// A move in place whose install is put back starts the stack's own service again where
-/// the rest of the stack is running, and leaves a stopped stack stopped.
+/// the rest of the stack is running, says so where Compose would not start it, and leaves
+/// a stopped stack stopped.
 #[tokio::test]
 async fn a_move_put_back_starts_the_stack_service_again_where_the_stack_runs() {
-    for (name, running) in [
-        ("embedded-put-back", true),
-        ("embedded-put-back-stopped", false),
+    for (name, running, refusing) in [
+        ("embedded-put-back", true, None),
+        ("embedded-put-back-stopped", false, None),
+        ("embedded-put-back-refused", true, Some("up")),
     ] {
-        let watching = super::offline::watching();
+        let watching = super::offline::refusing(refusing);
         let mut ctx = unmoved(name, &watching.serving).with_http(
             lemonfiber_fixtures::http::Fake::by_path(vec![
                 super::speaking::declares(),
@@ -142,10 +144,21 @@ async fn a_move_put_back_starts_the_stack_service_again_where_the_stack_runs() {
                 .publishing(&[(BUNDLED, "127.0.0.1", 8095), (ADAPTER, "127.0.0.1", 8080)]),
         );
 
-        let recorded = report(from_git(&ctx, BUNDLED).await)
-            .and_then(|one| one.install)
-            .map(|install| install.recorded);
-        assert_eq!(recorded, Some(false), "{name}");
+        let install = report(from_git(&ctx, BUNDLED).await).and_then(|one| one.install);
+        assert_eq!(
+            install.as_ref().map(|one| one.recorded),
+            Some(false),
+            "{name}"
+        );
+        let left: Vec<String> = install
+            .and_then(|one| one.reversed)
+            .map(|reversed| reversed.left)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|one| one.because.contains("could not be started again"))
+            .map(|one| one.target)
+            .collect();
+        assert_eq!(left.is_empty(), refusing.is_none(), "{name}: {left:?}");
 
         let asked = watching
             .seen

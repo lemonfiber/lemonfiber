@@ -91,6 +91,19 @@ pub(crate) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) -> Result
     Ok(())
 }
 
+/// Start `services` alone over the project as every start writes it, held to what every
+/// start is held to before it runs; whether Compose started them.
+///
+/// # Errors
+///
+/// What writing the project, or the check before a start, refused.
+pub(crate) async fn started_alone(ctx: &Ctx, services: &[String]) -> Result<bool, Box<Problem>> {
+    let action = Action::Start(services.to_vec());
+    let Composed { command, .. } = compose(ctx, &[], &action)?;
+    before(ctx, &action, services)?;
+    Ok(matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded()))
+}
+
 /// What resolving the forms into a runnable Compose command produced.
 ///
 /// Named fields rather than a tuple because callers want different parts of it: a

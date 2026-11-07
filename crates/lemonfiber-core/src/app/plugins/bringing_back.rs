@@ -6,18 +6,15 @@
 //! the machine removes it. Putting the files back restores the stack's own definition and
 //! starts nothing, so a running stack would be left without the service.
 
-use std::path::Path;
-
 use crate::plugin::Installed;
 use crate::ports::docker::Lifecycle;
-use crate::stack::compose::{build, Action};
 
 use super::super::putting_back::Left;
 use super::super::Ctx;
 
 /// Start each stack service `would` was moving in place of, where the rest of the stack is
-/// running; what could not be started again, said.
-pub(super) async fn brought_back(ctx: &Ctx, would: &Installed, stack: &Path) -> Vec<Left> {
+/// running, as every start is made; what could not be started again, said.
+pub(super) async fn brought_back(ctx: &Ctx, would: &Installed) -> Vec<Left> {
     let replaced: Vec<String> = would
         .services
         .iter()
@@ -26,28 +23,24 @@ pub(super) async fn brought_back(ctx: &Ctx, would: &Installed, stack: &Path) -> 
     if replaced.is_empty() || !stack_running(ctx, would).await {
         return Vec::new();
     }
-    let started = match super::super::engine::resolved(ctx, &[]) {
-        Ok((_, mut plan)) => {
-            plan.services.clone_from(&replaced);
-            let start = Action::Start(replaced.clone());
-            let command = build(&plan, &ctx.settings, stack, &start, ctx.environment);
-            matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded())
-        }
-        Err(_) => false,
+    let because = match super::super::engine::started_alone(ctx, &replaced).await {
+        Ok(true) => return Vec::new(),
+        Ok(false) => NOT_STARTED.to_owned(),
+        Err(problem) => problem.summary,
     };
-    if started {
-        return Vec::new();
-    }
     replaced
         .into_iter()
         .map(|service| Left {
             target: service,
-            because: "the stack's own service could not be started again after the install \
-                      was put back, so it is not running until the stack is started"
-                .to_owned(),
+            because: because.clone(),
         })
         .collect()
 }
+
+/// What a stack service Compose would not start again is left as.
+const NOT_STARTED: &str = "the stack's own service could not be started again after the \
+                           install was put back, so it is not running until the stack is \
+                           started";
 
 /// Whether any of the stack's services other than `would`'s is running.
 async fn stack_running(ctx: &Ctx, would: &Installed) -> bool {

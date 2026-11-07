@@ -369,7 +369,7 @@ async fn reversing(
         back.left.push(still_running(&would.plugin));
     }
     back.left
-        .extend(bringing_back::brought_back(ctx, would, stack).await);
+        .extend(bringing_back::brought_back(ctx, would).await);
     back
 }
 
