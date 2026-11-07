@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "endpoints": {
+      "type": [
+        "array[ref:ListedPushEndpoint]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "removed": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

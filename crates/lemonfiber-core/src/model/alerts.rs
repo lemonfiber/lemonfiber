@@ -24,6 +24,9 @@ pub struct AlertReport {
     pub means: String,
     /// Events set apart from the preset, quietest name first.
     pub exceptions: Vec<ExceptionReport>,
+    /// The notification kinds this stack raises as it is configured, so a client offers a
+    /// switch for each of those and for nothing else.
+    pub kinds: Vec<crate::alert::Notification>,
     /// Whether this call changed the answer.
     pub changed: bool,
     /// Whether it only reported what it would have written.

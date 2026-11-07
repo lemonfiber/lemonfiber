@@ -160,4 +160,14 @@ codes! {
         remedy: "Run lemonfiber plugin install with the part's name to see what its proofs \
             found, then start the form again.",
     }
+    /// Raised where a start would install a part whose install could not be read.
+    OFFLINE_INSTALL_UNREAD = "LIFE-15" {
+        severity: Warning,
+        status: 409,
+        since: "0.18.0",
+        meaning: "The form holds a part this build carries that this machine has never run, \
+            and its install could not be read, so no offer stands for a yes to answer. Nothing \
+            was installed, written or started; the message names the part and why.",
+        remedy: "Put right what stopped the read, and rehearse the start again.",
+    }
 }

@@ -306,6 +306,7 @@ fn a_wordy_snapshot() -> Snapshot {
         id: None,
         check: "service.sonarr".to_owned(),
         kind: "service.down".to_owned(),
+        notification: lemonfiber_core::alert::Notification::Problem,
         moment: lemonfiber_core::alert::Moment::Onset,
         severity: lemonfiber_core::error::Severity::Warning,
         summary: a_long(4),

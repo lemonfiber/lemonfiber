@@ -41,6 +41,42 @@
       "description": "Which way it went.",
       "$ref": "Moment.json"
     },
+    "notification": {
+      "description": "Which of the closed list of notification kinds this alert is, so a client can\noffer a switch for it. A problem on an alert recorded before alerts carried one.",
+      "default": "problem",
+      "oneOf": [
+        {
+          "description": "A condition at warning or worse, at onset and resolution.",
+          "type": "string",
+          "const": "problem"
+        },
+        {
+          "description": "Work the operator asked for finishing.",
+          "type": "string",
+          "const": "completion"
+        },
+        {
+          "description": "An update to the stack or lemonfiber being available.",
+          "type": "string",
+          "const": "update"
+        },
+        {
+          "description": "A backup that succeeded.",
+          "type": "string",
+          "const": "backup"
+        },
+        {
+          "description": "A household member's request newly waiting on the operator.",
+          "type": "string",
+          "const": "request"
+        },
+        {
+          "description": "An invitation accepted, declined or lapsed.",
+          "type": "string",
+          "const": "member"
+        }
+      ]
+    },
     "remedies": {
       "description": "What to do about it, most likely first. An alert that says what happened\nand not what to do is a notification, which is a different and worse thing.",
       "type": "array",

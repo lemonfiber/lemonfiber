@@ -226,3 +226,59 @@ fn the_device_keys_are_listed_with_where_each_stands_and_what_a_revoke_did() {
     .text();
     assert!(none.contains("No device key has been registered"), "{none}");
 }
+
+/// One push endpoint, as a listing shows it.
+fn a_push_endpoint() -> lemonfiber_core::push::Listed {
+    lemonfiber_core::push::Listed {
+        name: "pixel".to_owned(),
+        endpoint: "https://push.example/abc".to_owned(),
+        registered: "2026-11-07T00:00:00Z".to_owned(),
+    }
+}
+
+#[test]
+fn a_push_endpoint_registered_says_it_is_woken_or_would_be() {
+    let mut report = lemonfiber_core::push::Registered {
+        name: "pixel".to_owned(),
+        endpoint: "https://push.example/abc".to_owned(),
+        registered: "2026-11-07T00:00:00Z".to_owned(),
+        rehearsed: false,
+    };
+    let said = super::pushed(&report).text();
+    assert!(
+        said.contains("Registered the push endpoint pixel"),
+        "{said}"
+    );
+    report.rehearsed = true;
+    let said = super::pushed(&report).text();
+    assert!(said.contains("Registering would"), "{said}");
+}
+
+#[test]
+fn the_push_endpoints_are_listed_and_a_removal_is_said() {
+    let mut report = lemonfiber_core::push::Listing {
+        endpoints: Vec::new(),
+        removed: None,
+        rehearsed: false,
+    };
+    let said = super::pushes(&report).text();
+    assert!(
+        said.contains("No push endpoint has been registered"),
+        "{said}"
+    );
+
+    report.endpoints.push(a_push_endpoint());
+    let said = super::pushes(&report).text();
+    assert!(said.contains("pixel  https://push.example/abc"), "{said}");
+
+    report.removed = Some("tablet".to_owned());
+    let said = super::pushes(&report).text();
+    assert!(said.contains("Removed the push endpoint tablet"), "{said}");
+
+    report.rehearsed = true;
+    let said = super::pushes(&report).text();
+    assert!(
+        said.contains("Removing would stop waking the push endpoint tablet"),
+        "{said}"
+    );
+}

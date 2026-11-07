@@ -58,6 +58,16 @@ codes! {
             each occupies — so an offer that has moved since it was read is a different offer.",
         remedy: "Read the offer again, and answer the name it prints.",
     }
+    /// Raised when an answer narrows to a category its offer does not hold as costing nothing.
+    NOT_ON_OFFER = "SPACE-8" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "The answer narrows to something its offer does not hold as costing nothing: \
+            an empty category, a category that costs something, or no category at all. Nothing \
+            was removed; the message names it.",
+        remedy: "Read the offer again, and name a category it holds.",
+    }
     /// Raised when the client could not be reached, or would not let a download go.
     STILL_HELD = "SPACE-7" {
         severity: Error,

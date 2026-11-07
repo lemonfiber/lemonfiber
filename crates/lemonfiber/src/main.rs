@@ -206,6 +206,12 @@ macro_rules! taken {
     };
 }
 
+/// The account of the disk, answered with `agreement` where it was, of the categories `only`
+/// names.
+const fn spaced(agreement: Option<String>, only: Vec<String>) -> Command {
+    Command::Space { agreement, only }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Settled before anything is printed, because it decides how everything is.
@@ -338,11 +344,12 @@ async fn main() -> ExitCode {
         },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Uninstall(asked) => removing(asked),
-        Request::Space { offer } => Command::Space { agreement: offer },
+        Request::Space { offer, only } => spaced(offer, only),
         Request::StopSeeding { download, offer } => letting(download, offer),
         Request::Bandwidth(asked) => translate::sharing(asked),
         Request::Downloads(asked) => translate::pausing(&asked),
         Request::Key(asked) => translate::keyed(asked),
+        Request::PushEndpoint(asked) => translate::pushing(asked),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { offer } => Command::Reset {

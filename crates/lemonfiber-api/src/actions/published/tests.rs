@@ -70,7 +70,8 @@ fn the_consent_an_action_asks_for_is_the_yes_its_arguments_carry() {
     );
     assert!(consent("repair").contains(&"agreed"));
     assert!(consent("plugin-install").contains(&"approved"));
-    assert!(consent("up").is_empty());
+    assert!(consent("up").contains(&"offer"));
+    assert!(consent("down").is_empty());
     for one in &actions {
         assert!(one.consent.iter().all(|name| CONSENT.contains(name)));
     }

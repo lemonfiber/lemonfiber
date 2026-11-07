@@ -373,6 +373,24 @@
       ]
     },
     {
+      "description": "Leave a push endpoint as it stands.\n\nWorked out so the record of a registration or a removal has a reversal to name, and\nnever carried out: only the phone holds what a registration is made from.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "push-endpoint"
+        },
+        "name": {
+          "description": "The endpoint's name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "name"
+      ]
+    },
+    {
       "description": "Put a setting in the settings store back to what it held.",
       "type": "object",
       "properties": {

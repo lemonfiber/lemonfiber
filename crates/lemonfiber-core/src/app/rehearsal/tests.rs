@@ -382,6 +382,7 @@ fn always_reported() -> Vec<Command> {
         Command::Forget { confirm: true },
         Command::Space {
             agreement: Some("anything".to_owned()),
+            only: Vec::new(),
         },
         Command::StopSeeding(LettingGo {
             download: "anything".to_owned(),

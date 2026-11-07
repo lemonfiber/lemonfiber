@@ -1,9 +1,10 @@
 //! Whether a start installs the parts this build carries that its forms hold and this
 //! machine has never run, as the operator answers it at a terminal.
 //!
-//! Only an explicit yes installs. A no, a stray return, a run with nobody at a terminal
-//! and a machine-readable run each start nothing, and are answered with the report that
-//! says what is on offer and how to take it.
+//! Only an explicit yes installs. A no, a stray return, a run with nobody at a terminal,
+//! a machine-readable run and an install that could not be read each start nothing, and
+//! are answered with the report that says what is on offer and how to take it, or why it
+//! cannot be taken.
 
 use lemonfiber_core::app::{offline, Ctx};
 use lemonfiber_core::error::Problem;
@@ -37,12 +38,12 @@ pub(crate) async fn agreed(
     let Some(offline) = offline(ctx, forms).await? else {
         return Ok(Agreed::Nothing);
     };
-    if !interactive {
+    let Some(offer) = offline.offer.filter(|_| interactive) else {
         return Ok(Agreed::No);
-    }
+    };
     crate::render::moving::installing(&offline.installs, None).print();
     Ok(if is_yes(&ask(ASK_TO_INSTALL)) {
-        Agreed::Yes(offline.offer)
+        Agreed::Yes(offer)
     } else {
         Agreed::No
     })

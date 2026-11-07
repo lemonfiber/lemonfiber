@@ -25,6 +25,7 @@ fn an_event_set_apart_reads_as_the_answer_it_was_given() {
                 wanted: false,
             },
         ],
+        kinds: Vec::new(),
         changed: true,
         rehearsed: true,
     })
@@ -39,6 +40,7 @@ fn an_event_set_apart_reads_as_the_answer_it_was_given() {
         preset: "everything".to_owned(),
         means: "Told about everything.".to_owned(),
         exceptions: Vec::new(),
+        kinds: Vec::new(),
         changed: false,
         rehearsed: false,
     })

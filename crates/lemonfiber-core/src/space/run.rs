@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_contract::capabilities::download::torrent;
 
-use crate::error::codes::space::ANOTHER_OFFER;
+use crate::error::codes::space::{ANOTHER_OFFER, NOT_ON_OFFER};
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::ports::service::{Queued, Seeded};
 use crate::space::{
@@ -35,15 +35,20 @@ use crate::app::Ctx;
 /// asks about the whole of it rather than about one service's file inside it.
 const SERVICE_FILES: &str = "config";
 
-/// Where the disk stands, and — where an answer was given — what taking the offer
-/// came to.
+/// Where the disk stands, and — where an answer was given — what taking the offer came
+/// to, of the categories `only` names where it names any.
 ///
 /// # Errors
 ///
-/// Returns a [`Problem`] where there is no data location to measure, where the
-/// stack could not be read, or where the data location is there and will not be
-/// walked.
-pub(crate) async fn space(ctx: &Ctx, agreement: Option<String>) -> Result<Reckoning, Box<Problem>> {
+/// Returns a [`Problem`] where there is no data location to measure, where the stack
+/// could not be read, where the data location is there and will not be walked, where the
+/// answer names another offer, and where `only` names what this offer does not hold as
+/// costing nothing.
+pub(crate) async fn space(
+    ctx: &Ctx,
+    agreement: Option<String>,
+    only: &[String],
+) -> Result<Reckoning, Box<Problem>> {
     let gathered = measure(ctx).await?;
     let mut reckoned = reckon(&gathered.measured);
     let Some(given) = agreement else {
@@ -54,7 +59,11 @@ pub(crate) async fn space(ctx: &Ctx, agreement: Option<String>) -> Result<Reckon
     if given != reckoned.agreement {
         return Err(Box::new(another_offer(&reckoned.agreement)));
     }
-    reckoned.reclaimed = Some(reclaim(ctx, &reckoned, &gathered.measured).await);
+    let categories = reckoned
+        .narrowed(only)
+        .map_err(|word| Box::new(not_on_offer(word)))?;
+    let taking = reckoned.of_categories(&gathered.measured, &categories);
+    reckoned.reclaimed = Some(reclaim(ctx, taking).await);
     Ok(reckoned)
 }
 
@@ -323,14 +332,14 @@ fn marked(ctx: &Ctx, held: &[Seeded]) -> BTreeSet<String> {
 /// Each path is removed on its own so that one refusal does not stop the rest: a
 /// file the operator's own account cannot touch is reported as left behind, with
 /// the platform's words for why, and the room the others freed is still freed.
-async fn reclaim(ctx: &Ctx, reckoned: &Reckoning, measured: &Measured) -> Reclaimed {
+async fn reclaim(ctx: &Ctx, taking: Vec<crate::ports::occupancy::Occupant>) -> Reclaimed {
     let mut taken = Reclaimed {
         rehearsed: ctx.dry_run,
         gone: Vec::new(),
         bytes: 0,
         left: Vec::new(),
     };
-    for occupant in reckoned.offering(measured) {
+    for occupant in taking {
         // A rehearsal says what would go and takes nothing, which is the same
         // promise every other write in this product makes.
         if ctx.dry_run {
@@ -362,6 +371,18 @@ fn another_offer(standing: &str) -> Problem {
          offer. Taking this one would be taking something nobody saw.",
         Remedy::new("Read the offer again, and answer the name it prints")
             .with_detail(format!("the offer standing now is {standing}")),
+    )
+    .in_state(State::Guided)
+}
+
+/// The answer narrows to something the offer does not hold as costing nothing.
+fn not_on_offer(word: &str) -> Problem {
+    Problem::new(
+        NOT_ON_OFFER,
+        format!("{word} is not on offer, so nothing was removed"),
+        "An answer narrows only to the categories its offer names as costing nothing, and \
+         each of them is one the operator agrees to apart.",
+        Remedy::new("Read the offer again, and name a category it holds"),
     )
     .in_state(State::Guided)
 }

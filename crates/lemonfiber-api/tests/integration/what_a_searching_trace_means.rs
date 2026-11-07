@@ -200,7 +200,7 @@ fn a_search_agrees_to_nothing_and_narrows_no_diagnosis() {
     for argument in ["only", "confirm"] {
         let given = match argument {
             "only" => Arguments {
-                only: Some("vpn".to_owned()),
+                only: Some(lemonfiber_api::actions::Only::One("vpn".to_owned())),
                 ..searching(None)
             },
             _ => Arguments {

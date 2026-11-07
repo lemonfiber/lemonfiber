@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "kinds": {
+      "type": [
+        "array[ref:NotificationKind]"
+      ],
+      "required": true
+    },
     "means": {
       "type": [
         "string"

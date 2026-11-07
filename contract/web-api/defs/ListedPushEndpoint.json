@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One push endpoint as the listing shows it.",
+  "type": "object",
+  "properties": {
+    "endpoint": {
+      "description": "The `https` address its distributor gave.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name it was registered under.",
+      "type": "string"
+    },
+    "registered": {
+      "description": "When it was registered.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "endpoint",
+    "registered"
+  ]
+}

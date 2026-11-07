@@ -1,6 +1,52 @@
 use lemonfiber_core::app::plugins::MoveOffered;
+use lemonfiber_core::app::{unstarted, InstallOffered, Offline};
 
 use super::offered;
+
+/// What a start that answered none of the installs `offline` offers says it did.
+fn unstarted_over(offline: Offline) -> String {
+    let plan = crate::render::fixtures::a_plan("library", Vec::new());
+    super::unanswered(&unstarted("up", plan, offline))
+        .map(|lines| lines.text())
+        .unwrap_or_default()
+}
+
+/// A start with an install on offer says so, and names the offer that takes it.
+#[test]
+fn a_start_with_an_offer_says_how_to_answer_it() {
+    let said = unstarted_over(Offline {
+        installs: vec![InstallOffered {
+            plugin: "jellyfin".to_owned(),
+            offer: Some("a-part".to_owned()),
+            why: None,
+        }],
+        offer: Some("the-offer".to_owned()),
+    });
+    assert!(
+        said.contains("nothing was written or started — an install is on offer"),
+        "{said}"
+    );
+    assert!(said.contains("--offer the-offer"), "{said}");
+}
+
+/// A start whose install could not be read says why, and names no offer to run it with.
+#[test]
+fn a_start_with_no_offer_says_an_install_could_not_be_read() {
+    let said = unstarted_over(Offline {
+        installs: vec![InstallOffered {
+            plugin: "jellyfin".to_owned(),
+            offer: None,
+            why: Some("its tree could not be written".to_owned()),
+        }],
+        offer: None,
+    });
+    assert!(
+        said.contains("nothing was written or started — an install could not be read"),
+        "{said}"
+    );
+    assert!(said.contains("its tree could not be written"), "{said}");
+    assert!(!said.contains("--offer"), "{said}");
+}
 
 /// Nothing on offer says nothing.
 #[test]

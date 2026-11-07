@@ -172,6 +172,14 @@ pub enum Action {
         /// The device key's name.
         name: String,
     },
+    /// Leave a push endpoint as it stands.
+    ///
+    /// Worked out so the record of a registration or a removal has a reversal to name, and
+    /// never carried out: only the phone holds what a registration is made from.
+    PushEndpoint {
+        /// The endpoint's name.
+        name: String,
+    },
     /// Put a setting in the settings store back to what it held.
     Resettle {
         /// The setting's name.

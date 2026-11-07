@@ -4,13 +4,13 @@
 //! given and what each argument looks like, and two copies of that would answer the
 //! same question differently the first time one of them was updated.
 pub(crate) use lemonfiber_api::actions::{
-    named, Arguments, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED,
-    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL,
-    TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY,
-    TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS,
-    TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES,
-    TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE,
-    TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
+    named, Arguments, Only, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE,
+    TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT,
+    TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM,
+    TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET,
+    TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
+    TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -97,10 +97,10 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
-        only: takes(TAKES_NARROWING).then(|| NARROWED.to_owned()),
+        only: takes(TAKES_NARROWING).then(|| Only::One(NARROWED.to_owned())),
         check: takes(TAKES_CHECK).then(|| WARNED.to_owned()),
         disruptive: takes(TAKES_DISRUPTION).into(),
-        offer: takes(TAKES_CONSENT).then(|| OFFER.to_owned()),
+        offer: (takes(TAKES_CONSENT) && action != "up").then(|| OFFER.to_owned()),
         agreed: if takes(TAKES_AGREED) {
             vec![WARNED.to_owned()]
         } else {

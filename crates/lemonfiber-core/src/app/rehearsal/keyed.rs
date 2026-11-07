@@ -4,6 +4,7 @@ use super::{cannot, reads, reports, Asked};
 use crate::device_keys::run::Asked as Devices;
 use crate::keys::run::Asked as Keyed;
 use crate::model::kind;
+use crate::push::run::Asked as Pushing;
 
 /// Why minting a key cannot be rehearsed.
 const A_KEY_IS_ITS_SECRET: &str = "a key is its secret — a rehearsed one would \
@@ -32,5 +33,14 @@ pub(super) const fn devices(asked: &Devices) -> Asked {
         Devices::List => reads("device-key list"),
         Devices::Register { .. } => cannot("device-key register", A_REGISTRATION_IS_PROVED),
         Devices::Revoke { .. } => reports("device-key revoke", &[kind::DEVICE_KEYS]),
+    }
+}
+
+/// A listing reads; a registration and a removal each say what they would come to.
+pub(super) const fn pushing(asked: &Pushing) -> Asked {
+    match asked {
+        Pushing::List => reads("push-endpoint list"),
+        Pushing::Register { .. } => reports("push-endpoint register", &[kind::PUSH_ENDPOINT]),
+        Pushing::Remove { .. } => reports("push-endpoint remove", &[kind::PUSH_ENDPOINTS]),
     }
 }

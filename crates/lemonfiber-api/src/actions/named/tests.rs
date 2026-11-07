@@ -1,3 +1,5 @@
+use lemonfiber_core::app::Command;
+
 use super::{carried, KEY_CALLABLE, OFFERED};
 use crate::actions::{Arguments, TAKES_AGREEMENT};
 use crate::entitled::callable_by_a_key;
@@ -37,7 +39,7 @@ fn everything(confirm: bool) -> Arguments {
         logs: Some(12),
         filenames: true.into(),
         reveal: vec!["INDEXER_KEY".to_owned()],
-        only: Some("vpn.killswitch".to_owned()),
+        only: Some(crate::actions::Only::One("vpn.killswitch".to_owned())),
         check: Some("vpn.unprotected".to_owned()),
         disruptive: true.into(),
         offer: Some("0f0f0f0f".to_owned()),
@@ -187,6 +189,84 @@ fn a_key_callable_action_answers_an_offer_exactly_where_it_can_be_rehearsed() {
             );
         }
     }
+}
+
+/// `space` narrows to what is carried with its offer, and refuses a list naming nothing and
+/// a narrowing with no offer; a diagnosis takes a bare name and refuses a list.
+#[test]
+fn only_is_a_list_on_space_and_one_name_on_a_diagnosis() {
+    use crate::actions::{Only, Refused};
+
+    let spacing = |offer: Option<&str>, only: Only| {
+        carried(
+            "space",
+            Arguments {
+                offer: offer.map(ToOwned::to_owned),
+                only: Some(only),
+                ..Arguments::default()
+            },
+        )
+    };
+    let listed = || Only::Several(vec!["orphaned".to_owned()]);
+    assert!(matches!(
+        spacing(Some("the-offer"), listed()),
+        Ok(Command::Space { agreement: Some(offer), only })
+            if offer == "the-offer" && only == ["orphaned"]
+    ));
+    assert_eq!(
+        spacing(None, listed()).err(),
+        Some(Refused::Missing {
+            action: "space".to_owned(),
+            argument: "offer".to_owned(),
+        })
+    );
+    assert!(matches!(
+        spacing(Some("the-offer"), Only::One("orphaned".to_owned())),
+        Ok(Command::Space { only, .. }) if only == ["orphaned"]
+    ));
+    assert!(matches!(
+        spacing(Some("the-offer"), Only::Several(Vec::new())),
+        Err(Refused::Unrecognised { argument, .. }) if argument == "only"
+    ));
+    assert!(matches!(
+        carried(
+            "diagnose",
+            Arguments {
+                only: Some(listed()),
+                disruptive: crate::actions::Disturbing::Included,
+                ..Arguments::default()
+            },
+        ),
+        Err(Refused::Unrecognised { argument, .. }) if argument == "only"
+    ));
+}
+
+/// A start answering an install and a start of named services are different requests, so
+/// the pair is refused; alone, a start and a switch each carry the offer to their command.
+#[test]
+fn a_start_carries_its_offer_and_refuses_it_alongside_named_services() {
+    let answering = |forms: &[&str], services: &[&str]| Arguments {
+        forms: forms.iter().map(ToString::to_string).collect(),
+        services: services.iter().map(ToString::to_string).collect(),
+        offer: Some("the-offer".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        crate::actions::named("up", answering(&[], &["sonarr"])).err(),
+        Some(crate::actions::Refused::Together {
+            action: "up".to_owned(),
+            argument: "offer".to_owned(),
+            alongside: "services".to_owned(),
+        })
+    );
+    assert!(matches!(
+        carried("up", answering(&[], &[])),
+        Ok(Command::Up { offer: Some(offer), .. }) if offer == "the-offer"
+    ));
+    assert!(matches!(
+        carried("switch", answering(&["tv"], &[])),
+        Ok(Command::Switch { offer: Some(offer), .. }) if offer == "the-offer"
+    ));
 }
 
 /// Progress without how far in is refused by the argument it lacks, and a grant

@@ -92,6 +92,8 @@ pub(crate) const OUTBOX: &str = "outbox.json";
 pub(crate) const HALTED: &str = "halted.json";
 /// The public halves of the keys a phone proves the operator with.
 pub const DEVICE_KEYS: &str = "device-keys.json";
+/// The phones that asked to be woken, with the `WebPush` secret each is encrypted to.
+pub const PUSH_ENDPOINTS: &str = "push-endpoints.json";
 /// The keys other programs reach the web surface with, as digests.
 pub const KEYS: &str = "keys.json";
 /// When each of those keys was last used.
@@ -324,6 +326,12 @@ impl Paths {
     #[must_use]
     pub fn device_keys(&self) -> PathBuf {
         self.config.join(DEVICE_KEYS)
+    }
+
+    /// The phones that asked to be woken, with the `WebPush` secret each is encrypted to.
+    #[must_use]
+    pub fn push_endpoints(&self) -> PathBuf {
+        self.config.join(PUSH_ENDPOINTS)
     }
 
     /// The keys other programs reach the web surface with, as digests.

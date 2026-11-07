@@ -67,8 +67,13 @@ pub(crate) fn unanswered(report: &LifecycleReport) -> Option<Lines> {
     }
     let mut lines = Lines::default();
     lines.put(format!(
-        "{}: nothing was written or started — an install is on offer",
-        report.action
+        "{}: nothing was written or started — {}",
+        report.action,
+        if report.offer.is_some() {
+            "an install is on offer"
+        } else {
+            "an install could not be read"
+        }
     ));
     lines.extend(installing(&report.installing, answering(report)));
     Some(lines)

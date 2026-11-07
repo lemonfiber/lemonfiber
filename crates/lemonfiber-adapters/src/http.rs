@@ -119,19 +119,27 @@ impl Default for Web {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        read_as_text(self, request).await
+        read_as_text(self, request, None).await
+    }
+
+    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
+        read_as_text(self, request, Some(octets)).await
     }
 
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
         let client = self.client_for(request)?;
-        sent(&client, request, most.min(self.limit)).await
+        sent(&client, request, None, most.min(self.limit)).await
     }
 }
 
 /// The answer as text, or the failure to reach it where it was larger than the limit.
-async fn read_as_text(web: &Web, request: &Request) -> Result<Response, Unreachable> {
+async fn read_as_text(
+    web: &Web,
+    request: &Request,
+    octets: Option<&[u8]>,
+) -> Result<Response, Unreachable> {
     let client = web.client_for(request)?;
-    let fetched = sent(&client, request, web.limit).await?;
+    let fetched = sent(&client, request, octets, web.limit).await?;
     let Some(bytes) = fetched.bytes else {
         return Err(oversized(request, web.limit));
     };
@@ -217,6 +225,7 @@ fn pinned(
 async fn sent(
     client: &reqwest::Client,
     request: &Request,
+    octets: Option<&[u8]>,
     limit: usize,
 ) -> Result<Fetched, Unreachable> {
     let mut builder = match request.method {
@@ -231,6 +240,9 @@ async fn sent(
     }
     if let Some(body) = &request.body {
         builder = builder.body(body.clone());
+    }
+    if let Some(octets) = octets {
+        builder = builder.body(octets.to_vec());
     }
 
     // A transport error's own words can quote the URL it failed on, and a URL can

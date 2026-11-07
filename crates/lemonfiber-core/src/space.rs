@@ -53,7 +53,7 @@ pub use volume::{Freshness, Role, Volume};
 pub use waste::{ratio_reads, Candidate, Standing, RATIO_CONSEQUENCE};
 
 use crate::error::codes::space::{
-    HALTED, NOTHING_TO_ASK, NOT_HELD, NOWHERE_TO_MEASURE, WALK_REFUSED,
+    HALTED, NOTHING_TO_ASK, NOT_HELD, NOT_ON_OFFER, NOWHERE_TO_MEASURE, WALK_REFUSED,
 };
 use crate::error::Code;
 use crate::ports::occupancy::Occupant;
@@ -61,7 +61,7 @@ use crate::ports::service::Seeded;
 
 /// Every refusal the account of the disk, or letting one download go, answers with, which
 /// a client names by its code.
-pub const REFUSALS: [Code; 3] = [NOWHERE_TO_MEASURE, NOTHING_TO_ASK, NOT_HELD];
+pub const REFUSALS: [Code; 4] = [NOWHERE_TO_MEASURE, NOTHING_TO_ASK, NOT_HELD, NOT_ON_OFFER];
 
 /// An import that stopped part-way, in the words of whatever stopped it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -184,24 +184,61 @@ impl Reckoning {
     /// what it costs is not this product's to weigh.
     #[must_use]
     pub fn offering(&self, measured: &Measured) -> Vec<Occupant> {
-        let taking: BTreeSet<&str> = self
-            .candidates
-            .iter()
-            .filter(|candidate| candidate.offered())
-            .map(|candidate| candidate.name.as_str())
-            .collect();
-        let unpacking = measured.data.unpacking();
-        let mut offered: Vec<Occupant> = measured
-            .data
-            .holding()
-            .iter()
-            .filter(|occupant| belongs_to_any(&occupant.path, &taking))
-            .cloned()
-            .collect();
-        offered.extend(unpacked::already_unpacked(&unpacking).into_iter().cloned());
+        self.of_categories(measured, &[Category::Orphaned, Category::Extracted])
+    }
+
+    /// The paths an answered cleanup would take of `categories` alone.
+    #[must_use]
+    pub fn of_categories(&self, measured: &Measured, categories: &[Category]) -> Vec<Occupant> {
+        let mut offered: Vec<Occupant> = Vec::new();
+        if categories.contains(&Category::Orphaned) {
+            let taking: BTreeSet<&str> = self
+                .candidates
+                .iter()
+                .filter(|candidate| candidate.offered())
+                .map(|candidate| candidate.name.as_str())
+                .collect();
+            offered.extend(
+                measured
+                    .data
+                    .holding()
+                    .iter()
+                    .filter(|occupant| belongs_to_any(&occupant.path, &taking))
+                    .cloned(),
+            );
+        }
+        if categories.contains(&Category::Extracted) {
+            let unpacking = measured.data.unpacking();
+            offered.extend(unpacked::already_unpacked(&unpacking).into_iter().cloned());
+        }
         offered.sort_by(|left, right| left.path.cmp(&right.path));
         offered.dedup_by(|left, right| left.path == right.path);
         offered
+    }
+}
+
+impl Reckoning {
+    /// The categories `only` names, each one this offer holds as costing nothing, or the
+    /// first word it does not; every category it holds where `only` names none.
+    ///
+    /// # Errors
+    ///
+    /// The first word in `only` that names no category this offer holds as costing nothing.
+    pub fn narrowed<'a>(&self, only: &'a [String]) -> Result<Vec<Category>, &'a str> {
+        if only.is_empty() {
+            return Ok(vec![Category::Orphaned, Category::Extracted]);
+        }
+        only.iter()
+            .map(|word| {
+                Category::costing_nothing(word)
+                    .filter(|category| {
+                        self.reclaimable
+                            .iter()
+                            .any(|line| line.category == *category && line.any())
+                    })
+                    .ok_or(word.as_str())
+            })
+            .collect()
     }
 }
 

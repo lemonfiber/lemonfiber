@@ -1,6 +1,6 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes ten requests
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes eleven requests
 //! on its own account and they are enumerated here in full; the services in the stack make
 //! a great many more, and those are **theirs** — an indexer query is the indexer aggregator
 //! asking an indexer, a poster is a curator asking a metadata provider, and a peer
@@ -34,7 +34,7 @@ pub use ours::{
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Ten, and the closed set is the claim. An eleventh is a decision somebody makes by
+/// Eleven, and the closed set is the claim. A twelfth is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
 ///
@@ -86,6 +86,8 @@ pub enum Reach {
     Catalogue,
     /// Fetching the poster of a title a member's search found.
     Posters,
+    /// Waking a phone that asked to be woken when this stack has something to say.
+    Waking,
 }
 
 impl Reach {
@@ -103,6 +105,7 @@ impl Reach {
             Self::PluginSource => "plugin-source",
             Self::Catalogue => "catalogue",
             Self::Posters => "posters",
+            Self::Waking => "waking",
         }
     }
 }

@@ -22,8 +22,21 @@
         },
         "type": "array"
       }
+    },
+    {
+      "name": "offer",
+      "type": {
+        "default": null,
+        "description": "What was read before answering — the offer a repair's yes was read in, the\nlisting a restore's was, what a replacement would stop — as it named itself.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     }
   ],
-  "consent": [],
+  "consent": [
+    "offer"
+  ],
   "rehearsal": true
 }

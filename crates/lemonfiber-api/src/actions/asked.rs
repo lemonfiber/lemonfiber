@@ -31,6 +31,17 @@ use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
 use serde::Deserialize;
 
+/// What an `only` names: one group of checks or one check on a diagnosis, and a list of
+/// categories on `space`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum Only {
+    /// One name.
+    One(String),
+    /// A list of names.
+    Several(Vec<String>),
+}
+
 /// The arguments an action was given, mirroring the flags its command takes.
 ///
 /// Its schema is what the contract publishes as each argument's type, so the type a
@@ -98,7 +109,8 @@ pub struct Arguments {
     /// The settings to show as they are, named as the bundle names them.
     pub reveal: Vec<String>,
     /// The group of checks, or the one check, a diagnosis is narrowed to.
-    pub only: Option<String>,
+    #[schemars(with = "Option<String>", extend("default" = null))]
+    pub only: Option<Only>,
     /// The check a warning is being answered for.
     pub check: Option<String>,
     /// Whether the checks that disturb the running system are included.
@@ -244,7 +256,7 @@ impl Arguments {
             at: Some("1700000000".to_owned()),
             logs: Some(1),
             reveal: Vec::new(),
-            only: Some("vpn".to_owned()),
+            only: Some(Only::One("vpn".to_owned())),
             check: Some("vpn.unprotected".to_owned()),
             disruptive: Disturbing::Included,
             offer: Some("00000000".to_owned()),

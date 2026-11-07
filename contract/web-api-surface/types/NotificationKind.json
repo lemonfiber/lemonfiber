@@ -1,0 +1,11 @@
+{
+  "fields": {},
+  "variants": [
+    "\"backup\"",
+    "\"completion\"",
+    "\"member\"",
+    "\"problem\"",
+    "\"request\"",
+    "\"update\""
+  ]
+}

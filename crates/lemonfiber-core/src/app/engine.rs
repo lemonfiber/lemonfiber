@@ -325,7 +325,7 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         Action::Up => Box::pin(installing::offered(ctx, &plan)).await,
         _ => None,
     }
-    .map_or_else(Default::default, |one| (one.installs, Some(one.offer)));
+    .map_or_else(Default::default, |one| (one.installs, one.offer));
     let report = LifecycleReport {
         action: action.name().to_owned(),
         plan,

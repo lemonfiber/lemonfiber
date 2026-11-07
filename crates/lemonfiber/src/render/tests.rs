@@ -231,6 +231,7 @@ fn the_first_of_them() -> Vec<Outcome> {
                 kind: "storage.space".to_owned(),
                 wanted: true,
             }],
+            kinds: Vec::new(),
             changed: true,
             rehearsed: false,
         }),

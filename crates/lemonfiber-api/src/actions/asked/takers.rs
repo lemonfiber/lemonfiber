@@ -161,8 +161,9 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 /// be agreement from somebody who had not read what would go, one to a replacement from
 /// somebody who had not read what would stop, one to a choice from somebody who had not
 /// read what it would leave unfilled, one to a change of setting from somebody who had
-/// not read what it restarts, and one to an install from somebody who had not read what
-/// a stranger's manifest would write.
+/// not read what it restarts, one to an install from somebody who had not read what a
+/// stranger's manifest would write, and one to a start from somebody who had not read
+/// what it would install.
 ///
 /// The actions a key may call and rehearse take one too, and there it is optional: a
 /// program on a schedule calls them without one and is answered as before, and one that
@@ -170,6 +171,8 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 ///
 /// Everywhere else the reply is the answer.
 pub const TAKES_CONSENT: &[&str] = &[
+    "up",
+    "switch",
     "remove",
     "reset",
     "restart",
@@ -252,20 +255,17 @@ pub const TAKES_AGREED: &[&str] = &["repair"];
 /// the indexers nothing is the read already served.
 pub const TAKES_DISRUPTION: &[&str] = &["repair", "accept", "diagnose", "search"];
 
-/// The action whose command carries what the run is narrowed to.
+/// The actions whose command carries what the run is narrowed to.
 ///
-/// A diagnosis and nothing else, and it is the one argument this surface takes at
-/// both doors under one name: `/api/checks` narrows by `only` as a query parameter,
-/// and this narrows by `only` as a field, because it is the same narrowing of the
-/// same suite.
+/// A diagnosis takes it at both doors under one name: `/api/checks` narrows by `only` as a
+/// query parameter, and this narrows by `only` as a field, because it is the same narrowing
+/// of the same suite. Without it, following a finding that says to run one check that costs
+/// something — the tunnel taken away, an indexer's daily allowance spent — from a browser
+/// would mean running both.
 ///
-/// It matters most on the action. The checks a widened run adds are the two that
-/// cost something — the tunnel goes away for as long as the killswitch test needs
-/// it away, and a live release search spends one of the indexers' daily allowance —
-/// and each of those findings tells the operator to run *that one*. Without a
-/// narrowing here, following either instruction from a browser would mean running
-/// both.
-pub const TAKES_NARROWING: &[&str] = &["diagnose"];
+/// A cleanup of the disk takes a list of the categories of what its offer holds as costing
+/// nothing, so each is agreed to apart.
+pub const TAKES_NARROWING: &[&str] = &["diagnose", "space"];
 
 /// The action whose command carries the check whose warning is being answered.
 ///

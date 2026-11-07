@@ -65,6 +65,8 @@ fn diagnosis(
             | Outcome::Keys(_)
             | Outcome::DeviceKey(_)
             | Outcome::DeviceKeys(_)
+            | Outcome::PushEndpoint(_)
+            | Outcome::PushEndpoints(_)
             | Outcome::Status(_)
             | Outcome::Repair(_)
             | Outcome::Undo(_)

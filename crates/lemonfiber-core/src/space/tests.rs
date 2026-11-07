@@ -344,6 +344,50 @@ fn archive_parts_beside_what_was_unpacked_from_them_are_offered() {
     );
 }
 
+/// An answer narrowed to one category takes that category alone, and a word the offer does
+/// not hold as costing nothing is named.
+#[test]
+fn a_narrowing_takes_its_category_alone_and_names_what_is_not_on_offer() {
+    let measured = with(
+        a_stack(),
+        &[
+            file("/srv/media/downloads/Done/a.rar", 400, 60, 1),
+            file("/srv/media/downloads/Done/a.mkv", 900, 61, 1),
+        ],
+    );
+    let reckoned = reckon(&measured);
+    let taking = |words: &[&str]| -> Vec<String> {
+        let words: Vec<String> = words.iter().map(ToString::to_string).collect();
+        reckoned
+            .narrowed(&words)
+            .map(|categories| reckoned.of_categories(&measured, &categories))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|occupant| occupant.path.display().to_string())
+            .collect()
+    };
+
+    assert_eq!(taking(&["extracted"]), ["/srv/media/downloads/Done/a.rar"]);
+    assert_eq!(
+        taking(&["orphaned"]),
+        ["/srv/media/downloads/Never.Taken/b.mkv"]
+    );
+    assert_eq!(taking(&[]).len(), reckoned.offering(&measured).len());
+
+    for word in ["seeding", "unmanaged", "media"] {
+        let words = vec!["orphaned".to_owned(), word.to_owned()];
+        assert_eq!(reckoned.narrowed(&words).err(), Some(word));
+    }
+}
+
+/// A category the offer holds nothing of is not on offer.
+#[test]
+fn an_empty_category_is_not_on_offer() {
+    let reckoned = reckon(&a_stack());
+    let words = vec!["extracted".to_owned()];
+    assert_eq!(reckoned.narrowed(&words).err(), Some("extracted"));
+}
+
 #[test]
 fn nothing_offered_twice_where_a_download_is_also_an_unpacked_archive() {
     let measured = with(

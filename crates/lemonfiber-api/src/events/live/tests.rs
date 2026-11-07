@@ -56,3 +56,51 @@ async fn a_stream_beside_this_one_hears_none_of_it_and_ends_with_it() {
         "a stream beside this one went on after this run's streams were ended"
     );
 }
+
+/// A source counting its gathers, wanted with nobody listening while `wanted` holds.
+struct Counting {
+    /// Whether it is wanted.
+    wanted: std::sync::atomic::AtomicBool,
+    /// How many times it was gathered.
+    gathered: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl super::Gathers for Counting {
+    async fn gather(&self, _joined: bool) -> Vec<Rendered> {
+        self.gathered
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Vec::new()
+    }
+
+    fn wanted_unheard(&self) -> bool {
+        self.wanted.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// With nobody listening a source is gathered only once it wants to be, and being roused
+/// is what starts that.
+#[tokio::test]
+async fn a_source_that_wants_it_is_gathered_with_nobody_listening_once_roused() {
+    use std::sync::atomic::Ordering;
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let source = std::sync::Arc::new(Counting {
+        wanted: false.into(),
+        gathered: 0.into(),
+    });
+    let running = tokio::spawn(std::sync::Arc::clone(&live).gathering(source.clone()));
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(source.gathered.load(Ordering::SeqCst), 0);
+
+    source.wanted.store(true, Ordering::SeqCst);
+    live.roused();
+    let gathered = tokio::time::timeout(Duration::from_secs(5), async {
+        while source.gathered.load(Ordering::SeqCst) == 0 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    running.abort();
+    assert!(gathered.is_ok(), "it was never gathered");
+}

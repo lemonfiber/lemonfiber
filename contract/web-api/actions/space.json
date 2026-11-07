@@ -2,6 +2,17 @@
   "action": "space",
   "arguments": [
     {
+      "name": "only",
+      "type": {
+        "default": [],
+        "description": "The categories of what the offer holds as costing nothing to take, orphaned or extracted; all it holds where none is named.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    {
       "name": "offer",
       "type": {
         "default": null,
