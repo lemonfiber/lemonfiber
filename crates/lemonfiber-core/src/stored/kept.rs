@@ -357,6 +357,14 @@ pub const EVERY: &[Entry] = &[
         at: Paths::forwarded,
     },
     Entry {
+        accessor: "searched_again",
+        what: "the stuck downloads searched for again",
+        why: "The fingerprint of each stuck release a curator dropped and searched again for, \
+              so no stuck item is acted on twice.",
+        secret: false,
+        at: Paths::searched_again,
+    },
+    Entry {
         accessor: "outbox",
         what: "what you have been told, and what is still owed you",
         why: "Every alert decided and not yet delivered, and what was already said, so an \

@@ -191,6 +191,10 @@ fn did(kind: &Kind) -> String {
         Kind::MovedInPlace { service, release } => {
             format!("moved {service} onto its plugin for good, in {release}")
         }
+        Kind::Unqueued { kind, title, .. } => format!(
+            "dropped a stuck download of {} title {title} and searched for it again",
+            kind.media_type()
+        ),
     }
 }
 

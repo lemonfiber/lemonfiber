@@ -25,6 +25,7 @@ use super::Ctx;
 mod carried;
 mod journal;
 mod refusing;
+mod regrabbing;
 mod reseeding;
 
 use refusing::Fault;
@@ -52,6 +53,16 @@ pub(crate) async fn reconfigured(
     let fillers = super::targets::fillers_here(ctx, manifest);
     let mut reached = Reached::default();
     for undo in undos {
+        if let Action::Regrab {
+            kind,
+            title,
+            release,
+        } = &undo.action
+        {
+            regrabbing::regrabbed(ctx, &fillers, undo, (*kind, *title, release), &mut reached)
+                .await;
+            continue;
+        }
         let Action::Reconfigure {
             resource,
             id,
@@ -299,6 +310,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             "the internal certificate of {service}"
         ))),
         Action::Unmoved { service } => Ok(Step::BeyondReach(format!("{service} on its plugin"))),
+        Action::Regrab { .. } => Ok(Step::BeyondReach("a stuck download dropped".to_owned())),
         Action::Resettle {
             name,
             value,

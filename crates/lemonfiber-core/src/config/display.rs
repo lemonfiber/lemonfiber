@@ -64,6 +64,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          turned it on",
     ),
     (
+        super::STUCK_SEARCH_AGAIN_KEY,
+        "whether a stuck download is dropped, its release blocklisted and its title \
+         searched for again, once each, which is off unless you turned it on",
+    ),
+    (
         super::IDEMPOTENCY_MINUTES_KEY,
         "how long an action sent under a key is remembered, so the same action sent again \
          is answered rather than run twice",

@@ -75,6 +75,13 @@ pub const AUTOSTART_ON_BATTERY_KEY: &str = "LEMONFIBER_AUTOSTART_ON_BATTERY";
 /// it off stops new mints; keys members already minted stay until somebody revokes them.
 pub const MEMBER_KEYS_KEY: &str = "LEMONFIBER_MEMBER_KEYS";
 
+/// The setting that lets lemonfiber act once on each stuck item: its curator drops the
+/// download from its client, blocklists that release and searches for the title again.
+///
+/// Off unless the operator turns it on, because it removes a download nobody asked to
+/// lose; the stuck items are only reported while it is off.
+pub const STUCK_SEARCH_AGAIN_KEY: &str = "LEMONFIBER_STUCK_SEARCH_AGAIN";
+
 /// The hours the operator does not want waking for, as `HH:MM-HH:MM`.
 ///
 /// Read in the zone `TZ` names, which is the same zone the stack hands every container,
@@ -375,6 +382,7 @@ pub const SETTINGS: &[&str] = &[
     EXPLANATIONS_KEY,
     AUTOSTART_ON_BATTERY_KEY,
     MEMBER_KEYS_KEY,
+    STUCK_SEARCH_AGAIN_KEY,
     IDEMPOTENCY_MINUTES_KEY,
     IDEMPOTENCY_KEYS_KEY,
     PROJECT_KEY,

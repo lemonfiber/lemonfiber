@@ -160,6 +160,10 @@ fn restoring(action: &Action) -> String {
             format!("the internal certificate of {service} left as it is")
         }
         Action::Unmoved { service } => format!("{service} left on its plugin"),
+        Action::Regrab { kind, title, .. } => format!(
+            "the dropped release of {} title {title} grabbed again",
+            kind.media_type()
+        ),
         Action::Run {
             service,
             running: true,

@@ -125,7 +125,8 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::Overlaid { .. }
         | Kind::Restarted { .. }
         | Kind::Certified { .. }
-        | Kind::MovedInPlace { .. } => None,
+        | Kind::MovedInPlace { .. }
+        | Kind::Unqueued { .. } => None,
     }
 }
 

@@ -740,6 +740,14 @@ fn a_key_is_left_standing_and_named() {
             "decline on its plugin",
         ),
         (
+            Action::Regrab {
+                kind: crate::ports::media::Kind::Tv,
+                title: 9,
+                release: "9f86d081".to_owned(),
+            },
+            "a stuck download dropped",
+        ),
+        (
             Action::Run {
                 service: "prowlarr".to_owned(),
                 running: true,
