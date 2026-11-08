@@ -58,6 +58,7 @@ pub(crate) mod fixtures;
 pub mod forwarding;
 pub(crate) mod gating;
 pub(crate) mod handoff;
+pub(crate) mod healing;
 pub(crate) mod held;
 pub(crate) mod history;
 pub(crate) mod hosting;
@@ -98,8 +99,8 @@ pub(crate) mod watcher;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Removing, Restarting, Restoring, Setting, Settling, Teardown, Tracing, Viewing,
-    Whom, Wishing, HOSTABLE,
+    QualityAction, Queueing, Removing, Restarting, Restoring, Setting, Settling, Teardown, Tracing,
+    Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -466,6 +467,8 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Boot => boot::booted(ctx).await.map(Outcome::Boot),
         Command::Watcher => watcher::watcher(ctx).await.map(Outcome::Watcher),
+        Command::Queue(Queueing::Read) => healing::queue(ctx).map(Outcome::Queue),
+        Command::Queue(Queueing::Heal) => healing::heal(ctx).await.map(Outcome::Queue),
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
         Command::Clients => Ok(guided(ctx)),

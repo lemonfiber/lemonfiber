@@ -55,11 +55,11 @@ pub(crate) const HOUSEHOLD_EVERY: Duration = Duration::from_secs(60);
 /// tunnel reconnects, which is minutes apart at the very least.
 pub(crate) const VPN_EVERY: Duration = Duration::from_secs(5 * 60);
 
-/// How often the stuck items are read to be acted on.
+/// How often the guard asks whether the queue's own pace has come round.
 ///
-/// A queue is called stuck after many minutes without progress, so ten minutes between
-/// passes leaves nothing waiting long and asks each curator little.
-pub(crate) const SEARCHED_AGAIN_EVERY: Duration = Duration::from_secs(10 * 60);
+/// Each minute, the finest pace the operator may set; the pass itself looks at the queue
+/// only as often as the operator's setting says.
+pub(crate) const HEALED_EVERY: Duration = Duration::from_secs(60);
 
 /// A panel, or the forwarded port's pass, read at a pace of its own rather than on
 /// every refresh.
@@ -79,8 +79,8 @@ pub(crate) enum Paced {
     Vpn,
     /// The forwarded port, passed to every torrent client inside the guard.
     Forwarded,
-    /// Each stuck item, acted on once where the operator has said to.
-    SearchedAgain,
+    /// The queue, healed at its own pace.
+    Healed,
     /// The guard's check-in to its heartbeat in the outside watcher.
     CheckedIn,
 }
@@ -95,7 +95,7 @@ impl Paced {
         Self::Household,
         Self::Vpn,
         Self::Forwarded,
-        Self::SearchedAgain,
+        Self::Healed,
         Self::CheckedIn,
     ];
 
@@ -109,7 +109,7 @@ impl Paced {
             Self::Household => HOUSEHOLD_EVERY,
             Self::Vpn => VPN_EVERY,
             Self::Forwarded => crate::app::forwarding::EVERY,
-            Self::SearchedAgain => SEARCHED_AGAIN_EVERY,
+            Self::Healed => HEALED_EVERY,
             Self::CheckedIn => Duration::from_secs(crate::app::watcher::covering::GUARD.every_s),
         }
     }

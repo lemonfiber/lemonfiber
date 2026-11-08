@@ -1,4 +1,5 @@
-use super::{earliest, frees_up, waiting_for, DAY};
+use super::{earliest, frees_up, waiting_for};
+use crate::instant::DAY;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A moment the calendar holds, for the arithmetic to run against.

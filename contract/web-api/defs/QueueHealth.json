@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether healing acts, the strikes and grace it acts after, every unhealthy item of the\nlatest pass, what could not be reached, and the newest runs.",
+  "type": "object",
+  "properties": {
+    "classified_at": {
+      "description": "When the latest pass classified the queue, in seconds since the Unix epoch, where\none ever has.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "grace_s": {
+      "description": "How long a newly added download is left alone, in seconds.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "healing": {
+      "description": "Whether healing acts, or only classifies.",
+      "$ref": "HealingSwitch.json"
+    },
+    "incomplete": {
+      "description": "Whether the list may be short, because something could not be read.",
+      "type": "boolean"
+    },
+    "items": {
+      "description": "Every unhealthy item the latest pass found; a healthy one is left out.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "Wedged.json"
+      }
+    },
+    "mismatch": {
+      "description": "Where a download client files a curator's downloads outside the curator's folder,\nwhich nothing is acted on past.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this answer is a run that only said what it would do.",
+      "type": "boolean"
+    },
+    "runs": {
+      "description": "The newest runs first, each a pass that could act, rehearsed or not.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "HealRun.json"
+      }
+    },
+    "strikes_needed": {
+      "description": "How many consecutive passes flag an item for one reason before it is acted on.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "unreachable": {
+      "description": "Every curator or download client the latest pass could not reach or verify.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "Unreached.json"
+      }
+    }
+  },
+  "required": [
+    "healing",
+    "strikes_needed",
+    "grace_s",
+    "incomplete",
+    "rehearsed"
+  ]
+}

@@ -235,6 +235,14 @@
     "file": false
   },
   {
+    "path": "/api/queue",
+    "parameters": [],
+    "kinds": [
+      "queue"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/config",
     "parameters": [
       {

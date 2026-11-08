@@ -378,3 +378,14 @@ pub enum UpdateCommand {
         to: Option<String>,
     },
 }
+
+/// What can be done about the download queue.
+#[derive(Debug, Clone, Copy, Subcommand)]
+pub enum QueueCommand {
+    /// Look at the queue now, and act on every download that has struck out where healing
+    /// is on: its curator drops it, blocklists its release and searches for it again.
+    ///
+    /// With `--dry-run`, says what it would do to each and keeps that run for `lemonfiber
+    /// queue` to show, touching nothing else.
+    Heal,
+}

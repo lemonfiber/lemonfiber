@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One unhealthy item, as the latest pass found it.",
+  "type": "object",
+  "properties": {
+    "added_at": {
+      "description": "When it was added, in seconds since the Unix epoch, where anything says.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "class": {
+      "description": "Why it is unhealthy.",
+      "$ref": "Wedge.json"
+    },
+    "in_grace_until": {
+      "description": "Until when it is left alone as newly added, where it still is.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "next": {
+      "description": "What the next run would do to it, where healing is on.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "Act.json"
+      }
+    },
+    "release": {
+      "description": "The release, by its name in the client.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The curator it is queued with, or the client holding it where none is.",
+      "type": "string"
+    },
+    "strikes": {
+      "description": "How many consecutive passes have flagged it for this reason.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "title": {
+      "description": "The title it is for, where a curator holds it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "why": {
+      "description": "Why, in words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "release",
+    "class",
+    "why",
+    "strikes"
+  ]
+}

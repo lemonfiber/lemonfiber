@@ -35,7 +35,8 @@ use crate::error::Problem;
 use crate::model::kind::{self, Kind};
 
 use super::command::{
-    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Settling, Teardown, Tracing,
+    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Queueing, Settling, Teardown,
+    Tracing,
 };
 use super::disturbance::Situation;
 use super::engine::Waiting;
@@ -182,6 +183,21 @@ const fn wished(wishing: &Wishing) -> Asked {
     }
 }
 
+const fn traced(tracing: &Tracing) -> Asked {
+    if tracing.searching {
+        cannot("trace --search", A_SEARCH_IS_THE_ANSWER)
+    } else {
+        reads("trace")
+    }
+}
+
+const fn queued(queueing: Queueing) -> Asked {
+    match queueing {
+        Queueing::Read => reads("queue"),
+        Queueing::Heal => reports("queue heal", &[kind::QUEUE]),
+    }
+}
+
 const fn viewed(viewing: &Viewing) -> Asked {
     match viewing {
         Viewing::Title { .. } => reports("title", &[kind::TITLE]),
@@ -215,6 +231,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Stuck => reads("stuck"),
         Command::Boot => reads("boot"),
         Command::Watcher => reads("watcher"),
+        Command::Queue(queueing) => queued(*queueing),
         Command::FrontDoor => reads("front-door"),
         Command::News => reads("news"),
         Command::Playing { .. } => reads("playing"),
@@ -251,10 +268,7 @@ pub const fn asked(command: &Command) -> Asked {
         // asked. Refused rather than reported because the asking is the part with a
         // cost: an indexer allows a fixed number of queries a day, and one spent on
         // a rehearsal is one the operator no longer has.
-        Command::Trace(Tracing {
-            searching: true, ..
-        }) => cannot("trace --search", A_SEARCH_IS_THE_ANSWER),
-        Command::Trace(_) => reads("trace"),
+        Command::Trace(tracing) => traced(tracing),
 
         // The killswitch check *is* the disruption. It takes the tunnel's own route
         // down inside the container and watches what the rest of the stack does,
@@ -374,6 +388,20 @@ pub const fn asked(command: &Command) -> Asked {
         // expects, so a rehearsal of it names the values that would be taken on.
         Command::Seed => reports("seed", &[kind::SEED]),
         Command::Adopt => reports("adopt", &[kind::SEED]),
+    }
+}
+
+/// The record a rehearsal of `command` keeps of its own, by its file name beside the
+/// configuration; nothing for every command but one.
+///
+/// A rehearsed `queue heal` keeps the run it would have taken, every act `would`, so the
+/// queue's read shows it. It advances no strike, journals nothing, and tells no curator
+/// or download client anything.
+#[must_use]
+pub const fn keeps_its_own_record(command: &Command) -> Option<&'static str> {
+    match command {
+        Command::Queue(Queueing::Heal) => Some(crate::config::paths::HEALING),
+        _ => None,
     }
 }
 

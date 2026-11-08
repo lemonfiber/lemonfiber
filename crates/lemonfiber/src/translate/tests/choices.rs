@@ -365,3 +365,12 @@ fn either_of_them_can_be_installed_and_taken_back_again() {
         })
     );
 }
+
+#[test]
+fn a_bare_queue_reads_and_only_heal_runs_a_pass() {
+    assert_eq!(queue(None), Command::Queue(Queueing::Read));
+    assert_eq!(
+        queue(Some(QueueCommand::Heal)),
+        Command::Queue(Queueing::Heal)
+    );
+}

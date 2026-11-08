@@ -50,7 +50,7 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 use lemonfiber_api::read::table::{
     named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS,
     FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY,
-    REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
+    QUEUE, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -332,6 +332,13 @@ static AFTER: &[Question] = &[
         about: "whether the monitor outside the stack answers, what each of its monitors sees \
                 beside what it covers, and what nothing watches",
         read: WATCHER,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what is wedged in the queue",
+        about: "every download that is stalled, slow, failed or orphaned, why, its strikes, \
+                and what the newest healing runs did",
+        read: QUEUE,
         needs: Needed::Nothing,
     },
     Question {

@@ -10,6 +10,9 @@
 //! are imported here, because the list below has to name every setting lemonfiber
 //! has — and a list that names all but a few is one nothing can be held to.
 
+use super::healing::{
+    QUEUE_EVERY_MINUTES_KEY, QUEUE_GRACE_MINUTES_KEY, QUEUE_SLOW_DAYS_KEY, QUEUE_STRIKES_KEY,
+};
 use super::reaching::{
     OFFLINE_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
     REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY,
@@ -75,11 +78,12 @@ pub const AUTOSTART_ON_BATTERY_KEY: &str = "LEMONFIBER_AUTOSTART_ON_BATTERY";
 /// it off stops new mints; keys members already minted stay until somebody revokes them.
 pub const MEMBER_KEYS_KEY: &str = "LEMONFIBER_MEMBER_KEYS";
 
-/// The setting that lets lemonfiber act once on each stuck item: its curator drops the
-/// download from its client, blocklists that release and searches for the title again.
+/// The setting that lets lemonfiber heal the queue: each item flagged for one reason on
+/// enough consecutive passes is dropped from its client by its curator, its release
+/// blocklisted, and its title searched for again.
 ///
 /// Off unless the operator turns it on, because it removes a download nobody asked to
-/// lose; the stuck items are only reported while it is off.
+/// lose; the queue is only classified while it is off.
 pub const STUCK_SEARCH_AGAIN_KEY: &str = "LEMONFIBER_STUCK_SEARCH_AGAIN";
 
 /// The hours the operator does not want waking for, as `HH:MM-HH:MM`.
@@ -383,6 +387,10 @@ pub const SETTINGS: &[&str] = &[
     AUTOSTART_ON_BATTERY_KEY,
     MEMBER_KEYS_KEY,
     STUCK_SEARCH_AGAIN_KEY,
+    QUEUE_STRIKES_KEY,
+    QUEUE_GRACE_MINUTES_KEY,
+    QUEUE_EVERY_MINUTES_KEY,
+    QUEUE_SLOW_DAYS_KEY,
     IDEMPOTENCY_MINUTES_KEY,
     IDEMPOTENCY_KEYS_KEY,
     PROJECT_KEY,

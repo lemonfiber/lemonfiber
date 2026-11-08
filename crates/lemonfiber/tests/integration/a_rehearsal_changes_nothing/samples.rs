@@ -5,7 +5,7 @@ use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
     plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Diagnosing,
     Filling, Gathering, Inviting, Keeping, LettingGo, Linking, MigrateAction, QualityAction,
-    Removing, Restoring, Setting, Settling, SetupAction, Teardown, Tracing, Waiting,
+    Queueing, Removing, Restoring, Setting, Settling, SetupAction, Teardown, Tracing, Waiting,
 };
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::Narrowing;
@@ -152,6 +152,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("stuck", Command::Stuck),
         ("boot", Command::Boot),
         ("watcher", Command::Watcher),
+        ("queue", Command::Queue(Queueing::Heal)),
         ("front-door", Command::FrontDoor),
         ("news", Command::News),
         // The verb that writes rather than the one refused outright: pairing material is

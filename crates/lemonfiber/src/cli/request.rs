@@ -15,9 +15,10 @@ use clap::Subcommand;
 
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
-    PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawPushEndpoint, RawRemoving, RawRestart,
-    RawSetup, RawShelf, RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand,
+    PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
+    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawPushEndpoint,
+    RawRemoving, RawRestart, RawSetup, RawShelf, RawSwitch, RawTrace, RawUi, RawUp, RawWhom,
+    UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -251,6 +252,13 @@ pub enum Request {
     /// Say what the outside watcher sees beside what each of its monitors covers, and what
     /// no active monitor covers.
     Watcher,
+    /// Say what the download queue holds that is wedged, why, how many strikes each has,
+    /// and what the newest runs did to it.
+    Queue {
+        /// Run one pass now, or nothing to read what the latest pass found.
+        #[command(subcommand)]
+        action: Option<QueueCommand>,
+    },
     /// Name the one address to send somebody who lives here.
     ///
     /// The stack publishes several things to your network and only one of them is

@@ -19,9 +19,6 @@ use std::time::{Duration, SystemTime};
 /// enough that a weekend away is not a reminder.
 pub const REMINDING_AFTER: u64 = 7;
 
-/// Seconds in a day.
-const DAY: u64 = 86_400;
-
 /// How many whole days something asked for at `made` has been waiting at `now`.
 ///
 /// Nothing where the stamp is not one this reads, or where it is in the future: a
@@ -30,7 +27,7 @@ const DAY: u64 = 86_400;
 #[must_use]
 pub fn waiting_for(made: Option<&str>, now: SystemTime) -> Option<u64> {
     let asked = crate::instant::read(made?)?;
-    Some(now.duration_since(asked).ok()?.as_secs() / DAY)
+    Some(now.duration_since(asked).ok()?.as_secs() / crate::instant::DAY)
 }
 
 /// When the window lets go of the earliest thing counted in it.
@@ -42,7 +39,9 @@ pub fn waiting_for(made: Option<&str>, now: SystemTime) -> Option<u64> {
 #[must_use]
 pub fn frees_up(earliest: Option<&str>, days: u32) -> Option<String> {
     let counted = crate::instant::read(earliest?)?;
-    crate::instant::written(counted.checked_add(Duration::from_secs(u64::from(days) * DAY))?)
+    crate::instant::written(
+        counted.checked_add(Duration::from_secs(u64::from(days) * crate::instant::DAY))?,
+    )
 }
 
 /// The earliest of the stamps given, where any of them is one this reads.

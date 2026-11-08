@@ -40,6 +40,7 @@ pub(crate) mod plugin;
 mod provenance;
 mod qr;
 mod quality;
+mod queue;
 mod reconfigure;
 mod removal;
 pub(crate) mod repair;
@@ -261,6 +262,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Boot(report) => booted::booted(report),
         Outcome::Watcher(report) => watcher::watcher(report),
+        Outcome::Queue(report) => queue::queue(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),

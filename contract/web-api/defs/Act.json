@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One of the three acts a run takes on an item that struck out.",
+  "oneOf": [
+    {
+      "description": "Drop the download from its client.",
+      "type": "string",
+      "const": "remove"
+    },
+    {
+      "description": "Keep its release from being grabbed again.",
+      "type": "string",
+      "const": "blocklist"
+    },
+    {
+      "description": "Search for the title again.",
+      "type": "string",
+      "const": "search"
+    }
+  ]
+}
