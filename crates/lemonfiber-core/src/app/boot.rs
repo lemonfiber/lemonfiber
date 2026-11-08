@@ -357,12 +357,15 @@ const WAITING_COSTS: &str =
 /// not run has established nothing, and reporting that as a failed boot would be the
 /// comfortable falsehood — and held needs a check of it that passed.
 async fn tunnel(ctx: &Ctx) -> BootTunnel {
-    let Ok(report) = super::engine::diagnose(ctx, &Narrowing::Category(Category::Vpn), false).await
-    else {
-        return BootTunnel::NotChecked;
-    };
-    let named: Vec<&str> = report
-        .findings
+    super::engine::diagnose(ctx, &Narrowing::Category(Category::Vpn), false)
+        .await
+        .map_or(BootTunnel::NotChecked, |report| found(&report.findings))
+}
+
+/// What `findings` of the tunnel come to: not established where one failed or warned,
+/// held where one passed, and otherwise not checked.
+fn found(findings: &[crate::doctor::Finding]) -> BootTunnel {
+    let named: Vec<&str> = findings
         .iter()
         .filter(|finding| matches!(finding.verdict, Verdict::Fail(_) | Verdict::Warn(_)))
         .map(|finding| finding.check.as_str())
@@ -375,8 +378,7 @@ async fn tunnel(ctx: &Ctx) -> BootTunnel {
             ),
         };
     }
-    if report
-        .findings
+    if findings
         .iter()
         .any(|finding| matches!(finding.verdict, Verdict::Pass { .. }))
     {

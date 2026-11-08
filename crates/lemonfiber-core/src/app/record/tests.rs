@@ -1,4 +1,4 @@
-use super::{keep, kept};
+use super::{keep, kept, read};
 use std::collections::BTreeSet;
 
 /// A scratch record path for one test.
@@ -86,4 +86,20 @@ fn a_record_that_cannot_be_read_is_not_written_over() {
         refused.is_err_and(|problem| problem.summary.contains("could not be read")),
         "the refusal is the unreadable record's"
     );
+}
+
+#[test]
+fn a_record_read_for_an_answer_is_the_default_where_absent_and_refused_where_unreadable() {
+    let absent = scratch("read-absent");
+    assert_eq!(
+        read::<BTreeSet<String>>(Some(absent.path())).ok(),
+        Some(BTreeSet::new())
+    );
+    assert_eq!(read::<BTreeSet<String>>(None).ok(), Some(BTreeSet::new()));
+
+    let directory = scratch("read-a-directory");
+    let _ = std::fs::create_dir_all(directory.path());
+    let refused = read::<BTreeSet<String>>(Some(directory.path())).err();
+    let named = directory.path().display().to_string();
+    assert!(refused.is_some_and(|problem| problem.summary.contains(&named)));
 }

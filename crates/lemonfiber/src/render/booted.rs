@@ -22,10 +22,11 @@ pub(super) fn booted(report: &BootReport) -> Lines {
             lines.put(format!("  Nothing was started: {declined}"));
         }
         if let Some(last) = &report.last_verified {
-            let after = last
+            let started = last
                 .against
                 .map_or_else(|| "an earlier start".to_owned(), moment);
-            verified(&mut lines, &format!("After {after}"), last);
+            let after = format!("After {started}");
+            verified(&mut lines, &after, last);
         }
     }
     if let (Some(since), Some(boots)) = (report.failing_since, report.failed_boots) {

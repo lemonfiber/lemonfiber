@@ -178,3 +178,35 @@ async fn a_record_that_cannot_be_read_is_refused_naming_it_rather_than_read_as_n
         );
     }
 }
+
+/// A tunnel finding of `verdict`.
+fn finding(verdict: crate::doctor::Verdict) -> crate::doctor::Finding {
+    crate::doctor::Finding {
+        check: "vpn.tunnel".to_owned(),
+        category: crate::doctor::Category::Vpn,
+        title: "The tunnel is up".to_owned(),
+        service: None,
+        service_name: None,
+        caused_by: None,
+        said: None,
+        onset: None,
+        verdict,
+        origin: crate::origin::Origin::Bundled,
+        disruptive: None,
+    }
+}
+
+#[test]
+fn a_tunnel_is_held_where_a_check_of_it_passed_and_not_checked_where_none_did() {
+    use crate::doctor::Verdict;
+    let passed = finding(Verdict::Pass { note: None });
+    let skipped = finding(Verdict::Skipped {
+        reason: "no tunnel".to_owned(),
+    });
+    assert_eq!(
+        super::super::found(&[passed, skipped.clone()]),
+        BootTunnel::Held
+    );
+    assert_eq!(super::super::found(&[skipped]), BootTunnel::NotChecked);
+    assert_eq!(super::super::found(&[]), BootTunnel::NotChecked);
+}
