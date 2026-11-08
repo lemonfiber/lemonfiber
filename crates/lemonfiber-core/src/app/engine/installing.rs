@@ -14,12 +14,14 @@ use crate::agreement::over;
 use crate::app::plugins::moving_in::{uninstalled, Ran};
 use crate::app::plugins::Consent;
 use crate::app::Ctx;
+use crate::doctor::Verdict;
 use crate::error::codes::life::{
     OFFLINE_INSTALL_MOVED, OFFLINE_INSTALL_UNANSWERED, OFFLINE_INSTALL_UNHELD,
     OFFLINE_INSTALL_UNREAD,
 };
 use crate::error::{Problem, Remedy, State};
 use crate::model::LifecycleReport;
+use crate::plugin::{Proving, Verdict as ProofVerdict, Verification};
 use crate::stack::closure::Plan;
 
 /// Every refusal a start answering what it offers to install may meet, beside the offer
@@ -159,8 +161,14 @@ pub(crate) async fn answer(
             ..Consent::default()
         };
         let installs = crate::app::plugins::from_this_build(ctx, &one.plugin, consent).await?;
-        if !installs.install.is_some_and(|install| install.recorded) {
-            return Err(Box::new(unheld(&one.plugin)));
+        match installs.install {
+            Some(install) if install.recorded => {}
+            install => {
+                let why = install
+                    .map(|install| held_back(&install.proofs, install.verified.as_ref()))
+                    .unwrap_or_default();
+                return Err(Box::new(unheld(&one.plugin, &why)));
+            }
         }
         ctx.narrator
             .say(&format!(
@@ -324,9 +332,9 @@ fn unread(offline: &Offline) -> Problem {
     .in_state(State::Guided)
 }
 
-/// An install agreed to that did not hold.
-fn unheld(plugin: &str) -> Problem {
-    Problem::new(
+/// An install agreed to that did not hold, with `held_back`, what held it back.
+fn unheld(plugin: &str, held_back: &[String]) -> Problem {
+    let problem = Problem::new(
         OFFLINE_INSTALL_UNHELD,
         format!("The install of {plugin} from this build did not hold"),
         "It was put back, and nothing of the form was started.",
@@ -335,7 +343,34 @@ fn unheld(plugin: &str) -> Problem {
              the form again"
         )),
     )
-    .in_state(State::Guided)
+    .in_state(State::Guided);
+    if held_back.is_empty() {
+        problem
+    } else {
+        problem.with_detail(held_back.join("; "))
+    }
+}
+
+/// Every proof among `proofs` that failed or could not be run, and every check `verified`
+/// says the install broke.
+fn held_back(proofs: &[Proving], verified: Option<&Verification>) -> Vec<String> {
+    let proofs = proofs.iter().filter_map(|one| match &one.came_to {
+        Some(ProofVerdict::Failed { faults }) => {
+            Some(format!("{}: {}", one.proof, faults.join(", ")))
+        }
+        Some(ProofVerdict::Unproven { why }) => Some(format!("{}: {why}", one.proof)),
+        _ => None,
+    });
+    let checks = verified
+        .into_iter()
+        .flat_map(|verified| &verified.broke)
+        .map(|broke| match &broke.now.verdict {
+            Verdict::Fail(why) | Verdict::Warn(why) => {
+                format!("{}: {}", broke.now.check, why.summary)
+            }
+            _ => format!("{}: {}", broke.now.check, broke.now.title),
+        });
+    proofs.chain(checks).collect()
 }
 
 /// The plugins `offline` offers, as a list a sentence reads.
@@ -348,3 +383,6 @@ pub(crate) fn plugins(offline: &Offline) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
+
+#[cfg(test)]
+mod tests;
