@@ -81,11 +81,13 @@ pub(crate) enum Paced {
     Forwarded,
     /// Each stuck item, acted on once where the operator has said to.
     SearchedAgain,
+    /// The guard's check-in to its heartbeat in the outside watcher.
+    CheckedIn,
 }
 
 impl Paced {
     /// Every paced panel.
-    pub(crate) const ALL: [Self; 8] = [
+    pub(crate) const ALL: [Self; 9] = [
         Self::Queues,
         Self::FreeSpace,
         Self::Hardlink,
@@ -94,6 +96,7 @@ impl Paced {
         Self::Vpn,
         Self::Forwarded,
         Self::SearchedAgain,
+        Self::CheckedIn,
     ];
 
     /// How long a reading of this panel stays current.
@@ -107,6 +110,7 @@ impl Paced {
             Self::Vpn => VPN_EVERY,
             Self::Forwarded => crate::app::forwarding::EVERY,
             Self::SearchedAgain => SEARCHED_AGAIN_EVERY,
+            Self::CheckedIn => Duration::from_secs(crate::app::watcher::covering::GUARD.every_s),
         }
     }
 }

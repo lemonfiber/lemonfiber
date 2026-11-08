@@ -212,7 +212,7 @@ const UNADDRESSED: &str = " Nothing here can work out an address for this machin
 
 /// What is said where nothing here can work out where `door` is reached: the fix for
 /// the way it is published.
-const fn unaddressed(door: &Candidate<'_>) -> &'static str {
+pub(crate) const fn unaddressed(door: &Candidate<'_>) -> &'static str {
     match door.reached {
         Reached::Port(_) => UNADDRESSED,
         Reached::Proxied(_) => UNPROXIED,

@@ -104,6 +104,28 @@ pub(crate) fn household_domain(ctx: &Ctx) -> String {
         .to_owned()
 }
 
+/// The address the operator recorded for the household's links and the domain the
+/// household's names are under, each as recorded now and as this run started where
+/// nothing is recorded: what a change made in this run reads as at once.
+pub(crate) fn household_place(ctx: &Ctx) -> (Option<String>, Option<String>) {
+    let recorded = recorded::Recorded::of(ctx);
+    let now = |name: &str, started: Option<&String>| {
+        recorded
+            .value(name)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .or_else(|| started.cloned())
+    };
+    (
+        now(
+            crate::config::HOUSEHOLD_HOST_SETTING,
+            ctx.settings.household_host.as_ref(),
+        ),
+        now(own::DOMAIN, ctx.settings.household_domain.as_ref()),
+    )
+}
+
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {
     files::forgotten(ctx, plugin);
     let Some(env) = ctx.settings.env_file.as_deref() else {

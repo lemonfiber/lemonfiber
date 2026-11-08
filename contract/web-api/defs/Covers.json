@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a monitor lemonfiber provisions covers, which its tag names.",
+  "oneOf": [
+    {
+      "description": "A service of the stack, by its id.",
+      "type": "object",
+      "properties": {
+        "service": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "service"
+      ]
+    },
+    {
+      "description": "A household-facing entry point, by the id of the service it is.",
+      "type": "object",
+      "properties": {
+        "entry-point": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "entry-point"
+      ]
+    },
+    {
+      "description": "A job the stack runs on a schedule, by its id.",
+      "type": "object",
+      "properties": {
+        "job": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "job"
+      ]
+    }
+  ]
+}

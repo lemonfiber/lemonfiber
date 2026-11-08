@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which path an entry point's monitor watches.",
+  "oneOf": [
+    {
+      "description": "The address the household is handed.",
+      "type": "string",
+      "const": "household"
+    },
+    {
+      "description": "The address the stack's own network reaches it at.",
+      "type": "string",
+      "const": "internal"
+    }
+  ]
+}

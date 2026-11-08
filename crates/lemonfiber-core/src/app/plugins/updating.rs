@@ -225,7 +225,7 @@ async fn recorded(
     account.install.recorded = true;
     super::kept::kept(ctx, would, coming.source);
     let _ = super::conformance::cleared(ctx, &would.plugin);
-    let _ = crate::seed::run::refront(ctx).await;
+    crate::seed::run::reinstalled(ctx).await;
     Ok(after)
 }
 

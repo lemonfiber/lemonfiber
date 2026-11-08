@@ -1,0 +1,16 @@
+{
+  "capability": "status.watch",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "monitors",
+      "said": "Monitors the operator made"
+    },
+    {
+      "carried": false,
+      "kind": "readings",
+      "said": "Every reading it took"
+    }
+  ],
+  "major": 1
+}

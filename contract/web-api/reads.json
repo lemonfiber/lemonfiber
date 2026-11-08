@@ -227,6 +227,14 @@
     "file": false
   },
   {
+    "path": "/api/watcher",
+    "parameters": [],
+    "kinds": [
+      "watcher"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/config",
     "parameters": [
       {

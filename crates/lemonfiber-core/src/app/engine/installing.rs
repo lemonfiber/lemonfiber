@@ -249,6 +249,7 @@ pub fn unstarted(action: &str, plan: Plan, offline: Offline) -> LifecycleReport 
         port_conflicts: Vec::new(),
         forwarding: None,
         secured: None,
+        watched: None,
         switched: None,
         held: None,
         offer: offline.offer,

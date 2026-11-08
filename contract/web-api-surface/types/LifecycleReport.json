@@ -149,6 +149,12 @@
         "anyOf(null,ref:Unvetted)"
       ],
       "required": false
+    },
+    "watched": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     }
   },
   "variants": []

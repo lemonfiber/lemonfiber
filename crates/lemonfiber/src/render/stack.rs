@@ -294,7 +294,8 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
         lines.spaced(describe(condition));
         lines.extend(show(&report.services));
     }
-    for said in report.secured.iter().chain(&report.forwarding) {
+    let said = [&report.secured, &report.forwarding, &report.watched];
+    for said in said.into_iter().flatten() {
         lines.spaced(said.clone());
     }
 

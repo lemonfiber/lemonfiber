@@ -251,6 +251,7 @@ pub(crate) async fn settled_into(
         .await
         .as_ref()
         .map(crate::seed::run::Secured::said);
+    report.watched = crate::seed::run::remonitored(ctx).await;
     let pass = super::super::forwarding::after_start(ctx, manifest).await;
     report.forwarding = pass
         .as_ref()

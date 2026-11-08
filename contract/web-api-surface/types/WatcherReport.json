@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "monitors": {
+      "type": [
+        "array[ref:WatchedTarget]"
+      ],
+      "required": false
+    },
+    "reachable": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "read_at": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "uncovered": {
+      "type": [
+        "array[ref:Covers]"
+      ],
+      "required": false
+    },
+    "unreachable_because": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "watcher": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

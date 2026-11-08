@@ -85,6 +85,7 @@
     "walkthrough": "ref:WalkthroughReport",
     "watch": "ref:SupervisionReport",
     "watched": "ref:WatchedReport",
+    "watcher": "ref:WatcherReport",
     "wiring": "ref:WiringReport",
     "wizard": "ref:WizardReport",
     "word": "ref:Term"

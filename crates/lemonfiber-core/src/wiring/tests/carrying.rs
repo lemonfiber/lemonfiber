@@ -45,7 +45,12 @@ fn what_a_substitution_leaves_behind_is_read_from_the_contracts() {
     assert_eq!(behind("library.curate", "sonarr", "sickgear"), Some(every));
     assert_eq!(
         behind("library.curate", "uptime", "medusa"),
-        Some(Vec::new())
+        Some(
+            lemonfiber_contract::capabilities::status::watch::HOLDS
+                .iter()
+                .map(|held| held.kind.to_owned())
+                .collect::<Vec<_>>()
+        )
     );
     assert_eq!(
         behind("status.watch", "nowhere", "uptime"),

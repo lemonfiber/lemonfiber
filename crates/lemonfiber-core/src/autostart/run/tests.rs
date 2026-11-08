@@ -47,6 +47,7 @@ fn ran(status: Option<i32>, rehearsed: bool) -> LifecycleReport {
         port_conflicts: Vec::new(),
         forwarding: None,
         secured: None,
+        watched: None,
         switched: None,
         held: None,
         offer: None,

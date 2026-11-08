@@ -63,6 +63,7 @@ fn running() -> Vec<Outcome> {
             }],
             forwarding: None,
             secured: None,
+            watched: None,
             switched: None,
             held: None,
             offer: None,
@@ -227,6 +228,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Asked(an_ask()),
         Outcome::Stuck(StuckReport::default()),
         Outcome::Boot(a_boot()),
+        Outcome::Watcher(a_watcher()),
         Outcome::Invitation(an_invitation()),
         Outcome::Handoff(lemonfiber_core::model::Handoff {
             name: "ana".to_owned(),
@@ -674,5 +676,67 @@ fn an_invitation() -> lemonfiber_core::model::Invitation {
             requesting: lemonfiber_core::model::Linked::Made,
             filtering: "These limits are a content filter, not a lock".to_owned(),
         }),
+    }
+}
+
+/// A watcher whose entry point's monitor watches the stack's own network, beside a
+/// heartbeat, an operator's monitor and a service nothing watches.
+fn a_watcher() -> lemonfiber_core::model::WatcherReport {
+    use lemonfiber_core::model::{
+        Heartbeat, Unconfigured, WatchPath, WatchState, WatchedTarget, WatcherReport,
+    };
+    use lemonfiber_core::ports::service::{Covers, MonitorKind};
+    WatcherReport {
+        watcher: Some("uptime-kuma".to_owned()),
+        reachable: true,
+        read_at: 1_762_500_300,
+        unreachable_because: None,
+        monitors: vec![
+            WatchedTarget {
+                covers: Some(Covers::EntryPoint("seerr".to_owned())),
+                name: "Requests".to_owned(),
+                kind: MonitorKind::Http,
+                state: WatchState::NotReporting,
+                since: 1_762_500_000,
+                last_reading: Some(1_762_500_000),
+                heartbeat: None,
+                active: true,
+                path: Some(WatchPath::Internal),
+                unconfigured: Some(Unconfigured {
+                    wanted: "the address the household is handed".to_owned(),
+                    watches: "http://seerr:5055".to_owned(),
+                    why: "Set DOMAIN to a domain whose addresses point at this machine".to_owned(),
+                }),
+            },
+            WatchedTarget {
+                covers: Some(Covers::Job("guard".to_owned())),
+                name: "The guard".to_owned(),
+                kind: MonitorKind::Heartbeat,
+                state: WatchState::Up,
+                since: 1_762_500_000,
+                last_reading: Some(1_762_500_280),
+                heartbeat: Some(Heartbeat {
+                    every_s: 60,
+                    grace_s: 60,
+                    last_check_in: Some(1_762_500_280),
+                }),
+                active: true,
+                path: None,
+                unconfigured: None,
+            },
+            WatchedTarget {
+                covers: None,
+                name: "The router".to_owned(),
+                kind: MonitorKind::Ping,
+                state: WatchState::Paused,
+                since: 1_762_400_000,
+                last_reading: None,
+                heartbeat: None,
+                active: false,
+                path: None,
+                unconfigured: None,
+            },
+        ],
+        uncovered: vec![Covers::Service("sonarr".to_owned())],
     }
 }

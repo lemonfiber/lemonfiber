@@ -186,6 +186,13 @@
           "type": "null"
         }
       ]
+    },
+    "watched": {
+      "description": "What holding the outside watcher to the stack's monitors came to, where it was\nmore than held already: given them, or why not. Absent where it already held them\nor nothing fills `status.watch`.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [

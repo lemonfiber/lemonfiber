@@ -1,0 +1,38 @@
+{
+  "capability": "status.watch",
+  "files": [
+    {
+      "path": "status.watch/v1/openapi.json",
+      "sha256": "d6e0222a5e251fb3a78b44ee810f898871e4375c2b3f00b1c87cb36fb5efbf46"
+    },
+    {
+      "path": "status.watch/v1/operations/reachable.json",
+      "sha256": "3a14b8dce112bbf489503304882032906446371dccafab5f8fdf4f8100ef4ca4"
+    },
+    {
+      "path": "status.watch/v1/operations/monitors.json",
+      "sha256": "0938d22ebe084daaa62e24485d30733d49ddf4ab3c71c53b6b40f051a588a20c"
+    },
+    {
+      "path": "status.watch/v1/operations/provision.json",
+      "sha256": "0f3f79c84fbe61926d20b7866d512e1e56f490e84f2683344ec91875a92e8b21"
+    },
+    {
+      "path": "status.watch/v1/operations/check_in.json",
+      "sha256": "72aca8f864bfaf39dd141ddbb1f0aa9174a41ffea477adaf001b587658865278"
+    },
+    {
+      "path": "status.watch/v1/operations/retire.json",
+      "sha256": "8b2e52032c9ade5b313a8a2019f9a0811fc88f288f64f0b8678792a833d572b3"
+    },
+    {
+      "path": "status.watch/v1/holds.json",
+      "sha256": "c8058fdcbeaab3fb60cfddca524715f1ced7f49b604246a1765fae939fdbe788"
+    },
+    {
+      "path": "status.watch/v1/conformance.json",
+      "sha256": "06cd622df8fe7da15e862a48b0e1917a0faa6c9303d2498f706003451b834a7e"
+    }
+  ],
+  "major": 1
+}

@@ -205,6 +205,16 @@ pub const EVERY: &[Entry] = &[
         at: Paths::boot,
     },
     Entry {
+        accessor: "watcher",
+        what: "the monitors lemonfiber made in the outside watcher",
+        why: "The id the watcher answered for each monitor lemonfiber provisioned, what each \
+              was asked to watch and what it watches instead where it could not. It is the \
+              only way a monitor is paired with the service, entry point or job it covers: \
+              never by its name or its address, which you may change in the watcher itself.",
+        secret: false,
+        at: Paths::watcher,
+    },
+    Entry {
         accessor: "accepted",
         what: "the questions you have already settled",
         why: "The choices whose cost was stated to you once — running with no VPN, or with a \

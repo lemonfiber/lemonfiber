@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "active": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "covers": {
+      "type": [
+        "anyOf(null,ref:Covers)"
+      ],
+      "required": false
+    },
+    "heartbeat": {
+      "type": [
+        "anyOf(null,ref:Heartbeat)"
+      ],
+      "required": false
+    },
+    "kind": {
+      "type": [
+        "ref:MonitorKind"
+      ],
+      "required": true
+    },
+    "last_reading": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "anyOf(null,ref:WatchPath)"
+      ],
+      "required": false
+    },
+    "since": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:WatchState"
+      ],
+      "required": true
+    },
+    "unconfigured": {
+      "type": [
+        "anyOf(null,ref:Unconfigured)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

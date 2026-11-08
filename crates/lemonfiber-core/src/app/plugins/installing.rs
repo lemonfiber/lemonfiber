@@ -171,7 +171,7 @@ pub(super) async fn install(
             super::guarding::journalled(ctx, &stack_manifest, &would)?;
             super::kept::kept(ctx, &would, &crate::plugin::root(path));
             let _ = super::conformance::cleared(ctx, &would.plugin);
-            let _ = crate::seed::run::refront(ctx).await;
+            crate::seed::run::reinstalled(ctx).await;
         } else {
             put_back = Some(reversing(ctx, &would, stack, &stamp).await);
         }

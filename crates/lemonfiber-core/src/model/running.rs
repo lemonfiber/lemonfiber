@@ -77,6 +77,11 @@ pub struct LifecycleReport {
     /// guard speaks its contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secured: Option<String>,
+    /// What holding the outside watcher to the stack's monitors came to, where it was
+    /// more than held already: given them, or why not. Absent where it already held them
+    /// or nothing fills `status.watch`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub watched: Option<String>,
     /// What narrowing moved, where the command was a switch. Absent for every
     /// other action, which is what tells a reader that nothing was left running
     /// on purpose.

@@ -32,6 +32,7 @@ mod gating;
 mod guarding;
 mod household;
 mod metering;
+mod monitoring;
 mod notices;
 mod ownership;
 mod peering;
@@ -92,6 +93,10 @@ pub use household::{
     Signed, Unrated,
 };
 pub use metering::{Metering, Moved};
+pub use monitoring::{
+    Beat, Covers, Instead, Monitor, MonitorKind, MonitorState, Monitoring, Provision, Provisioned,
+    Reach, TAG_PREFIX,
+};
 pub use notices::Noticing;
 pub use ownership::{Claim, Owner, Ownership};
 pub use peering::Peering;

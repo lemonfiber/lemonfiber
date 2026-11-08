@@ -55,6 +55,7 @@ mod update;
 mod viewing;
 mod waiting;
 pub(crate) mod walkthrough;
+mod watcher;
 mod wiring;
 mod wishing;
 
@@ -259,6 +260,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::News(report) => news::news(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Boot(report) => booted::booted(report),
+        Outcome::Watcher(report) => watcher::watcher(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),

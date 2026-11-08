@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "every_s": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "grace_s": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "last_check_in": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

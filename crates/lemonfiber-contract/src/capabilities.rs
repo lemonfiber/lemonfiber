@@ -16,6 +16,7 @@ pub mod owner;
 pub mod proxy;
 pub mod quality;
 pub mod request;
+pub mod status;
 pub mod stream;
 pub mod subtitles;
 
@@ -218,6 +219,10 @@ pub fn parties(media_types: &[String]) -> Vec<Party> {
 /// filler is chosen for, so a service speaks it and does not provide it.
 pub const FACETS: [&str; 2] = [indexer::pull::CAPABILITY, owner::claim::CAPABILITY];
 
+/// Every capability whose contract is published before a bundled part provides it, which the
+/// vocabulary carries only once one does.
+pub const AWAITING_A_BUNDLED_CLAIMANT: [&str; 1] = [status::watch::CAPABILITY];
+
 /// Whether the capability `name` is a facet.
 #[must_use]
 pub fn is_facet(name: &str) -> bool {
@@ -246,6 +251,7 @@ pub fn all() -> Vec<crate::Capability> {
         stream::guard::capability(),
         invite::decline::capability(),
         request::gate::capability(),
+        status::watch::capability(),
         owner::claim::capability(),
     ]
 }

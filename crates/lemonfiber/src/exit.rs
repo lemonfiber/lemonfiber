@@ -232,6 +232,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::News(_)
         | Outcome::Stuck(_)
         | Outcome::Boot(_)
+        | Outcome::Watcher(_)
         | Outcome::Status(_)
         | Outcome::Word(_)
         | Outcome::Glossary(_)

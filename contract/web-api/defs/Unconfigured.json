@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a monitor was asked to watch, what it watches instead, and why.",
+  "type": "object",
+  "properties": {
+    "wanted": {
+      "description": "What it was asked to watch.",
+      "type": "string"
+    },
+    "watches": {
+      "description": "What it watches.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why, in the stack's words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "wanted",
+    "watches",
+    "why"
+  ]
+}
