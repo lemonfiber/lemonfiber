@@ -1,7 +1,7 @@
 //! The outside watcher, held over `status.watch` to a monitor for every critical service,
 //! household entry point and hosted job, each under lemonfiber's own tag.
 
-use super::super::watching::{remonitor, remonitored, seed_watcher};
+use super::super::watching::{remonitor, remonitored, seed_watcher, sentence};
 use super::*;
 use crate::app::watcher::kept::{self, Kept, Made};
 use crate::ports::hosting::{Manager, Standing};
@@ -203,7 +203,74 @@ async fn a_rehearsal_says_how_many_it_would_hold_and_provisions_and_retires_noth
     );
     assert!(provisioned(&http).is_empty());
     assert!(retired(&http).is_empty());
+    let mut record = Kept::default();
+    let gone = Covers::Service("gone".to_owned()).tag();
+    record.made.insert(gone.clone(), kept_as(&gone));
+    kept::keep(&ctx, &record);
     assert_eq!(kept::held(&ctx), Kept::default());
+}
+
+#[tokio::test]
+async fn what_the_watcher_watches_instead_is_kept_beside_what_it_was_asked_to_watch() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("watcher-instead");
+    let http = Fake::by_path(vec![
+        (MONITORS, Answer::reply(200, "[]")),
+        (
+            PROVISION,
+            Answer::reply(
+                200,
+                r#"{"id":"7","instead":{"watches":"the status alone","why":"it reads no body"}}"#,
+            ),
+        ),
+    ]);
+    let ctx = watching(&project, http);
+
+    assert_eq!(seeded(&ctx, &project).await, Some(State::Wired));
+
+    let record = kept::held(&ctx);
+    let sonarr = record.made.get(&Covers::Service("sonarr".to_owned()).tag());
+    assert!(
+        sonarr.is_some_and(|made| made
+            .unconfigured
+            .as_ref()
+            .is_some_and(|said| said.wanted == made.asked.target
+                && said.watches == "the status alone"
+                && said.why == "it reads no body")),
+        "{sonarr:?}"
+    );
+    let entry = record.made.iter().find(|(tag, made)| {
+        tag.starts_with("lemonfiber:entry:") && made.path == Some(crate::model::WatchPath::Internal)
+    });
+    assert!(
+        entry.is_some_and(|(_, made)| made
+            .unconfigured
+            .as_ref()
+            .is_some_and(|said| said.wanted == "the address the household is handed"
+                && said.watches == "the status alone")),
+        "{entry:?}"
+    );
+}
+
+#[test]
+fn a_pass_is_said_where_it_provisioned_or_could_not_and_not_where_it_held_already() {
+    for state in [
+        State::Failed {
+            detail: "refused".to_owned(),
+        },
+        State::Skipped {
+            reason: "refused".to_owned(),
+        },
+        State::Unmatched {
+            reason: "refused".to_owned(),
+        },
+    ] {
+        assert!(
+            sentence(&state).is_some_and(|said| said.ends_with(": refused")),
+            "{state:?}"
+        );
+    }
+    assert!(sentence(&State::Wired).is_some());
+    assert_eq!(sentence(&State::AlreadyWired), None);
 }
 
 #[tokio::test]
@@ -255,6 +322,20 @@ async fn a_watcher_that_will_not_provision_or_retire_keeps_what_the_record_held(
 
     assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
     assert_eq!(kept::held(&ctx), record);
+
+    let elsewhere = lemonfiber_fixtures::scratch::Scratch::new("watcher-refusing-to-retire");
+    let retiring = watching(
+        &elsewhere,
+        Fake::by_path(vec![
+            (MONITORS, Answer::reply(200, "[]")),
+            (PROVISION, Answer::reply(200, PROVISIONED)),
+            (RETIRE, Answer::reply(503, "")),
+        ]),
+    );
+    kept::keep(&retiring, &record);
+    let state = seeded(&retiring, &elsewhere).await;
+    assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
+    assert!(kept::held(&retiring).made.contains_key(&gone));
 }
 
 #[tokio::test]

@@ -143,7 +143,7 @@ pub(crate) async fn remonitored(ctx: &Ctx) -> Option<String> {
 }
 
 /// What a pass resting in `state` is said as, where it is worth saying.
-fn sentence(state: &State) -> Option<String> {
+pub(super) fn sentence(state: &State) -> Option<String> {
     match state {
         State::Wired => Some(PROVISIONED.to_owned()),
         State::Failed { detail: why }

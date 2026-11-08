@@ -509,6 +509,12 @@ fn every_capability_in_the_vocabulary_has_a_contract_this_build_speaks() {
         .iter()
         .map(|capability| capability.name)
         .filter(|name| !lemonfiber_contract::capabilities::is_facet(name))
+        .filter(|name| {
+            !lemonfiber_contract::capabilities::AWAITING_A_BUNDLED_CLAIMANT.contains(name)
+        })
         .collect();
     assert_eq!(named, contracted);
+    for awaiting in lemonfiber_contract::capabilities::AWAITING_A_BUNDLED_CLAIMANT {
+        assert!(!named.contains(awaiting), "{awaiting}");
+    }
 }
