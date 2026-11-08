@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "When this machine last started, what the run after it came to, and how long the\nstack has failed to come back.",
+  "type": "object",
+  "properties": {
+    "booted_at": {
+      "description": "When this machine last started, in seconds since the Unix epoch, where it says.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "declined": {
+      "description": "Why a run after that start started nothing, where one did.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "failed_boots": {
+      "description": "How many starts it has failed to come back after since then.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "failing_since": {
+      "description": "Since when the stack has failed to come back, in seconds since the Unix epoch.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "last_verified": {
+      "description": "The newest verification kept against any start.",
+      "anyOf": [
+        {
+          "$ref": "BootVerification.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verified": {
+      "description": "The verification kept against that start, where one ran after it.",
+      "anyOf": [
+        {
+          "$ref": "BootVerification.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

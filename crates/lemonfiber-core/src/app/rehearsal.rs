@@ -30,6 +30,7 @@
 //! reports the report it would have filled in and stops short of the one irreversible
 //! step. See `.docs/architecture/rehearsal.md`.
 
+use crate::companion::Asked as Pairing;
 use crate::error::Problem;
 use crate::model::kind::{self, Kind};
 
@@ -212,15 +213,14 @@ pub const fn asked(command: &Command) -> Asked {
         Command::History => reads("history"),
         Command::Status { .. } => reads("ps"),
         Command::Stuck => reads("stuck"),
+        Command::Boot => reads("boot"),
         Command::FrontDoor => reads("front-door"),
         Command::News => reads("news"),
         Command::Playing { .. } => reads("playing"),
-        Command::Companion(crate::companion::Asked::Pair) => {
-            cannot("companion pair", MATERIAL_IS_MATERIAL)
-        }
+        Command::Companion(Pairing::Pair) => cannot("companion pair", MATERIAL_IS_MATERIAL),
         // Unconfirmed it already is the rehearsal: what replacing costs, and nothing
         // replaced.
-        Command::Companion(crate::companion::Asked::Certificate { .. }) => {
+        Command::Companion(Pairing::Certificate { .. }) => {
             reports("companion certificate", CERTIFICATE)
         }
         Command::Explain { .. } => reads("explain"),

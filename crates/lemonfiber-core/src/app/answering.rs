@@ -44,6 +44,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::News => &[kind::NEWS_ITEMS],
         Command::Trace(_) => &[kind::TRACE],
         Command::Stuck => &[kind::STUCK],
+        Command::Boot => &[kind::BOOT],
         Command::ConfigGet { .. } | Command::ConfigShow => &[kind::CONFIG],
         Command::Explain { .. } => &[kind::WORD],
         Command::Glossary => &[kind::GLOSSARY],

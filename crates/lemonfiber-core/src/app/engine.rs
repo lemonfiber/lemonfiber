@@ -363,6 +363,7 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         } else {
             Vec::new()
         },
+        forwarded: None,
     };
     Ok(Readied {
         manifest,

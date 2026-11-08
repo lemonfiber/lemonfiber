@@ -179,6 +179,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         unfenced: super::fenced::held_back(&Action::Up, &project)?,
         rendering: beside.rendering,
         unrendered: crate::app::project::unrendered(&project),
+        forwarded: None,
     };
 
     if ctx.dry_run {

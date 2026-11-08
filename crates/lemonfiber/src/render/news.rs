@@ -86,7 +86,7 @@ fn problem(problem: &NewsProblem) -> String {
 
 /// An onset as a date and a time in UTC, or as the stack stamped it where it is not a
 /// number of seconds.
-fn when(onset: &str) -> String {
+pub(super) fn when(onset: &str) -> String {
     onset
         .parse::<u64>()
         .ok()

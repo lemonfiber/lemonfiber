@@ -219,6 +219,14 @@
     "file": false
   },
   {
+    "path": "/api/boot",
+    "parameters": [],
+    "kinds": [
+      "boot"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/config",
     "parameters": [
       {

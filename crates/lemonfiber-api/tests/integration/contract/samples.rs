@@ -76,6 +76,7 @@ fn running() -> Vec<Outcome> {
             rendering: None,
             unrendered: Vec::new(),
             guards: Vec::new(),
+            forwarded: None,
         }),
         Outcome::Config(ConfigReport {
             settings: Vec::new(),
@@ -225,35 +226,8 @@ fn serving() -> Vec<Outcome> {
         Outcome::Askable(a_search()),
         Outcome::Asked(an_ask()),
         Outcome::Stuck(StuckReport::default()),
-        Outcome::Invitation(lemonfiber_core::model::Invitation {
-            name: "ana".to_owned(),
-            address: "http://a-machine.local:8096".to_owned(),
-            decline: Some(
-                "http://a-machine.local:5056/decline/9f2c4e8a1b7d3f60a5e2c9b4d7f1a3e8".to_owned(),
-            ),
-            join: Some(
-                "lemonfiber://join?address=https%3A%2F%2Fa-machine.local%3A8443&fingerprint=\
-                 3b7c0e1d9a4f2b6c8e5d1a7f3c9b2e4d6a8f0c1e3b5d7f9a2c4e6b8d0f1a3c5e&stack=\
-                 000102030405060708090a0b0c0d0e0f&expires=1791417600&name=ana&claim=\
-                 4c8e2a6f1b9d3e7a5c0f8b2d6e4a1c9f"
-                    .to_owned(),
-            ),
-            unjoinable: None,
-            caution: None,
-            hours: 48,
-            withdrawn: Vec::new(),
-            suspended: Vec::new(),
-            rehearsed: false,
-            standing: lemonfiber_core::model::InvitationStanding::Made,
-            linked: lemonfiber_core::model::Linked::Made,
-            applied: Some(lemonfiber_core::model::Applied {
-                limit: Some("nothing above about 12".to_owned()),
-                libraries: vec!["Films".to_owned()],
-                unrated: lemonfiber_core::ports::service::Unrated::HeldBack,
-                requesting: lemonfiber_core::model::Linked::Made,
-                filtering: "These limits are a content filter, not a lock".to_owned(),
-            }),
-        }),
+        Outcome::Boot(a_boot()),
+        Outcome::Invitation(an_invitation()),
         Outcome::Handoff(lemonfiber_core::model::Handoff {
             name: "ana".to_owned(),
             state: lemonfiber_core::model::HandoffState::Connected,
@@ -637,5 +611,68 @@ fn an_ask() -> lemonfiber_core::model::AskedReport {
         released: true,
         said: "Asked. Whoever runs the house will say yes or no.".to_owned(),
         rehearsed: false,
+    }
+}
+
+/// A restart whose check found the tunnel down, beside the newest check that passed.
+fn a_boot() -> lemonfiber_core::model::BootReport {
+    use lemonfiber_core::model::{
+        BootOutcome, BootReport, BootTunnel, BootVerification, Forwarded,
+    };
+    let failed = BootVerification {
+        against: Some(1_762_500_000),
+        at: 1_762_500_300,
+        outcome: BootOutcome::Failed,
+        not_back: vec!["qbittorrent".to_owned()],
+        tunnel: BootTunnel::NotEstablished {
+            said: "the stack came back and its tunnel did not: vpn.tunnel".to_owned(),
+        },
+        port: Some(Forwarded {
+            was: Some(51_413),
+            now: Some(51_999),
+            pushed: false,
+        }),
+        said: Some("the stack came back and its tunnel did not: vpn.tunnel".to_owned()),
+    };
+    BootReport {
+        booted_at: Some(1_762_500_000),
+        verified: Some(failed.clone()),
+        last_verified: Some(failed),
+        declined: None,
+        failing_since: Some(1_762_500_300),
+        failed_boots: Some(1),
+    }
+}
+
+/// An invitation with every way in it carries.
+fn an_invitation() -> lemonfiber_core::model::Invitation {
+    lemonfiber_core::model::Invitation {
+        name: "ana".to_owned(),
+        address: "http://a-machine.local:8096".to_owned(),
+        decline: Some(
+            "http://a-machine.local:5056/decline/9f2c4e8a1b7d3f60a5e2c9b4d7f1a3e8".to_owned(),
+        ),
+        join: Some(
+            "lemonfiber://join?address=https%3A%2F%2Fa-machine.local%3A8443&fingerprint=\
+                     3b7c0e1d9a4f2b6c8e5d1a7f3c9b2e4d6a8f0c1e3b5d7f9a2c4e6b8d0f1a3c5e&stack=\
+                     000102030405060708090a0b0c0d0e0f&expires=1791417600&name=ana&claim=\
+                     4c8e2a6f1b9d3e7a5c0f8b2d6e4a1c9f"
+                .to_owned(),
+        ),
+        unjoinable: None,
+        caution: None,
+        hours: 48,
+        withdrawn: Vec::new(),
+        suspended: Vec::new(),
+        rehearsed: false,
+        standing: lemonfiber_core::model::InvitationStanding::Made,
+        linked: lemonfiber_core::model::Linked::Made,
+        applied: Some(lemonfiber_core::model::Applied {
+            limit: Some("nothing above about 12".to_owned()),
+            libraries: vec!["Films".to_owned()],
+            unrated: lemonfiber_core::ports::service::Unrated::HeldBack,
+            requesting: lemonfiber_core::model::Linked::Made,
+            filtering: "These limits are a content filter, not a lock".to_owned(),
+        }),
     }
 }

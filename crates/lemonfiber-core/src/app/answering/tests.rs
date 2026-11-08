@@ -65,6 +65,7 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::Wiring(Linking::Read), kind::WIRING),
         (Command::Settings(Settling::Read), kind::SETTINGS),
         (Command::Playing { member: None }, kind::PLAYING),
+        (Command::Boot, kind::BOOT),
         (
             Command::Wish(Wishing::Find {
                 member: "Ada".to_owned(),

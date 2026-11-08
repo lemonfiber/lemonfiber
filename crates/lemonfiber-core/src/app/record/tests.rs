@@ -1,4 +1,4 @@
-use super::{keep, kept};
+use super::{keep, kept, read};
 use std::collections::BTreeSet;
 
 /// A scratch record path for one test.
@@ -86,4 +86,29 @@ fn a_record_that_cannot_be_read_is_not_written_over() {
         refused.is_err_and(|problem| problem.summary.contains("could not be read")),
         "the refusal is the unreadable record's"
     );
+}
+
+#[test]
+fn a_record_read_for_an_answer_is_the_default_where_absent_and_refused_where_unreadable() {
+    let absent = scratch("read-absent");
+    assert_eq!(
+        read::<BTreeSet<String>>(Some(absent.path())).ok(),
+        Some(BTreeSet::new())
+    );
+    assert_eq!(read::<BTreeSet<String>>(None).ok(), Some(BTreeSet::new()));
+
+    let file = scratch("read-beneath-a-file");
+    if let Some(parent) = file.path().parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(file.path(), "not a directory");
+    let beneath = file.path().join("record.json");
+    let refused = read::<BTreeSet<String>>(Some(&beneath)).err();
+    let named = beneath.display().to_string();
+    assert!(refused.is_some_and(|problem| problem.summary.contains(&named)));
+
+    let damaged = scratch("read-damaged");
+    assert!(keep(Some(damaged.path()), &BTreeSet::<String>::new()).is_ok());
+    let _ = std::fs::write(damaged.path(), "{ not json");
+    assert!(read::<BTreeSet<String>>(Some(damaged.path())).is_err());
 }

@@ -14,6 +14,7 @@ pub(crate) mod fixtures;
 mod alerts;
 mod archive;
 mod bandwidth;
+mod booted;
 mod catalogue;
 mod changelog;
 mod clients;
@@ -257,6 +258,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::News(report) => news::news(report),
         Outcome::Stuck(report) => trace::stuck(report),
+        Outcome::Boot(report) => booted::booted(report),
         Outcome::Word(term) => glossary::explanation(term),
         Outcome::Glossary(listed) => glossary::vocabulary(listed),
         Outcome::Clients(all) => clients::guidance(all),

@@ -39,6 +39,34 @@ pub(crate) fn kept<T: Default + DeserializeOwned>(path: Option<&Path>) -> T {
         .unwrap_or_default()
 }
 
+/// What the record holds, the default where there is none, or why it cannot be read.
+///
+/// For a read that answers with the record: there a damaged record read as the default
+/// would be the claim that nothing was kept.
+///
+/// # Errors
+///
+/// Where the file is there and cannot be read, or does not read as the record.
+pub(crate) fn read<T: Default + DeserializeOwned>(path: Option<&Path>) -> Result<T, Box<Problem>> {
+    let Some(path) = path else {
+        return Ok(T::default());
+    };
+    let unreadable = |reason: String| {
+        Box::new(
+            store::Failure::Unreadable {
+                path: path.to_path_buf(),
+                reason,
+            }
+            .problem(),
+        )
+    };
+    match std::fs::read_to_string(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
+        Err(error) => Err(unreadable(error.to_string())),
+        Ok(text) => serde_json::from_str(&text).map_err(|why| unreadable(why.to_string())),
+    }
+}
+
 /// Read the record kept beside the environment file, or the default where there is none.
 ///
 /// The name is the whole of what differs between these records, so it is the whole of what

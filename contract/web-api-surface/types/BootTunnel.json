@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "said": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "const:\"held\"",
+        "const:\"not-checked\"",
+        "const:\"not-established\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"held\"",
+    "\"not-checked\"",
+    "\"not-established\""
+  ]
+}

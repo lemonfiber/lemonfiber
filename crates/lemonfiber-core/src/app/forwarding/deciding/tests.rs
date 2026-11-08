@@ -58,6 +58,7 @@ fn forwarding_that_ended_sets_the_client_to_none() {
         answer: None,
         clients: vec![client("qbittorrent", came_to(Ok(Some(51413)), Ok(())))],
         unrecorded: None,
+        was: None,
     };
     assert_eq!(
         pass.said(),
@@ -75,6 +76,7 @@ fn a_set_refused_is_said_in_the_refusers_words_and_raised() {
         answer: Some(51999),
         clients: vec![client("qbittorrent", refused)],
         unrecorded: None,
+        was: None,
     };
     assert!(!pass.passed());
     assert!(pass.changes("1000").is_empty());
@@ -106,6 +108,7 @@ fn a_moved_port_is_journalled_as_the_clients_own_field_and_put_back_through_it()
             client("transmission", CameTo::Moved { from: Some(None) }),
         ],
         unrecorded: Some("not recorded".to_owned()),
+        was: None,
     };
     assert!(pass.passed());
     assert_eq!(pass.fault(), None);

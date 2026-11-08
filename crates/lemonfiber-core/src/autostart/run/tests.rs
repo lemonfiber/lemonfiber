@@ -60,6 +60,7 @@ fn ran(status: Option<i32>, rehearsed: bool) -> LifecycleReport {
         rendering: None,
         unrendered: Vec::new(),
         guards: Vec::new(),
+        forwarded: None,
     }
 }
 

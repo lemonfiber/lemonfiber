@@ -110,6 +110,15 @@ pub(crate) fn dated(ctx: &Ctx, found: Vec<Finding>) -> Vec<Finding> {
         .collect()
 }
 
+/// The conditions kept, or why they cannot be read.
+///
+/// # Errors
+///
+/// Where the record is there and cannot be read.
+pub(crate) fn read(ctx: &Ctx) -> Result<Conditions, Box<crate::error::Problem>> {
+    super::record::read(path(ctx).as_deref())
+}
+
 /// Where the store is kept: beside the environment file, or nowhere on a machine
 /// with nothing configured — which has no faults to remember either.
 fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {

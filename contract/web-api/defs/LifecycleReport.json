@@ -32,6 +32,17 @@
         "null"
       ]
     },
+    "forwarded": {
+      "description": "The VPN's forwarded port before the start and after it, and whether every client\ntakes it, where the guard forwards one or the clients took one before.",
+      "anyOf": [
+        {
+          "$ref": "Forwarded.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "forwarding": {
       "description": "What starting the stack did about the VPN's forwarded port, where it did\nanything. Absent in the ordinary case — the client was already on it, or\nthere is no tunnel to forward through — and a sentence where the client was\nmoved, or could not be.",
       "type": [

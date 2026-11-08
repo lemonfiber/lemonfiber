@@ -4,7 +4,20 @@
 //! separate files and are re-exported as one, so `crate::model::X` reads the same as it
 //! always did.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+/// The VPN's forwarded port across a start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct Forwarded {
+    /// The port every client last took, where they took one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub was: Option<u16>,
+    /// The port the guard forwards now, where it forwards one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now: Option<u16>,
+    /// Whether every client inside the guard takes peers on it.
+    pub pushed: bool,
+}
 
 /// What a lifecycle command did, or would have done.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -54,6 +67,10 @@ pub struct LifecycleReport {
     /// moved, or could not be.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forwarding: Option<String>,
+    /// The VPN's forwarded port before the start and after it, and whether every client
+    /// takes it, where the guard forwards one or the clients took one before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forwarded: Option<Forwarded>,
     /// What asking the egress guard to hold its control server to the credential its
     /// adapter was handed came to, where it was more than held at once: the guard
     /// restarted to take it up, or why it did not. Absent where it held it at once or no

@@ -24,6 +24,12 @@
       ],
       "required": false
     },
+    "forwarded": {
+      "type": [
+        "anyOf(null,ref:Forwarded)"
+      ],
+      "required": false
+    },
     "forwarding": {
       "type": [
         "null|string"

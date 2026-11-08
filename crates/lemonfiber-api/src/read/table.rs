@@ -138,6 +138,9 @@ pub const TRACE: &str = "/api/trace";
 /// The items whose downloads have stopped.
 pub const STUCK: &str = "/api/stuck";
 
+/// When this machine last started, and what the run after it came to.
+pub const BOOT: &str = "/api/boot";
+
 /// Every setting, or one of them by name, with credentials withheld.
 pub const CONFIG: &str = "/api/config";
 
@@ -307,6 +310,7 @@ pub const OFFERED: &[&str] = &[
     NEWS,
     TRACE,
     STUCK,
+    BOOT,
     CONFIG,
     QUALITY,
     EXPLAIN,
@@ -458,6 +462,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         NEWS => Ok(Command::News),
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),
+        BOOT => Ok(Command::Boot),
         CONFIG => setting(key),
         QUALITY => Ok(Command::Quality(QualityAction::Show)),
         // Naming an empty word is naming one this product does not explain, and is

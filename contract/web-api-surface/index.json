@@ -11,6 +11,7 @@
     "backup": "ref:BackupReport",
     "bandwidth": "ref:Sharing",
     "beside": "ref:BesideReport",
+    "boot": "ref:BootReport",
     "bundle": "ref:Bundle",
     "capabilities": "ref:Capabilities",
     "catalogue": "ref:CatalogueReport",

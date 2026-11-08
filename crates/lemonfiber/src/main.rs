@@ -325,6 +325,7 @@ async fn main() -> ExitCode {
         Request::History => Command::History,
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,
+        Request::Boot => Command::Boot,
         Request::FrontDoor => Command::FrontDoor,
         Request::News => Command::News,
         Request::Companion(asked) => translate::paired(&asked),

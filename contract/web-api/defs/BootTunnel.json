@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether the tunnel came back with the stack.",
+  "oneOf": [
+    {
+      "description": "Its checks passed.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "held"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "A check of it failed.",
+      "type": "object",
+      "properties": {
+        "said": {
+          "description": "Which, in the stack's words.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "not-established"
+        }
+      },
+      "required": [
+        "state",
+        "said"
+      ]
+    },
+    {
+      "description": "Nothing checked it: the stack runs no tunnel, did not come up, or could not be\nread.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "not-checked"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    }
+  ]
+}

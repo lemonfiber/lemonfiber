@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a run at boot came to.",
+  "oneOf": [
+    {
+      "description": "The stack came back, tunnel and forwarded port included.",
+      "type": "string",
+      "const": "passed"
+    },
+    {
+      "description": "The stack, or its tunnel, did not come back.",
+      "type": "string",
+      "const": "failed"
+    },
+    {
+      "description": "The rest came back, and a part waits for its install from this build.",
+      "type": "string",
+      "const": "waiting-for-install"
+    }
+  ]
+}

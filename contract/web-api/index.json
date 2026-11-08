@@ -80,6 +80,7 @@
     "backup": "kinds/backup.json",
     "bandwidth": "kinds/bandwidth.json",
     "beside": "kinds/beside.json",
+    "boot": "kinds/boot.json",
     "bundle": "kinds/bundle.json",
     "capabilities": "kinds/capabilities.json",
     "catalogue": "kinds/catalogue.json",
