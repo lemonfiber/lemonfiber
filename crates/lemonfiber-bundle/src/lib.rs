@@ -61,9 +61,12 @@ pub struct Bundle {
     /// Every service the catalogue no longer carries, at schema 2.
     #[serde(default)]
     pub removed: Vec<Removed>,
-    /// Every first-party plugin, ordered by id.
+    /// Every first-party plugin that is a part of the stack, ordered by id.
     #[serde(default)]
     pub plugin: Vec<Pin>,
+    /// Every first-party plugin the stack does not ship, ordered by id, at schema 2.
+    #[serde(default)]
+    pub offered: Vec<Offered>,
     /// The image a fenced service runs behind, at schema 2, where the bundle pins one.
     #[serde(default)]
     pub fence: Option<Image>,
@@ -93,7 +96,7 @@ impl Image {
 pub const FENCE_IMAGE: &str = "ghcr.io/lemonfiber/fence";
 
 /// Whether the bundle assembles a part into the stack it ships or installs it through the
-/// plugin path.
+/// plugin path, or offers a plugin that is no part of the stack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Stage {
@@ -101,6 +104,10 @@ pub enum Stage {
     Assembled,
     /// Its adapter has shipped and it moves in place of the service it replaces.
     Installed,
+    /// It is no part of the stack, and is installed only where the operator asks; an
+    /// `[[offered]]` pin, which no `[[plugin]]` names as its stage.
+    #[serde(skip_deserializing)]
+    Offered,
 }
 
 /// One first-party plugin, as the bundle pins it.
@@ -133,6 +140,60 @@ pub struct Pin {
     /// The day its upstream last released, `YYYY-MM-DD`, at schema 2.
     #[serde(default)]
     pub last_release: Option<String>,
+}
+
+/// One first-party plugin the stack does not ship, as the bundle pins it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Offered {
+    /// The plugin's `[plugin].id`.
+    pub id: String,
+    /// The plugin's repository, as an https URL.
+    pub origin: String,
+    /// The version the release train tagged it at, without the `v`, where it was tagged.
+    #[serde(default)]
+    pub release: Option<String>,
+    /// The full commit of its repository the copy was taken from.
+    pub revision: String,
+    /// The digest of its manifest at that revision, written `sha256:<64 hex>`.
+    pub manifest: String,
+    /// The digest of its tree at that revision, written `sha256:<64 hex>`.
+    pub tree: String,
+    /// The profile its services sit in.
+    pub profile: String,
+    /// The day its upstream last released, `YYYY-MM-DD`.
+    pub last_release: String,
+}
+
+impl Offered {
+    /// The pin it is, as a part's is read: filling nothing, at [`Stage::Offered`].
+    #[must_use]
+    pub fn pin(&self) -> Pin {
+        Pin {
+            id: self.id.clone(),
+            origin: self.origin.clone(),
+            release: self.release.clone(),
+            revision: self.revision.clone(),
+            manifest: self.manifest.clone(),
+            tree: Some(self.tree.clone()),
+            fills: Vec::new(),
+            stage: Some(Stage::Offered),
+            profile: Some(self.profile.clone()),
+            last_release: Some(self.last_release.clone()),
+        }
+    }
+}
+
+impl Bundle {
+    /// Every pin: each part's, then each offered plugin's.
+    #[must_use]
+    pub fn pins(&self) -> Vec<Pin> {
+        self.plugin
+            .iter()
+            .cloned()
+            .chain(self.offered.iter().map(Offered::pin))
+            .collect()
+    }
 }
 
 /// One pinned plugin with the copy the bundle holds of it.
@@ -209,12 +270,12 @@ pub fn read(root: &Path) -> Result<(Bundle, Vec<Held>), Refused> {
     }
     let mut copies = copies;
     let held = bundle
-        .plugin
-        .iter()
+        .pins()
+        .into_iter()
         .map(|pin| {
             let copy = copies.remove(&pin.id).unwrap_or_default();
             Held {
-                pin: pin.clone(),
+                pin,
                 copy: copy.manifest.unwrap_or_default(),
                 tree: copy.files,
             }

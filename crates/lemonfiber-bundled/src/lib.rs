@@ -55,18 +55,22 @@ pub struct Pinned {
     /// The profile its services sit in, where the bundle names one.
     pub profile: Option<&'static str>,
     /// Every file of its tree beside the manifest, by its path from the plugin's root,
-    /// for a plugin the bundle installs; the stack carries an assembled one's.
+    /// for a plugin installed through the plugin path; the stack carries an assembled
+    /// one's.
     pub files: &'static [(&'static str, &'static [u8])],
 }
 
 /// Whether the bundle assembles a part into the stack or installs it through the plugin
-/// path.
+/// path, or offers a plugin that is no part of the stack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
     /// Its one service is a stack service.
     Assembled,
     /// It is installed through the plugin path, in place of the service it replaces.
     Installed,
+    /// It is no part of the stack, and is installed through the plugin path only where
+    /// the operator asks.
+    Offered,
 }
 
 include!(concat!(env!("OUT_DIR"), "/bundle.rs"));
