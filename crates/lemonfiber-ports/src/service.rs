@@ -62,7 +62,7 @@ pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
     Category, ClientProbe, Credential, Download, DownloadClient, Endpoint, FulfilmentTarget,
     Protocol, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
-    RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
+    RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, TransferState, Transfers,
 };
 pub use declaring::{
     joined, spelled_as_a_space, Addressee, Answered, Answers, BytePath, Declared, Declaring, Held,

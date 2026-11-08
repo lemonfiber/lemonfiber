@@ -7,7 +7,7 @@
     },
     {
       "path": "download.torrent/v1/operations/transfers.json",
-      "sha256": "8589870ba9c8c065854ed2116a8944f24b579f3cd707bd278482e612640408b8"
+      "sha256": "51c36ace1211efcb3b943ad7ff3425a70f928b989877540a163f289ef117b7dd"
     },
     {
       "path": "download.torrent/v1/operations/pulling.json",

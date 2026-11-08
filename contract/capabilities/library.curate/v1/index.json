@@ -143,7 +143,7 @@
     },
     {
       "path": "library.curate/v1/operations/downloading.json",
-      "sha256": "258b2b807286da16d5db5eed757a4dde4b8bcbd8650d8dae2371dc11bdf31bdd"
+      "sha256": "7bee09d16cd21ca945edd50bb4cd3b106e309180b2ea1db372eb31f5632e5125"
     },
     {
       "path": "library.curate/v1/operations/unqueue.json",

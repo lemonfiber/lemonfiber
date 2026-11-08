@@ -256,6 +256,39 @@ pub struct Download {
     /// across a stack's clients, this is the committed content the free-space
     /// projection weighs against what the volume has left.
     pub remaining: Option<u64>,
+    /// The client's own id for it, from minor 2: what a curator's queue entry names the
+    /// download by, so the two are paired by it and never by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// The category it is filed under, from minor 2: a curator's own, or the operator's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// What the client says it is doing, from minor 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<TransferState>,
+    /// When it was added to the client, in seconds since the Unix epoch, from minor 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added: Option<u64>,
+}
+
+/// What a download client says one of its transfers is doing.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum TransferState {
+    /// Moving bytes, or ready to as soon as a source answers.
+    Downloading,
+    /// Connected, with nothing moving and no source to move it.
+    Stalled,
+    /// A torrent still resolving what it is before anything can move.
+    Metadata,
+    /// The client reports an error it will not recover from.
+    Error,
+    /// Waiting behind others in the client's own queue.
+    Queued,
+    /// Paused, by the client or by somebody.
+    Paused,
 }
 
 /// Reading a download client's active transfers for the dashboard.

@@ -96,6 +96,10 @@ pub fn carrying() -> Download {
         speed: Some(4096),
         eta: Some(Duration::from_secs(120)),
         remaining: Some(700),
+        id: None,
+        category: None,
+        state: None,
+        added: None,
     }
 }
 
@@ -111,6 +115,10 @@ pub fn finished() -> Download {
         speed: Some(0),
         eta: None,
         remaining: Some(0),
+        id: None,
+        category: None,
+        state: None,
+        added: None,
     }
 }
 

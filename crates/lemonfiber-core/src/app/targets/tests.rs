@@ -57,6 +57,10 @@ fn download(remaining: Option<u64>) -> Download {
         speed: None,
         eta: None,
         remaining,
+        id: None,
+        category: None,
+        state: None,
+        added: None,
     }
 }
 
