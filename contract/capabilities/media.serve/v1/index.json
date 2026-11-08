@@ -118,12 +118,12 @@
       "sha256": "ceb0471ea756e058d442306fdc62f0b49d9954d6c02a94a6ae6d3e41fcc4fd7e"
     },
     {
-      "path": "media.serve/v1/conformance.json",
-      "sha256": "a0ddb022ab481f659b96d17a3c3069523b33d4f5110a55f6881d96eb8a17f11e"
-    },
-    {
       "path": "media.serve/v1/holds.json",
       "sha256": "650a291577b7cff56169aea8c407bfe65e55255c285f712d91b4c57417fe6ee4"
+    },
+    {
+      "path": "media.serve/v1/conformance.json",
+      "sha256": "6caa09a5b4b2386e937b69fea996e218717702801fdf933b368bda25abb2807e"
     }
   ],
   "major": 1

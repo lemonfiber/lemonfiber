@@ -14,12 +14,12 @@
       "sha256": "3d7a8fb7e3f348255998caf48f50c4afa2dc8b04431797332e64c9912e18b2db"
     },
     {
-      "path": "subtitles.fetch/v1/conformance.json",
-      "sha256": "f683a538a7d6209b92779b45266b0bf5476488685fd6b0c5578f392d3f665bf6"
-    },
-    {
       "path": "subtitles.fetch/v1/holds.json",
       "sha256": "a0be173ad9d75cec79306f63d479406e7aaaec4b3b87d260a5583a5540c2286c"
+    },
+    {
+      "path": "subtitles.fetch/v1/conformance.json",
+      "sha256": "9d416c480dadb6c82b16c3de2e33991bf5e88442331dfcd5c094b20b604a2201"
     }
   ],
   "major": 1

@@ -9,8 +9,8 @@
 use lemonfiber_ports::media::{Format, Kind, BOOKS, MUSIC};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Identity,
-    Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile,
+    Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed,
+    Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile,
     QualityReleases, Queue, QueueItem, Queues, Record, RegisteredClient, RegisteredFolder,
     ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
 };
@@ -44,7 +44,7 @@ const ASKED_BY: &str = "mode";
 const CLIENT_PROTOCOL: &str = "sabnzbd";
 
 /// Every operation that takes a `Kind`, each asked once for each kind.
-const BY_KIND: [&str; 18] = [
+const BY_KIND: [&str; 20] = [
     "search_upgrades",
     "lookup",
     "add_plan",
@@ -63,6 +63,8 @@ const BY_KIND: [&str; 18] = [
     "search",
     "remove",
     "downloading",
+    "unqueue",
+    "grab",
 ];
 
 /// The operations the request gate asks a curator under its request key, and no other.
@@ -90,6 +92,9 @@ const FIELD: &str = "category";
 
 /// An item no curator holds.
 const NO_ITEM: i64 = 0;
+
+/// The fingerprint a case asks to grab, of a release no curator holds.
+const FINGERPRINT: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// What answers as the download client the conformance cases register while a curator is
 /// recorded: `SABnzbd`'s answers to the queries a curator tests a client with before it saves
@@ -310,6 +315,10 @@ crate::contract! {
             fn remove(value kind: Kind, value id: i64) -> () where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
             /// What it is downloading of one kind.
             fn downloading(value kind: Kind) -> Vec<Downloading> where since = 1, asks = Asked { kind: Kind::Tv };
+            /// Drop one queue entry from its download client, blocklisting its release where asked.
+            fn unqueue(value kind: Kind, value id: i64, value blocklist: bool) -> String where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, blocklist: true };
+            /// Grab a release again by its fingerprint, lifting its blocklist entry.
+            fn grab(value kind: Kind, value id: i64, str release: &str) -> Grabbed where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, release: FINGERPRINT.to_owned() };
         }
     }
 }

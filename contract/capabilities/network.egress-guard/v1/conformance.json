@@ -1,52 +1,10 @@
 {
   "capability": "network.egress-guard",
+  "major": 1,
   "cases": [
-    {
-      "asked": {},
-      "case": "refuses-without-the-key",
-      "expect": {
-        "status": [
-          401
-        ]
-      },
-      "keyed": false,
-      "live": true,
-      "operation": "up",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "up-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "up",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "forwarded-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "forwarded",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "secure-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "secure",
-      "since": 0
-    }
-  ],
-  "major": 1
+    {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"up","since":0},
+    {"asked":{},"case":"up-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"up","since":0},
+    {"asked":{},"case":"forwarded-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"forwarded","since":0},
+    {"asked":{},"case":"secure-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"secure","since":0}
+  ]
 }

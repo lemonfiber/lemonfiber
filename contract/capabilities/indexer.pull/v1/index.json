@@ -14,12 +14,12 @@
       "sha256": "8e0fdd23ae1fa5b5b6fd8de03633b33b7d36e868ff94994e174165fcab803aaf"
     },
     {
-      "path": "indexer.pull/v1/conformance.json",
-      "sha256": "6bffb7bb928a8a5ef2c87d23e8f1759b3bf17e247cc5c81d9e9dba8a17b7e839"
-    },
-    {
       "path": "indexer.pull/v1/holds.json",
       "sha256": "350b2a447d587e57948010abc149647acddb2edbcfd1d6761ed82d2b68d7552a"
+    },
+    {
+      "path": "indexer.pull/v1/conformance.json",
+      "sha256": "26f9b936eb1a8d810b42ab45601962deecc1a1a06e4e68b98d15ed463f7c890f"
     }
   ],
   "major": 1

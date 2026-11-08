@@ -134,12 +134,12 @@
       "sha256": "8e713ad45abc6eeef09062bb3eed66d684160f7ebd3ca5155da215faaaef09b8"
     },
     {
-      "path": "request.intake/v1/conformance.json",
-      "sha256": "83e1964d2df57e21c92847f0541efab67862130c76f52879d1718252ae216cb3"
-    },
-    {
       "path": "request.intake/v1/holds.json",
       "sha256": "3cab73c20c265c7c8b68bd1fc4929695f6e0e3531530615cb0542c4f6bd3d41b"
+    },
+    {
+      "path": "request.intake/v1/conformance.json",
+      "sha256": "03380da6d4c17fee9643820f8e86c898de7a1668e71054f6ac4ad80518aa6be0"
     }
   ],
   "major": 1

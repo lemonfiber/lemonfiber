@@ -4,13 +4,14 @@
 
 use async_trait::async_trait;
 use lemonfiber_ports::media::{Format, Kind};
+use lemonfiber_ports::service::stage::Stage;
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
     Credential, CuratedSeason, CuratedTitle, DownloadClient, DownloadState, DownloadedEpisode,
-    Downloading, Failure, FoundItem, Fulfilling, Identity, Importing, ItemPart, Maintenance,
-    MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue, QueueItem, Queues,
-    Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest,
-    TraceEvent,
+    Downloading, Failure, FoundItem, Fulfilling, Grabbed, Identity, Importing, ItemPart,
+    Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue,
+    QueueItem, Queues, Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder,
+    StuckItem, TitleRequest, TraceEvent,
 };
 use lemonfiber_ports::Client;
 
@@ -190,9 +191,18 @@ impl Pipeline for Upstream {
     }
     async fn stuck_items(&self, kind: Kind) -> Result<Vec<StuckItem>, Failure> {
         self.tell(format!("stuck {kind:?}"));
-        Err(Failure::Unavailable {
-            service: SERVICE.to_owned(),
-        })
+        if kind == Kind::Movies {
+            return Err(Failure::Unavailable {
+                service: SERVICE.to_owned(),
+            });
+        }
+        Ok(vec![StuckItem {
+            title: "The Office".to_owned(),
+            stage: Stage::Downloading,
+            queued: Some(41),
+            title_id: Some(9),
+            release: Some(FINGERPRINT.to_owned()),
+        }])
     }
 }
 
@@ -245,6 +255,24 @@ impl Fulfilling for Upstream {
         Err(Failure::Refused {
             service: SERVICE.to_owned(),
             detail: "it holds no title 0".to_owned(),
+        })
+    }
+    async fn unqueue(&self, kind: Kind, id: i64, blocklist: bool) -> Result<String, Failure> {
+        self.tell(format!("unqueue {kind:?} {id} {blocklist}"));
+        if id == 0 {
+            return Err(Failure::Refused {
+                service: SERVICE.to_owned(),
+                detail: "it holds no queue entry 0".to_owned(),
+            });
+        }
+        Ok(FINGERPRINT.to_owned())
+    }
+    async fn grab(&self, kind: Kind, id: i64, release: &str) -> Result<Grabbed, Failure> {
+        self.tell(format!("grab {kind:?} {id} {release}"));
+        Ok(if release == FINGERPRINT {
+            Grabbed::Grabbed
+        } else {
+            Grabbed::Gone
         })
     }
     async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure> {
@@ -369,8 +397,16 @@ where
         format!("{:?}", curator.search(Kind::Tv, 9).await),
         format!("{:?}", curator.remove(Kind::Movies, 0).await),
         format!("{:?}", curator.downloading(Kind::Tv).await),
+        format!("{:?}", curator.stuck_items(Kind::Tv).await),
+        format!("{:?}", curator.unqueue(Kind::Tv, 41, true).await),
+        format!("{:?}", curator.unqueue(Kind::Movies, 0, false).await),
+        format!("{:?}", curator.grab(Kind::Tv, 9, FINGERPRINT).await),
+        format!("{:?}", curator.grab(Kind::Movies, 7, "elsewhere").await),
     ]
 }
+
+/// A release's fingerprint, as a curator answers it.
+const FINGERPRINT: &str = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
 
 #[tokio::test]
 async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process() {
@@ -402,7 +438,12 @@ async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process(
             "request",
             "search",
             "remove",
-            "downloading"
+            "downloading",
+            "stuck",
+            "unqueue",
+            "unqueue",
+            "grab",
+            "grab"
         ]
     );
 }

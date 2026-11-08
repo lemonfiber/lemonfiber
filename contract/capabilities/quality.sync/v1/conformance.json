@@ -1,89 +1,11 @@
 {
   "capability": "quality.sync",
+  "major": 1,
   "cases": [
-    {
-      "asked": {},
-      "case": "refuses-without-the-key",
-      "expect": {
-        "status": [
-          401
-        ]
-      },
-      "keyed": false,
-      "live": true,
-      "operation": "apply",
-      "since": 0
-    },
-    {
-      "asked": {
-        "profiled": {
-          "api_key": "{minted}",
-          "host": "conformance-curator",
-          "port": 58989,
-          "preset": "balanced",
-          "which": "tv"
-        }
-      },
-      "case": "apply-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "apply",
-      "since": 0
-    },
-    {
-      "asked": {
-        "which": "tv"
-      },
-      "case": "applied-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "applied",
-      "since": 0
-    },
-    {
-      "asked": {
-        "profiled": {
-          "api_key": "{minted}",
-          "host": "conformance-curator",
-          "port": 58989,
-          "preset": "balanced",
-          "which": "tv"
-        }
-      },
-      "case": "edited-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "edited",
-      "since": 0
-    },
-    {
-      "asked": {
-        "profiled": {
-          "api_key": "{minted}",
-          "host": "conformance-curator",
-          "port": 58989,
-          "preset": "balanced",
-          "which": "tv"
-        }
-      },
-      "case": "reapply-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "reapply",
-      "since": 0
-    }
-  ],
-  "major": 1
+    {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"apply","since":0},
+    {"asked":{"profiled":{"api_key":"{minted}","host":"conformance-curator","port":58989,"preset":"balanced","which":"tv"}},"case":"apply-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"apply","since":0},
+    {"asked":{"which":"tv"},"case":"applied-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"applied","since":0},
+    {"asked":{"profiled":{"api_key":"{minted}","host":"conformance-curator","port":58989,"preset":"balanced","which":"tv"}},"case":"edited-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"edited","since":0},
+    {"asked":{"profiled":{"api_key":"{minted}","host":"conformance-curator","port":58989,"preset":"balanced","which":"tv"}},"case":"reapply-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"reapply","since":0}
+  ]
 }

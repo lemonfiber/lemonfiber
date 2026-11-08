@@ -34,12 +34,12 @@
       "sha256": "6cb9fcb9fe4354f5a7998d4ccec96ea1842258051fe67c8cd2e840de486a7323"
     },
     {
-      "path": "indexer.search/v1/conformance.json",
-      "sha256": "35e47373fc7b91c2b195f768c6f0235cce268f665431d5913bc7fc858fc591b0"
-    },
-    {
       "path": "indexer.search/v1/holds.json",
       "sha256": "5d7a7a7c771f0feeb9e7bb7ca411ef231b8024e012d4888d17d510419f620788"
+    },
+    {
+      "path": "indexer.search/v1/conformance.json",
+      "sha256": "4bf1c1f7ed6d86268e2e371ed4b388332fb5f16ab68157ffd48ddb28c02a6ef7"
     }
   ],
   "major": 1

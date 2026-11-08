@@ -1,198 +1,21 @@
 {
   "capability": "download.torrent",
+  "major": 1,
   "cases": [
-    {
-      "asked": {},
-      "case": "refuses-without-the-key",
-      "expect": {
-        "status": [
-          401
-        ]
-      },
-      "keyed": false,
-      "live": true,
-      "operation": "transfers",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "transfers-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "transfers",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "pulling-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "pulling",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "stop-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "stop",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "resume-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "resume",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "throttled-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "throttled",
-      "since": 0
-    },
-    {
-      "asked": {
-        "wanted": {
-          "active": {
-            "down": 1048576,
-            "up": 1048576
-          },
-          "quiet": {
-            "down": null,
-            "up": null
-          },
-          "window": null
-        }
-      },
-      "case": "restrain-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "restrain",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "moving-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "moving",
-      "since": 0
-    },
-    {
-      "asked": {
-        "month": "2026-01"
-      },
-      "case": "moved-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "moved",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "seeding-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "seeding",
-      "since": 0
-    },
-    {
-      "asked": {
-        "name": "conformance-torrent"
-      },
-      "case": "stop_seeding-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "stop_seeding",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "filed-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "filed",
-      "since": 0
-    },
-    {
-      "asked": {
-        "folders": [
-          {
-            "category": "conformance",
-            "folder": "/data/conformance/complete/conformance"
-          }
-        ]
-      },
-      "case": "file_under-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "file_under",
-      "since": 0
-    },
-    {
-      "asked": {},
-      "case": "peer_port-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "peer_port",
-      "since": 0
-    },
-    {
-      "asked": {
-        "port": 51413
-      },
-      "case": "set_peer_port-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "set_peer_port",
-      "since": 0
-    }
-  ],
-  "major": 1
+    {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"transfers","since":0},
+    {"asked":{},"case":"transfers-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"transfers","since":0},
+    {"asked":{},"case":"pulling-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"pulling","since":0},
+    {"asked":{},"case":"stop-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"stop","since":0},
+    {"asked":{},"case":"resume-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"resume","since":0},
+    {"asked":{},"case":"throttled-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"throttled","since":0},
+    {"asked":{"wanted":{"active":{"down":1048576,"up":1048576},"quiet":{"down":null,"up":null},"window":null}},"case":"restrain-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"restrain","since":0},
+    {"asked":{},"case":"moving-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"moving","since":0},
+    {"asked":{"month":"2026-01"},"case":"moved-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"moved","since":0},
+    {"asked":{},"case":"seeding-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"seeding","since":0},
+    {"asked":{"name":"conformance-torrent"},"case":"stop_seeding-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"stop_seeding","since":0},
+    {"asked":{},"case":"filed-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"filed","since":0},
+    {"asked":{"folders":[{"category":"conformance","folder":"/data/conformance/complete/conformance"}]},"case":"file_under-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"file_under","since":0},
+    {"asked":{},"case":"peer_port-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"peer_port","since":0},
+    {"asked":{"port":51413},"case":"set_peer_port-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"set_peer_port","since":0}
+  ]
 }

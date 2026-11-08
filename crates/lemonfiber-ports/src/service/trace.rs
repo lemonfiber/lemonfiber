@@ -99,6 +99,16 @@ pub struct StuckItem {
     pub title: String,
     /// The stage its download is stuck at.
     pub stage: crate::service::stage::Stage,
+    /// The curator's id for its queue entry, from minor 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queued: Option<i64>,
+    /// The curator's id for the title, from minor 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_id: Option<i64>,
+    /// The release's fingerprint, the SHA-256 of the curator's own identity for it in
+    /// lower-case hexadecimal, from minor 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release: Option<String>,
 }
 
 /// Reading one curator's fragment of an item's journey — the service that monitors the

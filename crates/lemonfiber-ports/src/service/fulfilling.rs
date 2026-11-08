@@ -185,4 +185,35 @@ pub trait Fulfilling: Send + Sync {
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
     async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure>;
+
+    /// Remove the queue entry of `kind` it holds as `id` from the download client holding
+    /// it, blocklisting its release where `blocklist`; the release's fingerprint.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Refused`] where it holds no such entry, and [`Failure`] when the
+    /// curator or its download client is unreachable.
+    async fn unqueue(&self, kind: Kind, id: i64, blocklist: bool) -> Result<String, Failure>;
+
+    /// Lift the blocklist entry of the release fingerprinted `release` for the title of
+    /// `kind` it holds as `id`, search the indexers for the title and grab the release whose
+    /// fingerprint matches.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Refused`] where it holds no such title, and [`Failure`] when the
+    /// curator is unreachable.
+    async fn grab(&self, kind: Kind, id: i64, release: &str) -> Result<Grabbed, Failure>;
+}
+
+/// What grabbing a release again came to.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum Grabbed {
+    /// An indexer offered the release, and it was sent to the download client.
+    Grabbed,
+    /// No indexer offers it any more.
+    Gone,
 }

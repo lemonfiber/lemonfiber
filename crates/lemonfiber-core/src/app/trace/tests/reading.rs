@@ -155,6 +155,9 @@ async fn stuck_lists_each_stuck_item_tagged_with_its_service() {
     let report = super::super::stuck(&ctx_with(&stuck_as(answered(&[StuckItem {
         title: "The Expanse".to_owned(),
         stage: Stage::Downloading,
+        queued: None,
+        title_id: None,
+        release: None,
     }]))))
     .await
     .unwrap_or_default();

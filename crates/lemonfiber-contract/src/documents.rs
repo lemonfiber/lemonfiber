@@ -44,12 +44,16 @@ fn documents(capability: &Capability) -> Vec<(String, String)> {
             path_item(operation),
         )
     }));
-    documents.push((located(capability, CONFORMANCE), conformance(capability)));
     documents.push((located(capability, HOLDS), holds(capability)));
-    documents
+    let mut written: Vec<(String, String)> = documents
         .into_iter()
         .map(|(path, document)| (path, written(&document)))
-        .collect()
+        .collect();
+    written.push((
+        located(capability, CONFORMANCE),
+        case_by_line(&conformance(capability)),
+    ));
+    written
 }
 
 /// The name of the index of every capability, and of each capability's own.
@@ -104,6 +108,33 @@ fn written(document: &Value) -> String {
     let mut text = serde_json::to_string_pretty(document).unwrap_or_default();
     text.push('\n');
     text
+}
+
+/// A conformance list as it is committed: one case to a line, so the list grows a line a
+/// case and stays under the line cap however many cases a capability publishes.
+fn case_by_line(document: &Value) -> String {
+    let field = |name: &str| {
+        document
+            .get(name)
+            .and_then(|value| serde_json::to_string(value).ok())
+            .unwrap_or_default()
+    };
+    let cases: Vec<String> = document
+        .get("cases")
+        .and_then(Value::as_array)
+        .map(|cases| {
+            cases
+                .iter()
+                .map(|case| format!("    {}", serde_json::to_string(case).unwrap_or_default()))
+                .collect()
+        })
+        .unwrap_or_default();
+    format!(
+        "{{\n  \"capability\": {},\n  \"major\": {},\n  \"cases\": [\n{}\n  ]\n}}\n",
+        field("capability"),
+        field("major"),
+        cases.join(",\n")
+    )
 }
 
 /// One capability's `OpenAPI` document: each operation's path pointing at the document

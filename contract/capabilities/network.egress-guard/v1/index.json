@@ -18,12 +18,12 @@
       "sha256": "2efdf06dbe974cdf32452094baece2aa6e55e515a14675fc9b08bc563c1009a2"
     },
     {
-      "path": "network.egress-guard/v1/conformance.json",
-      "sha256": "ccaf4d5aafa3287d736bb4b22cbb52d70953ad52abc9f8ca911491b72b8b0b55"
-    },
-    {
       "path": "network.egress-guard/v1/holds.json",
       "sha256": "ce5431553d8527059895cabe0065f385b546fa61dcd721197064cadf48fcaca1"
+    },
+    {
+      "path": "network.egress-guard/v1/conformance.json",
+      "sha256": "b44563ac8e03aa46e85f70c9b5b0ef74c8d2e0e18413e545ad8cab32adadd045"
     }
   ],
   "major": 1

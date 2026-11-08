@@ -18,12 +18,12 @@
       "sha256": "cd3640ff2f16cfde2894506e4a3158d75b0257f5d638026a52b001586c811f3d"
     },
     {
-      "path": "owner.claim/v1/conformance.json",
-      "sha256": "e66e02c83614be1a6d09b52382c96224f163f8c06a9ce0ecedbb4d35e3dbd725"
-    },
-    {
       "path": "owner.claim/v1/holds.json",
       "sha256": "041375aefba9f3998b3bd39ec6e5e74811e0fd6e9aabdb854526047423a46a3e"
+    },
+    {
+      "path": "owner.claim/v1/conformance.json",
+      "sha256": "9dd11ccceb30f308fb87d9e0dbad9e8c74008db72f206fb3f4175eec83c364bd"
     }
   ],
   "major": 1

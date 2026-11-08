@@ -79,7 +79,7 @@ pub use filing::{Filed, Filing};
 pub use fronting::{AppKeys, Astray, Dated, Fronted, OutsideAccount, OutsideServer};
 pub use fulfilling::{
     CuratedSeason, CuratedTitle, DownloadState, DownloadedEpisode, Downloading, Fulfilling,
-    TitleRequest,
+    Grabbed, TitleRequest,
 };
 pub use furnishing::{FiledAt, Furnished, Furnishing};
 pub use gating::{
