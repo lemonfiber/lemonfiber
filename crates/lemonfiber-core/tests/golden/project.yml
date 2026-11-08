@@ -511,7 +511,7 @@ services:
     - KILL
     pids_limit: 1024
   request-gate:
-    image: ghcr.io/lemonfiber/request-gate@sha256:9ff9c3eb5ad701871a57fae9887693c5d7f4906b3013456443465e1521f79331
+    image: ghcr.io/lemonfiber/request-gate@sha256:70b128574814b4d6df92182f4542c1a192094f98fa83a0a30941bd49b70d17d4
     profiles:
     - media
     restart: unless-stopped
