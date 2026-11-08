@@ -37,6 +37,10 @@ pub const USENET: [&str; 10] = [
     "true",
 ];
 
+/// What setup answers once its answers are written. Its own start stops at the install a
+/// stack's first start offers, which `up` then agrees to.
+const APPLIED: &str = "applied";
+
 /// The member who asks.
 const MEMBER: &str = "arm";
 
@@ -229,7 +233,14 @@ pub fn run(root: &std::path::Path, asked: &Asked, usenet: &[&str]) {
         "false",
     ];
     setup.extend(usenet);
-    step(&core.run(&setup, ""), "setup");
+    let set_up = core.run(&setup, "");
+    assert!(
+        strings_under(&set_up.said, "outcome")
+            .iter()
+            .any(|outcome| outcome == APPLIED),
+        "setup was not applied:\n{}",
+        set_up.printed
+    );
     let mut up = vec!["up"];
     up.extend(asked.forms);
     step(&core.agreed(&up), "up");

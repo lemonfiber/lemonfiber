@@ -22,7 +22,8 @@ pub struct Core {
 pub struct Ran {
     /// Whether it exited zero.
     pub succeeded: bool,
-    /// What it printed, read as JSON where it is.
+    /// What it printed, read as JSON where it is: one document, or every document where
+    /// it printed several.
     pub said: serde_json::Value,
     /// What it printed on standard output and on standard error, as written.
     pub printed: String,
@@ -68,9 +69,7 @@ impl Core {
         };
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-        let said = serde_json::from_str(stdout.trim())
-            .or_else(|_| last_document(&stdout))
-            .unwrap_or(serde_json::Value::Null);
+        let said = serde_json::from_str(stdout.trim()).unwrap_or_else(|_| documents(&stdout));
         let ran = Ran {
             succeeded: output.status.success(),
             said,
@@ -104,13 +103,14 @@ impl Core {
     }
 }
 
-/// The last JSON document of `printed`, one per line, where a run streams them.
-fn last_document(printed: &str) -> Result<serde_json::Value, serde_json::Error> {
-    printed
-        .lines()
-        .rev()
-        .find_map(|line| serde_json::from_str(line.trim()).ok())
-        .map_or_else(|| serde_json::from_str("null"), Ok)
+/// Every JSON document of `printed`, one per line, where a run streams them.
+fn documents(printed: &str) -> serde_json::Value {
+    serde_json::Value::Array(
+        printed
+            .lines()
+            .filter_map(|line| serde_json::from_str(line.trim()).ok())
+            .collect(),
+    )
 }
 
 /// The offer an answer names, wherever in it it is named.
