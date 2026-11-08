@@ -620,3 +620,36 @@ pub(super) fn declares() -> (&'static str, lemonfiber_fixtures::http::Answer) {
         crate::test_support::media::answered(&lemonfiber_fixtures::declaring::enforceable()),
     )
 }
+
+/// A plugin no bundle names, providing a capability that awaits its bundled declarer, is
+/// refused at install naming the capability, however its adapter speaks its contract.
+#[tokio::test]
+async fn a_plugin_not_first_party_is_refused_a_capability_awaiting_its_bundled_declarer() {
+    let ctx = ctx("install-awaited");
+    let manifest = speaking()
+        .replace(
+            "provides    = [\"media.serve\"]\nspeaks      = [\"media.serve@1\"]",
+            "provides    = [\"status.watch\"]\nspeaks      = [\"status.watch@1\"]",
+        )
+        .replace("media_types = [\"comics\"]\n", "");
+    assert!(manifest.contains("status.watch@1"));
+
+    let refused = installing(&ctx, &source("install-awaited", &manifest)).await;
+
+    let problem = refused.err();
+    assert_eq!(
+        problem.as_ref().map(|problem| problem.code.to_string()),
+        Some(crate::error::codes::plugin::REFUSED.to_string())
+    );
+    let detail = problem
+        .and_then(|problem| problem.detail)
+        .unwrap_or_default();
+    assert!(
+        detail.contains(
+            "service komga-adapter.provides: status.watch awaits its bundled declarer, and until \
+             one is bundled only a first-party plugin may provide it"
+        ),
+        "{detail}"
+    );
+    assert!(!detail.contains("published vocabulary"), "{detail}");
+}

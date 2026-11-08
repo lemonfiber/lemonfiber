@@ -711,5 +711,6 @@ fn every_published_capability_is_one_a_binding_could_satisfy() {
     );
 }
 
+mod awaiting;
 mod fronted;
 mod run;

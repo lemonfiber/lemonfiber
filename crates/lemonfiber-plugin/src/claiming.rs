@@ -63,6 +63,20 @@ fn claimed_by(service: &Service, plugin: &str, found: &mut Vec<Violation>) {
                      contract, so a service speaks it and does not provide it"
                 ),
             });
+        } else if awaiting(name) {
+            if !service
+                .speaks
+                .iter()
+                .any(|named| lemonfiber_contract::capability_of(named) == Some(name.as_str()))
+            {
+                found.push(Violation {
+                    location: format!("{at}.provides"),
+                    message: format!(
+                        "{name} awaits its bundled declarer, so the vocabulary publishes no probe \
+                         for it, and only a service speaking its contract may provide it"
+                    ),
+                });
+            }
         } else if vocabulary::is_core_name(name) {
             core(
                 name,
@@ -81,6 +95,36 @@ fn claimed_by(service: &Service, plugin: &str, found: &mut Vec<Violation>) {
             });
         }
     }
+}
+
+/// Every capability `manifest` provides that awaits its bundled declarer, each refused:
+/// until a bundled service declares one, only a first-party plugin may provide it, and
+/// whether this one is first-party is the caller's to know.
+#[must_use]
+pub fn awaited(manifest: &Manifest) -> Vec<Violation> {
+    manifest
+        .services
+        .iter()
+        .flat_map(|service| {
+            service
+                .provides
+                .iter()
+                .filter(|name| awaiting(name))
+                .map(|name| Violation {
+                    location: format!("service {}.provides", service.id),
+                    message: format!(
+                        "{name} awaits its bundled declarer, and until one is bundled only a \
+                         first-party plugin may provide it"
+                    ),
+                })
+        })
+        .collect()
+}
+
+/// Whether `name` is a capability whose contract this build speaks and that no bundled
+/// service declares yet.
+fn awaiting(name: &str) -> bool {
+    lemonfiber_contract::capabilities::AWAITING_A_BUNDLED_CLAIMANT.contains(&name)
 }
 
 /// One core-shaped name, against the generation this build carries.
