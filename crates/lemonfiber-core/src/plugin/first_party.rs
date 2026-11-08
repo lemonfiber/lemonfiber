@@ -14,11 +14,15 @@ pub const EMBEDDED: &[FirstParty] = lemonfiber_bundled::FIRST_PARTY;
 /// Whether `installed` is one of `set`, by id, manifest and tree alike.
 #[must_use]
 pub fn holds(set: &[FirstParty], installed: &Installed) -> bool {
+    named(set, &installed.plugin, &installed.manifest, &installed.tree)
+}
+
+/// Whether `set` names the plugin `plugin` whose manifest has the digest `manifest` and
+/// whose tree has the digest `tree`.
+#[must_use]
+pub fn named(set: &[FirstParty], plugin: &str, manifest: &str, tree: &str) -> bool {
     set.iter().any(|one| {
-        one.plugin == installed.plugin
-            && one.manifest == installed.manifest
-            && !one.tree.is_empty()
-            && one.tree == installed.tree
+        one.plugin == plugin && one.manifest == manifest && !one.tree.is_empty() && one.tree == tree
     })
 }
 

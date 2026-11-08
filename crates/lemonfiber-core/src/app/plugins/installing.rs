@@ -366,6 +366,14 @@ pub(super) async fn accepted(
     }
     let mut refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     refusals.extend(lemonfiber_plugin::uninstallable(&manifest));
+    if !crate::plugin::first_party::named(
+        crate::plugin::first_party::EMBEDDED,
+        &manifest.plugin.id,
+        &digest,
+        &tree,
+    ) {
+        refusals.extend(lemonfiber_plugin::claiming::awaited(&manifest));
+    }
     match crate::plugin::seeding::shipped(
         manifest.services.iter().map(|service| service.id.as_str()),
         &crate::plugin::root(path),
