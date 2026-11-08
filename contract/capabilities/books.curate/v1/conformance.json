@@ -1,0 +1,10 @@
+{
+  "capability": "books.curate",
+  "major": 1,
+  "cases": [
+    {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"lookup","since":0},
+    {"asked":{"after":null,"term":"conformance","unit":"book"},"case":"lookup-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"lookup","since":0},
+    {"asked":{"ask":{"quality_profile":1,"reference":"conformance","root_folder":"/data/conformance","search":false,"unit":"book"}},"case":"request-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"request","since":0},
+    {"asked":{},"case":"profiles-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"profiles","since":0}
+  ]
+}

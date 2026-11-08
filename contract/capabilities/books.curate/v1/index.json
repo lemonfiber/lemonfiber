@@ -1,0 +1,30 @@
+{
+  "capability": "books.curate",
+  "files": [
+    {
+      "path": "books.curate/v1/openapi.json",
+      "sha256": "868e9338f0bf5c15de0bf4096e9d4237f3d3eb5495032ac93277ec6e8ec8de4e"
+    },
+    {
+      "path": "books.curate/v1/operations/lookup.json",
+      "sha256": "55872d42ee1731b185cff4a1fb7abef3f8d5c3b4cf1f87e2e65e39ec418a0667"
+    },
+    {
+      "path": "books.curate/v1/operations/request.json",
+      "sha256": "a964f1c68410a143f2ee0d9d010d3f83f32f6904ee36a8b8151b239685b24c43"
+    },
+    {
+      "path": "books.curate/v1/operations/profiles.json",
+      "sha256": "7e013682b405514cc0f76e1f4b07b0b11560fcd52f88980c99df93c02fe87bb5"
+    },
+    {
+      "path": "books.curate/v1/holds.json",
+      "sha256": "36f310576558040ad3065f2d6e65a2f835c285d02c39153a7e3b35c63fb866db"
+    },
+    {
+      "path": "books.curate/v1/conformance.json",
+      "sha256": "7f2a999b8ccad56e57145e0c7f48caf9a75176aeba1a63fc4f0ab9889269a20f"
+    }
+  ],
+  "major": 1
+}

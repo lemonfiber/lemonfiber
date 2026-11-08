@@ -4,6 +4,7 @@
 //! published documents are generated from [`all`], in the vocabulary's order.
 
 pub mod archive;
+pub mod books;
 pub mod dashboard;
 pub mod download;
 pub mod identity;
@@ -11,6 +12,7 @@ pub mod indexer;
 pub mod invite;
 pub mod library;
 pub mod media;
+pub mod music;
 pub mod network;
 pub mod owner;
 pub mod proxy;
@@ -221,7 +223,11 @@ pub const FACETS: [&str; 2] = [indexer::pull::CAPABILITY, owner::claim::CAPABILI
 
 /// Every capability whose contract is published before a bundled part provides it, which the
 /// vocabulary carries only once one does.
-pub const AWAITING_A_BUNDLED_CLAIMANT: [&str; 1] = [status::watch::CAPABILITY];
+pub const AWAITING_A_BUNDLED_CLAIMANT: [&str; 3] = [
+    status::watch::CAPABILITY,
+    music::curate::CAPABILITY,
+    books::curate::CAPABILITY,
+];
 
 /// Whether the capability `name` is a facet.
 #[must_use]
@@ -252,6 +258,8 @@ pub fn all() -> Vec<crate::Capability> {
         invite::decline::capability(),
         request::gate::capability(),
         status::watch::capability(),
+        music::curate::capability(),
+        books::curate::capability(),
         owner::claim::capability(),
     ]
 }
