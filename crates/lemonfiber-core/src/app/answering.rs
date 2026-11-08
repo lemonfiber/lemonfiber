@@ -12,7 +12,7 @@
 
 use crate::model::kind::{self, Kind};
 
-use super::command::{Asking, Keeping, Linking, MigrateAction, Settling, Wishing};
+use super::command::{Asking, Keeping, Linking, MigrateAction, Queueing, Settling, Wishing};
 use super::plugins;
 use super::rehearsal;
 use super::Command;
@@ -46,6 +46,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Stuck => &[kind::STUCK],
         Command::Boot => &[kind::BOOT],
         Command::Watcher => &[kind::WATCHER],
+        Command::Queue(Queueing::Read) => &[kind::QUEUE],
         Command::ConfigGet { .. } | Command::ConfigShow => &[kind::CONFIG],
         Command::Explain { .. } => &[kind::WORD],
         Command::Glossary => &[kind::GLOSSARY],

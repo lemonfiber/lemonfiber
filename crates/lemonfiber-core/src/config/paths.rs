@@ -82,8 +82,9 @@ pub(crate) const HANDOFFS: &str = "handoffs.json";
 pub(crate) const ACCEPTED: &str = "accepted.json";
 /// The port the egress guard last forwarded to every torrent client.
 pub(crate) const FORWARDED: &str = "forwarded.json";
-/// The stuck releases lemonfiber has searched again for, so none is acted on twice.
-pub(crate) const SEARCHED_AGAIN: &str = "searched-again.json";
+/// Each unhealthy download's strikes, what the latest look at the queue found, and the
+/// newest healing runs.
+pub const HEALING: &str = "queue-healing.json";
 /// What the update check remembers between runs.
 pub(crate) const UPDATES: &str = "updates.json";
 /// When each invitation was offered.
@@ -314,10 +315,11 @@ impl Paths {
         self.config.join(FORWARDED)
     }
 
-    /// The stuck releases lemonfiber has searched again for.
+    /// Each unhealthy download's strikes, what the latest look at the queue found, and
+    /// the newest healing runs.
     #[must_use]
-    pub fn searched_again(&self) -> PathBuf {
-        self.config.join(SEARCHED_AGAIN)
+    pub fn healing(&self) -> PathBuf {
+        self.config.join(HEALING)
     }
 
     /// When each invitation was offered, which the media server may lose.

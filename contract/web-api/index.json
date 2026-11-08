@@ -127,6 +127,7 @@
     "push-endpoint": "kinds/push-endpoint.json",
     "push-endpoints": "kinds/push-endpoints.json",
     "quality": "kinds/quality.json",
+    "queue": "kinds/queue.json",
     "removal": "kinds/removal.json",
     "repair": "kinds/repair.json",
     "replacement": "kinds/replacement.json",

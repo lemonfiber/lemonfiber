@@ -23,6 +23,7 @@ mod inviting;
 mod letting_go;
 mod migrate;
 mod quality;
+mod queueing;
 mod restarting;
 mod restoring;
 mod setting;
@@ -46,6 +47,7 @@ pub use inviting::Inviting;
 pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
+pub use queueing::Queueing;
 pub use restarting::Restarting;
 pub use restoring::Restoring;
 pub use setting::Setting;
@@ -274,6 +276,9 @@ pub enum Command {
     /// Say what the outside watcher sees beside what each of its monitors covers, whether
     /// it answers at all, and what no active monitor covers.
     Watcher,
+    /// Say what the download queue holds that is wedged, why, and what the newest runs
+    /// did to it; or run one pass now.
+    Queue(Queueing),
     /// Name the one address to hand somebody who lives here, and say where it stands —
     /// including that there is none, where this stack runs nothing they could begin at.
     FrontDoor,

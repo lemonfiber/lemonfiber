@@ -48,7 +48,7 @@ pub use naming::{A_SHELF, MOST_AT_ONCE};
 use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::{
     AlertAction, Asking, BandwidthAsked, Command, Keeping, Linking, MigrateAction, QualityAction,
-    Settling,
+    Queueing, Settling,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
@@ -143,6 +143,9 @@ pub const BOOT: &str = "/api/boot";
 
 /// What the outside watcher sees, beside what each of its monitors covers.
 pub const WATCHER: &str = "/api/watcher";
+
+/// What the download queue holds that is wedged, and what the newest healing runs did.
+pub const QUEUE: &str = "/api/queue";
 
 /// Every setting, or one of them by name, with credentials withheld.
 pub const CONFIG: &str = "/api/config";
@@ -315,6 +318,7 @@ pub const OFFERED: &[&str] = &[
     STUCK,
     BOOT,
     WATCHER,
+    QUEUE,
     CONFIG,
     QUALITY,
     EXPLAIN,
@@ -468,6 +472,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         STUCK => Ok(Command::Stuck),
         BOOT => Ok(Command::Boot),
         WATCHER => Ok(Command::Watcher),
+        QUEUE => Ok(Command::Queue(Queueing::Read)),
         CONFIG => setting(key),
         QUALITY => Ok(Command::Quality(QualityAction::Show)),
         // Naming an empty word is naming one this product does not explain, and is

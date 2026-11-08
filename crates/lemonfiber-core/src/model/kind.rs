@@ -212,6 +212,8 @@ kinds! {
     WATCH = "watch",
     /// What the outside watcher sees, beside what each of its monitors covers.
     WATCHER = "watcher",
+    /// What the download queue holds that is wedged, and what the newest runs did to it.
+    QUEUE = "queue",
     /// Where a setup run stands, and what it is still asking for.
     WIZARD = "wizard",
     /// One glossary term.

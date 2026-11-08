@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Why a download is unhealthy.",
+  "oneOf": [
+    {
+      "description": "Connected, with nothing moving and no source to move it.",
+      "type": "string",
+      "const": "stalled"
+    },
+    {
+      "description": "Moving, but so slowly its estimate runs past what is allowed.",
+      "type": "string",
+      "const": "slow"
+    },
+    {
+      "description": "The client or the curator gave up on it.",
+      "type": "string",
+      "const": "failed"
+    },
+    {
+      "description": "A torrent that has not resolved what it is.",
+      "type": "string",
+      "const": "stuck-on-metadata"
+    },
+    {
+      "description": "In a client under a curator's category, and in no curator's queue.",
+      "type": "string",
+      "const": "orphaned"
+    }
+  ]
+}

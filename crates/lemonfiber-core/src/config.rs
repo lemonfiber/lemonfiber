@@ -13,6 +13,7 @@
 pub(crate) mod credentials;
 pub mod display;
 pub mod env;
+pub mod healing;
 pub(crate) mod held;
 mod keys;
 pub mod paths;
@@ -47,6 +48,10 @@ use serde::{Deserialize, Serialize};
 use crate::ports::docker::Target;
 
 pub use crate::settings::read_by_the_stack;
+pub use healing::{
+    Healing, QUEUE_EVERY_MINUTES_KEY, QUEUE_GRACE_MINUTES_KEY, QUEUE_SLOW_DAYS_KEY,
+    QUEUE_STRIKES_KEY,
+};
 pub use resending::{Resending, IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY};
 
 pub use reaching::{

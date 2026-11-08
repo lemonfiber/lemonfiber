@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A curator or download client a pass could not reach or verify.",
+  "type": "object",
+  "properties": {
+    "service": {
+      "description": "The service, by its id.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why, in words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "why"
+  ]
+}

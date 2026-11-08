@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of one act.",
+  "oneOf": [
+    {
+      "description": "It was done.",
+      "type": "string",
+      "const": "done"
+    },
+    {
+      "description": "It would have been done; the run was a rehearsal.",
+      "type": "string",
+      "const": "would"
+    },
+    {
+      "description": "It was not done.",
+      "type": "string",
+      "const": "refused"
+    },
+    {
+      "description": "Something weaker was done in its place.",
+      "type": "string",
+      "const": "fell-back"
+    }
+  ]
+}

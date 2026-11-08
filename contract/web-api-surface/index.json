@@ -58,6 +58,7 @@
     "push-endpoint": "ref:RegisteredPushEndpoint",
     "push-endpoints": "ref:PushEndpointListing",
     "quality": "ref:QualityReport",
+    "queue": "ref:QueueHealth",
     "removal": "ref:HouseholdRemoval",
     "repair": "ref:RepairReport",
     "replacement": "ref:ReplaceReport",

@@ -324,6 +324,7 @@ async fn main() -> ExitCode {
         Request::Stuck => Command::Stuck,
         Request::Boot => Command::Boot,
         Request::Watcher => Command::Watcher,
+        Request::Queue { action } => translate::queue(action),
         Request::FrontDoor => Command::FrontDoor,
         Request::News => Command::News,
         Request::Companion(asked) => translate::paired(&asked),

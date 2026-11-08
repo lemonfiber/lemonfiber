@@ -116,12 +116,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // The music choice is recorded even when the service could not be reached, so
         // only a service that refused the change is a failure; a rehearsal or a service
         // still coming up has still recorded the choice.
-        Outcome::Music(report) => {
-            if matches!(report.outcome, Some(Triggered::Failed { .. })) {
-                ExitCode::from(FAILURE)
-            } else {
-                ExitCode::SUCCESS
-            }
+        Outcome::Music(report) if matches!(report.outcome, Some(Triggered::Failed { .. })) => {
+            ExitCode::from(FAILURE)
         }
         // A reset run without an offer that found edits to revert only previewed them —
         // like a held quality choice, it needs the operator's say-so, so a script sees a
@@ -196,6 +192,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // which is the thing it was watching for, and it reports whether it got the
         // services stopped — so the report is the answer rather than the failure.
         Outcome::Version(_)
+        | Outcome::Music(_)
         | Outcome::Forms(_)
         | Outcome::Preview(_)
         | Outcome::Config(_)
@@ -233,6 +230,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Stuck(_)
         | Outcome::Boot(_)
         | Outcome::Watcher(_)
+        | Outcome::Queue(_)
         | Outcome::Status(_)
         | Outcome::Word(_)
         | Outcome::Glossary(_)

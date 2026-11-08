@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "added_at": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "class": {
+      "type": [
+        "ref:Wedge"
+      ],
+      "required": true
+    },
+    "in_grace_until": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "next": {
+      "type": [
+        "array|null[ref:Act]"
+      ],
+      "required": false
+    },
+    "release": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "strikes": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

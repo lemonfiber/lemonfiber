@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One run: a pass that could act.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When, in seconds since the Unix epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "items": {
+      "description": "Every item it acted on, or would have.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "Healed.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether it was a rehearsal, which acted on nothing.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "at",
+    "rehearsed"
+  ]
+}

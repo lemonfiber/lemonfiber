@@ -58,6 +58,7 @@ fn settings_of(
             | Outcome::Stuck(_)
             | Outcome::Boot(_)
             | Outcome::Watcher(_)
+            | Outcome::Queue(_)
             | Outcome::Word(_)
             | Outcome::Glossary(_)
             | Outcome::Clients(_)

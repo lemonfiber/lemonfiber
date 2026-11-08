@@ -367,12 +367,14 @@ pub const EVERY: &[Entry] = &[
         at: Paths::forwarded,
     },
     Entry {
-        accessor: "searched_again",
-        what: "the stuck downloads searched for again",
-        why: "The fingerprint of each stuck release a curator dropped and searched again for, \
-              so no stuck item is acted on twice.",
+        accessor: "healing",
+        what: "how the queue has been healed",
+        why: "Each unhealthy download's strikes, so one is acted on only after enough looks \
+              in a row find it wedged for the same reason; what the latest look found; and \
+              the newest runs, each with what was dropped, blocklisted and searched for \
+              again, and why.",
         secret: false,
-        at: Paths::searched_again,
+        at: Paths::healing,
     },
     Entry {
         accessor: "outbox",

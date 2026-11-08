@@ -189,6 +189,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/watcher",
     },
     Reach {
+        request: "queue",
+        through: "/api/queue",
+    },
+    Reach {
         request: "outbound",
         through: "/api/outbound",
     },

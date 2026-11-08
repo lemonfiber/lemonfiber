@@ -65,8 +65,24 @@ pub const SHOWN: &[(&str, &str)] = &[
     ),
     (
         super::STUCK_SEARCH_AGAIN_KEY,
-        "whether a stuck download is dropped, its release blocklisted and its title \
-         searched for again, once each, which is off unless you turned it on",
+        "whether a download flagged on enough passes in a row is dropped, its release \
+         blocklisted and its title searched for again, which is off unless you turned it on",
+    ),
+    (
+        super::QUEUE_STRIKES_KEY,
+        "how many passes in a row flag a download for one reason before it is acted on",
+    ),
+    (
+        super::QUEUE_GRACE_MINUTES_KEY,
+        "how many minutes a newly added download is left alone",
+    ),
+    (
+        super::QUEUE_EVERY_MINUTES_KEY,
+        "how many minutes apart the queue is looked at",
+    ),
+    (
+        super::QUEUE_SLOW_DAYS_KEY,
+        "how many days a download's estimate may run before it is slow",
     ),
     (
         super::IDEMPOTENCY_MINUTES_KEY,

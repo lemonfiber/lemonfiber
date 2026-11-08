@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One item a run acted on.",
+  "type": "object",
+  "properties": {
+    "acts": {
+      "description": "Each act, in the order they were taken.",
+      "type": "array",
+      "items": {
+        "$ref": "ActTaken.json"
+      }
+    },
+    "release": {
+      "description": "The release, by its name in the client.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The curator it was queued with, or the client holding it where none was.",
+      "type": "string"
+    },
+    "title": {
+      "description": "The title it was for, where a curator held it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "why": {
+      "description": "Why it was acted on.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "release",
+    "why",
+    "acts"
+  ]
+}

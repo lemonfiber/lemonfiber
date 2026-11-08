@@ -74,6 +74,7 @@ pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, Held};
 pub(crate) use curating::curators;
 pub(crate) use enveloping::guarding_installed;
+pub(crate) use filing::completed;
 pub(crate) use fronting::{refront, served};
 use identity::seed_request_identity;
 pub(crate) use quality::{reapplied, reprofile};

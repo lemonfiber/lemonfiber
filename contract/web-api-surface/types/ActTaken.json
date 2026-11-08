@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "act": {
+      "type": [
+        "ref:Act"
+      ],
+      "required": true
+    },
+    "instead": {
+      "type": [
+        "anyOf(null,ref:Act)"
+      ],
+      "required": false
+    },
+    "outcome": {
+      "type": [
+        "ref:ActOutcome"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

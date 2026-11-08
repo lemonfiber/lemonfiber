@@ -95,9 +95,9 @@ async fn watch_until_lost(
             readings.read(Paced::Forwarded, now);
             super::forwarding::watched(ctx).await;
         }
-        if readings.due(Paced::SearchedAgain, now) {
-            readings.read(Paced::SearchedAgain, now);
-            searching_again::searched_again(ctx).await;
+        if readings.due(Paced::Healed, now) {
+            readings.read(Paced::Healed, now);
+            super::healing::paced(ctx).await;
         }
         if readings.due(Paced::CheckedIn, now) {
             readings.read(Paced::CheckedIn, now);
@@ -226,8 +226,6 @@ fn already_gone(root: &Path) -> Problem {
     )
     .in_state(State::Guided)
 }
-
-mod searching_again;
 
 #[cfg(test)]
 mod tests;

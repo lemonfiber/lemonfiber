@@ -19,13 +19,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use lemonfiber_manifest::Date;
 
 /// Seconds in a day.
-const DAY: u64 = 86_400;
+pub const DAY: u64 = 86_400;
 
 /// Seconds in an hour.
 const HOUR: u64 = 3_600;
 
 /// Seconds in a minute.
-const MINUTE: u64 = 60;
+pub const MINUTE: u64 = 60;
 
 /// The day the epoch counts from, which is how a date becomes a count of days.
 const EPOCH: Date = Date {

@@ -2,6 +2,7 @@
 //! document that kind actually writes.
 
 mod built;
+mod healing;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
@@ -229,6 +230,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Stuck(StuckReport::default()),
         Outcome::Boot(a_boot()),
         Outcome::Watcher(a_watcher()),
+        Outcome::Queue(healing::a_queue()),
         Outcome::Invitation(an_invitation()),
         Outcome::Handoff(lemonfiber_core::model::Handoff {
             name: "ana".to_owned(),

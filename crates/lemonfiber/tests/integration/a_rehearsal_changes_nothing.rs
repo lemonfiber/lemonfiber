@@ -48,7 +48,7 @@ use clap::CommandFactory as _;
 
 use lemonfiber::carried::STACK;
 use lemonfiber::cli::Cli;
-use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
+use lemonfiber_core::app::rehearsal::{asked, keeps_its_own_record, Rehearsal};
 use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::archive::{Archive, Archiving, Fault, Reader, Space, Vault};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
@@ -346,7 +346,10 @@ const CHANGES: [&str; 9] = [
 /// Drive one command as a rehearsal and say nothing changed, or why that is wrong.
 async fn unchanged(named: &str, command: Command) -> Result<(), String> {
     let dir = scratch(named, !before_configuration(&command)).kept();
-    let before = tree(&dir);
+    let kept = keeps_its_own_record(&command);
+    let own = |path: &PathBuf| kept.is_some_and(|kept| path.file_name() == Some(kept.as_ref()));
+    let mut before = tree(&dir);
+    before.retain(|path, _| !own(path));
     let (ctx, watched) = rehearsing(&dir);
 
     // The answer is not asserted on. A rehearsal of `restore` against an archive that
@@ -354,7 +357,8 @@ async fn unchanged(named: &str, command: Command) -> Result<(), String> {
     // behind on its way to failing.
     let _ = dispatch(command, &ctx).await;
 
-    let after = tree(&dir);
+    let mut after = tree(&dir);
+    after.retain(|path, _| !own(path));
     let mut wrong = Vec::new();
     for (path, bytes) in &after {
         match before.get(path) {

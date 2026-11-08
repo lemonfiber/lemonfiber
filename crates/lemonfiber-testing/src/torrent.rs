@@ -27,7 +27,7 @@ pub const PLUGIN: &str = "qbittorrent";
 pub const ADAPTER: &str = "qbittorrent-adapter";
 
 /// The torrent client's plugin and the adapter in front of it.
-const MOVED: Adapted = Adapted {
+pub const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
     adapter: ADAPTER,
     port: PORT,

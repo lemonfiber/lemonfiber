@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "classified_at": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "grace_s": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "healing": {
+      "type": [
+        "ref:HealingSwitch"
+      ],
+      "required": true
+    },
+    "incomplete": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "items": {
+      "type": [
+        "array[ref:Wedged]"
+      ],
+      "required": false
+    },
+    "mismatch": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "runs": {
+      "type": [
+        "array[ref:HealRun]"
+      ],
+      "required": false
+    },
+    "strikes_needed": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "unreachable": {
+      "type": [
+        "array[ref:Unreached]"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

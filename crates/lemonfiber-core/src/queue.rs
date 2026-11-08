@@ -25,6 +25,7 @@
 //! - [`assess`] — what, if anything, to say.
 
 mod assess;
+pub mod healing;
 mod item;
 pub mod run;
 mod stall;

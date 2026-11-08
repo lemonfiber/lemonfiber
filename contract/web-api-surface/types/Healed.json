@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "acts": {
+      "type": [
+        "array[ref:ActTaken]"
+      ],
+      "required": true
+    },
+    "release": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

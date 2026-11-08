@@ -1,6 +1,6 @@
 use super::answered_under;
 use crate::app::command::{
-    Asking, Diagnosing, Keeping, Linking, MigrateAction, Settling, Tracing, Whom, Wishing,
+    Asking, Diagnosing, Keeping, Linking, MigrateAction, Queueing, Settling, Tracing, Whom, Wishing,
 };
 use crate::app::{plugins, rehearsal, Command};
 use crate::model::kind::{self, Kind};
@@ -67,6 +67,7 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::Playing { member: None }, kind::PLAYING),
         (Command::Boot, kind::BOOT),
         (Command::Watcher, kind::WATCHER),
+        (Command::Queue(Queueing::Read), kind::QUEUE),
         (
             Command::Wish(Wishing::Find {
                 member: "Ada".to_owned(),

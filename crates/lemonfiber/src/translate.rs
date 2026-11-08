@@ -10,7 +10,7 @@ use lemonfiber_core::app::plugins;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
     AlertAction, BandwidthAsked, Command, Diagnosing, Filling, Gathering, Hostable, Keeping,
-    LettingGo, Linking, MigrateAction, QualityAction, Removing, Setting, Tracing,
+    LettingGo, Linking, MigrateAction, QualityAction, Queueing, Removing, Setting, Tracing,
 };
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::bandwidth::Pausing;
@@ -32,8 +32,8 @@ use crate::say::complain;
 use lemonfiber::cli::{
     AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
     HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, PushEndpointCommand,
-    QualityCommand, RawBandwidth, RawCompanion, RawDownloads, RawKey, RawPushEndpoint, RawRemoval,
-    RawRemoving, RawRestart, UpdateCommand, WiringCommand,
+    QualityCommand, QueueCommand, RawBandwidth, RawCompanion, RawDownloads, RawKey,
+    RawPushEndpoint, RawRemoval, RawRemoving, RawRestart, UpdateCommand, WiringCommand,
 };
 use lemonfiber_core::app::Restarting;
 
@@ -100,6 +100,14 @@ pub(crate) fn hosting(action: Option<HostingCommand>) -> Command {
             forms,
         },
         Some(HostingCommand::Remove { what }) => Keeping::Remove { what: kept(what) },
+    })
+}
+
+/// What was asked about the download queue: naming nothing reads it.
+pub(crate) const fn queue(action: Option<QueueCommand>) -> Command {
+    Command::Queue(match action {
+        None => Queueing::Read,
+        Some(QueueCommand::Heal) => Queueing::Heal,
     })
 }
 

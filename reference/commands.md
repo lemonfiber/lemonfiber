@@ -39,6 +39,7 @@ Commands:
   stuck          List the items whose downloads are stuck — the landing point for "N stuck", each named so `lemonfiber trace` follows it on its own
   boot           Say when this machine last started, and whether the stack, its tunnel and its forwarded port came back after it
   watcher        Say what the outside watcher sees beside what each of its monitors covers, and what no active monitor covers
+  queue          Say what the download queue holds that is wedged, why, how many strikes each has, and what the newest runs did to it
   front-door     Name the one address to send somebody who lives here
   news           List lemonfiber's releases, what the household has asked for, and the checks found wrong, each newest first
   catalogue      Say what each service in this stack is for, and what became of any it dropped
@@ -128,6 +129,7 @@ Options:
 - [`lemonfiber stuck`](commands/stuck.md)
 - [`lemonfiber boot`](commands/boot.md)
 - [`lemonfiber watcher`](commands/watcher.md)
+- [`lemonfiber queue`](commands/queue.md)
 - [`lemonfiber front-door`](commands/front-door.md)
 - [`lemonfiber news`](commands/news.md)
 - [`lemonfiber catalogue`](commands/catalogue.md)

@@ -158,6 +158,8 @@ outcomes! {
     Boot(crate::model::BootReport) => BOOT,
     /// What the outside watcher sees, beside what each of its monitors covers.
     Watcher(crate::model::WatcherReport) => WATCHER,
+    /// What the download queue holds that is wedged, and what the newest runs did to it.
+    Queue(crate::model::QueueHealth) => QUEUE [rehearsed],
     /// What one of this product's words means.
     Word(Term) => WORD,
     /// Every word this product explains.

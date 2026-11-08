@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"failed\"",
+    "\"orphaned\"",
+    "\"slow\"",
+    "\"stalled\"",
+    "\"stuck-on-metadata\""
+  ]
+}
