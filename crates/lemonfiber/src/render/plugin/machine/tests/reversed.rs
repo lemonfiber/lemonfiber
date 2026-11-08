@@ -546,6 +546,14 @@ fn a_device_key_put_back_is_said_by_its_name() {
         }),
         "left decline on its plugin"
     );
+    assert_eq!(
+        undone(Action::Regrab {
+            kind: lemonfiber_core::ports::media::Kind::Tv,
+            title: 9,
+            release: "9f86d081".to_owned(),
+        }),
+        "grabbed the dropped release of tv title 9 again"
+    );
     for (running, said) in [
         (true, "started prowlarr again"),
         (false, "stopped prowlarr again"),

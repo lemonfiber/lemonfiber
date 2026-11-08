@@ -43,23 +43,23 @@ pub(crate) fn asked_for(ctx: &Ctx) -> bool {
         .is_some_and(|value| crate::config::reads_as_on(&value))
 }
 
-/// Act once on each stuck item the curators name, where the operator has said to; what
-/// was acted on, a sentence each.
-pub(crate) async fn searched_again(ctx: &Ctx) -> Vec<String> {
+/// Act once on each stuck item the curators name, where the operator has said to, saying
+/// what was acted on, a sentence each.
+pub(crate) async fn searched_again(ctx: &Ctx) {
     if ctx.dry_run || !asked_for(ctx) {
-        return Vec::new();
+        return;
     }
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
-        return Vec::new();
+        return;
     };
     let fillers = fillers_here(ctx, &manifest);
     let mut searched: Searched = super::super::record::beside(ctx, RECORD);
-    let mut said = Vec::new();
     for target in curator_targets(ctx, &fillers).await {
-        said.extend(acted_on(ctx, &target, &mut searched).await);
+        for said in acted_on(ctx, &target, &mut searched).await {
+            ctx.narrator.say(&said).await;
+        }
     }
     super::super::record::keep_beside(ctx, RECORD, &searched);
-    said
 }
 
 /// Each stuck item of `target` not yet acted on, dropped and searched again for.

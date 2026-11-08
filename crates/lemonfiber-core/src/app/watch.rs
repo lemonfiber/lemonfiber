@@ -97,9 +97,7 @@ async fn watch_until_lost(
         }
         if readings.due(Paced::SearchedAgain, now) {
             readings.read(Paced::SearchedAgain, now);
-            for said in searching_again::searched_again(ctx).await {
-                ctx.narrator.say(&said).await;
-            }
+            searching_again::searched_again(ctx).await;
         }
     }
 }

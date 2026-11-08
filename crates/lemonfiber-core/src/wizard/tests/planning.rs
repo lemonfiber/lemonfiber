@@ -729,6 +729,14 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the move of decline onto its plugin"
     );
+    assert_eq!(
+        described(&change(Kind::Unqueued {
+            kind: crate::ports::media::Kind::Tv,
+            title: 9,
+            release: "9f86d081".to_owned(),
+        })),
+        "the drop of a stuck download"
+    );
 }
 
 #[test]

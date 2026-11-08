@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::searched_again;
@@ -7,6 +8,7 @@ use crate::app::Ctx;
 use crate::journal::{Change, Kind};
 use crate::ports::media::Kind as Media;
 use crate::ports::service::{ClientProbe, Grabbed, StuckItem};
+use crate::ports::Narrator;
 use crate::test_support::a_context;
 use crate::test_support::curators::{
     self, answered, curated, curating, refusing, told, TELEVISION,
@@ -76,6 +78,16 @@ fn ctx(name: &str, on: &str, http: &Arc<Fake>) -> Ctx {
     curators::reaching(ctx, &curators::ALL)
 }
 
+/// What acting on the stuck items `ctx` reaches says, a sentence each.
+async fn said(ctx: &Ctx) -> Vec<String> {
+    let heard = Arc::new(Heard::default());
+    let listening = ctx
+        .clone()
+        .with_narrator(Arc::clone(&heard) as Arc<dyn Narrator>);
+    searched_again(&listening).await;
+    heard.said()
+}
+
 /// Every change the journal holds.
 fn journal(ctx: &Ctx) -> Vec<Change> {
     crate::app::targets::layout(ctx)
@@ -89,13 +101,15 @@ async fn a_stuck_item_is_dropped_blocklisted_searched_again_and_journalled_once(
     let http = curating_stuck(true);
     let ctx = ctx("searched-again", "on", &http);
 
-    let said = searched_again(&ctx).await;
-    let again = searched_again(&ctx).await;
+    let first = said(&ctx).await;
+    let again = said(&ctx).await;
 
-    assert_eq!(said.len(), 1, "{said:?}");
+    assert_eq!(first.len(), 1, "{first:?}");
     assert!(
-        said.iter().all(|one| one.contains("searches for it again")),
-        "{said:?}"
+        first
+            .iter()
+            .all(|one| one.contains("searches for it again")),
+        "{first:?}"
     );
     assert!(
         again.is_empty(),
@@ -136,7 +150,7 @@ async fn nothing_is_acted_on_while_off_rehearsed_or_where_a_client_does_not_answ
         ctx("searched-again-unreached", "on", &unreached),
     ];
     for (ctx, http) in contexts.iter().zip([&off, &rehearsed, &unreached]) {
-        assert!(searched_again(ctx).await.is_empty());
+        assert!(said(ctx).await.is_empty());
         assert!(!http.asked_for("unqueue"), "{:?}", http.requests());
         assert!(journal(ctx).is_empty());
     }
@@ -160,21 +174,65 @@ async fn a_search_the_curator_refuses_is_said_and_the_drop_still_journalled() {
     ]);
     let ctx = ctx("searched-again-refused", "on", &http);
 
-    let said = searched_again(&ctx).await;
+    let refused = said(&ctx).await;
 
     assert!(
-        said.iter().all(|one| one.contains("would not search")),
-        "{said:?}"
+        refused.iter().all(|one| one.contains("would not search")),
+        "{refused:?}"
     );
     assert_eq!(journal(&ctx).len(), 1);
 }
 
 #[tokio::test]
+async fn nothing_is_acted_on_where_the_stack_or_the_curator_does_not_answer() {
+    let probes = (
+        curating(TELEVISION, "test_download_clients"),
+        answered(&Vec::<ClientProbe>::new()),
+    );
+    let unread = curating_stuck(true);
+    let no_items = Fake::by_path(vec![probes.clone(), ("", refusing())]);
+    let undropped = Fake::by_path(vec![
+        probes,
+        (curating(TELEVISION, "stuck_items"), answered(&stuck())),
+        ("", refusing()),
+    ]);
+    let mut nowhere = ctx("searched-again-nowhere", "on", &unread);
+    nowhere.stack = crate::test_support::nowhere();
+    let contexts = [
+        nowhere,
+        ctx("searched-again-no-items", "on", &no_items),
+        ctx("searched-again-undropped", "on", &undropped),
+    ];
+    for ctx in &contexts {
+        assert!(said(ctx).await.is_empty());
+        assert!(journal(ctx).is_empty());
+    }
+    assert!(!unread.asked_for("stuck_items"), "{:?}", unread.requests());
+    assert!(undropped.asked_for("unqueue"), "{:?}", undropped.requests());
+}
+
+#[tokio::test]
 async fn putting_the_act_back_grabs_the_release_again_or_says_it_is_gone() {
-    for (name, answer, put_back) in [
-        ("regrabbed", answered(&Grabbed::Grabbed), true),
-        ("regrab-gone", answered(&Grabbed::Gone), false),
-        ("regrab-refused", refusing(), false),
+    for (name, target, answer, put_back) in [
+        (
+            "regrabbed",
+            TELEVISION.plugin,
+            answered(&Grabbed::Grabbed),
+            true,
+        ),
+        (
+            "regrab-gone",
+            TELEVISION.plugin,
+            answered(&Grabbed::Gone),
+            false,
+        ),
+        ("regrab-refused", TELEVISION.plugin, refusing(), false),
+        (
+            "regrab-unfilled",
+            "no-such-curator",
+            answered(&Grabbed::Grabbed),
+            false,
+        ),
     ] {
         let http = Fake::by_path(vec![
             (curating(TELEVISION, "grab"), answer as Answer),
@@ -184,7 +242,7 @@ async fn putting_the_act_back_grabs_the_release_again_or_says_it_is_gone() {
         let change = Change {
             at: "1".to_owned(),
             operation: super::OPERATION.to_owned(),
-            target: TELEVISION.plugin.to_owned(),
+            target: target.to_owned(),
             kind: Kind::Unqueued {
                 kind: Media::Tv,
                 title: TITLE,
@@ -199,9 +257,14 @@ async fn putting_the_act_back_grabs_the_release_again_or_says_it_is_gone() {
 
         assert_eq!(reached.put_back.len(), usize::from(put_back), "{name}");
         assert_eq!(reached.unreached.len(), usize::from(!put_back), "{name}");
+        let grabbed: &[String] = if target == TELEVISION.plugin {
+            &[STUCK.to_owned()]
+        } else {
+            &[]
+        };
         assert_eq!(
             told::<String>(&http.requests(), TELEVISION, "grab", "release"),
-            [STUCK.to_owned()],
+            grabbed,
             "{name}"
         );
     }

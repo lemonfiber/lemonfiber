@@ -165,6 +165,19 @@ fn a_guard_moved_in_place_reads_as_moved_for_good() {
     );
 }
 
+/// A stuck download dropped reads by its kind and title, never its release.
+#[test]
+fn a_stuck_download_dropped_reads_as_its_title() {
+    assert_eq!(
+        did(&crate::journal::Kind::Unqueued {
+            kind: crate::ports::media::Kind::Tv,
+            title: 9,
+            release: "9f86d081".to_owned(),
+        }),
+        "dropped a stuck download of tv title 9 and searched for it again"
+    );
+}
+
 /// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {
