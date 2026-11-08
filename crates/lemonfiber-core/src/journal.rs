@@ -333,6 +333,19 @@ pub enum Kind {
         /// The release that moved it.
         release: String,
     },
+    /// A curator dropped a stuck download from its client and blocklisted its release,
+    /// then searched for the title again. Undoing asks it to grab that release again.
+    ///
+    /// The release is its fingerprint and never its identity, which can carry an
+    /// indexer's key.
+    Unqueued {
+        /// The kind of media the curator filed it as.
+        kind: crate::ports::media::Kind,
+        /// The curator's id for the title.
+        title: i64,
+        /// The release's fingerprint.
+        release: String,
+    },
     /// A service was started again so it takes up what its adapter applied.
     Restarted {
         /// The service.

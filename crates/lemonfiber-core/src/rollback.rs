@@ -290,7 +290,8 @@ pub fn standing(
         | Kind::Secret { .. }
         | Kind::Granted { .. }
         | Kind::Ran { .. }
-        | Kind::Restarted { .. } => Standing::whole(),
+        | Kind::Restarted { .. }
+        | Kind::Unqueued { .. } => Standing::whole(),
     }
 }
 

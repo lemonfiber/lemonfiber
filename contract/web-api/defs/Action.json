@@ -430,6 +430,35 @@
       ]
     },
     {
+      "description": "Ask a curator to grab a release again by its fingerprint and lift its blocklist\nentry.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "regrab"
+        },
+        "kind": {
+          "description": "The kind of media the curator files it as.",
+          "$ref": "Kind.json"
+        },
+        "release": {
+          "description": "The release's fingerprint.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The curator's id for the title.",
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "does",
+        "kind",
+        "title",
+        "release"
+      ]
+    },
+    {
       "description": "Give a grant back to a plugin, or end one it was given.",
       "type": "object",
       "properties": {

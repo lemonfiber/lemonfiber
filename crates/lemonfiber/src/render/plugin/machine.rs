@@ -400,6 +400,10 @@ fn undone(undo: &Undo) -> String {
             format!("left the internal certificate of {service} as it is")
         }
         Action::Unmoved { service } => format!("left {service} on its plugin"),
+        Action::Regrab { kind, title, .. } => format!(
+            "grabbed the dropped release of {} title {title} again",
+            kind.media_type()
+        ),
         Action::Run {
             service,
             running: true,

@@ -3,6 +3,49 @@
 use super::{Action, Change, Kind, Undo};
 
 impl Action {
+    /// Write `key` back to `value` where it still holds `wrote`.
+    fn restore(key: &str, value: Option<&str>, wrote: &str) -> Self {
+        Self::Restore {
+            key: key.to_owned(),
+            value: value.map(str::to_owned),
+            wrote: wrote.to_owned(),
+        }
+    }
+
+    /// Put the key now under `to` back under `from`.
+    fn rename_back(from: &str, to: &str) -> Self {
+        Self::RenameBack {
+            from: from.to_owned(),
+            to: to.to_owned(),
+        }
+    }
+
+    /// Move what is now at `to` back to `from`.
+    fn move_back(from: &str, to: &str) -> Self {
+        Self::MoveBack {
+            from: from.to_owned(),
+            to: to.to_owned(),
+        }
+    }
+
+    /// Remove the service's `resource` `id`.
+    fn remove(resource: &str, id: &str) -> Self {
+        Self::Remove {
+            resource: resource.to_owned(),
+            id: id.to_owned(),
+        }
+    }
+
+    /// Ask a curator to grab the release fingerprinted `release` of its `kind` title
+    /// `title` again.
+    fn regrab(kind: crate::ports::media::Kind, title: i64, release: &str) -> Self {
+        Self::Regrab {
+            kind,
+            title,
+            release: release.to_owned(),
+        }
+    }
+
     /// Put `field` of the service's `resource` `id` back to `value`.
     fn reconfigure(resource: &str, id: &str, field: &str, value: Option<&str>) -> Self {
         Self::Reconfigure {
@@ -90,19 +133,12 @@ impl Change {
     /// What reversing this change does.
     fn reversal(&self) -> Action {
         match &self.kind {
-            Kind::Created { resource, id } => Action::Remove {
-                resource: resource.clone(),
-                id: id.clone(),
-            },
+            Kind::Created { resource, id } => Action::remove(resource, id),
             Kind::Set {
                 key,
                 previous,
                 current,
-            } => Action::Restore {
-                key: key.clone(),
-                value: previous.clone(),
-                wrote: current.clone(),
-            },
+            } => Action::restore(key, previous.as_deref(), current),
             Kind::Made { path } => Action::Delete { path: path.clone() },
             Kind::Region {
                 path,
@@ -125,14 +161,8 @@ impl Change {
                 volume: volume.clone(),
                 to: to.clone(),
             },
-            Kind::Renamed { from, to } => Action::RenameBack {
-                from: from.clone(),
-                to: to.clone(),
-            },
-            Kind::Moved { from, to } => Action::MoveBack {
-                from: from.clone(),
-                to: to.clone(),
-            },
+            Kind::Renamed { from, to } => Action::rename_back(from, to),
+            Kind::Moved { from, to } => Action::move_back(from, to),
             Kind::Pinned {
                 previous, current, ..
             } => Action::Repin {
@@ -188,6 +218,11 @@ impl Change {
             Kind::Restarted { service } => Action::run(service, true),
             Kind::Certified { service, .. } => Action::unreplaced(service),
             Kind::MovedInPlace { service, .. } => Action::unmoved(service),
+            Kind::Unqueued {
+                kind,
+                title,
+                release,
+            } => Action::regrab(*kind, *title, release),
         }
     }
 }

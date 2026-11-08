@@ -14,6 +14,7 @@
         "const:\"move-back\"",
         "const:\"push-endpoint\"",
         "const:\"reconfigure\"",
+        "const:\"regrab\"",
         "const:\"regrant\"",
         "const:\"rehold\"",
         "const:\"reinstate\"",
@@ -88,6 +89,12 @@
       ],
       "required": true
     },
+    "kind": {
+      "type": [
+        "ref:Kind"
+      ],
+      "required": true
+    },
     "name": {
       "type": [
         "string"
@@ -124,6 +131,12 @@
       ],
       "required": false
     },
+    "release": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "resource": {
       "type": [
         "string"
@@ -145,6 +158,12 @@
     "service": {
       "type": [
         "string"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "integer/int64"
       ],
       "required": true
     },
@@ -186,6 +205,7 @@
     "\"move-back\"",
     "\"push-endpoint\"",
     "\"reconfigure\"",
+    "\"regrab\"",
     "\"regrant\"",
     "\"rehold\"",
     "\"reinstate\"",

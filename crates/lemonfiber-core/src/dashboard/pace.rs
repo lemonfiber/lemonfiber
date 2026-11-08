@@ -55,6 +55,12 @@ pub(crate) const HOUSEHOLD_EVERY: Duration = Duration::from_secs(60);
 /// tunnel reconnects, which is minutes apart at the very least.
 pub(crate) const VPN_EVERY: Duration = Duration::from_secs(5 * 60);
 
+/// How often the stuck items are read to be acted on.
+///
+/// A queue is called stuck after many minutes without progress, so ten minutes between
+/// passes leaves nothing waiting long and asks each curator little.
+pub(crate) const SEARCHED_AGAIN_EVERY: Duration = Duration::from_secs(10 * 60);
+
 /// A panel, or the forwarded port's pass, read at a pace of its own rather than on
 /// every refresh.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -73,11 +79,13 @@ pub(crate) enum Paced {
     Vpn,
     /// The forwarded port, passed to every torrent client inside the guard.
     Forwarded,
+    /// Each stuck item, acted on once where the operator has said to.
+    SearchedAgain,
 }
 
 impl Paced {
     /// Every paced panel.
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 8] = [
         Self::Queues,
         Self::FreeSpace,
         Self::Hardlink,
@@ -85,6 +93,7 @@ impl Paced {
         Self::Household,
         Self::Vpn,
         Self::Forwarded,
+        Self::SearchedAgain,
     ];
 
     /// How long a reading of this panel stays current.
@@ -97,6 +106,7 @@ impl Paced {
             Self::Household => HOUSEHOLD_EVERY,
             Self::Vpn => VPN_EVERY,
             Self::Forwarded => crate::app::forwarding::EVERY,
+            Self::SearchedAgain => SEARCHED_AGAIN_EVERY,
         }
     }
 }
