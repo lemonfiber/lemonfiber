@@ -22,6 +22,7 @@ pub(super) fn asks(manifest: &Manifest, service: &Service) -> Vec<Asking> {
             each: ask.each,
             native: ask.native.clone(),
             files: None,
+            media_types: ask.media_types.clone().unwrap_or_default(),
         })
         .collect();
     merged(declared, &service.env, service.network.as_ref())
@@ -50,6 +51,7 @@ pub(crate) fn merged(
                 .as_deref()
                 .map(lemonfiber_manifest::container::Apis::one),
             files: url.files.clone(),
+            media_types: Vec::new(),
         }),
         _ => None,
     });
@@ -58,6 +60,7 @@ pub(crate) fn merged(
         each: false,
         native: None,
         files: None,
+        media_types: Vec::new(),
     });
     for implied in addressed.chain(inside) {
         match asks.iter_mut().find(|ask| ask.is_of(&implied)) {
@@ -89,9 +92,22 @@ pub struct Asking {
     /// The medium the filler it reaches files, where it narrows the ask to one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub files: Option<String>,
+    /// The media it asks a filler of, where it narrows the ask to the fillers of those.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media_types: Vec<String>,
 }
 
 impl Asking {
+    /// The media a filler it reaches files at least one of; every filler where none.
+    #[must_use]
+    pub fn narrowed_to(&self) -> Vec<&str> {
+        self.files
+            .iter()
+            .chain(&self.media_types)
+            .map(String::as_str)
+            .collect()
+    }
+
     /// Whether `other` asks the capability and the medium this one asks.
     #[must_use]
     pub fn is_of(&self, other: &Self) -> bool {

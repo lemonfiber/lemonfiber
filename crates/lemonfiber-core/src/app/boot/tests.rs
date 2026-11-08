@@ -623,7 +623,7 @@ async fn a_start_that_could_not_be_carried_out_is_a_refusal_rather_than_a_report
     assert!(
         filed
             .as_deref()
-            .is_some_and(|said| said.contains("did not finish starting")),
+            .is_some_and(|said| said.contains("the engine holds no container for it")),
         "{filed:?}"
     );
 }

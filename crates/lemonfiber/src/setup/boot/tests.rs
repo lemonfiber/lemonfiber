@@ -142,6 +142,27 @@ async fn a_stack_that_came_up_reports_how_it_settled() {
     let _ = std::fs::remove_dir_all(&stack_dir);
 }
 
+/// A start refused after the images came down is reported as the refusal it is.
+#[tokio::test(start_paused = true)]
+async fn a_start_refused_after_the_pull_is_reported_rather_than_settled() {
+    let stack_dir = lemonfiber_fixtures::scratch::Scratch::named("boot-refused").kept();
+    let _ = std::fs::remove_dir_all(&stack_dir);
+    let mut ctx = working_ctx();
+    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.stack = Source::Embedded(&QUIET);
+    ctx.settings.stack_dir = Some(stack_dir.clone());
+    ctx.settings.container = Some("lemonfiber-in-a-box".to_owned());
+    let ctx = ctx.with_locations(lemonfiber_fixtures::located::Located::running(
+        "another",
+        &[],
+    ));
+
+    let code = start(&ctx, &Scripted::saying(false, &[])).await;
+
+    assert_ne!(shown(code), success(), "a refused start is not a success");
+    let _ = std::fs::remove_dir_all(&stack_dir);
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_stack_that_did_not_come_up_is_not_wired() {
     // Nothing is dispatched for a stack with nothing running: a context whose stack

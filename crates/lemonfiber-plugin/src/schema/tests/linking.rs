@@ -22,11 +22,19 @@ fn reads_what_a_service_asks_for() {
             service: Some("komga".to_owned()),
             capability: "library.curate".to_owned(),
             each: true,
+            media_types: None,
         }])
     );
     let unsaid = parse(&WHOLE.replace("each       = true\n", ""))
         .and_then(|manifest| manifest.asking.first().map(|ask| ask.each));
     assert_eq!(unsaid, Some(false));
+    let narrowed = parse(&WHOLE.replace(
+        "each       = true\n",
+        "each       = true\nmedia_types = [\"tv\", \"movies\"]\n",
+    ))
+    .and_then(|manifest| manifest.asking.into_iter().next())
+    .and_then(|ask| ask.media_types);
+    assert_eq!(narrowed, Some(vec!["tv".to_owned(), "movies".to_owned()]));
 }
 
 /// A wiring naming its service, which is how a plugin with two says which is which.

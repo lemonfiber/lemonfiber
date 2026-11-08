@@ -39,6 +39,7 @@ use super::Ctx;
 // here that reaches a service and a container engine should be the one thing a
 // reader has to hold a seam in mind for.
 mod absent;
+mod bringing_back;
 mod demanding;
 mod proving;
 // Asking the stack's own checks what they make of the machine, before the writes and
@@ -367,6 +368,8 @@ async fn reversing(
     if !off {
         back.left.push(still_running(&would.plugin));
     }
+    back.left
+        .extend(bringing_back::brought_back(ctx, would).await);
     back
 }
 

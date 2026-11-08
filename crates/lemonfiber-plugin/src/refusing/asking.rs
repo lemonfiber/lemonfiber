@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use lemonfiber_manifest::container::Value;
+use lemonfiber_manifest::container::{Value, MEDIA};
 
 use crate::schema::Manifest;
 use crate::{claiming, vocabulary, Violation};
@@ -61,6 +61,9 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
                 message: format!("{api} is not one lowercase word"),
             });
         }
+        if let Some(media) = &ask.media_types {
+            filing(media, &format!("{location}.media_types"), found);
+        }
         if ask.each {
             let held = service.env.iter().filter(
                 |(_, value)| matches!(value, Value::Url(url) if url.url_of == ask.capability),
@@ -76,6 +79,31 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
     }
     addressed(manifest, found);
+}
+
+/// The media an ask names, held to the stack manifest's vocabulary: at least one, and
+/// none twice.
+fn filing(media: &[String], location: &str, found: &mut Vec<Violation>) {
+    if media.is_empty() {
+        found.push(Violation {
+            location: location.to_owned(),
+            message: "names no medium; leave it out to reach every filler".to_owned(),
+        });
+    }
+    let mut seen = BTreeSet::new();
+    for medium in media {
+        if !MEDIA.contains(&medium.as_str()) {
+            found.push(Violation {
+                location: location.to_owned(),
+                message: format!("names {medium:?}, which is not one of {}", MEDIA.join(", ")),
+            });
+        } else if !seen.insert(medium.as_str()) {
+            found.push(Violation {
+                location: location.to_owned(),
+                message: format!("names {medium} twice"),
+            });
+        }
+    }
 }
 
 /// Every address a variable asks for held to the published core vocabulary, as an ask is.

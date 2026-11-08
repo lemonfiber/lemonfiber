@@ -24,10 +24,16 @@ const DECLINE: &str = guards::DECLINE.plugin;
 
 /// What `guard`'s plugin says of itself: the contract it speaks, and a release at the
 /// digest its image is pinned by where `released`.
-fn about(guard: Adapted, spoken: &str, released: bool) -> Answer {
+fn about(guard: Adapted, spoken: &str, at_its_pin: bool) -> Answer {
     let listed: Vec<_> = guard
         .digest()
-        .filter(|_| released)
+        .map(|digest| {
+            if at_its_pin {
+                digest
+            } else {
+                ELSEWHERE.to_owned()
+            }
+        })
         .map(|digest| serde_json::json!({ "version": "0.17.0", "digest": digest }))
         .into_iter()
         .collect();
@@ -43,10 +49,13 @@ fn asked_about(port: u16) -> &'static str {
     Box::leak(format!("{port}{}", lemonfiber_contract::adapter::about_path()).into_boxed_str())
 }
 
-/// Each guard's plugin answering as its proofs ask, its account of itself listing the
-/// release its image is pinned by where `released`, and every contract call refused
-/// without its key.
-fn answering(released: bool) -> Arc<Fake> {
+/// A digest no guard is pinned by.
+const ELSEWHERE: &str = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+
+/// Each guard's plugin answering as its proofs ask, its account of itself listing a
+/// release at the digest its image is pinned by where `at_its_pin` and at another where
+/// not, and every contract call refused without its key.
+fn answering(at_its_pin: bool) -> Arc<Fake> {
     let (gate, decline) = (guards::GATE.contract(), guards::DECLINE.contract());
     Fake::by_path(vec![
         (
@@ -54,7 +63,7 @@ fn answering(released: bool) -> Arc<Fake> {
             about(
                 guards::GATE,
                 &lemonfiber_contract::spoken(gate::CAPABILITY, gate::MAJOR),
-                released,
+                at_its_pin,
             ),
         ),
         (
@@ -62,7 +71,7 @@ fn answering(released: bool) -> Arc<Fake> {
             about(
                 guards::DECLINE,
                 &lemonfiber_contract::spoken(decline::CAPABILITY, decline::MAJOR),
-                released,
+                at_its_pin,
             ),
         ),
         ("/health", Answer::reply(200, r#"{"key":null}"#)),
@@ -263,8 +272,9 @@ async fn a_move_the_install_refuses_stays_on_offer_saying_why() {
     assert_eq!(still, vec![GATE.to_owned()]);
 }
 
-/// A move whose install is taken back, here for a plugin listing no release at the
-/// digest its image is pinned by, is not taken and says which proof did not hold.
+/// A move whose install is taken back, here for a plugin listing a release at a digest
+/// other than the one its image is pinned by, is not taken and says which proof did not
+/// hold.
 #[tokio::test]
 async fn a_move_taken_back_names_the_proof_that_did_not_hold() {
     let ctx = unmoved("guards-unproven").with_http(answering(false));

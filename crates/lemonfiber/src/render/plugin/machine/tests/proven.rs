@@ -427,6 +427,7 @@ fn asked(
                 .iter()
                 .map(|one| ((*one).to_owned(), lemonfiber_core::origin::Origin::Bundled))
                 .collect(),
+            media_types: Vec::new(),
         },
     }
 }

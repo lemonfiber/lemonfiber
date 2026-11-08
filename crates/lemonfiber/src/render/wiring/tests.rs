@@ -18,6 +18,7 @@ fn asking(by: &str, capability: &str, services: &[&str], settled: Settled) -> Wi
                 .iter()
                 .map(|one| ((*one).to_owned(), Origin::Bundled))
                 .collect(),
+            media_types: Vec::new(),
         },
     }
 }
@@ -101,6 +102,7 @@ fn what_an_ask_reaches_says_where_each_service_came_from() {
                 },
             ))
             .collect(),
+            media_types: Vec::new(),
         },
     };
     let said = shown(&WiringReport {
@@ -228,6 +230,7 @@ fn what_nothing_fills_is_listed_again_naming_what_asked() {
             files: None,
             by: "seerr".to_owned(),
             capability: "identity.source".to_owned(),
+            media_types: Vec::new(),
         }],
     });
     assert!(said.contains("Asked for, and nothing fills it:"), "{said}");
@@ -341,6 +344,7 @@ fn what_a_substitution_would_leave_unfilled_is_said_in_the_conditional() {
         files: None,
         by: "seerr".to_owned(),
         capability: "identity.source".to_owned(),
+        media_types: Vec::new(),
     }];
     let said = substituted(&substituting(false, leaves.clone())).text();
     assert!(said.contains("This would leave nothing filling:"), "{said}");

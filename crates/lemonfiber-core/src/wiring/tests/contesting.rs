@@ -43,6 +43,7 @@ fn a_plugin_claiming_what_the_stack_asks_for_contests_it_and_says_whose_each_is(
                 claimants: vec!["server".to_owned(), "kavita (plugin kavita)".to_owned()],
             },
             origins,
+            media_types: Vec::new(),
         })
     );
 }

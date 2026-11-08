@@ -54,6 +54,7 @@ fn an_ask_for_every_filler_reaches_every_filler() {
                     )
                 })
                 .collect(),
+            media_types: Vec::new(),
         })
     );
 }

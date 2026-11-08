@@ -6,6 +6,8 @@
 //! command has hung. What the wait *says* while it waits is decided next door; this is
 //! the waiting itself, and what it reports when the services never settle.
 
+use std::fmt::Write as _;
+
 use super::super::Ctx;
 use super::waiting;
 use crate::docker::{condition, survey_beside, unsettled, Service};
@@ -79,7 +81,16 @@ async fn settle(
         // still reports what it saw rather than reporting nothing at all.
         let now = ctx.seams.clock.now();
         if now >= deadline {
-            return Err(Box::new(never_settled(ctx, manifest, &waiting).await));
+            let gone: Vec<String> = services
+                .iter()
+                .filter(|service| {
+                    service.state == crate::docker::State::Absent && waiting.contains(&service.id)
+                })
+                .map(|service| service.id.clone())
+                .collect();
+            return Err(Box::new(
+                never_settled(ctx, manifest, &waiting, &gone).await,
+            ));
         }
 
         // Read from the same clock the deadline is, so what a line says about how
@@ -116,7 +127,9 @@ pub(crate) fn costs(manifest: &lemonfiber_manifest::Manifest, waiting: &[String]
     format!("What that costs, while it lasts: {}.", said.join("; "))
 }
 
-/// What to tell an operator whose stack did not finish starting.
+/// What to tell an operator whose stack did not finish starting, naming apart each of
+/// `gone`, the services the engine holds no container for, since those did not fail to
+/// start so much as stop existing.
 ///
 /// The services' own recent output is attached, because the explanation is
 /// almost always in it and an operator who has to go and find it has been given
@@ -126,8 +139,14 @@ async fn never_settled(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     waiting: &[String],
+    gone: &[String],
 ) -> Problem {
     let named = waiting.join(", ");
+    let summary = if gone.len() == waiting.len() {
+        format!("{named} is not running: the engine holds no container for it")
+    } else {
+        format!("{named} did not finish starting")
+    };
 
     // Assembled rather than interpolated, so a stack that says nothing about what a
     // service is for does not leave a gap where its sentence would have been.
@@ -136,6 +155,14 @@ async fn never_settled(
          The rest of the form is still up and was left alone — one service failing to \
          start is not a reason to take down the others.",
     );
+    if !gone.is_empty() {
+        let _ = write!(
+            explanation,
+            " The engine holds no container for {} at all: it was asked to start, and its \
+             container was removed or never made.",
+            gone.join(", ")
+        );
+    }
     let lost = costs(manifest, waiting);
     if !lost.is_empty() {
         explanation.push(' ');
@@ -145,7 +172,7 @@ async fn never_settled(
 
     let problem = Problem::new(
         crate::app::NEVER_SETTLED,
-        format!("{named} did not finish starting"),
+        summary,
         explanation,
         Remedy::new("Look at what the service said, then start it again")
             .with_detail("lemonfiber logs <service>"),

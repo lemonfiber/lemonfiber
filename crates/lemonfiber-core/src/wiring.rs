@@ -146,6 +146,9 @@ pub enum Reaches {
         /// The medium the filler it reaches files, where the ask is narrowed to one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         files: Option<String>,
+        /// The media the fillers it reaches file one of, where the ask is narrowed to those.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        media_types: Vec<String>,
     },
     /// A link deliberately kept to a named service, shown as the exception it is.
     ByName {
@@ -199,15 +202,29 @@ pub struct Unfilled {
     /// The medium it asked a filler of, where nothing filling it files that medium.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub files: Option<String>,
+    /// The media it asked a filler of, where nothing filling it files one of them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media_types: Vec<String>,
+}
+
+/// The words naming the media an ask is narrowed to, following what it asks for; none
+/// where it is narrowed to none.
+#[must_use]
+pub fn filing(files: Option<&str>, media_types: &[String]) -> String {
+    let media: Vec<&str> = files
+        .into_iter()
+        .chain(media_types.iter().map(String::as_str))
+        .collect();
+    if media.is_empty() {
+        String::new()
+    } else {
+        format!(" filing {}", media.join(" or "))
+    }
 }
 
 impl std::fmt::Display for Unfilled {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let filing = self
-            .files
-            .as_deref()
-            .map(|medium| format!(" filing {medium}"))
-            .unwrap_or_default();
+        let filing = filing(self.files.as_deref(), &self.media_types);
         match &self.native {
             Some(apis) => write!(
                 f,
@@ -318,7 +335,7 @@ pub fn substitute(
     if !claimants(
         manifest,
         installed,
-        (capability, None),
+        (capability, &[]),
         crate::plugin::first_party::EMBEDDED,
     )
     .iter()

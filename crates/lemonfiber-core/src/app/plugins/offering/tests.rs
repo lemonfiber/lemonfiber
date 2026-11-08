@@ -186,6 +186,7 @@ fn an_install_or_update_whose_asks_moved_is_refused_naming_that_part_alone() {
                 services: Vec::new(),
                 settled: crate::wiring::Settled::Unfilled,
                 origins: std::collections::BTreeMap::new(),
+                media_types: Vec::new(),
             },
         }],
         ..Standing::default()

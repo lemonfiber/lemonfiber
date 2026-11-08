@@ -16,6 +16,7 @@ fn plugin_asking(plugin: &str, service: &str, capability: &str, each: bool) -> I
         capability: capability.to_owned(),
         each,
         files: None,
+        media_types: Vec::new(),
     }];
     crate::test_support::an_installed(plugin, vec![placed])
 }
@@ -74,6 +75,7 @@ fn a_plugins_ask_follows_the_stacks_and_says_whose_service_asked() {
             services: vec!["one".to_owned(), "two".to_owned()],
             settled: Settled::Each,
             origins: bundled(&["one", "two"]),
+            media_types: Vec::new(),
         })
     );
 }
@@ -98,6 +100,7 @@ fn a_plugins_ask_for_one_of_several_takes_the_stacks_own_choice_and_its_reason()
                 over: vec!["one".to_owned()],
             },
             origins: bundled(&["one", "two"]),
+            media_types: Vec::new(),
         })
     );
 }
@@ -143,6 +146,7 @@ fn a_plugins_ask_nothing_fills_is_reported_naming_the_plugins_service() {
             files: None,
             by: "subfinder".to_owned(),
             capability: "subtitles.fetch".to_owned(),
+            media_types: Vec::new(),
         }])
     );
 }
@@ -253,6 +257,7 @@ fn an_address_narrowed_to_a_medium_is_settled_shown_and_reported_unfilled_as_an_
             capability: "library.curate".to_owned(),
             native: None,
             files: Some("music".to_owned()),
+            media_types: Vec::new(),
         }]
     );
     assert_eq!(
@@ -335,5 +340,72 @@ fn running_inside_a_fillers_network_is_an_ask_of_that_capability() {
                     && services == &["tunnel".to_owned()]
         ),
         "{wired:?}"
+    );
+}
+
+/// A curator plugin whose adapter, `<plugin>-adapter`, fronts `plugin` filing `media`.
+fn curator_plugin(plugin: &str, media: &str) -> Installed {
+    let mut upstream = crate::test_support::a_placed(plugin, &[], None);
+    upstream.media_types = vec![media.to_owned()];
+    let mut adapter =
+        crate::test_support::a_placed(&format!("{plugin}-adapter"), &["library.curate"], None);
+    adapter.fronts = Some(plugin.to_owned());
+    crate::test_support::an_installed(plugin, vec![upstream, adapter])
+}
+
+#[test]
+fn an_ask_narrowed_to_media_reaches_each_filler_of_one_of_them_an_adapter_by_its_upstream() {
+    let manifest = two_curators(&format!(
+        "{}media_types = [\"music\"]\n",
+        service("songs", "\"library.curate\"")
+    ));
+    let mut gate = plugin_asking("gate", "gate", "library.curate", true);
+    for one in &mut gate.services {
+        for ask in &mut one.asks {
+            ask.media_types = vec!["tv".to_owned(), "movies".to_owned()];
+        }
+    }
+    let installed = [
+        gate,
+        curator_plugin("medusa", "tv"),
+        curator_plugin("beets", "music"),
+    ];
+    let wired = plugins(manifest.as_ref(), &installed, &Chosen::default());
+    let reached: Vec<&Vec<String>> = wired
+        .iter()
+        .filter(|one| one.by == "gate")
+        .filter_map(|one| match &one.reaches {
+            Reaches::Asked {
+                services,
+                settled: Settled::Each,
+                media_types,
+                ..
+            } if media_types == &["tv".to_owned(), "movies".to_owned()] => Some(services),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        reached,
+        [&vec![
+            "series".to_owned(),
+            "films".to_owned(),
+            "medusa-adapter".to_owned()
+        ]]
+    );
+}
+
+#[test]
+fn an_ask_narrowed_to_media_nothing_files_is_reported_unfilled_naming_them() {
+    let manifest = two_curators("");
+    let mut reader = plugin_asking("reader", "reader", "library.curate", false);
+    for one in &mut reader.services {
+        for ask in &mut one.asks {
+            ask.media_types = vec!["music".to_owned(), "books".to_owned()];
+        }
+    }
+    let left = unfilled(&plugins(manifest.as_ref(), &[reader], &Chosen::default()));
+    assert_eq!(
+        left.first().map(ToString::to_string).as_deref(),
+        Some("reader asks for library.curate filing music or books and nothing fills it")
     );
 }

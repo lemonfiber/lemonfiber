@@ -13,6 +13,7 @@ fn asking(by: &str, capability: &str, services: &[&str]) -> Wired {
             origins: std::collections::BTreeMap::new(),
             native: None,
             files: None,
+            media_types: Vec::new(),
         },
     }
 }

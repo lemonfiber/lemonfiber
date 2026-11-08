@@ -30,7 +30,7 @@ mod interrupted;
 use boot::{preflight, start};
 use interrupted::recover_setup;
 
-use crate::context::read_settings;
+use crate::context::settings_at;
 use crate::exit::{complain, USAGE};
 use crate::prompt::{Flags, SetupFlags};
 use crate::say::{complain, say};
@@ -355,7 +355,7 @@ async fn drive(
         Ok(core_setup::Outcome::Applied) => {
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.
-            ctx.settings = read_settings(Some(&ctx));
+            ctx.settings = settings_at(Some(&ctx), Some(paths));
             concluded(
                 SetupOutcome::Applied,
                 &ctx.settings,

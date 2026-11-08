@@ -18,6 +18,7 @@ fn beside_contracted_requests(
             capability: crate::app::targets::IDENTITY.to_owned(),
             each: false,
             files: None,
+            media_types: Vec::new(),
         }];
     }
     crate::test_support::stack()

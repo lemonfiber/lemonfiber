@@ -18,7 +18,7 @@ use lemonfiber_core::PRODUCT;
 
 use super::boot::start;
 use super::{fresh_setup, Surface};
-use crate::context::read_settings;
+use crate::context::settings_at;
 use crate::exit::{complain, USAGE};
 use crate::prompt::SetupFlags;
 use crate::say::{complain, say};
@@ -79,7 +79,7 @@ pub(super) async fn recover_setup(
     }
     // The settings read at startup predate the file the recovery just wrote, so
     // they are refreshed before the stack is brought up against them.
-    ctx.settings = read_settings(Some(&ctx));
+    ctx.settings = settings_at(Some(&ctx), Some(paths));
     say!("\nSetup is done — bringing your stack up.");
     Box::pin(start(&ctx, surface)).await
 }

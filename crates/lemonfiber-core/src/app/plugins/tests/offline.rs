@@ -25,11 +25,13 @@ fn library() -> Vec<String> {
 }
 
 /// The git source an install reads, beside every other command run, each recorded.
-struct Watching {
+pub(super) struct Watching {
     /// What answers git.
-    serving: Arc<Serving>,
+    pub(super) serving: Arc<Serving>,
     /// Every command run, git or not.
-    seen: std::sync::Mutex<Vec<Vec<String>>>,
+    pub(super) seen: std::sync::Mutex<Vec<Vec<String>>>,
+    /// The Compose verb it refuses once something has been removed, where it refuses one.
+    pub(super) refusing: Option<&'static str>,
 }
 
 impl Watching {
@@ -45,18 +47,35 @@ impl Watching {
 #[async_trait]
 impl Runner for Watching {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
+        let removed = self
+            .seen
+            .lock()
+            .is_ok_and(|seen| seen.iter().any(|argv| argv.iter().any(|word| word == "rm")));
         if let Ok(mut seen) = self.seen.lock() {
             seen.push(argv.to_vec());
+        }
+        if removed
+            && self
+                .refusing
+                .is_some_and(|verb| argv.iter().any(|word| word == verb))
+        {
+            return Ok(lemonfiber_fixtures::support::refused("the daemon said no"));
         }
         self.serving.run(argv).await
     }
 }
 
 /// A runner answering git as an install's source does, recording everything run.
-fn watching() -> Arc<Watching> {
+pub(super) fn watching() -> Arc<Watching> {
+    refusing(None)
+}
+
+/// The same, refusing `verb` once something has been removed, where one is named.
+pub(super) fn refusing(verb: Option<&'static str>) -> Arc<Watching> {
     Arc::new(Watching {
         serving: Arc::new(Serving::listing("")),
         seen: std::sync::Mutex::new(Vec::new()),
+        refusing: verb,
     })
 }
 

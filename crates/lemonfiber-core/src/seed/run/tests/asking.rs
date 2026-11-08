@@ -28,6 +28,7 @@ fn asker(service: &str, listens: u16, asks: &[(&str, bool)]) -> Placed {
             capability: (*capability).to_owned(),
             each: *each,
             files: None,
+            media_types: Vec::new(),
         })
         .collect();
     placed

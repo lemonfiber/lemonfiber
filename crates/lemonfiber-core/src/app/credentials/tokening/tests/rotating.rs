@@ -55,6 +55,7 @@ fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::In
             capability: "library.curate".to_owned(),
             each: true,
             files: None,
+            media_types: Vec::new(),
         }];
     }
     installed

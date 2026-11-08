@@ -128,33 +128,32 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
                 service: Some("komga-sidecar".to_owned()),
                 capability: "library.curate".to_owned(),
                 each: true,
+                media_types: Some(vec!["tv".to_owned()]),
             },
             lemonfiber_plugin::Ask {
                 native: None,
                 service: Some("komga".to_owned()),
                 capability: "download.usenet".to_owned(),
                 each: false,
+                media_types: None,
             },
         ];
     });
     let asks = |service| placed(record.as_ref(), service).map(|one| one.asks);
+    let asking = |capability: &str, each, media_types: &[&str]| super::Asking {
+        native: None,
+        capability: capability.to_owned(),
+        each,
+        files: None,
+        media_types: media_types.iter().map(|one| (*one).to_owned()).collect(),
+    };
     assert_eq!(
         asks("komga-sidecar"),
-        Some(vec![super::Asking {
-            native: None,
-            capability: "library.curate".to_owned(),
-            each: true,
-            files: None,
-        }])
+        Some(vec![asking("library.curate", true, &["tv"])])
     );
     assert_eq!(
         asks("komga"),
-        Some(vec![super::Asking {
-            native: None,
-            capability: "download.usenet".to_owned(),
-            each: false,
-            files: None,
-        }])
+        Some(vec![asking("download.usenet", false, &[])])
     );
 }
 
@@ -181,6 +180,7 @@ fn a_variable_asking_an_address_is_an_ask_once_for_each_medium_it_files() {
             service: Some("komga".to_owned()),
             capability: "download.usenet".to_owned(),
             each: false,
+            media_types: None,
         }];
         set(manifest, |service| {
             service.env = [
@@ -203,6 +203,7 @@ fn a_variable_asking_an_address_is_an_ask_once_for_each_medium_it_files() {
         capability: capability.to_owned(),
         each: false,
         files: None,
+        media_types: Vec::new(),
     };
     let curating = |files: Option<&str>, native: Option<&str>| super::Asking {
         native: native.map(lemonfiber_manifest::container::Apis::one),

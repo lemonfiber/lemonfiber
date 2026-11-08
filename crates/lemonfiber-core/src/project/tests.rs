@@ -219,6 +219,7 @@ fn asking_for(service: &str, key: &str, capability: &str) -> Placed {
         each: false,
         native: None,
         files: None,
+        media_types: Vec::new(),
     }];
     placed
 }
@@ -685,6 +686,7 @@ fn a_plugin_services_ask_joins_it_to_that_asks_network_and_no_other() {
         capability: "media.serve".to_owned(),
         each: false,
         files: None,
+        media_types: Vec::new(),
     }];
     let project = project(&carried(), &[an_installed("subs", vec![asker])]);
 

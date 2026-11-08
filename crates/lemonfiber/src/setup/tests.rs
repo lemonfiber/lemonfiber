@@ -530,6 +530,10 @@ async fn an_answered_walk_applies_and_brings_the_stack_up() {
     // The stack cannot really come up here, so what is proven is that the walk
     // reached the end and wrote what it gathered.
     assert!(paths.env_file().exists(), "the answers were applied");
+    assert!(
+        paths.journal().exists(),
+        "the start journalled beside the answers"
+    );
     let _ = code;
 }
 

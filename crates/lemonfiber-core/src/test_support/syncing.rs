@@ -28,6 +28,7 @@ pub(crate) fn the_sync(speaking: bool) -> crate::plugin::Installed {
             capability: "library.curate".to_owned(),
             each: true,
             files: None,
+            media_types: Vec::new(),
         }];
         if !speaking {
             placed.speaks.clear();
