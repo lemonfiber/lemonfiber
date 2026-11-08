@@ -53,17 +53,23 @@ pub(crate) struct Part {
 
 /// Every rule a schema 2 `bundle` and its `copies` break, added to `broken`.
 pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>, broken: &mut Vec<String>) {
+    let pins = bundle.pins();
     let mut parts = BTreeMap::new();
-    for pin in &bundle.plugin {
+    let mut offered = BTreeMap::new();
+    for pin in &pins {
         let Some(part) = copied(pin, copies.get(&pin.id), broken) else {
             continue;
         };
         staged(pin, &part, bundle, broken);
-        parts.insert(pin.id.as_str(), part);
+        if pin.stage == Some(Stage::Offered) {
+            offered.insert(pin.id.as_str(), part);
+        } else {
+            parts.insert(pin.id.as_str(), part);
+        }
     }
     tables(bundle, &parts, broken);
     if bundle.fence.is_none() {
-        for (id, part) in &parts {
+        for (id, part) in parts.iter().chain(&offered) {
             for service in &part.services {
                 let needs = if service.fenced {
                     "is fenced"
@@ -173,44 +179,7 @@ fn staged(pin: &Pin, part: &Part, bundle: &Bundle, broken: &mut Vec<String>) {
             ));
         }
     }
-    match pin.stage {
-        Some(Stage::Assembled) => {
-            if part.services.len() != 1 || part.services.iter().any(|one| !one.speaks.is_empty()) {
-                broken.push(format!(
-                    "plugin {id} is assembled and so declares exactly one service, speaking no \
-                     contract"
-                ));
-            }
-            if part.services.iter().any(|one| one.id != *id) {
-                broken.push(format!(
-                    "plugin {id} is assembled and so its service.id is {id}, the id of the \
-                     service it takes the place of"
-                ));
-            }
-            let recorded = format!("{RECORDINGS}/{id}/");
-            for fixture in part
-                .fixtures
-                .iter()
-                .filter(|fixture| !fixture.starts_with(&recorded))
-            {
-                broken.push(format!(
-                    "plugin {id} is assembled and so its claim.probe.fixture {fixture} lies \
-                     under {recorded}"
-                ));
-            }
-        }
-        Some(Stage::Installed)
-            if !part
-                .services
-                .iter()
-                .any(|one| one.id == *id && one.replaces.as_deref() == Some(id.as_str())) =>
-        {
-            broken.push(format!(
-                "plugin {id} is installed and so declares service {id} with replaces = \"{id}\""
-            ));
-        }
-        Some(Stage::Installed) | None => {}
-    }
+    held_to_stage(pin, part, broken);
     for service in &part.services {
         let asked = service
             .asks_for
@@ -248,6 +217,60 @@ fn staged(pin: &Pin, part: &Part, bundle: &Bundle, broken: &mut Vec<String>) {
             "plugin {id}'s [plugin].forms names {named:?}, and the forms holding profile \
              {profile} are {holding:?}"
         ));
+    }
+}
+
+/// Every rule a part breaks against its pin's stage: an assembled part's one service, an
+/// installed part's service taking the place it is pinned for, and an offered plugin
+/// taking no part's place.
+fn held_to_stage(pin: &Pin, part: &Part, broken: &mut Vec<String>) {
+    let id = &pin.id;
+    match pin.stage {
+        Some(Stage::Assembled) => {
+            if part.services.len() != 1 || part.services.iter().any(|one| !one.speaks.is_empty()) {
+                broken.push(format!(
+                    "plugin {id} is assembled and so declares exactly one service, speaking no \
+                     contract"
+                ));
+            }
+            if part.services.iter().any(|one| one.id != *id) {
+                broken.push(format!(
+                    "plugin {id} is assembled and so its service.id is {id}, the id of the \
+                     service it takes the place of"
+                ));
+            }
+            let recorded = format!("{RECORDINGS}/{id}/");
+            for fixture in part
+                .fixtures
+                .iter()
+                .filter(|fixture| !fixture.starts_with(&recorded))
+            {
+                broken.push(format!(
+                    "plugin {id} is assembled and so its claim.probe.fixture {fixture} lies \
+                     under {recorded}"
+                ));
+            }
+        }
+        Some(Stage::Installed)
+            if !part
+                .services
+                .iter()
+                .any(|one| one.id == *id && one.replaces.as_deref() == Some(id.as_str())) =>
+        {
+            broken.push(format!(
+                "plugin {id} is installed and so declares service {id} with replaces = \"{id}\""
+            ));
+        }
+        Some(Stage::Offered) => {
+            for service in part.services.iter().filter(|one| one.replaces.is_some()) {
+                broken.push(format!(
+                    "plugin {id} is offered and so its service {} declares no replaces: it \
+                     takes the place of no part",
+                    service.id
+                ));
+            }
+        }
+        Some(Stage::Installed) | None => {}
     }
 }
 

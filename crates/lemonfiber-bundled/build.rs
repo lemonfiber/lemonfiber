@@ -167,14 +167,16 @@ fn staged(stage: Option<lemonfiber_bundle::Stage>) -> &'static str {
     match stage {
         Some(lemonfiber_bundle::Stage::Assembled) => "Some(Stage::Assembled)",
         Some(lemonfiber_bundle::Stage::Installed) => "Some(Stage::Installed)",
+        Some(lemonfiber_bundle::Stage::Offered) => "Some(Stage::Offered)",
         None => "None",
     }
 }
 
-/// Each file of an installed plugin's tree as a path and its bytes included from its
-/// copy, nothing for one the stack assembles.
+/// Each file of the tree of a plugin installed through the plugin path, a part or an
+/// offered plugin, as a path and its bytes included from its copy; nothing for one the
+/// stack assembles.
 fn carried(one: &lemonfiber_bundle::Held, copies: &Path) -> String {
-    if one.pin.stage != Some(lemonfiber_bundle::Stage::Installed) {
+    if one.pin.stage == Some(lemonfiber_bundle::Stage::Assembled) {
         return String::new();
     }
     let mut files = String::new();

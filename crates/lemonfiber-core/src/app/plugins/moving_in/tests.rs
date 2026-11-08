@@ -109,6 +109,22 @@ fn a_part_the_bundle_assembles_is_never_offered_a_move() {
         .all(|one| !assembled.contains(&one.plugin.as_str())));
 }
 
+/// A plugin the bundle offers is no part of the stack: nothing installs it, a start's
+/// offer and an update's move alike, until the operator asks.
+#[test]
+fn a_plugin_the_bundle_offers_is_never_installed_on_its_own_account() {
+    let pins: Vec<lemonfiber_bundled::Pinned> = PINNED
+        .iter()
+        .map(|one| lemonfiber_bundled::Pinned {
+            stage: Some(Stage::Offered),
+            ..*one
+        })
+        .collect();
+
+    assert!(super::uninstalled(&pins, &[]).is_empty());
+    assert_eq!(offered(&pins, &carried(), &[], &all_ran()), Vec::new());
+}
+
 /// The offer is read from this machine's record each time it is asked: every move where
 /// nothing is recorded installed, and nothing known where the record cannot be read.
 #[tokio::test]

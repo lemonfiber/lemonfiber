@@ -35,15 +35,17 @@ pub(crate) async fn from_this_build(
     .await
 }
 
-/// The plugin of this id the bundle installs, where it pins one.
+/// The plugin of this id the bundle installs or offers, where it pins one.
 pub(super) fn pinned(id: &str) -> Option<&'static Pinned> {
     installed_among(PINNED, id)
 }
 
-/// The plugin of this id among `pins` pinned as installed.
+/// The plugin of this id among `pins` installed through the plugin path: a part pinned as
+/// installed, or a plugin the bundle offers.
 fn installed_among<'a>(pins: &'a [Pinned], id: &str) -> Option<&'a Pinned> {
-    pins.iter()
-        .find(|one| one.first_party.plugin == id && one.stage == Some(Stage::Installed))
+    pins.iter().find(|one| {
+        one.first_party.plugin == id && matches!(one.stage, Some(Stage::Installed | Stage::Offered))
+    })
 }
 
 /// Carry an errand out over `pinned`'s tree, written where a fetch would have checked it

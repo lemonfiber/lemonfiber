@@ -1,19 +1,19 @@
-//! The services of a plugin the bundle installs, in the stack profile its bundle entry
-//! places them in.
+//! The services of a plugin the bundle installs or offers, in the stack profile its
+//! bundle entry places them in.
 //!
-//! A plugin the bundle installs takes the place of one of the stack's parts, so its
-//! services start and stop with the forms whose closure holds that part's profile, are
-//! narrowed away with that profile's protocol, and are surveyed and waited on beside the
-//! stack's own services. Any other plugin's services sit in a profile of the plugin's
-//! own, which no form names.
+//! A plugin the bundle installs takes the place of one of the stack's parts, and one it
+//! offers stands in for one, so its services start and stop with the forms whose closure
+//! holds that profile, are narrowed away with that profile's protocol, and are surveyed
+//! and waited on beside the stack's own services. Any other plugin's services sit in a
+//! profile of the plugin's own, which no form names.
 
 use lemonfiber_bundled::{Pinned, Stage, PINNED};
 use lemonfiber_manifest::Criticality;
 
 use super::Installed;
 
-/// One service of a plugin the bundle installs, as a service of the stack profile it sits
-/// in.
+/// One service of a plugin the bundle installs or offers, as a service of the stack
+/// profile it sits in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Profiled {
     /// Its id, which is its Compose service name.
@@ -29,17 +29,17 @@ pub struct Profiled {
 }
 
 /// The bundle's pin of `installed` and the stack profile it names, where `installed` is a
-/// first-party plugin the bundle installs.
+/// first-party plugin the bundle installs or offers.
 fn pinned(installed: &Installed) -> Option<(&'static Pinned, &'static str)> {
     PINNED
         .iter()
-        .filter(|pin| pin.stage == Some(Stage::Installed))
+        .filter(|pin| matches!(pin.stage, Some(Stage::Installed | Stage::Offered)))
         .filter(|pin| super::first_party::holds(std::slice::from_ref(&pin.first_party), installed))
         .find_map(|pin| pin.profile.map(|profile| (pin, profile)))
 }
 
 /// The Compose profile `installed`'s services sit in: the stack profile its bundle entry
-/// names where the bundle installs it, and the plugin's own otherwise.
+/// names where the bundle installs or offers it, and the plugin's own otherwise.
 #[must_use]
 pub fn profile_of(installed: &Installed) -> String {
     pinned(installed).map_or_else(

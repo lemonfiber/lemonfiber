@@ -23,31 +23,81 @@ const COMMIT_IMAGE_DIGITS: usize = 12;
 /// How many numbers a release is written in.
 const RELEASE_PARTS: usize = 3;
 
+/// The table each part's pin is written in.
+const PARTS: &str = "plugin";
+
+/// The table each offered plugin's pin is written in.
+const OFFERED_TABLE: &str = "offered";
+
 /// The fields every `[[plugin]]` names, whatever the schema.
 const PINNED: [&str; 5] = ["id", "origin", "revision", "manifest", "fills"];
 
-/// Each field of [`PINNED`] a `[[plugin]]` of the bundle file's `table` leaves out, named
-/// with the plugin, or with its place where it names no id.
+/// The fields every `[[offered]]` names.
+const OFFERED: [&str; 7] = [
+    "id",
+    "origin",
+    "revision",
+    "manifest",
+    "tree",
+    "profile",
+    "last_release",
+];
+
+/// The fields of a part's pin no `[[offered]]` names: it fills nothing until the operator
+/// chooses it, and nothing installs it until the operator asks.
+const UNOFFERED: [&str; 2] = ["fills", "stage"];
+
+/// Each field a pin of the bundle file's `table` leaves out that its table requires, and
+/// each an `[[offered]]` names that no offered plugin may, named with the plugin, or with
+/// its place where it names no id.
 pub(crate) fn unpinned(table: &toml::Table) -> Vec<String> {
-    let plugins = table
-        .get("plugin")
-        .and_then(toml::Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_default();
-    plugins
-        .iter()
-        .enumerate()
-        .flat_map(|(at, plugin)| {
-            let named = plugin.get("id").and_then(toml::Value::as_str).map_or_else(
-                || format!("[[plugin]] {}", at + 1),
-                |id| format!("plugin {id}"),
-            );
-            PINNED
-                .into_iter()
-                .filter(|field| plugin.get(field).is_none())
+    let mut unpinned = missing(table, PARTS, &PINNED);
+    unpinned.extend(missing(table, OFFERED_TABLE, &OFFERED));
+    unpinned.extend(entries(table, OFFERED_TABLE).flat_map(|(named, offered)| {
+        UNOFFERED
+            .into_iter()
+            .filter(|field| offered.get(field).is_some())
+            .map(move |field| {
+                format!(
+                    "{named}.{field} is declared, which no plugin the stack does not ship names"
+                )
+            })
+    }));
+    unpinned
+}
+
+/// Each of `required` an entry of `table`'s array `key` leaves out.
+fn missing(table: &toml::Table, key: &str, required: &'static [&'static str]) -> Vec<String> {
+    entries(table, key)
+        .flat_map(|(named, entry)| {
+            required
+                .iter()
+                .filter(|field| entry.get(**field).is_none())
                 .map(move |field| format!("{named}.{field} is missing, which every pin names"))
         })
         .collect()
+}
+
+/// Each entry of `table`'s array `key`, named by its id, or by its place where it names
+/// none.
+fn entries<'a>(
+    table: &'a toml::Table,
+    key: &'a str,
+) -> impl Iterator<Item = (String, &'a toml::Value)> + 'a {
+    table
+        .get(key)
+        .and_then(toml::Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+        .map(move |(at, entry)| {
+            let named = entry.get("id").and_then(toml::Value::as_str).map_or_else(
+                || format!("[[{key}]] {}", at + 1),
+                |id| format!("{key} {id}"),
+            );
+            (named, entry)
+        })
 }
 
 /// Every rule `bundle` and the `copies` beside it break.
@@ -61,18 +111,32 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>) -> Vec<St
         ));
         return broken;
     }
-    for (before, after) in bundle.plugin.iter().zip(bundle.plugin.iter().skip(1)) {
-        if before.id >= after.id {
-            broken.push(format!(
-                "plugin {} comes after {}: plugins are ordered by id and named once",
-                after.id, before.id
-            ));
+    let offered: Vec<Pin> = bundle.offered.iter().map(crate::Offered::pin).collect();
+    for (table, pins) in [(PARTS, &bundle.plugin), (OFFERED_TABLE, &offered)] {
+        for (before, after) in pins.iter().zip(pins.iter().skip(1)) {
+            if before.id >= after.id {
+                broken.push(format!(
+                    "{table} {} comes after {}: each table is ordered by id and names a plugin \
+                     once",
+                    after.id, before.id
+                ));
+            }
         }
     }
-    for pin in &bundle.plugin {
+    for both in offered
+        .iter()
+        .filter(|one| bundle.plugin.iter().any(|part| part.id == one.id))
+    {
+        broken.push(format!(
+            "plugin {} is pinned both as a part and as offered, and is one or the other",
+            both.id
+        ));
+    }
+    let pins = bundle.pins();
+    for pin in &pins {
         pinned(pin, &mut broken);
     }
-    let named: BTreeSet<&str> = bundle.plugin.iter().map(|pin| pin.id.as_str()).collect();
+    let named: BTreeSet<&str> = pins.iter().map(|pin| pin.id.as_str()).collect();
     for (_, unpinned) in copies.iter().filter(|(id, _)| !named.contains(id.as_str())) {
         broken.push(format!(
             "{} is a copy the bundle pins no plugin for",
@@ -123,6 +187,7 @@ fn first(bundle: &Bundle, copies: &BTreeMap<String, Copy>, broken: &mut Vec<Stri
         ("form", bundle.form.len()),
         ("wiring", bundle.wiring.len()),
         ("removed", bundle.removed.len()),
+        (OFFERED_TABLE, bundle.offered.len()),
     ] {
         if declared > 0 {
             broken.push(format!(
