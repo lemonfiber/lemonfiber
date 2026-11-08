@@ -217,6 +217,18 @@
       "sha256": "6384399cf956295e5629faf55cb0fb7840974db496a64735cdc132faa384ecae"
     },
     {
+      "capability": "status.watch",
+      "conformance": "status.watch/v1/conformance.json",
+      "facet": false,
+      "index": "status.watch/v1/index.json",
+      "majors": [
+        1
+      ],
+      "openapi": "status.watch/v1/openapi.json",
+      "operations": 5,
+      "sha256": "8854578499a473304bfaa1eb073ac66f55e34ec64a4fd3325599fa9dc22f2763"
+    },
+    {
       "capability": "owner.claim",
       "conformance": "owner.claim/v1/conformance.json",
       "facet": true,

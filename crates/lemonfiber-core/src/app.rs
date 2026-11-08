@@ -93,6 +93,7 @@ pub(crate) mod trace;
 pub mod unforwarded;
 pub(crate) mod upgrade;
 pub mod watch;
+pub(crate) mod watcher;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
@@ -464,6 +465,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Companion(asked) => crate::companion::asked(ctx, asked).await,
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Boot => boot::booted(ctx).await.map(Outcome::Boot),
+        Command::Watcher => watcher::watcher(ctx).await.map(Outcome::Watcher),
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
         Command::Clients => Ok(guided(ctx)),

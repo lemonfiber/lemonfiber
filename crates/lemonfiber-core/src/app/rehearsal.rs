@@ -214,6 +214,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Status { .. } => reads("ps"),
         Command::Stuck => reads("stuck"),
         Command::Boot => reads("boot"),
+        Command::Watcher => reads("watcher"),
         Command::FrontDoor => reads("front-door"),
         Command::News => reads("news"),
         Command::Playing { .. } => reads("playing"),

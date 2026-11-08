@@ -29,6 +29,7 @@ fn report(services: &[&str]) -> LifecycleReport {
         port_conflicts: Vec::new(),
         forwarding: None,
         secured: None,
+        watched: None,
         switched: None,
         held: None,
         offer: None,

@@ -70,6 +70,8 @@ pub(crate) const NOTIFICATIONS: &str = "notifications.json";
 pub(crate) const AUTOSTART: &str = "autostart.json";
 /// Which restart of this machine lemonfiber last acted on.
 pub(crate) const BOOT: &str = "boot.json";
+/// The monitors lemonfiber provisioned in the outside watcher, by tag.
+pub(crate) const WATCHER: &str = "watcher.json";
 /// What the household declared about its line.
 pub(crate) const BANDWIDTH: &str = "bandwidth.json";
 /// Why each request was turned down.
@@ -255,6 +257,18 @@ impl Paths {
     #[must_use]
     pub fn boot(&self) -> PathBuf {
         self.config.join(BOOT)
+    }
+
+    /// The monitors lemonfiber provisioned in the outside watcher: the id the watcher
+    /// answered for each tag, what each was asked to watch, and what it watches instead
+    /// where it could not.
+    ///
+    /// Kept with configuration because it is the only pairing of a monitor with what it
+    /// covers: a monitor is never paired by its name or its target, so a record lost is
+    /// every monitor lemonfiber made read as one it did not.
+    #[must_use]
+    pub fn watcher(&self) -> PathBuf {
+        self.config.join(WATCHER)
     }
 
     /// What the household declared about its line: the limits, the hours, the cap,

@@ -737,6 +737,7 @@ mod taken_back;
 mod targets;
 mod tokens;
 mod unmanaged;
+mod watching;
 
 /// Whose a credential is, for a test: one of the stack's own services where `plugin` is
 /// nothing, and otherwise the service that plugin brought.

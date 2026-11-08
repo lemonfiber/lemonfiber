@@ -38,6 +38,7 @@ mod stores;
 mod trace;
 mod upgrade;
 mod walkthrough;
+mod watcher;
 mod wiring;
 mod wishing;
 
@@ -67,6 +68,7 @@ pub use stores::*;
 pub use trace::*;
 pub use upgrade::*;
 pub use walkthrough::*;
+pub use watcher::*;
 pub use wiring::*;
 pub use wishing::*;
 

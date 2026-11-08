@@ -76,7 +76,7 @@ fn assess(baseline: u64, current: Presence) -> Availability {
 }
 
 /// Poll the data root until it is lost, and say how it was lost, passing the forwarded
-/// port on each minute while it holds.
+/// port on and checking in to its heartbeat each minute while it holds.
 async fn watch_until_lost(
     ctx: &Ctx,
     volume: &dyn Volume,
@@ -98,6 +98,10 @@ async fn watch_until_lost(
         if readings.due(Paced::SearchedAgain, now) {
             readings.read(Paced::SearchedAgain, now);
             searching_again::searched_again(ctx).await;
+        }
+        if readings.due(Paced::CheckedIn, now) {
+            readings.read(Paced::CheckedIn, now);
+            super::watcher::checking::checked_in(ctx, super::watcher::covering::GUARD).await;
         }
     }
 }

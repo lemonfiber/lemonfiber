@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a monitor sees.",
+  "oneOf": [
+    {
+      "description": "What it watches answered.",
+      "type": "string",
+      "const": "up"
+    },
+    {
+      "description": "What it watches failed as many checks as it alarms after.",
+      "type": "string",
+      "const": "down"
+    },
+    {
+      "description": "What it watches failed a check, and fewer than it alarms after.",
+      "type": "string",
+      "const": "pending"
+    },
+    {
+      "description": "It is not checking.",
+      "type": "string",
+      "const": "paused"
+    },
+    {
+      "description": "What it covers is stopped on purpose.",
+      "type": "string",
+      "const": "expected-down"
+    },
+    {
+      "description": "It holds no reading newer than its interval and grace.",
+      "type": "string",
+      "const": "not-reporting"
+    }
+  ]
+}

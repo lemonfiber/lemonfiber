@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "entry-point": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "job": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

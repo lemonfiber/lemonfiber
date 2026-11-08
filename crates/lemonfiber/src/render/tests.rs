@@ -296,6 +296,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             incomplete: false,
         }),
         Outcome::Boot(lemonfiber_core::model::BootReport::default()),
+        Outcome::Watcher(lemonfiber_core::model::WatcherReport::default()),
         Outcome::FrontDoor(FrontDoorReport {
             standing: Standing::Absent,
             chosen: lemonfiber_core::door::Chosen::Derived,

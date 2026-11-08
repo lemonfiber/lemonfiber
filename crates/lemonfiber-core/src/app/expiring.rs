@@ -217,6 +217,7 @@ async fn closing(ctx: &Ctx, after: u32, interval: Duration) -> CameTo {
         if ctx.dry_run {
             return came_to;
         }
+        super::watcher::checking::checked_in(ctx, super::watcher::covering::EXPIRING).await;
         tokio::time::sleep(interval).await;
         // Read again rather than remembered, which is the whole of what makes stopping a
         // matter of the record: an operator who withdrew the arrangement an hour ago has

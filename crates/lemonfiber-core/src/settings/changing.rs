@@ -172,6 +172,11 @@ async fn written(
     if changing.contains_key(super::own::DOMAIN) {
         let _ = crate::seed::run::refront(ctx).await;
     }
+    if changing.contains_key(super::own::DOMAIN)
+        || changing.contains_key(crate::config::HOUSEHOLD_HOST_SETTING)
+    {
+        let _ = crate::seed::run::remonitor(ctx).await;
+    }
     if changing.contains_key(crate::plex_link::SETTING) {
         let _ = Box::pin(crate::seed::run::seed(ctx, false)).await;
     }

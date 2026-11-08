@@ -1,5 +1,7 @@
 //! The services the operator declared unmanaged, taken out of a pass and said.
 
+use crate::error::Diagnose as _;
+
 /// Take the services the operator declared unmanaged out of the manifest, and say what
 /// was taken, in the words they gave for taking it.
 ///
@@ -74,9 +76,30 @@ pub(crate) fn managed(
     Vec<crate::plugin::Installed>,
     crate::wiring::Fillers,
 )> {
-    let mut manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    read_managed(ctx).ok()
+}
+
+/// [`managed`], or why the stack or the record of what is installed cannot be read.
+///
+/// # Errors
+///
+/// Where the stack or the record of what is installed cannot be read.
+pub(crate) fn read_managed(
+    ctx: &crate::app::Ctx,
+) -> Result<
+    (
+        Vec<lemonfiber_manifest::Service>,
+        Vec<crate::plugin::Installed>,
+        crate::wiring::Fillers,
+    ),
+    Box<crate::error::Problem>,
+> {
+    let mut manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|failure| Box::new(failure.problem()))?;
     let _ = withheld(&mut manifest.services, &ctx.settings.unmanaged);
-    let register = crate::app::plugins::read(ctx).ok()?;
+    let register = crate::app::plugins::read(ctx)?;
     let (installed, _) = withheld_brought(register.installed(), &ctx.settings.unmanaged);
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
@@ -87,5 +110,5 @@ pub(crate) fn managed(
         project.as_deref(),
     )
     .numbered(crate::app::targets::ordinals(ctx));
-    Some((manifest.services, installed, fillers))
+    Ok((manifest.services, installed, fillers))
 }

@@ -288,10 +288,7 @@ async fn main() -> ExitCode {
         Request::Migrate { action } => Command::Migrate(translate::migrating(action.as_ref())),
         Request::Alerts { action } => taken!(translate::alerts(action)),
         Request::Quality { action } => taken!(quality(action)),
-        Request::Doctor(asked) => match doctoring(&ctx, asked, cli.json).await {
-            Ok(command) => command,
-            Err(code) => return code,
-        },
+        Request::Doctor(asked) => taken!(doctoring(&ctx, asked, cli.json).await),
         // Two of the words under this one are about this machine and go through
         // dispatch like any other verb. The five that are not are documents this
         // build generated at compile time, so they are answered here and never
@@ -326,6 +323,7 @@ async fn main() -> ExitCode {
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,
         Request::Boot => Command::Boot,
+        Request::Watcher => Command::Watcher,
         Request::FrontDoor => Command::FrontDoor,
         Request::News => Command::News,
         Request::Companion(asked) => translate::paired(&asked),

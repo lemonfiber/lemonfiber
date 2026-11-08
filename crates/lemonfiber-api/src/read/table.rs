@@ -141,6 +141,9 @@ pub const STUCK: &str = "/api/stuck";
 /// When this machine last started, and what the run after it came to.
 pub const BOOT: &str = "/api/boot";
 
+/// What the outside watcher sees, beside what each of its monitors covers.
+pub const WATCHER: &str = "/api/watcher";
+
 /// Every setting, or one of them by name, with credentials withheld.
 pub const CONFIG: &str = "/api/config";
 
@@ -311,6 +314,7 @@ pub const OFFERED: &[&str] = &[
     TRACE,
     STUCK,
     BOOT,
+    WATCHER,
     CONFIG,
     QUALITY,
     EXPLAIN,
@@ -463,6 +467,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),
         BOOT => Ok(Command::Boot),
+        WATCHER => Ok(Command::Watcher),
         CONFIG => setting(key),
         QUALITY => Ok(Command::Quality(QualityAction::Show)),
         // Naming an empty word is naming one this product does not explain, and is

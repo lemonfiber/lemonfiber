@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One monitor, and what it covers where lemonfiber made it.",
+  "type": "object",
+  "properties": {
+    "active": {
+      "description": "Whether it is checking, rather than only defined.",
+      "type": "boolean"
+    },
+    "covers": {
+      "description": "What it covers, by the record of what lemonfiber provisioned; absent for a monitor\nlemonfiber did not make.",
+      "anyOf": [
+        {
+          "$ref": "Covers.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "heartbeat": {
+      "description": "A heartbeat's interval, grace and last check-in.",
+      "anyOf": [
+        {
+          "$ref": "Heartbeat.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "description": "How it checks.",
+      "$ref": "MonitorKind.json"
+    },
+    "last_reading": {
+      "description": "When it last took a reading, in seconds since the Unix epoch, where it ever has.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "name": {
+      "description": "Its own name in the watcher.",
+      "type": "string"
+    },
+    "path": {
+      "description": "Which path an entry point's monitor watches.",
+      "anyOf": [
+        {
+          "$ref": "WatchPath.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "since": {
+      "description": "Since when, in seconds since the Unix epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "state": {
+      "description": "What it sees.",
+      "$ref": "WatchState.json"
+    },
+    "unconfigured": {
+      "description": "What it was asked to watch and what it watches instead, where it does not watch\nwhat it should.",
+      "anyOf": [
+        {
+          "$ref": "Unconfigured.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "kind",
+    "state",
+    "since",
+    "active"
+  ]
+}

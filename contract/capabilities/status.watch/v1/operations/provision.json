@@ -1,0 +1,203 @@
+{
+  "post": {
+    "operationId": "provision",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "MonitorKind": {
+                "description": "How a monitor checks what it watches.",
+                "oneOf": [
+                  {
+                    "const": "http",
+                    "description": "An HTTP request answered with a success.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "keyword",
+                    "description": "An HTTP request whose answer holds a word.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "port",
+                    "description": "A TCP port that takes a connection.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "ping",
+                    "description": "A host that answers a ping.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "dns",
+                    "description": "A name that resolves.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "docker",
+                    "description": "A container that runs.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "heartbeat",
+                    "description": "A check-in expected each interval.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "Provision": {
+                "additionalProperties": false,
+                "description": "The one monitor to hold a tag.",
+                "properties": {
+                  "every_s": {
+                    "description": "The seconds between its checks, or between a heartbeat's check-ins.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "grace_s": {
+                    "description": "The seconds past its interval a heartbeat waits before it alarms.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "$ref": "#/$defs/MonitorKind",
+                    "description": "How it checks."
+                  },
+                  "retries": {
+                    "description": "How many checks in a row fail before it alarms.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tag": {
+                    "description": "The tag, beginning with [`TAG_PREFIX`].",
+                    "type": "string"
+                  },
+                  "target": {
+                    "description": "What it is pointed at: an address, a host and its port, a host, a name, a\ncontainer's name, or for a heartbeat the id of the job that checks in.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tag",
+                  "kind",
+                  "target",
+                  "every_s",
+                  "retries"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "provision": {
+                "$ref": "#/$defs/Provision",
+                "description": "The port's `provision`."
+              }
+            },
+            "required": [
+              "provision"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Instead": {
+                  "additionalProperties": false,
+                  "description": "What the watcher watches in place of what it was asked to, and why.",
+                  "properties": {
+                    "watches": {
+                      "description": "What it watches.",
+                      "type": "string"
+                    },
+                    "why": {
+                      "description": "Why, in words.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "watches",
+                    "why"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "The monitor a provision made or updated.",
+              "properties": {
+                "id": {
+                  "description": "The watcher's id for it.",
+                  "type": "string"
+                },
+                "instead": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Instead"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What it watches instead, where it could not watch what it was asked to."
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "Provisioned",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576,
+    "x-lemonfiber-since": 0
+  }
+}

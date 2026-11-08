@@ -248,6 +248,9 @@ pub enum Request {
     /// Say when this machine last started, and whether the stack, its tunnel and its
     /// forwarded port came back after it.
     Boot,
+    /// Say what the outside watcher sees beside what each of its monitors covers, and what
+    /// no active monitor covers.
+    Watcher,
     /// Name the one address to send somebody who lives here.
     ///
     /// The stack publishes several things to your network and only one of them is

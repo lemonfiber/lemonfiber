@@ -1,0 +1,12 @@
+{
+  "fields": {},
+  "variants": [
+    "\"dns\"",
+    "\"docker\"",
+    "\"heartbeat\"",
+    "\"http\"",
+    "\"keyword\"",
+    "\"ping\"",
+    "\"port\""
+  ]
+}

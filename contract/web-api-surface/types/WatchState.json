@@ -1,0 +1,11 @@
+{
+  "fields": {},
+  "variants": [
+    "\"down\"",
+    "\"expected-down\"",
+    "\"not-reporting\"",
+    "\"paused\"",
+    "\"pending\"",
+    "\"up\""
+  ]
+}

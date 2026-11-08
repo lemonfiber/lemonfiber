@@ -271,6 +271,9 @@ pub enum Command {
     /// Say when this machine last started, what the post-boot verification after it came
     /// to, and since when the stack has failed to come back.
     Boot,
+    /// Say what the outside watcher sees beside what each of its monitors covers, whether
+    /// it answers at all, and what no active monitor covers.
+    Watcher,
     /// Name the one address to hand somebody who lives here, and say where it stands —
     /// including that there is none, where this stack runs nothing they could begin at.
     FrontDoor,

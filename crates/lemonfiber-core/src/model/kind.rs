@@ -210,6 +210,8 @@ kinds! {
     WALKTHROUGH = "walkthrough",
     /// A supervision run's findings.
     WATCH = "watch",
+    /// What the outside watcher sees, beside what each of its monitors covers.
+    WATCHER = "watcher",
     /// Where a setup run stands, and what it is still asking for.
     WIZARD = "wizard",
     /// One glossary term.

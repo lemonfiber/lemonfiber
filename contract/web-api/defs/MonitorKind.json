@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a monitor checks what it watches.",
+  "oneOf": [
+    {
+      "description": "An HTTP request answered with a success.",
+      "type": "string",
+      "const": "http"
+    },
+    {
+      "description": "An HTTP request whose answer holds a word.",
+      "type": "string",
+      "const": "keyword"
+    },
+    {
+      "description": "A TCP port that takes a connection.",
+      "type": "string",
+      "const": "port"
+    },
+    {
+      "description": "A host that answers a ping.",
+      "type": "string",
+      "const": "ping"
+    },
+    {
+      "description": "A name that resolves.",
+      "type": "string",
+      "const": "dns"
+    },
+    {
+      "description": "A container that runs.",
+      "type": "string",
+      "const": "docker"
+    },
+    {
+      "description": "A check-in expected each interval.",
+      "type": "string",
+      "const": "heartbeat"
+    }
+  ]
+}

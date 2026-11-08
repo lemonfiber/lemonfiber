@@ -50,7 +50,7 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 use lemonfiber_api::read::table::{
     named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS,
     FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY,
-    REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
+    REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -326,6 +326,13 @@ static AFTER: &[Question] = &[
             asks: "which removal — stop, services, configuration or media",
             narrows: Narrows::Removal,
         }]),
+    },
+    Question {
+        name: "what the outside watcher sees",
+        about: "whether the monitor outside the stack answers, what each of its monitors sees \
+                beside what it covers, and what nothing watches",
+        read: WATCHER,
+        needs: Needed::Nothing,
     },
     Question {
         name: "what the last restart left",

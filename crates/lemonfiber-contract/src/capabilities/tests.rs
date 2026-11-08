@@ -26,6 +26,7 @@ use super::owner::claim;
 use super::proxy::front;
 use super::quality::sync;
 use super::request::{gate, intake};
+use super::status::watch;
 use super::stream::guard;
 use super::subtitles::fetch;
 use crate::{wire, Contracted};
@@ -43,6 +44,7 @@ mod parties;
 mod proxy;
 mod quality;
 mod request;
+mod status;
 mod stream;
 mod subtitles;
 
@@ -263,6 +265,7 @@ impl Http for Served {
             guard::CAPABILITY => guard::dispatch(&*self.upstream, operation, body).await,
             decline::CAPABILITY => decline::dispatch(&*self.upstream, operation, body).await,
             gate::CAPABILITY => gate::dispatch(&*self.upstream, operation, body).await,
+            watch::CAPABILITY => watch::dispatch(&*self.upstream, operation, body).await,
             claim::CAPABILITY => claim::dispatch(&*self.upstream, operation, body).await,
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
@@ -447,6 +450,7 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             guard::CAPABILITY,
             decline::CAPABILITY,
             gate::CAPABILITY,
+            watch::CAPABILITY,
             claim::CAPABILITY,
         ]
     );

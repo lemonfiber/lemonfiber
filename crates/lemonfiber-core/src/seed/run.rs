@@ -47,6 +47,8 @@ pub(crate) mod request_keys;
 mod showing;
 mod subtitles;
 mod taken_back;
+// The outside watcher's monitors, one under lemonfiber's own tag for each thing it covers.
+mod watching;
 // The request service's connection to the media server, held at the request gate's route
 // to it.
 mod linking;
@@ -80,8 +82,16 @@ pub(crate) use restarting::answering;
 pub(crate) use securing::{secured, secured_by, securing_installed, would_restart, Secured};
 pub(crate) use showing::reshow;
 pub(crate) use subtitles::rewatch;
-pub(crate) use withholding::managed;
+pub(crate) use watching::{remonitor, remonitored};
+pub(crate) use withholding::{managed, read_managed};
 use withholding::{withheld, withheld_brought};
+
+/// Hold the proxy's routes and the outside watcher's monitors to what is installed now, as
+/// installing, updating or removing a plugin owes both.
+pub(crate) async fn reinstalled(ctx: &Ctx) {
+    let _ = refront(ctx).await;
+    let _ = remonitor(ctx).await;
+}
 
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes — or, on a run that only says what it would do,
@@ -250,6 +260,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         fronting::seed_routes(ctx, &manifest.services, &installed, &fillers, &baseline).await,
     );
     wirings.extend(showing::seed_dashboard(ctx, &manifest.services, &installed, &fillers).await);
+    wirings.extend(watching::seed_watcher(ctx, &manifest.services, &installed, &fillers).await);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the

@@ -154,6 +154,7 @@
     "walkthrough": "kinds/walkthrough.json",
     "watch": "kinds/watch.json",
     "watched": "kinds/watched.json",
+    "watcher": "kinds/watcher.json",
     "wiring": "kinds/wiring.json",
     "wizard": "kinds/wizard.json",
     "word": "kinds/word.json"

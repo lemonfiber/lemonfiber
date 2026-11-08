@@ -456,6 +456,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         forwarding: None,
         forwarded: None,
         secured: None,
+        watched: None,
         switched: None,
         held: Some(reason.to_owned()),
         offer: None,

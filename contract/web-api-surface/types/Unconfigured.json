@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "wanted": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "watches": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

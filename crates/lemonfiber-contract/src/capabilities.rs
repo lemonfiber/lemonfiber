@@ -16,6 +16,7 @@ pub mod owner;
 pub mod proxy;
 pub mod quality;
 pub mod request;
+pub mod status;
 pub mod stream;
 pub mod subtitles;
 
@@ -246,6 +247,7 @@ pub fn all() -> Vec<crate::Capability> {
         stream::guard::capability(),
         invite::decline::capability(),
         request::gate::capability(),
+        status::watch::capability(),
         owner::claim::capability(),
     ]
 }

@@ -156,6 +156,8 @@ outcomes! {
     Stuck(StuckReport) => STUCK,
     /// When this machine last started, and what the run after it came to.
     Boot(crate::model::BootReport) => BOOT,
+    /// What the outside watcher sees, beside what each of its monitors covers.
+    Watcher(crate::model::WatcherReport) => WATCHER,
     /// What one of this product's words means.
     Word(Term) => WORD,
     /// Every word this product explains.

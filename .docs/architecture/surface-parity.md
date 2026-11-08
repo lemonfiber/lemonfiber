@@ -104,6 +104,7 @@ and the rest is named in **Standing**.
 | `forget` | `forget` | dashboard | Reachable in full from all three, and the confirmation is inside the command rather than in a screen: unconfirmed it lists exactly what `stored` lists and touches nothing, and only a second request carrying the agreement removes. That is deliberate — what is agreed to has to be *what was read*, and a removal that summarised the listing in different words would be a second account of the same thing. What it removes is two directories, which is every location the layout names; what it does not remove is named in the same answer, because somebody agreeing to this is entitled to have read that their library is not in the list before they agree rather than afterwards. On the terminal it is the last entry on the errands list, under the reset, so nobody lands on the most destructive thing here by pressing enter at a list they have only just opened. |
 | `stuck` | `/api/stuck` | dashboard | Served on the web, which is where the dashboard's own "N stuck" figure lands: each entry is named the way `/api/trace` is asked, so the count leads somewhere. The terminal reaches it as a question now and follows one the same way the web's list does: taking the question asks that read, and the entries it comes back with are offered as a list to take one of, which asks `/api/trace` by that entry's own title. Taken rather than typed, because the title is on the screen already and retyping it is a spelling test. The panel stays and is not this: it renders the queue-health gather, which counts what has stopped and names the cause where several items share one, rather than naming each item the way a trace is asked for — two readings of one worry, and it was the second the screen could not reach. |
 | `boot` | `/api/boot` | dashboard | Reachable from all three: when this machine last started, what the check after that start found, the newest check after any start, why a run started nothing, and since when the stack has not come back. A check after an earlier start is answered beside the latest start rather than as it, so no surface shows "passed" for a restart nothing checked. |
+| `watcher` | `/api/watcher` | dashboard | Reachable from all three: which part watches the stack from outside it, whether it answers, each of its monitors beside what lemonfiber made it to cover, and every critical service and household entry point no active monitor covers. A monitor is paired with what it covers by the record of what lemonfiber provisioned and never by its name, so an operator's own monitor reads as one the stack does not run. A watcher that does not answer is answered as blind, with everything it should cover uncovered, never as nothing wrong. |
 | `seed` | `seed` | dashboard | Reachable from all three. It is the first of the six errands the dashboard keeps behind one key, and the one with nothing to leave out: the command takes no arguments, so the question names what wiring the services to each other comes to and an explicit yes is the whole of what it needs. |
 | `adopt` | `adopt` | dashboard | As above, and the pair it makes with `reset` is what the errands are ordered by. Keeping what an operator changed sits near the top of that list and throwing it away sits at the bottom of it, so nobody lands on the destructive one by pressing enter at a list they have only just opened. |
 | `reset` | `reset` | dashboard | Reachable in full on both. It is the one write in this group that destroys work, so the terminal does not put the question until the stack has said what would be lost: the unconfirmed command goes first, the reverts it names are what the box shows, and the question sits under that account rather than over it. An effect somebody reads after agreeing to it is not one they agreed to, which is the reading every repair is already offered under. The agreement itself is the command's own field, so the screen carries no second idea of what confirming means. |
@@ -129,7 +130,7 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the fifty-nine requests, fifty-three reach the web in full, four reach it in
+Of the sixty requests, fifty-four reach the web in full, four reach it in
 part, zero do not reach it at all, and two — `ui` and `pass` — are honest exceptions.
 Four gaps and two exceptions is close to the split `G1-R1` asks for, and the split is
 deliberately lopsided: an exception has to survive being argued, and almost nothing
@@ -173,7 +174,7 @@ otherwise. What moved is the sentence underneath it. The reminder that names an
 expiry period no longer says flatly that nothing runs it — it says that while
 nothing does, and says what is running it once something is.
 
-On the other side of the table forty-five reach the terminal in full, six reach
+On the other side of the table forty-six reach the terminal in full, six reach
 the terminal in part, one reaches the terminal but for an exception, and six have
 no terminal form that anybody is still to build. That last figure stood at zero for
 a slice and is at six, which are `wiring`, `plugin`, `companion`, `key`, `push-endpoint` and `settings`

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A heartbeat's interval and grace, and its last check-in.",
+  "type": "object",
+  "properties": {
+    "every_s": {
+      "description": "The seconds between the check-ins it expects.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "grace_s": {
+      "description": "The seconds past its interval it waits before it alarms.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "last_check_in": {
+      "description": "When it last checked in, in seconds since the Unix epoch, where it ever has.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "every_s",
+    "grace_s"
+  ]
+}

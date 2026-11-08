@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which part watches the stack from outside it, whether it answers, and what each of its\nmonitors sees beside what it covers.",
+  "type": "object",
+  "properties": {
+    "monitors": {
+      "description": "Every monitor it holds, the operator's and lemonfiber's.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "WatchedTarget.json"
+      }
+    },
+    "reachable": {
+      "description": "Whether the watcher answers. False is coverage nobody can see, never all clear.",
+      "type": "boolean"
+    },
+    "read_at": {
+      "description": "When it was asked, in seconds since the Unix epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "uncovered": {
+      "description": "Every critical service and household entry point no active monitor covers.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "Covers.json"
+      }
+    },
+    "unreachable_because": {
+      "description": "Why it does not answer, where it does not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "watcher": {
+      "description": "The plugin filling `status.watch`, where one does.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "reachable",
+    "read_at"
+  ]
+}

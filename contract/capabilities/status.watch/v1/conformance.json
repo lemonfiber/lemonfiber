@@ -1,0 +1,12 @@
+{
+  "capability": "status.watch",
+  "major": 1,
+  "cases": [
+    {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"reachable","since":0},
+    {"asked":{},"case":"reachable-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"reachable","since":0},
+    {"asked":{},"case":"monitors-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"monitors","since":0},
+    {"asked":{"provision":{"every_s":60,"grace_s":60,"kind":"heartbeat","retries":1,"tag":"lemonfiber:job:conformance","target":"conformance"}},"case":"provision-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"provision","since":0},
+    {"asked":{"tag":"lemonfiber:job:conformance"},"case":"check_in-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"check_in","since":0},
+    {"asked":{"tag":"lemonfiber:job:conformance"},"case":"retire-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"retire","since":0}
+  ]
+}

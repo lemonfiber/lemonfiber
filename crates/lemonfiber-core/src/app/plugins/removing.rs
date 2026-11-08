@@ -172,7 +172,7 @@ pub(crate) async fn remove(
     crate::settings::forgotten(ctx, &going);
     super::kept::forgotten(ctx, &going.plugin);
 
-    let _ = crate::seed::run::refront(ctx).await;
+    crate::seed::run::reinstalled(ctx).await;
 
     Ok(answering(
         after.installed().to_vec(),
