@@ -6,6 +6,8 @@
 //! one arm and `SUBSTITUTE_TREE` a checkout of its origin at its revision, it holds that
 //! checkout to what the arm says the substitute is.
 
+mod live;
+
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -43,13 +45,40 @@ struct Substitute {
     claimed: bool,
 }
 
+/// One curator the bundle pins, run live through its own request flow.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Curator {
+    arm: String,
+    plugin: String,
+    origin: String,
+    revision: String,
+    media_type: String,
+}
+
 /// The file.
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Pinned {
     schema: u32,
     substitute: Vec<Substitute>,
+    #[serde(default)]
+    curator: Vec<Curator>,
 }
+
+impl Pinned {
+    /// Every arm's name, a substitute's and a curator's.
+    fn arms(&self) -> Vec<&str> {
+        self.substitute
+            .iter()
+            .map(|one| one.arm.as_str())
+            .chain(self.curator.iter().map(|one| one.arm.as_str()))
+            .collect()
+    }
+}
+
+/// The capability a curator arm proves.
+const CURATES: &str = "library.curate";
 
 /// The workspace's root, where the file is.
 fn root() -> PathBuf {
@@ -91,6 +120,18 @@ fn fills<'a>(bundle: &'a toml::Value, id: &str) -> Vec<&'a str> {
         .collect()
 }
 
+/// The revision the bundle pins its plugin `id` at.
+fn bundled_at<'a>(bundle: &'a toml::Value, id: &str) -> Option<&'a str> {
+    bundle
+        .get("plugin")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|plugin| plugin.get("id").and_then(toml::Value::as_str) == Some(id))
+        .and_then(|plugin| plugin.get("revision"))
+        .and_then(toml::Value::as_str)
+}
+
 /// Whether `revision` is a full commit, written as git writes it.
 fn full_commit(revision: &str) -> bool {
     revision.len() == 40
@@ -129,6 +170,34 @@ fn every_arm_stands_a_substitute_in_for_what_the_bundle_fills_the_capability_wit
 }
 
 #[test]
+fn every_curator_arm_runs_a_curator_the_bundle_pins_at_its_pin() {
+    let read = read_with(&root().join("assets/plugins/bundle/bundle.toml"));
+    assert!(read.is_ok(), "{read:?}");
+    let Ok((pinned, bundle)) = read else {
+        return;
+    };
+    let arms = pinned.arms();
+    let named: BTreeSet<&str> = arms.iter().copied().collect();
+    assert_eq!(named.len(), arms.len(), "an arm is named twice: {arms:?}");
+    for one in &pinned.curator {
+        assert!(fills(&bundle, &one.plugin).contains(&CURATES), "{one:?}");
+        assert_eq!(
+            bundled_at(&bundle, &one.plugin),
+            Some(one.revision.as_str()),
+            "{one:?}"
+        );
+        assert_eq!(one.origin, format!("{ORIGINS}{}", one.plugin), "{one:?}");
+        assert!(
+            live::ASKED
+                .iter()
+                .any(|asked| asked.media == one.media_type),
+            "{one:?}: no household request is run for {}",
+            one.media_type
+        );
+    }
+}
+
+#[test]
 fn a_revision_is_a_full_commit_and_nothing_else() {
     assert!(full_commit(&"0a".repeat(20)));
     for revision in [
@@ -151,9 +220,26 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
     let Ok((pinned, manifest)) = read else {
         return;
     };
-    let one = pinned.substitute.iter().find(|one| one.arm == arm);
+    let one = pinned
+        .substitute
+        .iter()
+        .find(|one| one.arm == arm)
+        .map(|one| {
+            (
+                one.plugin.as_str(),
+                one.capability.as_str(),
+                one.media_type.as_str(),
+            )
+        })
+        .or_else(|| {
+            pinned
+                .curator
+                .iter()
+                .find(|one| one.arm == arm)
+                .map(|one| (one.plugin.as_str(), CURATES, one.media_type.as_str()))
+        });
     assert!(one.is_some(), "substitutes.toml has no arm {arm}");
-    let Some(one) = one else {
+    let Some((plugin, capability, media_type)) = one else {
         return;
     };
     assert_eq!(
@@ -161,7 +247,7 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
             .get("plugin")
             .and_then(|plugin| plugin.get("id"))
             .and_then(toml::Value::as_str),
-        Some(one.plugin.as_str()),
+        Some(plugin),
         "{arm}"
     );
     let providing = manifest
@@ -169,21 +255,17 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
         .and_then(toml::Value::as_array)
         .into_iter()
         .flatten()
-        .find(|service| strings(service, "provides").contains(&one.capability.as_str()));
+        .find(|service| strings(service, "provides").contains(&capability));
     assert!(
         providing.is_some(),
-        "{arm}: no service of {} provides {}",
-        one.plugin,
-        one.capability
+        "{arm}: no service of {plugin} provides {capability}"
     );
     let files = providing.map(|service| strings(service, "media_types"));
     assert!(
         files
             .as_ref()
-            .is_some_and(|files| files.is_empty() || files.contains(&one.media_type.as_str())),
-        "{arm}: {} files {files:?}, not {}",
-        one.plugin,
-        one.media_type
+            .is_some_and(|files| files.is_empty() || files.contains(&media_type)),
+        "{arm}: {plugin} files {files:?}, not {media_type}"
     );
 }
 
@@ -211,12 +293,33 @@ fn the_workflow_runs_one_job_for_every_arm_and_no_other() {
         .flatten()
         .filter_map(serde_norway::Value::as_str)
         .collect();
-    let mut arms: Vec<&str> = pinned
-        .substitute
-        .iter()
-        .map(|one| one.arm.as_str())
-        .collect();
+    let mut arms = pinned.arms();
     run.sort_unstable();
     arms.sort_unstable();
     assert_eq!(run, arms);
+}
+
+#[test]
+fn a_curator_arm_carries_a_household_request_to_a_grab_and_undoes_it() {
+    let Ok(arm) = std::env::var(ARM) else {
+        return;
+    };
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let Ok(pinned) = pinned else {
+        return;
+    };
+    let Some(curator) = pinned.curator.iter().find(|one| one.arm == arm) else {
+        return;
+    };
+    let asked = live::ASKED
+        .iter()
+        .find(|asked| asked.media == curator.media_type);
+    assert!(asked.is_some(), "{curator:?}");
+    let Some(asked) = asked else {
+        return;
+    };
+    let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
+    let _ = std::fs::remove_dir_all(&root);
+    live::run(&root, asked, &live::USENET);
 }
