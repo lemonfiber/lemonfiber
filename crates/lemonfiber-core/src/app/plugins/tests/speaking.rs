@@ -160,6 +160,25 @@ async fn an_adapter_that_speaks_otherwise_or_cannot_be_reached_is_not_installed(
 }
 
 #[tokio::test]
+async fn an_adapter_never_published_is_unproven_with_where_its_container_stands() {
+    let outcome = adapted("adapter-standing", &[], r#"["media.serve@1"]"#).await;
+    let why = verdicts(outcome)
+        .into_iter()
+        .flatten()
+        .find_map(|verdict| match verdict {
+            Verdict::Unproven { why } => Some(why),
+            _ => None,
+        });
+    assert!(
+        why.as_deref().is_some_and(|why| why.contains(
+            "komga-adapter publishes no port on this machine's loopback for 8080; its \
+             container is running"
+        )),
+        "{why:?}"
+    );
+}
+
+#[tokio::test]
 async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
     let told = about(r#"["media.serve@1"]"#, UPSTREAM);
     let http = Fake::by_path_in_turn(vec![

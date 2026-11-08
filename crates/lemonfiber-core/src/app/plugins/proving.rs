@@ -248,6 +248,34 @@ pub(crate) async fn asked(
     secured
 }
 
+/// Where `service`'s container stands and the last lines it wrote, as a clause said after
+/// why it could not be asked: nothing where the engine will not say.
+async fn standing(ctx: &Ctx, service: &str) -> String {
+    let containers = ctx
+        .seams
+        .engine
+        .list(&ctx.settings.project)
+        .await
+        .unwrap_or_default();
+    let state = containers
+        .iter()
+        .find(|container| container.service == service)
+        .map_or_else(
+            || "it has no container".to_owned(),
+            |container| format!("its container is {:?}", container.lifecycle).to_lowercase(),
+        );
+    let said: Vec<String> = crate::app::engine::lately(ctx, &[service.to_owned()])
+        .await
+        .into_iter()
+        .map(|line| line.line)
+        .collect();
+    if said.is_empty() {
+        format!("; {state}")
+    } else {
+        format!("; {state}, and it last said: {}", said.join(" | "))
+    }
+}
+
 /// What asking an adapter what it speaks came to: whether it speaks exactly the
 /// contracts its manifest declares, asked again while it has not answered yet.
 pub(super) async fn spoken(
@@ -266,6 +294,11 @@ pub(super) async fn spoken(
         match (reached, asked) {
             (Ok(adapter), Ok(about)) => {
                 return held_to(ctx, stack, &adapter, (installed, placed), &about).await
+            }
+            (Err(why), _) if ctx.seams.clock.now() >= deadline => {
+                return Verdict::Unproven {
+                    why: format!("{why}{}", standing(ctx, &placed.service).await),
+                }
             }
             (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
             _ => tokio::time::sleep(POLL).await,
