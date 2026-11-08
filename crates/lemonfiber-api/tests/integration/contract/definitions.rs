@@ -172,3 +172,22 @@ fn no_definition_is_numbered_apart() {
          {numbered:?} — give the types names of their own"
     );
 }
+
+/// No definition is named `Kind`, the name every SDK gives the kinds of envelope.
+#[test]
+fn no_definition_takes_the_name_of_the_kinds_of_envelope() {
+    let contract = serde_json::to_value(Contract::describe()).unwrap_or_default();
+    let holding: BTreeSet<String> = definitions(&contract)
+        .into_iter()
+        .filter(|(_, name, _)| name == "Kind")
+        .map(|(kind, _, _)| kind)
+        .collect();
+
+    assert!(
+        holding.is_empty(),
+        "these kinds carry a definition named `Kind`, which every SDK generator refuses \
+         because it names the kinds of envelope: {holding:?} — give the type a name of \
+         its own with #[schemars(rename = \"...\")] or describe the field with \
+         #[schemars(with = \"...\")]"
+    );
+}

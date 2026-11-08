@@ -91,7 +91,7 @@
     },
     "kind": {
       "type": [
-        "ref:Kind"
+        "ref:TitleKind"
       ],
       "required": true
     },
