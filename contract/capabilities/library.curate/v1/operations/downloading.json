@@ -152,6 +152,14 @@
                       "minimum": 0,
                       "type": "integer"
                     },
+                    "queued": {
+                      "description": "The curator's id for its queue entry, the id `unqueue` takes, from minor 3.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
                     "release": {
                       "description": "The release's name.",
                       "type": "string"

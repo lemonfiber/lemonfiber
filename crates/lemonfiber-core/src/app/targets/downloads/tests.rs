@@ -128,6 +128,10 @@ fn arriving() -> Download {
         speed: Some(9),
         eta: None,
         remaining: Some(600),
+        id: None,
+        category: None,
+        state: None,
+        added: None,
     }
 }
 

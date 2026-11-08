@@ -60,6 +60,10 @@ impl Transfers for Client {
             speed: Some(1),
             eta: Some(Duration::from_secs(60)),
             remaining: Some(9),
+            id: Some("7a3f".to_owned()),
+            category: Some("tv".to_owned()),
+            state: Some(lemonfiber_ports::service::TransferState::Stalled),
+            added: Some(1_799_000_000),
         }])
     }
 }

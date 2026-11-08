@@ -86,6 +86,10 @@ pub fn carrying() -> Download {
         speed: None,
         eta: Some(Duration::from_secs(300)),
         remaining: None,
+        id: None,
+        category: None,
+        state: None,
+        added: None,
     }
 }
 

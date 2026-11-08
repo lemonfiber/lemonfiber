@@ -285,6 +285,7 @@ impl Fulfilling for Upstream {
             expected: Some(1_800_000_000),
             state: DownloadState::Downloading,
             download_id: Some("SABnzbd_nzo_1".to_owned()),
+            queued: Some(4),
             episode: Some(DownloadedEpisode {
                 season: 1,
                 number: 2,

@@ -87,6 +87,10 @@ pub(super) fn carrying_it() -> Vec<Download> {
         speed: Some(13_672 * 1024),
         eta: Some(std::time::Duration::from_secs(120)),
         remaining: Some(1050 * 1024 * 1024),
+        id: None,
+        category: None,
+        state: None,
+        added: None,
     }]
 }
 

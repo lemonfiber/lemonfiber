@@ -122,6 +122,9 @@ pub struct Downloading {
     pub state: DownloadState,
     /// The download client's own id for it, where the curator knows one.
     pub download_id: Option<String>,
+    /// The curator's id for its queue entry, the id `unqueue` takes, from minor 3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queued: Option<i64>,
     /// The episode it is for, where it is for one.
     pub episode: Option<DownloadedEpisode>,
 }

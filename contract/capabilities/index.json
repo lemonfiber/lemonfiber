@@ -10,7 +10,7 @@
       ],
       "openapi": "download.usenet/v1/openapi.json",
       "operations": 11,
-      "sha256": "c764a53db5f82ad448ef4fb90ad0cd7c5e905dce900675c1d58a0a7d8340bd3d"
+      "sha256": "f05a0f6cdc6b560eec4e2ea093663d65d89fe58a93159f1c6af4f6f2c6525786"
     },
     {
       "capability": "download.torrent",
@@ -22,7 +22,7 @@
       ],
       "openapi": "download.torrent/v1/openapi.json",
       "operations": 14,
-      "sha256": "16c3fc74def5fa0244610154ec4edfbd0238a2d1a02641521d279ad2c241412d"
+      "sha256": "570ccc72087504c3e01a952ae6aa9e6ea235bd678b562aeef73af5116d1c88c4"
     },
     {
       "capability": "network.egress-guard",
@@ -46,7 +46,7 @@
       ],
       "openapi": "library.curate/v1/openapi.json",
       "operations": 37,
-      "sha256": "ace4da267f581e8c2b20d65f78c2c0dcbb132209874ea70a216795ccefcec660"
+      "sha256": "d8874d950c0eb7233d8affa954043efa273bcb8b515d04d95b745371e6dfaec4"
     },
     {
       "capability": "indexer.search",
