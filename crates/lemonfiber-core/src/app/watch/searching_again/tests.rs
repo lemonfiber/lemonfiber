@@ -5,7 +5,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::searched_again;
 use crate::app::Ctx;
-use crate::journal::{Change, Kind};
+use crate::journal::{Action, Change, Kind, Undo};
 use crate::ports::media::Kind as Media;
 use crate::ports::service::{ClientProbe, Grabbed, StuckItem};
 use crate::ports::Narrator;
@@ -268,4 +268,52 @@ async fn putting_the_act_back_grabs_the_release_again_or_says_it_is_gone() {
             "{name}"
         );
     }
+}
+
+#[tokio::test]
+async fn a_regrab_is_put_back_beside_the_reversals_its_curator_and_the_host_carry() {
+    let http = Fake::by_path(vec![
+        (curating(TELEVISION, "grab"), answered(&Grabbed::Grabbed)),
+        (curating(TELEVISION, "set_client_field"), answered(&())),
+        ("", refusing()),
+    ]);
+    let ctx = ctx("regrab-beside", "on", &http);
+    let undo = |target: &str, action: Action| Undo {
+        target: target.to_owned(),
+        action,
+    };
+    let reconfigure = || Action::Reconfigure {
+        resource: "download client".to_owned(),
+        id: "1".to_owned(),
+        field: "category".to_owned(),
+        value: None,
+    };
+    let regrab = undo(
+        TELEVISION.plugin,
+        Action::Regrab {
+            kind: Media::Tv,
+            title: TITLE,
+            release: STUCK.to_owned(),
+        },
+    );
+    let field = undo(TELEVISION.plugin, reconfigure());
+    let unfilled = undo("no-such-curator", reconfigure());
+    let host = undo(
+        TELEVISION.plugin,
+        Action::Unmoved {
+            service: "decline".to_owned(),
+        },
+    );
+    let manifest = ctx.stack.checked_manifest(ctx.today());
+    assert!(manifest.is_ok(), "the repository stack reads: {manifest:?}");
+    let Ok(manifest) = manifest else {
+        return;
+    };
+    let undos = [regrab.clone(), field.clone(), unfilled, host.clone()];
+
+    let reached = crate::app::recover::reconfigured(&ctx, &undos, &manifest).await;
+
+    assert_eq!(reached.put_back, [regrab, field]);
+    assert_eq!(reached.left, [host]);
+    assert_eq!(reached.unreached, ["download client in no-such-curator"]);
 }
