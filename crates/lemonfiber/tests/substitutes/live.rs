@@ -10,6 +10,9 @@ mod core;
 mod http;
 mod member;
 mod site;
+mod substitute;
+
+pub use self::substitute::Substitution;
 
 use std::time::{Duration, Instant};
 
@@ -113,20 +116,35 @@ fn waited_every(within: Duration, every: Duration, mut done: impl FnMut() -> boo
     done()
 }
 
-/// The port the bundle's `service` of `plugin` publishes, as its copy declares it.
-fn published(plugin: &str, service: &str) -> Option<u16> {
+/// Every service the bundle's copy of `plugin` declares.
+fn services_of(plugin: &str) -> Vec<toml::Value> {
     let at = super::root().join(format!(
         "assets/plugins/bundle/plugins/{plugin}/plugin.toml"
     ));
-    let manifest: toml::Value = super::read(&at).ok()?;
-    manifest
-        .get("service")?
-        .as_array()?
+    super::read::<toml::Value>(&at)
+        .ok()
+        .and_then(|manifest| manifest.get("service")?.as_array().cloned())
+        .unwrap_or_default()
+}
+
+/// The port the bundle's `service` of `plugin` publishes, as its copy declares it.
+fn published(plugin: &str, service: &str) -> Option<u16> {
+    services_of(plugin)
         .iter()
         .find(|one| one.get("id").and_then(toml::Value::as_str) == Some(service))?
         .get("port")?
         .as_integer()
         .and_then(|port| u16::try_from(port).ok())
+}
+
+/// The service of the bundle's copy of `plugin` that provides `capability`.
+fn providing(plugin: &str, capability: &str) -> Option<String> {
+    services_of(plugin)
+        .iter()
+        .find(|one| super::strings(one, "provides").contains(&capability))?
+        .get("id")?
+        .as_str()
+        .map(str::to_owned)
 }
 
 /// The gateway of the network the indexer's container sits on, which reaches this machine.
@@ -203,12 +221,17 @@ fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
 }
 
 /// Run `asked` live through a stack this build sets up beneath `root`, with the usenet
-/// login `usenet` gives setup.
+/// login `usenet` gives setup, and `substitution` put in place once it is first seeded.
 ///
 /// # Panics
 ///
 /// At the first step that does not come to what it should, naming it and what was said.
-pub fn run(root: &std::path::Path, asked: &Asked, usenet: &[&str]) {
+pub fn run(
+    root: &std::path::Path,
+    asked: &Asked,
+    usenet: &[&str],
+    substitution: Option<&Substitution>,
+) {
     let site = Site::serving(Release {
         title: asked.release.to_owned(),
         category: asked.category,
@@ -245,6 +268,11 @@ pub fn run(root: &std::path::Path, asked: &Asked, usenet: &[&str]) {
     up.extend(asked.forms);
     step(&core.agreed(&up), "up");
     step(&core.run(&["seed"], ""), "seed");
+    if let Some(substitution) = substitution {
+        let made = substitution.made(&core);
+        assert!(made.is_ok(), "{made:?}");
+        step(&core.run(&["seed"], ""), "seed after the substitution");
+    }
 
     let revealed = core.run(&["credentials", "--reveal", INDEXER_KEY, "--confirm"], "");
     step(&revealed, "the indexer's key");

@@ -7,7 +7,8 @@ name: substitutes
 # a pin that does not. A pull request runs it where its change reaches what an arm reads:
 # a contract, the bundle's pin, a substitute's pin, the arms themselves or this file. Any
 # other pull request skips every arm, and a skipped job reports, so each arm can be a
-# required check.
+# required check. Medusa's arm runs only where SUBSTITUTES_THETVDB_KEY is set, since it
+# looks a series up under the operator's TheTVDB key, and says so where it is not.
 on:
   pull_request:
   merge_group:
@@ -29,7 +30,19 @@ jobs:
     timeout-minutes: 10
     outputs:
       proves: ${{ steps.changed.outputs.proves }}
+      looks_up: ${{ steps.thetvdb.outputs.looks_up }}
     steps:
+      - id: thetvdb
+        name: Whether Medusa can look a series up
+        env:
+          KEY: ${{ secrets.SUBSTITUTES_THETVDB_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEY}" ]; then
+            echo "looks_up=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "looks_up=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -72,6 +85,8 @@ jobs:
     if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.proves == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      RUNS: ${{ matrix.arm != 'library-curate-medusa' || needs.scope.outputs.looks_up == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -80,13 +95,22 @@ jobs:
           - media-serve-music
           - media-serve-audiobooks
           - media-serve-plex-unclaimed
+          - media-serve-emby
+          - library-curate-medusa
           - curator-radarr
     steps:
+      - name: Why the arm does not run
+        if: env.RUNS != 'true'
+        env:
+          ARM: ${{ matrix.arm }}
+        run: echo "::notice title=${ARM} is skipped::SUBSTITUTES_THETVDB_KEY is not set, so Medusa cannot look up a series a household asks for."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.RUNS == 'true'
         with:
           persist-credentials: false
           submodules: recursive
       - name: Where the arm's substitute is pinned
+        if: env.RUNS == 'true'
         id: pinned
         env:
           ARM: ${{ matrix.arm }}
@@ -106,6 +130,7 @@ jobs:
           print(f"revision={one['revision']}")
           PY
       - name: The substitute, at its pin
+        if: env.RUNS == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ steps.pinned.outputs.repository }}
@@ -113,11 +138,16 @@ jobs:
           path: .substitute
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        if: env.RUNS == 'true'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: env.RUNS == 'true'
       - name: The arm
+        if: env.RUNS == 'true'
         env:
           SUBSTITUTE_ARM: ${{ matrix.arm }}
           SUBSTITUTE_TREE: ${{ github.workspace }}/.substitute
+          SUBSTITUTES_THETVDB_KEY: ${{ secrets.SUBSTITUTES_THETVDB_KEY }}
+          SUBSTITUTES_THETVDB_PIN: ${{ secrets.SUBSTITUTES_THETVDB_PIN }}
         run: cargo test -p lemonfiber --test substitutes -- --nocapture
       - name: What every container said, where the arm failed
         if: failure()

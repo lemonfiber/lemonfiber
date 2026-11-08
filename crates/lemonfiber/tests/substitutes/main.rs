@@ -122,8 +122,13 @@ fn fills<'a>(bundle: &'a toml::Value, id: &str) -> Vec<&'a str> {
 
 /// The revision the bundle pins its plugin `id` at.
 fn bundled_at<'a>(bundle: &'a toml::Value, id: &str) -> Option<&'a str> {
+    pinned_in(bundle, "plugin", id)
+}
+
+/// The revision the bundle's `table` pins the plugin `id` at.
+fn pinned_in<'a>(bundle: &'a toml::Value, table: &str, id: &str) -> Option<&'a str> {
     bundle
-        .get("plugin")
+        .get(table)
         .and_then(toml::Value::as_array)
         .into_iter()
         .flatten()
@@ -166,6 +171,12 @@ fn every_arm_stands_a_substitute_in_for_what_the_bundle_fills_the_capability_wit
             "{one:?}"
         );
         assert!(one.claimed || one.capability == CLAIMABLE, "{one:?}");
+        if let Some(offered) = pinned_in(&bundle, "offered", &one.plugin) {
+            assert_eq!(
+                offered, one.revision,
+                "{one:?}: the bundle offers it at {offered}"
+            );
+        }
     }
 }
 
@@ -321,5 +332,77 @@ fn a_curator_arm_carries_a_household_request_to_a_grab_and_undoes_it() {
     };
     let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
     let _ = std::fs::remove_dir_all(&root);
-    live::run(&root, asked, &live::USENET);
+    live::run(&root, asked, &live::USENET, None);
+}
+
+/// The job's secret holding the operator's `TheTVDB` key, which Medusa looks a series up
+/// with.
+const THETVDB_KEY: &str = "SUBSTITUTES_THETVDB_KEY";
+
+/// The job's secret holding the subscriber PIN a user-supported `TheTVDB` key needs.
+const THETVDB_PIN: &str = "SUBSTITUTES_THETVDB_PIN";
+
+/// The settings a curator standing in is given, from the job's secrets, or why it cannot
+/// run where one it needs is not set.
+fn settings_of(plugin: &str) -> Result<Vec<(String, String)>, String> {
+    if plugin != "medusa" {
+        return Ok(Vec::new());
+    }
+    let key = std::env::var(THETVDB_KEY)
+        .ok()
+        .filter(|key| !key.is_empty())
+        .ok_or_else(|| format!("{THETVDB_KEY} is not set, so Medusa cannot look up a series"))?;
+    let pin = std::env::var(THETVDB_PIN)
+        .ok()
+        .filter(|pin| !pin.is_empty());
+    let mut settings = vec![
+        (
+            "medusa:thetvdb-lookup".to_owned(),
+            if pin.is_some() { "on-with-pin" } else { "on" }.to_owned(),
+        ),
+        ("medusa:thetvdb-key".to_owned(), key),
+    ];
+    settings.extend(pin.map(|pin| ("medusa:thetvdb-pin".to_owned(), pin)));
+    Ok(settings)
+}
+
+#[test]
+fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
+    let Ok(arm) = std::env::var(ARM) else {
+        return;
+    };
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let Ok(pinned) = pinned else {
+        return;
+    };
+    let Some(one) = pinned
+        .substitute
+        .iter()
+        .find(|one| one.arm == arm && one.capability == CURATES)
+    else {
+        return;
+    };
+    let asked = live::ASKED
+        .iter()
+        .find(|asked| asked.media == one.media_type);
+    assert!(asked.is_some(), "{one:?}");
+    let Some(asked) = asked else {
+        return;
+    };
+    let settings = match settings_of(&one.plugin) {
+        Ok(settings) => settings,
+        Err(why) => {
+            println!("{arm} does not run: {why}");
+            return;
+        }
+    };
+    let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
+    let _ = std::fs::remove_dir_all(&root);
+    let substitution = live::Substitution {
+        plugin: one.plugin.clone(),
+        capability: one.capability.clone(),
+        settings,
+    };
+    live::run(&root, asked, &live::USENET, Some(&substitution));
 }

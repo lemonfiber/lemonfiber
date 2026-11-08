@@ -17,6 +17,12 @@
 #                  outside the house and runs unclaimed, so its arm proves install and the
 #                  reading that names it `Open` alone.
 #
+# A substitute the bundle offers is pinned at the revision the bundle offers it at. One
+# standing in for a curator is run live as a curator arm is, put in the curator's place
+# once the stack is first seeded. Medusa looks a series up under the operator's TheTVDB
+# key, the job's secret SUBSTITUTES_THETVDB_KEY (and SUBSTITUTES_THETVDB_PIN for a key
+# that needs one); its arm is skipped, saying so, where the key is not set.
+#
 # One [[curator]] table per curator the bundle pins that is run live through its own
 # media's household request: set up and started by this build, wired by its seed alone,
 # asked for one title by a household member, proved to grab it where the indexer site the
@@ -71,6 +77,26 @@ revision      = "93efbedde3ab37384cdeb63cc3763d8c608bcc62"
 stands_in_for = "jellyfin"
 media_type    = "movies"
 claimed       = false
+
+[[substitute]]
+arm           = "media-serve-emby"
+capability    = "media.serve"
+plugin        = "emby"
+origin        = "https://github.com/lemonfiber/plugin-emby"
+revision      = "d19435ea8423b9f2074fc17ce01180e63a9d117b"
+stands_in_for = "jellyfin"
+media_type    = "movies"
+claimed       = true
+
+[[substitute]]
+arm           = "library-curate-medusa"
+capability    = "library.curate"
+plugin        = "medusa"
+origin        = "https://github.com/lemonfiber/plugin-medusa"
+revision      = "bba1695f4a52e7c72994b0f0d1beeae26ea27067"
+stands_in_for = "sonarr"
+media_type    = "tv"
+claimed       = true
 
 [[curator]]
 arm        = "curator-radarr"
