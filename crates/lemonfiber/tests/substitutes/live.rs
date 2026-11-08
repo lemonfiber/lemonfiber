@@ -8,6 +8,7 @@
 
 mod core;
 mod http;
+mod member;
 mod site;
 
 use std::time::{Duration, Instant};
@@ -92,13 +93,18 @@ fn step(ran: &self::core::Ran, what: &str) {
 }
 
 /// Wait until `done`, looking every [`LOOKING`] for at most `within`.
-fn waited(within: Duration, mut done: impl FnMut() -> bool) -> bool {
+fn waited(within: Duration, done: impl FnMut() -> bool) -> bool {
+    waited_every(within, LOOKING, done)
+}
+
+/// Wait until `done`, looking every `every` for at most `within`.
+fn waited_every(within: Duration, every: Duration, mut done: impl FnMut() -> bool) -> bool {
     let started = Instant::now();
     while started.elapsed() < within {
         if done() {
             return true;
         }
-        std::thread::sleep(LOOKING);
+        std::thread::sleep(every);
     }
     done()
 }
@@ -213,6 +219,8 @@ pub fn run(root: &std::path::Path, asked: &Asked, usenet: &[&str]) {
         "usenet",
         "--data-location",
         &media,
+        "--library",
+        "docker",
         "--vpn",
         "false",
         "--household",
@@ -242,11 +250,13 @@ pub fn run(root: &std::path::Path, asked: &Asked, usenet: &[&str]) {
     step(&core.run(&["seed"], ""), "seed after the indexer");
 
     step(&core.run(&["invite", MEMBER, "--confirm"], ""), "invite");
-    let mut ask = vec!["household", "ask", MEMBER, asked.id, "--kind", asked.kind];
-    for season in asked.seasons {
-        ask.extend(["--season", season]);
-    }
-    step(&core.run(&ask, ""), "household ask");
+    let served = member::Served::by(&core);
+    assert!(served.is_ok(), "{:?}", served.err());
+    let Ok(served) = served else {
+        return;
+    };
+    let ask = member::asked(&core, &served, MEMBER, asked);
+    assert!(ask.is_ok(), "the member's ask: {ask:?}");
 
     assert!(
         waited(GRAB_WITHIN, || site.grabbed()),

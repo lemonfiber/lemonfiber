@@ -79,6 +79,9 @@ tokio = { workspace = true, features = ["test-util"] }
 toml = { workspace = true }
 # The pins the substitutes job reads, read as the arms they declare.
 serde = { workspace = true }
+# A household member's request in a live arm, sent through the web API as a member's
+# program sends it.
+lemonfiber-sdk = { git = "https://github.com/lemonfiber/sdk-rust", rev = "282753952c17140c64a67d92120793ae868b403c" }
 # Reading the NAS templates, which are Compose files, so what each one runs and mounts
 # is checked as a document rather than matched as text. Already in the tree via the
 # core's reading of the stack.

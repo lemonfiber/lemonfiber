@@ -1,6 +1,7 @@
 //! lemonfiber, the build under test, run as an operator runs it: its own configuration and
 //! data directories, every answer read as JSON.
 
+use std::ffi::OsStr;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -42,10 +43,7 @@ impl Core {
     pub fn run(&self, args: &[&str], typed: &str) -> Ran {
         let child = Command::new(env!("CARGO_BIN_EXE_lemonfiber"))
             .arg("--json")
-            .arg("--config-dir")
-            .arg(&self.config)
-            .arg("--data-dir")
-            .arg(&self.data)
+            .args(self.dirs())
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -80,6 +78,17 @@ impl Core {
         };
         println!("{}", ran.printed);
         ran
+    }
+
+    /// The arguments that keep a run of it beneath its own directories.
+    #[must_use]
+    pub fn dirs(&self) -> [&OsStr; 4] {
+        [
+            OsStr::new("--config-dir"),
+            self.config.as_os_str(),
+            OsStr::new("--data-dir"),
+            self.data.as_os_str(),
+        ]
     }
 
     /// Run `args`, and where it names an offer, run it again answering that offer.
