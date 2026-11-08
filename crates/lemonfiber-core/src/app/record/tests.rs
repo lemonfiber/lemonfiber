@@ -97,9 +97,18 @@ fn a_record_read_for_an_answer_is_the_default_where_absent_and_refused_where_unr
     );
     assert_eq!(read::<BTreeSet<String>>(None).ok(), Some(BTreeSet::new()));
 
-    let directory = scratch("read-a-directory");
-    let _ = std::fs::create_dir_all(directory.path());
-    let refused = read::<BTreeSet<String>>(Some(directory.path())).err();
-    let named = directory.path().display().to_string();
+    let file = scratch("read-beneath-a-file");
+    if let Some(parent) = file.path().parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(file.path(), "not a directory");
+    let beneath = file.path().join("record.json");
+    let refused = read::<BTreeSet<String>>(Some(&beneath)).err();
+    let named = beneath.display().to_string();
     assert!(refused.is_some_and(|problem| problem.summary.contains(&named)));
+
+    let damaged = scratch("read-damaged");
+    assert!(keep(Some(damaged.path()), &BTreeSet::<String>::new()).is_ok());
+    let _ = std::fs::write(damaged.path(), "{ not json");
+    assert!(read::<BTreeSet<String>>(Some(damaged.path())).is_err());
 }
