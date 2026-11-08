@@ -62,6 +62,7 @@ pub mod bytes;
 pub mod certificate;
 pub mod changelog;
 pub mod clients;
+pub mod collected;
 pub mod companion;
 pub mod condition;
 pub mod config;
