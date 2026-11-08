@@ -168,7 +168,16 @@ fn an_entry_the_client_does_not_name_is_kept_under_its_curator_and_one_with_no_q
         Vec::new(),
     );
 
-    let judged = judged(&gathered, &BTreeMap::new(), &healing(), NOW);
+    let healthy_before = BTreeMap::from([(
+        "sonarr:44".to_owned(),
+        Struck {
+            wedge: Wedge::Stalled,
+            strikes: 2,
+            since: NOW - 600,
+        },
+    )]);
+
+    let judged = judged(&gathered, &healthy_before, &healing(), NOW);
 
     let keys: Vec<&str> = judged.strikes.keys().map(String::as_str).collect();
     assert_eq!(keys, ["sonarr:43", "sonarr:The.Office.S01E04"]);

@@ -98,12 +98,11 @@ pub struct Struck {
     pub since: u64,
 }
 
-/// An item's strikes after a pass that found it `found`: one more for the same reason, one
-/// for a new reason, and none where it was healthy.
+/// An item's strikes after a pass that found it unhealthy for `wedge`: one more for the
+/// same reason, and one for a new reason.
 #[must_use]
-pub fn struck(before: Option<Struck>, found: Option<Wedge>, now: u64) -> Option<Struck> {
-    let wedge = found?;
-    Some(match before {
+pub fn strike(before: Option<Struck>, wedge: Wedge, now: u64) -> Struck {
+    match before {
         Some(before) if before.wedge == wedge => Struck {
             strikes: before.strikes.saturating_add(1),
             ..before
@@ -113,7 +112,7 @@ pub fn struck(before: Option<Struck>, found: Option<Wedge>, now: u64) -> Option<
             strikes: 1,
             since: now,
         },
-    })
+    }
 }
 
 /// Until when an item added at `added` is left alone, where it still is at `now`.

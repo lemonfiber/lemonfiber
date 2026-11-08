@@ -7,7 +7,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use super::{heal, kept, paced, queue};
 use crate::app::Ctx;
 use crate::journal::{Action, Change, Kind, Undo};
-use crate::model::{Act, ActOutcome, HealingSwitch, QueueHealth, Wedge};
+use crate::model::{Act, ActOutcome, ActTaken, Healed, HealingSwitch, QueueHealth, Wedge};
 use crate::ports::media::Kind as Media;
 use crate::ports::service::{
     ClientProbe, CuratedTitle, Download, DownloadState, Downloading, Filed, Grabbed, TransferState,
@@ -16,9 +16,9 @@ use crate::ports::Narrator;
 use crate::test_support::a_context;
 use crate::test_support::adapted::{refused, Adapted};
 use crate::test_support::curators::{
-    self, answered, curated, curating, refusing, told, TELEVISION,
+    self, answered, curated, curating, refusing, told, FILM, TELEVISION,
 };
-use crate::test_support::torrent;
+use crate::test_support::{torrent, usenet};
 
 /// The release the television curator drops.
 const DROPPED: &str = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
@@ -561,4 +561,140 @@ async fn a_regrab_is_put_back_beside_the_reversals_its_curator_and_the_host_carr
     assert_eq!(reached.put_back, [regrab, field]);
     assert_eq!(reached.left, [host]);
     assert_eq!(reached.unreached, ["download client in no-such-curator"]);
+}
+
+#[tokio::test]
+async fn a_curator_that_does_not_answer_is_named_the_list_may_be_short_and_an_entry_with_no_queue_id_is_left_alone(
+) {
+    let unqueued: Vec<Downloading> = wedged()
+        .into_iter()
+        .map(|entry| Downloading {
+            queued: None,
+            ..entry
+        })
+        .collect();
+    let named = |id, title: &str| CuratedTitle {
+        reference: 2,
+        id,
+        title: title.to_owned(),
+        year: None,
+        monitored: true,
+        files: 0,
+        seasons: Vec::new(),
+    };
+    let http = Fake::by_path(vec![
+        (curating(TELEVISION, "test_download_clients"), refusing()),
+        (curating(TELEVISION, "downloading"), refusing()),
+        (
+            curating(FILM, "test_download_clients"),
+            answered(&Vec::<ClientProbe>::new()),
+        ),
+        (curating(FILM, "downloading"), answered(&unqueued)),
+        (
+            curating(FILM, "titles"),
+            answered(&[named(None, "Unnamed"), named(Some(TITLE), "The Film")]),
+        ),
+        ("", refusing()),
+    ]);
+    let ctx = ctx(
+        "healing-unanswered",
+        &[
+            (crate::config::STUCK_SEARCH_AGAIN_KEY, "on"),
+            (crate::config::QUEUE_STRIKES_KEY, "1"),
+            (crate::config::QUEUE_GRACE_MINUTES_KEY, "0"),
+        ],
+        &http,
+    );
+
+    let (read, _) = healed(&ctx).await;
+
+    assert!(read.incomplete, "{read:?}");
+    assert!(
+        read.unreachable
+            .iter()
+            .any(|one| one.service == TELEVISION.plugin),
+        "{read:?}"
+    );
+    assert!(
+        read.runs
+            .first()
+            .is_some_and(
+                |run| run.items.iter().any(|item| item.service == FILM.plugin
+                    && item.title.as_deref() == Some("The Film")
+                    && item
+                        .acts
+                        .iter()
+                        .all(|taken| taken.outcome == ActOutcome::Refused
+                            && taken
+                                .why
+                                .as_deref()
+                                .is_some_and(|why| why.contains("no queue entry"))))
+            ),
+        "{read:?}"
+    );
+    assert!(!http.asked_for("unqueue"));
+}
+
+#[tokio::test]
+async fn a_client_naming_every_download_and_filing_where_the_curator_does_is_trusted_and_one_that_does_not_answer_is_named(
+) {
+    let tv = Media::Tv.media_type();
+    let http = Fake::by_path(vec![
+        torrent::transfers(&[held(Some("NAMED"), tv)]),
+        (
+            torrent::operation("filed"),
+            answered(&[Filed {
+                category: tv.to_owned(),
+                folder: crate::seed::run::completed(tv),
+            }]),
+        ),
+        (usenet::operation("transfers"), refusing()),
+        (usenet::operation("filed"), refusing()),
+        ("", refusing()),
+    ]);
+    let mut adapted = curators::ALL.to_vec();
+    adapted.extend([torrent::MOVED, usenet::MOVED]);
+    let ctx = reaching("healing-clients", &[], &http, &adapted);
+
+    let (read, _) = healed(&ctx).await;
+
+    assert_eq!(read.mismatch, None, "{read:?}");
+    assert!(read.incomplete, "{read:?}");
+    assert!(
+        read.unreachable
+            .iter()
+            .any(|one| one.service == usenet::ADAPTER),
+        "{read:?}"
+    );
+    assert!(
+        read.unreachable
+            .iter()
+            .all(|one| one.service != torrent::ADAPTER),
+        "{read:?}"
+    );
+}
+
+#[test]
+fn an_act_refused_for_no_reason_and_an_item_no_service_holds_are_said_plainly() {
+    let refused = |act, outcome| ActTaken {
+        act,
+        outcome,
+        instead: None,
+        why: None,
+    };
+    let healed = Healed {
+        title: None,
+        service: String::new(),
+        release: "Some.Release".to_owned(),
+        why: "it stalled".to_owned(),
+        acts: vec![
+            refused(Act::Remove, ActOutcome::Refused),
+            refused(Act::Blocklist, ActOutcome::FellBack),
+        ],
+    };
+
+    assert_eq!(
+        super::acting::said(&healed, false),
+        "healed Some.Release, because it stalled: drop: not done, blocklist: not done"
+    );
 }

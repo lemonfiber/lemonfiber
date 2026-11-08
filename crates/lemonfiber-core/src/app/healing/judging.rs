@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::config::Healing;
 use crate::model::{Act, Wedged};
 use crate::ports::service::{Download, Downloading};
-use crate::queue::healing::{classify, in_grace_until, orphaned, struck, Struck};
+use crate::queue::healing::{classify, in_grace_until, orphaned, strike, Struck};
 
 use super::gathering::Gathered;
 
@@ -146,17 +146,15 @@ pub(super) fn judged(
                 now,
             );
             if let Some((wedge, why)) = wedge {
-                if let Some(struck) = struck(before.get(&key).copied(), Some(wedge), now) {
-                    found.push(Found {
-                        key,
-                        curator: Some(at),
-                        entry: Some(entry.clone()),
-                        item: item.map(|one| one.download.clone()),
-                        client: item.map(|one| one.client.clone()),
-                        why,
-                        struck,
-                    });
-                }
+                found.push(Found {
+                    struck: strike(before.get(&key).copied(), wedge, now),
+                    key,
+                    curator: Some(at),
+                    entry: Some(entry.clone()),
+                    item: item.map(|one| one.download.clone()),
+                    client: item.map(|one| one.client.clone()),
+                    why,
+                });
             }
         }
     }
@@ -170,17 +168,15 @@ pub(super) fn judged(
                 continue;
             }
             let (wedge, why) = orphaned(category);
-            if let Some(struck) = struck(before.get(&id).copied(), Some(wedge), now) {
-                found.push(Found {
-                    key: id,
-                    curator: None,
-                    entry: None,
-                    item: Some(one.download.clone()),
-                    client: Some(one.client.clone()),
-                    why,
-                    struck,
-                });
-            }
+            found.push(Found {
+                struck: strike(before.get(&id).copied(), wedge, now),
+                key: id,
+                curator: None,
+                entry: None,
+                item: Some(one.download.clone()),
+                client: Some(one.client.clone()),
+                why,
+            });
         }
     }
     let strikes = found

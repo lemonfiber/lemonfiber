@@ -173,7 +173,7 @@ fn journalled(ctx: &Ctx, curator: &Curator, title: i64, release: &str) {
             release: release.to_owned(),
         },
     };
-    if let Some(paths) = crate::app::targets::layout(ctx) {
-        let _ = crate::app::recover::journalled(&paths.journal(), std::slice::from_ref(&change));
-    }
+    let _ = crate::app::targets::layout(ctx).map(|paths| {
+        crate::app::recover::journalled(&paths.journal(), std::slice::from_ref(&change))
+    });
 }

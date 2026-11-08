@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use super::{classify, in_grace_until, orphaned, struck, Struck};
+use super::{classify, in_grace_until, orphaned, strike, Struck};
 use crate::model::Wedge;
 use crate::ports::service::{Download, DownloadState, Downloading, TransferState};
 
 /// A week.
-const WEEK: Duration = Duration::from_secs(7 * 86_400);
+const WEEK: Duration = Duration::from_secs(7 * crate::instant::DAY);
 
 /// The moment the cases are judged at.
 const NOW: u64 = 1_800_000_000;
@@ -135,24 +135,23 @@ fn a_slow_download_says_how_long_it_would_take_against_what_is_allowed() {
 }
 
 #[test]
-fn a_strike_is_added_for_the_same_reason_restarted_for_another_and_cleared_when_healthy() {
-    let first = struck(None, Some(Wedge::Stalled), NOW);
+fn a_strike_is_added_for_the_same_reason_and_restarted_for_another() {
+    let first = strike(None, Wedge::Stalled, NOW);
     assert_eq!(
         first,
-        Some(Struck {
+        Struck {
             wedge: Wedge::Stalled,
             strikes: 1,
             since: NOW
-        })
+        }
     );
-    let second = struck(first, Some(Wedge::Stalled), NOW + 600);
-    assert_eq!(second.map(|one| (one.strikes, one.since)), Some((2, NOW)));
-    let other = struck(second, Some(Wedge::Slow), NOW + 1_200);
+    let second = strike(Some(first), Wedge::Stalled, NOW + 600);
+    assert_eq!((second.strikes, second.since), (2, NOW));
+    let other = strike(Some(second), Wedge::Slow, NOW + 1_200);
     assert_eq!(
-        other.map(|one| (one.wedge, one.strikes, one.since)),
-        Some((Wedge::Slow, 1, NOW + 1_200))
+        (other.wedge, other.strikes, other.since),
+        (Wedge::Slow, 1, NOW + 1_200)
     );
-    assert_eq!(struck(other, None, NOW + 1_800), None);
 }
 
 #[test]
