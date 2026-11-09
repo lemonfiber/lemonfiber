@@ -106,6 +106,7 @@ pub use profiled::{profile_of, profiled, Profiled};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
+pub(crate) use recording::health_passes;
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{

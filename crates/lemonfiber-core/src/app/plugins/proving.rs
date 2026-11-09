@@ -21,6 +21,7 @@
 //! comes off first and the rest is somebody else's machinery.
 
 mod declaring;
+mod healthy;
 mod restarting;
 
 use std::collections::BTreeSet;
@@ -221,7 +222,10 @@ pub(crate) async fn asked(
             (None, Some(run), Some(placed), _) => {
                 running(ctx, placed, run, &proof.expect, source).await
             }
-            (Some(request), None, _, Some(address)) => {
+            (Some(request), None, placed, Some(address)) => {
+                if let Some(placed) = placed {
+                    healthy::passed(ctx, placed, address, deadline).await;
+                }
                 answering(ctx, request, &proof.expect, address, deadline).await
             }
             (Some(_), None, _, None) => Verdict::Unproven {
@@ -332,16 +336,15 @@ async fn held_to(
         .collect();
     for capability in &spoken {
         for case in lemonfiber_contract::conformance::live(capability) {
-            let lemonfiber_contract::conformance::Expect::Status(statuses) = case.expect else {
-                continue;
-            };
-            match adapter.unkeyed(case.operation).await {
-                Ok(status) if statuses.contains(&status) => {}
-                Ok(status) => faults.push(format!(
-                    "{} answered {status}, and the contract refuses it with {statuses:?}",
-                    case.case
-                )),
-                Err(failure) => faults.push(format!("{}: {failure}", case.case)),
+            if let lemonfiber_contract::conformance::Expect::Status(statuses) = case.expect {
+                match adapter.unkeyed(case.operation).await {
+                    Ok(status) if statuses.contains(&status) => {}
+                    Ok(status) => faults.push(format!(
+                        "{} answered {status}, and the contract refuses it with {statuses:?}",
+                        case.case
+                    )),
+                    Err(failure) => faults.push(format!("{}: {failure}", case.case)),
+                }
             }
         }
     }

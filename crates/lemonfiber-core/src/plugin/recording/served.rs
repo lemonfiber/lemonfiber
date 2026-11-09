@@ -467,11 +467,7 @@ async fn unpassed(
         pinned: None,
     };
     match (kind, http.send(&request).await) {
-        (HealthKind::Http, Ok(response))
-            if (200..400).contains(&response.status) || REFUSALS.contains(&response.status) =>
-        {
-            None
-        }
+        (HealthKind::Http, Ok(response)) if passes(response.status) => None,
         (HealthKind::Http, Ok(response)) => {
             Some(format!("answered {path} with {}", response.status))
         }
@@ -481,6 +477,12 @@ async fn unpassed(
             unreached.reason
         )),
     }
+}
+
+/// Whether a health path answering `status` says its service is up: it answered, or it
+/// refused a caller presenting nothing.
+pub(crate) fn passes(status: u16) -> bool {
+    (200..400).contains(&status) || REFUSALS.contains(&status)
 }
 
 #[cfg(test)]

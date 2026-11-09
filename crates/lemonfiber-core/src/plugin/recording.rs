@@ -19,6 +19,7 @@ mod unasked;
 mod written;
 
 pub(super) use fronted::handed_over;
+pub(crate) use served::passes as health_passes;
 pub(super) use served::{answering, mountable, settled_as, started};
 
 use std::path::Path;

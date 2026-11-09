@@ -561,6 +561,7 @@ mod fencing;
 mod fetching;
 mod following;
 mod fronting;
+mod healthy;
 mod installing;
 mod offline;
 mod proving;
