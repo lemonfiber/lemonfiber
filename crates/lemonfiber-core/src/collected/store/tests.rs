@@ -1,4 +1,4 @@
-use super::{filed, kept, settled, Asking, Standing};
+use super::{arrived, filed, kept, settled, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
 use crate::ports::service::{BookUnit, MusicUnit};
 
@@ -102,4 +102,37 @@ fn asks_kept_where_no_file_can_be_written_are_refused() {
         "2026-11-09"
     )
     .is_err());
+}
+
+#[test]
+fn a_sent_ask_arrives_once_and_keeps_when_it_was_first_seen_held() {
+    let at = path("collected-arrived");
+    let album = Unit::Music(MusicUnit::Album);
+    let named = filed(&at, &asking(album, Standing::Sent)).ok();
+    let waiting = filed(&at, &asking(album, Standing::Waiting)).ok();
+    let (Some(named), Some(waiting)) = (named, waiting) else {
+        unreachable!("the asks were not kept");
+    };
+
+    let first = arrived(&at, named, Standing::PartlyHere, "2026-11-09T10:00:00Z");
+    let again = arrived(&at, named, Standing::PartlyHere, "2026-11-09T11:00:00Z");
+    let whole = arrived(&at, named, Standing::Here, "2026-11-09T12:00:00Z");
+    let never = arrived(&at, waiting, Standing::Here, "2026-11-09T12:00:00Z");
+
+    assert!(first.is_ok() && again.is_ok() && whole.is_ok() && never.is_ok());
+    let asks = kept(&at).map(|kept| kept.asks).unwrap_or_default();
+    let read = |reference: Reference| {
+        asks.iter()
+            .find(|ask| ask.named() == reference)
+            .map(|ask| (ask.standing, ask.arrived_at.clone(), ask.settled_at.clone()))
+    };
+    assert_eq!(
+        read(named),
+        Some((
+            Standing::Here,
+            Some("2026-11-09T10:00:00Z".to_owned()),
+            Some("2026-11-09T12:00:00Z".to_owned())
+        ))
+    );
+    assert_eq!(read(waiting), Some((Standing::Waiting, None, None)));
 }

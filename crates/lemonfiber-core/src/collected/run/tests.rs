@@ -259,6 +259,7 @@ fn ask(member: &str, asked_at: String, standing: Standing) -> Ask {
         asked_at,
         standing,
         settled_at: None,
+        arrived_at: None,
     }
 }
 
@@ -282,6 +283,11 @@ fn what_is_left_counts_the_member_s_live_asks_of_the_medium_inside_the_period() 
     assert_eq!((music.limit, music.used, music.days), (Some(3), 2, Some(7)));
     assert_eq!(music.remaining(), Some(1));
     assert_eq!(left(&asks, films, "ada", Medium::Books, now).used, 0);
+    let held = [
+        ask("ada", written(now - DAY), Standing::Here),
+        ask("ada", written(now - DAY), Standing::PartlyHere),
+    ];
+    assert_eq!(left(&held, films, "ada", Medium::Music, now).used, 2);
     let unlimited = Left {
         limit: None,
         used: 0,
