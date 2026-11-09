@@ -32,7 +32,7 @@ fn an_installed_plugin_carries_the_tree_its_pin_names_and_an_assembled_one_none(
             .map(|(path, bytes)| ((*path).to_owned(), bytes.to_vec()))
             .collect();
         match pinned.stage {
-            Some(lemonfiber_bundled::Stage::Installed) => {
+            Some(lemonfiber_bundled::Stage::Installed | lemonfiber_bundled::Stage::Offered) => {
                 installed += 1;
                 assert_eq!(
                     lemonfiber_bundle::tree_digest(pinned.copy, &files),
@@ -52,7 +52,12 @@ fn an_installed_plugin_carries_the_tree_its_pin_names_and_an_assembled_one_none(
 fn every_part_the_bundle_pins_is_installed_through_the_plugin_path() {
     let assembled: Vec<&str> = lemonfiber_bundled::PINNED
         .iter()
-        .filter(|pinned| pinned.stage != Some(lemonfiber_bundled::Stage::Installed))
+        .filter(|pinned| {
+            !matches!(
+                pinned.stage,
+                Some(lemonfiber_bundled::Stage::Installed | lemonfiber_bundled::Stage::Offered)
+            )
+        })
         .map(|pinned| pinned.first_party.plugin)
         .collect();
     assert!(!lemonfiber_bundled::PINNED.is_empty());

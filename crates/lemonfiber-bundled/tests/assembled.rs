@@ -99,7 +99,11 @@ fn the_embedded_stack_runs_a_service_for_every_part_the_bundle_pins() {
         .iter()
         .map(|one| id(one).to_owned())
         .collect();
-    let pinned: BTreeSet<String> = held().into_iter().map(|one| one.pin.id).collect();
+    let pinned: BTreeSet<String> = held()
+        .into_iter()
+        .filter(|one| one.pin.stage != Some(lemonfiber_bundle::Stage::Offered))
+        .map(|one| one.pin.id)
+        .collect();
     assert!(!pinned.is_empty());
     assert_eq!(ours, pinned);
 }
