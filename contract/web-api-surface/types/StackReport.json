@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "env": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "exceptions": {
+      "type": [
+        "array[ref:StackException]"
+      ],
+      "required": true
+    },
+    "non_interactive": {
+      "type": [
+        "ref:NonInteractive"
+      ],
+      "required": true
+    },
+    "plain_up": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "project": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "source": {
+      "type": [
+        "ref:StackSource"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

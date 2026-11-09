@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A part of the stack that the plain Compose words alone do not bring up as lemonfiber\ndoes, and why.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why, in the operator's words.",
+      "type": "string"
+    },
+    "part": {
+      "description": "The part, by its id.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "part",
+    "because"
+  ]
+}

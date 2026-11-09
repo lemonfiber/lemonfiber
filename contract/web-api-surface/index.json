@@ -69,6 +69,7 @@
     "settings": "ref:SettingsReport",
     "setup": "ref:SetupReport",
     "space": "ref:Reckoning",
+    "stack": "ref:StackReport",
     "start": "string",
     "status": "ref:StatusReport",
     "step": "ref:Line",

@@ -36,6 +36,7 @@ fn diagnosis(
             | Outcome::Askable(_)
             | Outcome::Asked(_)
             | Outcome::FrontDoor(_)
+            | Outcome::Stack(_)
             | Outcome::News(_)
             | Outcome::Stuck(_)
             | Outcome::Boot(_)

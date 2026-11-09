@@ -258,6 +258,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Asked(report) => wishing::asked(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
+        Outcome::Stack(report) => hosting::underneath(report),
         Outcome::News(report) => news::news(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Boot(report) => booted::booted(report),

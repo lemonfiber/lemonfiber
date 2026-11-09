@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How any action is run without a question being put.",
+  "type": "object",
+  "properties": {
+    "form": {
+      "description": "The words an action is run with, as the command line takes them.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "form"
+  ]
+}

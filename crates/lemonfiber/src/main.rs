@@ -8,7 +8,10 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawDoctor, RawDown, RawLogs, RawSetup, RawUi, RawUp, Request};
+use lemonfiber::cli::{
+    Cli, Mending, RawDoctor, RawDown, RawLogs, RawSetup, RawSpace, RawStopSeeding, RawUi, RawUp,
+    Request,
+};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Restoring, SetupAction};
 
@@ -209,7 +212,7 @@ macro_rules! taken {
 /// The account of the disk, answered with `agreement` where it was, of the categories `only`
 /// names.
 const fn spaced(agreement: Option<String>, only: Vec<String>) -> Command {
-    Command::Space { agreement, only }
+    Command::Space(lemonfiber_core::app::Reclaiming { agreement, only })
 }
 
 #[tokio::main]
@@ -326,6 +329,7 @@ async fn main() -> ExitCode {
         Request::Watcher => Command::Watcher,
         Request::Queue { action } => translate::queue(action),
         Request::FrontDoor => Command::FrontDoor,
+        Request::Stack => Command::Stack,
         Request::News => Command::News,
         Request::Companion(asked) => translate::paired(&asked),
         Request::Catalogue => Command::Catalogue,
@@ -344,8 +348,8 @@ async fn main() -> ExitCode {
         },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Uninstall(asked) => removing(asked),
-        Request::Space { offer, only } => spaced(offer, only),
-        Request::StopSeeding { download, offer } => letting(download, offer),
+        Request::Space(RawSpace { offer, only }) => spaced(offer, only),
+        Request::StopSeeding(RawStopSeeding { download, offer }) => letting(download, offer),
         Request::Bandwidth(asked) => translate::sharing(asked),
         Request::Downloads(asked) => translate::pausing(&asked),
         Request::Key(asked) => translate::keyed(asked),

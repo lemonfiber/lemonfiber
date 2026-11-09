@@ -307,9 +307,24 @@ fn the_first_of_them() -> Vec<Outcome> {
             meaning: "there is none".to_owned(),
             beside: Vec::new(),
         }),
+        a_stack(),
         Outcome::from(a_lifecycle("up", a_plan("media", Vec::new()))),
         Outcome::Credentials(lemonfiber_core::credential::Inventory::of(Vec::new())),
     ]
+}
+
+/// How a shipped stack runs without lemonfiber.
+fn a_stack() -> Outcome {
+    Outcome::Stack(lemonfiber_core::model::StackReport {
+        source: lemonfiber_core::model::StackSource::Bundled,
+        project: "/srv/stack".to_owned(),
+        env: "/srv/.env".to_owned(),
+        plain_up: vec!["docker".to_owned(), "compose".to_owned()],
+        non_interactive: lemonfiber_core::model::NonInteractive {
+            form: "lemonfiber <command>".to_owned(),
+        },
+        exceptions: Vec::new(),
+    })
 }
 
 /// What removing somebody would cost, unconfirmed.

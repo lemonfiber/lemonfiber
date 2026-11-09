@@ -194,6 +194,14 @@
     "file": false
   },
   {
+    "path": "/api/stack",
+    "parameters": [],
+    "kinds": [
+      "stack"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/news",
     "parameters": [],
     "kinds": [

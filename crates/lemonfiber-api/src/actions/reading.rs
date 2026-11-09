@@ -157,10 +157,10 @@ pub(super) fn spacing(offer: Option<String>, only: Option<Only>) -> Result<Comma
             argument: "offer".to_owned(),
         });
     }
-    Ok(Command::Space {
+    Ok(Command::Space(lemonfiber_core::app::Reclaiming {
         agreement: offer,
         only,
-    })
+    }))
 }
 
 /// The diagnosis a widened run asks for, narrowed as the reading it follows was.

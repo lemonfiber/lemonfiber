@@ -184,6 +184,8 @@ kinds! {
     /// One line said while services are starting: what the container engine wrote, or
     /// what the wait after it is still waiting for.
     START = "start",
+    /// How the stack runs without lemonfiber.
+    STACK = "stack",
     /// What each service is doing.
     STATUS = "status",
     /// One step of a walkthrough, said the moment it is true.

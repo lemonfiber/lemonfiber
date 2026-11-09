@@ -41,6 +41,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Doctor(_) => &[kind::DOCTOR],
         Command::Hosting(Keeping::Read) => &[kind::HOSTING],
         Command::FrontDoor => &[kind::FRONT_DOOR],
+        Command::Stack => &[kind::STACK],
         Command::News => &[kind::NEWS_ITEMS],
         Command::Trace(_) => &[kind::TRACE],
         Command::Stuck => &[kind::STUCK],

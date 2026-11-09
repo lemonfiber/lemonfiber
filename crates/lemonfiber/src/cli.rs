@@ -17,6 +17,7 @@ mod removing;
 mod repair;
 mod serving;
 mod setup;
+mod space;
 mod starting;
 mod trace;
 
@@ -52,6 +53,7 @@ pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
+pub use space::{RawSpace, RawStopSeeding};
 pub use starting::{RawDown, RawRestart, RawSwitch, RawUp};
 pub use trace::RawTrace;
 pub use whom::RawWhom;

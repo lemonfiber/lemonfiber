@@ -206,10 +206,10 @@ fn carries_offer(command: &Command) -> bool {
             agreement: Some(named),
             ..
         })
-        | Command::Space {
+        | Command::Space(lemonfiber_core::app::Reclaiming {
             agreement: Some(named),
             ..
-        }
+        })
         | Command::Up {
             offer: Some(named), ..
         }
@@ -538,7 +538,7 @@ fn carries_narrowing(command: &Command) -> bool {
             narrowing: Narrowing::Check(id),
             ..
         }) if id == NARROWED
-    ) || matches!(command, Command::Space { only, .. } if only == &[NARROWED])
+    ) || matches!(command, Command::Space(lemonfiber_core::app::Reclaiming { only, .. }) if only == &[NARROWED])
 }
 
 fn give_narrowing(given: &mut Arguments) {

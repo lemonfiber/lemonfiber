@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which stack this machine runs.",
+  "oneOf": [
+    {
+      "description": "The stack this build ships.",
+      "type": "string",
+      "const": "bundled"
+    },
+    {
+      "description": "The operator's own stack directory, by its path.",
+      "type": "object",
+      "properties": {
+        "own": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "own"
+      ]
+    }
+  ]
+}

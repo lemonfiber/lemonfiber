@@ -138,6 +138,7 @@
     "settings": "kinds/settings.json",
     "setup": "kinds/setup.json",
     "space": "kinds/space.json",
+    "stack": "kinds/stack.json",
     "start": "kinds/start.json",
     "status": "kinds/status.json",
     "step": "kinds/step.json",

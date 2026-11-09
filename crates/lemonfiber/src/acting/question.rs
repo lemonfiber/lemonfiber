@@ -50,7 +50,7 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 use lemonfiber_api::read::table::{
     named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS,
     FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY,
-    QUEUE, REQUESTS, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
+    QUEUE, REQUESTS, STACK, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -193,6 +193,13 @@ static AFTER: &[Question] = &[
         name: "where the household begins",
         about: "the one address to send somebody who lives here, and why nothing else is",
         read: FRONT_DOOR,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "how the stack runs without lemonfiber",
+        about: "which stack this is, where its project is, and the plain Compose words that \
+                start it",
+        read: STACK,
         needs: Needed::Nothing,
     },
     Question {

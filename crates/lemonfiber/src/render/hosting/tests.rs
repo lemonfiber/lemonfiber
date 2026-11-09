@@ -1,4 +1,7 @@
-use super::{hosting, stands, Changed, HostedCommand, Hosting, HostingReport};
+use super::{
+    hosting, stands, underneath, Changed, HostedCommand, Hosting, HostingReport, StackReport,
+    StackSource,
+};
 use lemonfiber_core::ports::hosting::Manager;
 use std::path::PathBuf;
 
@@ -216,4 +219,42 @@ fn an_install_that_did_not_start_it_does_not_say_it_did() {
     let text = hosting(&report).text();
     assert!(text.contains("installed watch"));
     assert!(!text.contains("running now"));
+}
+
+#[test]
+fn how_the_stack_runs_without_lemonfiber_names_whose_it_is_the_words_and_what_they_leave_out() {
+    let report = StackReport {
+        source: StackSource::Own("/home/ada/my-stack".to_owned()),
+        project: "/home/ada/.config/lemonfiber/stack".to_owned(),
+        env: "/home/ada/.config/lemonfiber/.env".to_owned(),
+        plain_up: ["docker", "compose", "up", "--detach"]
+            .map(str::to_owned)
+            .to_vec(),
+        non_interactive: lemonfiber_core::model::NonInteractive {
+            form: "lemonfiber <command>".to_owned(),
+        },
+        exceptions: vec![lemonfiber_core::model::StackException {
+            part: "jellyfin".to_owned(),
+            because: "installed first".to_owned(),
+        }],
+    };
+
+    let said = underneath(&report).text();
+
+    assert!(
+        said.contains("Your own stack, from /home/ada/my-stack."),
+        "{said}"
+    );
+    assert!(said.contains("docker compose up --detach"), "{said}");
+    assert!(said.contains("as lemonfiber <command>."), "{said}");
+    assert!(said.contains("jellyfin   installed first"), "{said}");
+
+    let shipped = underneath(&StackReport {
+        source: StackSource::Bundled,
+        exceptions: Vec::new(),
+        ..report
+    })
+    .text();
+    assert!(shipped.contains("The stack this build ships."), "{shipped}");
+    assert!(!shipped.contains("leave out"), "{shipped}");
 }

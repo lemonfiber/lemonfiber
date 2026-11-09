@@ -128,10 +128,10 @@ async fn where_the_disk_went_is_the_envelope_the_command_renders() {
     // names pointing at a file, and the whole answer here is built out of those.
     let expected = as_the_command_renders_it(
         &measuring("rendered"),
-        Command::Space {
+        Command::Space(lemonfiber_core::app::Reclaiming {
             agreement: None,
             only: Vec::new(),
-        },
+        }),
     )
     .await;
 

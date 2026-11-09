@@ -739,10 +739,10 @@ async fn a_dispatched_accounting_of_the_disk_serialises_under_its_own_kind() {
     // one answer this reaches with nothing running and nothing on a disk — and
     // it exercises the dispatch arm, which is what this is here for.
     let refused = dispatch(
-        Command::Space {
+        Command::Space(crate::app::Reclaiming {
             agreement: None,
             only: Vec::new(),
-        },
+        }),
         &ctx(Ok(spoke(""))),
     )
     .await

@@ -16,8 +16,8 @@ use lemonfiber_core::model::{
 
 use built::{
     a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_settings_report,
-    a_setup_part_way, a_shared_line, a_substitution, a_walk, a_word, an_update, manifest, plan,
-    what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
+    a_setup_part_way, a_shared_line, a_stack, a_substitution, a_walk, a_word, an_update, manifest,
+    plan, what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
 };
 
 /// One sample of every outcome, so each kind's description can be held against
@@ -270,6 +270,7 @@ fn serving() -> Vec<Outcome> {
             findings: Vec::new(),
         }),
         Outcome::FrontDoor(a_front_door()),
+        Outcome::Stack(a_stack()),
         Outcome::Pairing(a_pairing()),
         Outcome::Certificate(lemonfiber_core::companion::Replacement {
             rehearsed: false,

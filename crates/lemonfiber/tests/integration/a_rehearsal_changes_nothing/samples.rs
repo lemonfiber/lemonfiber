@@ -110,6 +110,7 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
             }),
         ),
         ("watch", Command::Watch { forms: Vec::new() }),
+        ("stack", Command::Stack),
         (
             "hosting",
             Command::Hosting(Keeping::Install {
@@ -248,10 +249,10 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
         ),
         (
             "space",
-            Command::Space {
+            Command::Space(lemonfiber_core::app::Reclaiming {
                 agreement: Some("anything".to_owned()),
                 only: Vec::new(),
-            },
+            }),
         ),
         (
             "stop-seeding",
