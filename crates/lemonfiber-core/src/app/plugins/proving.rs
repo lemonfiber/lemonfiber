@@ -331,7 +331,7 @@ async fn held_to(
         })
         .collect();
     for capability in &spoken {
-        for case in lemonfiber_contract::conformance::cases(capability) {
+        for case in lemonfiber_contract::conformance::live(capability) {
             let lemonfiber_contract::conformance::Expect::Status(statuses) = case.expect else {
                 continue;
             };

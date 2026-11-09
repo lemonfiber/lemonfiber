@@ -159,6 +159,49 @@ async fn an_adapter_that_speaks_otherwise_or_cannot_be_reached_is_not_installed(
     }
 }
 
+/// An adapter refusing every call without the key, whose contract asks under the key what
+/// it must refuse, is installed: install asks the running adapter its unkeyed case alone.
+#[tokio::test]
+async fn an_adapter_is_asked_live_only_what_needs_no_key() {
+    let name = "adapter-refusing-unkeyed";
+    let manifest = speaking().replace("media.serve", "indexer.proxy");
+    let mut ctx = proving(
+        name,
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        Fake::by_path(vec![
+            (
+                "/api/v1/libraries",
+                lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+            ),
+            (
+                "/lemonfiber/adapter/v1/about",
+                lemonfiber_fixtures::http::Answer::reply(
+                    200,
+                    about(r#"["indexer.proxy@1"]"#, UPSTREAM),
+                ),
+            ),
+            (
+                "/lemonfiber/indexer.proxy/v1/solve",
+                lemonfiber_fixtures::http::Answer::reply(401, ""),
+            ),
+        ]),
+    );
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+
+    let outcome = installing(&ctx, &source(name, &manifest)).await;
+
+    assert_eq!(
+        verdicts(outcome)
+            .iter()
+            .map(|verdict| came_to(verdict.as_ref()))
+            .collect::<Vec<_>>(),
+        ["passed", "passed"]
+    );
+}
+
 #[tokio::test]
 async fn an_adapter_never_published_is_unproven_with_where_its_container_stands() {
     let outcome = adapted("adapter-standing", &[], r#"["media.serve@1"]"#).await;

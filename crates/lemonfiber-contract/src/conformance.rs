@@ -196,6 +196,15 @@ pub fn cases(capability: &Capability) -> Vec<Case<'_>> {
         .collect()
 }
 
+/// Every case of `capability` install asks of the running adapter.
+#[must_use]
+pub fn live(capability: &Capability) -> Vec<Case<'_>> {
+    cases(capability)
+        .into_iter()
+        .filter(|case| case.live)
+        .collect()
+}
+
 /// Every case of `capability` an adapter whose upstream files `files` is asked: every
 /// case of an operation bound to no kind of media, and those of the media types it files.
 #[must_use]

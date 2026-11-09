@@ -3,7 +3,7 @@ use lemonfiber_ports::service::Failure;
 
 use serde_json::Value;
 
-use super::{answers, cases, Expect, Placeholder, REFUSES_WITHOUT_THE_KEY};
+use super::{answers, cases, live, Expect, Placeholder, REFUSES_WITHOUT_THE_KEY};
 use crate::Contracted;
 
 #[test]
@@ -38,6 +38,22 @@ fn a_case_asking_what_an_operation_must_refuse_is_held_to_the_refusal() {
     assert!(listed
         .iter()
         .any(|case| case.case == "answers-answers" && case.expect == Expect::Conforms));
+}
+
+/// Install asks the running adapter only what it can ask without the key.
+#[test]
+fn install_asks_a_running_adapter_its_unkeyed_case_alone() {
+    for capability in crate::capabilities::all() {
+        assert_eq!(
+            live(&capability)
+                .iter()
+                .map(|case| (case.case.as_str(), case.keyed))
+                .collect::<Vec<_>>(),
+            [(REFUSES_WITHOUT_THE_KEY, false)],
+            "{}",
+            capability.name
+        );
+    }
 }
 
 #[tokio::test]
