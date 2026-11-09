@@ -76,7 +76,7 @@ mod listing;
 mod newest;
 // The install recipes an install or an update runs, and the values they are given.
 mod following;
-pub(crate) use embedding::from_this_build;
+pub(crate) use embedding::{from_this_build, read_after};
 pub(crate) use following::diagnosed;
 // Installing from a directory: what it settles, its offer, and its writes and proofs.
 mod installing;

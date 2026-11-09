@@ -81,13 +81,18 @@ async fn unrun(ctx: &Ctx, plan: &Plan) -> Vec<&'static Pinned> {
         .collect()
 }
 
-/// What a start offers to install over `plan`, each install read through the plugin path:
-/// nothing where every part the form holds is installed or has run here.
+/// What a start offers to install over `plan`, each install read through the plugin path
+/// beside every one offered before it, as answering installs them in turn: nothing where
+/// every part the form holds is installed or has run here.
 pub(crate) async fn offered(ctx: &Ctx, plan: &Plan) -> Option<Offline> {
     let mut installs = Vec::new();
+    let mut before = Vec::new();
     for pinned in unrun(ctx, plan).await {
         let plugin = pinned.first_party.plugin;
-        let read = crate::app::plugins::from_this_build(ctx, plugin, Consent::default()).await;
+        let read = crate::app::plugins::read_after(ctx, plugin, &before).await;
+        if let Some(install) = read.as_ref().ok().and_then(|one| one.install.as_ref()) {
+            before.push(install.would.clone());
+        }
         installs.push(InstallOffered {
             plugin: plugin.to_owned(),
             offer: read

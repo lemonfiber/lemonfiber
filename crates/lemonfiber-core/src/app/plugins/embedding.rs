@@ -35,6 +35,32 @@ pub(crate) async fn from_this_build(
     .await
 }
 
+/// What installing the plugin `plugin` the bundle installs from the tree this build
+/// carries reads as once every one of `before` is recorded beside what the record holds:
+/// the reading an install made after them meets. Nothing is acted on.
+///
+/// # Errors
+///
+/// Where the record cannot be read, and every refusal an install's reading makes.
+pub(crate) async fn read_after(
+    ctx: &Ctx,
+    plugin: &str,
+    before: &[crate::plugin::Installed],
+) -> Result<Installs, Box<Problem>> {
+    let mut held = super::read(ctx)?;
+    for one in before {
+        held.record(one.clone()).unwrap_or_default();
+    }
+    Box::pin(super::sourced(
+        ctx,
+        held,
+        &crate::plugin::Source::Name(plugin.to_owned()),
+        Errand::Install,
+        &Consent::default(),
+    ))
+    .await
+}
+
 /// The plugin of this id the bundle installs or offers, where it pins one.
 pub(super) fn pinned(id: &str) -> Option<&'static Pinned> {
     installed_among(PINNED, id)
