@@ -154,7 +154,15 @@ jobs:
         run: |
           docker ps -a
           for container in $(docker ps -aq); do
-            echo "::group::$(docker inspect --format '{{.Name}}' "${container}")"
-            docker logs --tail 300 "${container}" 2>&1 || true
+            name="$(docker inspect --format '{{.Name}}' "${container}")"
+            echo "::group::${name}"
+            case "${name}" in
+            *medusa*)
+              echo "Not shown: Medusa and its adapter hold the operator's TheTVDB key."
+              ;;
+            *)
+              docker logs --tail 300 "${container}" 2>&1 || true
+              ;;
+            esac
             echo "::endgroup::"
           done

@@ -44,7 +44,11 @@ impl Substitution {
         )?;
         for (setting, value) in &self.settings {
             held(
-                &core.run(&["config", "set", setting, value, "--confirm"], ""),
+                &core.withholding(
+                    &["config", "set", setting, value, "--confirm"],
+                    "",
+                    &[value],
+                ),
                 setting,
             )?;
         }

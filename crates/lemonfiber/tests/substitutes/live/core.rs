@@ -6,6 +6,9 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+/// What a withheld value is printed as.
+const WITHHELD: &str = "<withheld>";
+
 /// The keys an answer names the offer it is read with under.
 const OFFERS: [&str; 2] = ["offer", "agreement"];
 
@@ -42,6 +45,19 @@ impl Core {
     /// Run it with `args` and `--json`, typing `typed` where it asks.
     #[must_use]
     pub fn run(&self, args: &[&str], typed: &str) -> Ran {
+        self.withholding(args, typed, &[])
+    }
+
+    /// As [`Self::run`], with each of `withheld` written as `<withheld>` wherever what
+    /// was run and what it said are printed.
+    #[must_use]
+    pub fn withholding(&self, args: &[&str], typed: &str, withheld: &[&str]) -> Ran {
+        let shown = |printed: String| {
+            withheld
+                .iter()
+                .filter(|secret| !secret.is_empty())
+                .fold(printed, |printed, secret| printed.replace(secret, WITHHELD))
+        };
         let child = Command::new(env!("CARGO_BIN_EXE_lemonfiber"))
             .arg("--json")
             .args(self.dirs())
@@ -54,7 +70,7 @@ impl Core {
             return Ran {
                 succeeded: false,
                 said: serde_json::Value::Null,
-                printed: format!("{args:?}: {child:?}"),
+                printed: shown(format!("{args:?}: {child:?}")),
             };
         };
         if let Some(mut stdin) = child.stdin.take() {
@@ -64,7 +80,7 @@ impl Core {
             return Ran {
                 succeeded: false,
                 said: serde_json::Value::Null,
-                printed: format!("{args:?}: no output"),
+                printed: shown(format!("{args:?}: no output")),
             };
         };
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -73,7 +89,10 @@ impl Core {
         let ran = Ran {
             succeeded: output.status.success(),
             said,
-            printed: format!("$ lemonfiber {}\n{stdout}\n{stderr}", args.join(" ")),
+            printed: shown(format!(
+                "$ lemonfiber {}\n{stdout}\n{stderr}",
+                args.join(" ")
+            )),
         };
         println!("{}", ran.printed);
         ran
