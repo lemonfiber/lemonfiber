@@ -23,6 +23,7 @@
 //! bound correctly — a stack that is down is reported as one this could not be
 //! established for.
 
+use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::sync::Arc;
 
@@ -166,7 +167,8 @@ async fn ran(check: &BindingsCheck) -> Vec<Finding> {
     found
 }
 
-/// Where a published port is reached without the host's firewall being consulted.
+/// Where each service's published ports are reached without the host's firewall being
+/// consulted, one finding a service.
 ///
 /// Nothing here inspects a firewall. It cannot: the rules belong to whichever of
 /// several tools the operator uses, and reading them would be a guess about which.
@@ -179,26 +181,33 @@ async fn ran(check: &BindingsCheck) -> Vec<Finding> {
 /// a virtual machine and forwards from a process the host's firewall does see, so
 /// macOS, Windows and Desktop-on-Linux are not this case and are not warned about —
 /// a warning that fired everywhere would be one nobody could act on.
-fn around_the_firewall(environment: Environment, running: &[&Container]) -> Option<Finding> {
+fn around_the_firewall(environment: Environment, running: &[&Container]) -> Vec<Finding> {
     if environment != Environment::LinuxNative {
-        return None;
+        return Vec::new();
     }
-    let mut reached: Vec<String> = running
-        .iter()
-        .flat_map(|container| {
-            container
-                .published
-                .iter()
-                .filter(|published| !published.address.is_loopback())
-                .map(|published| format!("{} on {}", container.service, wide(published.address)))
+    let mut reached: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    for container in running {
+        for published in &container.published {
+            if !published.address.is_loopback() {
+                reached
+                    .entry(container.service.as_str())
+                    .or_default()
+                    .push(format!(
+                        "{} on {}",
+                        container.service,
+                        wide(published.address)
+                    ));
+            }
+        }
+    }
+    reached
+        .into_iter()
+        .map(|(service, mut where_)| {
+            where_.sort_unstable();
+            where_.dedup();
+            bypassed(&where_).about(service)
         })
-        .collect();
-    if reached.is_empty() {
-        return None;
-    }
-    reached.sort_unstable();
-    reached.dedup();
-    Some(bypassed(&reached))
+        .collect()
 }
 
 /// What is said where a published port is answered around the host's own rules.
