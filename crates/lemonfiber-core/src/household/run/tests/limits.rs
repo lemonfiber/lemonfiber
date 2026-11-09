@@ -182,7 +182,11 @@ fn an_administrator_is_not_reported_as_a_household_in_disagreement() {
 #[test]
 fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
     let mut reasons = crate::asking::Reasons::default();
-    reasons.keep(0, "we already have it dubbed", None);
+    reasons.keep(
+        crate::collected::Reference::Filed(0),
+        "we already have it dubbed",
+        None,
+    );
 
     let report = assemble(
         vec![account("Ana", true)],

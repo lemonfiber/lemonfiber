@@ -32,8 +32,8 @@ mod whom;
 mod wiring;
 
 pub use under::{
-    AlertCommand, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
-    QualityCommand, QueueCommand, UpdateCommand, Wished,
+    AlertCommand, Collected, ConfigAction, HostingCommand, HouseholdCommand, Kept, MigrateCommand,
+    QualityCommand, QueueCommand, UpdateCommand, Wished, Within,
 };
 
 // Re-exported rather than reached for through the module they now live in: where a

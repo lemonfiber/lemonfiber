@@ -381,6 +381,8 @@ pub struct Wanted {
     pub after: Option<String>,
     /// Whether the title a read is about is a series or a film, as it was written.
     pub kind: Option<String>,
+    /// What a search for music or books looks for, as it was written.
+    pub unit: Option<String>,
     /// The title a read is about, as its path names it.
     pub title: Option<String>,
 }
@@ -439,7 +441,8 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         most,
         after,
         title,
-        kind: _,
+        kind,
+        unit,
     } = given;
     match read {
         VERSION => Ok(Command::Version),
@@ -457,7 +460,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         PLAYING => watching(member),
         TITLE => titled(member, defaults.as_deref(), title),
         WATCHING => part_way(member, most),
-        ASKABLE => Ok(askable(member, term, after)),
+        ASKABLE => askable(member, term, after, kind.as_deref(), unit.as_deref()),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different

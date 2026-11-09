@@ -9,9 +9,13 @@ use serde::Serialize;
 /// One thing a household member asked for, and where it stands in their words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MemberRequest {
-    /// The number the request service files it under, which is how one is named again
-    /// when somebody rules on it.
-    pub id: i64,
+    /// The reference it is named by again when somebody rules on it: the number the
+    /// request service files it under (`42`), or `music-<n>` or `books-<n>` for an ask
+    /// for music or books the core keeps itself.
+    pub id: String,
+    /// When it was asked for, where the request service or the core says.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asked: Option<String>,
     /// What it is called: from the library of the service filing it, where it has been
     /// told about it and that library could be read, and otherwise from the request
     /// service's own record of the title. Absent where neither names it.

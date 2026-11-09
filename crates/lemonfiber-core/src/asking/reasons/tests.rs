@@ -1,4 +1,5 @@
 use super::Reasons;
+use crate::collected::Reference;
 use std::collections::BTreeSet;
 
 /// A moment the calendar holds, for these records to be stamped with.
@@ -11,19 +12,19 @@ fn a_reason_comes_back_under_the_request_it_was_written_for() {
     assert!(held.is_empty());
 
     held.keep(
-        41,
+        Reference::Filed(41),
         "we already have it in another form",
         Some(AT.to_owned()),
     );
 
     assert!(!held.is_empty());
     assert_eq!(
-        held.of(41)
+        held.of(Reference::Filed(41))
             .map(|kept| (kept.reason.as_str(), kept.at.as_deref())),
         Some(("we already have it in another form", Some(AT)))
     );
     assert_eq!(
-        held.of(42),
+        held.of(Reference::Filed(42)),
         None,
         "a reason reached a request it is not for"
     );
@@ -37,10 +38,15 @@ fn a_reason_comes_back_under_the_request_it_was_written_for() {
 #[test]
 fn the_reason_is_kept_as_the_operator_was_shown_it() {
     let mut held = Reasons::default();
-    held.keep(7, "  the disk is nearly full  ", Some(AT.to_owned()));
+    held.keep(
+        Reference::Filed(7),
+        "  the disk is nearly full  ",
+        Some(AT.to_owned()),
+    );
 
     assert_eq!(
-        held.of(7).map(|kept| kept.reason.as_str()),
+        held.of(Reference::Filed(7))
+            .map(|kept| kept.reason.as_str()),
         Some("the disk is nearly full")
     );
 }
@@ -49,11 +55,16 @@ fn the_reason_is_kept_as_the_operator_was_shown_it() {
 #[test]
 fn a_second_answer_replaces_the_first() {
     let mut held = Reasons::default();
-    held.keep(7, "not this month", None);
-    held.keep(7, "on second thoughts, the disk", Some(AT.to_owned()));
+    held.keep(Reference::Filed(7), "not this month", None);
+    held.keep(
+        Reference::Filed(7),
+        "on second thoughts, the disk",
+        Some(AT.to_owned()),
+    );
 
     assert_eq!(
-        held.of(7).map(|kept| kept.reason.as_str()),
+        held.of(Reference::Filed(7))
+            .map(|kept| kept.reason.as_str()),
         Some("on second thoughts, the disk")
     );
 }
@@ -65,22 +76,26 @@ fn a_second_answer_replaces_the_first() {
 #[test]
 fn a_reason_whose_request_has_gone_is_forgotten() {
     let mut held = Reasons::default();
-    held.keep(1, "too new", Some(AT.to_owned()));
-    held.keep(2, "we have it", Some(AT.to_owned()));
-    held.keep(3, "no room", None);
+    held.keep(Reference::Filed(1), "too new", Some(AT.to_owned()));
+    held.keep(Reference::Filed(2), "we have it", Some(AT.to_owned()));
+    held.keep(Reference::Filed(3), "no room", None);
 
     held.only(&BTreeSet::from([2, 3, 9]));
 
-    assert_eq!(held.of(1), None);
-    assert!(held.of(2).is_some());
-    assert!(held.of(3).is_some());
+    assert_eq!(held.of(Reference::Filed(1)), None);
+    assert!(held.of(Reference::Filed(2)).is_some());
+    assert!(held.of(Reference::Filed(3)).is_some());
 }
 
 /// It survives being written down and read back.
 #[test]
 fn it_survives_being_written_down_and_read_back() {
     let mut held = Reasons::default();
-    held.keep(11, "the season is only half out", Some(AT.to_owned()));
+    held.keep(
+        Reference::Filed(11),
+        "the season is only half out",
+        Some(AT.to_owned()),
+    );
 
     let written = serde_json::to_string(&held).unwrap_or_default();
     let read: Reasons = serde_json::from_str(&written).unwrap_or_default();
@@ -104,14 +119,29 @@ fn a_record_that_will_not_read_is_no_reasons() {
 #[test]
 fn words_are_owed_once_and_then_never_again() {
     let mut held = Reasons::default();
-    held.keep(7, "no room this month", Some(AT.to_owned()));
-    assert!(held.owed(7), "a fresh refusal owes nobody anything");
+    held.keep(
+        Reference::Filed(7),
+        "no room this month",
+        Some(AT.to_owned()),
+    );
+    assert!(
+        held.owed(Reference::Filed(7)),
+        "a fresh refusal owes nobody anything"
+    );
 
-    held.passed_on(7, vec!["Pushover".to_owned()], Some(AT.to_owned()));
+    held.passed_on(
+        Reference::Filed(7),
+        vec!["Pushover".to_owned()],
+        Some(AT.to_owned()),
+    );
 
-    assert!(!held.owed(7), "the same words are owed a second time");
+    assert!(
+        !held.owed(Reference::Filed(7)),
+        "the same words are owed a second time"
+    );
     assert_eq!(
-        held.of(7).and_then(|kept| kept.told.clone()),
+        held.of(Reference::Filed(7))
+            .and_then(|kept| kept.told.clone()),
         Some(super::Passed {
             to: vec!["Pushover".to_owned()],
             at: Some(AT.to_owned()),
@@ -123,13 +153,13 @@ fn words_are_owed_once_and_then_never_again() {
 #[test]
 fn nowhere_to_send_is_still_an_attempt_that_happened() {
     let mut held = Reasons::default();
-    held.keep(7, "not this month", None);
+    held.keep(Reference::Filed(7), "not this month", None);
 
-    held.passed_on(7, Vec::new(), None);
+    held.passed_on(Reference::Filed(7), Vec::new(), None);
 
-    assert!(!held.owed(7));
+    assert!(!held.owed(Reference::Filed(7)));
     assert_eq!(
-        held.of(7)
+        held.of(Reference::Filed(7))
             .and_then(|kept| kept.told.clone())
             .map(|passed| passed.to),
         Some(Vec::new())
@@ -140,11 +170,18 @@ fn nowhere_to_send_is_still_an_attempt_that_happened() {
 #[test]
 fn a_request_with_no_reason_kept_is_owed_nothing() {
     let mut held = Reasons::default();
-    assert!(!held.owed(7), "a request nobody refused here owes words");
+    assert!(
+        !held.owed(Reference::Filed(7)),
+        "a request nobody refused here owes words"
+    );
 
-    held.passed_on(7, vec!["Pushover".to_owned()], None);
+    held.passed_on(Reference::Filed(7), vec!["Pushover".to_owned()], None);
 
-    assert_eq!(held.of(7), None, "a delivery invented a refusal");
+    assert_eq!(
+        held.of(Reference::Filed(7)),
+        None,
+        "a delivery invented a refusal"
+    );
 }
 
 /// A request nobody ruled on is kept apart from one somebody refused.
@@ -155,13 +192,27 @@ fn a_request_with_no_reason_kept_is_owed_nothing() {
 #[test]
 fn a_request_that_ran_out_is_kept_apart_from_one_somebody_refused() {
     let mut held = Reasons::default();
-    held.keep(7, "we already have it dubbed", Some(AT.to_owned()));
-    held.closed(9, "nobody ruled on it within 30 days", Some(AT.to_owned()));
+    held.keep(
+        Reference::Filed(7),
+        "we already have it dubbed",
+        Some(AT.to_owned()),
+    );
+    held.closed(
+        Reference::Filed(9),
+        "nobody ruled on it within 30 days",
+        Some(AT.to_owned()),
+    );
 
-    assert_eq!(held.of(7).map(|kept| kept.expired), Some(false));
-    assert_eq!(held.of(9).map(|kept| kept.expired), Some(true));
+    assert_eq!(
+        held.of(Reference::Filed(7)).map(|kept| kept.expired),
+        Some(false)
+    );
+    assert_eq!(
+        held.of(Reference::Filed(9)).map(|kept| kept.expired),
+        Some(true)
+    );
     assert!(
-        held.owed(9),
+        held.owed(Reference::Filed(9)),
         "a request that ran out owes its words like any other"
     );
 }
@@ -175,14 +226,30 @@ fn a_request_that_ran_out_is_kept_apart_from_one_somebody_refused() {
 #[test]
 fn closing_the_same_request_twice_owes_its_words_once() {
     let mut held = Reasons::default();
-    held.closed(7, "nobody ruled on it within 30 days", Some(AT.to_owned()));
-    held.passed_on(7, vec!["Pushover".to_owned()], Some(AT.to_owned()));
+    held.closed(
+        Reference::Filed(7),
+        "nobody ruled on it within 30 days",
+        Some(AT.to_owned()),
+    );
+    held.passed_on(
+        Reference::Filed(7),
+        vec!["Pushover".to_owned()],
+        Some(AT.to_owned()),
+    );
 
-    held.closed(7, "nobody ruled on it within 30 days", Some(AT.to_owned()));
+    held.closed(
+        Reference::Filed(7),
+        "nobody ruled on it within 30 days",
+        Some(AT.to_owned()),
+    );
 
-    assert!(!held.owed(7), "the same words were owed a second time");
+    assert!(
+        !held.owed(Reference::Filed(7)),
+        "the same words were owed a second time"
+    );
     assert_eq!(
-        held.of(7).and_then(|kept| kept.told.clone()),
+        held.of(Reference::Filed(7))
+            .and_then(|kept| kept.told.clone()),
         Some(super::Passed {
             to: vec!["Pushover".to_owned()],
             at: Some(AT.to_owned()),
@@ -197,13 +264,20 @@ fn closing_the_same_request_twice_owes_its_words_once() {
 #[test]
 fn somebody_answering_after_it_ran_out_owes_their_own_words() {
     let mut held = Reasons::default();
-    held.closed(7, "nobody ruled on it within 30 days", None);
-    held.passed_on(7, vec!["Pushover".to_owned()], None);
+    held.closed(
+        Reference::Filed(7),
+        "nobody ruled on it within 30 days",
+        None,
+    );
+    held.passed_on(Reference::Filed(7), vec!["Pushover".to_owned()], None);
 
-    held.keep(7, "and we already have it dubbed", None);
+    held.keep(Reference::Filed(7), "and we already have it dubbed", None);
 
-    assert!(held.owed(7));
-    assert_eq!(held.of(7).map(|kept| kept.expired), Some(false));
+    assert!(held.owed(Reference::Filed(7)));
+    assert_eq!(
+        held.of(Reference::Filed(7)).map(|kept| kept.expired),
+        Some(false)
+    );
 }
 
 /// A second answer to the same request owes its own words afresh.
@@ -214,10 +288,10 @@ fn somebody_answering_after_it_ran_out_owes_their_own_words() {
 #[test]
 fn a_second_answer_owes_its_own_words() {
     let mut held = Reasons::default();
-    held.keep(7, "not this month", None);
-    held.passed_on(7, vec!["Pushover".to_owned()], None);
+    held.keep(Reference::Filed(7), "not this month", None);
+    held.passed_on(Reference::Filed(7), vec!["Pushover".to_owned()], None);
 
-    held.keep(7, "on second thoughts, the disk", None);
+    held.keep(Reference::Filed(7), "on second thoughts, the disk", None);
 
-    assert!(held.owed(7));
+    assert!(held.owed(Reference::Filed(7)));
 }

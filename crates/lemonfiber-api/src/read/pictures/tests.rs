@@ -27,6 +27,7 @@ fn search(member: &str) -> Command {
         member: member.to_owned(),
         term: String::new(),
         after: None,
+        unit: None,
     })
 }
 

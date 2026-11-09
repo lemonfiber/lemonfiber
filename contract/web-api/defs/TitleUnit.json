@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one title of music or books is, within its kind.",
+  "oneOf": [
+    {
+      "description": "One album.",
+      "type": "string",
+      "const": "album"
+    },
+    {
+      "description": "A whole artist.",
+      "type": "string",
+      "const": "artist"
+    },
+    {
+      "description": "One book.",
+      "type": "string",
+      "const": "book"
+    },
+    {
+      "description": "A whole author.",
+      "type": "string",
+      "const": "author"
+    },
+    {
+      "description": "A series of books.",
+      "type": "string",
+      "const": "series"
+    }
+  ]
+}

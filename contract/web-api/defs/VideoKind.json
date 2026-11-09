@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a title a curator of video files is a series or a film, as a document that\nnames one of those two alone publishes it.",
+  "oneOf": [
+    {
+      "description": "A series.",
+      "type": "string",
+      "const": "tv"
+    },
+    {
+      "description": "A film.",
+      "type": "string",
+      "const": "movies"
+    }
+  ]
+}

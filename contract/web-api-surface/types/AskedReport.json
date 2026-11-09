@@ -36,6 +36,12 @@
       ],
       "required": true
     },
+    "request": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "said": {
       "type": [
         "string"
@@ -53,6 +59,12 @@
         "string"
       ],
       "required": true
+    },
+    "unit": {
+      "type": [
+        "anyOf(null,ref:TitleUnit)"
+      ],
+      "required": false
     }
   },
   "variants": []

@@ -143,8 +143,10 @@ pub struct Arguments {
     pub requests: Option<u32>,
     /// How long that period is, in days.
     pub days: Option<u32>,
-    /// The request being ruled on, by the number the request service files it under.
-    pub request: Option<i64>,
+    /// The request being ruled on, by the reference the household list names it with:
+    /// the request service's own number (`42`), or `music-<n>` or `books-<n>` for an ask
+    /// the core keeps.
+    pub request: Option<String>,
     /// Why a request is being turned down, or why a service was chosen to fill a
     /// capability.
     pub reason: Option<String>,
@@ -211,9 +213,13 @@ pub struct Arguments {
     /// Whether the member finished it. Absent says nothing about finishing, which is
     /// a position like any other.
     pub ended: Option<bool>,
-    /// Whether the title asked for is a series or a film, as a page of a member's search
-    /// names it: `tv` or `movies`.
+    /// Whether the title asked for is a series, a film, music or books, as a page of a
+    /// member's search names it: `tv`, `movies`, `music` or `books`.
     pub kind: Option<String>,
+    /// What is asked for within music or books, as a page of a member's search names
+    /// it: `album` or `artist`, `book`, `author` or `series`. Absent asks for an album
+    /// or a book.
+    pub unit: Option<String>,
     /// The seasons of a series asked for. None names every season not already here or
     /// on its way.
     pub seasons: Vec<u32>,
@@ -269,7 +275,7 @@ impl Arguments {
             policy: Some("within-a-limit".to_owned()),
             requests: Some(1),
             days: Some(1),
-            request: Some(1),
+            request: Some("1".to_owned()),
             reason: Some("asked".to_owned()),
             capability: Some("indexer.search".to_owned()),
             tier: Some("stop".to_owned()),

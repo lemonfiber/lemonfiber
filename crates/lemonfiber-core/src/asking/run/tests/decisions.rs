@@ -10,7 +10,7 @@ async fn approving_a_waiting_request_says_what_happened() {
     let report = deciding(
         &a_household("approve"),
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         },
     )
@@ -33,7 +33,7 @@ async fn turning_one_down_says_the_reason_back_and_where_it_went() {
     let report = deciding(
         &a_household("decline"),
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "no room this month".to_owned(),
             },
@@ -136,7 +136,7 @@ async fn a_household_this_machine_may_not_reach_is_said_rather_than_reached() {
     let report = deciding(
         &ctx,
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "no room this month".to_owned(),
             },
@@ -158,7 +158,7 @@ async fn turning_down(tag: &str, routes: Vec<(&'static str, Answer)>) -> String 
     deciding(
         &answering(tag, routes),
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "no room this month".to_owned(),
             },
@@ -178,7 +178,7 @@ async fn a_rehearsed_decision_rules_on_nothing() {
     let report = deciding(
         &a_household("norule").rehearsing(),
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         },
     )
@@ -355,7 +355,7 @@ async fn a_service_that_will_not_list_what_was_asked_for_decides_nothing() {
     let refused = deciding(
         &refusing("nolist", vec![intake("requests")]),
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         },
     )
@@ -373,7 +373,7 @@ async fn a_service_that_will_not_rule_says_so() {
     let refused = deciding(
         &refusing("norule2", vec![intake("decide")]),
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         },
     )

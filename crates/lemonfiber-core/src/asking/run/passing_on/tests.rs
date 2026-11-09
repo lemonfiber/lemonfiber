@@ -81,13 +81,21 @@ fn words_carried_once_are_owed_to_nobody() {
     let mut reasons = Reasons::default();
     assert_eq!(still_owed(&reasons, 7), None, "a refusal nobody made");
 
-    reasons.keep(7, "no room this month", None);
+    reasons.keep(
+        crate::collected::Reference::Filed(7),
+        "no room this month",
+        None,
+    );
     assert_eq!(
         still_owed(&reasons, 7),
         Some("no room this month".to_owned())
     );
 
-    reasons.passed_on(7, vec!["Pushover".to_owned()], None);
+    reasons.passed_on(
+        crate::collected::Reference::Filed(7),
+        vec!["Pushover".to_owned()],
+        None,
+    );
     assert_eq!(still_owed(&reasons, 7), None, "the same words twice");
 }
 
@@ -103,7 +111,7 @@ fn the_record_keeps_this_refusal_and_only_what_the_service_still_holds() {
         &[asked(7)],
     );
     assert_eq!(
-        kept.of(7)
+        kept.of(crate::collected::Reference::Filed(7))
             .map(|refusal| (refusal.reason.as_str(), refusal.expired)),
         Some(("no room this month", false))
     );
@@ -136,7 +144,7 @@ fn a_request_that_ran_out_is_written_down_as_having_run_out() {
     );
 
     assert_eq!(
-        kept.of(7)
+        kept.of(crate::collected::Reference::Filed(7))
             .map(|refusal| (refusal.reason.as_str(), refusal.expired)),
         Some(("nobody ruled on it within 30 days", true))
     );

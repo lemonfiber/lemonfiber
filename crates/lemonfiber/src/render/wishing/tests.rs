@@ -41,8 +41,11 @@ fn a_title(id: &str, kind: TitleKind, year: Option<u16>, stands: Stands) -> Aska
     Askable {
         id: id.to_owned(),
         kind,
+        unit: None,
         title: format!("Harbour {id}"),
+        by: None,
         year,
+        cover: None,
         stands,
     }
 }
@@ -114,7 +117,9 @@ fn an_ask_is_said_in_the_households_own_sentence() {
         member: "ana".to_owned(),
         title: "1399".to_owned(),
         kind: TitleKind::Tv,
+        unit: None,
         seasons: vec![3],
+        request: None,
         outcome: Became::Waiting,
         leaves: LeftAfter::default(),
         released: true,
@@ -135,7 +140,9 @@ fn a_search_and_an_ask_are_rendered_by_their_own_shapes() {
         member: "ana".to_owned(),
         title: "603".to_owned(),
         kind: TitleKind::Movies,
+        unit: None,
         seasons: Vec::new(),
+        request: None,
         outcome: Became::OnItsWay,
         leaves: LeftAfter::default(),
         released: true,

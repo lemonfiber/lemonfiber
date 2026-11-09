@@ -443,14 +443,6 @@ impl Paths {
         self.config.join("admission.json")
     }
 
-    /// The asks for music and books the core keeps itself, since no request service
-    /// holds them. Kept with configuration, so a backup carries the household's waiting
-    /// asks and the numbers they are named by.
-    #[must_use]
-    pub fn household_asks(&self) -> PathBuf {
-        self.config.join("household-asks.json")
-    }
-
     /// What pairing a phone with this stack rests on: the certificate the web surface
     /// presents, the stack's own identifier, and how the surface was last served.
     ///

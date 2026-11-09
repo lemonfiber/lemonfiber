@@ -191,14 +191,24 @@ pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
 #[must_use]
 pub(crate) fn their_wish(id: &str, wishing: &Wishing) -> Wishing {
     match wishing.clone() {
-        Wishing::Find { term, after, .. } => Wishing::Find {
+        Wishing::Find {
+            term, after, unit, ..
+        } => Wishing::Find {
             member: id.to_owned(),
             term,
             after,
+            unit,
         },
         Wishing::Ask { wish, .. } => Wishing::Ask {
             member: id.to_owned(),
             wish,
+        },
+        Wishing::Collect {
+            unit, reference, ..
+        } => Wishing::Collect {
+            member: id.to_owned(),
+            unit,
+            reference,
         },
     }
 }

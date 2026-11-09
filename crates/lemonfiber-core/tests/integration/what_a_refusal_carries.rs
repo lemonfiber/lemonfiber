@@ -203,7 +203,7 @@ async fn an_approval_tells_nobody_because_there_is_nothing_to_tell() {
     let ctx = reaching("approved", &transport, Reaching::default());
     let said = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         }),
         &ctx,
@@ -229,7 +229,7 @@ async fn an_approval_tells_nobody_because_there_is_nothing_to_tell() {
 async fn decided(ctx: &Ctx) -> String {
     dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "we already have it dubbed".to_owned(),
             },

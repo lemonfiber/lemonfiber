@@ -373,7 +373,7 @@ pub(super) fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
         (
             "deciding",
             Command::Deciding(Decision {
-                request: 1,
+                request: lemonfiber_core::collected::Reference::Filed(1),
                 answer: lemonfiber_core::app::Answer::LetThrough,
             }),
         ),

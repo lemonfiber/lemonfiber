@@ -1,3 +1,4 @@
+use crate::collected::Reference;
 use crate::ports::service::{MediaStatus, RequestStatus};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -413,7 +414,7 @@ async fn a_sweep_closes_what_waited_too_long_and_tells_whoever_asked() {
     );
     assert_eq!(
         crate::app::refusals::load(&ctx)
-            .of(7)
+            .of(Reference::Filed(7))
             .map(|kept| kept.expired),
         Some(true),
         "what ran out was not recorded as having run out"

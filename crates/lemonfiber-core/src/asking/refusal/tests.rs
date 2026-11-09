@@ -30,7 +30,7 @@ fn the_policy_that_is_a_limit_refuses_to_be_chosen_without_one() {
 /// A request already ruled on is named rather than decided a second time.
 #[test]
 fn a_request_already_ruled_on_is_named_rather_than_decided_again() {
-    let problem = nothing_to_decide(42);
+    let problem = nothing_to_decide(crate::collected::Reference::Filed(42));
 
     assert_eq!(problem.code, NOT_WAITING);
     assert_eq!(problem.status(), 404);

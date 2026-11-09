@@ -49,7 +49,7 @@ pub(crate) struct Ask {
     pub by: Option<String>,
     /// Its year, where the catalogue gives one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub year: Option<i32>,
+    pub year: Option<u16>,
     /// The member who asked, by their account's id.
     pub member: String,
     /// When it was asked for.
@@ -81,7 +81,7 @@ pub(crate) struct Asking {
     /// Its artist or author.
     pub by: Option<String>,
     /// Its year.
-    pub year: Option<i32>,
+    pub year: Option<u16>,
     /// The member asking, by their account's id.
     pub member: String,
     /// When.
@@ -104,7 +104,7 @@ pub(crate) fn kept(path: &Path) -> Result<Kept, Failure> {
 /// # Errors
 ///
 /// The [`Failure`] the file was read or written with.
-pub(crate) fn filed(path: &Path, asking: Asking) -> Result<Reference, Failure> {
+pub(crate) fn filed(path: &Path, asking: &Asking) -> Result<Reference, Failure> {
     let mut named = None;
     crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
         let medium = asking.unit.medium();

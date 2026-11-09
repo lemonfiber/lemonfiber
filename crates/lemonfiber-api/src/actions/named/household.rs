@@ -16,6 +16,7 @@
 
 use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision, Inviting};
 use lemonfiber_core::asking::Policy;
+use lemonfiber_core::collected::NotAReference;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 
 use super::filled;
@@ -215,8 +216,14 @@ fn allowing(
 /// The number is required for the reason a trace's term is: a decision with no request
 /// has lost its subject, and answering it with every waiting request would rule on
 /// things nobody mentioned.
-fn deciding(action: &str, request: Option<i64>, answer: Answer) -> Result<Command, Refused> {
-    let request = request.ok_or_else(|| missing(action, "request"))?;
+fn deciding(action: &str, request: Option<String>, answer: Answer) -> Result<Command, Refused> {
+    let written = request.ok_or_else(|| missing(action, "request"))?;
+    let request = written
+        .parse()
+        .map_err(|why: NotAReference| Refused::Unrecognised {
+            argument: "request".to_owned(),
+            offered: format!("{written} is not a reference: {why}"),
+        })?;
     Ok(Command::Deciding(Decision { request, answer }))
 }
 

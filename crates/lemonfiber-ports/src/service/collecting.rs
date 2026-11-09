@@ -163,6 +163,18 @@ pub trait MusicCurating: Send + Sync {
         after: Option<&str>,
     ) -> Result<Candidates, Failure>;
 
+    /// The `unit` `reference` names, as `lookup` would answer it, or nothing where the
+    /// curator's catalogue holds no such reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the curator is unreachable or refuses.
+    async fn candidate(
+        &self,
+        unit: MusicUnit,
+        reference: &str,
+    ) -> Result<Option<Candidate>, Failure>;
+
     /// Ask for `ask`, answering it as it now stands.
     ///
     /// # Errors
@@ -193,6 +205,18 @@ pub trait BookCurating: Send + Sync {
         term: &str,
         after: Option<&str>,
     ) -> Result<Candidates, Failure>;
+
+    /// The `unit` `reference` names, as `lookup` would answer it, or nothing where the
+    /// curator's catalogue holds no such reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the curator is unreachable or refuses.
+    async fn candidate(
+        &self,
+        unit: BookUnit,
+        reference: &str,
+    ) -> Result<Option<Candidate>, Failure>;
 
     /// Ask for `ask`, answering it as it now stands.
     ///

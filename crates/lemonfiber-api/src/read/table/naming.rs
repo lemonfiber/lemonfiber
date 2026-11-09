@@ -17,6 +17,8 @@ use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
 
+use lemonfiber_core::collected::Unit;
+
 use crate::refusal::Refusal;
 
 /// The object of an update read that is this binary.
@@ -268,17 +270,26 @@ pub(super) fn following(term: Option<String>, season: Option<&str>) -> Result<Co
 
 /// One page of a member's search.
 ///
-/// Nothing is refused here. Who is named, the words and the place are each the core's to
-/// judge, so a search naming nobody or too little is refused there, in the household's
-/// own sentence, on every surface alike.
+/// Only a kind and a unit naming no unit of music or books are refused here. Who is
+/// named, the words and the place are each the core's to judge, so a search naming
+/// nobody or too little is refused there, in the household's own sentence, on every
+/// surface alike.
+///
+/// # Errors
+///
+/// The refusal for a kind and a unit that choose no unit of music or books.
 pub(crate) fn askable(
     member: Option<String>,
     term: Option<String>,
     after: Option<String>,
-) -> Command {
-    Command::Wish(Wishing::Find {
+    kind: Option<&str>,
+    unit: Option<&str>,
+) -> Result<Command, Refusal> {
+    let unit = Unit::chosen(kind, unit).map_err(|_| Refusal::UnrecognisedArgument)?;
+    Ok(Command::Wish(Wishing::Find {
         member: member.unwrap_or_default(),
         term: term.unwrap_or_default(),
         after,
-    })
+        unit,
+    }))
 }

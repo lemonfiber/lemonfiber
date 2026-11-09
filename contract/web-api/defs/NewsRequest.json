@@ -1,16 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One request, by its number.",
+  "description": "One request, by its reference.",
   "type": "object",
   "properties": {
+    "asked": {
+      "description": "When it was asked for, where that is known.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "by": {
       "description": "Who asked for it, by the name the media server holds them under.",
       "type": "string"
     },
-    "number": {
-      "description": "The number the request service files it under.",
-      "type": "integer",
-      "format": "int64"
+    "request": {
+      "description": "The reference the household list names it with: the request service's number\n(`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.",
+      "type": "string"
     },
     "title": {
       "description": "What it is called, where a service has been told about it.",
@@ -21,7 +27,7 @@
     }
   },
   "required": [
-    "number",
+    "request",
     "by"
   ]
 }

@@ -379,7 +379,7 @@ fn a_decision_with_no_request_is_refused() {
 #[test]
 fn turning_a_request_down_without_a_reason_is_refused() {
     let given = Arguments {
-        request: Some(7),
+        request: Some("7".to_owned()),
         ..Arguments::default()
     };
 
@@ -399,7 +399,7 @@ fn turning_a_request_down_without_a_reason_is_refused() {
 #[test]
 fn an_approval_cannot_carry_a_reason() {
     let given = Arguments {
-        request: Some(7),
+        request: Some("7".to_owned()),
         reason: Some("no room".to_owned()),
         ..Arguments::default()
     };

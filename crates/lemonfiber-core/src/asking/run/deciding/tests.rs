@@ -32,7 +32,7 @@ async fn a_stack_that_cannot_be_read_rules_on_nothing() {
     let refused = deciding(
         &ctx,
         &Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Answer::LetThrough,
         },
     )

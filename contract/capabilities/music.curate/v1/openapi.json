@@ -90,6 +90,9 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/lemonfiber/music.curate/v1/candidate": {
+      "$ref": "operations/candidate.json"
+    },
     "/lemonfiber/music.curate/v1/lookup": {
       "$ref": "operations/lookup.json"
     },

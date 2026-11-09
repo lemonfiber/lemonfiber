@@ -439,7 +439,7 @@
         },
         "kind": {
           "description": "The kind of media the curator files it as.",
-          "$ref": "TitleKind.json"
+          "$ref": "VideoKind.json"
         },
         "release": {
           "description": "The release's fingerprint.",

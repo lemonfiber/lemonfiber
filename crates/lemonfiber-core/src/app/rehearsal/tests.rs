@@ -360,7 +360,7 @@ fn always_reported() -> Vec<Command> {
         },
         Command::Allowing(Chosen::default()),
         Command::Deciding(Decision {
-            request: 1,
+            request: crate::collected::Reference::Filed(1),
             answer: crate::app::Answer::LetThrough,
         }),
         Command::Expiring(Arranged::After(30)),

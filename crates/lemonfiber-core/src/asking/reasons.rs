@@ -22,6 +22,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::collected::Reference;
+
 /// What was said when one request was turned down.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Refused {
@@ -66,16 +68,14 @@ pub struct Passed {
     pub at: Option<String>,
 }
 
-/// Every reason this machine holds, by the request the service files it under.
-///
-/// Keyed by the service's own number rather than by anything of this program's: it is
-/// the only name both sides know a request by, and a second naming would be a second
-/// chance to attach a reason to the wrong thing.
+/// Every reason this machine holds, by the reference the request is named by: the
+/// service's own number for one it files, which is the only name both sides know it by,
+/// and `music-<n>` or `books-<n>` for an ask the core keeps.
 #[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reasons {
     /// The reasons themselves.
     #[serde(default)]
-    given: BTreeMap<i64, Refused>,
+    given: BTreeMap<Reference, Refused>,
 }
 
 impl Reasons {
@@ -84,12 +84,12 @@ impl Reasons {
     /// Nothing for a request refused elsewhere — somebody using the request service
     /// directly leaves no reason here, and inventing one would put words in their mouth.
     #[must_use]
-    pub fn of(&self, request: i64) -> Option<&Refused> {
+    pub fn of(&self, request: Reference) -> Option<&Refused> {
         self.given.get(&request)
     }
 
     /// Write down why an operator turned this one down.
-    pub fn keep(&mut self, request: i64, reason: &str, at: Option<String>) {
+    pub fn keep(&mut self, request: Reference, reason: &str, at: Option<String>) {
         self.written(request, reason, at, false);
     }
 
@@ -106,7 +106,7 @@ impl Reasons {
     /// silence, and a record rewritten here would owe it afresh to somebody who has
     /// already had it. So what stops a household hearing this twice is this line, rather
     /// than the request service having moved the request out of the clock's reach.
-    pub fn closed(&mut self, request: i64, reason: &str, at: Option<String>) {
+    pub fn closed(&mut self, request: Reference, reason: &str, at: Option<String>) {
         if self.given.get(&request).is_some_and(|kept| kept.expired) {
             return;
         }
@@ -118,7 +118,7 @@ impl Reasons {
     /// The reason is trimmed on the way in because it is trimmed on the way past the
     /// check that refuses a blank one, and a record holding the untrimmed spelling would
     /// disagree with the line the operator was shown.
-    fn written(&mut self, request: i64, reason: &str, at: Option<String>, expired: bool) {
+    fn written(&mut self, request: Reference, reason: &str, at: Option<String>, expired: bool) {
         self.given.insert(
             request,
             Refused {
@@ -135,7 +135,7 @@ impl Reasons {
     /// Nothing kept is nothing owed: a request refused somewhere else leaves no reason
     /// here, and there is nothing to carry.
     #[must_use]
-    pub fn owed(&self, request: i64) -> bool {
+    pub fn owed(&self, request: Reference) -> bool {
         self.given
             .get(&request)
             .is_some_and(|kept| kept.told.is_none())
@@ -146,19 +146,23 @@ impl Reasons {
     /// Written even where nothing was reached, because what this records is that the
     /// one attempt happened. Nothing for a request no reason is held for — there was
     /// nothing to carry, so there is nothing to say was carried.
-    pub(crate) fn passed_on(&mut self, request: i64, to: Vec<String>, at: Option<String>) {
+    pub(crate) fn passed_on(&mut self, request: Reference, to: Vec<String>, at: Option<String>) {
         if let Some(kept) = self.given.get_mut(&request) {
             kept.told = Some(Passed { to, at });
         }
     }
 
-    /// Forget every reason whose request the service no longer holds.
+    /// Forget every reason whose request the service no longer holds, keeping every one
+    /// for an ask the core keeps itself.
     ///
     /// Given the numbers that still exist rather than the ones to drop: what this record
     /// is owed is what is still there, and a caller working out the difference would be
     /// the second place that arithmetic lived.
     pub fn only(&mut self, held: &BTreeSet<i64>) {
-        self.given.retain(|request, _| held.contains(request));
+        self.given.retain(|request, _| match request {
+            Reference::Filed(number) => held.contains(number),
+            Reference::Kept(..) => true,
+        });
     }
 
     /// Whether nothing has been turned down from here.

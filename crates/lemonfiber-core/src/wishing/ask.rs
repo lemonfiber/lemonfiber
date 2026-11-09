@@ -52,7 +52,9 @@ pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedRep
                 member: reached.member.name,
                 title: wish.id,
                 kind: wish.kind.into(),
+                unit: None,
                 seasons: wish.seasons,
+                request: None,
                 outcome: Became::OnItsWay,
                 leaves: leaves(&theirs, wish.kind, 0),
                 released: detail.released,
@@ -88,8 +90,10 @@ pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedRep
         member: reached.member.name,
         title: wish.id,
         kind: wish.kind.into(),
+        unit: None,
         said: said(outcome, detail.released, &leaves, ctx.dry_run),
         seasons,
+        request: None,
         outcome,
         leaves,
         released: detail.released,
@@ -229,12 +233,14 @@ fn leaves(theirs: &OwnAllowance, kind: Kind, cost: u32) -> LeftAfter {
     LeftAfter {
         films: after(Kind::Movies),
         television: after(Kind::Tv),
+        music: None,
+        books: None,
     }
 }
 
 /// The refusal for an allowance with nothing left, saying when it frees up where that is
 /// known.
-fn nothing_left(theirs: &OwnAllowance) -> Box<Problem> {
+pub(super) fn nothing_left(theirs: &OwnAllowance) -> Box<Problem> {
     let summary = "You've asked for all you can for now.";
     match &theirs.asking.frees_up {
         Some(at) => refused_with(
@@ -250,10 +256,10 @@ fn nothing_left(theirs: &OwnAllowance) -> Box<Problem> {
 }
 
 /// What is said where somebody already asked for all of it.
-const ON_ITS_WAY: &str = "Somebody already asked for this, and it's on its way.";
+pub(super) const ON_ITS_WAY: &str = "Somebody already asked for this, and it's on its way.";
 
 /// What an ask came to, or would come to, in one household sentence.
-fn said(outcome: Became, released: bool, leaves: &LeftAfter, rehearsed: bool) -> String {
+pub(super) fn said(outcome: Became, released: bool, leaves: &LeftAfter, rehearsed: bool) -> String {
     let mut said = match (outcome, rehearsed) {
         (Became::Waiting, true) => {
             "Asking for this waits for whoever runs the house to say yes.".to_owned()
@@ -279,7 +285,14 @@ fn room(leaves: &LeftAfter) -> Option<String> {
     let television = leaves
         .television
         .map(|seasons| more(seasons, "season", " of television"));
-    let parts: Vec<String> = films.into_iter().chain(television).collect();
+    let music = leaves.music.map(|asks| more(asks, "ask", " for music"));
+    let books = leaves.books.map(|asks| more(asks, "ask", " for books"));
+    let parts: Vec<String> = films
+        .into_iter()
+        .chain(television)
+        .chain(music)
+        .chain(books)
+        .collect();
     (!parts.is_empty()).then(|| format!("After this, there's room for {}.", parts.join(" and ")))
 }
 

@@ -3,12 +3,26 @@
   "description": "One title a member's search found.",
   "type": "object",
   "properties": {
+    "by": {
+      "description": "Its artist or author, where it is music or books and one is known.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cover": {
+      "description": "Where its cover is published, where it is music or books and has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "id": {
       "description": "The id it is asked for by.",
       "type": "string"
     },
     "kind": {
-      "description": "Whether it is a series or a film.",
+      "description": "Whether it is a series, a film, music or books.",
       "$ref": "TitleKind.json"
     },
     "stands": {
@@ -18,6 +32,17 @@
     "title": {
       "description": "What it is called.",
       "type": "string"
+    },
+    "unit": {
+      "description": "What it is within music or books, and nothing for a series or a film.",
+      "anyOf": [
+        {
+          "$ref": "TitleUnit.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "year": {
       "description": "The year it came out, where that is known.",

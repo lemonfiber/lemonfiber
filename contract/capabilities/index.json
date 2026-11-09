@@ -237,8 +237,8 @@
         1
       ],
       "openapi": "music.curate/v1/openapi.json",
-      "operations": 3,
-      "sha256": "bda63af4ffaa259c2022aff8809289263abc70648b50669a713e6c13b1e8421a"
+      "operations": 4,
+      "sha256": "b5df17c176bb75ee5f8702598c8d28e05972e67797f621facd0f4d593849624f"
     },
     {
       "capability": "books.curate",
@@ -249,8 +249,8 @@
         1
       ],
       "openapi": "books.curate/v1/openapi.json",
-      "operations": 3,
-      "sha256": "da680bcd51f7390f344b2e3922c6d74504a4183ed667b5561364dbdb94036fbc"
+      "operations": 4,
+      "sha256": "b9a66f7b9a8a1714ea805b4b02ad6e42a60aad3957b54577af635f369bdd8be6"
     },
     {
       "capability": "owner.claim",

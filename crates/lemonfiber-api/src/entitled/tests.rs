@@ -360,6 +360,7 @@ fn a_search(member: &str) -> Command {
         member: member.to_owned(),
         term: "harbour".to_owned(),
         after: Some("next-place".to_owned()),
+        unit: None,
     })
 }
 

@@ -234,6 +234,10 @@ async fn closing(ctx: &Ctx, after: u32, interval: Duration) -> CameTo {
 /// ask again next hour, and ending a month-long run over a restart would be a clock that
 /// stopped the first time anything moved.
 async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
+    match crate::collected::run::expired(ctx, after, &why(after)) {
+        Ok(closed) => came_to.closed += closed,
+        Err(missed) => came_to.missed(&missed),
+    }
     let manifest = match ctx.stack.checked_manifest(ctx.today()) {
         Ok(manifest) => manifest,
         Err(err) => return came_to.missed(&err.problem().summary),

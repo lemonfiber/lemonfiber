@@ -595,7 +595,7 @@ fn carries_limit(command: &Command) -> bool {
 
 /// Whether the command carries the request it was told to rule on.
 fn carries_request(command: &Command) -> bool {
-    matches!(command, Command::Deciding(Decision { request, .. }) if *request == WAITING)
+    matches!(command, Command::Deciding(Decision { request, .. }) if request.to_string() == WAITING)
 }
 
 /// Whether the command carries the reason a request was turned down.
@@ -653,7 +653,7 @@ fn give_days(given: &mut Arguments) {
 }
 
 fn give_request(given: &mut Arguments) {
-    given.request = Some(WAITING);
+    given.request = Some(WAITING.to_owned());
 }
 
 fn give_reason(given: &mut Arguments) {
@@ -670,7 +670,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 57] = [
+pub(super) const SWEEPS: [Sweep; 58] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -735,6 +735,7 @@ pub(super) const SWEEPS: [Sweep; 57] = [
     ),
     ("ended", viewing::give_ended, viewing::carries_ended),
     ("kind", viewing::give_kind, viewing::carries_kind),
+    ("unit", viewing::give_unit, viewing::carries_unit),
     ("seasons", viewing::give_seasons, viewing::carries_seasons),
 ];
 

@@ -23,6 +23,11 @@ crate::contract! {
                 term: NAMED.to_owned(),
                 after: None,
             };
+            /// One candidate of a unit, by the curator's reference for it, or nothing.
+            fn candidate(value unit: MusicUnit, str reference: &str) -> Option<Candidate> where asks = Asked {
+                unit: MusicUnit::Album,
+                reference: NAMED.to_owned(),
+            };
             /// Ask for one candidate, by its unit and the curator's reference for it.
             fn request(refer ask: &MusicAsk as MusicAsk) -> Candidate where asks = Asked {
                 ask: MusicAsk {

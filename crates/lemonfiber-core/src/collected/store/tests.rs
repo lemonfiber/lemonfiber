@@ -38,15 +38,15 @@ fn each_medium_numbers_its_own_asks_from_one() {
     let album = Unit::Music(MusicUnit::Album);
     let book = Unit::Books(BookUnit::Book);
     assert_eq!(
-        filed(&at, asking(album, Standing::Sent)).ok(),
+        filed(&at, &asking(album, Standing::Sent)).ok(),
         Some(Reference::Kept(Medium::Music, 1))
     );
     assert_eq!(
-        filed(&at, asking(book, Standing::Waiting)).ok(),
+        filed(&at, &asking(book, Standing::Waiting)).ok(),
         Some(Reference::Kept(Medium::Books, 1))
     );
     assert_eq!(
-        filed(&at, asking(album, Standing::Waiting)).ok(),
+        filed(&at, &asking(album, Standing::Waiting)).ok(),
         Some(Reference::Kept(Medium::Music, 2))
     );
     let asks = kept(&at).map(|kept| kept.asks).unwrap_or_default();
@@ -61,8 +61,8 @@ fn each_medium_numbers_its_own_asks_from_one() {
 fn only_a_waiting_ask_is_settled_and_only_once() {
     let at = path("collected-settled");
     let artist = Unit::Music(MusicUnit::Artist);
-    let _ = filed(&at, asking(artist, Standing::Sent));
-    let waiting = filed(&at, asking(artist, Standing::Waiting));
+    let _ = filed(&at, &asking(artist, Standing::Sent));
+    let waiting = filed(&at, &asking(artist, Standing::Waiting));
     assert_eq!(waiting.ok(), Some(Reference::Kept(Medium::Music, 2)));
     let sent = Reference::Kept(Medium::Music, 1);
     assert_eq!(

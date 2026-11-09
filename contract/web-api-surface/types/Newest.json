@@ -8,7 +8,7 @@
     },
     "requests": {
       "type": [
-        "array[integer/int64]"
+        "array[string]"
       ],
       "required": true
     },

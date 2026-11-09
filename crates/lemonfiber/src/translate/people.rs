@@ -5,12 +5,15 @@ use lemonfiber_core::app::{
     Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Viewing, Whom, Wishing,
 };
 use lemonfiber_core::asking::Policy;
+use lemonfiber_core::collected::{Medium, Unit};
 use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::{HowFar, Quota, Unrated, Wish};
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom, Wished};
+use lemonfiber::cli::{
+    Collected, HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom, Wished, Within,
+};
 
 /// The command line spells what somebody may watch as three flags and the core carries
 /// them as one choice, because they are one decision taken at one moment. Only the
@@ -146,28 +149,98 @@ pub(crate) fn household(whom: RawWhom, action: Option<HouseholdCommand>) -> Resu
                 ended,
             },
         })),
-        HouseholdCommand::Search { name, term, after } => Ok(Command::Wish(Wishing::Find {
+        HouseholdCommand::Search {
+            name,
+            term,
+            after,
+            kind,
+            unit,
+        } => Ok(Command::Wish(Wishing::Find {
             member: name,
             term: term.join(" "),
             after,
+            unit: chosen(kind.map(medium_of), unit)?,
         })),
         HouseholdCommand::Ask {
             name,
             id,
             kind,
+            unit,
             seasons,
-        } => Ok(Command::Wish(Wishing::Ask {
-            member: name,
-            wish: Wish {
-                id,
-                kind: match kind {
-                    Wished::Tv => Kind::Tv,
-                    Wished::Movies => Kind::Movies,
-                },
-                seasons,
-            },
-        })),
+        } => asking(name, id, kind, unit, seasons),
     }
+}
+
+/// A member's ask for a title, or for music or books, as the core takes it.
+///
+/// # Errors
+///
+/// [`USAGE`] where a unit is given for a series or a film, where seasons are given for
+/// music or books, and where the unit is of the other medium.
+fn asking(
+    member: String,
+    id: String,
+    kind: Wished,
+    within: Option<Within>,
+    seasons: Vec<u32>,
+) -> Result<Command, u8> {
+    let screened = match kind {
+        Wished::Tv => Some(Kind::Tv),
+        Wished::Movies => Some(Kind::Movies),
+        Wished::Music | Wished::Books => None,
+    };
+    if let Some(kind) = screened {
+        if within.is_some() {
+            complain!("error: `--unit` is for music and books, not for a series or a film");
+            return Err(USAGE);
+        }
+        return Ok(Command::Wish(Wishing::Ask {
+            member,
+            wish: Wish { id, kind, seasons },
+        }));
+    }
+    if !seasons.is_empty() {
+        complain!("error: `--season` is for a series, not for music or books");
+        return Err(USAGE);
+    }
+    let medium = if kind == Wished::Music {
+        Medium::Music
+    } else {
+        Medium::Books
+    };
+    let unit = chosen(Some(medium), within)?.unwrap_or(Unit::first_of(medium));
+    Ok(Command::Wish(Wishing::Collect {
+        member,
+        unit,
+        reference: id,
+    }))
+}
+
+/// The medium a search names.
+const fn medium_of(kind: Collected) -> Medium {
+    match kind {
+        Collected::Music => Medium::Music,
+        Collected::Books => Medium::Books,
+    }
+}
+
+/// The unit a medium and a unit given choose, as [`Unit::chosen`] reads them.
+///
+/// # Errors
+///
+/// [`USAGE`] where the unit is of the other medium.
+fn chosen(medium: Option<Medium>, within: Option<Within>) -> Result<Option<Unit>, u8> {
+    let word = within.map(|within| match within {
+        Within::Album => "album",
+        Within::Artist => "artist",
+        Within::Book => "book",
+        Within::Author => "author",
+        Within::Series => "series",
+    });
+    Unit::chosen(medium.map(Medium::word), word).map_err(|why| {
+        complain!("error: {why}");
+        USAGE
+    })
 }
 
 /// What is being arranged about the requests nobody rules on.

@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"album\"",
+    "\"artist\"",
+    "\"author\"",
+    "\"book\"",
+    "\"series\""
+  ]
+}

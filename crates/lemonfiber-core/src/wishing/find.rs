@@ -20,6 +20,24 @@ const TERM_LONGEST: usize = 100;
 /// for a title the member may be shown.
 const READ_PER_PAGE: usize = 3;
 
+/// `term` trimmed, where it is long enough to search with and no longer than a search
+/// is made with.
+///
+/// # Errors
+///
+/// The refusal for words too few or too many.
+pub(in crate::wishing) fn searched(term: &str) -> Result<&str, Box<Problem>> {
+    let term = term.trim();
+    if (TERM_SHORTEST..=TERM_LONGEST).contains(&term.chars().count()) {
+        Ok(term)
+    } else {
+        Err(refused(
+            NOT_A_SEARCH,
+            "Type at least two letters, and no more than a hundred.",
+        ))
+    }
+}
+
 /// One page of what `term` finds for the member `named`, from `after` on.
 ///
 /// # Errors
@@ -33,13 +51,7 @@ pub(super) async fn found(
     term: &str,
     after: Option<&str>,
 ) -> Result<AskableReport, Box<Problem>> {
-    let term = term.trim();
-    if !(TERM_SHORTEST..=TERM_LONGEST).contains(&term.chars().count()) {
-        return Err(refused(
-            NOT_A_SEARCH,
-            "Type at least two letters, and no more than a hundred.",
-        ));
-    }
+    let term = searched(term)?;
     let mut place = Place::read(after)?;
     let reached = reached(ctx, named).await?;
     if reached.kinds.is_empty() {
@@ -120,8 +132,11 @@ fn askable(found: Found) -> Askable {
         stands: stands(found.status),
         id: found.id,
         kind: found.kind.into(),
+        unit: None,
         title: found.title,
+        by: None,
         year: found.year,
+        cover: None,
     }
 }
 

@@ -123,6 +123,8 @@ async fn a_rehearsal_says_what_the_ask_leaves_and_that_it_waits_and_files_nothin
             LeftAfter {
                 films: Some(0),
                 television: Some(5),
+                music: None,
+                books: None,
             },
             true,
             TitleKind::Movies
@@ -286,6 +288,8 @@ fn an_ask_under_no_limit_says_nothing_about_room() {
     let unlimited = LeftAfter {
         films: None,
         television: None,
+        music: None,
+        books: None,
     };
 
     assert_eq!(
@@ -410,6 +414,8 @@ async fn a_series_asks_only_for_the_seasons_not_already_here_or_on_their_way() {
             LeftAfter {
                 films: Some(1),
                 television: Some(4),
+                music: None,
+                books: None,
             }
         ))
     );

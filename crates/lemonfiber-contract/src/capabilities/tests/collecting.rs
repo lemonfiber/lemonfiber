@@ -61,6 +61,14 @@ impl MusicCurating for Upstream {
             next: after.is_none().then(|| "2".to_owned()),
         })
     }
+    async fn candidate(
+        &self,
+        unit: MusicUnit,
+        reference: &str,
+    ) -> Result<Option<Candidate>, Failure> {
+        self.tell(format!("candidate {unit:?} {reference}"));
+        Ok((reference != UNHELD).then(|| found(&format!("{unit:?}"), None)))
+    }
     async fn request(&self, ask: &MusicAsk) -> Result<Candidate, Failure> {
         self.tell(format!("request {ask:?}"));
         if ask.reference == UNHELD {
@@ -90,6 +98,14 @@ impl BookCurating for Upstream {
             found: vec![found(&format!("{unit:?}"), Some("ebook"))],
             next: None,
         })
+    }
+    async fn candidate(
+        &self,
+        unit: BookUnit,
+        reference: &str,
+    ) -> Result<Option<Candidate>, Failure> {
+        self.tell(format!("candidate {unit:?} {reference}"));
+        Ok((reference != UNHELD).then(|| found(&format!("{unit:?}"), Some("ebook"))))
     }
     async fn request(&self, ask: &BookAsk) -> Result<Candidate, Failure> {
         self.tell(format!("request {ask:?}"));
@@ -133,6 +149,8 @@ async fn listening<C: MusicCurating>(curator: &C) -> Vec<String> {
                 .lookup(MusicUnit::Artist, "lanterns", Some("2"))
                 .await,
         ),
+        said(curator.candidate(MusicUnit::Album, "album-0d1e").await),
+        said(curator.candidate(MusicUnit::Artist, UNHELD).await),
         said(curator.request(&ask(MusicUnit::Album, "album-0d1e")).await),
         said(curator.request(&ask(MusicUnit::Artist, UNHELD)).await),
         said(curator.profiles().await),
@@ -151,6 +169,8 @@ async fn reading<C: BookCurating>(curator: &C) -> Vec<String> {
     vec![
         said(curator.lookup(BookUnit::Book, "harbour", None).await),
         said(curator.lookup(BookUnit::Series, "lights", Some("2")).await),
+        said(curator.candidate(BookUnit::Series, "series-0d1e").await),
+        said(curator.candidate(BookUnit::Book, UNHELD).await),
         said(curator.request(&ask(BookUnit::Author, "author-0d1e")).await),
         said(curator.request(&ask(BookUnit::Book, UNHELD)).await),
         said(curator.profiles().await),
@@ -162,7 +182,15 @@ async fn a_curator_of_music_answers_and_is_told_through_its_contract_as_it_is_in
     crosses_alike!(
         listening,
         music::curate::Adapter,
-        ["lookup", "lookup", "request", "request", "profiles"]
+        [
+            "lookup",
+            "lookup",
+            "candidate",
+            "candidate",
+            "request",
+            "request",
+            "profiles"
+        ]
     );
 }
 
@@ -171,6 +199,14 @@ async fn a_curator_of_books_answers_and_is_told_through_its_contract_as_it_is_in
     crosses_alike!(
         reading,
         books::curate::Adapter,
-        ["lookup", "lookup", "request", "request", "profiles"]
+        [
+            "lookup",
+            "lookup",
+            "candidate",
+            "candidate",
+            "request",
+            "request",
+            "profiles"
+        ]
     );
 }

@@ -2,8 +2,8 @@
 //!
 //! Three kinds, each listed newest first by an order the stack keeps rather than one
 //! a surface works out: a release by its place in the record this build carries, a
-//! request by the number the request service files it under, and a check found
-//! wrong by when it went wrong. A surface that remembers the newest of each kind it
+//! request by when it was asked, whichever of the request service and the core keeps
+//! it, and a check found wrong by when it went wrong. A surface that remembers the newest of each kind it
 //! has shown can then say what came after it without comparing anything the stack
 //! did not order.
 //!
@@ -34,8 +34,8 @@ pub const NEWEST: usize = 10;
 pub struct Newest {
     /// The versions of the newest releases in the record this build carries.
     pub updates: Vec<String>,
-    /// The numbers of the household's newest requests.
-    pub requests: Vec<i64>,
+    /// The references of the household's newest requests.
+    pub requests: Vec<String>,
     /// The checks most recently found wrong, each with its onset.
     pub problems: Vec<NewsCheck>,
     /// The kinds that could not be read, as [`News::unread`] names them.
@@ -57,7 +57,7 @@ pub struct NewsCheck {
 pub struct News {
     /// The releases in the record this build carries, newest first.
     pub updates: Vec<NewsUpdate>,
-    /// What the household has asked for, highest number first.
+    /// What the household has asked for, the most recently asked first.
     pub requests: Vec<NewsRequest>,
     /// The checks found wrong, the most recent onset first.
     pub problems: Vec<NewsProblem>,
@@ -90,11 +90,15 @@ pub struct NewsUpdate {
     pub delivers: Option<String>,
 }
 
-/// One request, by its number.
+/// One request, by its reference.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct NewsRequest {
-    /// The number the request service files it under.
-    pub number: i64,
+    /// The reference the household list names it with: the request service's number
+    /// (`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.
+    pub request: String,
+    /// When it was asked for, where that is known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asked: Option<String>,
     /// What it is called, where a service has been told about it.
     pub title: Option<String>,
     /// Who asked for it, by the name the media server holds them under.
@@ -169,7 +173,7 @@ impl News {
                 .requests
                 .iter()
                 .take(NEWEST)
-                .map(|request| request.number)
+                .map(|request| request.request.clone())
                 .collect(),
             problems: self
                 .problems
@@ -197,21 +201,29 @@ fn releases(record: &Record) -> Vec<NewsUpdate> {
         .collect()
 }
 
-/// Every request anybody in the household made, highest number first.
+/// Every request anybody in the household made, the most recently asked first, and one
+/// whose asking was not read after every one whose was.
+///
+/// Ordered by the instant each stamp reads as, since the two keepers write it to
+/// different precisions; one that cannot be read counts as not read.
 fn requests(household: &HouseholdReport) -> Vec<NewsRequest> {
     let mut requests: Vec<NewsRequest> = household
         .members
         .iter()
         .flat_map(|member| {
             member.requests.iter().map(|request| NewsRequest {
-                number: request.id,
+                request: request.id.clone(),
+                asked: request.asked.clone(),
                 title: request.title.clone(),
                 by: member.name.clone(),
             })
         })
         .collect();
-    requests.sort_by_key(|request| std::cmp::Reverse(request.number));
-    requests.dedup_by_key(|request| request.number);
+    requests.sort_by_key(|request| {
+        std::cmp::Reverse(request.asked.as_deref().and_then(crate::instant::read))
+    });
+    let mut seen = std::collections::BTreeSet::new();
+    requests.retain(|request| seen.insert(request.request.clone()));
     requests
 }
 

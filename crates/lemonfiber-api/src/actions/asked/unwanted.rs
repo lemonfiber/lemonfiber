@@ -121,6 +121,11 @@ pub(crate) const TAKEN: &[Taken] = &[
         given: |arguments| !arguments.seasons.is_empty(),
     },
     Taken {
+        name: "unit",
+        takers: TAKES_WISH,
+        given: |arguments| arguments.unit.is_some(),
+    },
+    Taken {
         name: "position",
         takers: TAKES_PROGRESS,
         given: |arguments| arguments.position.is_some(),
