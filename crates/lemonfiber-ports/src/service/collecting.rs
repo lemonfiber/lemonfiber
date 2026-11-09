@@ -276,3 +276,6 @@ pub trait BookCurating: Send + Sync {
     /// Returns [`Failure`] when the curator is unreachable or refuses.
     async fn profiles(&self) -> Result<AskedWith, Failure>;
 }
+
+#[cfg(test)]
+mod tests;
