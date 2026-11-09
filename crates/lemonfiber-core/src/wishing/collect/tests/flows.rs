@@ -177,9 +177,11 @@ async fn a_search_from_nowhere_a_page_gives_or_of_a_curator_not_answering_is_ref
     let ctx = ctx(&transport, "found-refused");
 
     let nowhere = found(&ctx, ALBUM, Some("")).await;
+    let too_far = found(&ctx, ALBUM, Some(&"9".repeat(1025))).await;
     let unanswered = found(&ctx, ALBUM, None).await;
 
     assert!(is(&nowhere, NOT_A_PLACE));
+    assert!(is(&too_far, NOT_A_PLACE));
     assert!(is(&unanswered, NOT_WORKING));
 }
 
@@ -189,8 +191,10 @@ async fn a_house_with_no_curator_of_a_medium_cannot_fetch_it() {
     let ctx = ctx_engine(Arc::clone(&transport), "collect-no-curator", engine());
 
     let refused = found(&ctx, ALBUM, None).await;
+    let unasked = asked(&ctx, "Ada", ALBUM).await;
 
     assert!(is(&refused, CANNOT_FETCH));
+    assert!(is(&unasked, CANNOT_FETCH));
 }
 
 #[tokio::test]
@@ -512,4 +516,20 @@ async fn an_ask_that_cannot_be_kept_is_not_working() {
     let refused = asked(&ctx, "Ada", ALBUM).await;
 
     assert!(is(&refused, NOT_WORKING), "{refused:?}");
+}
+
+#[tokio::test]
+async fn an_ask_with_nowhere_to_be_kept_asks_the_curator_nothing() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let mut ctx = ctx(&transport, "nowhere-kept");
+    ctx.settings.env_file = None;
+
+    let refused = asked(&ctx, "Ada", ALBUM).await;
+
+    assert!(is(&refused, NOT_WORKING), "{refused:?}");
+    assert_eq!(sent(&transport, "candidate"), 0);
+    assert_eq!(sent(&transport, "request"), 0);
 }

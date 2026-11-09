@@ -40,6 +40,24 @@ fn kept(ctx: &crate::app::Ctx, asking: &Asking) -> Option<Reference> {
     kept_at(ctx).ok().and_then(|path| filed(&path, asking).ok())
 }
 
+fn blocked(at: Option<std::path::PathBuf>) -> bool {
+    at.is_some_and(|at| {
+        let _ = std::fs::remove_file(&at);
+        std::fs::create_dir_all(at.join("in-the-way")).is_ok()
+    })
+}
+
+fn reasons_blocked(ctx: &crate::app::Ctx) -> bool {
+    blocked(crate::app::targets::beside_env(
+        ctx,
+        crate::config::paths::REFUSALS,
+    ))
+}
+
+fn asks_blocked(ctx: &crate::app::Ctx) -> bool {
+    blocked(kept_at(ctx).ok().map(|at| crate::config::held::beside(&at)))
+}
+
 fn standing_of(ctx: &crate::app::Ctx, named: Reference) -> Option<Standing> {
     every(ctx)
         .into_iter()
@@ -112,6 +130,49 @@ fn an_ask_left_waiting_past_the_period_is_closed_with_why_and_no_other() {
     assert!(reasons.of(overdue).is_some_and(|refused| refused.expired));
     assert!(reasons.of(fresh).is_none());
     assert_eq!(expired(&ctx, 30, "nobody ruled on it"), Ok(0));
+}
+
+#[tokio::test]
+async fn a_decline_that_cannot_be_written_fails_and_leaves_the_ask_waiting() {
+    for (tag, block) in [
+        (
+            "collected-reason-unkept",
+            reasons_blocked as fn(&crate::app::Ctx) -> bool,
+        ),
+        ("collected-ask-unsettled", asks_blocked),
+    ] {
+        let ctx = ctx(tag);
+        let named = kept(
+            &ctx,
+            &album("ada", written(ctx.seams.clock.now()), Standing::Waiting),
+        );
+        assert!(block(&ctx), "{tag}");
+
+        assert!(decided(&ctx, Medium::Music, 1, Some("no")).await.is_err());
+        assert_eq!(
+            named.and_then(|named| standing_of(&ctx, named)),
+            Some(Standing::Waiting),
+            "{tag}"
+        );
+    }
+}
+
+#[test]
+fn closing_asks_that_cannot_be_written_says_why() {
+    for (tag, block) in [
+        (
+            "collected-expiry-unkept",
+            reasons_blocked as fn(&crate::app::Ctx) -> bool,
+        ),
+        ("collected-expiry-unsettled", asks_blocked),
+    ] {
+        let ctx = ctx(tag);
+        let old = written(ctx.seams.clock.now() - DAY * 40);
+        let _ = kept(&ctx, &album("ada", old, Standing::Waiting));
+        assert!(block(&ctx), "{tag}");
+
+        assert!(expired(&ctx, 30, "nobody ruled on it").is_err(), "{tag}");
+    }
 }
 
 #[tokio::test]

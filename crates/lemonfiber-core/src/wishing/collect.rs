@@ -80,6 +80,7 @@ pub(super) async fn asked(
     unit: Unit,
     reference: &str,
 ) -> Result<AskedReport, Box<Problem>> {
+    let path = crate::collected::run::kept_at(ctx).map_err(|_| not_working())?;
     let reached = reached(ctx, named).await?;
     let curator = curator_of(ctx, unit).await?;
     let candidate = curator
@@ -153,7 +154,6 @@ pub(super) async fn asked(
             .await
             .map_err(|_| not_working())?;
     }
-    let path = crate::collected::run::kept_at(ctx).map_err(|_| not_working())?;
     let filed = crate::collected::store::filed(
         &path,
         &Asking {
