@@ -1,5 +1,17 @@
 {
   "fields": {
+    "by": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "cover": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "id": {
       "type": [
         "string"
@@ -23,6 +35,12 @@
         "string"
       ],
       "required": true
+    },
+    "unit": {
+      "type": [
+        "anyOf(null,ref:TitleUnit)"
+      ],
+      "required": false
     },
     "year": {
       "type": [

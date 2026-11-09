@@ -1,18 +1,13 @@
 //! A member's search for a title, and what asking for one came to, printed.
 
-use lemonfiber_core::model::{AskableReport, AskedReport, Stands};
-use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::model::{AskableReport, AskedReport, Stands, TitleUnit};
 
 use super::Lines;
 
 /// One page of what a search found, a title a line, and where the next page begins.
 pub(super) fn askable(report: &AskableReport) -> Lines {
     let mut lines = Lines::default();
-    let kinds: Vec<&str> = report
-        .kinds
-        .iter()
-        .map(|kind| Kind::from(*kind).noun())
-        .collect();
+    let kinds: Vec<&str> = report.kinds.iter().map(|kind| kind.noun()).collect();
     lines.put(format!(
         "{} — \"{}\", among every {}",
         report.member,
@@ -20,13 +15,17 @@ pub(super) fn askable(report: &AskableReport) -> Lines {
         kinds.join(" and every ")
     ));
     for title in &report.titles {
+        let by = title
+            .by
+            .as_ref()
+            .map_or_else(String::new, |by| format!(" by {by}"));
         let year = title
             .year
             .map_or_else(String::new, |year| format!(" ({year})"));
         lines.put(format!(
-            "  {}{year} · {} · {} · {}",
+            "  {}{by}{year} · {} · {} · {}",
             title.title,
-            Kind::from(title.kind).noun(),
+            title.unit.map_or(title.kind.noun(), TitleUnit::noun),
             stands(title.stands),
             title.id
         ));
@@ -48,6 +47,9 @@ pub(super) fn askable(report: &AskableReport) -> Lines {
 pub(super) fn asked(report: &AskedReport) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("{} — {}", report.member, report.said));
+    if let Some(request) = &report.request {
+        lines.put(format!("On the household list as {request}."));
+    }
     lines
 }
 

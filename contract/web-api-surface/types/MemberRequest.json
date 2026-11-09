@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "asked": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "estimate": {
       "type": [
         "anyOf(null,ref:Estimate)"
@@ -14,7 +20,7 @@
     },
     "id": {
       "type": [
-        "integer/int64"
+        "string"
       ],
       "required": true
     },

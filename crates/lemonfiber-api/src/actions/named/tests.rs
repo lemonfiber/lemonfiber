@@ -21,6 +21,7 @@ fn everything(confirm: bool) -> Arguments {
         position: Some(1),
         ended: Some(true),
         kind: Some("movies".to_owned()),
+        unit: None,
         seasons: Vec::new(),
         libraries: vec!["Films".to_owned()],
         age_limit: Some(12),
@@ -52,7 +53,7 @@ fn everything(confirm: bool) -> Arguments {
         policy: Some("within-a-limit".to_owned()),
         requests: Some(5),
         days: Some(30),
-        request: Some(7),
+        request: Some("7".to_owned()),
         reason: Some("there is no room this month".to_owned()),
         capability: Some("indexer.search".to_owned()),
         plugin: Some("komga".to_owned()),
@@ -326,6 +327,7 @@ fn an_ask_is_refused_by_what_it_lacks_and_a_kind_that_is_neither() {
     let titled = |kind: Option<&str>| Arguments {
         id: Some("603".to_owned()),
         kind: kind.map(str::to_owned),
+        unit: None,
         ..Arguments::default()
     };
     assert_eq!(
@@ -340,12 +342,54 @@ fn an_ask_is_refused_by_what_it_lacks_and_a_kind_that_is_neither() {
         super::wishing::asked_for(titled(Some("film"))).err(),
         Some(crate::actions::Refused::Unrecognised {
             argument: "kind".to_owned(),
-            offered: "film is neither movies nor tv".to_owned(),
+            offered: "film is none of movies, tv, music and books".to_owned(),
         })
     );
     assert!(matches!(
         super::wishing::asked_for(titled(Some("movies"))),
         Ok(Command::Wish(Wishing::Ask { member, wish }))
             if member.is_empty() && wish.kind == Kind::Movies && wish.seasons.is_empty()
+    ));
+}
+
+/// Music and books are asked for by unit, their medium's first where none is named; a
+/// unit of the other medium, a unit for a film and seasons for music are refused.
+#[test]
+fn music_and_books_are_asked_for_by_unit() {
+    use lemonfiber_core::app::{Command, Wishing};
+    use lemonfiber_core::collected::Unit;
+    use lemonfiber_core::ports::service::{BookUnit, MusicUnit};
+    let asked = |kind: &str, unit: Option<&str>, seasons: Vec<u32>| {
+        super::wishing::asked_for(Arguments {
+            id: Some("mbid-1".to_owned()),
+            kind: Some(kind.to_owned()),
+            unit: unit.map(str::to_owned),
+            seasons,
+            ..Arguments::default()
+        })
+    };
+    assert!(matches!(
+        asked("music", None, Vec::new()),
+        Ok(Command::Wish(Wishing::Collect { unit: Unit::Music(MusicUnit::Album), reference, .. }))
+            if reference == "mbid-1"
+    ));
+    assert!(matches!(
+        asked("books", Some("author"), Vec::new()),
+        Ok(Command::Wish(Wishing::Collect {
+            unit: Unit::Books(BookUnit::Author),
+            ..
+        }))
+    ));
+    assert!(matches!(
+        asked("music", Some("series"), Vec::new()),
+        Err(crate::actions::Refused::Unrecognised { argument, .. }) if argument == "unit"
+    ));
+    assert!(matches!(
+        asked("movies", Some("album"), Vec::new()),
+        Err(crate::actions::Refused::Unwanted { argument, .. }) if argument == "unit"
+    ));
+    assert!(matches!(
+        asked("books", None, vec![1]),
+        Err(crate::actions::Refused::Unwanted { argument, .. }) if argument == "seasons"
     ));
 }

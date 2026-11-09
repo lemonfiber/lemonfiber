@@ -179,7 +179,7 @@ const fn cannot(named: &'static str, why: &'static str) -> Asked {
 const fn wished(wishing: &Wishing) -> Asked {
     match wishing {
         Wishing::Find { .. } => reads("household search"),
-        Wishing::Ask { .. } => reports("household ask", &[kind::ASKED]),
+        Wishing::Ask { .. } | Wishing::Collect { .. } => reports("household ask", &[kind::ASKED]),
     }
 }
 

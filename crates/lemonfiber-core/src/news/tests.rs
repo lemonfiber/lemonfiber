@@ -23,12 +23,14 @@ fn record() -> Option<Record> {
     ])
 }
 
-fn asked(id: i64, title: Option<&str>) -> MemberRequest {
+/// A request named `id`, asked for at the hour `hour` of one day where one is given.
+fn asked(id: &str, hour: Option<u32>, title: Option<&str>) -> MemberRequest {
     MemberRequest {
         year: None,
         arrived: None,
         shelf_id: None,
-        id,
+        id: id.to_owned(),
+        asked: hour.map(|hour| format!("2026-11-08T{hour:02}:00:00.000Z")),
         title: title.map(str::to_owned),
         media: None,
         state: None,
@@ -87,20 +89,35 @@ fn a_release_is_newer_by_its_place_in_the_record() {
 }
 
 #[test]
-fn a_request_is_newer_by_its_number_whoever_asked() {
+fn a_request_is_newer_by_when_it_was_asked_whoever_keeps_it_and_whoever_asked() {
     let house = household(vec![
-        member("Anna", vec![asked(3, Some("Dune")), asked(12, None)]),
-        member("Bram", vec![asked(7, Some("Bluey"))]),
+        member(
+            "Anna",
+            vec![
+                asked("3", Some(3), Some("Dune")),
+                asked("music-1", Some(12), Some("Blue")),
+                asked("9", None, None),
+            ],
+        ),
+        member("Bram", vec![asked("7", Some(7), Some("Bluey"))]),
     ]);
 
     let news = News::of(None, Some(&house), &[]);
 
-    let numbers: Vec<(i64, &str)> = news
+    let named: Vec<(&str, &str)> = news
         .requests
         .iter()
-        .map(|one| (one.number, one.by.as_str()))
+        .map(|one| (one.request.as_str(), one.by.as_str()))
         .collect();
-    assert_eq!(numbers, vec![(12, "Anna"), (7, "Bram"), (3, "Anna")]);
+    assert_eq!(
+        named,
+        vec![
+            ("music-1", "Anna"),
+            ("7", "Bram"),
+            ("3", "Anna"),
+            ("9", "Anna")
+        ]
+    );
 }
 
 #[test]
@@ -152,7 +169,9 @@ fn the_newest_of_each_kind_is_the_first_ten_by_what_names_them() {
         .collect();
     let house = household(vec![member(
         "Anna",
-        (1..=15).map(|id| asked(id, None)).collect(),
+        (1..=15)
+            .map(|id| asked(&id.to_string(), Some(id), None))
+            .collect(),
     )]);
 
     let newest = News::of(record().as_ref(), Some(&house), &affected).newest();
@@ -171,5 +190,5 @@ fn the_newest_of_each_kind_is_the_first_ten_by_what_names_them() {
             .map(|one| (one.check.as_str(), one.onset.as_str())),
         Some(("check.14", "1014"))
     );
-    assert_eq!(newest.requests.last(), Some(&6));
+    assert_eq!(newest.requests.last().map(String::as_str), Some("6"));
 }

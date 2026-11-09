@@ -2,7 +2,7 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::asking::{Policy, Standing};
 use lemonfiber_core::model::{
     Askable, AskableReport, AskedReport, Became, Counted, LeftAfter, MemberAsking, Stands,
-    TitleKind,
+    TitleKind, TitleUnit,
 };
 
 use super::{askable, asked};
@@ -41,8 +41,11 @@ fn a_title(id: &str, kind: TitleKind, year: Option<u16>, stands: Stands) -> Aska
     Askable {
         id: id.to_owned(),
         kind,
+        unit: None,
         title: format!("Harbour {id}"),
+        by: None,
         year,
+        cover: None,
         stands,
     }
 }
@@ -114,7 +117,9 @@ fn an_ask_is_said_in_the_households_own_sentence() {
         member: "ana".to_owned(),
         title: "1399".to_owned(),
         kind: TitleKind::Tv,
+        unit: None,
         seasons: vec![3],
+        request: None,
         outcome: Became::Waiting,
         leaves: LeftAfter::default(),
         released: true,
@@ -129,13 +134,48 @@ fn an_ask_is_said_in_the_households_own_sentence() {
 }
 
 #[test]
+fn an_album_is_listed_by_its_artist_and_its_ask_by_the_reference_it_is_kept_under() {
+    let text = askable(&a_page(
+        None,
+        vec![Askable {
+            unit: Some(TitleUnit::Album),
+            by: Some("Miles Davis".to_owned()),
+            ..a_title("mbid-1", TitleKind::Music, Some(1959), Stands::Askable)
+        }],
+    ))
+    .text();
+    assert!(
+        text.contains("Harbour mbid-1 by Miles Davis (1959) · album · may be asked for · mbid-1"),
+        "{text}"
+    );
+
+    let said = asked(&AskedReport {
+        member: "ana".to_owned(),
+        title: "mbid-1".to_owned(),
+        kind: TitleKind::Music,
+        unit: Some(TitleUnit::Album),
+        seasons: Vec::new(),
+        request: Some("music-1".to_owned()),
+        outcome: Became::Waiting,
+        leaves: LeftAfter::default(),
+        released: true,
+        said: "Asked. Whoever runs the house will say yes or no.".to_owned(),
+        rehearsed: false,
+    })
+    .text();
+    assert!(said.contains("On the household list as music-1."), "{said}");
+}
+
+#[test]
 fn a_search_and_an_ask_are_rendered_by_their_own_shapes() {
     let page = a_page(None, Vec::new());
     let report = AskedReport {
         member: "ana".to_owned(),
         title: "603".to_owned(),
         kind: TitleKind::Movies,
+        unit: None,
         seasons: Vec::new(),
+        request: None,
         outcome: Became::OnItsWay,
         leaves: LeftAfter::default(),
         released: true,

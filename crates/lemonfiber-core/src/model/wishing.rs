@@ -7,12 +7,14 @@
 use serde::Serialize;
 
 use super::MemberAsking;
+use crate::collected::{Medium, Unit};
 use crate::ports::media::Kind;
+use crate::ports::service::{BookUnit, MusicUnit};
 
-/// Whether a title is a series or a film, as a member's search and ask name it.
+/// What kind of title a member's search and ask name: a series, a film, music or books.
 ///
-/// The web surface's own name for [`Kind`], whose name an SDK already gives to the kinds
-/// of envelope: the same two words on the wire, under a name nothing else takes.
+/// The web surface's own name for what a member asks for, whose name an SDK already gives
+/// to the kinds of envelope: the same words on the wire, under a name nothing else takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum TitleKind {
@@ -20,6 +22,23 @@ pub enum TitleKind {
     Tv,
     /// A film.
     Movies,
+    /// An album or a whole artist.
+    Music,
+    /// A book, a whole author or a series of books.
+    Books,
+}
+
+impl TitleKind {
+    /// What a household calls a title of this kind, one of them.
+    #[must_use]
+    pub const fn noun(self) -> &'static str {
+        match self {
+            Self::Tv => Kind::Tv.noun(),
+            Self::Movies => Kind::Movies.noun(),
+            Self::Music => "album and artist",
+            Self::Books => "book, author and series",
+        }
+    }
 }
 
 impl From<Kind> for TitleKind {
@@ -31,11 +50,64 @@ impl From<Kind> for TitleKind {
     }
 }
 
-impl From<TitleKind> for Kind {
-    fn from(kind: TitleKind) -> Self {
-        match kind {
-            TitleKind::Tv => Self::Tv,
-            TitleKind::Movies => Self::Movies,
+impl From<Medium> for TitleKind {
+    fn from(medium: Medium) -> Self {
+        match medium {
+            Medium::Music => Self::Music,
+            Medium::Books => Self::Books,
+        }
+    }
+}
+
+/// Whether a title a curator of video files is a series or a film, as a document that
+/// names one of those two alone publishes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum VideoKind {
+    /// A series.
+    Tv,
+    /// A film.
+    Movies,
+}
+
+/// What one title of music or books is, within its kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum TitleUnit {
+    /// One album.
+    Album,
+    /// A whole artist.
+    Artist,
+    /// One book.
+    Book,
+    /// A whole author.
+    Author,
+    /// A series of books.
+    Series,
+}
+
+impl TitleUnit {
+    /// What a household calls one.
+    #[must_use]
+    pub const fn noun(self) -> &'static str {
+        match self {
+            Self::Album => "album",
+            Self::Artist => "artist",
+            Self::Book => "book",
+            Self::Author => "author",
+            Self::Series => "book series",
+        }
+    }
+}
+
+impl From<Unit> for TitleUnit {
+    fn from(unit: Unit) -> Self {
+        match unit {
+            Unit::Music(MusicUnit::Album) => Self::Album,
+            Unit::Music(MusicUnit::Artist) => Self::Artist,
+            Unit::Books(BookUnit::Book) => Self::Book,
+            Unit::Books(BookUnit::Author) => Self::Author,
+            Unit::Books(BookUnit::Series) => Self::Series,
         }
     }
 }
@@ -59,13 +131,22 @@ pub enum Stands {
 pub struct Askable {
     /// The id it is asked for by.
     pub id: String,
-    /// Whether it is a series or a film.
+    /// Whether it is a series, a film, music or books.
     pub kind: TitleKind,
+    /// What it is within music or books, and nothing for a series or a film.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<TitleUnit>,
     /// What it is called.
     pub title: String,
+    /// Its artist or author, where it is music or books and one is known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
     /// The year it came out, where that is known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<u16>,
+    /// Where its cover is published, where it is music or books and has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
     /// Where it stands in the house.
     pub stands: Stands,
 }
@@ -112,6 +193,12 @@ pub struct LeftAfter {
     /// Seasons of television still to ask for, absent where nothing limits them.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub television: Option<u32>,
+    /// Albums and artists still to ask for, absent where nothing limits them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub music: Option<u32>,
+    /// Books, authors and series still to ask for, absent where nothing limits them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub books: Option<u32>,
 }
 
 /// What asking for one title came to, or would come to under a rehearsal.
@@ -121,10 +208,16 @@ pub struct AskedReport {
     pub member: String,
     /// The id of the title asked for.
     pub title: String,
-    /// Whether it is a series or a film.
+    /// Whether it is a series, a film, music or books.
     pub kind: TitleKind,
-    /// The seasons asked for, none for a film.
+    /// What it is within music or books, and nothing for a series or a film.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<TitleUnit>,
+    /// The seasons asked for, none for a film, music or books.
     pub seasons: Vec<u32>,
+    /// The reference the ask is named by on the household list, where the core keeps it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<String>,
     /// What it came to.
     pub outcome: Became,
     /// What is left of the member's allowance once it is counted.
@@ -137,3 +230,6 @@ pub struct AskedReport {
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }
+
+#[cfg(test)]
+mod tests;

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Whether a title is a series or a film, as a member's search and ask name it.\n\nThe web surface's own name for [`Kind`], whose name an SDK already gives to the kinds\nof envelope: the same two words on the wire, under a name nothing else takes.",
+  "description": "What kind of title a member's search and ask name: a series, a film, music or books.\n\nThe web surface's own name for what a member asks for, whose name an SDK already gives\nto the kinds of envelope: the same words on the wire, under a name nothing else takes.",
   "oneOf": [
     {
       "description": "A series.",
@@ -11,6 +11,16 @@
       "description": "A film.",
       "type": "string",
       "const": "movies"
+    },
+    {
+      "description": "An album or a whole artist.",
+      "type": "string",
+      "const": "music"
+    },
+    {
+      "description": "A book, a whole author or a series of books.",
+      "type": "string",
+      "const": "books"
     }
   ]
 }

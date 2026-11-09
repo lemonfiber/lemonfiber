@@ -6,11 +6,14 @@
 
 use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::books;
 use lemonfiber_contract::capabilities::indexer::search;
 use lemonfiber_contract::capabilities::library::curate;
+use lemonfiber_contract::capabilities::music;
 use lemonfiber_contract::capabilities::request::intake;
 
 use crate::app::Ctx;
+use crate::collected::{Collector, Medium};
 use crate::ports::service::UsenetAccounts;
 use crate::wiring::{Filler, Fillers};
 
@@ -112,6 +115,23 @@ pub(crate) async fn requests_as_owner(
         Spoken::Over(adapter) => Some(Arc::new(intake::Adapter(adapter))),
         Spoken::Unanswered | Spoken::Not => None,
     }
+}
+
+/// The curator filling `medium`'s capability among `fillers`, as the stack settles it,
+/// asked over its contract: nothing where nothing here fills it or it cannot be asked.
+pub(crate) async fn collector(ctx: &Ctx, fillers: &Fillers, medium: Medium) -> Option<Collector> {
+    let (capability, major) = match medium {
+        Medium::Music => (music::curate::CAPABILITY, music::curate::MAJOR),
+        Medium::Books => (books::curate::CAPABILITY, books::curate::MAJOR),
+    };
+    let (filler, _) = fillers.filling(capability)?;
+    let Spoken::Over(adapter) = spoken(ctx, filler, capability, major).await else {
+        return None;
+    };
+    Some(match medium {
+        Medium::Music => Collector::Music(Arc::new(music::curate::Adapter(adapter))),
+        Medium::Books => Collector::Books(Arc::new(books::curate::Adapter(adapter))),
+    })
 }
 
 /// The first Usenet download client among `fillers`, as a reader of the accounts behind

@@ -125,7 +125,7 @@ async fn a_choice_that_is_written_answers_with_the_household() {
 async fn a_request_that_is_ruled_on_answers_with_the_household() {
     let said = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "no room this month".to_owned(),
             },
@@ -156,7 +156,7 @@ async fn a_reason_survives_the_refusal_and_reaches_whoever_asked() {
     let ruling = answering("passed-on");
     let decided = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "we already have it dubbed".to_owned(),
             },
@@ -245,7 +245,7 @@ async fn both_writes_refuse_rather_than_claiming_a_change() {
     .await;
     let decided = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         }),
         &silent("decided"),
@@ -294,7 +294,7 @@ async fn a_choice_about_one_person_is_written_and_read_back() {
 async fn a_request_let_through_answers_with_the_household() {
     let said = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         }),
         &answering("letthrough"),
@@ -337,7 +337,7 @@ async fn a_write_the_service_will_not_take_changes_nothing() {
 async fn a_decision_the_service_will_not_rule_on_says_so() {
     let refused = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Ruling::LetThrough,
         }),
         &refusing("norule", intake("decide")),

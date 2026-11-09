@@ -149,6 +149,14 @@
       {
         "name": "after",
         "repeatable": false
+      },
+      {
+        "name": "kind",
+        "repeatable": false
+      },
+      {
+        "name": "unit",
+        "repeatable": false
       }
     ],
     "kinds": [

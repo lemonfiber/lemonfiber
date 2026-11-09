@@ -360,6 +360,7 @@ fn a_search(member: &str) -> Command {
         member: member.to_owned(),
         term: "harbour".to_owned(),
         after: Some("next-place".to_owned()),
+        unit: None,
     })
 }
 
@@ -372,6 +373,17 @@ fn an_ask(member: &str) -> Command {
             kind: lemonfiber_core::ports::media::Kind::Tv,
             seasons: vec![2],
         },
+    })
+}
+
+/// An ask for an album for `member`.
+fn a_collection(member: &str) -> Command {
+    Command::Wish(lemonfiber_core::app::Wishing::Collect {
+        member: member.to_owned(),
+        unit: lemonfiber_core::collected::Unit::Music(
+            lemonfiber_core::ports::service::MusicUnit::Album,
+        ),
+        reference: "mbid-1".to_owned(),
     })
 }
 
@@ -390,6 +402,10 @@ fn a_member_searches_and_asks_as_themselves_whoever_they_named() {
         assert_eq!(
             may(&asking, Door::Acting, an_ask(SOMEBODY_ELSE)),
             Permitted::This(an_ask(ASKING))
+        );
+        assert_eq!(
+            may(&asking, Door::Acting, a_collection(SOMEBODY_ELSE)),
+            Permitted::This(a_collection(ASKING))
         );
     }
 }

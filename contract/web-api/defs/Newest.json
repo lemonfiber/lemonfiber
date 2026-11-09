@@ -11,11 +11,10 @@
       }
     },
     "requests": {
-      "description": "The numbers of the household's newest requests.",
+      "description": "The references of the household's newest requests.",
       "type": "array",
       "items": {
-        "type": "integer",
-        "format": "int64"
+        "type": "string"
       }
     },
     "unread": {

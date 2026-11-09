@@ -14,6 +14,7 @@ mod allowance;
 mod defaults;
 mod handing_over;
 mod holding;
+mod kept;
 mod naming;
 mod notices;
 mod standing;
@@ -22,6 +23,7 @@ use std::collections::BTreeMap;
 
 use crate::app::targets::{household_requests, identity};
 use crate::app::{Ctx, Hostable, Whom};
+use crate::collected::Reference;
 pub(crate) use allowance::{allowance_of, OwnAllowance};
 use naming::{library_titles, named_access, named_by_the_server, titled, unheld_titles, Naming};
 
@@ -158,6 +160,11 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // has nothing there to read.
     let mut accounts = accounts;
     accounts.extend(removed);
+    let members_by_id: BTreeMap<String, String> = accounts
+        .iter()
+        .map(|account| (account.id.clone(), account.name.clone()))
+        .collect();
+    let reasons = crate::app::refusals::load(ctx);
     let mut report = assemble(
         accounts,
         requests,
@@ -169,7 +176,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
             asked: &asked,
             quality: &quality,
             now: ctx.seams.clock.now(),
-            reasons: &crate::app::refusals::load(ctx),
+            reasons: &reasons,
             expiring: crate::app::arrangement::load(ctx).after(),
             no_room,
             hosted: crate::app::hosting::keeping(ctx, Hostable::Expiring).await,
@@ -178,6 +185,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
         },
         member,
     );
+    kept::listed(ctx, &mut report, &members_by_id, &reasons);
     report.findings.append(&mut findings);
     Ok(report)
 }
@@ -358,7 +366,8 @@ fn grouped(
         }
         let named = titled(&request, naming.titles).or_else(|| naming.unheld.get(&request.id));
         theirs.requests.push(MemberRequest {
-            id: request.id,
+            id: request.id.to_string(),
+            asked: request.made.clone(),
             title: named.map(|named| named.title.clone()),
             year: named.and_then(|named| named.year),
             arrived: request.arrived.clone(),
@@ -367,7 +376,7 @@ fn grouped(
             state,
             waiting_days: allowance::waiting(state, made.as_deref(), naming.now),
             estimate: allowance::estimated(request.kind, naming.quality),
-            refused: naming.reasons.of(request.id).cloned(),
+            refused: naming.reasons.of(Reference::Filed(request.id)).cloned(),
         });
     }
     by_whom

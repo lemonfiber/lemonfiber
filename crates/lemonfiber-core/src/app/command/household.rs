@@ -36,11 +36,13 @@ pub struct Chosen {
 /// What is being done about one request that is waiting on somebody.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Decision {
-    /// The request, by the number the request service files it under.
+    /// The request, by the reference the household list names it with: the number the
+    /// request service files it under, or `music-<n>` or `books-<n>` for an ask the core
+    /// keeps.
     ///
-    /// A number rather than a title: a household asks for the same film twice under two
-    /// spellings, and a decision that matched on words could rule on the wrong one.
-    pub request: i64,
+    /// A reference rather than a title: a household asks for the same film twice under
+    /// two spellings, and a decision that matched on words could rule on the wrong one.
+    pub request: crate::collected::Reference,
     /// Which way it goes.
     pub answer: Answer,
 }

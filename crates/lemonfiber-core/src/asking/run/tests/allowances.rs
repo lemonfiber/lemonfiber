@@ -128,7 +128,7 @@ async fn a_request_nobody_is_waiting_on_is_named() {
     let refused = deciding(
         &a_household("missing"),
         &Decision {
-            request: 99,
+            request: crate::collected::Reference::Filed(99),
             answer: Ruling::LetThrough,
         },
     )

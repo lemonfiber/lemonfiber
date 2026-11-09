@@ -34,6 +34,27 @@ pub(super) fn carries_kind(command: &Command) -> bool {
     matches!(command, Command::Wish(Wishing::Ask { wish, .. }) if wish.kind == Kind::Movies)
 }
 
+pub(super) fn give_unit(given: &mut Arguments) {
+    if given.kind.is_some() {
+        given.kind = Some("music".to_owned());
+        given.seasons = Vec::new();
+    }
+    given.unit = Some("artist".to_owned());
+}
+
+/// Whether the command asks for the unit of music a member named.
+pub(super) fn carries_unit(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Wish(Wishing::Collect {
+            unit: lemonfiber_core::collected::Unit::Music(
+                lemonfiber_core::ports::service::MusicUnit::Artist
+            ),
+            ..
+        })
+    )
+}
+
 pub(super) fn give_seasons(given: &mut Arguments) {
     given.seasons = vec![SEASON + 1];
 }

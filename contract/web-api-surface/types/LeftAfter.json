@@ -1,6 +1,18 @@
 {
   "fields": {
+    "books": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
     "films": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "music": {
       "type": [
         "integer|null/uint32"
       ],

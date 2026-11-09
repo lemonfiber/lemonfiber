@@ -1,0 +1,11 @@
+{
+  "capability": "music.curate",
+  "holds": [
+    {
+      "carried": false,
+      "kind": "library",
+      "said": "Everything it holds and wants"
+    }
+  ],
+  "major": 1
+}

@@ -232,6 +232,14 @@ pub const EVERY: &[Entry] = &[
         at: Paths::refusals,
     },
     Entry {
+        accessor: "asks",
+        what: "what each person asked for of music and books",
+        why: "No request service holds an ask for music or books, so lemonfiber keeps each one \
+              itself: what was asked, by whom, and whether you let it through or turned it down.",
+        secret: false,
+        at: Paths::asks,
+    },
+    Entry {
         accessor: "handoffs",
         what: "when each person was handed a code",
         why: "The media server says which devices are signed in and nothing about a code \

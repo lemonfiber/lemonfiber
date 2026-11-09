@@ -178,7 +178,8 @@ fn diagnosing() -> Vec<Outcome> {
                 delivers: Some("Fixes".to_owned()),
             }],
             requests: vec![lemonfiber_core::news::NewsRequest {
-                number: 12,
+                request: "12".to_owned(),
+                asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
                 title: Some("Dune".to_owned()),
                 by: "Anna".to_owned(),
             }],
@@ -583,8 +584,11 @@ fn a_search() -> lemonfiber_core::model::AskableReport {
         titles: vec![Askable {
             id: "1399".to_owned(),
             kind: TitleKind::Tv,
+            unit: None,
             title: "Harbour Lights".to_owned(),
+            by: None,
             year: Some(2011),
+            cover: None,
             stands: Stands::Askable,
         }],
         next: Some("eyJwYWdlIjoyLCJzaG93biI6WyIxMzk5Il19".to_owned()),
@@ -599,18 +603,20 @@ fn a_search() -> lemonfiber_core::model::AskableReport {
     }
 }
 
-/// What asking for a series came to, with every field an answer can carry.
+/// What asking for an album came to, with every field an answer can carry.
 fn an_ask() -> lemonfiber_core::model::AskedReport {
-    use lemonfiber_core::model::{AskedReport, Became, LeftAfter, TitleKind};
+    use lemonfiber_core::model::{AskedReport, Became, LeftAfter, TitleKind, TitleUnit};
     AskedReport {
         member: "ana".to_owned(),
-        title: "1399".to_owned(),
-        kind: TitleKind::Tv,
-        seasons: vec![3],
+        title: "f5093c06-23e3-404f-aeaa-40f72885ee3a".to_owned(),
+        kind: TitleKind::Music,
+        unit: Some(TitleUnit::Album),
+        seasons: Vec::new(),
+        request: Some("music-3".to_owned()),
         outcome: Became::Waiting,
         leaves: LeftAfter {
-            films: Some(1),
-            television: Some(4),
+            music: Some(2),
+            ..LeftAfter::default()
         },
         released: true,
         said: "Asked. Whoever runs the house will say yes or no.".to_owned(),

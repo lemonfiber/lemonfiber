@@ -10,6 +10,13 @@
         "null"
       ]
     },
+    "asked": {
+      "description": "When it was asked for, where the request service or the core says.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "estimate": {
       "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",
       "anyOf": [
@@ -22,9 +29,8 @@
       ]
     },
     "id": {
-      "description": "The number the request service files it under, which is how one is named again\nwhen somebody rules on it.",
-      "type": "integer",
-      "format": "int64"
+      "description": "The reference it is named by again when somebody rules on it: the number the\nrequest service files it under (`42`), or `music-<n>` or `books-<n>` for an ask\nfor music or books the core keeps itself.",
+      "type": "string"
     },
     "media": {
       "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",

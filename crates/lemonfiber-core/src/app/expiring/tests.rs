@@ -1,3 +1,4 @@
+use crate::collected::Reference;
 use crate::ports::service::{MediaStatus, RequestStatus};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -413,7 +414,7 @@ async fn a_sweep_closes_what_waited_too_long_and_tells_whoever_asked() {
     );
     assert_eq!(
         crate::app::refusals::load(&ctx)
-            .of(7)
+            .of(Reference::Filed(7))
             .map(|kept| kept.expired),
         Some(true),
         "what ran out was not recorded as having run out"
@@ -556,4 +557,19 @@ async fn a_rehearsed_run_closes_nothing() {
         "a rehearsal did not say what it would close"
     );
     assert!(!declined(&transport), "a rehearsal closed something");
+}
+
+#[tokio::test]
+async fn asks_the_core_keeps_that_cannot_be_read_are_a_wake_missed_and_said_why() {
+    let ctx = ctx("unreadable-asks");
+    let at = crate::collected::run::kept_at(&ctx).ok();
+    assert!(at
+        .as_deref()
+        .is_some_and(|at| std::fs::write(at, "not the asks").is_ok()));
+    let mut came_to = CameTo::default();
+
+    super::swept(&ctx, 30, &mut came_to).await;
+
+    assert!(came_to.missed >= 1);
+    assert!(came_to.why.is_some());
 }

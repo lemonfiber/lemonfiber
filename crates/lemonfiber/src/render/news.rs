@@ -1,7 +1,7 @@
 //! What a surface can mark as new, on a terminal.
 //!
 //! Three short lists, each newest first and each led by what names its items: the
-//! version, the request's number, the check. Those are what a reader matches against
+//! version, the request's reference, the check. Those are what a reader matches against
 //! what they last saw, so they are the first thing on each line, and the words follow.
 //!
 //! A kind that could not be read says so in place of its list. An empty list under a
@@ -70,8 +70,11 @@ fn update(update: &NewsUpdate) -> String {
 
 fn request(request: &NewsRequest) -> String {
     match &request.title {
-        Some(title) => format!("#{}   {title}, asked for by {}", request.number, request.by),
-        None => format!("#{}   asked for by {}", request.number, request.by),
+        Some(title) => format!(
+            "#{}   {title}, asked for by {}",
+            request.request, request.by
+        ),
+        None => format!("#{}   asked for by {}", request.request, request.by),
     }
 }
 

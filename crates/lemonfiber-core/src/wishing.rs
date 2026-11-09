@@ -14,6 +14,7 @@
 //! of the stack reads as asking not working right now, with whoever runs the house told.
 
 mod ask;
+mod collect;
 mod find;
 mod limits;
 mod place;
@@ -36,6 +37,7 @@ use crate::ports::media::Kind;
 use crate::ports::service::{Detail, Member};
 use crate::wiring::Fillers;
 
+use find::searched;
 use limits::Limits;
 
 pub use poster::poster;
@@ -69,10 +71,26 @@ pub(crate) async fn wished(ctx: &Ctx, wishing: Wishing) -> Result<Outcome, Box<P
             member,
             term,
             after,
+            unit: None,
         } => find::found(ctx, &member, &term, after.as_deref())
             .await
             .map(Outcome::Askable),
+        Wishing::Find {
+            member,
+            term,
+            after,
+            unit: Some(unit),
+        } => collect::found(ctx, &member, &term, after.as_deref(), unit)
+            .await
+            .map(Outcome::Askable),
         Wishing::Ask { member, wish } => ask::asked(ctx, &member, wish).await.map(Outcome::Asked),
+        Wishing::Collect {
+            member,
+            unit,
+            reference,
+        } => collect::asked(ctx, &member, unit, &reference)
+            .await
+            .map(Outcome::Asked),
     }
 }
 

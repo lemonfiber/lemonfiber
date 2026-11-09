@@ -14,6 +14,7 @@ use lemonfiber_ports::service::{
 };
 
 use super::archive::extract;
+use super::books;
 use super::dashboard::show;
 use super::download::{torrent, usenet};
 use super::identity::source;
@@ -21,6 +22,7 @@ use super::indexer::{proxy as solver, pull, search};
 use super::invite::decline;
 use super::library::curate;
 use super::media::serve;
+use super::music;
 use super::network::egress;
 use super::owner::claim;
 use super::proxy::front;
@@ -32,6 +34,7 @@ use super::subtitles::fetch;
 use crate::{wire, Contracted};
 
 mod archive;
+mod collecting;
 mod dashboard;
 mod identity;
 mod indexer;
@@ -270,6 +273,12 @@ impl Http for Served {
             decline::CAPABILITY => decline::dispatch(&*self.upstream, operation, body).await,
             gate::CAPABILITY => gate::dispatch(&*self.upstream, operation, body).await,
             watch::CAPABILITY => watch::dispatch(&*self.upstream, operation, body).await,
+            music::curate::CAPABILITY => {
+                music::curate::dispatch(&*self.upstream, operation, body).await
+            }
+            books::curate::CAPABILITY => {
+                books::curate::dispatch(&*self.upstream, operation, body).await
+            }
             claim::CAPABILITY => claim::dispatch(&*self.upstream, operation, body).await,
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
@@ -455,6 +464,8 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             decline::CAPABILITY,
             gate::CAPABILITY,
             watch::CAPABILITY,
+            music::curate::CAPABILITY,
+            books::curate::CAPABILITY,
             claim::CAPABILITY,
         ]
     );

@@ -229,6 +229,30 @@
       "sha256": "8854578499a473304bfaa1eb073ac66f55e34ec64a4fd3325599fa9dc22f2763"
     },
     {
+      "capability": "music.curate",
+      "conformance": "music.curate/v1/conformance.json",
+      "facet": false,
+      "index": "music.curate/v1/index.json",
+      "majors": [
+        1
+      ],
+      "openapi": "music.curate/v1/openapi.json",
+      "operations": 4,
+      "sha256": "e3c9f20c936ebe8be49742cac65feb46ff7fd56df06e8da403f1e69c8a6e416b"
+    },
+    {
+      "capability": "books.curate",
+      "conformance": "books.curate/v1/conformance.json",
+      "facet": false,
+      "index": "books.curate/v1/index.json",
+      "majors": [
+        1
+      ],
+      "openapi": "books.curate/v1/openapi.json",
+      "operations": 4,
+      "sha256": "fda7d6612f58e13dcaf8df83dffcd17f95f6d904acfcd07aac9a675c35c2fbfe"
+    },
+    {
       "capability": "owner.claim",
       "conformance": "owner.claim/v1/conformance.json",
       "facet": true,

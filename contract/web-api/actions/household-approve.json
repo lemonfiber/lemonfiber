@@ -5,10 +5,9 @@
       "name": "request",
       "type": {
         "default": null,
-        "description": "The request being ruled on, by the number the request service files it under.",
-        "format": "int64",
+        "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `music-<n>` or `books-<n>` for an ask\nthe core keeps.",
         "type": [
-          "integer",
+          "string",
           "null"
         ]
       }

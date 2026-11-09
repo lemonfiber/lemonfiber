@@ -28,6 +28,7 @@
 //! because the two answer to different things: a decision the service would not take is
 //! a refusal to report, and a message that could not go is a line to read.
 
+use crate::collected::Reference;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::HouseholdReport;
@@ -42,6 +43,15 @@ pub(crate) async fn deciding(
     decision: &Decision,
 ) -> Result<HouseholdReport, Box<Problem>> {
     let reason = reason_given(&decision.answer)?;
+    let request = match decision.request {
+        Reference::Filed(number) => number,
+        Reference::Kept(medium, number) => {
+            let said = crate::collected::run::decided(ctx, medium, number, reason).await?;
+            let mut report = crate::household::run::household(ctx, None).await?;
+            report.findings.insert(0, said);
+            return Ok(report);
+        }
+    };
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -52,7 +62,7 @@ pub(crate) async fn deciding(
         .requests()
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_DECIDED)))?;
-    let waiting = still_waiting(&asked, decision.request)
+    let waiting = still_waiting(&asked, request)
         .ok_or_else(|| Box::new(crate::asking::nothing_to_decide(decision.request)))?;
 
     let approve = matches!(decision.answer, Answer::LetThrough);
@@ -68,13 +78,13 @@ pub(crate) async fn deciding(
     if !ctx.dry_run {
         access
             .requests
-            .decide(decision.request, approve)
+            .decide(request, approve)
             .await
             .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_DECIDED)))?;
         // The operator's own, always: what closes a request nobody ruled on comes through
         // the same door and says whose words it carries there rather than here.
         let words = reason.map(super::passing_on::Said::Operators);
-        notes = super::passing_on::carried(ctx, &access, decision.request, words, &asked).await;
+        notes = super::passing_on::carried(ctx, &access, request, words, &asked).await;
     }
 
     let mut report = crate::household::run::household(ctx, None).await?;

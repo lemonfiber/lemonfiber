@@ -399,7 +399,7 @@ async fn choosing_and_deciding_refuse_rather_than_claim_a_change() {
     .await;
     let decided = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "no room this month".to_owned(),
             },
@@ -427,7 +427,7 @@ async fn choosing_and_deciding_refuse_rather_than_claim_a_change() {
 async fn a_decline_with_a_blank_reason_never_reaches_the_service() {
     let refused = dispatch(
         Command::Deciding(Decision {
-            request: 7,
+            request: crate::collected::Reference::Filed(7),
             answer: Ruling::TurnedDown {
                 reason: "   ".to_owned(),
             },

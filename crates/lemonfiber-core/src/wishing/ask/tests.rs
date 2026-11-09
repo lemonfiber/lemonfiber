@@ -123,6 +123,8 @@ async fn a_rehearsal_says_what_the_ask_leaves_and_that_it_waits_and_files_nothin
             LeftAfter {
                 films: Some(0),
                 television: Some(5),
+                music: None,
+                books: None,
             },
             true,
             TitleKind::Movies
@@ -286,11 +288,36 @@ fn an_ask_under_no_limit_says_nothing_about_room() {
     let unlimited = LeftAfter {
         films: None,
         television: None,
+        music: None,
+        books: None,
     };
 
     assert_eq!(
         said(Became::Asked, true, &unlimited, false),
         "Asked. It's on its way."
+    );
+}
+
+#[test]
+fn an_ask_for_music_or_books_says_the_room_left_for_its_medium() {
+    let music = LeftAfter {
+        music: Some(1),
+        ..LeftAfter::default()
+    };
+    let books = LeftAfter {
+        books: Some(0),
+        ..LeftAfter::default()
+    };
+
+    assert_eq!(
+        said(Became::Waiting, true, &music, false),
+        "Asked. Whoever runs the house will say yes or no. After this, there's room for 1 \
+         more ask for music."
+    );
+    assert_eq!(
+        said(Became::Waiting, true, &books, false),
+        "Asked. Whoever runs the house will say yes or no. After this, there's room for no \
+         more asks for books."
     );
 }
 
@@ -410,6 +437,8 @@ async fn a_series_asks_only_for_the_seasons_not_already_here_or_on_their_way() {
             LeftAfter {
                 films: Some(1),
                 television: Some(4),
+                music: None,
+                books: None,
             }
         ))
     );

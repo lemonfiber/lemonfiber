@@ -6,6 +6,7 @@
 //! their allowance are the core's to judge, in the household's own sentences.
 
 use lemonfiber_core::app::{Command, Wishing};
+use lemonfiber_core::collected::{Medium, Unit};
 use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::Wish;
 
@@ -26,6 +27,7 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
         name,
         id,
         kind,
+        unit,
         seasons,
         ..
     } = given;
@@ -35,16 +37,50 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
     };
     let id = id.ok_or_else(|| missing("id"))?;
     let written = kind.ok_or_else(|| missing("kind"))?;
-    let kind = Kind::for_media_type(&written).ok_or_else(|| Refused::Unrecognised {
-        argument: "kind".to_owned(),
-        offered: format!(
-            "{written} is neither {} nor {}",
-            Kind::Movies.media_type(),
-            Kind::Tv.media_type()
-        ),
-    })?;
-    Ok(Command::Wish(Wishing::Ask {
-        member: name.unwrap_or_default(),
-        wish: Wish { id, kind, seasons },
+    let member = name.unwrap_or_default();
+    if let Some(kind) = Kind::for_media_type(&written) {
+        if unit.is_some() {
+            return Err(Refused::Unwanted {
+                action: ADDRESSED.to_owned(),
+                argument: "unit".to_owned(),
+            });
+        }
+        return Ok(Command::Wish(Wishing::Ask {
+            member,
+            wish: Wish { id, kind, seasons },
+        }));
+    }
+    let unrecognised = |argument: &str, offered: String| Refused::Unrecognised {
+        argument: argument.to_owned(),
+        offered,
+    };
+    let medium = Medium::ALL
+        .into_iter()
+        .find(|medium| medium.word() == written)
+        .ok_or_else(|| {
+            unrecognised(
+                "kind",
+                format!(
+                    "{written} is none of {}, {}, {} and {}",
+                    Kind::Movies.media_type(),
+                    Kind::Tv.media_type(),
+                    Medium::Music.word(),
+                    Medium::Books.word()
+                ),
+            )
+        })?;
+    if !seasons.is_empty() {
+        return Err(Refused::Unwanted {
+            action: ADDRESSED.to_owned(),
+            argument: "seasons".to_owned(),
+        });
+    }
+    let unit = Unit::chosen(Some(medium.word()), unit.as_deref())
+        .map_err(|why| unrecognised("unit", why.to_string()))?
+        .unwrap_or(Unit::first_of(medium));
+    Ok(Command::Wish(Wishing::Collect {
+        member,
+        unit,
+        reference: id,
     }))
 }

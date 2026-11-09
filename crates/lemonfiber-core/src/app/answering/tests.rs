@@ -73,6 +73,7 @@ fn reading() -> Vec<(Command, Kind)> {
                 member: "Ada".to_owned(),
                 term: "harbour".to_owned(),
                 after: None,
+                unit: None,
             }),
             kind::ASKABLE,
         ),

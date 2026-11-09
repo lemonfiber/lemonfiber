@@ -11,7 +11,7 @@
       }
     },
     "requests": {
-      "description": "What the household has asked for, highest number first.",
+      "description": "What the household has asked for, the most recently asked first.",
       "type": "array",
       "items": {
         "$ref": "NewsRequest.json"

@@ -1,0 +1,34 @@
+{
+  "capability": "books.curate",
+  "files": [
+    {
+      "path": "books.curate/v1/openapi.json",
+      "sha256": "1a3228f08e1ae5e927b317a297916264aa399a94251b25d942c888399ed2ecf0"
+    },
+    {
+      "path": "books.curate/v1/operations/lookup.json",
+      "sha256": "54775b9568bcb3cb2701199516c4c006f59cd312c100d6a8ff22e90d0854741b"
+    },
+    {
+      "path": "books.curate/v1/operations/candidate.json",
+      "sha256": "0af74d98b51a407a63f20d40195a4d0a6e521b4002ff8d19fd2476d6bbfc467c"
+    },
+    {
+      "path": "books.curate/v1/operations/request.json",
+      "sha256": "39f704f875f8317e0bc24512665799f3a9cb6e5abae95a07942c0d498d9ad5ab"
+    },
+    {
+      "path": "books.curate/v1/operations/profiles.json",
+      "sha256": "7e013682b405514cc0f76e1f4b07b0b11560fcd52f88980c99df93c02fe87bb5"
+    },
+    {
+      "path": "books.curate/v1/holds.json",
+      "sha256": "36f310576558040ad3065f2d6e65a2f835c285d02c39153a7e3b35c63fb866db"
+    },
+    {
+      "path": "books.curate/v1/conformance.json",
+      "sha256": "fab941505044de0eada1cf6afbaca3179fa3d9b045ca0120152bcc80373f7c7a"
+    }
+  ],
+  "major": 1
+}

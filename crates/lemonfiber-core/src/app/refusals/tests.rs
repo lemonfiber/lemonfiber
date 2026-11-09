@@ -1,4 +1,5 @@
 use super::{keep, load, NAME};
+use crate::collected::Reference;
 use crate::config::Settings;
 use crate::test_support::{a_context, a_password, env_at};
 
@@ -19,11 +20,13 @@ fn a_reason_written_down_is_read_back() {
     let mut held = load(&ctx);
     assert!(held.is_empty(), "a fresh install holds a refusal");
 
-    held.keep(41, "we already have it dubbed", None);
+    held.keep(Reference::Filed(41), "we already have it dubbed", None);
     assert!(keep(&ctx, &held).is_ok());
 
     assert_eq!(
-        load(&ctx).of(41).map(|kept| kept.reason.as_str()),
+        load(&ctx)
+            .of(Reference::Filed(41))
+            .map(|kept| kept.reason.as_str()),
         Some("we already have it dubbed")
     );
 }

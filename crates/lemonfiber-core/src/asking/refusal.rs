@@ -56,7 +56,7 @@ pub(crate) fn no_limit_named() -> Problem {
 /// correct silently: an operator approving something a second time has misread a list,
 /// and being told so is worth more than a second approval that changes nothing.
 #[must_use]
-pub(crate) fn nothing_to_decide(request: i64) -> Problem {
+pub(crate) fn nothing_to_decide(request: crate::collected::Reference) -> Problem {
     Problem::new(
         NOT_WAITING,
         format!("request {request} is not one that is waiting on anybody"),

@@ -372,6 +372,23 @@ fn a_decision_with_no_request_is_refused() {
     }
 }
 
+/// A decision naming something that is no request's reference is refused by name.
+#[test]
+fn a_decision_naming_no_reference_is_refused() {
+    let given = Arguments {
+        request: Some("films-3".to_owned()),
+        ..Arguments::default()
+    };
+
+    let refused = refusal("household-approve", given);
+
+    assert!(
+        matches!(&refused, Some(Refused::Unrecognised { argument, offered })
+            if argument == "request" && offered.contains("music-<n>")),
+        "{refused:?}"
+    );
+}
+
 /// Turning a request down without a reason is refused by name.
 ///
 /// A refusal with nothing beside it is indistinguishable from being ignored, which
@@ -379,7 +396,7 @@ fn a_decision_with_no_request_is_refused() {
 #[test]
 fn turning_a_request_down_without_a_reason_is_refused() {
     let given = Arguments {
-        request: Some(7),
+        request: Some("7".to_owned()),
         ..Arguments::default()
     };
 
@@ -399,7 +416,7 @@ fn turning_a_request_down_without_a_reason_is_refused() {
 #[test]
 fn an_approval_cannot_carry_a_reason() {
     let given = Arguments {
-        request: Some(7),
+        request: Some("7".to_owned()),
         reason: Some("no room".to_owned()),
         ..Arguments::default()
     };

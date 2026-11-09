@@ -113,7 +113,9 @@ fn the_narrowing_and_a_decision_are_refused_together() {
     assert_eq!(
         household(
             whom(Some("ana".to_owned()), false),
-            Some(HouseholdCommand::Approve { request: 7 })
+            Some(HouseholdCommand::Approve {
+                request: lemonfiber_core::collected::Reference::Filed(7)
+            })
         ),
         Err(USAGE)
     );
@@ -176,10 +178,12 @@ fn approving_and_declining_are_one_command_with_two_answers() {
     assert_eq!(
         household(
             whom(None, false),
-            Some(HouseholdCommand::Approve { request: 7 })
+            Some(HouseholdCommand::Approve {
+                request: lemonfiber_core::collected::Reference::Filed(7)
+            })
         ),
         Ok(Command::Deciding(Decision {
-            request: 7,
+            request: lemonfiber_core::collected::Reference::Filed(7),
             answer: Answer::LetThrough,
         }))
     );
@@ -187,12 +191,12 @@ fn approving_and_declining_are_one_command_with_two_answers() {
         household(
             whom(None, false),
             Some(HouseholdCommand::Decline {
-                request: 8,
+                request: lemonfiber_core::collected::Reference::Filed(8),
                 reason: "no room".to_owned(),
             })
         ),
         Ok(Command::Deciding(Decision {
-            request: 8,
+            request: lemonfiber_core::collected::Reference::Filed(8),
             answer: Answer::TurnedDown {
                 reason: "no room".to_owned()
             },
@@ -357,7 +361,9 @@ fn the_reading_narrowed_to_the_defaults_is_no_part_of_a_decision() {
     assert_eq!(
         household(
             whom(None, true),
-            Some(HouseholdCommand::Approve { request: 7 })
+            Some(HouseholdCommand::Approve {
+                request: lemonfiber_core::collected::Reference::Filed(7)
+            })
         ),
         Err(USAGE)
     );
@@ -455,12 +461,15 @@ fn a_search_and_an_ask_are_made_as_somebody_in_the_house() {
                 name: "ana".to_owned(),
                 term: vec!["harbour".to_owned(), "lights".to_owned()],
                 after: Some("next-place".to_owned()),
+                kind: None,
+                unit: None,
             })
         ),
         Ok(Command::Wish(Wishing::Find {
             member: "ana".to_owned(),
             term: "harbour lights".to_owned(),
             after: Some("next-place".to_owned()),
+            unit: None,
         }))
     );
     for (wished, kind) in [(Wished::Tv, Kind::Tv), (Wished::Movies, Kind::Movies)] {
@@ -471,6 +480,7 @@ fn a_search_and_an_ask_are_made_as_somebody_in_the_house() {
                     name: "ana".to_owned(),
                     id: "1399".to_owned(),
                     kind: wished,
+                    unit: None,
                     seasons: vec![2, 3],
                 })
             ),
@@ -484,4 +494,83 @@ fn a_search_and_an_ask_are_made_as_somebody_in_the_house() {
             }))
         );
     }
+}
+
+#[test]
+fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_default() {
+    use lemonfiber::cli::{Collected, HouseholdCommand, Wished, Within};
+    use lemonfiber_core::app::Wishing;
+    use lemonfiber_core::collected::Unit;
+    use lemonfiber_core::ports::service::{BookUnit, MusicUnit};
+    let search = |kind, unit| {
+        super::super::household(
+            whom(None, false),
+            Some(HouseholdCommand::Search {
+                name: "ana".to_owned(),
+                term: vec!["blue".to_owned()],
+                after: None,
+                kind,
+                unit,
+            }),
+        )
+    };
+    let found = |unit| {
+        Ok(Command::Wish(Wishing::Find {
+            member: "ana".to_owned(),
+            term: "blue".to_owned(),
+            after: None,
+            unit,
+        }))
+    };
+    assert_eq!(
+        search(Some(Collected::Music), None),
+        found(Some(Unit::Music(MusicUnit::Album)))
+    );
+    assert_eq!(
+        search(None, Some(Within::Series)),
+        found(Some(Unit::Books(BookUnit::Series)))
+    );
+    assert_eq!(
+        search(Some(Collected::Books), Some(Within::Author)),
+        found(Some(Unit::Books(BookUnit::Author)))
+    );
+    assert_eq!(
+        search(None, Some(Within::Album)),
+        found(Some(Unit::Music(MusicUnit::Album)))
+    );
+    assert_eq!(
+        search(Some(Collected::Music), Some(Within::Book)),
+        Err(USAGE)
+    );
+
+    let ask = |kind, unit, seasons| {
+        super::super::household(
+            whom(None, false),
+            Some(HouseholdCommand::Ask {
+                name: "ana".to_owned(),
+                id: "mbid-1".to_owned(),
+                kind,
+                unit,
+                seasons,
+            }),
+        )
+    };
+    assert_eq!(
+        ask(Wished::Books, None, Vec::new()),
+        Ok(Command::Wish(Wishing::Collect {
+            member: "ana".to_owned(),
+            unit: Unit::Books(BookUnit::Book),
+            reference: "mbid-1".to_owned(),
+        }))
+    );
+    assert_eq!(
+        ask(Wished::Music, Some(Within::Artist), Vec::new()),
+        Ok(Command::Wish(Wishing::Collect {
+            member: "ana".to_owned(),
+            unit: Unit::Music(MusicUnit::Artist),
+            reference: "mbid-1".to_owned(),
+        }))
+    );
+    assert_eq!(ask(Wished::Music, None, vec![1]), Err(USAGE));
+    assert_eq!(ask(Wished::Tv, Some(Within::Album), Vec::new()), Err(USAGE));
 }

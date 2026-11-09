@@ -13,6 +13,9 @@ use crate::source_tree::shipped;
 /// Where the layout is, as the workspace crawl keys it.
 const LAYOUT: &str = "crates/lemonfiber-core/src/config/paths.rs";
 
+/// Where the layout's own modules are, as the workspace crawl keys them.
+const LAYOUT_MODULES: &str = "crates/lemonfiber-core/src/config/paths/";
+
 /// The calls that keep something beside the environment file, by what precedes the
 /// name they are given.
 const KEEPING: [&str; 3] = ["beside_env(", "record::beside(", "record::keep_beside("];
@@ -162,7 +165,11 @@ fn every_file_kept_beside_the_configuration_is_one_the_layout_discloses() {
         .into_iter()
         .filter(|(path, _)| path.contains("crates/lemonfiber-core/src/"))
         .collect();
-    let layout = files.get(LAYOUT).cloned().unwrap_or_default();
+    let layout: String = files
+        .iter()
+        .filter(|(path, _)| *path == LAYOUT || path.starts_with(LAYOUT_MODULES))
+        .map(|(_, text)| text.as_str())
+        .collect();
     let named = disclosed(&layout);
     assert!(
         named.len() > 20,

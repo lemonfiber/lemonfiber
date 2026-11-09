@@ -91,7 +91,7 @@
     },
     "kind": {
       "type": [
-        "ref:TitleKind"
+        "ref:VideoKind"
       ],
       "required": true
     },

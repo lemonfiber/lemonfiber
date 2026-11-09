@@ -79,8 +79,13 @@ const WHAT: &str = "what";
 /// Where a page of a search said the next one begins.
 const AFTER: &str = "after";
 
-/// Whether the title a read is about is a series or a film.
+/// Whether the title a read is about is a series or a film, or a search is for music or
+/// books.
 const KIND: &str = "kind";
+
+/// What a search for music or books looks for: an album, an artist, a book, an author or
+/// a series.
+const UNIT: &str = "unit";
 
 /// What each read takes, and nothing else.
 ///
@@ -111,7 +116,7 @@ const TAKEN: &[(&str, &[&str])] = &[
     (POSTER, &[MEMBER, DEFAULTS]),
     (BACKDROP, &[MEMBER, DEFAULTS]),
     (WATCHING, &[MEMBER, MOST]),
-    (ASKABLE, &[MEMBER, TERM, AFTER]),
+    (ASKABLE, &[MEMBER, TERM, AFTER, KIND, UNIT]),
     (ASKABLE_POSTER, &[MEMBER, KIND]),
     (HOSTING, &[]),
     (FRONT_DOOR, &[]),
@@ -226,6 +231,7 @@ impl Asked {
             most: self.one(MOST).map(str::to_owned),
             after: self.one(AFTER).map(str::to_owned),
             kind: self.one(KIND).map(str::to_owned),
+            unit: self.one(UNIT).map(str::to_owned),
             title: None,
         }
     }

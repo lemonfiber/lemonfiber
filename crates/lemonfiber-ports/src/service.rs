@@ -18,6 +18,7 @@ mod asking;
 mod carrying;
 mod catalogue;
 mod clients;
+mod collecting;
 mod declaring;
 mod declining;
 mod encrypting;
@@ -63,6 +64,10 @@ pub use clients::{
     Category, ClientProbe, Credential, Download, DownloadClient, Endpoint, FulfilmentTarget,
     Protocol, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, TransferState, Transfers,
+};
+pub use collecting::{
+    AskedWith, BookAsk, BookCurating, BookUnit, Candidate, CandidateState, Candidates, MusicAsk,
+    MusicCurating, MusicUnit, Profile,
 };
 pub use declaring::{
     joined, spelled_as_a_space, Addressee, Answered, Answers, BytePath, Declared, Declaring, Held,

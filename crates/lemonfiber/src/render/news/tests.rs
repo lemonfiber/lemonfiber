@@ -11,7 +11,8 @@ fn report() -> News {
             delivers: Some("Fixes".to_owned()),
         }],
         requests: vec![NewsRequest {
-            number: 12,
+            request: "12".to_owned(),
+            asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
             title: Some("Dune".to_owned()),
             by: "Anna".to_owned(),
         }],
@@ -61,7 +62,8 @@ fn an_item_without_its_words_is_named_by_what_names_it_alone() {
             delivers: None,
         }],
         requests: vec![NewsRequest {
-            number: 3,
+            request: "3".to_owned(),
+            asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
             title: None,
             by: "Bram".to_owned(),
         }],

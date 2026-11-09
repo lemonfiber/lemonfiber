@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "kind": {
-      "description": "Whether it is a series or a film.",
+      "description": "Whether it is a series, a film, music or books.",
       "$ref": "TitleKind.json"
     },
     "leaves": {
@@ -27,12 +27,19 @@
       "description": "Whether the title has come out yet. One that has not is asked for, and arrives\nonce it is out.",
       "type": "boolean"
     },
+    "request": {
+      "description": "The reference the ask is named by on the household list, where the core keeps it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "said": {
       "description": "All of it, in one household sentence.",
       "type": "string"
     },
     "seasons": {
-      "description": "The seasons asked for, none for a film.",
+      "description": "The seasons asked for, none for a film, music or books.",
       "type": "array",
       "items": {
         "type": "integer",
@@ -43,6 +50,17 @@
     "title": {
       "description": "The id of the title asked for.",
       "type": "string"
+    },
+    "unit": {
+      "description": "What it is within music or books, and nothing for a series or a film.",
+      "anyOf": [
+        {
+          "$ref": "TitleUnit.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

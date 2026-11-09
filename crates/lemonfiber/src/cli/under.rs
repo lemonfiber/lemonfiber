@@ -9,6 +9,7 @@
 //! as it always did.
 
 use clap::{Subcommand, ValueEnum};
+use lemonfiber_core::collected::Reference;
 
 /// What can be decided about the household, and done for one person in it.
 ///
@@ -44,8 +45,8 @@ pub enum HouseholdCommand {
     /// Refused where there is no room left on the disk, and said as the disk rather
     /// than as anybody's limit — raising a limit would change nothing.
     Approve {
-        /// The request, by the number beside it.
-        request: i64,
+        /// The request, by the reference beside it: a number, or music-<n> or books-<n>.
+        request: Reference,
     },
     /// Turn one waiting request down, saying why.
     ///
@@ -53,8 +54,8 @@ pub enum HouseholdCommand {
     /// asked that it was declined and carries no reason with it, so what you write here
     /// is yours to pass on.
     Decline {
-        /// The request, by the number beside it.
-        request: i64,
+        /// The request, by the reference beside it: a number, or music-<n> or books-<n>.
+        request: Reference,
         /// Why, in a few words.
         #[arg(long, required = true)]
         reason: String,
@@ -127,6 +128,13 @@ pub enum HouseholdCommand {
         /// Go on from where the previous page said the next one begins.
         #[arg(long)]
         after: Option<String>,
+        /// Look for music or books instead of series and films.
+        #[arg(long, value_enum)]
+        kind: Option<Collected>,
+        /// What to look for within music or books: an album (the default for music) or
+        /// an artist, a book (the default for books), an author or a series.
+        #[arg(long, value_enum)]
+        unit: Option<Within>,
     },
     /// Ask for a title on somebody's behalf, as their own ask.
     ///
@@ -137,9 +145,14 @@ pub enum HouseholdCommand {
         name: String,
         /// The title, by the id their search listed it under.
         id: String,
-        /// Whether it is a series or a film.
+        /// Whether it is a series, a film, music or books.
         #[arg(long, value_enum)]
         kind: Wished,
+        /// What is asked for within music or books, as their search listed it: an album
+        /// (the default for music) or an artist, a book (the default for books), an
+        /// author or a series.
+        #[arg(long, value_enum)]
+        unit: Option<Within>,
         /// A season to ask for, given once for each. None asks for every season not
         /// already here or on its way.
         #[arg(long = "season")]
@@ -154,6 +167,34 @@ pub enum Wished {
     Tv,
     /// A film.
     Movies,
+    /// An album or an artist.
+    Music,
+    /// A book, an author or a series of books.
+    Books,
+}
+
+/// Which of music and books a search looks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Collected {
+    /// Albums or artists.
+    Music,
+    /// Books, authors or series of books.
+    Books,
+}
+
+/// What is looked for or asked for within music or books.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Within {
+    /// One album.
+    Album,
+    /// A whole artist.
+    Artist,
+    /// One book.
+    Book,
+    /// A whole author.
+    Author,
+    /// A series of books.
+    Series,
 }
 
 /// What to do about a setup already on this machine.

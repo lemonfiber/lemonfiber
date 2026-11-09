@@ -1,0 +1,207 @@
+{
+  "post": {
+    "operationId": "request",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "BookAsk": {
+                "additionalProperties": false,
+                "description": "A member's ask of a curator of books.",
+                "properties": {
+                  "quality_profile": {
+                    "description": "The quality profile it is fetched at.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "reference": {
+                    "description": "The curator's reference for it.",
+                    "type": "string"
+                  },
+                  "root_folder": {
+                    "description": "The root folder it is filed under.",
+                    "type": "string"
+                  },
+                  "search": {
+                    "description": "Whether the curator searches for it once it wants it.",
+                    "type": "boolean"
+                  },
+                  "unit": {
+                    "$ref": "#/$defs/BookUnit",
+                    "description": "A book, a whole author or a series."
+                  }
+                },
+                "required": [
+                  "unit",
+                  "reference",
+                  "root_folder",
+                  "quality_profile",
+                  "search"
+                ],
+                "type": "object"
+              },
+              "BookUnit": {
+                "description": "What a member asks a curator of books for.",
+                "oneOf": [
+                  {
+                    "const": "book",
+                    "description": "One book: a work.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "author",
+                    "description": "A whole author: every book, and those that come later.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "series",
+                    "description": "A series: every book of it, and those that come later.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "ask": {
+                "$ref": "#/$defs/BookAsk",
+                "description": "The port's `ask`."
+              }
+            },
+            "required": [
+              "ask"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "CandidateState": {
+                  "description": "Where a candidate stands in the house.",
+                  "oneOf": [
+                    {
+                      "const": "here",
+                      "description": "The house holds all of it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "partly-here",
+                      "description": "The house holds some of an artist, an author or a series.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "asked",
+                      "description": "The curator already wants it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "may-ask",
+                      "description": "Nothing has asked for it yet.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "One album, artist, book, author or series a curator's catalogue found.",
+              "properties": {
+                "by": {
+                  "description": "Its artist or author, where it is an album or a book.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cover": {
+                  "description": "Where its cover is published, where it has one.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "format": {
+                  "description": "The format the household files a book in, for a book, an author or a series.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "description": "What it is called.",
+                  "type": "string"
+                },
+                "reference": {
+                  "description": "The curator's reference for it, which names it to `request`.",
+                  "type": "string"
+                },
+                "state": {
+                  "$ref": "#/$defs/CandidateState",
+                  "description": "Where it stands in the house."
+                },
+                "year": {
+                  "description": "The year it first came out, where the curator knows one.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "reference",
+                "name",
+                "state"
+              ],
+              "title": "Candidate",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576,
+    "x-lemonfiber-since": 0
+  }
+}

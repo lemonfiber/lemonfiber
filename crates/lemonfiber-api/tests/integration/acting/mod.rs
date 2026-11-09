@@ -124,7 +124,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         // was *not* given, and every sweep over it would read as something else.
         requests: takes(TAKES_POLICY).then_some(ALLOWED),
         days: takes(TAKES_POLICY).then_some(PERIOD),
-        request: takes(TAKES_REQUEST).then_some(WAITING),
+        request: takes(TAKES_REQUEST).then(|| WAITING.to_owned()),
         reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
         capability: takes(TAKES_CAPABILITY).then(|| CAPABILITY.to_owned()),
         plugin: takes(TAKES_PLUGIN).then(|| PLUGIN.to_owned()),
@@ -153,6 +153,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         id: takes(TAKES_TITLE).then(|| TITLE.to_owned()),
         position: takes(TAKES_PROGRESS).then_some(POSITION),
         kind: takes(TAKES_WISH).then(|| WISHED_KIND.to_owned()),
+        unit: None,
         seasons: if takes(TAKES_WISH) {
             vec![SEASON]
         } else {
@@ -278,9 +279,9 @@ pub(crate) const ALLOWED: u32 = 5;
 /// a case noticing.
 pub(crate) const PERIOD: u32 = 30;
 
-/// One waiting request, by the number the request service would file it under. Not
-/// nought, so a command carrying it cannot pass for one carrying nothing.
-pub(crate) const WAITING: i64 = 7;
+/// One waiting request, by the reference the household list names it with: an ask the
+/// core keeps, so a command carrying it cannot pass for one carrying a bare number.
+pub(crate) const WAITING: &str = "music-7";
 
 /// Why a request was turned down, in the operator's own words.
 pub(crate) const REASON: &str = "there is no room this month";

@@ -23,6 +23,7 @@
 //! record keeps which of the two it was, because having been refused and having run out
 //! are different things to have happened to somebody.
 
+use crate::collected::Reference;
 use std::collections::BTreeSet;
 
 use crate::asking::Reasons;
@@ -110,8 +111,8 @@ fn held(ctx: &Ctx, request: i64, said: Said<'_>, asked: &[HouseholdRequest]) -> 
     let mut reasons = crate::app::refusals::load(ctx);
     let at = crate::instant::written(ctx.seams.clock.now());
     match said {
-        Said::Operators(reason) => reasons.keep(request, reason, at),
-        Said::RanOut(reason) => reasons.closed(request, reason, at),
+        Said::Operators(reason) => reasons.keep(Reference::Filed(request), reason, at),
+        Said::RanOut(reason) => reasons.closed(Reference::Filed(request), reason, at),
     }
     reasons.only(&still_held);
     reasons
@@ -140,7 +141,7 @@ async fn passed_on(
     };
     let told = tell(&ctx.seams.http, &addresses, &reason).await;
     reasons.passed_on(
-        request,
+        Reference::Filed(request),
         told.reached.clone(),
         crate::instant::written(ctx.seams.clock.now()),
     );
@@ -149,7 +150,7 @@ async fn passed_on(
 
 /// The words this refusal still owes whoever asked, or nothing where it owes none.
 fn still_owed(reasons: &Reasons, request: i64) -> Option<String> {
-    let kept = reasons.of(request)?;
+    let kept = reasons.of(Reference::Filed(request))?;
     kept.told.is_none().then(|| kept.reason.clone())
 }
 
