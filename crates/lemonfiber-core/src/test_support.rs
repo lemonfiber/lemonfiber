@@ -47,6 +47,7 @@ pub mod torrent;
 #[path = "../../lemonfiber-testing/src/usenet.rs"]
 pub mod usenet;
 
+pub(crate) mod collecting;
 mod crossing;
 mod typing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader, crossing_stack};

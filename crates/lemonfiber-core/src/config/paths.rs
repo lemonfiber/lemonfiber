@@ -76,6 +76,8 @@ pub(crate) const WATCHER: &str = "watcher.json";
 pub(crate) const BANDWIDTH: &str = "bandwidth.json";
 /// Why each request was turned down.
 pub(crate) const REFUSALS: &str = "refusals.json";
+/// Every ask for music or books the core keeps.
+pub(crate) const ASKS: &str = "household-asks.json";
 /// When each person was first handed a code.
 pub(crate) const HANDOFFS: &str = "handoffs.json";
 /// The choices whose cost was stated once.
@@ -282,24 +284,6 @@ impl Paths {
         self.config.join(BANDWIDTH)
     }
 
-    /// Why a request was turned down, by the number the request service files it
-    /// under. Kept with configuration because it is a record of something the operator
-    /// decided and the request service has nowhere to hold — a restore that lost it
-    /// would leave every refusal bare again, which is the state this record exists to
-    /// get a household out of.
-    #[must_use]
-    pub fn refusals(&self) -> PathBuf {
-        self.config.join(REFUSALS)
-    }
-
-    /// When each person was first handed a code to sign a device in with. Kept with
-    /// configuration because the media server records no such thing, and it is what tells
-    /// a code still waiting on somebody's phone from one never handed over.
-    #[must_use]
-    pub fn handoffs(&self) -> PathBuf {
-        self.config.join(HANDOFFS)
-    }
-
     /// The choices the operator answered whose cost was stated to them once —
     /// running with no VPN, or with a provider that forwards no port. Kept with
     /// configuration because it records a decision, and a backup that restored the
@@ -320,18 +304,6 @@ impl Paths {
     #[must_use]
     pub fn healing(&self) -> PathBuf {
         self.config.join(HEALING)
-    }
-
-    /// When each invitation was offered, which the media server may lose.
-    #[must_use]
-    pub fn invitations(&self) -> PathBuf {
-        self.config.join(INVITATIONS)
-    }
-
-    /// What the household agreed about the requests nobody rules on.
-    #[must_use]
-    pub fn expiring(&self) -> PathBuf {
-        self.config.join(EXPIRING)
     }
 
     /// What the operator has been told, and what is still owed them.
@@ -544,6 +516,8 @@ impl Paths {
         self.data.join("support")
     }
 }
+
+mod household;
 
 #[cfg(test)]
 mod tests;

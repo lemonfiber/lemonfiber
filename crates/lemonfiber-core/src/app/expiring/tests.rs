@@ -558,3 +558,18 @@ async fn a_rehearsed_run_closes_nothing() {
     );
     assert!(!declined(&transport), "a rehearsal closed something");
 }
+
+#[tokio::test]
+async fn asks_the_core_keeps_that_cannot_be_read_are_a_wake_missed_and_said_why() {
+    let ctx = ctx("unreadable-asks");
+    let at = crate::collected::run::kept_at(&ctx).ok();
+    assert!(at
+        .as_deref()
+        .is_some_and(|at| std::fs::write(at, "not the asks").is_ok()));
+    let mut came_to = CameTo::default();
+
+    super::swept(&ctx, 30, &mut came_to).await;
+
+    assert!(came_to.missed >= 1);
+    assert!(came_to.why.is_some());
+}

@@ -114,7 +114,7 @@ Usage: lemonfiber household approve [OPTIONS] <REQUEST>
 
 Arguments:
   <REQUEST>
-          The request, by the number beside it
+          The request, by the reference beside it: a number, or music-<n> or books-<n>
 
 Options:
       --json
@@ -150,7 +150,7 @@ Usage: lemonfiber household decline [OPTIONS] --reason <REASON> <REQUEST>
 
 Arguments:
   <REQUEST>
-          The request, by the number beside it
+          The request, by the reference beside it: a number, or music-<n> or books-<n>
 
 Options:
       --json
@@ -362,8 +362,25 @@ Options:
       --dry-run
           Say what would happen, and change nothing
 
+      --kind <KIND>
+          Look for music or books instead of series and films
+
+          Possible values:
+          - music: Albums or artists
+          - books: Books, authors or series of books
+
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --unit <UNIT>
+          What to look for within music or books: an album (the default for music) or an artist, a book (the default for books), an author or a series
+
+          Possible values:
+          - album:  One album
+          - artist: A whole artist
+          - book:   One book
+          - author: A whole author
+          - series: A series of books
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
@@ -399,20 +416,32 @@ Options:
           Print machine-readable output
 
       --kind <KIND>
-          Whether it is a series or a film
+          Whether it is a series, a film, music or books
 
           Possible values:
           - tv:     A series
           - movies: A film
+          - music:  An album or an artist
+          - books:  A book, an author or a series of books
 
       --dry-run
           Say what would happen, and change nothing
 
-      --season <SEASONS>
-          A season to ask for, given once for each. None asks for every season not already here or on its way
+      --unit <UNIT>
+          What is asked for within music or books, as their search listed it: an album (the default for music) or an artist, a book (the default for books), an author or a series
+
+          Possible values:
+          - album:  One album
+          - artist: A whole artist
+          - book:   One book
+          - author: A whole author
+          - series: A series of books
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --season <SEASONS>
+          A season to ask for, given once for each. None asks for every season not already here or on its way
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

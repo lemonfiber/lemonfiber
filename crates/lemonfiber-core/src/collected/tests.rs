@@ -57,6 +57,7 @@ fn a_reference_is_kept_as_the_words_it_is_named_by() {
         Some(Reference::Filed(42))
     );
     assert!(serde_json::from_str::<Reference>("\"film-1\"").is_err());
+    assert!(serde_json::from_str::<Reference>("42").is_err());
 }
 
 #[test]

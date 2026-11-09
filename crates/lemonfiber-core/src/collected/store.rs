@@ -21,7 +21,7 @@ pub(crate) struct Kept {
 
 /// Where one ask stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Standing {
     /// Waiting for the operator.
     Waiting,
@@ -105,10 +105,10 @@ pub(crate) fn kept(path: &Path) -> Result<Kept, Failure> {
 ///
 /// The [`Failure`] the file was read or written with.
 pub(crate) fn filed(path: &Path, asking: &Asking) -> Result<Reference, Failure> {
-    let mut named = None;
+    let medium = asking.unit.medium();
+    let mut number = 0;
     crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        let medium = asking.unit.medium();
-        let number = next_number(kept, medium);
+        number = next_number(kept, medium);
         kept.asks.push(Ask {
             number,
             unit: asking.unit,
@@ -121,13 +121,9 @@ pub(crate) fn filed(path: &Path, asking: &Asking) -> Result<Reference, Failure> 
             standing: asking.standing,
             settled_at: None,
         });
-        named = Some(Reference::Kept(medium, number));
         Ok(())
     })?;
-    named.ok_or_else(|| Failure::NotWritten {
-        path: path.to_path_buf(),
-        reason: "nothing was kept".to_owned(),
-    })
+    Ok(Reference::Kept(medium, number))
 }
 
 /// Move the waiting ask `reference` names at `path` to `standing`, at `at`, and say what

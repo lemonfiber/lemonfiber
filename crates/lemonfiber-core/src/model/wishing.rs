@@ -230,3 +230,6 @@ pub struct AskedReport {
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }
+
+#[cfg(test)]
+mod tests;

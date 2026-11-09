@@ -114,6 +114,27 @@ fn an_ask_left_waiting_past_the_period_is_closed_with_why_and_no_other() {
     assert_eq!(expired(&ctx, 30, "nobody ruled on it"), Ok(0));
 }
 
+#[tokio::test]
+async fn a_machine_with_nowhere_to_keep_asks_closes_none_and_keeps_none() {
+    let ctx = a_context().build();
+
+    assert_eq!(expired(&ctx, 30, "nobody ruled on it"), Ok(0));
+    assert!(kept_at(&ctx).is_err());
+    assert!(every(&ctx).is_empty());
+    assert!(decided(&ctx, Medium::Music, 1, None).await.is_err());
+}
+
+#[test]
+fn asks_that_cannot_be_read_are_not_closed_and_say_why() {
+    let ctx = ctx("collected-unreadable");
+    let at = kept_at(&ctx).ok();
+    assert!(at
+        .as_deref()
+        .is_some_and(|at| std::fs::write(at, "not the asks").is_ok()));
+
+    assert!(expired(&ctx, 30, "nobody ruled on it").is_err());
+}
+
 fn ask(member: &str, asked_at: String, standing: Standing) -> Ask {
     Ask {
         number: 1,

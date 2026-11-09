@@ -1,12 +1,15 @@
 use super::EVERY;
 
-/// The layout's own source, read at compile time.
+/// The layout's own source, every file of it, read at compile time.
 ///
 /// The layout is the list of places lemonfiber writes. Reading it is what makes
 /// the disclosure hold: a place added there and not here is a thing kept on
 /// somebody's machine that nothing tells them about, and it is exactly the kind
 /// of addition nobody thinks to mention.
-const LAYOUT: &str = include_str!("../../config/paths.rs");
+const LAYOUT: &str = concat!(
+    include_str!("../../config/paths.rs"),
+    include_str!("../../config/paths/household.rs")
+);
 
 /// Every location the layout names, by the accessor that names it.
 ///

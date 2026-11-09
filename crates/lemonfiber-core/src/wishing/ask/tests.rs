@@ -298,6 +298,29 @@ fn an_ask_under_no_limit_says_nothing_about_room() {
     );
 }
 
+#[test]
+fn an_ask_for_music_or_books_says_the_room_left_for_its_medium() {
+    let music = LeftAfter {
+        music: Some(1),
+        ..LeftAfter::default()
+    };
+    let books = LeftAfter {
+        books: Some(0),
+        ..LeftAfter::default()
+    };
+
+    assert_eq!(
+        said(Became::Waiting, true, &music, false),
+        "Asked. Whoever runs the house will say yes or no. After this, there's room for 1 \
+         more ask for music."
+    );
+    assert_eq!(
+        said(Became::Waiting, true, &books, false),
+        "Asked. Whoever runs the house will say yes or no. After this, there's room for no \
+         more asks for books."
+    );
+}
+
 #[tokio::test]
 async fn a_title_outside_the_members_limits_is_no_such_title_and_nothing_is_filed() {
     let transport = titled(vec![titled_as("604", answered(&Some(rated(Some("15")))))]);

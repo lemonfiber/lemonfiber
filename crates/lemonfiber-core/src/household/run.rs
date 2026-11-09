@@ -14,6 +14,7 @@ mod allowance;
 mod defaults;
 mod handing_over;
 mod holding;
+mod kept;
 mod naming;
 mod notices;
 mod standing;
@@ -184,30 +185,9 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
         },
         member,
     );
-    kept_asks_listed(ctx, &mut report, &members_by_id, &reasons);
+    kept::listed(ctx, &mut report, &members_by_id, &reasons);
     report.findings.append(&mut findings);
     Ok(report)
-}
-
-/// Each ask for music or books the core keeps, listed under the member who made it after
-/// their other requests, the newest first.
-fn kept_asks_listed(
-    ctx: &Ctx,
-    report: &mut HouseholdReport,
-    names: &BTreeMap<String, String>,
-    reasons: &crate::asking::Reasons,
-) {
-    let now = ctx.seams.clock.now();
-    for ask in crate::collected::run::every(ctx).iter().rev() {
-        let Some(name) = names.get(&ask.member) else {
-            continue;
-        };
-        if let Some(member) = report.members.iter_mut().find(|one| &one.name == name) {
-            member
-                .requests
-                .push(crate::collected::run::listed(ask, reasons, now));
-        }
-    }
 }
 
 /// What the household asked for, and what each member may ask for, from the request

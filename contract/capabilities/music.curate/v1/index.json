@@ -7,15 +7,15 @@
     },
     {
       "path": "music.curate/v1/operations/lookup.json",
-      "sha256": "0d197bff11fbf6bd7b741046a64c50f4e1456d5bb735910400c6f0aae01d7e51"
+      "sha256": "28502a87a6b85e5f0ab57d43f97f9f35843b3d75cb0e82e2240d4e548ff787cf"
     },
     {
       "path": "music.curate/v1/operations/candidate.json",
-      "sha256": "cf19c0168cdf0b36f56177107c9326e9c6dbf2e875b8848cf6aa2e5685dd6930"
+      "sha256": "52837b5bbe4225763a2d5aa78342f85346bad186324adfaec13ece4075744b51"
     },
     {
       "path": "music.curate/v1/operations/request.json",
-      "sha256": "95141f6303f9db3eed006dd64705057da11b21524b09dfccb7444af2b4151d23"
+      "sha256": "87642592e66de8f0c60613ea19a3bf8c7e560152f9e24940198d2b3b05e30621"
     },
     {
       "path": "music.curate/v1/operations/profiles.json",

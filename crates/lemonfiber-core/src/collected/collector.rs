@@ -120,3 +120,6 @@ fn other_medium() -> Failure {
         detail: "it answers for the other medium".to_owned(),
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -531,6 +531,14 @@ fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_de
         found(Some(Unit::Books(BookUnit::Series)))
     );
     assert_eq!(
+        search(Some(Collected::Books), Some(Within::Author)),
+        found(Some(Unit::Books(BookUnit::Author)))
+    );
+    assert_eq!(
+        search(None, Some(Within::Album)),
+        found(Some(Unit::Music(MusicUnit::Album)))
+    );
+    assert_eq!(
         search(Some(Collected::Music), Some(Within::Book)),
         Err(USAGE)
     );

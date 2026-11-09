@@ -14,7 +14,7 @@ use super::Failure;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum MusicUnit {
     /// One album: a release group.
     Album,
@@ -26,7 +26,7 @@ pub enum MusicUnit {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum BookUnit {
     /// One book: a work.
     Book,
@@ -40,7 +40,7 @@ pub enum BookUnit {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum CandidateState {
     /// The house holds it.
     Here,

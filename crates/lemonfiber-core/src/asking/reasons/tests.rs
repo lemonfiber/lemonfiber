@@ -79,9 +79,12 @@ fn a_reason_whose_request_has_gone_is_forgotten() {
     held.keep(Reference::Filed(1), "too new", Some(AT.to_owned()));
     held.keep(Reference::Filed(2), "we have it", Some(AT.to_owned()));
     held.keep(Reference::Filed(3), "no room", None);
+    let kept = Reference::Kept(crate::collected::Medium::Music, 1);
+    held.keep(kept, "we have it on vinyl", None);
 
     held.only(&BTreeSet::from([2, 3, 9]));
 
+    assert!(held.of(kept).is_some());
     assert_eq!(held.of(Reference::Filed(1)), None);
     assert!(held.of(Reference::Filed(2)).is_some());
     assert!(held.of(Reference::Filed(3)).is_some());

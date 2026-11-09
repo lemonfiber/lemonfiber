@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::super::kept_asks_listed;
+use super::super::kept;
 use crate::collected::run::kept_at;
 use crate::collected::store::{filed, Asking, Standing};
 use crate::collected::Unit;
@@ -81,7 +81,7 @@ fn a_kept_ask_is_listed_under_whoever_made_it_after_their_other_requests_newest_
     };
     let names = BTreeMap::from([("id-ada".to_owned(), "Ada".to_owned())]);
 
-    kept_asks_listed(
+    kept::listed(
         &ctx,
         &mut report,
         &names,

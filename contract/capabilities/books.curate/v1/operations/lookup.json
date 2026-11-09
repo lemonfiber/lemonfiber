@@ -133,7 +133,7 @@
                       "type": "string"
                     },
                     {
-                      "const": "may_ask",
+                      "const": "may-ask",
                       "description": "Nothing has asked for it yet.",
                       "type": "string"
                     }

@@ -22,7 +22,7 @@ use crate::ports::service::{BookUnit, MusicUnit};
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Medium {
     /// Albums and artists, asked of a curator speaking `music.curate`.
     Music,
@@ -46,7 +46,7 @@ impl Medium {
 
 /// What one ask is for, within its medium.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "medium", content = "unit", rename_all = "snake_case")]
+#[serde(tag = "medium", content = "unit", rename_all = "kebab-case")]
 pub enum Unit {
     /// An album or a whole artist.
     Music(MusicUnit),

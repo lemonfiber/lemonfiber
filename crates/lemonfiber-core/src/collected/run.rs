@@ -6,15 +6,13 @@ use std::path::PathBuf;
 use super::store::{self, Ask, Standing};
 use super::{Collector, Medium, Reference, Unit};
 use crate::app::Ctx;
+use crate::config::paths::ASKS;
 use crate::config::store::Failure;
 use crate::error::codes::quota::UNREACHABLE;
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::household::State;
 use crate::model::MemberRequest;
 use crate::ports::service::Left;
-
-/// The file the asks are kept in, beside the stack's environment file.
-pub(crate) const ASKS: &str = "household-asks.json";
 
 /// Where the asks are kept.
 ///
