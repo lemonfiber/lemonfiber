@@ -18,6 +18,7 @@
 //! one, because a plugin author will trust it.
 
 // The bundled stack's own claims, judged by the reader and the judge a plugin's meet.
+pub(crate) mod adapting;
 pub mod bundled;
 // The catalogue's signed index, and what a name resolves to through it.
 pub mod catalogue;

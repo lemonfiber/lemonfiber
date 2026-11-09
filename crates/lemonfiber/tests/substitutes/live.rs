@@ -94,14 +94,6 @@ pub const ASKED: [Asked; 2] = [
     },
 ];
 
-/// The user and group owning `path`, as `setup --service-user` takes them: the operator
-/// running the arm, whose files the services are to read and make.
-fn owner(path: &std::path::Path) -> Option<String> {
-    use std::os::unix::fs::MetadataExt as _;
-    let held = std::fs::metadata(path).ok()?;
-    Some(format!("{}:{}", held.uid(), held.gid()))
-}
-
 /// One step of the run, held to having succeeded.
 fn step(ran: &self::core::Ran, what: &str) {
     assert!(ran.succeeded, "{what} failed:\n{}", ran.printed);
@@ -246,12 +238,6 @@ pub fn run(
     });
     let core = Core::beneath(root);
     let media = root.join("media");
-    let _ = std::fs::create_dir_all(&media);
-    let user = owner(&media);
-    assert!(user.is_some(), "{} has no owner", media.display());
-    let Some(user) = user else {
-        return;
-    };
     let media = media.to_string_lossy();
     let mut setup = vec![
         "setup",
@@ -268,8 +254,6 @@ pub fn run(
         "true",
         "--autostart",
         "false",
-        "--service-user",
-        &user,
     ];
     setup.extend(usenet);
     let set_up = core.run(&setup, "");

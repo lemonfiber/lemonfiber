@@ -53,7 +53,7 @@ impl Operator {
             .filter(|zone| !zone.is_empty())
             .unwrap_or_else(|| DEFAULT_ZONE.to_owned());
         let ids = ctx.settings.service_user.map_or_else(
-            || (OPERATOR_FALLBACK.to_owned(), OPERATOR_FALLBACK.to_owned()),
+            || (OPERATOR_FALLBACK.to_string(), OPERATOR_FALLBACK.to_string()),
             |(uid, gid)| (uid.to_string(), gid.to_string()),
         );
         Self { zone, ids }
@@ -64,7 +64,7 @@ impl Operator {
     pub(crate) fn recording() -> Self {
         Self {
             zone: DEFAULT_ZONE.to_owned(),
-            ids: (OPERATOR_FALLBACK.to_owned(), OPERATOR_FALLBACK.to_owned()),
+            ids: (OPERATOR_FALLBACK.to_string(), OPERATOR_FALLBACK.to_string()),
         }
     }
 }

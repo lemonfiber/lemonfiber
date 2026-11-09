@@ -31,7 +31,7 @@ pub(crate) const LIBRARY_VOLUME: &str = "data";
 pub(crate) const LIBRARY_TARGET: &str = "/data";
 
 /// The uid and gid written while the operator's environment file names neither.
-pub(crate) const OPERATOR_FALLBACK: &str = "1000";
+pub(crate) const OPERATOR_FALLBACK: u32 = 1000;
 
 /// What the engine resolves to this machine from inside a container.
 const HOST_GATEWAY: &str = "host-gateway";
@@ -160,6 +160,9 @@ pub struct Values<'a> {
     /// The operator's value for a variable of their environment file, where one is
     /// written.
     pub operator: &'a dyn Fn(&str) -> Option<String>,
+    /// The user and group an adapter runs as, where the owner of what lemonfiber writes
+    /// for it is known.
+    pub adapters_as: Option<(u32, u32)>,
 }
 
 /// One service's entry, and the whole of what one can carry.
@@ -287,12 +290,13 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         image: unit.image.clone(),
         profiles: vec![unit.profile.clone()],
         restart: RESTART,
-        user: (unit.user == UserMode::Uid).then(|| {
-            format!(
+        user: (unit.user == UserMode::Uid).then(|| match (unit.contract, values.adapters_as) {
+            (Some(_), Some((uid, gid))) => format!("{uid}:{gid}"),
+            _ => format!(
                 "{}:{}",
-                operated(values, PUID_KEY, OPERATOR_FALLBACK),
-                operated(values, PGID_KEY, OPERATOR_FALLBACK)
-            )
+                operated(values, PUID_KEY, &OPERATOR_FALLBACK.to_string()),
+                operated(values, PGID_KEY, &OPERATOR_FALLBACK.to_string())
+            ),
         }),
         extra_hosts: unit
             .reaches_host
@@ -390,7 +394,10 @@ fn environment(unit: &Unit<'_>, values: &Values<'_>) -> BTreeMap<String, String>
             (&variables.uid_env, PUID_KEY),
             (&variables.gid_env, PGID_KEY),
         ] {
-            written.insert(variable.clone(), operated(values, key, OPERATOR_FALLBACK));
+            written.insert(
+                variable.clone(),
+                operated(values, key, &OPERATOR_FALLBACK.to_string()),
+            );
         }
     }
     written

@@ -317,6 +317,38 @@ fn an_adapter_runs_as_the_operator_and_nothing_else_is_given_a_user() {
     }
 }
 
+/// An adapter runs as whoever owns what lemonfiber writes for it, where that is known, and
+/// never as root; the services' own user is left to what the operator chose.
+#[test]
+fn an_adapter_runs_as_the_owner_of_its_configuration_whatever_the_services_run_as() {
+    let user_of = |adapters_as: Option<(u32, u32)>| {
+        let operator = |key: &str| (key == "PUID" || key == "PGID").then(|| "2000".to_owned());
+        let written = written(
+            &installed(vec![Placed {
+                speaks: vec!["media.serve@1".to_owned()],
+                listens: Some(8080),
+                ..placed()
+            }]),
+            &Reading {
+                operator: &operator,
+                adapters_as,
+                ..Reading::bare()
+            },
+        );
+        read(&written)
+            .get("services")
+            .and_then(|services| services.get("komga"))
+            .and_then(|entry| entry.get("user"))
+            .and_then(serde_norway::Value::as_str)
+            .map(str::to_owned)
+    };
+    assert_eq!(user_of(None).as_deref(), Some("2000:2000"));
+    let operator = crate::plugin::adapting::as_adapter((1001, 121));
+    assert_eq!(user_of(Some(operator)).as_deref(), Some("1001:121"));
+    let root = crate::plugin::adapting::as_adapter((0, 0));
+    assert_eq!(user_of(Some(root)).as_deref(), Some("1000:1000"));
+}
+
 /// The library is mounted for a service that said it handles media, and no other.
 #[test]
 fn the_library_is_mounted_only_where_the_manifest_said_it_is_wanted() {
