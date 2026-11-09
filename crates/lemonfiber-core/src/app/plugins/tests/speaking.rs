@@ -624,6 +624,47 @@ async fn an_adapter_declaring_what_no_guard_could_enforce_is_not_installed() {
     );
 }
 
+/// An adapter answering that no guard of lemonfiber's stands in front of its server, as
+/// one for a server no member reaches through the guard does, declares nothing to hold
+/// and is installed.
+#[tokio::test]
+async fn an_adapter_with_no_declaration_to_offer_is_installed() {
+    let http = Fake::by_path(vec![
+        (
+            crate::test_support::media::serve("declared"),
+            lemonfiber_fixtures::http::Answer::served(
+                500,
+                "application/problem+json",
+                r#"{"type":"unsupported","detail":"it serves no member through a guard of lemonfiber's"}"#,
+            ),
+        ),
+        (
+            "/api/v1/libraries",
+            lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+        ),
+        (
+            "/lemonfiber/adapter/v1/about",
+            lemonfiber_fixtures::http::Answer::reply(200, about(r#"["media.serve@1"]"#, UPSTREAM)),
+        ),
+        (UNKEYED, lemonfiber_fixtures::http::Answer::reply(401, "")),
+    ]);
+    let name = "adapter-undeclared";
+    let mut ctx = proving(name, Arc::new(Recording::answering(Ok(spoke("")))), http);
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+    let verdicts = verdicts(installing(&ctx, &source(name, &speaking())).await);
+    assert_eq!(
+        verdicts
+            .iter()
+            .map(|verdict| came_to(verdict.as_ref()))
+            .collect::<Vec<_>>(),
+        ["passed", "passed"],
+        "{verdicts:?}"
+    );
+}
+
 /// One scripted answer, given at every turn.
 fn turned(
     (at, answer): (&'static str, lemonfiber_fixtures::http::Answer),

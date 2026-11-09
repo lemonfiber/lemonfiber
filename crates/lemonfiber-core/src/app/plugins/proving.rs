@@ -387,7 +387,9 @@ async fn held_to(
 
 /// Why the declaration an adapter speaking `media.serve` gives does not hold, where it
 /// does not: one that admits a byte path without a question, or whose template host is
-/// not its base, is refused at install rather than first met by the guard.
+/// not its base, is refused at install rather than first met by the guard. An adapter
+/// answering that it offers no declaration serves nobody through a guard, so there is
+/// nothing of its to hold.
 async fn undeclarable(
     adapter: &lemonfiber_contract::Contracted,
     placed: &crate::plugin::Placed,
@@ -401,6 +403,7 @@ async fn undeclarable(
             .checked()
             .err()
             .map(|refused| format!("{spoken}: its declaration was refused: {refused}")),
+        Err(crate::ports::service::Failure::Unsupported { .. }) => None,
         Err(failure) => Some(format!("{spoken}: declared: {failure}")),
     }
 }
