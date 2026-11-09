@@ -180,6 +180,7 @@ async fn a_machine_with_nowhere_to_keep_asks_closes_none_and_keeps_none() {
     let ctx = a_context().build();
 
     assert_eq!(expired(&ctx, 30, "nobody ruled on it"), Ok(0));
+    super::arrivals(&ctx).await;
     assert!(kept_at(&ctx).is_err());
     assert!(every(&ctx).is_empty());
     assert!(decided(&ctx, Medium::Music, 1, None).await.is_err());
