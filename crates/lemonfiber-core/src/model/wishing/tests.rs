@@ -1,5 +1,6 @@
 use super::{TitleKind, TitleUnit};
 use crate::collected::{Medium, Unit};
+use crate::ports::media::Kind;
 
 #[test]
 fn music_and_books_are_named_by_the_units_they_are_asked_for_in() {
@@ -7,6 +8,8 @@ fn music_and_books_are_named_by_the_units_they_are_asked_for_in() {
     assert_eq!(TitleKind::from(Medium::Books), TitleKind::Books);
     assert_eq!(TitleKind::Music.noun(), "album and artist");
     assert_eq!(TitleKind::Books.noun(), "book, author and series");
+    assert_eq!(TitleKind::from(Kind::Tv).noun(), Kind::Tv.noun());
+    assert_eq!(TitleKind::from(Kind::Movies).noun(), Kind::Movies.noun());
 }
 
 #[test]

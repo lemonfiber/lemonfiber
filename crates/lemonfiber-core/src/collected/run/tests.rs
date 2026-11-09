@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use super::{decided, every, expired, kept_at, left, listed};
+use super::{collector, decided, every, expired, kept_at, left, listed};
 use crate::collected::store::{filed, Ask, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
 use crate::config::Settings;
@@ -133,6 +133,57 @@ fn asks_that_cannot_be_read_are_not_closed_and_say_why() {
         .is_some_and(|at| std::fs::write(at, "not the asks").is_ok()));
 
     assert!(expired(&ctx, 30, "nobody ruled on it").is_err());
+}
+
+#[tokio::test]
+async fn a_stack_that_cannot_be_read_settles_no_curator() {
+    let mut ctx = ctx("collected-no-stack");
+    let missing = lemonfiber_fixtures::scratch::Scratch::named("collected-missing-stack").kept();
+    let _ = std::fs::remove_dir_all(&missing);
+    ctx.stack = crate::stack::Source::External(Box::leak(missing.into_boxed_path()));
+
+    assert!(collector(&ctx, Medium::Music).await.is_none());
+}
+
+#[tokio::test]
+async fn asks_that_cannot_be_read_are_not_ruled_on() {
+    let ctx = ctx("collected-unruled");
+    let at = kept_at(&ctx).ok();
+    assert!(at
+        .as_deref()
+        .is_some_and(|at| std::fs::write(at, "not the asks").is_ok()));
+
+    assert!(decided(&ctx, Medium::Music, 1, Some("no")).await.is_err());
+}
+
+#[tokio::test]
+async fn an_ask_is_not_let_through_onto_a_full_disk() {
+    let mut ctx = ctx("collected-full");
+    let full = crate::ports::filesystem::StorageFacts {
+        point: std::path::PathBuf::new(),
+        kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
+        removable: false,
+        available: 0,
+        total: 4 * 1024 * 1024 * 1024 * 1024,
+    };
+    ctx = ctx.with_filesystem(std::sync::Arc::new(
+        crate::test_support::SeedFs::keyed(None).with_facts(full),
+    ));
+    ctx.settings.data_root = ctx
+        .settings
+        .env_file
+        .clone()
+        .and_then(|env| env.parent().map(std::path::Path::to_path_buf));
+    let _ = kept(
+        &ctx,
+        &album("ada", written(ctx.seams.clock.now()), Standing::Waiting),
+    );
+
+    assert!(decided(&ctx, Medium::Music, 1, None).await.is_err());
+    assert_eq!(
+        standing_of(&ctx, Reference::Kept(Medium::Music, 1)),
+        Some(Standing::Waiting)
+    );
 }
 
 fn ask(member: &str, asked_at: String, standing: Standing) -> Ask {

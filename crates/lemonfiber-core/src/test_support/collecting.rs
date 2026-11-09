@@ -46,28 +46,31 @@ pub(crate) fn speaking(ctx: &Ctx) {
 pub(crate) fn speaking_of(ctx: &Ctx, medium: Medium) {
     let (curator, capability, major) = of(medium);
     curator.moved_in(ctx);
-    let Some(kept) = ctx
+    let kept = ctx
         .settings
         .env_file
         .as_deref()
-        .map(|env| env.with_file_name(crate::config::paths::PLUGINS))
-    else {
-        return;
-    };
-    let mut register = std::fs::read_to_string(&kept)
-        .ok()
+        .map(|env| env.with_file_name(crate::config::paths::PLUGINS));
+    let mut register = kept
+        .as_deref()
+        .and_then(|at| std::fs::read_to_string(at).ok())
         .and_then(|text| Register::parse(&text).ok())
         .unwrap_or_else(Register::empty);
-    let Some(mut installed) = register.holds(curator.plugin).cloned() else {
-        return;
-    };
-    for placed in &mut installed.services {
-        if placed.service == curator.adapter {
-            placed.speaks.push(format!("{capability}@{major}"));
-            placed.provides.push(capability.to_owned());
-        }
+    let speaking = register
+        .holds(curator.plugin)
+        .cloned()
+        .map(|mut installed| {
+            for placed in &mut installed.services {
+                if placed.service == curator.adapter {
+                    placed.speaks.push(format!("{capability}@{major}"));
+                    placed.provides.push(capability.to_owned());
+                }
+            }
+            installed
+        });
+    if let (Some(kept), Some(installed)) = (kept, speaking) {
+        register.forget(curator.plugin);
+        let _ = register.record(installed);
+        let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
     }
-    register.forget(curator.plugin);
-    let _ = register.record(installed);
-    let _ = std::fs::write(&kept, register.to_json().unwrap_or_default());
 }

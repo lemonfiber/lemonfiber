@@ -9,7 +9,8 @@ use crate::app::{Ctx, Outcome, Wishing};
 use crate::collected::store::{self, Standing};
 use crate::collected::{Medium, Unit};
 use crate::error::codes::wish::{
-    ALREADY_HERE, CANNOT_FETCH, NOTHING_LEFT, NOT_ASKABLE, NOT_A_PLACE, NOT_WORKING, NO_ROOM,
+    ALREADY_HERE, CANNOT_FETCH, NOTHING_LEFT, NOT_ASKABLE, NOT_A_MEMBER, NOT_A_PLACE, NOT_A_SEARCH,
+    NOT_WORKING, NO_ROOM,
 };
 use crate::error::Code;
 use crate::model::{AskedReport, Became, Stands, TitleKind};
@@ -428,4 +429,87 @@ async fn a_search_for_books_is_asked_of_the_curator_of_books() {
     };
 
     assert_eq!(shown.map(|one| one.kinds), Some(vec![TitleKind::Books]));
+}
+
+#[tokio::test]
+async fn a_search_of_no_words_or_by_nobody_in_the_household_is_refused() {
+    let transport = the_house(Vec::new());
+    let ctx = ctx(&transport, "found-nobody");
+
+    let wordless = crate::wishing::wished(
+        &ctx,
+        Wishing::Find {
+            member: "Ada".to_owned(),
+            term: "  ".to_owned(),
+            after: None,
+            unit: Some(ALBUM),
+        },
+    )
+    .await;
+    let stranger = crate::wishing::wished(
+        &ctx,
+        Wishing::Find {
+            member: "Zed".to_owned(),
+            term: "kind of blue".to_owned(),
+            after: None,
+            unit: Some(ALBUM),
+        },
+    )
+    .await;
+    let asked_by_a_stranger = asked(&ctx, "Zed", ALBUM).await;
+
+    assert!(is(&wordless, NOT_A_SEARCH), "{wordless:?}");
+    assert!(is(&stranger, NOT_A_MEMBER), "{stranger:?}");
+    assert!(is(&asked_by_a_stranger, NOT_A_MEMBER));
+}
+
+#[tokio::test]
+async fn an_allowance_that_cannot_be_read_is_not_working() {
+    let transport = house(vec![
+        call("left", unavailable()),
+        curator("lookup", answered(&Candidates::default())),
+        curator(
+            "candidate",
+            answered(&Some(candidate(CandidateState::MayAsk))),
+        ),
+    ]);
+    let ctx = ctx(&transport, "allowance-unread");
+
+    let searched = found(&ctx, ALBUM, None).await;
+    let asking = asked(&ctx, "Ada", ALBUM).await;
+
+    assert!(is(&searched, NOT_WORKING), "{searched:?}");
+    assert!(is(&asking, NOT_WORKING), "{asking:?}");
+}
+
+#[tokio::test]
+async fn an_artist_held_in_part_whose_ask_waits_here_is_on_its_way() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::PartlyHere))),
+    )]);
+    let ctx = ctx(&transport, "partly-twice");
+
+    let first = report(asked(&ctx, "Ada", ARTIST).await);
+    let again = report(asked(&ctx, "Ada", ARTIST).await);
+
+    assert_eq!(first.map(|one| one.outcome), Some(Became::Waiting));
+    assert_eq!(again.map(|one| one.outcome), Some(Became::OnItsWay));
+}
+
+#[tokio::test]
+async fn an_ask_that_cannot_be_kept_is_not_working() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let ctx = ctx(&transport, "unkeepable");
+    let at = crate::collected::run::kept_at(&ctx).ok();
+    assert!(at
+        .as_deref()
+        .is_some_and(|at| std::fs::create_dir_all(at.join("in-the-way")).is_ok()));
+
+    let refused = asked(&ctx, "Ada", ALBUM).await;
+
+    assert!(is(&refused, NOT_WORKING), "{refused:?}");
 }

@@ -87,3 +87,19 @@ fn only_a_waiting_ask_is_settled_and_only_once() {
         [(Standing::Sent, None), (Standing::Declined, Some("later"))]
     );
 }
+
+#[test]
+fn asks_kept_where_no_file_can_be_written_are_refused() {
+    let at = path("asks-unwritable");
+    assert!(std::fs::create_dir_all(&at).is_ok());
+
+    let asking = asking(Unit::Music(MusicUnit::Album), Standing::Waiting);
+    assert!(filed(&at, &asking).is_err());
+    assert!(settled(
+        &at,
+        Reference::Kept(Medium::Music, 1),
+        Standing::Sent,
+        "2026-11-09"
+    )
+    .is_err());
+}
