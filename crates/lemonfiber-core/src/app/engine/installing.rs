@@ -58,7 +58,8 @@ pub struct Offline {
 }
 
 /// Every part the bundle installs that `plan` holds, whose plugin is not installed and
-/// whose stack service has never run on this machine: nothing where the record of what is
+/// whose stack service has never run on this machine, in the order a start installs them:
+/// nothing where the record of what is
 /// installed cannot be read, since an install offered over one already there is one
 /// nothing can take, nor where lemonfiber keeps no files of its own here, since nothing
 /// is set up for an install to be made into.
@@ -70,7 +71,7 @@ async fn unrun(ctx: &Ctx, plan: &Plan) -> Vec<&'static Pinned> {
         return Vec::new();
     };
     let ran = Ran::here(ctx).await;
-    uninstalled(PINNED, register.installed())
+    let unrun = uninstalled(PINNED, register.installed())
         .into_iter()
         .filter(|one| {
             plan.services
@@ -78,7 +79,63 @@ async fn unrun(ctx: &Ctx, plan: &Plan) -> Vec<&'static Pinned> {
                 .any(|service| service == one.first_party.plugin)
         })
         .filter(|one| !ran.has_run(one.first_party.plugin))
-        .collect()
+        .collect();
+    in_order(unrun)
+}
+
+/// `parts` in the order a start installs them: each after every other one among them
+/// whose services provide a capability it asks for, since its proofs ask what that one
+/// answers, and otherwise in the order given.
+fn in_order(parts: Vec<&'static Pinned>) -> Vec<&'static Pinned> {
+    let mut left: Vec<(&'static Pinned, Read)> =
+        parts.into_iter().map(|one| (one, Read::of(one))).collect();
+    let mut ordered = Vec::with_capacity(left.len());
+    while !left.is_empty() {
+        let ready = left
+            .iter()
+            .position(|(_, one)| {
+                !left
+                    .iter()
+                    .any(|(_, other)| !std::ptr::eq(one, other) && other.answers(one))
+            })
+            .unwrap_or_default();
+        ordered.push(left.remove(ready).0);
+    }
+    ordered
+}
+
+/// What a part's manifest asks for and what its services provide.
+struct Read {
+    /// Every capability it asks for.
+    asks: Vec<String>,
+    /// Every capability its services provide.
+    provides: Vec<String>,
+}
+
+impl Read {
+    /// What `pinned`'s manifest says, and nothing where it does not read.
+    fn of(pinned: &Pinned) -> Self {
+        let manifest = lemonfiber_plugin::Manifest::from_toml(pinned.copy).ok();
+        Self {
+            asks: manifest
+                .iter()
+                .flat_map(|one| one.asking.iter().map(|ask| ask.capability.clone()))
+                .collect(),
+            provides: manifest
+                .iter()
+                .flat_map(|one| {
+                    one.services
+                        .iter()
+                        .flat_map(|service| service.provides.clone())
+                })
+                .collect(),
+        }
+    }
+
+    /// Whether it provides something `other` asks for.
+    fn answers(&self, other: &Self) -> bool {
+        other.asks.iter().any(|asked| self.provides.contains(asked))
+    }
 }
 
 /// What a start offers to install over `plan`, each install read through the plugin path

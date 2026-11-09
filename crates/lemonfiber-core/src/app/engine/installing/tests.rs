@@ -73,3 +73,31 @@ fn an_install_that_did_not_hold_says_why_where_it_knows_and_nothing_where_it_doe
     );
     assert!(held_back(&[proof("abs.passes", Some(ProofVerdict::Passed))], None).is_empty());
 }
+
+/// The part the bundle installs as `plugin`.
+fn part(plugin: &str) -> Option<&'static lemonfiber_bundled::Pinned> {
+    lemonfiber_bundled::PINNED
+        .iter()
+        .find(|one| one.first_party.plugin == plugin)
+}
+
+/// The plugins `parts` name, in their order.
+fn named(parts: &[&lemonfiber_bundled::Pinned]) -> Vec<&'static str> {
+    parts.iter().map(|one| one.first_party.plugin).collect()
+}
+
+#[test]
+fn a_part_is_installed_after_the_parts_providing_what_it_asks_for_and_otherwise_in_turn() {
+    let given: Vec<_> = ["audiobookshelf", "door", "flaresolverr", "jellyfin"]
+        .into_iter()
+        .filter_map(part)
+        .collect();
+    assert_eq!(given.len(), 4);
+
+    let ordered = super::in_order(given);
+
+    assert_eq!(
+        named(&ordered),
+        ["audiobookshelf", "flaresolverr", "jellyfin", "door"]
+    );
+}
