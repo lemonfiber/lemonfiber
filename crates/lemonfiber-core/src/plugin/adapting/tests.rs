@@ -56,3 +56,31 @@ fn a_whole_tree_is_handed_over_without_following_a_link_out_of_it() {
     }
     assert!(handed_over_whole(&dir.join("nowhere"), operator).is_err());
 }
+
+/// A stack directory root owns runs its adapters as the fallback user, and what is written
+/// for them is handed to that user, where whoever runs this may hand it over.
+#[test]
+fn what_is_written_beneath_a_stack_root_owns_is_handed_to_the_fallback_user() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-root").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(std::fs::create_dir_all(&dir).is_ok());
+    let key = dir.join("lemonfiber.key");
+    assert!(std::fs::write(&key, "key").is_ok());
+    let rooted = std::path::Path::new("/");
+    assert_eq!(owner(rooted).map(|(uid, _)| uid), Some(0));
+    assert_eq!(running_as(rooted), Some(HANDED_TO));
+
+    let handed = handed_over(&key, rooted);
+
+    let runner = owner(&key);
+    if runner == Some(HANDED_TO) || runner.is_some_and(|(uid, _)| uid == 0) {
+        assert_eq!(handed, Ok(()));
+    } else {
+        assert!(
+            handed
+                .as_ref()
+                .is_err_and(|why| why.contains("could not be handed to 1000:1000")),
+            "{handed:?}"
+        );
+    }
+}

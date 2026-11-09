@@ -129,9 +129,7 @@ pub(crate) fn carry_out(
                     &write.path,
                     (fields, awaited),
                 )?;
-                if write.path.exists() {
-                    handed_over(&write.path, &stack)?;
-                }
+                handed_over(&write.path, &stack)?;
             }
         }
     }

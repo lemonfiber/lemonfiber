@@ -222,6 +222,30 @@ async fn an_adapter_never_published_is_unproven_with_where_its_container_stands(
 }
 
 #[tokio::test]
+async fn an_adapter_never_published_is_unproven_with_what_its_container_last_said() {
+    let name = "adapter-said";
+    let mut ctx = adapting(name, &[], r#"["media.serve@1"]"#);
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .saying("komga-adapter", "bound to nothing"),
+    );
+    let outcome = installing(&ctx, &source(name, &speaking())).await;
+    let why = verdicts(outcome)
+        .into_iter()
+        .flatten()
+        .find_map(|verdict| match verdict {
+            Verdict::Unproven { why } => Some(why),
+            _ => None,
+        });
+    assert!(
+        why.as_deref().is_some_and(
+            |why| why.contains("its container is running, and it last said: bound to nothing")
+        ),
+        "{why:?}"
+    );
+}
+
+#[tokio::test]
 async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
     let told = about(r#"["media.serve@1"]"#, UPSTREAM);
     let http = Fake::by_path_in_turn(vec![

@@ -79,9 +79,7 @@ pub(crate) async fn lent(ctx: &Ctx, borrowing: &Borrowing<'_>) -> Result<Lent, S
     let mut operator = Operator::of(ctx);
     if let Some(owner) = held.owner() {
         let (uid, gid) = super::adapting::as_adapter(owner);
-        if (uid, gid) != owner {
-            super::adapting::handed_over_whole(held.path(), (uid, gid))?;
-        }
+        super::adapting::handed_over_whole(held.path(), (uid, gid))?;
         operator.ids = (uid.to_string(), gid.to_string());
     }
     let serve = Serve {
