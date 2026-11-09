@@ -192,12 +192,14 @@ pub fn is_digest(text: &str) -> bool {
 /// It is appended to the address lemonfiber resolved for that service, so it has to
 /// start at that service's root: a leading `/` is what ends the address before it,
 /// and without one the text is still part of the address. What would let it name
-/// another place from inside a route is refused too — `@` (credentials before a
-/// host), `\` (read as `/` by some clients), `#` (the rest of the line never sent),
-/// whitespace and anything a diff cannot show.
+/// another place from inside a route is refused too — a leading `//` (a host, to a
+/// client reading it as a reference of its own), `@` (credentials before a host), `\`
+/// (read as `/` by some clients), `#` (the rest of the line never sent), whitespace and
+/// anything a diff cannot show.
 #[must_use]
 pub fn is_route(text: &str) -> bool {
     text.starts_with('/')
+        && !text.starts_with("//")
         && !text.chars().any(|letter| {
             matches!(letter, '@' | '\\' | '#') || letter.is_whitespace() || letter.is_control()
         })
@@ -302,15 +304,22 @@ pub(super) fn carried(manifest: &Manifest, found: &mut Vec<Violation>) {
             }
         }
     }
-    for (at, request) in requests(manifest) {
-        if !is_route(&request.path) {
+    let health = manifest.services.iter().filter_map(|service| {
+        let path = service.health.as_ref()?.path.as_deref()?;
+        Some((format!("service {}.health.path", service.id), path))
+    });
+    let asked = requests(manifest)
+        .into_iter()
+        .map(|(at, request)| (format!("{at}.request.path"), request.path.as_str()));
+    for (location, path) in health.chain(asked) {
+        if !is_route(path) {
             found.push(Violation {
-                location: format!("{at}.request.path"),
+                location,
                 message: format!(
-                    "{} is not a route on the service it asks; it has to start with \"/\" and \
-                     carry no \"@\", \"\\\", \"#\" or whitespace, because it is appended to the \
-                     address lemonfiber resolved and anything else could name another host",
-                    request.path
+                    "{path} is not a route on the service it asks; it has to start with one \
+                     \"/\" and carry no \"@\", \"\\\", \"#\" or whitespace, because it is \
+                     appended to the address lemonfiber resolved and anything else could name \
+                     another host"
                 ),
             });
         }

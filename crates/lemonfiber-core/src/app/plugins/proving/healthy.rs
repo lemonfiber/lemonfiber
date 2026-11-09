@@ -14,7 +14,11 @@ pub(super) async fn passed(
     address: &str,
     deadline: SystemTime,
 ) {
-    let Some(path) = placed.health.as_deref() else {
+    let Some(path) = placed
+        .health
+        .as_deref()
+        .filter(|path| lemonfiber_plugin::refusing::carried::is_route(path))
+    else {
         return;
     };
     let request = Request {
@@ -35,3 +39,6 @@ pub(super) async fn passed(
         tokio::time::sleep(super::POLL).await;
     }
 }
+
+#[cfg(test)]
+mod tests;

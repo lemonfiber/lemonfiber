@@ -260,6 +260,24 @@ fn a_request_path_that_is_not_a_route_is_refused_wherever_it_is_declared() {
     }
 }
 
+/// A health path is sent as a request is, so it is held to the same route.
+#[test]
+fn a_health_path_that_is_not_a_route_is_refused() {
+    for path in ["@evil.example/", "//host"] {
+        let said = without(
+            "health      = { kind = \"http\", path = \"/actuator/health\", timeout_s = 90 }",
+            &format!(
+                "health      = {{ kind = \"http\", path = {}, timeout_s = 90 }}",
+                toml(path)
+            ),
+        );
+        assert!(
+            names(&said, &["service komga.health.path", "not a route"]),
+            "{path}: {said:?}"
+        );
+    }
+}
+
 /// The fields the sweep for unreadable text used to pass over, each carrying one.
 #[test]
 fn a_control_character_is_named_in_every_field_that_reaches_a_file() {
@@ -348,7 +366,8 @@ fn a_route_starts_at_the_root_and_names_nowhere_else() {
         assert!(is_route(good), "{good}");
     }
     for bad in [
-        "", "api", "@h:1/x", "/a@b", "/a\\b", "/a#b", "/a b", "/a\n", "/a\u{7}",
+        "", "api", "@h:1/x", "/a@b", "/a\\b", "/a#b", "/a b", "/a\n", "/a\u{7}", "//host",
+        "//host/x",
     ] {
         assert!(!is_route(bad), "{bad:?}");
     }
