@@ -48,6 +48,7 @@ pub(super) fn curator(operation: &str, answer: Answer) -> Route {
 
 fn with() -> AskedWith {
     AskedWith {
+        units: vec![MusicUnit::Album.into(), MusicUnit::Artist.into()],
         root_folders: vec!["/music".to_owned()],
         quality: vec![Profile {
             id: 1,

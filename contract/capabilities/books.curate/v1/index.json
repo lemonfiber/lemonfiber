@@ -19,7 +19,7 @@
     },
     {
       "path": "books.curate/v1/operations/profiles.json",
-      "sha256": "7e013682b405514cc0f76e1f4b07b0b11560fcd52f88980c99df93c02fe87bb5"
+      "sha256": "45090b07f0efe218028379d5f4806e52a5131e3e28794e3b5ee05bed4730beb7"
     },
     {
       "path": "books.curate/v1/holds.json",

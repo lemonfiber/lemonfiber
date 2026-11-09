@@ -66,8 +66,8 @@ pub use clients::{
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, TransferState, Transfers,
 };
 pub use collecting::{
-    AskedWith, BookAsk, BookCurating, BookUnit, Candidate, CandidateState, Candidates, MusicAsk,
-    MusicCurating, MusicUnit, Profile,
+    AskedWith, BookAsk, BookCurating, BookUnit, Candidate, CandidateState, Candidates, CuratedUnit,
+    MusicAsk, MusicCurating, MusicUnit, Profile,
 };
 pub use declaring::{
     joined, spelled_as_a_space, Addressee, Answered, Answers, BytePath, Declared, Declaring, Held,

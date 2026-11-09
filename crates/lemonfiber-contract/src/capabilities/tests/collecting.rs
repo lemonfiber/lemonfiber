@@ -33,6 +33,11 @@ fn asked_with(metadata: bool) -> AskedWith {
         name: "Standard".to_owned(),
     };
     AskedWith {
+        units: if metadata {
+            vec![MusicUnit::Album.into(), MusicUnit::Artist.into()]
+        } else {
+            vec![BookUnit::Book.into()]
+        },
         root_folders: vec!["/data/media/music".to_owned()],
         quality: vec![standard.clone()],
         metadata: if metadata { vec![standard] } else { Vec::new() },

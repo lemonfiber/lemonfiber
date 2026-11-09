@@ -38,7 +38,8 @@ crate::contract! {
                     search: false,
                 },
             };
-            /// The root folders and profiles a request may name.
+            /// The units it answers for as it is configured now, and the root folders and
+            /// profiles a request may name.
             fn profiles() -> AskedWith where asks = Asked {};
         }
     }

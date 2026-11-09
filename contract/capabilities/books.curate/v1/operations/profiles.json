@@ -21,6 +21,36 @@
           "application/json": {
             "schema": {
               "$defs": {
+                "CuratedUnit": {
+                  "description": "A unit a curator of music or books is asked for in.",
+                  "oneOf": [
+                    {
+                      "const": "album",
+                      "description": "An album.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "artist",
+                      "description": "An artist.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "book",
+                      "description": "A book.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "author",
+                      "description": "An author.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "series",
+                      "description": "A series of books.",
+                      "type": "string"
+                    }
+                  ]
+                },
                 "Profile": {
                   "additionalProperties": false,
                   "description": "One profile a request may name.",
@@ -66,9 +96,17 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                "units": {
+                  "description": "The units of its medium it answers for as it is configured now.",
+                  "items": {
+                    "$ref": "#/$defs/CuratedUnit"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
+                "units",
                 "root_folders",
                 "quality",
                 "metadata"
