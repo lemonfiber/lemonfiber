@@ -1,4 +1,4 @@
-use super::{as_adapter, handed_over, owner, running_as, HANDED_TO};
+use super::{as_adapter, handed_over, handed_over_whole, owner, running_as, HANDED_TO};
 
 #[test]
 fn an_adapter_runs_as_the_owner_of_what_lemonfiber_writes_and_never_as_root() {
@@ -24,4 +24,35 @@ fn a_stack_written_by_its_operator_runs_its_adapters_as_them_and_hands_nothing_o
     assert_eq!(owner(&key), running_as(&dir));
     assert_eq!(running_as(&dir.join("nowhere")), None);
     assert_eq!(handed_over(&dir.join("nowhere"), &dir), Ok(()));
+}
+
+#[test]
+fn a_whole_tree_is_handed_over_without_following_a_link_out_of_it() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-whole").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let lent = dir.join("lent");
+    assert!(std::fs::create_dir_all(lent.join("deeper")).is_ok());
+    assert!(std::fs::write(lent.join("lemonfiber.key"), "key").is_ok());
+    assert!(std::fs::write(lent.join("deeper/upstream.json"), "{}").is_ok());
+    let outside = dir.join("outside");
+    assert!(std::fs::write(&outside, "not the adapter's").is_ok());
+    #[cfg(unix)]
+    assert!(std::os::unix::fs::symlink(&outside, lent.join("out")).is_ok());
+
+    let operator = owner(&lent);
+    assert!(operator.is_some());
+    let Some(operator) = operator else {
+        return;
+    };
+    assert_eq!(handed_over_whole(&lent, operator), Ok(()));
+    for beneath in [
+        "",
+        "lemonfiber.key",
+        "deeper",
+        "deeper/upstream.json",
+        "out",
+    ] {
+        assert_eq!(owner(&lent.join(beneath)), Some(operator), "{beneath}");
+    }
+    assert!(handed_over_whole(&dir.join("nowhere"), operator).is_err());
 }

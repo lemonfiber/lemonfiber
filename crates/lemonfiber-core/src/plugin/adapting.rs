@@ -49,6 +49,29 @@ pub(crate) fn handed_over(path: &Path, stack: &Path) -> Result<(), String> {
     chowned(path, to)
 }
 
+/// `root` and everything beneath it given to `to`, no link followed: a lent adapter's
+/// throwaway configuration, where whoever wrote it is not who the adapter runs as.
+///
+/// # Errors
+///
+/// Why something beneath it could not be read or handed over.
+pub(crate) fn handed_over_whole(root: &Path, to: (u32, u32)) -> Result<(), String> {
+    chowned(root, to)?;
+    let is_directory = std::fs::symlink_metadata(root)
+        .map_err(|why| format!("{} could not be read: {why}", root.display()))?
+        .is_dir();
+    if !is_directory {
+        return Ok(());
+    }
+    let entries = std::fs::read_dir(root)
+        .map_err(|why| format!("{} could not be read: {why}", root.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|why| format!("{} could not be read: {why}", root.display()))?;
+        handed_over_whole(&entry.path(), to)?;
+    }
+    Ok(())
+}
+
 /// The user and group owning `path`, read without following a link.
 #[cfg(unix)]
 fn owner(path: &Path) -> Option<(u32, u32)> {

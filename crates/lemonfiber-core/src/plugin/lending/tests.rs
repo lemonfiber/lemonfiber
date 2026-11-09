@@ -87,6 +87,19 @@ async fn a_lent_adapter_is_pointed_at_their_service_with_their_key_alone_and_tak
     assert_eq!(upstream, serde_json::json!({ "api_key": "their-key" }));
     let key = std::fs::read_to_string(held.join(KEY_FILE)).unwrap_or_default();
     assert!(!key.is_empty());
+    let wrote = {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::metadata(held.join(KEY_FILE))
+            .ok()
+            .map(|made| (made.uid(), made.gid()))
+    };
+    let runs_as = wrote.map(crate::plugin::adapting::as_adapter);
+    assert_eq!(wrote, runs_as, "the key is the lent adapter's to read");
+    assert_eq!(
+        asked.user,
+        runs_as.map(|(uid, gid)| format!("{uid}:{gid}")),
+        "a lent adapter runs as whoever its key is written for"
+    );
     assert!(ready.requests().iter().any(|request| request
         .headers
         .contains(&("Authorization".to_owned(), format!("Bearer {key}")))));
