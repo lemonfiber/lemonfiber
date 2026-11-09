@@ -317,11 +317,11 @@ fn an_adapter_runs_as_the_operator_and_nothing_else_is_given_a_user() {
     }
 }
 
-/// An adapter runs as whoever owns what lemonfiber writes for it, where that is known, and
-/// never as root; the services' own user is left to what the operator chose.
+/// An adapter runs as whoever owns what lemonfiber writes for it, whatever the operator
+/// chose for the services, and never as root.
 #[test]
 fn an_adapter_runs_as_the_owner_of_its_configuration_whatever_the_services_run_as() {
-    let user_of = |adapters_as: Option<(u32, u32)>| {
+    let user_of = |owner: Option<(u32, u32)>| {
         let operator = |key: &str| (key == "PUID" || key == "PGID").then(|| "2000".to_owned());
         let written = written(
             &installed(vec![Placed {
@@ -331,7 +331,7 @@ fn an_adapter_runs_as_the_owner_of_its_configuration_whatever_the_services_run_a
             }]),
             &Reading {
                 operator: &operator,
-                adapters_as,
+                owner,
                 ..Reading::bare()
             },
         );
@@ -342,7 +342,7 @@ fn an_adapter_runs_as_the_owner_of_its_configuration_whatever_the_services_run_a
             .and_then(serde_norway::Value::as_str)
             .map(str::to_owned)
     };
-    assert_eq!(user_of(None).as_deref(), Some("2000:2000"));
+    assert_eq!(user_of(None).as_deref(), Some("1000:1000"));
     let operator = crate::plugin::adapting::as_adapter((1001, 121));
     assert_eq!(user_of(Some(operator)).as_deref(), Some("1001:121"));
     let root = crate::plugin::adapting::as_adapter((0, 0));
@@ -805,3 +805,4 @@ fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
 mod exposing;
 mod model;
 mod needing;
+mod running;

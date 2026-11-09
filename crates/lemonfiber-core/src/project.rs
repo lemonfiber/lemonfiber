@@ -74,9 +74,9 @@ pub struct Reading<'a> {
     pub fence: Option<&'a str>,
     /// The addresses of the engine's host, as the engine last answered them.
     pub host: &'a [IpAddr],
-    /// The user and group an adapter runs as, where the owner of what lemonfiber writes
-    /// for it is known.
-    pub adapters_as: Option<(u32, u32)>,
+    /// The user and group owning the stack directory, root's handed to the fallback user,
+    /// where that owner can be read.
+    pub owner: Option<(u32, u32)>,
 }
 
 impl Reading<'_> {
@@ -96,7 +96,7 @@ impl Reading<'_> {
             held: &|_| false,
             fence: None,
             host: &[],
-            adapters_as: None,
+            owner: None,
         }
     }
 }
@@ -147,7 +147,7 @@ pub fn generated(
         render_group: reading.render_group,
         nfs: reading.nfs,
         operator: reading.operator,
-        adapters_as: reading.adapters_as,
+        owner: reading.owner,
     };
     let mut units: Vec<Unit<'_>> = inputs::written(manifest, installed)
         .map(|service| stack_unit(service, reading))

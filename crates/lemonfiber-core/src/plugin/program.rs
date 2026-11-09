@@ -52,10 +52,16 @@ impl Operator {
             .and_then(|file| file.get(ZONE_KEY).map(str::trim).map(str::to_owned))
             .filter(|zone| !zone.is_empty())
             .unwrap_or_else(|| DEFAULT_ZONE.to_owned());
-        let ids = ctx.settings.service_user.map_or_else(
-            || (OPERATOR_FALLBACK.to_string(), OPERATOR_FALLBACK.to_string()),
-            |(uid, gid)| (uid.to_string(), gid.to_string()),
-        );
+        let (uid, gid) = ctx
+            .settings
+            .service_user
+            .or_else(|| {
+                crate::app::project::directory(ctx)
+                    .as_deref()
+                    .and_then(super::adapting::running_as)
+            })
+            .unwrap_or((OPERATOR_FALLBACK, OPERATOR_FALLBACK));
+        let ids = (uid.to_string(), gid.to_string());
         Self { zone, ids }
     }
 

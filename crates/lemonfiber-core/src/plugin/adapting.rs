@@ -2,10 +2,11 @@
 //! owner of the stack directory, since the key and the configuration an adapter reads
 //! are written beneath it and nowhere else.
 //!
-//! The services' own user, `PUID` and `PGID`, stays the media services' choice: an
-//! adapter reads nothing but its own configuration, so it runs as whoever wrote that.
-//! Root is never an adapter's user. Where lemonfiber runs as root, an adapter runs as
-//! the fallback user instead, and its key and configuration are handed to that user.
+//! An adapter reads nothing but its own configuration, so it runs as whoever wrote that,
+//! whatever `PUID` and `PGID` say; a service that speaks no contract runs as them where
+//! the operator set them, and as this same owner otherwise. Root is never the user.
+//! Where lemonfiber runs as root, the fallback user is run as instead, and an adapter's
+//! key and configuration are handed to that user.
 
 use std::path::Path;
 

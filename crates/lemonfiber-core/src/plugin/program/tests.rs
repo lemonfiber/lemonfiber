@@ -465,10 +465,20 @@ fn the_operator_is_what_this_machines_settings_write_each_falling_back_as_the_en
     let blank = crate::test_support::a_context()
         .settings(crate::config::Settings {
             env_file: Some(env),
+            stack_dir: Some(machine.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build();
-    assert_eq!(Operator::of(&blank), Operator::recording());
+    let owner = crate::plugin::adapting::running_as(&machine)
+        .map(|(uid, gid)| (uid.to_string(), gid.to_string()));
+    assert!(owner.is_some());
+    assert_eq!(
+        Some(Operator::of(&blank)),
+        owner.map(|ids| Operator {
+            ids,
+            ..Operator::recording()
+        })
+    );
 }
 
 /// [`RUNNING`] with its service declaring the certificate it serves with.

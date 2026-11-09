@@ -16,7 +16,7 @@ pub(crate) struct Resolved {
     fillers: Option<Fillers>,
     nfs: Option<crate::config::storage::Export>,
     render_group: Option<u32>,
-    adapters_as: Option<(u32, u32)>,
+    owner: Option<(u32, u32)>,
     moved: Vec<crate::model::MovedReport>,
     name: String,
     pass: Option<String>,
@@ -42,7 +42,7 @@ impl Resolved {
         let recorded = Recorded::of(ctx);
         Self {
             render_group: crate::app::project::render_group(ctx),
-            adapters_as: crate::app::project::directory(ctx)
+            owner: crate::app::project::directory(ctx)
                 .as_deref()
                 .and_then(crate::plugin::adapting::running_as),
             moved: crate::app::beside::moved(recorded.env()),
@@ -154,7 +154,7 @@ impl Resolved {
             fence: lemonfiber_bundled::FENCE,
             host: &self.host,
             held: &|name| self.recorded.holds_secret(name),
-            adapters_as: self.adapters_as,
+            owner: self.owner,
         })
     }
 }
