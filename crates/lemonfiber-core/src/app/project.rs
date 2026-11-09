@@ -5,6 +5,7 @@
 
 mod copying;
 mod fencing;
+mod host;
 mod linking;
 mod mounting;
 mod moving;
@@ -34,11 +35,13 @@ use crate::topology::Topology;
 use crate::wiring::Chosen;
 
 pub(crate) use copying::{pending as copies, Copies};
-pub(crate) use fencing::readied as fence_readied;
+#[cfg(test)]
+pub(crate) use fencing::ASKED as FENCE_ASKED;
+pub(crate) use host::{asked as host_asked, Asked};
 pub(crate) use linking::unlinked;
 pub(crate) use moving::{beneath as moved_beneath, moved};
 pub(crate) use passing::readied as pass_readied;
-pub(crate) use rendering::{readied as render_readied, unrendered};
+pub(crate) use rendering::unrendered;
 pub(crate) use retiring::{retired, still_there};
 pub(crate) use secrets::written as secrets_written;
 pub(crate) use sweeping::{swept, Sweep};

@@ -557,6 +557,7 @@ fn entry_in(text: &str) -> String {
 mod cataloguing;
 mod demanding;
 mod embedding;
+mod fencing;
 mod fetching;
 mod following;
 mod fronting;

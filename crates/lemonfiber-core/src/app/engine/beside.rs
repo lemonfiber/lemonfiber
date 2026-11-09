@@ -20,23 +20,18 @@ pub(super) async fn beside_readied(ctx: &Ctx) -> Beside {
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         return Beside::default();
     };
+    let passing = if ctx.dry_run {
+        None
+    } else {
+        crate::app::project::pass_readied(ctx, &manifest).await
+    };
+    let installed = crate::app::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    let asked = crate::app::project::host_asked(ctx, &manifest.services, &installed).await;
     Beside {
-        passing: if ctx.dry_run {
-            None
-        } else {
-            crate::app::project::pass_readied(ctx, &manifest).await
-        },
-        fencing: Box::pin(crate::app::project::fence_readied(
-            ctx,
-            &manifest,
-            lemonfiber_bundled::FENCE,
-        ))
-        .await,
-        rendering: Box::pin(crate::app::project::render_readied(
-            ctx,
-            &manifest,
-            lemonfiber_bundled::FENCE,
-        ))
-        .await,
+        passing,
+        fencing: asked.fencing,
+        rendering: asked.rendering,
     }
 }

@@ -45,7 +45,14 @@ fn unrendering(ctx: &Ctx) -> Option<lemonfiber_manifest::Manifest> {
 }
 
 async fn readied(ctx: &Ctx, image: Option<&str>) -> Option<String> {
-    super::readied(ctx, &unrendering(ctx)?, image).await
+    super::readied(ctx, &unrendering(ctx)?.services, &installed(ctx), image).await
+}
+
+/// What `ctx`'s register holds.
+fn installed(ctx: &Ctx) -> Vec<crate::plugin::Installed> {
+    crate::app::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default()
 }
 
 #[tokio::test]
@@ -162,7 +169,10 @@ async fn a_stack_service_taking_render_is_asked_for_too() {
     };
     service.shape = Some(Shape::Render);
 
-    assert_eq!(super::readied(&ctx, &manifest, Some(IMAGE)).await, None);
+    assert_eq!(
+        super::readied(&ctx, &manifest.services, &[], Some(IMAGE)).await,
+        None
+    );
     assert_eq!(program.asked().len(), 1);
 }
 

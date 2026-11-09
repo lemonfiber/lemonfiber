@@ -5,23 +5,29 @@
 //! it ends. Asked again every time, so the group written is the one the host holds now.
 
 use lemonfiber_manifest::container::{Shape, RENDER_DEVICE};
-use lemonfiber_manifest::Manifest;
+use lemonfiber_manifest::Service;
 
 use super::super::Ctx;
 use super::fencing::{answered, kept};
 use crate::fence::RENDER_HELD;
+use crate::plugin::Installed;
 use crate::ports::program::{Bound, Joined};
 
 /// The argument the fence image answers its host's render group under.
 pub(crate) const ASKED: &str = "render-group";
 
 /// Ask the engine for the group owning its host's render devices where a service of
-/// `manifest`'s or an installed plugin's takes `render`, with `image` the fence this build
+/// `stack`'s or of `installed`'s takes `render`, with `image` the fence this build
 /// pins, and keep the answer where the project reads it, keeping none where it answers
 /// none; say why none is kept, where it answered nothing that can be read. A rehearsal
 /// runs and keeps nothing.
-pub(crate) async fn readied(ctx: &Ctx, manifest: &Manifest, image: Option<&str>) -> Option<String> {
-    if ctx.dry_run || !renders(ctx, manifest) {
+pub(crate) async fn readied(
+    ctx: &Ctx,
+    stack: &[Service],
+    installed: &[Installed],
+    image: Option<&str>,
+) -> Option<String> {
+    if ctx.dry_run || !renders(stack, installed) {
         return None;
     }
     let directory = super::directory(ctx)?;
@@ -50,19 +56,15 @@ pub(crate) fn unrendered(project: &crate::project::Project) -> Vec<String> {
         .collect()
 }
 
-/// Whether a service of `manifest`'s, or of a plugin installed here, takes `render`.
-fn renders(ctx: &Ctx, manifest: &Manifest) -> bool {
-    manifest
-        .services
+/// Whether a service of `stack`'s or of `installed`'s takes `render`.
+fn renders(stack: &[Service], installed: &[Installed]) -> bool {
+    stack
         .iter()
         .any(|service| service.shape == Some(Shape::Render))
-        || super::super::plugins::read(ctx).is_ok_and(|register| {
-            register.installed().iter().any(|installed| {
-                installed
-                    .services
-                    .iter()
-                    .any(|placed| placed.shape == Some(Shape::Render))
-            })
+        || installed.iter().any(|one| {
+            one.services
+                .iter()
+                .any(|placed| placed.shape == Some(Shape::Render))
         })
 }
 

@@ -131,6 +131,9 @@ pub(super) async fn install(
         // fact there is nothing left to ask.
         let (standing, before) = verifying::looked(ctx).await?;
 
+        let asked = super::planned::asked(ctx, &would).await;
+        super::planned::fenced(ctx, &would, &asked)?;
+        let planned = super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?;
         writing::unlinked(ctx, &would, stack)?;
         super::minting::minted(ctx, &would, &read.manifest, &stamp, trusted)?;
         carry_out(ctx, &would.plugin, &stamp, &planned)?;

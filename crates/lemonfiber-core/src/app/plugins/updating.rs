@@ -310,7 +310,9 @@ enum Came {
 /// reading taken before anything moved. It carries out no reversal of its own; the
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
-    let put = super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source))
+    let asked = super::planned::asked(ctx, coming.would).await;
+    let put = super::planned::fenced(ctx, coming.would, &asked)
+        .and_then(|()| super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source)))
         .and_then(|planned| {
             super::writing::unlinked(ctx, coming.would, coming.stack)
                 .and_then(|()| {
@@ -434,11 +436,13 @@ pub(super) fn brought_back(
 /// started where the files would not land, since a container started without its
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
+    let asked = super::planned::asked(ctx, was).await;
+    let startable = super::planned::fenced(ctx, was, &asked).is_ok();
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()
         && super::planned::writes(ctx, was, stack, None)
             .and_then(|planned| carry_out(ctx, &was.plugin, stamp, &planned))
             .is_ok();
-    let running = placed && proving::up(ctx, was, stack).await.is_none();
+    let running = placed && startable && proving::up(ctx, was, stack).await.is_none();
     Restored {
         version: was.version.clone(),
         placed,
