@@ -36,6 +36,43 @@ pub enum BookUnit {
     Series,
 }
 
+/// A unit a curator of music or books is asked for in.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum CuratedUnit {
+    /// An album.
+    Album,
+    /// An artist.
+    Artist,
+    /// A book.
+    Book,
+    /// An author.
+    Author,
+    /// A series of books.
+    Series,
+}
+
+impl From<MusicUnit> for CuratedUnit {
+    fn from(unit: MusicUnit) -> Self {
+        match unit {
+            MusicUnit::Album => Self::Album,
+            MusicUnit::Artist => Self::Artist,
+        }
+    }
+}
+
+impl From<BookUnit> for CuratedUnit {
+    fn from(unit: BookUnit) -> Self {
+        match unit {
+            BookUnit::Book => Self::Book,
+            BookUnit::Author => Self::Author,
+            BookUnit::Series => Self::Series,
+        }
+    }
+}
+
 /// Where a candidate stands in the house.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
@@ -104,6 +141,8 @@ pub struct Profile {
 )]
 #[serde(deny_unknown_fields)]
 pub struct AskedWith {
+    /// The units of its medium it answers for as it is configured now.
+    pub units: Vec<CuratedUnit>,
     /// The root folders it files into.
     pub root_folders: Vec<String>,
     /// Its quality profiles.
@@ -185,7 +224,8 @@ pub trait MusicCurating: Send + Sync {
     /// profile or reference it does not hold included.
     async fn request(&self, ask: &MusicAsk) -> Result<Candidate, Failure>;
 
-    /// The root folders and profiles a request may name.
+    /// The units it answers for as it is configured now, and the root folders and profiles
+    /// a request may name.
     ///
     /// # Errors
     ///
@@ -228,7 +268,8 @@ pub trait BookCurating: Send + Sync {
     /// profile or reference it does not hold included.
     async fn request(&self, ask: &BookAsk) -> Result<Candidate, Failure>;
 
-    /// The root folders and profiles a request may name.
+    /// The units it answers for as it is configured now, and the root folders and profiles
+    /// a request may name.
     ///
     /// # Errors
     ///

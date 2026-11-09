@@ -35,6 +35,7 @@ impl Curator {
         };
         Arc::new(Self {
             with: AskedWith {
+                units: Vec::new(),
                 root_folders: vec!["/library".to_owned()],
                 quality: vec![profile.clone()],
                 metadata: if metadata { vec![profile] } else { Vec::new() },
