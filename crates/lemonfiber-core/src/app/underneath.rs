@@ -5,6 +5,7 @@
 //! start builds, so this read and lemonfiber's own start cannot come to disagree.
 
 use crate::app::Ctx;
+use crate::config::display::without_credentials;
 use crate::config::store::Failure;
 use crate::error::{Diagnose as _, Problem};
 use crate::model::{NonInteractive, StackException, StackReport, StackSource};
@@ -59,7 +60,11 @@ pub(crate) async fn stack(ctx: &Ctx) -> Result<StackReport, Box<Problem>> {
         source,
         project: project.display().to_string(),
         env: env.display().to_string(),
-        plain_up: start.command,
+        plain_up: start
+            .command
+            .iter()
+            .map(|word| without_credentials(word))
+            .collect(),
         non_interactive: NonInteractive {
             form: NAMED.to_owned(),
         },

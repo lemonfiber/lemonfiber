@@ -66,6 +66,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Settings(Settling::Read) => &[kind::SETTINGS],
         Command::Playing { .. } => &[kind::PLAYING],
         Command::Wish(Wishing::Find { .. }) => &[kind::ASKABLE],
+        Command::Wish(Wishing::Kinds { .. }) => &[kind::ASKABLE_KINDS],
         _ => &[],
     }
 }

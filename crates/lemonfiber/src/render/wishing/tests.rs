@@ -1,11 +1,11 @@
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::asking::{Policy, Standing};
 use lemonfiber_core::model::{
-    Askable, AskableReport, AskedReport, Became, Counted, LeftAfter, MemberAsking, Stands,
-    TitleKind, TitleUnit,
+    Askable, AskableKind, AskableKindsReport, AskableReport, AskedReport, Became, Counted,
+    LeftAfter, MemberAsking, Stands, TitleKind, TitleUnit,
 };
 
-use super::{askable, asked};
+use super::{askable, asked, kinds};
 
 /// What a member's period allows of one kind: `limit` of it, `used` spent.
 fn counted(limit: Option<u32>, used: u32) -> Counted {
@@ -190,5 +190,43 @@ fn a_search_and_an_ask_are_rendered_by_their_own_shapes() {
     assert_eq!(
         crate::render::shaped(&Outcome::Asked(report.clone())).text(),
         asked(&report).text()
+    );
+}
+
+#[test]
+fn the_kinds_a_member_may_ask_for_are_a_kind_a_line_with_its_units() {
+    let report = AskableKindsReport {
+        member: "ana".to_owned(),
+        kinds: vec![
+            AskableKind {
+                kind: TitleKind::Tv,
+                units: Vec::new(),
+            },
+            AskableKind {
+                kind: TitleKind::Movies,
+                units: Vec::new(),
+            },
+            AskableKind {
+                kind: TitleKind::Music,
+                units: vec![TitleUnit::Album, TitleUnit::Artist],
+            },
+            AskableKind {
+                kind: TitleKind::Books,
+                units: vec![TitleUnit::Book, TitleUnit::Series],
+            },
+        ],
+    };
+
+    assert_eq!(
+        kinds(&report).text(),
+        "ana may ask for\n  series\n  films\n  music: album, artist\n  books: book, book series"
+    );
+    let nothing = AskableKindsReport {
+        member: "ana".to_owned(),
+        kinds: Vec::new(),
+    };
+    assert_eq!(
+        crate::render::shaped(&Outcome::AskableKinds(nothing)).text(),
+        "ana may ask for\n  Nothing right now."
     );
 }

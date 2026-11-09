@@ -78,6 +78,12 @@ fn reading() -> Vec<(Command, Kind)> {
             }),
             kind::ASKABLE,
         ),
+        (
+            Command::Wish(Wishing::Kinds {
+                member: "Ada".to_owned(),
+            }),
+            kind::ASKABLE_KINDS,
+        ),
     ]
 }
 

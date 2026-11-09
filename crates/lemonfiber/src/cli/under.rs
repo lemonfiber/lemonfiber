@@ -115,6 +115,12 @@ pub enum HouseholdCommand {
         #[arg(long)]
         ended: bool,
     },
+    /// Which kinds somebody in the house may ask for now, each with what a title of it
+    /// is asked for as.
+    Kinds {
+        /// Who is asking, named the way they sign in.
+        name: String,
+    },
     /// Search, as somebody in the house, for titles the house does not hold yet.
     ///
     /// Only what they may ask for is shown, under their own limits, among the kinds the

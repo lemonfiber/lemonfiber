@@ -76,6 +76,7 @@
     "alerts": "kinds/alerts.json",
     "archives": "kinds/archives.json",
     "askable": "kinds/askable.json",
+    "askable-kinds": "kinds/askable-kinds.json",
     "asked": "kinds/asked.json",
     "backup": "kinds/backup.json",
     "bandwidth": "kinds/bandwidth.json",

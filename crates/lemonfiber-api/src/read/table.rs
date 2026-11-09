@@ -33,8 +33,8 @@ mod naming;
 
 pub(crate) use naming::{askable, THE_STACK, THIS_BINARY};
 use naming::{
-    diagnosing, following, household, moving, narrowed, part_way, removing, setting, shelf, titled,
-    watching,
+    askable_kinds, diagnosing, following, household, moving, narrowed, part_way, removing, setting,
+    shelf, titled, watching,
 };
 
 /// How much of a shelf a read answers with, and the most it ever will.
@@ -118,6 +118,9 @@ pub const WATCHING: &str = "/api/watching";
 /// Named for what it answers rather than for searching: what a member is shown is what
 /// they may ask for, and a title outside their limits is never on it at all.
 pub const ASKABLE: &str = "/api/askable";
+
+/// Which kinds a member may ask for now, each with the units it is asked for in.
+pub const ASKABLE_KINDS: &str = "/api/askable/kinds";
 
 /// The poster of a title a member's search found, fetched by the core and handed to that
 /// member alone, so their client never reaches the catalogue.
@@ -313,6 +316,7 @@ pub const OFFERED: &[&str] = &[
     TITLE,
     WATCHING,
     ASKABLE,
+    ASKABLE_KINDS,
     PLAYING,
     HOSTING,
     FRONT_DOOR,
@@ -465,6 +469,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         TITLE => titled(member, defaults.as_deref(), title),
         WATCHING => part_way(member, most),
         ASKABLE => askable(member, term, after, kind.as_deref(), unit.as_deref()),
+        ASKABLE_KINDS => Ok(askable_kinds(member)),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different

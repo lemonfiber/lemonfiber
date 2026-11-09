@@ -34,6 +34,7 @@ fn diagnosis(
             | Outcome::Granted(_)
             | Outcome::Watched(_)
             | Outcome::Askable(_)
+            | Outcome::AskableKinds(_)
             | Outcome::Asked(_)
             | Outcome::FrontDoor(_)
             | Outcome::Stack(_)

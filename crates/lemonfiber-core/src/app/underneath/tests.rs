@@ -87,3 +87,26 @@ async fn a_machine_with_nothing_set_up_refuses_the_read() {
 
     assert!(stack(&ctx).await.is_err());
 }
+
+#[tokio::test]
+async fn a_login_in_the_daemon_s_address_is_never_said() {
+    let mut ctx = shipped("underneath-login");
+    every_part_has_run(&ctx);
+    ctx.settings.docker = crate::ports::docker::Target::at(
+        "tcp://operator:hunter2@nas.local:2376",
+        crate::ports::docker::Origin::Variable,
+    );
+
+    let read = stack(&ctx).await;
+
+    let Ok(read) = read else {
+        unreachable!("the read was refused: {read:?}");
+    };
+    assert!(read.plain_up.iter().any(|word| word == "--host"));
+    assert!(read.plain_up.iter().any(|word| word.contains("nas.local")));
+    assert!(
+        !read.plain_up.iter().any(|word| word.contains("hunter2")),
+        "{:?}",
+        read.plain_up
+    );
+}

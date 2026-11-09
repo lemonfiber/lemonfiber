@@ -438,6 +438,30 @@ fn the_operator_searches_and_asks_for_whoever_they_name_and_a_key_does_neither()
     }
 }
 
+/// How the stack runs is the operator's alone: a member, a key scoped to one, and a
+/// `read` or an `act` key are refused it, and the operator is given it.
+#[test]
+fn only_the_operator_reads_how_the_stack_runs() {
+    use lemonfiber_core::keys::Scope;
+    for caller in [Caller::Machine, Caller::Operator] {
+        assert_eq!(
+            may(&caller, Door::Reading, Command::Stack),
+            Permitted::This(Command::Stack)
+        );
+    }
+    let member_key = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
+        assert_eq!(
+            may(&caller, Door::Reading, Command::Stack),
+            Permitted::Nothing,
+            "{caller:?}"
+        );
+    }
+}
+
 /// The settings are the operator's alone: a member, a key scoped to one, and a `read` or
 /// an `act` key are refused the read and both changes, and the operator is given them.
 #[test]

@@ -16,7 +16,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::ports::service::{BookUnit, MusicUnit};
+use crate::ports::service::{BookUnit, CuratedUnit, MusicUnit};
 
 /// A medium the core keeps asks for.
 #[derive(
@@ -80,6 +80,15 @@ impl Unit {
         match medium {
             Medium::Music => Self::Music(MusicUnit::Album),
             Medium::Books => Self::Books(BookUnit::Book),
+        }
+    }
+
+    /// What a curator's `profiles` calls it.
+    #[must_use]
+    pub fn curated(self) -> CuratedUnit {
+        match self {
+            Self::Music(unit) => unit.into(),
+            Self::Books(unit) => unit.into(),
         }
     }
 

@@ -227,6 +227,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
         Outcome::Askable(a_search()),
+        Outcome::AskableKinds(the_kinds()),
         Outcome::Asked(an_ask()),
         Outcome::Stuck(StuckReport::default()),
         Outcome::Boot(a_boot()),
@@ -563,6 +564,24 @@ fn a_title() -> lemonfiber_core::model::TitleReport {
             }],
         }),
         rehearsed: false,
+    }
+}
+
+/// The kinds a member may ask for, one with units and one without.
+fn the_kinds() -> lemonfiber_core::model::AskableKindsReport {
+    use lemonfiber_core::model::{AskableKind, AskableKindsReport, TitleKind, TitleUnit};
+    AskableKindsReport {
+        member: "Ada".to_owned(),
+        kinds: vec![
+            AskableKind {
+                kind: TitleKind::Movies,
+                units: Vec::new(),
+            },
+            AskableKind {
+                kind: TitleKind::Music,
+                units: vec![TitleUnit::Album, TitleUnit::Artist],
+            },
+        ],
     }
 }
 

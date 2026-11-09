@@ -144,6 +144,8 @@ outcomes! {
     Watched(crate::model::WatchedReport) => WATCHED [rehearsed],
     /// One page of what a member's search for a title found, under their limits.
     Askable(crate::model::AskableReport) => ASKABLE,
+    /// Which kinds a member may ask for now.
+    AskableKinds(crate::model::AskableKindsReport) => ASKABLE_KINDS,
     /// What asking for a title on a member's behalf came to.
     Asked(crate::model::AskedReport) => ASKED [rehearsed],
     /// What this machine keeps running for lemonfiber, and what a change to it did.

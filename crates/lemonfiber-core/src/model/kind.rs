@@ -119,6 +119,8 @@ kinds! {
     WATCHED = "watched",
     /// One page of what a member's search for a title found, under their limits.
     ASKABLE = "askable",
+    /// Which kinds a member may ask for now, each with the units it is asked for in.
+    ASKABLE_KINDS = "askable-kinds",
     /// What asking for a title on a member's behalf came to.
     ASKED = "asked",
     /// Where handing somebody's device the way onto the stack stands.

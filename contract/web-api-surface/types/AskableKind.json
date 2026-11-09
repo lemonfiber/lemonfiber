@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "kind": {
+      "type": [
+        "ref:TitleKind"
+      ],
+      "required": true
+    },
+    "units": {
+      "type": [
+        "array[ref:TitleUnit]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
