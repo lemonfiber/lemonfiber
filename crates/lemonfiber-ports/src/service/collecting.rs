@@ -42,8 +42,10 @@ pub enum BookUnit {
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum CandidateState {
-    /// The house holds it.
+    /// The house holds all of it.
     Here,
+    /// The house holds some of an artist, an author or a series.
+    PartlyHere,
     /// The curator already wants it.
     Asked,
     /// Nothing has asked for it yet.

@@ -227,6 +227,20 @@ async fn an_album_asked_by_a_member_who_approves_their_own_is_sent_and_kept_as_s
 }
 
 #[tokio::test]
+async fn an_artist_held_in_part_is_asked_for_the_rest() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::PartlyHere))),
+    )]);
+    let ctx = ctx(&transport, "asked-partly");
+
+    let done = report(asked(&ctx, "Ada", ARTIST).await);
+
+    assert_eq!(done.map(|one| one.outcome), Some(Became::Waiting));
+    assert_eq!(kept(&ctx).len(), 1);
+}
+
+#[tokio::test]
 async fn a_whole_artist_waits_even_for_a_member_who_approves_their_own() {
     let transport = the_house(vec![
         call("requesting", account(true)),

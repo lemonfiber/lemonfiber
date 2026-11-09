@@ -46,6 +46,24 @@ fn a_candidate_is_shown_with_its_artist_cover_and_unit_by_the_curator_s_referenc
 }
 
 #[test]
+fn an_artist_held_in_part_is_partly_here_until_an_ask_for_the_rest_waits() {
+    let artist = Unit::Music(MusicUnit::Artist);
+    assert_eq!(
+        askable(artist, candidate("a", CandidateState::PartlyHere), &[]).stands,
+        Stands::PartlyHere
+    );
+    assert_eq!(
+        askable(
+            artist,
+            candidate("a", CandidateState::PartlyHere),
+            &[waiting(artist, "a", Standing::Waiting)]
+        )
+        .stands,
+        Stands::OnItsWay
+    );
+}
+
+#[test]
 fn a_candidate_stands_where_the_curator_says_unless_an_ask_for_it_waits_here() {
     assert_eq!(
         askable(ALBUM, candidate("a", CandidateState::Here), &[]).stands,

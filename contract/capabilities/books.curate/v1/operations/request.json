@@ -92,7 +92,12 @@
                   "oneOf": [
                     {
                       "const": "here",
-                      "description": "The house holds it.",
+                      "description": "The house holds all of it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "partly-here",
+                      "description": "The house holds some of an artist, an author or a series.",
                       "type": "string"
                     },
                     {

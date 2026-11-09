@@ -7,15 +7,15 @@
     },
     {
       "path": "books.curate/v1/operations/lookup.json",
-      "sha256": "9241ac63461fc6adeff859596fa345b0390eb89f53914de0d22948e01bc1a81b"
+      "sha256": "54775b9568bcb3cb2701199516c4c006f59cd312c100d6a8ff22e90d0854741b"
     },
     {
       "path": "books.curate/v1/operations/candidate.json",
-      "sha256": "c3c355ec3d39fb0bb40b5c7e66db83537d4aafcd0a2c47e028c021b09b738c6f"
+      "sha256": "0af74d98b51a407a63f20d40195a4d0a6e521b4002ff8d19fd2476d6bbfc467c"
     },
     {
       "path": "books.curate/v1/operations/request.json",
-      "sha256": "c628fcf822ad060baaddb46d124d7d382778c57d85030efb022ff87589ef54f6"
+      "sha256": "39f704f875f8317e0bc24512665799f3a9cb6e5abae95a07942c0d498d9ad5ab"
     },
     {
       "path": "books.curate/v1/operations/profiles.json",

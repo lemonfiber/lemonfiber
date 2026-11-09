@@ -125,8 +125,10 @@ pub(super) async fn asked(
     match candidate.state {
         CandidateState::Here => return Err(refused(ALREADY_HERE, "It's already in the house.")),
         CandidateState::Asked => return Ok(report(Became::OnItsWay, 0, None)),
-        CandidateState::MayAsk if waiting => return Ok(report(Became::OnItsWay, 0, None)),
-        CandidateState::MayAsk => {}
+        CandidateState::PartlyHere | CandidateState::MayAsk if waiting => {
+            return Ok(report(Became::OnItsWay, 0, None))
+        }
+        CandidateState::PartlyHere | CandidateState::MayAsk => {}
     }
     if crate::space::run::admits(ctx).await.is_err() {
         return Err(refused(
@@ -217,7 +219,8 @@ fn askable(unit: Unit, found: Candidate, kept: &[Ask]) -> Askable {
         stands: match found.state {
             CandidateState::Here => Stands::Here,
             CandidateState::Asked => Stands::OnItsWay,
-            CandidateState::MayAsk if waiting => Stands::OnItsWay,
+            CandidateState::PartlyHere | CandidateState::MayAsk if waiting => Stands::OnItsWay,
+            CandidateState::PartlyHere => Stands::PartlyHere,
             CandidateState::MayAsk => Stands::Askable,
         },
         id: found.reference,
