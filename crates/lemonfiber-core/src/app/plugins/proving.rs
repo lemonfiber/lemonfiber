@@ -20,13 +20,13 @@
 //! container leaves something Compose will never be asked about again. So the container
 //! comes off first and the rest is somebody else's machinery.
 
+mod declaring;
 mod restarting;
 
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
-use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_plugin::Manifest;
 
@@ -34,7 +34,6 @@ use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
-use crate::ports::service::Declaring as _;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 pub(in crate::app::plugins) use restarting::Restarted;
@@ -248,34 +247,6 @@ pub(crate) async fn asked(
     secured
 }
 
-/// Where `service`'s container stands and the last lines it wrote, as a clause said after
-/// why it could not be asked: nothing where the engine will not say.
-async fn standing(ctx: &Ctx, service: &str) -> String {
-    let containers = ctx
-        .seams
-        .engine
-        .list(&ctx.settings.project)
-        .await
-        .unwrap_or_default();
-    let state = containers
-        .iter()
-        .find(|container| container.service == service)
-        .map_or_else(
-            || "it has no container".to_owned(),
-            |container| format!("its container is {:?}", container.lifecycle).to_lowercase(),
-        );
-    let said: Vec<String> = crate::app::engine::lately(ctx, &[service.to_owned()])
-        .await
-        .into_iter()
-        .map(|line| line.line)
-        .collect();
-    if said.is_empty() {
-        format!("; {state}")
-    } else {
-        format!("; {state}, and it last said: {}", said.join(" | "))
-    }
-}
-
 /// What asking an adapter what it speaks came to: whether it speaks exactly the
 /// contracts its manifest declares, asked again while it has not answered yet.
 pub(super) async fn spoken(
@@ -297,7 +268,10 @@ pub(super) async fn spoken(
             }
             (Err(why), _) if ctx.seams.clock.now() >= deadline => {
                 return Verdict::Unproven {
-                    why: format!("{why}{}", standing(ctx, &placed.service).await),
+                    why: format!(
+                        "{why}{}",
+                        crate::app::engine::standing(ctx, &placed.service).await
+                    ),
                 }
             }
             (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
@@ -371,7 +345,7 @@ async fn held_to(
             }
         }
     }
-    faults.extend(undeclarable(adapter, placed).await);
+    faults.extend(declaring::undeclarable(adapter, placed).await);
     if !faults.is_empty() {
         return Verdict::Failed { faults };
     }
@@ -383,29 +357,6 @@ async fn held_to(
         adapter,
     };
     claiming(ctx, adapter, (installed, placed), &restarted).await
-}
-
-/// Why the declaration an adapter speaking `media.serve` gives does not hold, where it
-/// does not: one that admits a byte path without a question, or whose template host is
-/// not its base, is refused at install rather than first met by the guard. An adapter
-/// answering that it offers no declaration serves nobody through a guard, so there is
-/// nothing of its to hold.
-async fn undeclarable(
-    adapter: &lemonfiber_contract::Contracted,
-    placed: &crate::plugin::Placed,
-) -> Option<String> {
-    let spoken = lemonfiber_contract::spoken(serve::CAPABILITY, serve::MAJOR);
-    if !placed.speaks.contains(&spoken) {
-        return None;
-    }
-    match serve::Adapter(adapter.clone()).declared().await {
-        Ok(declared) => declared
-            .checked()
-            .err()
-            .map(|refused| format!("{spoken}: its declaration was refused: {refused}")),
-        Err(crate::ports::service::Failure::Unsupported { .. }) => None,
-        Err(failure) => Some(format!("{spoken}: declared: {failure}")),
-    }
 }
 
 /// What claiming the part an adapter speaking `owner.claim` stands in front of came to:

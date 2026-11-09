@@ -246,16 +246,28 @@ fn a_check_the_install_made_worse_is_shown_at_both_readings() {
                     ),
                     before: Some(Checked::Pass { note: None }),
                 }],
-                unsettled: vec![lemonfiber_core::plugin::Changed {
-                    now: found(
-                        "providers.usenet",
-                        Checked::Unverified {
-                            reason: "nothing answered".to_owned(),
-                            remedy: lemonfiber_core::error::Remedy::new("Try again"),
+                unsettled: vec![
+                    lemonfiber_core::plugin::Changed {
+                        now: found(
+                            "providers.usenet",
+                            Checked::Unverified {
+                                reason: "nothing answered".to_owned(),
+                                remedy: lemonfiber_core::error::Remedy::new("Try again"),
+                            },
+                        ),
+                        before: Some(Checked::Pass { note: None }),
+                    },
+                    lemonfiber_core::plugin::Changed {
+                        now: lemonfiber_core::doctor::Finding {
+                            service: Some("komga".to_owned()),
+                            ..found(
+                                "network.firewall",
+                                Checked::Warn(wrong("a firewall rule may not apply to its port")),
+                            )
                         },
-                    ),
-                    before: Some(Checked::Pass { note: None }),
-                }],
+                        before: Some(Checked::Pass { note: None }),
+                    },
+                ],
             }),
             ..install(one, false)
         })),
@@ -282,6 +294,13 @@ fn a_check_the_install_made_worse_is_shown_at_both_readings() {
     );
     assert!(
         said.contains("could not be told: nothing answered"),
+        "{said}"
+    );
+    assert!(
+        said.contains(
+            "network.firewall on komga, a service it brings: a firewall rule may not apply to \
+             its port — reported, and not counted against the install"
+        ),
         "{said}"
     );
 }

@@ -31,7 +31,7 @@ mod remote;
 mod settling;
 mod status;
 mod stopping;
-pub(crate) use settling::{fell_short_into, lately, settled_into};
+pub(crate) use settling::{fell_short_into, settled_into, standing};
 mod streaming;
 mod switch;
 mod underneath;

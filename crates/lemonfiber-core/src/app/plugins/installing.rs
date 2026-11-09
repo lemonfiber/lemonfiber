@@ -56,6 +56,17 @@ use super::{
 /// already made. Nothing here undoes anything itself.
 ///
 /// **The yes is the offer.** Asked with none, this is the reading: everything above is
+/// What the stack's own checks make of `would` once its proofs held: the reading taken
+/// before it, `before`, against one taken again now.
+async fn verified(
+    ctx: &Ctx,
+    (standing, before): (&crate::app::engine::Stack, &[crate::doctor::Finding]),
+    would: &Installed,
+) -> crate::plugin::Verification {
+    let after = verifying::again(ctx, standing).await;
+    crate::plugin::against(before, &after, &would.service_ids())
+}
+
 /// worked out and stated, with the name it goes by, and nothing is written.
 pub(super) async fn install(
     ctx: &Ctx,
@@ -137,10 +148,7 @@ pub(super) async fn install(
         // already failed is a run being put back, and asking a machine mid-reversal
         // what it makes of itself would produce an account of neither state.
         if proving::held(&stated) {
-            checked = Some(crate::plugin::against(
-                &before,
-                &verifying::again(ctx, &standing).await,
-            ));
+            checked = Some(verified(ctx, (&standing, &before), &would).await);
         }
 
         // Recorded where both halves held, and put back where either did not. One

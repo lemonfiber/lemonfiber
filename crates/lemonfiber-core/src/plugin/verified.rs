@@ -99,13 +99,24 @@ impl Verification {
 /// Keyed on the check's own identity, which is the identifier a narrowed run is asked
 /// for by and the one thing about a finding that is promised to be the same across two
 /// runs. A second key kept beside it would be a second place for the two to disagree.
+///
+/// A warning raised about one of `own`, the services the plugin brings, is reported
+/// among the unsettled rather than reversing it: the operator chose that service, and a
+/// caveat about it is the service's own rather than something it broke. A warning about
+/// any other service, and any failure, still reverses it.
+///
+/// Whether a move onto a plugin is on offer is left out: the second reading is taken
+/// before the install is recorded, so it would name the very move being made.
 #[must_use]
-pub fn against(before: &[Finding], after: &[Finding]) -> Verification {
+pub fn against(before: &[Finding], after: &[Finding], own: &[&str]) -> Verification {
     let mut verification = Verification {
         broke: Vec::new(),
         unsettled: Vec::new(),
     };
-    for finding in after {
+    for finding in after
+        .iter()
+        .filter(|finding| finding.check != crate::doctor::moving::CHECK)
+    {
         let earlier = before.iter().find(|one| one.check == finding.check);
         let was = earlier.map_or(Some(Standing::Held), |one| standing(&one.verdict));
         let changed = || Changed {
@@ -113,6 +124,15 @@ pub fn against(before: &[Finding], after: &[Finding]) -> Verification {
             before: earlier.map(|one| one.verdict.clone()),
         };
         match (was, standing(&finding.verdict)) {
+            (Some(was), Some(Standing::Raised))
+                if Standing::Raised > was
+                    && finding
+                        .service
+                        .as_deref()
+                        .is_some_and(|service| own.contains(&service)) =>
+            {
+                verification.unsettled.push(changed());
+            }
             (Some(was), Some(now)) if now > was => verification.broke.push(changed()),
             // Assurance that was there and is not. The check is not failing — it is
             // saying it could not tell — so it is not the install's fault as far as

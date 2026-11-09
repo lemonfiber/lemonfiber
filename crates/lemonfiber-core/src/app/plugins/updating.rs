@@ -343,8 +343,11 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
     if !proving::held(&install.proofs) {
         return Came::NotHeld;
     }
-    let checked =
-        crate::plugin::against(coming.before, &verifying::again(ctx, coming.standing).await);
+    let checked = crate::plugin::against(
+        coming.before,
+        &verifying::again(ctx, coming.standing).await,
+        &coming.would.service_ids(),
+    );
     let held = checked.held();
     install.verified = Some(checked);
     if !held {
