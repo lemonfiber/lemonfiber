@@ -283,6 +283,10 @@ fn the_bcrypt_form_is_a_salted_cost_ten_hash_of_the_value_that_verifies() {
     assert!(hash.starts_with("$2b$10$"), "{written}");
     assert!(bcrypt::verify(HELD, hash).unwrap_or(false), "{written}");
     assert!(!written.contains(HELD));
+    assert_eq!(
+        super::written(b"{{secret:api-key|bcrypt}}", &held, &Chance::exactly(None)),
+        Err(super::UNMINTED.to_owned())
+    );
 }
 
 #[test]
