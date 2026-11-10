@@ -136,6 +136,21 @@ async fn a_cover_of_nothing_the_curator_holds_or_of_a_medium_nobody_fetches_is_r
 }
 
 #[tokio::test]
+async fn a_curator_that_fails_to_answer_for_a_cover_is_not_working() {
+    let transport = super::flows::the_house(vec![(
+        at("candidate"),
+        None,
+        vec![Answer::reply(500, "down")],
+    )]);
+    let ctx = outward(&transport, "cover-failing");
+
+    let failed = cover(&ctx, "Ada", ALBUM, KIND_OF_BLUE).await;
+
+    assert_eq!(code(&failed), Some(NOT_WORKING));
+    assert_eq!(reached_covers(&transport), 0);
+}
+
+#[tokio::test]
 async fn a_kept_ask_s_cover_is_the_asker_s_and_the_operator_s_alone() {
     let transport = house_covering(covered("https://covers.example/blue.jpg"));
     let ctx = outward(&transport, "cover-kept");

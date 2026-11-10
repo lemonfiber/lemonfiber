@@ -242,7 +242,7 @@ async fn a_found_titles_poster_for_nobody_is_refused_as_the_search_is() {
 
 /// The cover of music a search found, and of an ask the core keeps, are the member's own
 /// as the search is: each reaches the core for them, and a unit that names no unit of the
-/// kind is refused before it does.
+/// kind or a parameter the read does not take is refused before it does.
 #[tokio::test]
 async fn a_member_reaches_a_found_or_kept_cover_as_they_reach_the_search() {
     let (router, carried) = as_a_member("member-covers").await;
@@ -261,16 +261,19 @@ async fn a_member_reaches_a_found_or_kept_cover_as_they_reach_the_search() {
         assert!(answer.body.contains("WISH-"), "{read}: {}", answer.body);
     }
 
-    let answer = asked(
-        router.clone(),
-        "GET",
+    for read in [
         "/api/askable/mbid-1/poster?kind=music&unit=book",
-        &carried,
-        "",
-    )
-    .await;
-    assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
-    assert!(!answer.body.contains("WISH-"), "{}", answer.body);
+        "/api/requests/music-1/poster?term=heat",
+    ] {
+        let answer = asked(router.clone(), "GET", read, &carried, "").await;
+        assert_eq!(
+            answer.status,
+            StatusCode::BAD_REQUEST,
+            "{read}: {}",
+            answer.body
+        );
+        assert!(!answer.body.contains("WISH-"), "{read}: {}", answer.body);
+    }
 
     let _ = fs::remove_dir_all(a_directory("member-covers"));
 }
