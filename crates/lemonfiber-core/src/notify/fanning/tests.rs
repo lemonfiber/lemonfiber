@@ -426,3 +426,17 @@ async fn a_record_that_cannot_be_read_delivers_nothing() {
 
     assert!(http.requests().is_empty());
 }
+
+#[tokio::test]
+async fn with_no_back_end_configured_nothing_is_owed_or_written() {
+    let http = Fake::always(Answer::reply(200, ""));
+    let ctx = machine("notify-unconfigured-fan", Arc::clone(&http));
+    let path = backends::at(&ctx).unwrap_or_default();
+
+    Fanning::default().owing(&ctx, &[alert("jellyfin", Severity::Error)]);
+    super::owe_now(&ctx, Notification::Completion, "Dune arrived", false);
+    super::ready(&ctx, "ada");
+
+    assert!(!path.exists());
+    assert!(http.requests().is_empty());
+}

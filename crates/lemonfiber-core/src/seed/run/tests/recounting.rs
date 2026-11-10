@@ -247,3 +247,29 @@ fn a_service_with_no_configuration_here_is_written_no_key() {
         "{written:?}"
     );
 }
+
+#[tokio::test]
+async fn a_service_refusing_the_ask_is_reported_failed() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("recounting-refused");
+    let http = Fake::by_path(vec![(EVENTS, Answer::reply(401, ""))]);
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+
+    let wirings = told(&ctx, &stack(&project)).await;
+
+    assert!(failed(&wirings).is_some(), "{wirings:?}");
+    assert!(http.asked_for(EVENTS));
+}
+
+#[tokio::test]
+async fn a_media_server_refusing_the_events_is_a_failure_in_its_own_words() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("recounting-refused");
+    let http = Fake::by_path(vec![(EVENTS, Answer::reply(500, "it broke"))]);
+    let ctx = contracted_ctx(&project, SERVICE, true, http);
+
+    let wirings = told(&ctx, &stack(&project)).await;
+
+    assert!(
+        failed(&wirings).is_some_and(|detail| detail.contains("500")),
+        "{wirings:?}"
+    );
+}
