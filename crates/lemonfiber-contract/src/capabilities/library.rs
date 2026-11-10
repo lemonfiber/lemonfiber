@@ -11,14 +11,14 @@ use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
     Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed,
     Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile,
-    QualityReleases, Queue, QueueItem, Queues, Record, RegisteredClient, RegisteredFolder,
-    ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
+    QualityReleases, Queue, QueueItem, Queues, Record, Recounting, RegisteredClient,
+    RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
 };
 use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
 use serde_json::Value;
 
-use super::{FOLDER, NAMED, PROFILE};
+use super::{FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_WITH};
 use crate::conformance::Placeholder;
 
 /// The host the conformance cases name a download client on.
@@ -319,6 +319,10 @@ crate::contract! {
             fn unqueue(value kind: Kind, value id: i64, value blocklist: bool) -> String where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, blocklist: true };
             /// Grab a release again by its fingerprint, lifting its blocklist entry.
             fn grab(value kind: Kind, value id: i64, str release: &str) -> Grabbed where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, release: FINGERPRINT.to_owned() };
+        }
+        impl Recounting {
+            /// Send each happening to the core's address with the key the core minted for it.
+            fn events(opt_str address: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), key: Some(TOLD_WITH.to_owned()) };
         }
     }
 }

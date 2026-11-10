@@ -130,6 +130,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::keys::routes())
         .merge(crate::device_keys::routes())
         .merge(crate::push_endpoints::routes())
+        .merge(crate::notify_events::routes())
         .merge(crate::capabilities::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming))
@@ -141,9 +142,14 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
 }
 
 /// The paths that open without a credential: the sign-in door, where a caller holding a
-/// password and nothing else carries none by definition, and the door a key minted as a
-/// claim is collected at, by a program holding nothing but the claim.
-const DOORS: [&str; 2] = [crate::admission::SESSION, crate::keys::COLLECTING];
+/// password and nothing else carries none by definition, the door a key minted as a claim
+/// is collected at, by a program holding nothing but the claim, and the door a service
+/// tells the core what happened at, holding nothing but the key the core minted for it.
+const DOORS: [&str; 3] = [
+    crate::admission::SESSION,
+    crate::keys::COLLECTING,
+    crate::notify_events::EVENTS,
+];
 
 /// Let a request through, or turn it away before a handler runs.
 async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -> Response {

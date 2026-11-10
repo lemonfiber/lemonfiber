@@ -70,6 +70,7 @@ Commands:
   companion      Pair a phone with this stack, or replace the certificate a paired phone pins
   key            Mint, list or revoke the keys another program reaches the web interface with
   push-endpoint  List or remove the phones that asked to be woken when this stack has something to say
+  notify         Add, prove, change, list or remove the back-ends the stack delivers its alerts to
   restore        Restore your configuration from a backup archive
   help           Print this message or the help of the given subcommand(s)
 
@@ -162,4 +163,5 @@ Options:
 - [`lemonfiber companion`](commands/companion.md)
 - [`lemonfiber key`](commands/key.md)
 - [`lemonfiber push-endpoint`](commands/push-endpoint.md)
+- [`lemonfiber notify`](commands/notify.md)
 - [`lemonfiber restore`](commands/restore.md)

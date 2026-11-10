@@ -65,6 +65,7 @@
     "/api/device-keys": "bodies/device-keys.json",
     "/api/keys": "bodies/keys.json",
     "/api/keys/claim": "bodies/keys-claim.json",
+    "/api/notify/events": "bodies/notify-events.json",
     "/api/push-endpoints": "bodies/push-endpoints.json",
     "/api/session": "bodies/session.json",
     "/api/setup/answer": "bodies/setup-answer.json",

@@ -111,6 +111,9 @@
     "/lemonfiber/media.serve/v1/declared": {
       "$ref": "operations/declared.json"
     },
+    "/lemonfiber/media.serve/v1/events": {
+      "$ref": "operations/events.json"
+    },
     "/lemonfiber/media.serve/v1/filed_as": {
       "$ref": "operations/filed_as.json"
     },

@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use super::{Paths, NOTIFY_BACKENDS, NOTIFY_SECRETS};
+use super::{Paths, NOTIFY_BACKENDS, NOTIFY_EVENTS, NOTIFY_SECRETS};
 
 impl Paths {
     /// Every notification back-end the stack delivers to, with how far each is proven and
@@ -18,5 +18,12 @@ impl Paths {
     #[must_use]
     pub fn notify_secrets(&self) -> PathBuf {
         self.config.join(NOTIFY_SECRETS)
+    }
+
+    /// The digest of the key each curator and the media server tell the core what happened
+    /// with.
+    #[must_use]
+    pub fn notify_events(&self) -> PathBuf {
+        self.config.join(NOTIFY_EVENTS)
     }
 }

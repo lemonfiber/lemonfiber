@@ -18,6 +18,10 @@ pub const KEY_FILE: &str = "lemonfiber.key";
 /// answers the gate, and on no other.
 pub const REQUEST_KEY_FILE: &str = "request.key";
 
+/// The file in an adapter's configuration directory the core writes the key it sends the
+/// core what happened with to, readable by the adapter's user alone.
+pub const EVENTS_KEY_FILE: &str = "events.key";
+
 /// The file in an adapter's configuration directory the core writes its upstream's
 /// credential to, as a JSON object of named strings.
 pub const UPSTREAM_FILE: &str = "upstream.json";

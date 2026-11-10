@@ -107,6 +107,8 @@ pub const PUSH_ENDPOINTS: &str = "push-endpoints.json";
 pub(crate) const NOTIFY_BACKENDS: &str = "notify-backends.json";
 /// The secret each notification back-end is reached with.
 pub(crate) const NOTIFY_SECRETS: &str = "notify-secrets.json";
+/// The digest of the key each filler tells the core what happened with.
+pub(crate) const NOTIFY_EVENTS: &str = "notify-events.json";
 /// The keys other programs reach the web surface with, as digests.
 pub const KEYS: &str = "keys.json";
 /// When each of those keys was last used.

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One of the four happenings a service tells the core.",
+  "oneOf": [
+    {
+      "description": "A title a curator fetched is imported into the library.",
+      "type": "string",
+      "const": "imported"
+    },
+    {
+      "description": "A grab or an import failed.",
+      "type": "string",
+      "const": "failed"
+    },
+    {
+      "description": "The service raised a problem about itself, or cleared one.",
+      "type": "string",
+      "const": "health"
+    },
+    {
+      "description": "A title was added to a library of the media server.",
+      "type": "string",
+      "const": "added"
+    }
+  ]
+}

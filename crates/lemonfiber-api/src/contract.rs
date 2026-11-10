@@ -288,6 +288,7 @@ fn bodies() -> BTreeMap<String, Schema> {
             crate::keys::collecting_body(),
             crate::device_keys::body(),
             crate::push_endpoints::body(),
+            crate::notify_events::body(),
             crate::admission::body(),
         ])
         .map(|(route, schema)| (route.to_owned(), schema))
