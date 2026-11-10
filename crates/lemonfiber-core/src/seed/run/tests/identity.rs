@@ -722,6 +722,45 @@ async fn a_fresh_media_server_is_given_its_libraries_after_its_administrator_is_
     );
 }
 
+/// **A media server nothing asks for has no administrator set up where it is claimed over
+/// `owner.claim`**, and one that cannot be asked over its contract is said on the
+/// administrator's line.
+#[tokio::test]
+async fn a_media_server_nothing_asks_for_is_set_up_over_its_contract_or_said() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let ctx = seed_ctx(true, None, None).with_http(http);
+    let mut claimed = crate::test_support::a_contracted_media_server(Some("jellyfin"));
+    for adapter in claimed
+        .services
+        .iter_mut()
+        .filter(|placed| placed.fronts.is_some())
+    {
+        adapter.speaks.push("owner.claim@1".to_owned());
+    }
+
+    let (wirings, _) =
+        identity_beside(&ctx, &[], &[claimed], &crate::baseline::Baseline::new()).await;
+    assert!(wirings.is_empty(), "{wirings:?}");
+
+    let (wirings, _) = identity_beside(
+        &ctx,
+        &[],
+        &[crate::test_support::a_contracted_media_server(Some(
+            "upstream",
+        ))],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+    assert!(
+        matches!(wirings.as_slice(), [one]
+            if one.connection.ends_with("'s administrator, which its adapter signs in with")
+                && matches!(&one.state, State::Skipped { reason }
+                    if reason.ends_with(" speaks the identity source's contract and cannot \
+                                         be asked over it"))),
+        "{wirings:?}"
+    );
+}
+
 /// Whether the secret store beside `env` holds a credential under `name`.
 fn held(env: &std::path::Path, name: &str) -> bool {
     crate::settings::Secrets::at(&env.with_file_name(crate::config::paths::SECRETS))

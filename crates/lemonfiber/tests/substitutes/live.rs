@@ -164,6 +164,24 @@ fn gateway() -> Option<String> {
         .map(str::to_owned)
 }
 
+/// This machine's address on Docker's default bridge, which the household's links name.
+fn bridged() -> Option<String> {
+    let output = std::process::Command::new("docker")
+        .args([
+            "network",
+            "inspect",
+            "bridge",
+            "--format",
+            "{{range .IPAM.Config}}{{.Gateway}} {{end}}",
+        ])
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .next()
+        .map(str::to_owned)
+}
+
 /// The site added to the indexer as the operator adds one: its own Newznab definition
 /// from the indexer's schema, pointed at the site, under the key the core minted for it.
 fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
@@ -263,6 +281,16 @@ pub fn run(
             .any(|outcome| outcome == APPLIED),
         "setup was not applied:\n{}",
         set_up.printed
+    );
+    let household = bridged();
+    assert!(household.is_some(), "no address the household reaches");
+    let Some(household) = household else {
+        return;
+    };
+    let addressed = format!("{}={household}", lemonfiber_manifest::container::LAN_HOST);
+    step(
+        &core.agreed(&["settings", "set", &addressed]),
+        "the household's address",
     );
     let mut up = vec!["up"];
     up.extend(asked.forms);
