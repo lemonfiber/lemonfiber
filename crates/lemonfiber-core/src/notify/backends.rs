@@ -138,6 +138,16 @@ pub(crate) fn secrets_at(ctx: &Ctx) -> Option<PathBuf> {
     crate::app::targets::beside_env(ctx, NOTIFY_SECRETS)
 }
 
+/// What `backend` is reached with: its secret as kept, or the household's own ntfy's
+/// account where it is that and none was handed over.
+pub(crate) fn held(ctx: &Ctx, backend: &Backend) -> Held {
+    let kept = secrets_at(ctx)
+        .and_then(|path| secrets(&path).ok())
+        .and_then(|mut secrets| secrets.held.remove(&backend.id))
+        .unwrap_or_default();
+    super::bundled::reached_with(ctx, backend, kept)
+}
+
 /// Each back-end kept, by what it speaks and where it is reached, with no credential.
 pub(crate) fn destinations(ctx: &Ctx) -> Vec<(BackendKind, String)> {
     at(ctx)

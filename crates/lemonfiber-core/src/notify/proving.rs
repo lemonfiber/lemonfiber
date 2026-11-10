@@ -45,10 +45,7 @@ pub(crate) async fn test(ctx: &Ctx, id: &str) -> Result<NotifyReport, Box<Proble
 
 /// How far `backend` stands proven once a test is sent to it.
 async fn proved(ctx: &Ctx, backend: &Backend) -> BackendProof {
-    let held = backends::secrets_at(ctx)
-        .and_then(|path| backends::secrets(&path).ok())
-        .and_then(|mut secrets| secrets.held.remove(&backend.id))
-        .unwrap_or_default();
+    let held = backends::held(ctx, backend);
     let now = super::now(ctx);
     let message = Message {
         kind: Notification::Completion,

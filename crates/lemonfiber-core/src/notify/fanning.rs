@@ -130,6 +130,32 @@ fn receives_the_stack(backend: &Backend) -> bool {
         && backend.kind != BackendKind::Unifiedpush
 }
 
+/// Owe every back-end that receives the stack's alerts one message now, apart from any
+/// alert the dashboard carries: what a service told the core happened.
+pub(crate) fn owe_now(ctx: &Ctx, kind: Notification, summary: &str, urgent: bool) {
+    let Some(path) = configured_at(ctx) else {
+        return;
+    };
+    let now = super::now(ctx);
+    let _ = backends::changed(&path, &mut |kept: &mut Kept| {
+        for one in kept
+            .backends
+            .iter_mut()
+            .filter(|one| receives_the_stack(one) && one.owed.len() < MOST_OWED)
+        {
+            one.owed.push(Owed {
+                kind,
+                summary: summary.to_owned(),
+                urgent,
+                at: now,
+                attempts: 0,
+                next: None,
+            });
+        }
+        Ok(())
+    });
+}
+
 /// Owe every back-end `member` receives on that something they asked for is ready, and
 /// nothing more: no title, no service and nothing about the stack.
 pub(crate) fn ready(ctx: &Ctx, member: &str) {
@@ -167,11 +193,8 @@ fn is_due(backend: &Backend, now: u64) -> bool {
 
 /// Send `id` everything it is owed, oldest first, until one fails or nothing is due.
 async fn delivered(ctx: &Ctx, path: &Path, id: &str) {
-    let held: Held = backends::secrets_at(ctx)
-        .and_then(|at| backends::secrets(&at).ok())
-        .and_then(|mut secrets| secrets.held.remove(id))
-        .unwrap_or_default();
     while let Some((backend, owed)) = next_due(path, id, super::now(ctx)) {
+        let held = backends::held(ctx, &backend);
         let message = Message {
             kind: owed.kind,
             summary: owed.summary.clone(),
