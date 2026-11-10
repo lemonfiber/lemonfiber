@@ -422,3 +422,6 @@ pub(super) fn nowhere() -> Box<Problem> {
 pub(super) fn read_failure(failure: &Failure) -> Box<Problem> {
     Box::new(failure.problem())
 }
+
+#[cfg(test)]
+mod tests;
