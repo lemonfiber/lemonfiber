@@ -246,6 +246,7 @@ fn reads() -> Vec<Command> {
         Command::Status { forms: Vec::new() },
         Command::Stuck,
         Command::FrontDoor,
+        Command::Stack,
         Command::News,
         Command::Playing { member: None },
         Command::Explain {
@@ -380,10 +381,10 @@ fn always_reported() -> Vec<Command> {
             name: "ana".to_owned(),
         },
         Command::Forget { confirm: true },
-        Command::Space {
+        Command::Space(crate::app::Reclaiming {
             agreement: Some("anything".to_owned()),
             only: Vec::new(),
-        },
+        }),
         Command::StopSeeding(LettingGo {
             download: "anything".to_owned(),
             agreement: None,

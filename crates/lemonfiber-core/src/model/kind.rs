@@ -119,6 +119,8 @@ kinds! {
     WATCHED = "watched",
     /// One page of what a member's search for a title found, under their limits.
     ASKABLE = "askable",
+    /// Which kinds a member may ask for now, each with the units it is asked for in.
+    ASKABLE_KINDS = "askable-kinds",
     /// What asking for a title on a member's behalf came to.
     ASKED = "asked",
     /// Where handing somebody's device the way onto the stack stands.
@@ -184,6 +186,8 @@ kinds! {
     /// One line said while services are starting: what the container engine wrote, or
     /// what the wait after it is still waiting for.
     START = "start",
+    /// How the stack runs without lemonfiber.
+    STACK = "stack",
     /// What each service is doing.
     STATUS = "status",
     /// One step of a walkthrough, said the moment it is true.

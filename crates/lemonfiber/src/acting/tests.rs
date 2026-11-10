@@ -137,7 +137,7 @@ fn at(name: &str) -> Acting {
 
 /// More presses than there are questions, so a name nothing matches stops rather
 /// than moving for ever.
-const MOST: usize = 30;
+const MOST: usize = 40;
 
 /// The screen, having taken the question named.
 fn asking(name: &str) -> Acting {

@@ -211,7 +211,7 @@ fn only_is_a_list_on_space_and_one_name_on_a_diagnosis() {
     let listed = || Only::Several(vec!["orphaned".to_owned()]);
     assert!(matches!(
         spacing(Some("the-offer"), listed()),
-        Ok(Command::Space { agreement: Some(offer), only })
+        Ok(Command::Space(lemonfiber_core::app::Reclaiming { agreement: Some(offer), only }))
             if offer == "the-offer" && only == ["orphaned"]
     ));
     assert_eq!(
@@ -223,7 +223,7 @@ fn only_is_a_list_on_space_and_one_name_on_a_diagnosis() {
     );
     assert!(matches!(
         spacing(Some("the-offer"), Only::One("orphaned".to_owned())),
-        Ok(Command::Space { only, .. }) if only == ["orphaned"]
+        Ok(Command::Space(lemonfiber_core::app::Reclaiming { only, .. })) if only == ["orphaned"]
     ));
     assert!(matches!(
         spacing(Some("the-offer"), Only::Several(Vec::new())),

@@ -17,8 +17,8 @@ use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
     RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawPushEndpoint,
-    RawRemoving, RawRestart, RawSetup, RawShelf, RawSwitch, RawTrace, RawUi, RawUp, RawWhom,
-    UpdateCommand,
+    RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding, RawSwitch, RawTrace,
+    RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -266,6 +266,12 @@ pub enum Request {
     /// stack runs nothing anybody could begin at — that there is no address to send
     /// rather than naming the nearest thing that would open.
     FrontDoor,
+    /// Say how the stack runs without lemonfiber.
+    ///
+    /// Which stack this machine runs, the stack this build ships or your own, where its
+    /// Compose project and `.env` are, the exact `docker compose` words that start it with
+    /// no lemonfiber running, and anything those words alone do not start.
+    Stack,
     /// List lemonfiber's releases, what the household has asked for, and the checks
     /// found wrong, each newest first.
     ///
@@ -417,15 +423,7 @@ pub enum Request {
     /// to be left alone is on offer at any level of fullness. The account prints a
     /// name for its offer, and answering with that name is the yes; the disk is read
     /// again first, and an answer given for a different reading is refused.
-    Space {
-        /// The offer being answered, as the account printed it.
-        #[arg(long, value_name = "NAME")]
-        offer: Option<String>,
-        /// Take only this category of what the offer costs nothing to take: `orphaned` or
-        /// `extracted`. May be repeated.
-        #[arg(long, value_name = "CATEGORY", requires = "offer")]
-        only: Vec<String>,
-    },
+    Space(RawSpace),
     /// Stop seeding one completed download, and let its files go with it.
     ///
     /// Everything the disk account names and deliberately leaves alone is asked for
@@ -435,13 +433,7 @@ pub enum Request {
     /// nothing, and prints a name for that offer; answering with that name is the
     /// yes. There is no other way to say it, because a blanket confirmation would be
     /// agreement from somebody who had not read the cost.
-    StopSeeding {
-        /// The completed download, as the account and the client both name it.
-        download: String,
-        /// The offer being answered, as the run that made it printed it.
-        #[arg(long, value_name = "NAME")]
-        offer: Option<String>,
-    },
+    StopSeeding(RawStopSeeding),
     /// Account for the line: what it carries, what the stack takes, what that costs.
     ///
     /// Asked nothing it reports — the limits in force, which side of your day the

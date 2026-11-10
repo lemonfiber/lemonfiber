@@ -573,4 +573,19 @@ fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_de
     );
     assert_eq!(ask(Wished::Music, None, vec![1]), Err(USAGE));
     assert_eq!(ask(Wished::Tv, Some(Within::Album), Vec::new()), Err(USAGE));
+    assert_eq!(
+        ask(Wished::Music, Some(Within::Book), Vec::new()),
+        Err(USAGE)
+    );
+    assert_eq!(
+        super::super::household(
+            whom(None, false),
+            Some(HouseholdCommand::Kinds {
+                name: "ana".to_owned()
+            }),
+        ),
+        Ok(Command::Wish(Wishing::Kinds {
+            member: "ana".to_owned()
+        }))
+    );
 }

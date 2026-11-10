@@ -179,6 +179,7 @@ const fn cannot(named: &'static str, why: &'static str) -> Asked {
 const fn wished(wishing: &Wishing) -> Asked {
     match wishing {
         Wishing::Find { .. } => reads("household search"),
+        Wishing::Kinds { .. } => reads("household kinds"),
         Wishing::Ask { .. } | Wishing::Collect { .. } => reports("household ask", &[kind::ASKED]),
     }
 }
@@ -233,6 +234,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Watcher => reads("watcher"),
         Command::Queue(queueing) => queued(*queueing),
         Command::FrontDoor => reads("front-door"),
+        Command::Stack => reads("stack"),
         Command::News => reads("news"),
         Command::Playing { .. } => reads("playing"),
         Command::Companion(Pairing::Pair) => cannot("companion pair", MATERIAL_IS_MATERIAL),
@@ -324,7 +326,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Reissue { .. } => reports("reissue", &[kind::INVITATION]),
         Command::Handoff { .. } => reports("household handoff", &[kind::HANDOFF]),
         Command::Forget { .. } => reports("forget", &[kind::STORED]),
-        Command::Space { .. } => reports("space", &[kind::SPACE]),
+        Command::Space(_) => reports("space", &[kind::SPACE]),
         Command::StopSeeding(_) => reports("stop-seeding", &[kind::STOP_SEEDING]),
         Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
         Command::Downloads { .. } => reports("downloads", &[kind::PAUSING]),

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which kinds a member may ask for now.",
+  "type": "object",
+  "properties": {
+    "kinds": {
+      "description": "Each kind they may ask for now, series first.",
+      "type": "array",
+      "items": {
+        "$ref": "AskableKind.json"
+      }
+    },
+    "member": {
+      "description": "The member asked about, by the name they are known by.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "member",
+    "kinds"
+  ]
+}

@@ -185,7 +185,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
         },
         member,
     );
-    kept::listed(ctx, &mut report, &members_by_id, &reasons);
+    kept::listed(ctx, &mut report, &members_by_id, &reasons).await;
     report.findings.append(&mut findings);
     Ok(report)
 }

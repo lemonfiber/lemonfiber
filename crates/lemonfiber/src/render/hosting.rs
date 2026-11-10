@@ -1,11 +1,14 @@
-//! What this machine keeps running, said so that installed and running are two things.
+//! What this machine keeps running, said so that installed and running are two things,
+//! and how the stack runs without lemonfiber at all.
 //!
 //! The whole point of the reading is that a written definition is not a running
 //! command, so no line here says one where it means the other. A state the manager
 //! would not confirm reads as unconfirmed and never as working, and a command
 //! nothing is keeping says outright that it stops when its window closes.
 
-use lemonfiber_core::model::{Changed, HostedCommand, Hosting, HostingReport};
+use lemonfiber_core::model::{
+    Changed, HostedCommand, Hosting, HostingReport, StackReport, StackSource,
+};
 
 use super::Lines;
 
@@ -107,6 +110,31 @@ const fn stands(standing: Hosting) -> &'static str {
              closes"
         }
     }
+}
+
+/// How the stack runs without lemonfiber: whose stack it is, where it is written, the
+/// words that start it, and what those words alone leave out.
+pub(super) fn underneath(report: &StackReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(match &report.source {
+        StackSource::Bundled => "The stack this build ships.".to_owned(),
+        StackSource::Own(path) => format!("Your own stack, from {path}."),
+    });
+    lines.put(format!("  Project   {}", report.project));
+    lines.put(format!("  Settings  {}", report.env));
+    lines.spaced("Without lemonfiber running, this starts it:");
+    lines.put(format!("  {}", report.plain_up.join(" ")));
+    lines.spaced(format!(
+        "Every action runs without a question as {}.",
+        report.non_interactive.form
+    ));
+    if !report.exceptions.is_empty() {
+        lines.spaced("Those words alone leave out:");
+        for exception in &report.exceptions {
+            lines.put(format!("  {}   {}", exception.part, exception.because));
+        }
+    }
+    lines
 }
 
 #[cfg(test)]

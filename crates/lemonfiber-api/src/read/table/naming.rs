@@ -268,6 +268,14 @@ pub(super) fn following(term: Option<String>, season: Option<&str>) -> Result<Co
     }))
 }
 
+/// Which kinds a member may ask for now. Who is named is the core's to judge, as for a
+/// search.
+pub(super) fn askable_kinds(member: Option<String>) -> Command {
+    Command::Wish(Wishing::Kinds {
+        member: member.unwrap_or_default(),
+    })
+}
+
 /// One page of a member's search.
 ///
 /// Only a kind and a unit naming no unit of music or books are refused here. Who is

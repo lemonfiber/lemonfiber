@@ -171,6 +171,24 @@ pub struct AskableReport {
     pub approval: String,
 }
 
+/// One kind a member may ask for now, with the units it is asked for in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct AskableKind {
+    /// The kind.
+    pub kind: TitleKind,
+    /// The units a title of it is asked for in, none for series and films.
+    pub units: Vec<TitleUnit>,
+}
+
+/// Which kinds a member may ask for now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct AskableKindsReport {
+    /// The member asked about, by the name they are known by.
+    pub member: String,
+    /// Each kind they may ask for now, series first.
+    pub kinds: Vec<AskableKind>,
+}
+
 /// What asking for a title came to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]

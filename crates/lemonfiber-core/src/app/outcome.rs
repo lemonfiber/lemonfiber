@@ -144,12 +144,16 @@ outcomes! {
     Watched(crate::model::WatchedReport) => WATCHED [rehearsed],
     /// One page of what a member's search for a title found, under their limits.
     Askable(crate::model::AskableReport) => ASKABLE,
+    /// Which kinds a member may ask for now.
+    AskableKinds(crate::model::AskableKindsReport) => ASKABLE_KINDS,
     /// What asking for a title on a member's behalf came to.
     Asked(crate::model::AskedReport) => ASKED [rehearsed],
     /// What this machine keeps running for lemonfiber, and what a change to it did.
     Hosting(HostingReport) => HOSTING [rehearsed],
     /// The one address to hand somebody who lives here.
     FrontDoor(FrontDoorReport) => FRONT_DOOR,
+    /// How the stack runs without lemonfiber.
+    Stack(crate::model::StackReport) => STACK,
     /// What a surface can mark as new.
     News(crate::news::News) => NEWS_ITEMS,
     /// The items whose downloads are stuck, each linkable to its trace.

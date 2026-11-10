@@ -763,3 +763,30 @@ pub(super) fn plan() -> Plan {
         running: lemonfiber_core::stack::closure::Running::Unasked,
     }
 }
+
+/// How an operator's own stack runs without lemonfiber, one part installed first.
+pub(super) fn a_stack() -> lemonfiber_core::model::StackReport {
+    lemonfiber_core::model::StackReport {
+        source: lemonfiber_core::model::StackSource::Own("/home/ada/my-stack".to_owned()),
+        project: "/home/ada/.config/lemonfiber/stack".to_owned(),
+        env: "/home/ada/.config/lemonfiber/.env".to_owned(),
+        plain_up: [
+            "docker",
+            "compose",
+            "--project-name",
+            "lemonfiber",
+            "up",
+            "--detach",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        non_interactive: lemonfiber_core::model::NonInteractive {
+            form: "lemonfiber <command>".to_owned(),
+        },
+        exceptions: vec![lemonfiber_core::model::StackException {
+            part: "jellyfin".to_owned(),
+            because: "lemonfiber installs it from this build before the stack first starts"
+                .to_owned(),
+        }],
+    }
+}

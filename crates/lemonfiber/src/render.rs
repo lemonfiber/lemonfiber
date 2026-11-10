@@ -70,11 +70,6 @@ use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
 /// What stands in for an answer that could not be turned into JSON.
-///
-/// Serialising these reports cannot actually fail — every field is a plain owned value —
-/// so this exists to keep the fallback a value rather than an unreachable branch. It is
-/// built eagerly for the same reason: a lazily-built one would be a line no test could
-/// ever run, which is exactly what the coverage gate is there to forbid.
 pub(crate) const UNRENDERABLE: &str = "this answer could not be rendered as JSON";
 
 /// The lines an answer renders to, in order.
@@ -255,9 +250,11 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Granted(report) => viewing::grant(report),
         Outcome::Watched(report) => viewing::watched(report),
         Outcome::Askable(report) => wishing::askable(report),
+        Outcome::AskableKinds(report) => wishing::kinds(report),
         Outcome::Asked(report) => wishing::asked(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
+        Outcome::Stack(report) => hosting::underneath(report),
         Outcome::News(report) => news::news(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Boot(report) => booted::booted(report),

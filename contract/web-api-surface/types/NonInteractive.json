@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "form": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

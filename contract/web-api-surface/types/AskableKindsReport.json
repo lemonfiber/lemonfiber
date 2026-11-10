@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "kinds": {
+      "type": [
+        "array[ref:AskableKind]"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

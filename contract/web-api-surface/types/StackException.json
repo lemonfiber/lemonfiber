@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "part": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

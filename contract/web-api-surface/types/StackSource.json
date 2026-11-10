@@ -1,0 +1,13 @@
+{
+  "fields": {
+    "own": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"bundled\""
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How this stack runs without lemonfiber.",
+  "type": "object",
+  "properties": {
+    "env": {
+      "description": "The `.env` file beside it.",
+      "type": "string"
+    },
+    "exceptions": {
+      "description": "Every part the words alone do not bring up as lemonfiber does. Empty where there\nis none.",
+      "type": "array",
+      "items": {
+        "$ref": "StackException.json"
+      }
+    },
+    "non_interactive": {
+      "description": "How any action is run without a question being put.",
+      "$ref": "NonInteractive.json"
+    },
+    "plain_up": {
+      "description": "The `docker compose` words that bring the stack up with no lemonfiber running, as\nlemonfiber's own start would run them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "project": {
+      "description": "The directory the Compose project is written to.",
+      "type": "string"
+    },
+    "source": {
+      "description": "Whether this machine runs the stack this build ships or the operator's own.",
+      "$ref": "StackSource.json"
+    }
+  },
+  "required": [
+    "source",
+    "project",
+    "env",
+    "plain_up",
+    "non_interactive",
+    "exceptions"
+  ]
+}

@@ -424,10 +424,10 @@ fn the_yes_to_reclaiming_room_is_the_name_the_account_gave_itself() {
 
     assert_eq!(
         answered,
-        Some(Ok(Command::Space {
+        Some(Ok(Command::Space(lemonfiber_core::app::Reclaiming {
             agreement: Some(account.agreement),
             only: Vec::new(),
-        })),
+        }))),
         "the account that was read is what the yes names"
     );
 }

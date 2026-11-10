@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::{books, music};
 
-use super::Unit;
+use super::{Medium, Unit};
 use crate::ports::service::{AskedWith, BookAsk, Candidate, Candidates, Failure, MusicAsk};
 
 /// A curator a member's music or books are asked of, over its medium's contract.
@@ -51,6 +51,22 @@ impl Collector {
             (Self::Books(curator), Unit::Books(unit)) => curator.candidate(unit, reference).await,
             _ => Err(other_medium()),
         }
+    }
+
+    /// The units of its medium the curator answers for as it is configured now.
+    ///
+    /// # Errors
+    ///
+    /// The [`Failure`] the curator answered with.
+    pub(crate) async fn units(&self) -> Result<Vec<Unit>, Failure> {
+        let (with, medium) = match self {
+            Self::Music(curator) => (curator.profiles().await?, Medium::Music),
+            Self::Books(curator) => (curator.profiles().await?, Medium::Books),
+        };
+        Ok(Unit::ALL
+            .into_iter()
+            .filter(|unit| unit.medium() == medium && with.units.contains(&unit.curated()))
+            .collect())
     }
 
     /// Ask for the candidate `reference` names, as a `unit`, at the first root folder and

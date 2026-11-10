@@ -18,6 +18,11 @@ pub enum Wishing {
         /// and films.
         unit: Option<Unit>,
     },
+    /// Which kinds a member may ask for now.
+    Kinds {
+        /// The member asking, by name or id.
+        member: String,
+    },
     /// Ask for one title, or seasons of it, on a member's behalf.
     Ask {
         /// The member asking, by name or id.

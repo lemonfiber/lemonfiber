@@ -24,6 +24,7 @@ mod letting_go;
 mod migrate;
 mod quality;
 mod queueing;
+mod reclaiming;
 mod restarting;
 mod restoring;
 mod setting;
@@ -48,6 +49,7 @@ pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
 pub use queueing::Queueing;
+pub use reclaiming::Reclaiming;
 pub use restarting::Restarting;
 pub use restoring::Restoring;
 pub use setting::Setting;
@@ -282,6 +284,8 @@ pub enum Command {
     /// Name the one address to hand somebody who lives here, and say where it stands —
     /// including that there is none, where this stack runs nothing they could begin at.
     FrontDoor,
+    /// Say how the stack runs without lemonfiber, and the plain Compose words that start it.
+    Stack,
     /// List the releases in this build's record, what the household has asked for, and
     /// the checks found wrong, each newest first, for a surface to mark what is new.
     News,
@@ -429,14 +433,7 @@ pub enum Command {
     /// categories of it `only` names. Nothing else can be chosen: a seeding torrent's
     /// removal has a consequence outside this machine and is named and left, and something
     /// the operator asked to be left alone is not on offer at any level of fullness.
-    Space {
-        /// The offer being answered, as the run that made it named itself; without
-        /// one, nothing is removed.
-        agreement: Option<String>,
-        /// The categories of what the offer holds as costing nothing to take, as a line's
-        /// `of` spells them; all it holds where none is named.
-        only: Vec<String>,
-    },
+    Space(Reclaiming),
     /// Ask the download client to let one completed download go, files and all.
     ///
     /// The one thing the account above names and leaves alone, taken on its own. It

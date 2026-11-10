@@ -16,8 +16,8 @@ use lemonfiber_core::model::{
 
 use built::{
     a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_settings_report,
-    a_setup_part_way, a_shared_line, a_substitution, a_walk, a_word, an_update, manifest, plan,
-    what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
+    a_setup_part_way, a_shared_line, a_stack, a_substitution, a_walk, a_word, an_update, manifest,
+    plan, what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
 };
 
 /// One sample of every outcome, so each kind's description can be held against
@@ -227,6 +227,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
         Outcome::Askable(a_search()),
+        Outcome::AskableKinds(the_kinds()),
         Outcome::Asked(an_ask()),
         Outcome::Stuck(StuckReport::default()),
         Outcome::Boot(a_boot()),
@@ -270,6 +271,7 @@ fn serving() -> Vec<Outcome> {
             findings: Vec::new(),
         }),
         Outcome::FrontDoor(a_front_door()),
+        Outcome::Stack(a_stack()),
         Outcome::Pairing(a_pairing()),
         Outcome::Certificate(lemonfiber_core::companion::Replacement {
             rehearsed: false,
@@ -562,6 +564,24 @@ fn a_title() -> lemonfiber_core::model::TitleReport {
             }],
         }),
         rehearsed: false,
+    }
+}
+
+/// The kinds a member may ask for, one with units and one without.
+fn the_kinds() -> lemonfiber_core::model::AskableKindsReport {
+    use lemonfiber_core::model::{AskableKind, AskableKindsReport, TitleKind, TitleUnit};
+    AskableKindsReport {
+        member: "Ada".to_owned(),
+        kinds: vec![
+            AskableKind {
+                kind: TitleKind::Movies,
+                units: Vec::new(),
+            },
+            AskableKind {
+                kind: TitleKind::Music,
+                units: vec![TitleUnit::Album, TitleUnit::Artist],
+            },
+        ],
     }
 }
 

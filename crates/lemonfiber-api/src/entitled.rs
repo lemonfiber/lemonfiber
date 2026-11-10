@@ -104,7 +104,7 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
                 Permitted::Nothing
             }
             (Scope::Read | Scope::Act, Door::Reading)
-                if matches!(command, Command::Settings(_)) =>
+                if matches!(command, Command::Settings(_) | Command::Stack) =>
             {
                 Permitted::Nothing
             }
@@ -198,6 +198,9 @@ pub(crate) fn their_wish(id: &str, wishing: &Wishing) -> Wishing {
             term,
             after,
             unit,
+        },
+        Wishing::Kinds { .. } => Wishing::Kinds {
+            member: id.to_owned(),
         },
         Wishing::Ask { wish, .. } => Wishing::Ask {
             member: id.to_owned(),

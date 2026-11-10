@@ -24,6 +24,7 @@ Commands:
   handoff   Hand somebody's phone or television the way onto the stack, and see whether it arrived
   grant     Open a session on somebody's own account for one of their devices
   watched   Record how far somebody got through a title, as their own progress
+  kinds     Which kinds somebody in the house may ask for now, each with what a title of it is asked for as
   search    Search, as somebody in the house, for titles the house does not hold yet
   ask       Ask for a title on somebody's behalf, as their own ask
   help      Print this message or the help of the given subcommand(s)
@@ -319,6 +320,40 @@ Options:
 
       --ended
           Record it as finished
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help
+```
+
+## `lemonfiber household kinds`
+
+```text
+Which kinds somebody in the house may ask for now, each with what a title of it is asked for as
+
+Usage: lemonfiber household kinds [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>
+          Who is asking, named the way they sign in
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
 
       --force
           Take the stack from a run that claimed it and did not give it back

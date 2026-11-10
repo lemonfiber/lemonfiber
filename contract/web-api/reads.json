@@ -165,6 +165,19 @@
     "file": false
   },
   {
+    "path": "/api/askable/kinds",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "askable-kinds"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/playing",
     "parameters": [
       {
@@ -190,6 +203,14 @@
     "parameters": [],
     "kinds": [
       "front-door"
+    ],
+    "file": false
+  },
+  {
+    "path": "/api/stack",
+    "parameters": [],
+    "kinds": [
+      "stack"
     ],
     "file": false
   },

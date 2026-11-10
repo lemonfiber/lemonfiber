@@ -12,7 +12,7 @@ use crate::error::codes::quota::UNREACHABLE;
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::household::State;
 use crate::model::MemberRequest;
-use crate::ports::service::Left;
+use crate::ports::service::{CandidateState, Left};
 
 /// Where the asks are kept.
 ///
@@ -141,7 +141,12 @@ pub(crate) fn left(
     let used = films.days.map_or(0, |days| {
         kept.iter()
             .filter(|ask| ask.member == member && ask.unit.medium() == medium)
-            .filter(|ask| matches!(ask.standing, Standing::Waiting | Standing::Sent))
+            .filter(|ask| {
+                matches!(
+                    ask.standing,
+                    Standing::Waiting | Standing::Sent | Standing::PartlyHere | Standing::Here
+                )
+            })
             .filter(|ask| {
                 crate::asking::waiting_for(Some(&ask.asked_at), now)
                     .is_some_and(|age| age < u64::from(days))
@@ -152,6 +157,45 @@ pub(crate) fn left(
         limit: films.limit,
         used: u32::try_from(used).unwrap_or(u32::MAX),
         days: films.days,
+    }
+}
+
+/// Read each sent ask back from its curator, and mark those the house now holds, all of
+/// them or in part, with when the core first saw them held. Nothing under a rehearsal, and
+/// an ask whose curator does not answer stays where it stood.
+pub(crate) async fn arrivals(ctx: &Ctx) {
+    let Some(path) = crate::app::targets::beside_env(ctx, ASKS) else {
+        return;
+    };
+    if ctx.dry_run {
+        return;
+    }
+    let waiting: Vec<Ask> = every(ctx)
+        .into_iter()
+        .filter(|ask| matches!(ask.standing, Standing::Sent | Standing::PartlyHere))
+        .collect();
+    for medium in Medium::ALL {
+        let of_medium: Vec<&Ask> = waiting
+            .iter()
+            .filter(|ask| ask.unit.medium() == medium)
+            .collect();
+        if of_medium.is_empty() {
+            continue;
+        }
+        let Some(curator) = collector(ctx, medium).await else {
+            continue;
+        };
+        for ask in of_medium {
+            let held = match curator.candidate(ask.unit, &ask.reference).await {
+                Ok(Some(found)) if found.state == CandidateState::Here => Standing::Here,
+                Ok(Some(found)) if found.state == CandidateState::PartlyHere => {
+                    Standing::PartlyHere
+                }
+                _ => continue,
+            };
+            let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
+            let _ = store::arrived(&path, ask.named(), held, &at);
+        }
     }
 }
 
@@ -182,6 +226,8 @@ pub(crate) fn listed(
     let state = match ask.standing {
         Standing::Waiting => State::WaitingForApproval,
         Standing::Sent => State::Getting,
+        Standing::PartlyHere => State::PartlyHere,
+        Standing::Here => State::Here,
         Standing::Declined | Standing::Expired => State::Declined,
     };
     MemberRequest {
@@ -189,7 +235,7 @@ pub(crate) fn listed(
         asked: Some(ask.asked_at.clone()),
         title: Some(ask.name.clone()),
         year: ask.year,
-        arrived: None,
+        arrived: ask.arrived_at.clone(),
         shelf_id: None,
         media: Some(ask.unit.noun().to_owned()),
         state: Some(state),

@@ -62,6 +62,7 @@ pub(crate) mod healing;
 pub(crate) mod held;
 pub(crate) mod history;
 pub(crate) mod hosting;
+mod household_commands;
 pub(crate) mod import;
 pub(crate) mod invite;
 pub(crate) mod letting;
@@ -91,6 +92,7 @@ pub mod support;
 pub mod switched;
 pub(crate) mod targets;
 pub(crate) mod trace;
+mod underneath;
 pub mod unforwarded;
 pub(crate) mod upgrade;
 pub mod watch;
@@ -99,8 +101,8 @@ pub(crate) mod watcher;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Queueing, Removing, Restarting, Restoring, Setting, Settling, Teardown, Tracing,
-    Viewing, Whom, Wishing, HOSTABLE,
+    QualityAction, Queueing, Reclaiming, Removing, Restarting, Restoring, Setting, Settling,
+    Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -160,15 +162,6 @@ async fn down(ctx: &Ctx, forms: &[String], wait: Waiting) -> Result<Outcome, Box
     engine::teardown(ctx, forms, wait).await.map(Outcome::from)
 }
 
-/// Remove somebody from the household, or say what that would cost.
-///
-/// Beside the table for the reason [`down`] is.
-async fn removed(ctx: &Ctx, name: String, offer: Option<String>) -> Result<Outcome, Box<Problem>> {
-    remove::remove(ctx, name, offer.as_deref())
-        .await
-        .map(Outcome::Removal)
-}
-
 /// Which app to use on which device, with what the quality in force does to playback.
 ///
 /// Beside the table because it has a step before the answer. One caution above the
@@ -194,21 +187,6 @@ async fn inventoried(ctx: &Ctx, asked: Asking) -> Result<Outcome, Box<Problem>> 
     credentials::credentials(ctx, asked)
         .await
         .map(Outcome::Credentials)
-}
-
-/// Offer somebody an account, which is the one request this table takes apart.
-///
-/// Named apart for the reason [`lifecycle`] is: every other row here passes what it was
-/// given straight along in one line, and an invitation carries three things.
-async fn invited(ctx: &Ctx, inviting: Inviting) -> Result<Outcome, Box<Problem>> {
-    let Inviting {
-        name,
-        allowance,
-        confirm,
-    } = inviting;
-    invite::offer(ctx, name, allowance, confirm)
-        .await
-        .map(Outcome::Invitation)
 }
 
 /// What the services themselves reach out for, which needs the stack read first.
@@ -251,6 +229,13 @@ async fn diagnosed(
     // accepted is not remembered as wrong.
     report.findings = conditions::dated(ctx, report.findings);
     Ok(Outcome::Doctor(report))
+}
+
+/// Where the disk stands, and what taking the offer came to where `asked` answers it.
+async fn reclaimed(ctx: &Ctx, asked: Reclaiming) -> Result<Outcome, Box<Problem>> {
+    space::space(ctx, asked.agreement, &asked.only)
+        .await
+        .map(Outcome::Space)
 }
 
 /// What letting one completed download go costs, and what became of letting it.
@@ -305,16 +290,6 @@ async fn restored(ctx: &Ctx, restoring: Restoring) -> Result<Outcome, Box<Proble
     restore::run(ctx, &archive, repoint, &consent)
         .await
         .map(Outcome::Restore)
-}
-
-/// What became of one thing the household asked for.
-async fn decided(
-    ctx: &Ctx,
-    decision: crate::app::command::Decision,
-) -> Result<Outcome, Box<Problem>> {
-    asking::deciding(ctx, &decision)
-        .await
-        .map(Outcome::Household)
 }
 
 /// Putting right what the diagnosis found, at the operator's word.
@@ -398,21 +373,6 @@ async fn watching(ctx: &Ctx, forms: &[String]) -> Result<Outcome, Box<Problem>> 
         .map(Outcome::Watch)
 }
 
-/// Held on until the arrangement changes under it, sweeping as it goes.
-///
-/// Beside the table for the reason [`watching`] is: this arm reached for something
-/// the caller never named. How often it wakes is this command's own, because a
-/// period in whole days has no moment to miss — and a surface that could choose it
-/// could choose one that misses the day.
-///
-/// It is also the one command here that acts while nobody is watching, which is why
-/// its period is named rather than defaulted: naming one records it and stops.
-async fn sweeping(ctx: &Ctx, arranged: Arranged) -> Result<Outcome, Box<Problem>> {
-    expiring::expiring(ctx, arranged, expiring::SWEEPING)
-        .await
-        .map(Outcome::Household)
-}
-
 /// The table itself: every command, and where it goes.
 ///
 /// Split from [`dispatch`] so that the three things asked of every command are asked
@@ -446,20 +406,19 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Playing { member } => playing::asked(ctx, member.as_deref()).await,
         Command::Viewing(viewing) => crate::screening::viewed(ctx, viewing).await,
         Command::Wish(wishing) => crate::wishing::wished(ctx, wishing).await,
-        Command::Household { member } => household::household(ctx, member.as_ref())
-            .await
-            .map(Outcome::Household),
+        Command::Household { member } => household_commands::household(ctx, member.as_ref()).await,
         // Both answer with the household as it now stands rather than with a report of
         // their own, the way a forget answers with what is left: what an operator wants
         // to see after changing a limit is the limit, on the people it applies to.
         Command::Allowing(chosen) => asking::allowing(ctx, &chosen).await.map(Outcome::Household),
-        Command::Deciding(decision) => decided(ctx, decision).await,
-        Command::Expiring(arranged) => sweeping(ctx, arranged).await,
+        Command::Deciding(decision) => household_commands::decided(ctx, decision).await,
+        Command::Expiring(arranged) => household_commands::sweeping(ctx, arranged).await,
         // The short command that decides what becomes of the long ones. It reads
         // after it writes rather than reporting what a write claimed, because a written
         // definition is not a running command and this exists to tell the two apart.
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
+        Command::Stack => underneath::stack(ctx).await.map(Outcome::Stack),
         // A read that cannot fail: a kind that could not be read is named in the
         // answer rather than failing the rest.
         Command::News => Ok(Outcome::News(crate::news::run::news(ctx).await)),
@@ -472,10 +431,12 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
         Command::Clients => Ok(guided(ctx)),
-        Command::Invite(inviting) => invited(ctx, inviting).await,
+        Command::Invite(inviting) => household_commands::invited(ctx, inviting).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
         Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
-        Command::Remove { name, agreement } => removed(ctx, name, agreement).await,
+        Command::Remove { name, agreement } => {
+            household_commands::removed(ctx, name, agreement).await
+        }
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Wiring(asked) => wiring::wiring(ctx, &asked).await,
         Command::Settings(asked) => crate::settings::run::settings(ctx, &asked).await,
@@ -505,9 +466,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Forget { confirm } => stored::forget(ctx, confirm).await.map(Outcome::Stored),
         // The same shape, over the operator's own disk: unconfirmed it accounts and offers,
         // confirmed it takes what the account named as costing nothing.
-        Command::Space { agreement, only } => space::space(ctx, agreement, &only)
-            .await
-            .map(Outcome::Space),
+        Command::Space(asked) => reclaimed(ctx, asked).await,
         // The one download the account leaves with the operator, asked for by name and
         // answered by the offer's own name. Apart from the account rather than an
         // argument to it, because a yes to reclaiming what costs nothing is not a yes

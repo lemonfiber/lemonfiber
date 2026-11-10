@@ -219,12 +219,14 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // A page of a search and an ask each arrived; a refusal already came back as a
         // problem, and an ask already on its way is answered rather than refused.
         | Outcome::Askable(_)
+        | Outcome::AskableKinds(_)
         | Outcome::Asked(_)
         // What is hosted is a reading, and an install or a removal that could not be
         // carried out already comes back as a problem — so a report here is one that
         // arrived, whatever it says stands.
         | Outcome::Hosting(_)
         | Outcome::FrontDoor(_)
+        | Outcome::Stack(_)
         // A kind that could not be read is named in the answer, which still arrived.
         | Outcome::News(_)
         | Outcome::Stuck(_)

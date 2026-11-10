@@ -149,6 +149,7 @@ pub(crate) fn household(whom: RawWhom, action: Option<HouseholdCommand>) -> Resu
                 ended,
             },
         })),
+        HouseholdCommand::Kinds { name } => Ok(Command::Wish(Wishing::Kinds { member: name })),
         HouseholdCommand::Search {
             name,
             term,

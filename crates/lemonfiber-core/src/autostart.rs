@@ -245,11 +245,18 @@ impl Returning {
         if self.halted {
             return Err(Held::StoppedOnPurpose);
         }
-        Ok(if self.pinned.is_empty() {
+        Ok(self.forms())
+    }
+
+    /// The forms this machine runs: the pinned ones, or else the ones last run, where
+    /// naming none is every form.
+    #[must_use]
+    pub fn forms(&self) -> &[String] {
+        if self.pinned.is_empty() {
             &self.last_run
         } else {
             &self.pinned
-        })
+        }
     }
 }
 

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One kind a member may ask for now, with the units it is asked for in.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "The kind.",
+      "$ref": "TitleKind.json"
+    },
+    "units": {
+      "description": "The units a title of it is asked for in, none for series and films.",
+      "type": "array",
+      "items": {
+        "$ref": "TitleUnit.json"
+      }
+    }
+  },
+  "required": [
+    "kind",
+    "units"
+  ]
+}

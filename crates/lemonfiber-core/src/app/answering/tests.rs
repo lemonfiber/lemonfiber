@@ -27,6 +27,7 @@ fn reading() -> Vec<(Command, Kind)> {
         ),
         (Command::Hosting(Keeping::Read), kind::HOSTING),
         (Command::FrontDoor, kind::FRONT_DOOR),
+        (Command::Stack, kind::STACK),
         (Command::News, kind::NEWS_ITEMS),
         (
             Command::Trace(Tracing {
@@ -76,6 +77,12 @@ fn reading() -> Vec<(Command, Kind)> {
                 unit: None,
             }),
             kind::ASKABLE,
+        ),
+        (
+            Command::Wish(Wishing::Kinds {
+                member: "Ada".to_owned(),
+            }),
+            kind::ASKABLE_KINDS,
         ),
     ]
 }

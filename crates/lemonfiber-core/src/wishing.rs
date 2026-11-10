@@ -16,6 +16,7 @@
 mod ask;
 mod collect;
 mod find;
+mod kinds;
 mod limits;
 mod place;
 mod poster;
@@ -83,6 +84,7 @@ pub(crate) async fn wished(ctx: &Ctx, wishing: Wishing) -> Result<Outcome, Box<P
         } => collect::found(ctx, &member, &term, after.as_deref(), unit)
             .await
             .map(Outcome::Askable),
+        Wishing::Kinds { member } => kinds::kinds(ctx, &member).await.map(Outcome::AskableKinds),
         Wishing::Ask { member, wish } => ask::asked(ctx, &member, wish).await.map(Outcome::Asked),
         Wishing::Collect {
             member,

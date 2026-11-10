@@ -1,6 +1,8 @@
 //! A member's search for a title, and what asking for one came to, printed.
 
-use lemonfiber_core::model::{AskableReport, AskedReport, Stands, TitleUnit};
+use lemonfiber_core::model::{
+    AskableKindsReport, AskableReport, AskedReport, Stands, TitleKind, TitleUnit,
+};
 
 use super::Lines;
 
@@ -43,6 +45,24 @@ pub(super) fn askable(report: &AskableReport) -> Lines {
     lines
 }
 
+/// Which kinds a member may ask for now, a kind a line with what it is asked for as.
+pub(super) fn kinds(report: &AskableKindsReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{} may ask for", report.member));
+    for one in &report.kinds {
+        let units: Vec<&str> = one.units.iter().map(|unit| unit.noun()).collect();
+        if units.is_empty() {
+            lines.put(format!("  {}", called(one.kind)));
+        } else {
+            lines.put(format!("  {}: {}", called(one.kind), units.join(", ")));
+        }
+    }
+    if report.kinds.is_empty() {
+        lines.put("  Nothing right now.");
+    }
+    lines
+}
+
 /// What asking came to, in the household's own sentence.
 pub(super) fn asked(report: &AskedReport) -> Lines {
     let mut lines = Lines::default();
@@ -51,6 +71,16 @@ pub(super) fn asked(report: &AskedReport) -> Lines {
         lines.put(format!("On the household list as {request}."));
     }
     lines
+}
+
+/// What a household calls a kind, all of it.
+const fn called(kind: TitleKind) -> &'static str {
+    match kind {
+        TitleKind::Tv => "series",
+        TitleKind::Movies => "films",
+        TitleKind::Music => "music",
+        TitleKind::Books => "books",
+    }
 }
 
 /// Where a title stands, as a line names it.

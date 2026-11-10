@@ -27,6 +27,10 @@ pub enum Standing {
     Waiting,
     /// Sent to the curator, which wants it now.
     Sent,
+    /// Held in part by the house: some of an artist, an author or a series.
+    PartlyHere,
+    /// Held by the house.
+    Here,
     /// Turned down.
     Declined,
     /// Left waiting past the household's window, and so let go.
@@ -59,6 +63,9 @@ pub(crate) struct Ask {
     /// When it last changed where it stands, where it has.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settled_at: Option<String>,
+    /// When the core first saw the house hold any of it, where it has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arrived_at: Option<String>,
 }
 
 impl Ask {
@@ -120,6 +127,7 @@ pub(crate) fn filed(path: &Path, asking: &Asking) -> Result<Reference, Failure> 
             asked_at: asking.at.clone(),
             standing: asking.standing,
             settled_at: None,
+            arrived_at: None,
         });
         Ok(())
     })?;
@@ -152,6 +160,33 @@ pub(crate) fn settled(
         Ok(())
     })?;
     Ok(was)
+}
+
+/// Mark the ask `reference` names at `path` as `held` by the house, where it was sent or
+/// held in part, and keep `at` as when it arrived where nothing was kept yet.
+///
+/// # Errors
+///
+/// The [`Failure`] the file was read or written with.
+pub(crate) fn arrived(
+    path: &Path,
+    reference: Reference,
+    held: Standing,
+    at: &str,
+) -> Result<(), Failure> {
+    crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
+        if let Some(ask) = kept.asks.iter_mut().find(|ask| {
+            ask.named() == reference
+                && matches!(ask.standing, Standing::Sent | Standing::PartlyHere)
+        }) {
+            if ask.standing != held {
+                ask.standing = held;
+                ask.settled_at = Some(at.to_owned());
+            }
+            ask.arrived_at.get_or_insert_with(|| at.to_owned());
+        }
+        Ok(())
+    })
 }
 
 /// The number the next ask of `medium` is given: one past the highest it has given.

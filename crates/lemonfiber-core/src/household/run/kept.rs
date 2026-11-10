@@ -6,13 +6,15 @@ use crate::app::Ctx;
 use crate::model::HouseholdReport;
 
 /// Each ask for music or books the core keeps, listed under the member who made it after
-/// their other requests, the newest first.
-pub(super) fn listed(
+/// their other requests, the newest first, those the house now holds read back from their
+/// curator first.
+pub(super) async fn listed(
     ctx: &Ctx,
     report: &mut HouseholdReport,
     names: &BTreeMap<String, String>,
     reasons: &crate::asking::Reasons,
 ) {
+    crate::collected::run::arrivals(ctx).await;
     let now = ctx.seams.clock.now();
     for ask in crate::collected::run::every(ctx).iter().rev() {
         let Some(name) = names.get(&ask.member) else {

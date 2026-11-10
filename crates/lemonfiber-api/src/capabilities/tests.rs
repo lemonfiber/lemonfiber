@@ -109,6 +109,7 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
             "/api/actions/grant",
             "/api/actions/watched",
             "/api/askable",
+            "/api/askable/kinds",
             "/api/askable/{id}/poster",
             "/api/held",
             "/api/held/{id}",
@@ -140,16 +141,19 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
             .collect()
     };
     // Every served read, the logs and the bundle among them, and the event stream, but
-    // a member's search and the poster of what it found, which are a member's own and
-    // the operator's, and the settings, which are the operator's alone.
+    // a member's search, the kinds they may ask for and the poster of what it found,
+    // which are a member's own and the operator's, and the settings and how the stack
+    // runs, which are the operator's alone.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(BESIDE.iter().map(|(read, _)| read))
         .filter(|read| {
             ![
                 crate::read::table::ASKABLE,
+                crate::read::table::ASKABLE_KINDS,
                 crate::read::table::ASKABLE_POSTER,
                 crate::read::table::SETTINGS,
+                crate::read::table::STACK,
             ]
             .contains(*read)
         })
@@ -166,6 +170,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     );
     assert_eq!(
         reading.capabilities.get(crate::read::table::SETTINGS),
+        Some(&Standing::Unpermitted)
+    );
+    assert_eq!(
+        reading.capabilities.get(crate::read::table::STACK),
         Some(&Standing::Unpermitted)
     );
 
