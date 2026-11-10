@@ -56,5 +56,6 @@ pub(super) const fn pushing(asked: &Pushing) -> Asked {
         Pushing::List { .. } => reads("push-endpoint list"),
         Pushing::Register { .. } => reports("push-endpoint register", &[kind::PUSH_ENDPOINT]),
         Pushing::Remove { .. } => reports("push-endpoint remove", &[kind::PUSH_ENDPOINTS]),
+        Pushing::Woken { .. } => reports("push-woken", &[kind::PUSH_ENDPOINTS]),
     }
 }

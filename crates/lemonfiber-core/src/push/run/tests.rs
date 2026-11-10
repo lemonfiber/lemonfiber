@@ -260,6 +260,14 @@ async fn soon(settled: impl Fn() -> bool) -> bool {
     .is_ok()
 }
 
+/// How many failed deliveries the first endpoint shows.
+fn failures(ctx: &Ctx) -> usize {
+    super::at(ctx)
+        .and_then(|path| super::read(&path).ok())
+        .and_then(|kept| kept.endpoints.first().map(|one| one.failures.len()))
+        .unwrap_or_default()
+}
+
 /// What is owed each endpoint, as kept.
 fn owed(ctx: &Ctx) -> Vec<usize> {
     super::at(ctx)
@@ -313,9 +321,10 @@ async fn each_onset_and_resolution_is_sent_once_to_every_endpoint() {
     }));
 }
 
-/// An endpoint its distributor says is gone is forgotten, journaled, and sent nothing more.
+/// An endpoint its distributor says is gone stays, its failure shown, and is sent nothing
+/// more until it is woken again.
 #[tokio::test]
-async fn an_endpoint_its_distributor_says_is_gone_is_forgotten() {
+async fn an_endpoint_its_distributor_says_is_gone_stays_with_its_failure_shown() {
     for status in [404, 410] {
         let (ctx, distributor) = machine(&format!("push-gone-{status}"), status);
         assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
@@ -332,10 +341,9 @@ async fn an_endpoint_its_distributor_says_is_gone_is_forgotten() {
             ],
         );
 
-        assert!(soon(|| !any_waiting(&ctx)).await, "{status}");
-        assert!(names(&ctx).is_empty(), "{status}");
+        assert!(soon(|| failures(&ctx) == 1).await, "{status}");
+        assert_eq!(names(&ctx), ["pixel"], "{status}");
         assert_eq!(distributor.took(), 1, "{status}");
-        assert!(journal(&ctx).contains("pixel"));
     }
 }
 

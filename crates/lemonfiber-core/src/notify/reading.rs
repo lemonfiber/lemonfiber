@@ -25,7 +25,7 @@ pub(crate) fn report(ctx: &Ctx) -> Result<NotifyReport, Box<Problem>> {
     let path = backends::at(ctx).ok_or_else(nowhere)?;
     let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
     let mut listed: Vec<BackendReport> = kept.backends.iter().map(listed).collect();
-    listed.extend(crate::push::run::as_backends(ctx));
+    listed.extend(crate::push::telling::as_backends(ctx));
     Ok(NotifyReport {
         state: state(&listed),
         backends: listed,

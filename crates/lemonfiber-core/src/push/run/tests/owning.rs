@@ -5,7 +5,8 @@ use super::{alert, machine, owed, registering};
 use crate::alert::Moment;
 use crate::app::Outcome;
 use crate::error::codes::push::PUSH_NOT_REGISTERED;
-use crate::push::run::{asked, owns_one, ready, Asked, Waking};
+use crate::push::run::{asked, Asked, Waking};
+use crate::push::telling::{owns_one, ready};
 
 fn theirs(name: &str, owner: &str) -> Asked {
     match registering(name, "https://push.example/a") {

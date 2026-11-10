@@ -29,7 +29,7 @@ pub(crate) fn mine(ctx: &Ctx, member: &str) -> Result<NotifyMineReport, Box<Prob
                 })
             })
             .collect(),
-        phone: crate::push::run::owns_one(ctx, member),
+        phone: crate::push::telling::owns_one(ctx, member),
         rehearsed: ctx.dry_run,
     })
 }

@@ -26,6 +26,7 @@ use crate::error::codes::push::{
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::journal::{Change, Kind};
 use crate::keys::names_a_key;
+use crate::model::DeliveryOutcome;
 use crate::ports::http::{Method, Request};
 
 /// What the endpoint's distributor is asked to hold a message for, a day being as long as
@@ -36,7 +37,7 @@ const HELD_FOR_SECONDS: &str = "86400";
 pub const WAITED_FOR: Duration = Duration::from_secs(10);
 
 /// The most messages an endpoint is owed: as many alerts as a returning stream replays.
-const MOST_OWED: usize = crate::alert::KEPT;
+pub(super) const MOST_OWED: usize = crate::alert::KEPT;
 
 /// The operation every journal entry about a push endpoint is written under.
 const OPERATION: &str = "push-endpoint";
@@ -72,6 +73,15 @@ pub enum Asked {
         /// The member removing their own, by their account's id.
         owner: Option<String>,
     },
+    /// The phone's word that a wake arrived, by the id it carried.
+    Woken {
+        /// The endpoint's name.
+        name: String,
+        /// The id the wake carried.
+        id: String,
+        /// The member whose own phone it is, by their account's id.
+        owner: Option<String>,
+    },
 }
 
 /// What was asked, its keys and its address withheld.
@@ -88,6 +98,11 @@ impl std::fmt::Debug for Asked {
                 .field("name", name)
                 .field("owner", owner)
                 .finish(),
+            Self::Woken { name, owner, .. } => out
+                .debug_struct("Woken")
+                .field("name", name)
+                .field("owner", owner)
+                .finish_non_exhaustive(),
         }
     }
 }
@@ -120,12 +135,19 @@ pub fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
                 registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
                 owed: 0,
                 owner,
+                wakes: Vec::new(),
+                last: None,
+                failures: Vec::new(),
+                proven: None,
             },
         )
         .map(Outcome::PushEndpoint),
         Asked::List { owner } => listing(ctx, None, owner.as_deref()).map(Outcome::PushEndpoints),
         Asked::Remove { name, owner } => {
             remove(ctx, &name, owner.as_deref()).map(Outcome::PushEndpoints)
+        }
+        Asked::Woken { name, id, owner } => {
+            super::woken::confirmed(ctx, &name, &id, owner.as_deref()).map(Outcome::PushEndpoints)
         }
     }
 }
@@ -206,33 +228,6 @@ fn owned_by(record: &Record, owner: Option<&str>) -> bool {
     owner.is_none_or(|owner| record.owner.as_deref() == Some(owner))
 }
 
-/// Whether `member` has registered a phone of their own.
-pub(crate) fn owns_one(ctx: &Ctx, member: &str) -> bool {
-    at(ctx)
-        .and_then(|path| read(&path).ok())
-        .is_some_and(|kept| {
-            kept.endpoints
-                .iter()
-                .any(|one| one.owner.as_deref() == Some(member))
-        })
-}
-
-/// Owe `member`'s own phones one wake, that something they asked for is ready.
-pub(crate) fn ready(ctx: &Ctx, member: &str) {
-    if let Some(path) = waiting_at(ctx) {
-        let _ = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
-            for one in kept
-                .endpoints
-                .iter_mut()
-                .filter(|one| one.owner.as_deref() == Some(member))
-            {
-                one.owed = one.owed.saturating_add(1).min(MOST_OWED);
-            }
-            Ok(())
-        });
-    }
-}
-
 /// Take `name` out of `kept`, once the journal says so, and forget what was sent with the
 /// last of them, so a phone registered later is not sent what was said meanwhile.
 fn forgotten(ctx: &Ctx, kept: &mut Kept, name: &str) -> Result<(), Box<Problem>> {
@@ -273,39 +268,10 @@ fn listing(
 
 /// Where the record of the endpoints waiting to be woken is, where any are: nowhere where
 /// waking is switched off, or where the record cannot be read.
-fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
+pub(super) fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
     at(ctx)
         .filter(|_| ctx.settings.reaching.allows(REACH_WAKING_KEY))
         .filter(|path| read(path).is_ok_and(|kept| !kept.endpoints.is_empty()))
-}
-
-/// Every endpoint as a back-end the stack delivers to, by the host its distributor is on.
-pub(crate) fn as_backends(ctx: &Ctx) -> Vec<crate::model::BackendReport> {
-    at(ctx)
-        .and_then(|path| read(&path).ok())
-        .map(|kept| kept.endpoints.iter().map(as_backend).collect())
-        .unwrap_or_default()
-}
-
-/// One endpoint as a back-end.
-fn as_backend(record: &Record) -> crate::model::BackendReport {
-    crate::model::BackendReport {
-        id: record.name.clone(),
-        kind: crate::model::BackendKind::Unifiedpush,
-        reaches: url::Url::parse(&record.endpoint)
-            .ok()
-            .and_then(|url| url.host_str().map(str::to_owned))
-            .unwrap_or_default(),
-        chosen_by: record.owner.clone().map_or(
-            crate::model::ChosenBy::Operator,
-            crate::model::ChosenBy::Member,
-        ),
-        hosted: None,
-        proof: crate::model::BackendProof::Unproven,
-        last: None,
-        failures: Vec::new(),
-        retry: None,
-    }
 }
 
 /// Whether any endpoint is waiting to be woken, so the stack is worth reading with nobody
@@ -376,12 +342,17 @@ impl Waking {
     }
 }
 
-/// Send `name` everything it is owed, one message at a time, and forget it if its
-/// distributor answers that it is gone.
+/// Send `name` everything it is owed, one message at a time, each carrying an id its phone
+/// confirms it by, until its distributor answers that it is gone: the endpoint stays, the
+/// failure shown, until the phone or the operator removes it.
 async fn delivered(ctx: &Ctx, path: &Path, name: &str) {
     while let Some(record) = next_owed(path, name) {
-        if woke(ctx, &record).await {
-            forget(ctx, path, name);
+        let Some(id) = super::woken::fresh(ctx) else {
+            return;
+        };
+        let (outcome, gone) = woke(ctx, &record, &id).await;
+        super::woken::sent(path, name, &id, &outcome, crate::notify::now(ctx));
+        if gone {
             return;
         }
     }
@@ -410,17 +381,20 @@ pub(crate) fn said_as(alert: &Alert) -> Option<String> {
     Some(format!("{} {}", alert.id.as_ref()?, alert.moment.said()))
 }
 
-/// The message that wakes `record`, where its keys can be read.
-fn sealed_for(record: &Record) -> Option<Vec<u8>> {
+/// The message that wakes `record` carrying `id`, where its keys can be read.
+fn sealed_for(record: &Record, id: &str) -> Option<Vec<u8>> {
     let public = URL_SAFE_NO_PAD.decode(&record.p256dh).ok()?;
     let secret = URL_SAFE_NO_PAD.decode(&record.auth).ok()?;
-    sealing::sealed(&public, &secret)
+    sealing::sealed(&public, &secret, id)
 }
 
-/// Send `record` one message, and whether its distributor answered that it is gone.
-async fn woke(ctx: &Ctx, record: &Record) -> bool {
-    let Some(sealed) = sealed_for(record) else {
-        return false;
+/// Send `record` one message carrying `id`, and what became of it: taken by its
+/// distributor, or failed with what the distributor answered; and whether the distributor
+/// answered that the endpoint is gone.
+async fn woke(ctx: &Ctx, record: &Record, id: &str) -> (DeliveryOutcome, bool) {
+    let Some(sealed) = sealed_for(record, id) else {
+        let unreadable = DeliveryOutcome::Failed("its keys cannot be encrypted to".to_owned());
+        return (unreadable, false);
     };
     let request = Request {
         method: Method::Post,
@@ -438,20 +412,59 @@ async fn woke(ctx: &Ctx, record: &Record) -> bool {
         pinned: None,
     };
     let sent = tokio::time::timeout(WAITED_FOR, ctx.seams.http.send_octets(&request, &sealed));
-    matches!(sent.await, Ok(Ok(answered)) if GONE.contains(&answered.status))
-}
-
-/// Forget `name`, best effort: one still kept is told again and answers again.
-fn forget(ctx: &Ctx, path: &Path, name: &str) {
-    let _ = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        let _ = forgotten(ctx, kept, name);
-        Ok(())
-    });
+    match sent.await {
+        Ok(Ok(answered)) if (200..300).contains(&answered.status) => (DeliveryOutcome::Sent, false),
+        Ok(Ok(answered)) if GONE.contains(&answered.status) => (
+            DeliveryOutcome::Failed(format!(
+                "{}: its distributor no longer holds it, so the phone registers again",
+                answered.status
+            )),
+            true,
+        ),
+        Ok(Ok(answered)) => (DeliveryOutcome::Failed(answered.status.to_string()), false),
+        Ok(Err(why)) => (
+            DeliveryOutcome::Failed(crate::error::withheld::without_credentials(
+                &why.to_string(),
+            )),
+            false,
+        ),
+        Err(_) => (
+            DeliveryOutcome::Failed("it did not answer in time".to_owned()),
+            false,
+        ),
+    }
 }
 
 /// The record at `path`.
 fn read(path: &Path) -> Result<Kept, Failure> {
     crate::settings::kept::read(path)
+}
+
+/// Where the endpoints are kept.
+///
+/// # Errors
+///
+/// A [`Problem`] where there is nowhere to keep them.
+pub(super) fn kept_at(ctx: &Ctx) -> Result<PathBuf, Box<Problem>> {
+    at(ctx).ok_or_else(nowhere)
+}
+
+/// The record at `path`, as a refusal where it cannot be read.
+///
+/// # Errors
+///
+/// A [`Problem`] where the record cannot be read.
+pub(super) fn read_kept(path: &Path) -> Result<Kept, Box<Problem>> {
+    read(path).map_err(|failure| Box::new(failure.problem()))
+}
+
+/// Every endpoint `owner` registered, or every one where nobody is named.
+///
+/// # Errors
+///
+/// A [`Problem`] where the record cannot be read.
+pub(super) fn listed_for(ctx: &Ctx, owner: Option<&str>) -> Result<Listing, Box<Problem>> {
+    listing(ctx, None, owner)
 }
 
 /// The refusal of a registration under a name `kept` holds, where it holds it.

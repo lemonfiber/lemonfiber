@@ -7,9 +7,6 @@ use ring::agreement::{self, EphemeralPrivateKey, UnparsedPublicKey, ECDH_P256};
 use ring::rand::{self, SystemRandom};
 use ring::{aead, hkdf};
 
-/// What the message says: only that the stack has something to say.
-const WAKE: &[u8] = b"{\"wake\":true}";
-
 /// The record size the coding declares, which this one short message is within.
 const RECORD_SIZE: u32 = 4096;
 
@@ -35,13 +32,14 @@ impl hkdf::KeyType for Long {
 pub(super) fn readable(p256dh: &str, auth: &str) -> Option<(Vec<u8>, Vec<u8>)> {
     let public = URL_SAFE_NO_PAD.decode(p256dh).ok()?;
     let secret = URL_SAFE_NO_PAD.decode(auth).ok()?;
-    (public.len() == PUBLIC_KEY && secret.len() == SECRET && sealed(&public, &secret).is_some())
+    (public.len() == PUBLIC_KEY && secret.len() == SECRET && sealed(&public, &secret, "").is_some())
         .then_some((public, secret))
 }
 
 /// The message that wakes a phone holding `public` and `secret`, under a key made for it
-/// alone.
-pub(super) fn sealed(public: &[u8], secret: &[u8]) -> Option<Vec<u8>> {
+/// alone: only that the stack has something to say, and the id the phone confirms it by.
+pub(super) fn sealed(public: &[u8], secret: &[u8], id: &str) -> Option<Vec<u8>> {
+    let wake = serde_json::json!({ "wake": true, "id": id }).to_string();
     let random = SystemRandom::new();
     let ours = EphemeralPrivateKey::generate(&ECDH_P256, &random).ok()?;
     let our_public = ours.compute_public_key().ok()?;
@@ -60,7 +58,7 @@ pub(super) fn sealed(public: &[u8], secret: &[u8]) -> Option<Vec<u8>> {
             secret,
             salt: &salt,
         },
-        WAKE,
+        wake.as_bytes(),
     )
 }
 
