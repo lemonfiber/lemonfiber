@@ -15,13 +15,16 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
+use lemonfiber_core::collected::Unit;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::service::Picture;
 use lemonfiber_core::screening::{picture, spoke, Pictured};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
-use crate::read::table::{named, wanted, Wanted, ASKABLE_POSTER, BACKDROP, POSTER, TITLE};
+use crate::read::table::{
+    named, wanted, Wanted, ASKABLE_POSTER, BACKDROP, POSTER, REQUEST_POSTER, TITLE,
+};
 use crate::refusal::Refusal;
 use crate::router::Serving;
 use crate::serve::carrying;
@@ -43,6 +46,7 @@ pub(super) fn routes() -> Router<Serving> {
             get(|state, caller, id, query| pictured(state, caller, id, query, Picture::Backdrop)),
         )
         .route(ASKABLE_POSTER, get(found))
+        .route(REQUEST_POSTER, get(kept))
 }
 
 /// The poster of a title a member's search found, fetched by the core for that member.
@@ -52,28 +56,57 @@ async fn found(
     Path(id): Path<String>,
     RawQuery(query): RawQuery,
 ) -> Response {
-    let (member, kind) = match searched_for(&caller, query.as_deref()) {
+    let (member, given) = match searched_for(&caller, ASKABLE_POSTER, query.as_deref()) {
         Ok(asked) => asked,
         Err(refused) => return *refused,
     };
     if let Some(asker) = caller.member() {
         spoke(&serving.ctx, asker);
     }
-    answered(lemonfiber_core::wishing::poster(&serving.ctx, &member, &kind, &id).await)
+    let kind = given.kind.unwrap_or_default();
+    let ctx = &serving.ctx;
+    answered(match Unit::chosen(Some(&kind), given.unit.as_deref()) {
+        Ok(Some(unit)) => lemonfiber_core::wishing::cover(ctx, &member, unit, &id).await,
+        Ok(None) => lemonfiber_core::wishing::poster(ctx, &member, &kind, &id).await,
+        Err(_) => return Refusal::UnrecognisedArgument.answered(),
+    })
 }
 
-/// Whose search a poster read is for and the kind of title it names, ruled on as the
-/// search read is, or what the caller is answered with instead.
-fn searched_for(caller: &Caller, query: Option<&str>) -> Result<(String, String), Box<Response>> {
-    let given = wanted(ASKABLE_POSTER, query).map_err(|problem| Box::new(went_wrong(&problem)))?;
+/// The cover of an ask the core keeps, fetched by the core for the member who made it or
+/// for whoever runs the house.
+async fn kept(
+    State(serving): State<Serving>,
+    caller: Caller,
+    Path(reference): Path<String>,
+    RawQuery(query): RawQuery,
+) -> Response {
+    let member = match searched_for(&caller, REQUEST_POSTER, query.as_deref()) {
+        Ok((member, _)) => member,
+        Err(refused) => return *refused,
+    };
+    if let Some(asker) = caller.member() {
+        spoke(&serving.ctx, asker);
+    }
+    let named = Some(member.as_str()).filter(|member| !member.is_empty());
+    answered(lemonfiber_core::wishing::kept_cover(&serving.ctx, named, &reference).await)
+}
+
+/// Whose search a picture read at `read` is for and what else it was asked with, ruled on
+/// as the search read is, or what the caller is answered with instead.
+fn searched_for(
+    caller: &Caller,
+    read: &str,
+    query: Option<&str>,
+) -> Result<(String, Wanted), Box<Response>> {
+    let given = wanted(read, query).map_err(|problem| Box::new(went_wrong(&problem)))?;
     let search = Command::Wish(Wishing::Find {
-        member: given.member.unwrap_or_default(),
+        member: given.member.clone().unwrap_or_default(),
         term: String::new(),
         after: None,
         unit: None,
     });
     let member = searcher(may(caller, Door::Reading, search).granted())?;
-    Ok((member, given.kind.unwrap_or_default()))
+    Ok((member, given))
 }
 
 /// Whose search a granted search read names, or what the caller is answered with where

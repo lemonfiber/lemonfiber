@@ -363,6 +363,7 @@ async fn a_member_who_asked_for_all_they_may_is_refused() {
             name: reference.to_owned(),
             by: None,
             year: None,
+            cover: None,
             member: "a7f3".to_owned(),
             at: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
             standing: Standing::Waiting,

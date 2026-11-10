@@ -54,6 +54,9 @@ pub(crate) struct Ask {
     /// Its year, where the catalogue gives one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub year: Option<u16>,
+    /// Where the curator said its cover is, where it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
     /// The member who asked, by their account's id.
     pub member: String,
     /// When it was asked for.
@@ -89,6 +92,8 @@ pub(crate) struct Asking {
     pub by: Option<String>,
     /// Its year.
     pub year: Option<u16>,
+    /// Where its cover is.
+    pub cover: Option<String>,
     /// The member asking, by their account's id.
     pub member: String,
     /// When.
@@ -123,6 +128,7 @@ pub(crate) fn filed(path: &Path, asking: &Asking) -> Result<Reference, Failure> 
             name: asking.name.clone(),
             by: asking.by.clone(),
             year: asking.year,
+            cover: asking.cover.clone(),
             member: asking.member.clone(),
             asked_at: asking.at.clone(),
             standing: asking.standing,

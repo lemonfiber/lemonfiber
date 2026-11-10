@@ -78,6 +78,8 @@ pub(crate) const BANDWIDTH: &str = "bandwidth.json";
 pub(crate) const REFUSALS: &str = "refusals.json";
 /// Every ask for music or books the core keeps.
 pub(crate) const ASKS: &str = "household-asks.json";
+/// Every host a cover was fetched from.
+pub(crate) const COVER_HOSTS: &str = "cover-hosts.json";
 /// When each person was first handed a code.
 pub(crate) const HANDOFFS: &str = "handoffs.json";
 /// The choices whose cost was stated once.
@@ -291,6 +293,13 @@ impl Paths {
     #[must_use]
     pub fn accepted(&self) -> PathBuf {
         self.config.join(ACCEPTED)
+    }
+
+    /// Every host the core fetched a music or book cover from, for the account of what
+    /// leaves this machine.
+    #[must_use]
+    pub fn cover_hosts(&self) -> PathBuf {
+        self.config.join(COVER_HOSTS)
     }
 
     /// The port the egress guard last forwarded, which every torrent client was set to.

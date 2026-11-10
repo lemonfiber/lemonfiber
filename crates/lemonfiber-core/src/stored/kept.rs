@@ -7,7 +7,7 @@
 
 use crate::config::paths::Paths;
 
-use super::{Beside, Kept, Root};
+use super::{Kept, Root};
 
 /// One thing kept: the accessor that locates it, what it is, why, and whether it
 /// holds a credential.
@@ -238,6 +238,15 @@ pub const EVERY: &[Entry] = &[
               itself: what was asked, by whom, and whether you let it through or turned it down.",
         secret: false,
         at: Paths::asks,
+    },
+    Entry {
+        accessor: "cover_hosts",
+        what: "where music and book covers were fetched from",
+        why: "A cover is fetched from wherever the curator says it is, so lemonfiber notes \
+              each host it fetched one from, and the account of what leaves this machine names \
+              them.",
+        secret: false,
+        at: Paths::cover_hosts,
     },
     Entry {
         accessor: "handoffs",
@@ -512,34 +521,9 @@ pub(super) fn roots(paths: &Paths) -> Vec<Root> {
     ]
 }
 
-/// What is on this machine that lemonfiber neither keeps nor removes.
-///
-/// An operator reading a list of what is stored is owed the reason a thing is absent
-/// from it as much as they are owed the entries — and the library is the absence
-/// that would otherwise read as an oversight.
-#[must_use]
-pub fn beside() -> Vec<Beside> {
-    vec![
-        Beside {
-            what: "your library and your downloads".to_owned(),
-            why: "Written by the services under the path you chose, and yours. lemonfiber never \
-                  reads what is in them and never removes them."
-                .to_owned(),
-        },
-        Beside {
-            what: "the containers, images and volumes".to_owned(),
-            why: "The container engine's. lemonfiber starts and stops them and owns none of \
-                  them; docker is what lists and removes them."
-                .to_owned(),
-        },
-        Beside {
-            what: "anything you installed yourself".to_owned(),
-            why: "Docker, a media server running natively, a tunnel client. lemonfiber did not \
-                  put them there and does not take them away."
-                .to_owned(),
-        },
-    ]
-}
+mod outside;
+
+pub use outside::beside;
 
 #[cfg(test)]
 mod tests;

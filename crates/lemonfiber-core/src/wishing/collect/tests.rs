@@ -26,6 +26,7 @@ fn waiting(unit: Unit, reference: &str, standing: Standing) -> Ask {
         name: String::new(),
         by: None,
         year: None,
+        cover: None,
         member: "ada".to_owned(),
         asked_at: String::new(),
         standing,
@@ -116,5 +117,6 @@ fn what_is_left_is_said_for_the_asked_medium_alone() {
 }
 
 mod arriving;
+mod covering;
 mod deciding;
 mod flows;

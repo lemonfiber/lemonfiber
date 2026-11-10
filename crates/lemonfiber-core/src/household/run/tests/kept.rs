@@ -17,6 +17,7 @@ fn asking(unit: Unit, member: &str, name: &str, standing: Standing) -> Asking {
         name: name.to_owned(),
         by: None,
         year: None,
+        cover: None,
         member: member.to_owned(),
         at: "2026-11-08T22:00:00Z".to_owned(),
         standing,

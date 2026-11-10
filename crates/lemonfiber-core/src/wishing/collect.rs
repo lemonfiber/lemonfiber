@@ -162,6 +162,7 @@ pub(super) async fn asked(
             name: candidate.name,
             by: candidate.by,
             year: candidate.year,
+            cover: candidate.cover,
             member: reached.member.id.clone(),
             at: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
             standing: if waits {

@@ -10,7 +10,7 @@ fn a_stack() -> Vec<lemonfiber_manifest::Service> {
 
 #[test]
 fn every_request_this_product_makes_is_listed_once() {
-    let listed: Vec<Reach> = leaving(&Settings::default(), &a_stack(), &[])
+    let listed: Vec<Reach> = leaving(&Settings::default(), &a_stack(), &[], &[])
         .ours
         .into_iter()
         .map(|entry| entry.reach)
@@ -24,7 +24,7 @@ fn every_request_this_product_makes_is_listed_once() {
 
 #[test]
 fn each_entry_says_where_it_goes_why_what_it_sends_and_what_refusing_costs() {
-    let ours = leaving(&Settings::default(), &a_stack(), &[]).ours;
+    let ours = leaving(&Settings::default(), &a_stack(), &[], &[]).ours;
     // An empty list of what leaves this machine is the answer a reader would most
     // like to be true and the one this must not report by accident.
     assert!(!ours.is_empty(), "nothing was listed as leaving");
@@ -59,7 +59,7 @@ fn a_machine_that_refuses_everything_says_so_of_every_entry() {
         reaching: Reaching::none(),
         ..Settings::default()
     };
-    let refused: Vec<Reach> = leaving(&settings, &a_stack(), &[])
+    let refused: Vec<Reach> = leaving(&settings, &a_stack(), &[], &[])
         .ours
         .into_iter()
         .filter(|entry| entry.allowed)
@@ -70,7 +70,7 @@ fn a_machine_that_refuses_everything_says_so_of_every_entry() {
 
 #[test]
 fn the_stacks_own_requests_are_listed_as_the_stacks() {
-    let theirs = leaving(&Settings::default(), &a_stack(), &[]).theirs;
+    let theirs = leaving(&Settings::default(), &a_stack(), &[], &[]).theirs;
     assert!(!theirs.is_empty(), "the stack reaches the network");
     for entry in &theirs {
         assert!(!entry.service.is_empty());
@@ -84,7 +84,7 @@ fn the_stacks_own_requests_are_listed_as_the_stacks() {
 
 #[test]
 fn a_stack_with_no_services_leaves_the_stacks_own_list_empty() {
-    let leaving = leaving(&Settings::default(), &[], &[]);
+    let leaving = leaving(&Settings::default(), &[], &[], &[]);
     assert!(leaving.theirs.is_empty());
     assert_eq!(leaving.ours.len(), EVERY.len());
 }
@@ -141,7 +141,7 @@ fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
         from("git@example.org:ana/plugin-kuma.git"),
     ];
 
-    let leaving = leaving(&Settings::default(), &[], &installed);
+    let leaving = leaving(&Settings::default(), &[], &installed, &[]);
     let fetching = leaving
         .ours
         .iter()

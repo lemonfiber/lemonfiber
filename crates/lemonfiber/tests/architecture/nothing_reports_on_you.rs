@@ -397,13 +397,17 @@ fn what_the_source_asks_for_is_what_the_operator_is_told_about() {
         .filter(|(_, reach, _)| *reach == Reach::Asked)
         .map(|(host, _, _)| *host)
         .collect();
-    let listed: BTreeSet<String> =
-        lemonfiber_core::outbound::leaving(&lemonfiber_core::config::Settings::default(), &[], &[])
-            .ours
-            .into_iter()
-            .flat_map(|entry| entry.destination)
-            .filter_map(|where_to| host_of(&where_to))
-            .collect();
+    let listed: BTreeSet<String> = lemonfiber_core::outbound::leaving(
+        &lemonfiber_core::config::Settings::default(),
+        &[],
+        &[],
+        &[],
+    )
+    .ours
+    .into_iter()
+    .flat_map(|entry| entry.destination)
+    .filter_map(|where_to| host_of(&where_to))
+    .collect();
     assert!(
         !listed.is_empty(),
         "the enumeration names nowhere at all, so this is holding the sweep to nothing"

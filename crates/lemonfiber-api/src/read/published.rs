@@ -15,7 +15,7 @@ use lemonfiber_core::model::kind::Kind;
 use super::logs;
 use super::table::{
     self, taken, Wanted, ASKABLE, ASKABLE_POSTER, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER,
-    REPEATABLE, THIS_BINARY, TITLE,
+    REPEATABLE, REQUEST_POSTER, THIS_BINARY, TITLE,
 };
 
 /// One read, as the contract lists it.
@@ -73,6 +73,7 @@ pub(crate) const BESIDE: &[(&str, Ruled)] = &[
     (POSTER, Ruled::As(TITLE)),
     (BACKDROP, Ruled::As(TITLE)),
     (ASKABLE_POSTER, Ruled::As(ASKABLE)),
+    (REQUEST_POSTER, Ruled::As(ASKABLE)),
 ];
 
 /// Who a read served beside the table is given to, as its route rules.
@@ -85,7 +86,7 @@ pub(crate) enum Ruled {
 }
 
 /// The reads that answer with a file rather than an envelope.
-const FILES: [&str; 4] = [BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER];
+const FILES: [&str; 5] = [BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER, REQUEST_POSTER];
 
 /// Every kind a read answers under, by name.
 ///

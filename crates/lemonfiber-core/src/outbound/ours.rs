@@ -16,6 +16,7 @@ use crate::config::{
     REACH_INDEXER_KEY, REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY,
     REACH_UPDATES_KEY, REACH_USENET_KEY, REACH_WAKING_KEY,
 };
+use crate::schemes::SECURE_SCHEME;
 use lemonfiber_manifest::Service;
 
 /// Every request lemonfiber makes, in the order an operator meets them: what the
@@ -113,10 +114,11 @@ pub(super) fn outbound(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
+    covers: &[String],
 ) -> Outbound {
     Outbound {
         reach,
-        destination: destination(reach, settings, services, installed),
+        destination: destination(reach, settings, services, installed, covers),
         purpose: purpose(reach).to_owned(),
         sends: sends(reach).to_owned(),
         allowed: allowed(reach, settings),
@@ -131,6 +133,7 @@ fn destination(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
+    covers: &[String],
 ) -> Vec<String> {
     match reach {
         Reach::Registry => registries(services),
@@ -145,7 +148,13 @@ fn destination(
             .map_or_else(Vec::new, |host| vec![host.clone()]),
         Reach::Household => vec![PUSHOVER.to_owned(), PUSHBULLET.to_owned()],
         Reach::Waking => vec![WAKING.to_owned()],
-        Reach::Posters => vec![POSTERS.to_owned()],
+        Reach::Posters => std::iter::once(POSTERS.to_owned())
+            .chain(
+                covers
+                    .iter()
+                    .map(|host| format!("{SECURE_SCHEME}://{host}")),
+            )
+            .collect(),
         Reach::Updates => vec![RELEASE_LIST.to_owned()],
         Reach::PluginSource => sources(installed),
         Reach::Catalogue => vec![
@@ -229,9 +238,11 @@ pub fn purpose(reach: Reach) -> &'static str {
         }
         Reach::Posters => {
             "Show a member the poster of a title their search found and the house does not \
-             hold yet. Their client is handed the picture by this machine, so their own \
-             device never reaches the catalogue. Made only when a member's client asks for \
-             the picture of a title their search showed."
+             hold yet, or the cover of music or a book they found or asked for. Their client is \
+             handed the picture by this machine, so their own device never reaches the \
+             catalogue or the cover's host. Made only when a member's client asks for the \
+             picture. A cover is fetched over https from wherever the curator says it is, \
+             and each host one was fetched from is listed here."
         }
         Reach::Updates => {
             "Read which version of lemonfiber has been released, so an operator asking \
@@ -291,10 +302,10 @@ pub fn sends(reach: Reach) -> &'static str {
              learns when this stack spoke and from what address, and never what it said."
         }
         Reach::Posters => {
-            "One unauthenticated request for one title's poster, from this machine's address. \
-             No credential and nothing about the member, who is never named, but the address \
-             names the picture, so the catalogue can tell that somebody here looked at that \
-             title."
+            "One unauthenticated request for one title's poster or cover, from this machine's \
+             address. No credential and nothing about the member, who is never named, but the \
+             address names the picture, so the catalogue or the cover's host can tell that \
+             somebody here looked at that title."
         }
         Reach::Updates => {
             "One unauthenticated request for a list of releases. No credential, no setting, \

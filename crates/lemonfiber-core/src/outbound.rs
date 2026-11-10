@@ -20,6 +20,7 @@
 //! pointed it — with its query stripped, because an indexer authenticates by one.
 
 mod behalf;
+pub(crate) mod covers;
 mod ours;
 mod theirs;
 
@@ -197,13 +198,14 @@ pub fn leaving(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
+    covers: &[String],
 ) -> Leaving {
     let mut theirs = theirs::elsewhere(services);
     theirs.extend(theirs::brought(installed));
     Leaving {
         ours: EVERY
             .iter()
-            .map(|reach| ours::outbound(*reach, settings, services, installed))
+            .map(|reach| ours::outbound(*reach, settings, services, installed, covers))
             .collect(),
         on_behalf: behalf::declared(services, installed),
         theirs,
