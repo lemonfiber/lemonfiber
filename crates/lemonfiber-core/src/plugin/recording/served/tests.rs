@@ -96,7 +96,7 @@ fn a_service_is_served_as_lemonfiber_runs_it_with_throwaway_files_and_its_port()
     let confined = SERVED
         .replace(
             "user_mode   = \"puid-env\"",
-            "user_mode   = \"uid\"\nposture     = \"confined\"\ntmpfs       = [\"/tmp\"]",
+            "user_mode   = \"uid\"\nposture     = \"confined\"\ntmpfs       = [\"/tmp\"]\nargs        = [\"serve\", \"--quiet\"]",
         )
         .replace("takes_data  = true\n", "");
     let Some(confined) = placed(&confined) else {
@@ -108,13 +108,16 @@ fn a_service_is_served_as_lemonfiber_runs_it_with_throwaway_files_and_its_port()
     assert_eq!(serve.cap_add, Vec::<String>::new());
     assert_eq!(serve.tmpfs, vec!["/tmp".to_owned()]);
     assert_eq!(serve.binds.len(), 1);
+    assert_eq!(serve.command, ["serve", "--quiet"]);
     let published = SERVED
         .replace("port        = 8989", "port        = 7878")
         .replace("listens     = 8989\n", "");
     let Some(published) = placed(&published) else {
         return;
     };
-    assert_eq!(settled(&published, &copy, None).listens, Some(7878));
+    let published = settled(&published, &copy, None);
+    assert_eq!(published.listens, Some(7878));
+    assert!(published.command.is_empty(), "{:?}", published.command);
 }
 
 #[test]

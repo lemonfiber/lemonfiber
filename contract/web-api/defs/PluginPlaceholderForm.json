@@ -11,6 +11,11 @@
       "description": "PBKDF2-HMAC-SHA512 of the value under a fresh salt, as a service keeping only a\nhash of its password reads it.",
       "type": "string",
       "const": "pbkdf2"
+    },
+    {
+      "description": "bcrypt of the value at cost 10 under a fresh salt, written `$2b$10$…`.",
+      "type": "string",
+      "const": "bcrypt"
     }
   ]
 }

@@ -26,6 +26,7 @@ lemonfiber-sidecar = { workspace = true }
 argon2 = { workspace = true }
 regex = { workspace = true }
 ring = { workspace = true }
+bcrypt = { workspace = true }
 x509-parser = { workspace = true }
 ciborium-ll = { workspace = true }
 ciborium-io = { workspace = true }

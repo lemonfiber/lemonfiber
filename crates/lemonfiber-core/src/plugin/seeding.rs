@@ -35,6 +35,12 @@ const ROUNDS: NonZeroU32 = match NonZeroU32::new(100_000) {
 /// How many random bytes salt the hashed form of a secret.
 const SALT_BYTES: usize = 16;
 
+/// The cost a bcrypt hash is made at.
+const BCRYPT_COST: u32 = 10;
+
+/// How many random bytes salt a bcrypt hash.
+const BCRYPT_SALT_BYTES: usize = 16;
+
 /// What is said where the machine would not supply the random bytes a secret is made of.
 pub(crate) const UNMINTED: &str =
     "this machine would not supply the random bytes a secret is made from";
@@ -345,6 +351,15 @@ fn hashed(value: &str, random: &dyn Random) -> Option<String> {
     ))
 }
 
+/// `value` as a service reading a bcrypt hash reads it: cost [`BCRYPT_COST`] over a fresh
+/// salt, written `$2b$10$…`.
+fn bcrypt_hashed(value: &str, random: &dyn Random) -> Option<String> {
+    let salt: [u8; BCRYPT_SALT_BYTES] = random.bytes(BCRYPT_SALT_BYTES)?.try_into().ok()?;
+    bcrypt::hash_with_salt(value, BCRYPT_COST, salt)
+        .ok()
+        .map(|parts| parts.format_for_version(bcrypt::Version::TwoB))
+}
+
 /// `bytes` with each secret they name written as `value` holds it, in the form named.
 ///
 /// # Errors
@@ -366,6 +381,7 @@ pub(crate) fn written(
         match placeholder.form {
             Form::Plain => Ok(held),
             Form::Pbkdf2 => hashed(&held, random).ok_or_else(|| UNMINTED.to_owned()),
+            Form::Bcrypt => bcrypt_hashed(&held, random).ok_or_else(|| UNMINTED.to_owned()),
         }
     })
     .map(String::into_bytes)
@@ -418,6 +434,7 @@ pub(crate) fn replaced(
         let written = match placeholder.form {
             Form::Plain => value.to_owned(),
             Form::Pbkdf2 => hashed(value, random).ok_or_else(|| UNMINTED.to_owned())?,
+            Form::Bcrypt => bcrypt_hashed(value, random).ok_or_else(|| UNMINTED.to_owned())?,
         };
         now = anchored(&now, before, after, &written).ok_or_else(|| {
             format!("the line holding {secret} is not where the service keeps it now")

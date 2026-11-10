@@ -1,6 +1,7 @@
 {
   "fields": {},
   "variants": [
+    "\"bcrypt\"",
     "\"pbkdf2\"",
     "\"plain\""
   ]

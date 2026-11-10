@@ -1,10 +1,10 @@
 //! The secrets a plugin's starting files name, and where each is written in them.
 //!
 //! A starting file names a secret the plugin holds as `{{secret:<id>}}`, and lemonfiber
-//! writes the value there; `{{secret:<id>|pbkdf2}}` asks for the salted hash a service
-//! that keeps only a hash of its password reads. This reads the placeholders out of a
-//! file and holds them to the manifest. Writing a value, and making the hash, belong to
-//! `lemonfiber-core`, which holds the values and the random source.
+//! writes the value there; `{{secret:<id>|pbkdf2}}` and `{{secret:<id>|bcrypt}}` ask for
+//! the salted hash a service that keeps only a hash of its password reads. This reads the
+//! placeholders out of a file and holds them to the manifest. Writing a value, and making
+//! the hash, belong to `lemonfiber-core`, which holds the values and the random source.
 
 use std::ops::Range;
 
@@ -37,11 +37,16 @@ pub enum Form {
     /// PBKDF2-HMAC-SHA512 of the value under a fresh salt, as a service keeping only a
     /// hash of its password reads it.
     Pbkdf2,
+    /// bcrypt of the value at cost 10 under a fresh salt, written `$2b$10$…`.
+    Bcrypt,
 }
 
 impl Form {
     /// The word a placeholder names [`Form::Pbkdf2`] by.
     pub const PBKDF2: &str = "pbkdf2";
+
+    /// The word a placeholder names [`Form::Bcrypt`] by.
+    pub const BCRYPT: &str = "bcrypt";
 
     /// The word [`Form::Plain`] is named by, which a placeholder asking for it leaves out.
     pub const PLAIN: &str = "plain";
@@ -52,12 +57,17 @@ impl Form {
         match self {
             Self::Plain => Self::PLAIN,
             Self::Pbkdf2 => Self::PBKDF2,
+            Self::Bcrypt => Self::BCRYPT,
         }
     }
 
     /// The form a placeholder's word names, where it names one.
     fn named(word: &str) -> Option<Self> {
-        (word == Self::PBKDF2).then_some(Self::Pbkdf2)
+        match word {
+            Self::PBKDF2 => Some(Self::Pbkdf2),
+            Self::BCRYPT => Some(Self::Bcrypt),
+            _ => None,
+        }
     }
 }
 
@@ -95,8 +105,8 @@ pub fn named(secret: &str, form: Form) -> String {
 /// # Errors
 ///
 /// A placeholder that never closes, one naming no secret, and one asking for a form
-/// other than `pbkdf2`. Said without quoting the placeholder, which reads as a credential
-/// to everything that withholds one from what it shows.
+/// other than `pbkdf2` or `bcrypt`. Said without quoting the placeholder, which reads as a
+/// credential to everything that withholds one from what it shows.
 pub fn placeholders(text: &str) -> Result<Vec<Placeholder<'_>>, String> {
     let mut found = Vec::new();
     let mut from = 0;
@@ -115,8 +125,9 @@ pub fn placeholders(text: &str) -> Result<Vec<Placeholder<'_>>, String> {
                 Form::named(word).ok_or_else(|| {
                     format!(
                         "has the placeholder for secret {secret} asking for the form {word}, and \
-                         the one form a placeholder may ask for is {}",
-                        Form::PBKDF2
+                         the forms a placeholder may ask for are {} and {}",
+                        Form::PBKDF2,
+                        Form::BCRYPT
                     )
                 })?,
             ),

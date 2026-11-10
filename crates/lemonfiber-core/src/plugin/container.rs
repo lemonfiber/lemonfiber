@@ -99,7 +99,7 @@ pub(crate) fn unit<'a>(
         mem_limit_mib: fields.mem_limit_mib,
         shape: placed.shape,
         secrets_file: secrets_file(placed, reading),
-        command: Vec::new(),
+        command: fields.args.clone(),
         granted: &[],
     }
 }

@@ -48,6 +48,9 @@ pub struct Fields {
     /// The certificate lemonfiber makes for it, where it declares one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub certificate: Option<Certificate>,
+    /// The arguments its image's own entrypoint is handed, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
 }
 
 impl Fields {

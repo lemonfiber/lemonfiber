@@ -170,6 +170,7 @@ impl Placed {
                 mem_limit_mib: service.mem_limit_mib,
                 network: service.network.clone(),
                 certificate: service.certificate.clone(),
+                args: service.args.clone().unwrap_or_default(),
             },
             service: service.id.clone(),
             image: service.image.clone(),

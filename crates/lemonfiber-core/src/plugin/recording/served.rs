@@ -245,7 +245,7 @@ pub(in crate::plugin) fn settled_as(
         reaching: Vec::new(),
         image: crate::plugin::program::pinned(placed),
         env,
-        command: Vec::new(),
+        command: placed.fields.args.clone(),
         user,
         security_opt,
         cap_drop,

@@ -48,6 +48,7 @@ mod recipes;
 mod replacing;
 mod shaping;
 mod speaking;
+mod starting;
 
 pub use installing::uninstallable;
 pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outside};
@@ -205,6 +206,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         fronting::outside(service, found);
         fronting::filed(service, &manifest.services, found);
         replacing::replaced(service, found);
+        starting::started(service, found);
         minting::handed(manifest, service, found);
     }
 }

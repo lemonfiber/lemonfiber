@@ -1,5 +1,11 @@
 {
   "fields": {
+    "args": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "certificate": {
       "type": [
         "anyOf(null,ref:ServiceCertificate)"
