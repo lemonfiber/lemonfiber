@@ -129,6 +129,62 @@ async fn a_part_taking_up_the_claim_is_waited_out() {
     assert_eq!(asked_at(&http, OWNER), 2);
 }
 
+/// A claim whose answer is lost while the part starts again to take it up is asked after:
+/// who holds the part once it answers again is what the claim came to.
+#[tokio::test(start_paused = true)]
+async fn a_claim_left_unanswered_is_asked_after_once_the_part_answers() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-unanswered");
+    let http = Fake::by_path_in_turn(vec![
+        (CLAIM, vec![Answer::Silent]),
+        (OWNER, vec![Answer::Silent, holding("ours")]),
+    ]);
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+
+    let wirings = super::super::owning::owned(
+        &ctx,
+        &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
+        &mut Baseline::new(),
+    )
+    .await;
+
+    assert_eq!(
+        wirings.first().map(|one| &one.state),
+        Some(&crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+}
+
+/// A part starting again to take up the claim does not answer for a moment, and that
+/// moment is waited out with the rest of its settling.
+#[tokio::test(start_paused = true)]
+async fn a_part_silent_while_it_starts_again_is_waited_out() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("owning-restarting");
+    let http = Fake::by_path_in_turn(vec![
+        (CLAIM, vec![holding("settling")]),
+        (
+            OWNER,
+            vec![holding("settling"), Answer::Silent, holding("ours")],
+        ),
+    ]);
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+
+    let wirings = super::super::owning::owned(
+        &ctx,
+        &beside(&project, &first_party(PLUGIN)),
+        &[claimer()],
+        &mut Baseline::new(),
+    )
+    .await;
+
+    assert_eq!(
+        wirings.first().map(|one| &one.state),
+        Some(&crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    assert_eq!(asked_at(&http, OWNER), 3);
+}
+
 #[tokio::test]
 async fn a_part_claimed_before_and_open_again_is_drift_and_never_claimed_on_a_seed() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("owning-drifted");

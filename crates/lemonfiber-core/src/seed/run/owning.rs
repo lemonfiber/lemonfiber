@@ -77,7 +77,8 @@ pub(crate) async fn parts<'f>(
 }
 
 /// Who holds `part` once it has settled: `first`, or where that says it is settling,
-/// who holds it after asking again within a restart's patience.
+/// who holds it after asking again within a restart's patience, through the moments its
+/// upstream does not answer while it starts again.
 async fn settled(part: &dyn Ownership, first: Result<Owner, Failure>) -> Result<Owner, Failure> {
     if !matches!(first, Ok(Owner::Settling)) {
         return first;
@@ -85,24 +86,33 @@ async fn settled(part: &dyn Ownership, first: Result<Owner, Failure>) -> Result<
     crate::patience::RESTART
         .until(
             || part.owner(),
-            |owner| !matches!(owner, Ok(Owner::Settling)),
+            |owner| {
+                !matches!(
+                    owner,
+                    Ok(Owner::Settling) | Err(Failure::Unavailable { .. })
+                )
+            },
         )
         .await
 }
 
 /// Claim the part `reaching` reaches, and say who holds it once it has settled: where it
-/// takes the claim only once its upstream restarts, once that has started again.
+/// takes the claim only once its upstream restarts, once that has started again, and
+/// where the claim went unanswered, as a part restarting to take it up goes, who holds it
+/// once it answers again.
 ///
 /// # Errors
 ///
 /// Returns [`Failure`] where it could not be asked, or its upstream not started again.
 pub(crate) async fn claimed(reaching: Reaching<'_>) -> Result<Owner, Failure> {
-    match reaching.part.claim().await? {
-        Claim::Held(owner) => settled(reaching.part, Ok(owner)).await,
-        Claim::Restarting(_) => {
+    match reaching.part.claim().await {
+        Ok(Claim::Held(owner)) => settled(reaching.part, Ok(owner)).await,
+        Ok(Claim::Restarting(_)) => {
             reaching.restarts.restarted().await?;
             held(reaching.part).await
         }
+        Err(Failure::Unavailable { .. }) => settled(reaching.part, Ok(Owner::Settling)).await,
+        Err(refused) => Err(refused),
     }
 }
 
