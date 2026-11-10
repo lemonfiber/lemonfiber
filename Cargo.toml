@@ -138,6 +138,9 @@ p12-keystore = { version = "=0.4.1", default-features = false }
 # Verifying the signature a registry offers beside an image, with the library rustls
 # already builds on.
 ring = "0.17"
+# The bcrypt hash a plugin's starting file asks for, salted by the core's own random
+# source, so none of its own is built.
+bcrypt = { version = "0.19", default-features = false, features = ["alloc"] }
 # Reading the certificates a phone's attestation carries, and the Android key description
 # inside one. Already in the tree via rcgen; its own signature checks are left off, and
 # each signature is checked with ring against the algorithms a device key accepts.

@@ -564,6 +564,12 @@
       "description": "What runs.\n\nDeclared in the stack manifest's service vocabulary, restricted to these fields.\nThe restriction is the substance of it: the set of fields *is* the set of things a\nplugin may ask for, so \"what can this plugin reach\" is answerable from the format\nrather than from the instance.",
       "type": "object",
       "properties": {
+        "args": {
+          "description": "The arguments handed to the image's own entrypoint, each a literal, written in\norder as the Compose `command`; absent where the image runs its own command.",
+          "type": ["array", "null"],
+          "default": null,
+          "items": {"type": "string"}
+        },
         "asks_for": {
           "description": "What it asks for out there, in the same terms; never blank.",
           "type": ["string", "null"],

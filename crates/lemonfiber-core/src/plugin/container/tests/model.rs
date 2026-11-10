@@ -62,6 +62,19 @@ fn further_ports_are_published_on_the_tier_to_where_the_container_listens() {
 }
 
 #[test]
+fn the_arguments_a_service_declares_are_its_command_in_order_each_a_literal() {
+    let told = entry_of(&document(with(Fields {
+        args: vec!["serve".to_owned(), "--cost=5%".to_owned()],
+        ..Fields::default()
+    })));
+    let untold = entry_of(&document(placed()));
+
+    assert_eq!(strings(&told, "command"), ["serve", "--cost=5%"]);
+    assert!(untold.get("command").is_none(), "{untold:?}");
+    assert!(told.get("entrypoint").is_none(), "{told:?}");
+}
+
+#[test]
 fn further_mounts_come_from_the_mount_tree_and_the_configuration_may_be_read_only() {
     let entry = entry_of(&document(with(Fields {
         config_ro: true,

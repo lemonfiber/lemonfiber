@@ -12,10 +12,18 @@ fn manifest() -> Option<Manifest> {
 
 #[test]
 fn every_placeholder_is_read_in_order_with_its_form() {
-    let text = "a = {{secret:one}}\nb = {{secret:two|pbkdf2}}\nc = {{other}}\n";
+    let text = "a = {{secret:one}}\nb = {{secret:two|pbkdf2}}\nc = {{other}}\nd = {{secret:three|bcrypt}}\n";
     let named = placeholders(text).unwrap_or_default();
     let read: Vec<(&str, Form)> = named.iter().map(|one| (one.secret, one.form)).collect();
-    assert_eq!(read, vec![("one", Form::Plain), ("two", Form::Pbkdf2)]);
+    assert_eq!(
+        read,
+        vec![
+            ("one", Form::Plain),
+            ("two", Form::Pbkdf2),
+            ("three", Form::Bcrypt)
+        ]
+    );
+    assert_eq!(Form::Bcrypt.word(), "bcrypt");
     assert_eq!(
         named.first().and_then(|one| text.get(one.span.clone())),
         Some("{{secret:one}}")
@@ -44,7 +52,7 @@ fn filling_writes_each_placeholder_and_leaves_everything_else_as_it_was() {
         |one| {
             Ok(match one.form {
                 Form::Plain => format!("<{}>", one.secret),
-                Form::Pbkdf2 => format!("<hash of {}>", one.secret),
+                Form::Pbkdf2 | Form::Bcrypt => format!("<hash of {}>", one.secret),
             })
         },
     );

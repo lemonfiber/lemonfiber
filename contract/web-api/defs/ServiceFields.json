@@ -3,6 +3,13 @@
   "description": "The container fields an install record keeps for a service, beyond those every\nrecord already holds.",
   "type": "object",
   "properties": {
+    "args": {
+      "description": "The arguments its image's own entrypoint is handed, in order.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "certificate": {
       "description": "The certificate lemonfiber makes for it, where it declares one.",
       "anyOf": [

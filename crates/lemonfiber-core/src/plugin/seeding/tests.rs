@@ -264,6 +264,54 @@ fn a_replaced_hash_is_derived_afresh_for_the_new_value() {
     assert!(!replaced.contains("old:old"), "{replaced}");
 }
 
+#[test]
+fn the_bcrypt_form_is_a_salted_cost_ten_hash_of_the_value_that_verifies() {
+    let written = written(
+        b"auth-users: [\"lemonfiber:{{secret:api-key|bcrypt}}:admin\"]",
+        &held,
+        &Chance::exactly(Some(vec![7_u8; 16])),
+    )
+    .ok()
+    .and_then(|bytes| String::from_utf8(bytes).ok())
+    .unwrap_or_default();
+    let hash = written
+        .split_once("lemonfiber:")
+        .and_then(|(_, rest)| rest.split_once(":admin"))
+        .map(|(hash, _)| hash)
+        .unwrap_or_default();
+
+    assert!(hash.starts_with("$2b$10$"), "{written}");
+    assert!(bcrypt::verify(HELD, hash).unwrap_or(false), "{written}");
+    assert!(!written.contains(HELD));
+}
+
+#[test]
+fn a_replaced_bcrypt_hash_is_made_afresh_and_none_without_random_bytes() {
+    let crypting = |random: &Chance| {
+        super::replaced(
+            b"auth-users: [\"lemonfiber:{{secret:api-key|bcrypt}}:admin\"]\n",
+            b"base-url: x\nauth-users: [\"lemonfiber:old:admin\"]\n",
+            "api-key",
+            "fedcba",
+            random,
+        )
+    };
+    assert_eq!(
+        crypting(&Chance::exactly(None)),
+        Err(super::UNMINTED.to_owned())
+    );
+    let replaced = crypting(&Chance::exactly(Some(vec![9_u8; 16])))
+        .ok()
+        .flatten()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_default();
+    assert!(
+        replaced.starts_with("base-url: x\nauth-users: [\"lemonfiber:$2b$10$"),
+        "{replaced}"
+    );
+    assert!(!replaced.contains(":old:"), "{replaced}");
+}
+
 /// Whether `value` holds 32 characters, every one of them a letter, a digit or `-_.~`, and
 /// at least one of each class.
 fn a_password(value: &str) -> bool {

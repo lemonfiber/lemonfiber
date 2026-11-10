@@ -250,6 +250,10 @@ pub struct Service {
     /// port and the name the proxy answers for it.
     #[serde(default)]
     pub replaces: Option<String>,
+    /// The arguments handed to the image's own entrypoint, each a literal, written in
+    /// order as the Compose `command`; absent where the image runs its own command.
+    #[serde(default)]
+    pub args: Option<Vec<String>>,
 }
 }
 
