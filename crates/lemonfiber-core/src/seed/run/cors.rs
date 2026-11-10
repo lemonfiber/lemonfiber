@@ -32,8 +32,7 @@ pub(super) async fn seed_cors(
 ) -> Option<Wiring> {
     let server = server?;
     // No administrator of this media server is recorded where lemonfiber did not set it
-    // up — one no request service asks for — and a server lemonfiber holds no account on
-    // is not one it configures. A rehearsal before the first run finds none recorded
+    // up, and a server lemonfiber holds no account on is not one it configures. A rehearsal before the first run finds none recorded
     // either, because the identity step mints it, so where that step would it says what
     // the run would write.
     let client = server.administering(ctx).await;

@@ -202,7 +202,12 @@ async fn a_contracted_request_service_unreachable_or_untrusted_is_asked_nothing(
         let (wirings, records) = identity_over(&ctx, &fillers).await;
 
         let asked = http.requests();
-        assert!(wirings.is_empty(), "{tag}: {wirings:?}");
+        assert!(
+            wirings
+                .iter()
+                .all(|one| one.connection == ADMINISTRATOR_SET_UP),
+            "{tag}: {wirings:?}"
+        );
         assert!(
             records
                 .entry(CONTRACTED_REQUESTS, crate::seed::TELLING)

@@ -190,10 +190,10 @@ impl MediaServer {
     }
 
     /// Whether a rehearsal stands where the identity step mints this server's
-    /// administrator's password: a request service the password may reach asks for it.
+    /// administrator's password: any server not claimed over `owner.claim`.
     #[must_use]
     pub(crate) fn would_mint(&self, ctx: &Ctx) -> bool {
-        ctx.dry_run && self.asked_by.is_some()
+        ctx.dry_run && !self.claimed()
     }
 
     /// The administrator's password lemonfiber recorded for this server.

@@ -173,8 +173,9 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
 }
 
 /// A media server lemonfiber holds no account on is not configured; a rehearsal before
-/// the identity step has minted one says what the run would write; and a stack with no
-/// media server has nothing to hold.
+/// the identity step has minted one says what the run would write, whether or not a
+/// request service asks for the server; and a stack with no media server has nothing to
+/// hold.
 #[tokio::test]
 async fn without_a_credential_or_a_media_server_nothing_is_asked() {
     let http = serving(OPEN, true);
@@ -194,7 +195,7 @@ async fn without_a_credential_or_a_media_server_nothing_is_asked() {
 
     assert!(seeded(&rehearsing, &[published(media_server_svc())])
         .await
-        .is_none());
+        .is_some());
     assert!(seeded(&ctx, &[published(requests_svc())]).await.is_none());
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

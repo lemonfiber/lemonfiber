@@ -77,16 +77,51 @@ async fn identity_at(
 }
 
 #[tokio::test]
-async fn identity_does_nothing_without_both_the_media_server_and_the_request_service() {
+async fn identity_does_nothing_without_the_media_server() {
     let ctx = seed_ctx(true, None, None);
-    // The request service present but no media server, and the other way round: either
-    // alone is nothing to wire.
     let base = crate::baseline::Baseline::new();
     assert!(identity(&ctx, &[requests_svc()], &base).await.0.is_empty());
-    assert!(identity(&ctx, &[media_server_svc()], &base)
-        .await
-        .0
-        .is_empty());
+}
+
+/// **A media server nothing asks for still gets its administrator**, recorded and handed
+/// to its adapter, which signs in to it with that password; nothing else is wired.
+#[tokio::test]
+async fn a_media_server_no_request_service_asks_for_is_given_its_administrator() {
+    let env = config_scratch("jellyfin-alone");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(household(false, false));
+
+    let (wirings, _, project) = identity_in(
+        &ctx,
+        &[media_server_svc()],
+        &[],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+
+    assert_eq!(
+        wirings
+            .iter()
+            .map(|wiring| (wiring.connection.as_str(), &wiring.state))
+            .collect::<Vec<_>>(),
+        vec![(ADMINISTRATOR_SET_UP, &crate::seed::State::Wired)]
+    );
+    assert!(
+        held(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD"),
+        "the minted password is recorded"
+    );
+    let handed = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER)
+        .with_file_name(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    assert!(
+        std::fs::read_to_string(&handed)
+            .is_ok_and(|held| held.contains(lemonfiber_contract::adapter::UPSTREAM_PASSWORD)),
+        "the adapter is handed the password"
+    );
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
 /// **The stack's administrator's password is never sent to a plugin.** A plugin's
@@ -124,7 +159,12 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
     .await;
 
     let sent = http.requests();
-    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(
+        wirings
+            .iter()
+            .all(|one| one.connection == ADMINISTRATOR_SET_UP),
+        "{wirings:?}"
+    );
     assert!(
         !sent.iter().any(|asked| asked.url.contains(":5999")),
         "{sent:?}"
