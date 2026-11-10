@@ -19,7 +19,7 @@ pub(super) fn started(service: &Service, found: &mut Vec<Violation>) {
     if args.is_empty() {
         found.push(Violation {
             location: location.clone(),
-            message: "is empty; a service told nothing to run leaves `args` out and runs its \
+            message: "is empty; a service told nothing to run leaves args out and runs its \
                       image's own command"
                 .to_owned(),
         });
