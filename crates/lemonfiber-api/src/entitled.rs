@@ -248,9 +248,6 @@ fn members(id: &str, command: &Command) -> Permitted {
         // their own account and allowance. Whoever the request named is discarded, so a
         // member cannot search under somebody else's limits or spend their allowance.
         Command::Wish(wishing) => Permitted::This(Command::Wish(their_wish(id, wishing))),
-        // Theirs, narrowed the same way: what they may be told on, and their choice of it.
-        // Whoever the request named is discarded, so a member cannot read or set what
-        // another member is told on.
         Command::Notify(Notifying::Mine { .. }) => {
             Permitted::This(Command::Notify(Notifying::Mine {
                 member: id.to_owned(),
@@ -262,7 +259,6 @@ fn members(id: &str, command: &Command) -> Permitted {
                 backends: backends.clone(),
             }))
         }
-        // Their own phone's word that a wake arrived, and no other phone's.
         Command::PushEndpoints(Pushing::Woken { name, id: wake, .. }) => {
             Permitted::This(Command::PushEndpoints(Pushing::Woken {
                 name: name.clone(),
