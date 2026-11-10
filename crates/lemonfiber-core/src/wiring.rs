@@ -357,7 +357,7 @@ pub fn substitute(
         return Err(Refused::NothingAsks(capability.to_owned()));
     }
 
-    let was = filled(&before)
+    let was = filled(&before, installed)
         .get(capability)
         .and_then(|held| match held.as_slice() {
             [only] => Some(only.clone()),

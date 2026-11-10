@@ -55,7 +55,7 @@ fn choosing_a_plugin_s_service_settles_the_contest_it_made() {
     let installed = [plugin_filling("kavita", "kavita", "media.serve")];
     let chosen = Chosen::read(Some("media.serve=kavita"));
     let reached = one_server().and_then(|manifest| {
-        filled(&settle(&manifest, &installed, &chosen))
+        filled(&settle(&manifest, &installed, &chosen), &installed)
             .get("media.serve")
             .cloned()
     });
@@ -127,9 +127,12 @@ fn what_an_install_leaves_contested_is_only_what_it_turns_into_a_contest() {
 fn a_plugin_filling_something_else_is_not_a_candidate() {
     let installed = [plugin_filling("uptime", "uptime", "status.watch")];
     let reached = one_server().and_then(|manifest| {
-        filled(&settle(&manifest, &installed, &Chosen::default()))
-            .get("media.serve")
-            .cloned()
+        filled(
+            &settle(&manifest, &installed, &Chosen::default()),
+            &installed,
+        )
+        .get("media.serve")
+        .cloned()
     });
     assert_eq!(reached, Some(vec!["server".to_owned()]));
 }

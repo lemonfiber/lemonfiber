@@ -415,25 +415,43 @@ pub fn unfilled(wired: &[Wired]) -> Vec<Unfilled> {
 /// Which service fills each capability the stack asks for, for whatever wires it.
 ///
 /// A capability asked for by several links resolves the same way for all of them, so
-/// the answer is one map rather than one per asker. Only what is settled appears: a
-/// contest and an unfilled ask are both *nobody*, and a caller handed a name for
-/// either would be wiring to a guess.
+/// the answer is one map rather than one per asker: an ask in the upstream's own API
+/// reaches the upstream, and is filled by the claimant of `installed` fronting it. Only
+/// what is settled appears: a contest and an unfilled ask are both *nobody*, and a
+/// caller handed a name for either would be wiring to a guess.
 #[must_use]
-pub fn filled(wired: &[Wired]) -> BTreeMap<String, Vec<String>> {
+pub fn filled(wired: &[Wired], installed: &[Installed]) -> BTreeMap<String, Vec<String>> {
     let mut held: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for one in wired {
         if let Reaches::Asked {
             capability,
             services,
+            origins,
             ..
         } = &one.reaches
         {
             if !services.is_empty() {
-                held.insert(capability.clone(), services.clone());
+                let fillers = services
+                    .iter()
+                    .map(|service| fronting(installed, origins, service))
+                    .collect();
+                held.insert(capability.clone(), fillers);
             }
         }
     }
     held
+}
+
+/// The claimant among `origins` fronting `service`, where an ask in its own API reached
+/// it, and `service` itself otherwise.
+fn fronting(installed: &[Installed], origins: &BTreeMap<String, Origin>, service: &str) -> String {
+    installed
+        .iter()
+        .flat_map(|one| &one.services)
+        .find(|placed| {
+            placed.fronts.as_deref() == Some(service) && origins.contains_key(&placed.service)
+        })
+        .map_or_else(|| service.to_owned(), |placed| placed.service.clone())
 }
 
 /// Every ask that installing `adding` would leave contested and that is not contested

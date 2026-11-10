@@ -13,7 +13,7 @@ use crate::plugin::Installed;
 #[must_use]
 pub fn replaced(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<String> {
     let wired = settle(manifest, installed, chosen);
-    let filling: BTreeSet<String> = filled(&wired).into_values().flatten().collect();
+    let filling: BTreeSet<String> = filled(&wired, installed).into_values().flatten().collect();
     let passed_over: BTreeSet<&String> = wired
         .iter()
         .filter_map(|one| match &one.reaches {

@@ -16,12 +16,14 @@ fn moved() -> Vec<crate::wiring::Wired> {
         .unwrap_or_default()
 }
 
-/// An ask for all of them is not a contest. Four services curate a library here,
-/// and a reader that could only answer "one or refused" would refuse every link
-/// in the stack that reaches all of them.
+/// An ask for all of them is not a contest. Four services curate a library here, three
+/// of them answering in the Servarr API the subtitle finder asks in, and a reader that
+/// could only answer "one or refused" would refuse every link in the stack that reaches
+/// all of them.
 #[test]
 fn an_ask_for_every_filler_reaches_every_filler() {
     let curators = ["bindery", "lidarr", "radarr", "sonarr"];
+    let servarr = ["lidarr", "radarr", "sonarr"];
     let reaches = moved()
         .into_iter()
         .filter(|one| one.by == "bazarr")
@@ -38,10 +40,10 @@ fn an_ask_for_every_filler_reaches_every_filler() {
     assert_eq!(
         reaches,
         Some(Reaches::Asked {
-            native: None,
+            native: Some(lemonfiber_manifest::container::Apis::one("servarr")),
             files: None,
             capability: "library.curate".to_owned(),
-            services: curators.map(|one| format!("{one}-adapter")).to_vec(),
+            services: servarr.map(str::to_owned).to_vec(),
             settled: Settled::Each,
             origins: curators
                 .iter()
@@ -63,7 +65,7 @@ fn an_ask_for_every_filler_reaches_every_filler() {
 /// is settled is one map rather than one answer per asker.
 #[test]
 fn what_fills_each_capability_is_one_answer_for_every_asker() {
-    let held = filled(&moved());
+    let held = filled(&moved(), &crate::test_support::adapted::installed_parts());
     assert_eq!(
         held.get("download.torrent").map(Vec::as_slice),
         Some(["qbittorrent-adapter".to_owned()].as_slice())
