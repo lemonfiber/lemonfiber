@@ -12,9 +12,10 @@
 
 use super::{Outbound, Reach};
 use crate::config::{
-    Settings, IP_ECHO_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY,
-    REACH_INDEXER_KEY, REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY,
-    REACH_UPDATES_KEY, REACH_USENET_KEY, REACH_WAKING_KEY,
+    Settings, IP_ECHO_KEY, REACH_APPRISE_KEY, REACH_CATALOGUE_KEY, REACH_GOTIFY_KEY,
+    REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY, REACH_NTFY_KEY,
+    REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY,
+    REACH_USENET_KEY, REACH_WAKING_KEY, REACH_WEBHOOK_KEY,
 };
 use crate::schemes::SECURE_SCHEME;
 use lemonfiber_manifest::Service;
@@ -33,6 +34,10 @@ pub const EVERY: &[Reach] = &[
     Reach::Usenet,
     Reach::Household,
     Reach::Waking,
+    Reach::Ntfy,
+    Reach::Gotify,
+    Reach::Webhook,
+    Reach::Apprise,
     Reach::Posters,
     Reach::Updates,
     Reach::PluginSource,
@@ -114,11 +119,11 @@ pub(super) fn outbound(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
-    covers: &[String],
+    noted: &super::Noted,
 ) -> Outbound {
     Outbound {
         reach,
-        destination: destination(reach, settings, services, installed, covers),
+        destination: destination(reach, settings, services, installed, noted),
         purpose: purpose(reach).to_owned(),
         sends: sends(reach).to_owned(),
         allowed: allowed(reach, settings),
@@ -133,7 +138,7 @@ fn destination(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
-    covers: &[String],
+    noted: &super::Noted,
 ) -> Vec<String> {
     match reach {
         Reach::Registry => registries(services),
@@ -150,7 +155,8 @@ fn destination(
         Reach::Waking => vec![WAKING.to_owned()],
         Reach::Posters => std::iter::once(POSTERS.to_owned())
             .chain(
-                covers
+                noted
+                    .covers
                     .iter()
                     .map(|host| format!("{SECURE_SCHEME}://{host}")),
             )
@@ -161,6 +167,12 @@ fn destination(
             crate::plugin::catalogue::INDEX.to_owned(),
             crate::plugin::catalogue::SIGNATURE.to_owned(),
         ],
+        Reach::Ntfy | Reach::Gotify | Reach::Webhook | Reach::Apprise => noted
+            .backends
+            .iter()
+            .filter(|(kind, _)| Reach::delivering(*kind) == reach)
+            .map(|(_, url)| url.clone())
+            .collect(),
     }
 }
 
@@ -236,6 +248,11 @@ pub fn purpose(reach: Reach) -> &'static str {
              hears of an alert while it is closed. Made only for a phone registered here, on \
              each alert's onset and resolution, while the web surface is serving."
         }
+        Reach::Ntfy | Reach::Gotify | Reach::Webhook | Reach::Apprise => {
+            "Deliver each alert worth telling to a back-end you added with notify add, and \
+             read its history where it keeps one, to see the message arrive. Made only for a \
+             back-end you added, while the web surface is serving or when you run notify test."
+        }
         Reach::Posters => {
             "Show a member the poster of a title their search found and the house does not \
              hold yet, or the cover of music or a book they found or asked for. Their client is \
@@ -301,6 +318,12 @@ pub fn sends(reach: Reach) -> &'static str {
              that phone. It says only that the stack has something to say, so the distributor \
              learns when this stack spoke and from what address, and never what it said."
         }
+        Reach::Ntfy | Reach::Gotify | Reach::Webhook | Reach::Apprise => {
+            "One message per alert, carrying its kind and its summary as the stack words it, \
+             and the secret the back-end is reached with. Never a member's name, what anybody \
+             is watching or a title somebody asked for. A back-end on a hosted service also \
+             learns this machine's address each time a message is delivered."
+        }
         Reach::Posters => {
             "One unauthenticated request for one title's poster or cover, from this machine's \
              address. No credential and nothing about the member, who is never named, but the \
@@ -330,6 +353,7 @@ pub fn sends(reach: Reach) -> &'static str {
 }
 
 /// The setting that switches a request off.
+#[must_use]
 pub fn switch(reach: Reach) -> &'static str {
     match reach {
         Reach::Registry => REACH_REGISTRY_KEY,
@@ -339,6 +363,10 @@ pub fn switch(reach: Reach) -> &'static str {
         Reach::Usenet => REACH_USENET_KEY,
         Reach::Household => REACH_HOUSEHOLD_KEY,
         Reach::Waking => REACH_WAKING_KEY,
+        Reach::Ntfy => REACH_NTFY_KEY,
+        Reach::Gotify => REACH_GOTIFY_KEY,
+        Reach::Webhook => REACH_WEBHOOK_KEY,
+        Reach::Apprise => REACH_APPRISE_KEY,
         Reach::Posters => REACH_POSTERS_KEY,
         Reach::Updates => REACH_UPDATES_KEY,
         Reach::PluginSource => REACH_PLUGIN_SOURCE_KEY,
@@ -380,6 +408,11 @@ pub fn cost(reach: Reach) -> &'static str {
         Reach::Waking => {
             "A phone hears of an alert only when it is opened. The alert is kept and shown then, \
              and everything else works exactly as before."
+        }
+        Reach::Ntfy | Reach::Gotify | Reach::Webhook | Reach::Apprise => {
+            "Back-ends of this kind are told nothing, and a test of one sends nothing. Alerts \
+             are kept and shown on the dashboard and to the phones, and every other back-end \
+             goes on being told."
         }
         Reach::Posters => {
             "A member's search shows each title by its name and year alone. Searching and \

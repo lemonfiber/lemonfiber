@@ -61,6 +61,18 @@ pub const REACH_POSTERS_KEY: &str = "LEMONFIBER_REACH_POSTERS";
 /// The setting that stops lemonfiber waking the phones that asked to be woken.
 pub const REACH_WAKING_KEY: &str = "LEMONFIBER_REACH_WAKING";
 
+/// The setting that stops lemonfiber delivering alerts to an ntfy topic.
+pub const REACH_NTFY_KEY: &str = "LEMONFIBER_REACH_NTFY";
+
+/// The setting that stops lemonfiber delivering alerts to a gotify server.
+pub const REACH_GOTIFY_KEY: &str = "LEMONFIBER_REACH_GOTIFY";
+
+/// The setting that stops lemonfiber posting alerts to a webhook.
+pub const REACH_WEBHOOK_KEY: &str = "LEMONFIBER_REACH_WEBHOOK";
+
+/// The setting that stops lemonfiber delivering alerts to an Apprise API.
+pub const REACH_APPRISE_KEY: &str = "LEMONFIBER_REACH_APPRISE";
+
 /// Every setting that switches one request off.
 ///
 /// The leak check's own source is not among them: it is named rather than switched,
@@ -78,6 +90,10 @@ pub const SWITCHES: &[&str] = &[
     REACH_CATALOGUE_KEY,
     REACH_POSTERS_KEY,
     REACH_WAKING_KEY,
+    REACH_NTFY_KEY,
+    REACH_GOTIFY_KEY,
+    REACH_WEBHOOK_KEY,
+    REACH_APPRISE_KEY,
 ];
 
 /// Whether this operator has asked that nothing leave the machine.

@@ -26,13 +26,17 @@ fn pushbullet() -> Address {
 /// and left off the enumeration would pass a test that named it twice.
 #[test]
 fn a_message_goes_only_where_the_enumeration_names() {
-    let allowed: Vec<String> =
-        crate::outbound::leaving(&crate::config::Settings::default(), &[], &[], &[])
-            .ours
-            .into_iter()
-            .filter(|entry| entry.reach == crate::outbound::Reach::Household)
-            .flat_map(|entry| entry.destination)
-            .collect();
+    let allowed: Vec<String> = crate::outbound::leaving(
+        &crate::config::Settings::default(),
+        &[],
+        &[],
+        &crate::outbound::Noted::default(),
+    )
+    .ours
+    .into_iter()
+    .filter(|entry| entry.reach == crate::outbound::Reach::Household)
+    .flat_map(|entry| entry.destination)
+    .collect();
 
     assert_eq!(allowed.len(), 2, "{allowed:?}");
     for address in [pushover(Some("bike")), pushbullet()] {

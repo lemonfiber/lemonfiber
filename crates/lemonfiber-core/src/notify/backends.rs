@@ -99,6 +99,16 @@ pub(crate) struct Owed {
     pub next: Option<u64>,
 }
 
+impl Backend {
+    /// Where it reaches: its address, and its topic where it posts to one.
+    pub(crate) fn reaches(&self) -> String {
+        match &self.topic {
+            Some(topic) => format!("{}/{topic}", self.url),
+            None => self.url.clone(),
+        }
+    }
+}
+
 /// The secret each back-end is reached with, by its id.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Secrets {
@@ -126,6 +136,19 @@ pub(crate) fn at(ctx: &Ctx) -> Option<PathBuf> {
 /// Where their secrets are kept, where anywhere is configured.
 pub(crate) fn secrets_at(ctx: &Ctx) -> Option<PathBuf> {
     crate::app::targets::beside_env(ctx, NOTIFY_SECRETS)
+}
+
+/// Each back-end kept, by what it speaks and where it is reached, with no credential.
+pub(crate) fn destinations(ctx: &Ctx) -> Vec<(BackendKind, String)> {
+    at(ctx)
+        .and_then(|path| kept(&path).ok())
+        .map(|kept| {
+            kept.backends
+                .into_iter()
+                .map(|one| (one.kind, one.reaches()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The back-ends kept at `path`, and none where nothing was kept yet.

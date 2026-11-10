@@ -209,7 +209,10 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         &ctx.settings,
         &manifest.services,
         installed.installed(),
-        &crate::outbound::covers::recorded(ctx),
+        &crate::outbound::Noted {
+            covers: crate::outbound::covers::recorded(ctx),
+            backends: crate::notify::backends::destinations(ctx),
+        },
     )))
 }
 

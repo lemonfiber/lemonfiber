@@ -36,14 +36,10 @@ pub(crate) fn report(ctx: &Ctx) -> Result<NotifyReport, Box<Problem>> {
 
 /// One back-end as the read lists it.
 fn listed(backend: &Backend) -> BackendReport {
-    let reaches = match &backend.topic {
-        Some(topic) => format!("{}/{topic}", backend.url),
-        None => backend.url.clone(),
-    };
     BackendReport {
         id: backend.id.clone(),
         kind: backend.kind,
-        reaches,
+        reaches: backend.reaches(),
         chosen_by: backend.chosen_by.clone(),
         hosted: backend.hosted.then(|| HostedBackend {
             host: Url::parse(&backend.url)

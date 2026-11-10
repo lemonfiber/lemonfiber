@@ -1,6 +1,7 @@
 use super::{allowed, destination, registries, registry_of, DOCKER_HUB, EVERY, GUIDE_SOURCE};
 use crate::config::{Indexer, Reaching, Settings};
-use crate::outbound::Reach;
+use crate::model::BackendKind;
+use crate::outbound::{Noted, Reach};
 use lemonfiber_manifest::Service;
 
 /// The stack's own services with their images replaced, because nothing in this
@@ -53,7 +54,13 @@ fn each_registry_is_named_once_however_many_images_come_from_it() {
 #[test]
 fn the_guide_source_is_the_one_the_probe_is_handed() {
     assert_eq!(
-        destination(Reach::Guides, &Settings::default(), &[], &[], &[]),
+        destination(
+            Reach::Guides,
+            &Settings::default(),
+            &[],
+            &[],
+            &Noted::default()
+        ),
         vec![GUIDE_SOURCE.to_owned()]
     );
 }
@@ -68,7 +75,7 @@ fn an_indexer_is_named_without_the_key_it_authenticates_with() {
         }),
         ..Settings::default()
     };
-    let named = destination(Reach::Indexer, &settings, &[], &[], &[]);
+    let named = destination(Reach::Indexer, &settings, &[], &[], &Noted::default());
     let shown = named.join(" ");
     assert_eq!(named.len(), 1, "{shown}");
     assert!(shown.starts_with("https://indexer.example/api?"), "{shown}");
@@ -78,7 +85,7 @@ fn an_indexer_is_named_without_the_key_it_authenticates_with() {
 #[test]
 fn a_request_with_nothing_configured_names_nowhere() {
     for reach in [Reach::Indexer, Reach::Usenet, Reach::PluginSource] {
-        assert!(destination(reach, &Settings::default(), &[], &[], &[]).is_empty());
+        assert!(destination(reach, &Settings::default(), &[], &[], &Noted::default()).is_empty());
     }
     // And what a surface puts there instead, which is read from here by the
     // renderer in another crate — so it is exercised from both compilations of
@@ -93,7 +100,7 @@ fn a_usenet_provider_is_named_by_the_host_the_operator_gave() {
         ..Settings::default()
     };
     assert_eq!(
-        destination(Reach::Usenet, &settings, &[], &[], &[]),
+        destination(Reach::Usenet, &settings, &[], &[], &Noted::default()),
         vec!["news.example.net".to_owned()]
     );
 }
@@ -101,7 +108,7 @@ fn a_usenet_provider_is_named_by_the_host_the_operator_gave() {
 #[test]
 fn the_echo_is_the_sources_in_force_and_is_off_when_there_are_none() {
     let settings = Settings::default();
-    assert!(!destination(Reach::Echo, &settings, &[], &[], &[]).is_empty());
+    assert!(!destination(Reach::Echo, &settings, &[], &[], &Noted::default()).is_empty());
     assert!(allowed(Reach::Echo, &settings));
     let switched_off = Settings {
         ip_echo: Vec::new(),
@@ -117,7 +124,13 @@ fn the_echo_is_the_sources_in_force_and_is_off_when_there_are_none() {
 /// reading this was told it could go.
 #[test]
 fn where_a_household_member_is_told_is_the_two_the_list_names() {
-    let named = destination(Reach::Household, &Settings::default(), &[], &[], &[]);
+    let named = destination(
+        Reach::Household,
+        &Settings::default(),
+        &[],
+        &[],
+        &Noted::default(),
+    );
 
     assert_eq!(named.len(), 2, "{named:?}");
     assert!(
@@ -133,7 +146,13 @@ fn where_a_household_member_is_told_is_the_two_the_list_names() {
 /// Read from here by [`crate::wishing`], which fetches nothing that is not beneath it.
 #[test]
 fn where_a_poster_is_fetched_from_is_the_one_address_the_list_names() {
-    let named = destination(Reach::Posters, &Settings::default(), &[], &[], &[]);
+    let named = destination(
+        Reach::Posters,
+        &Settings::default(),
+        &[],
+        &[],
+        &Noted::default(),
+    );
 
     assert_eq!(named, vec![super::POSTERS.to_owned()]);
     assert!(super::POSTERS.starts_with("https://"), "{named:?}");
@@ -144,7 +163,11 @@ fn where_a_poster_is_fetched_from_is_the_one_address_the_list_names() {
 fn each_host_a_cover_was_fetched_from_is_named_beside_the_catalogue() {
     let covers = ["art.example".to_owned(), "covers.example".to_owned()];
 
-    let named = destination(Reach::Posters, &Settings::default(), &[], &[], &covers);
+    let noted = Noted {
+        covers: covers.to_vec(),
+        ..Noted::default()
+    };
+    let named = destination(Reach::Posters, &Settings::default(), &[], &[], &noted);
 
     assert_eq!(
         named,
@@ -173,4 +196,31 @@ fn each_of_the_others_answers_its_own_switch() {
         assert!(!allowed(*reach, &refused), "{reach:?} ignored its switch");
         assert!(allowed(*reach, &Settings::default()), "{reach:?}");
     }
+}
+
+#[test]
+fn each_back_end_is_listed_under_the_request_its_kind_is_delivered_by_and_switched_alone() {
+    let noted = Noted {
+        backends: vec![
+            (BackendKind::Ntfy, "http://ntfy.home/stack".to_owned()),
+            (BackendKind::Webhook, "http://hooks.home/alerts".to_owned()),
+            (BackendKind::Ntfy, "https://ntfy.sh/away".to_owned()),
+        ],
+        ..Noted::default()
+    };
+    let settings = Settings {
+        reaching: Reaching::without(crate::config::REACH_NTFY_KEY),
+        ..Settings::default()
+    };
+    let at = |reach| destination(reach, &settings, &[], &[], &noted);
+
+    assert_eq!(
+        at(Reach::Ntfy),
+        ["http://ntfy.home/stack", "https://ntfy.sh/away"]
+    );
+    assert_eq!(at(Reach::Webhook), ["http://hooks.home/alerts"]);
+    assert!(at(Reach::Gotify).is_empty() && at(Reach::Apprise).is_empty());
+    assert!(!allowed(Reach::Ntfy, &settings));
+    assert!(allowed(Reach::Gotify, &settings));
+    assert_eq!(Reach::delivering(BackendKind::Unifiedpush), Reach::Waking);
 }

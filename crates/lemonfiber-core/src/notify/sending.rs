@@ -69,6 +69,10 @@ struct Page {
 
 /// Send `message` to `backend`, reached with `held`.
 pub(crate) async fn send(ctx: &Ctx, backend: &Backend, held: &Held, message: &Message) -> Sent {
+    let switch = crate::outbound::switch(crate::outbound::Reach::delivering(backend.kind));
+    if !ctx.settings.reaching.allows(switch) {
+        return failed(&format!("{switch} switches it off"));
+    }
     let Some(request) = request(backend, held, message) else {
         return failed("it cannot be spoken to this way");
     };

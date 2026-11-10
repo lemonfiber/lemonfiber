@@ -30,12 +30,12 @@ use crate::config::Settings;
 use lemonfiber_manifest::Service;
 
 pub use ours::{
-    nothing_configured, EVERY, GUIDE_SOURCE, POSTERS, PUSHBULLET, PUSHOVER, RELEASE_LIST,
+    nothing_configured, switch, EVERY, GUIDE_SOURCE, POSTERS, PUSHBULLET, PUSHOVER, RELEASE_LIST,
 };
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Eleven, and the closed set is the claim. A twelfth is a decision somebody makes by
+/// Fifteen, and the closed set is the claim. A sixteenth is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
 ///
@@ -63,6 +63,9 @@ pub use ours::{
 /// The tenth is made for a member rather than for the operator: the poster of a title
 /// their search found, from the one catalogue address this build names, so their client
 /// draws it without ever being sent there.
+///
+/// The last four deliver alerts to the back-ends the operator added, one for each kind,
+/// so each kind is switched off on its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "OutboundReach")]
@@ -89,6 +92,14 @@ pub enum Reach {
     Posters,
     /// Waking a phone that asked to be woken when this stack has something to say.
     Waking,
+    /// Delivering an alert to an ntfy topic.
+    Ntfy,
+    /// Delivering an alert to a gotify server.
+    Gotify,
+    /// Posting an alert to a webhook.
+    Webhook,
+    /// Delivering an alert to an Apprise API.
+    Apprise,
 }
 
 impl Reach {
@@ -107,8 +118,35 @@ impl Reach {
             Self::Catalogue => "catalogue",
             Self::Posters => "posters",
             Self::Waking => "waking",
+            Self::Ntfy => "ntfy",
+            Self::Gotify => "gotify",
+            Self::Webhook => "webhook",
+            Self::Apprise => "apprise",
         }
     }
+
+    /// The request delivering to a back-end of `kind`, where it is one of these; a phone's
+    /// push endpoint is woken.
+    #[must_use]
+    pub const fn delivering(kind: crate::model::BackendKind) -> Self {
+        match kind {
+            crate::model::BackendKind::Ntfy => Self::Ntfy,
+            crate::model::BackendKind::Gotify => Self::Gotify,
+            crate::model::BackendKind::Webhook => Self::Webhook,
+            crate::model::BackendKind::Apprise => Self::Apprise,
+            crate::model::BackendKind::Unifiedpush => Self::Waking,
+        }
+    }
+}
+
+/// What this machine has noted of where it reaches beyond its settings: each host a cover
+/// was fetched from, and each back-end alerts are delivered to.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Noted {
+    /// Each host a cover was fetched from.
+    pub covers: Vec<String>,
+    /// Each back-end, by what it speaks and the address it is reached at.
+    pub backends: Vec<(crate::model::BackendKind, String)>,
 }
 
 /// One request lemonfiber makes, where it goes, and what refusing it costs.
@@ -198,14 +236,14 @@ pub fn leaving(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
-    covers: &[String],
+    noted: &Noted,
 ) -> Leaving {
     let mut theirs = theirs::elsewhere(services);
     theirs.extend(theirs::brought(installed));
     Leaving {
         ours: EVERY
             .iter()
-            .map(|reach| ours::outbound(*reach, settings, services, installed, covers))
+            .map(|reach| ours::outbound(*reach, settings, services, installed, noted))
             .collect(),
         on_behalf: behalf::declared(services, installed),
         theirs,
