@@ -43,6 +43,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::FrontDoor => &[kind::FRONT_DOOR],
         Command::Stack => &[kind::STACK],
         Command::Notify(crate::notify::configuring::Asked::List) => &[kind::NOTIFY],
+        Command::Notify(crate::notify::configuring::Asked::Mine { .. }) => &[kind::NOTIFY_MINE],
         Command::News => &[kind::NEWS_ITEMS],
         Command::Trace(_) => &[kind::TRACE],
         Command::Stuck => &[kind::STUCK],

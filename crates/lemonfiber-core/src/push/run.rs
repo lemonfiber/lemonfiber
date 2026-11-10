@@ -57,13 +57,20 @@ pub enum Asked {
         p256dh: String,
         /// The phone's `WebPush` secret, in base64url.
         auth: String,
+        /// The member registering their own phone, by their account's id.
+        owner: Option<String>,
     },
-    /// List the endpoints.
-    List,
-    /// Remove the endpoint holding a name.
+    /// List the endpoints, or a member's own.
+    List {
+        /// The member listing their own, by their account's id.
+        owner: Option<String>,
+    },
+    /// Remove the endpoint holding a name, which a member may only do to their own.
     Remove {
         /// The endpoint's name.
         name: String,
+        /// The member removing their own, by their account's id.
+        owner: Option<String>,
     },
 }
 
@@ -75,8 +82,12 @@ impl std::fmt::Debug for Asked {
                 .debug_struct("Register")
                 .field("name", name)
                 .finish_non_exhaustive(),
-            Self::List => out.write_str("List"),
-            Self::Remove { name } => out.debug_struct("Remove").field("name", name).finish(),
+            Self::List { owner } => out.debug_struct("List").field("owner", owner).finish(),
+            Self::Remove { name, owner } => out
+                .debug_struct("Remove")
+                .field("name", name)
+                .field("owner", owner)
+                .finish(),
         }
     }
 }
@@ -98,38 +109,39 @@ pub fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             endpoint,
             p256dh,
             auth,
-        } => register(ctx, name, endpoint, p256dh, auth).map(Outcome::PushEndpoint),
-        Asked::List => listing(ctx, None).map(Outcome::PushEndpoints),
-        Asked::Remove { name } => remove(ctx, &name).map(Outcome::PushEndpoints),
+            owner,
+        } => register(
+            ctx,
+            &Record {
+                name,
+                endpoint,
+                p256dh,
+                auth,
+                registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+                owed: 0,
+                owner,
+            },
+        )
+        .map(Outcome::PushEndpoint),
+        Asked::List { owner } => listing(ctx, None, owner.as_deref()).map(Outcome::PushEndpoints),
+        Asked::Remove { name, owner } => {
+            remove(ctx, &name, owner.as_deref()).map(Outcome::PushEndpoints)
+        }
     }
 }
 
 /// Register an endpoint, once its name, its address and its keys can be used.
-fn register(
-    ctx: &Ctx,
-    name: String,
-    endpoint: String,
-    p256dh: String,
-    auth: String,
-) -> Result<Registered, Box<Problem>> {
-    if !names_a_key(&name) {
-        return Err(Box::new(bad_name(&name)));
+fn register(ctx: &Ctx, record: &Record) -> Result<Registered, Box<Problem>> {
+    if !names_a_key(&record.name) {
+        return Err(Box::new(bad_name(&record.name)));
     }
-    if !is_https(&endpoint) {
-        return Err(Box::new(not_https(&name)));
+    if !is_https(&record.endpoint) {
+        return Err(Box::new(not_https(&record.name)));
     }
-    if sealing::readable(&p256dh, &auth).is_none() {
-        return Err(Box::new(unreadable_keys(&name)));
+    if sealing::readable(&record.p256dh, &record.auth).is_none() {
+        return Err(Box::new(unreadable_keys(&record.name)));
     }
     let path = at(ctx).ok_or_else(nowhere)?;
-    let record = Record {
-        name,
-        endpoint,
-        p256dh,
-        auth,
-        registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
-        owed: 0,
-    };
     let answer = Registered {
         name: record.name.clone(),
         endpoint: record.endpoint.clone(),
@@ -161,18 +173,23 @@ fn register(
     refused.map_or(Ok(answer), Err)
 }
 
-/// Remove the endpoint holding `name`.
-fn remove(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
+/// Remove the endpoint holding `name`, where it is `owner`'s own or nobody is named.
+fn remove(ctx: &Ctx, name: &str, owner: Option<&str>) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(nowhere)?;
     let mut refused = None;
+    let held = |kept: &Kept| {
+        kept.endpoints
+            .iter()
+            .any(|one| one.name == name && owned_by(one, owner))
+    };
     if ctx.dry_run {
         let kept = read(&path).map_err(|failure| Box::new(failure.problem()))?;
-        if !kept.endpoints.iter().any(|one| one.name == name) {
+        if !held(&kept) {
             return Err(Box::new(not_registered(name)));
         }
     } else {
         crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
-            refused = if kept.endpoints.iter().any(|one| one.name == name) {
+            refused = if held(kept) {
                 forgotten(ctx, kept, name).err()
             } else {
                 Some(Box::new(not_registered(name)))
@@ -181,7 +198,39 @@ fn remove(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
         })
         .map_err(|failure| Box::new(failure.problem()))?;
     }
-    refused.map_or_else(|| listing(ctx, Some(name.to_owned())), Err)
+    refused.map_or_else(|| listing(ctx, Some(name.to_owned()), owner), Err)
+}
+
+/// Whether `record` is `owner`'s own, where a member is named.
+fn owned_by(record: &Record, owner: Option<&str>) -> bool {
+    owner.is_none_or(|owner| record.owner.as_deref() == Some(owner))
+}
+
+/// Whether `member` has registered a phone of their own.
+pub(crate) fn owns_one(ctx: &Ctx, member: &str) -> bool {
+    at(ctx)
+        .and_then(|path| read(&path).ok())
+        .is_some_and(|kept| {
+            kept.endpoints
+                .iter()
+                .any(|one| one.owner.as_deref() == Some(member))
+        })
+}
+
+/// Owe `member`'s own phones one wake, that something they asked for is ready.
+pub(crate) fn ready(ctx: &Ctx, member: &str) {
+    if let Some(path) = waiting_at(ctx) {
+        let _ = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
+            for one in kept
+                .endpoints
+                .iter_mut()
+                .filter(|one| one.owner.as_deref() == Some(member))
+            {
+                one.owed = one.owed.saturating_add(1).min(MOST_OWED);
+            }
+            Ok(())
+        });
+    }
 }
 
 /// Take `name` out of `kept`, once the journal says so, and forget what was sent with the
@@ -201,12 +250,22 @@ fn forgotten(ctx: &Ctx, kept: &mut Kept, name: &str) -> Result<(), Box<Problem>>
     Ok(())
 }
 
-/// Every endpoint, and the one this request removed.
-fn listing(ctx: &Ctx, removed: Option<String>) -> Result<Listing, Box<Problem>> {
+/// Every endpoint, or `owner`'s own where a member is named, and the one this request
+/// removed.
+fn listing(
+    ctx: &Ctx,
+    removed: Option<String>,
+    owner: Option<&str>,
+) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(nowhere)?;
     let kept = read(&path).map_err(|failure| Box::new(failure.problem()))?;
     Ok(Listing {
-        endpoints: kept.endpoints.iter().map(Listed::from).collect(),
+        endpoints: kept
+            .endpoints
+            .iter()
+            .filter(|one| owned_by(one, owner))
+            .map(Listed::from)
+            .collect(),
         removed,
         rehearsed: ctx.dry_run,
     })
@@ -237,7 +296,10 @@ fn as_backend(record: &Record) -> crate::model::BackendReport {
             .ok()
             .and_then(|url| url.host_str().map(str::to_owned))
             .unwrap_or_default(),
-        chosen_by: crate::model::ChosenBy::Operator,
+        chosen_by: record.owner.clone().map_or(
+            crate::model::ChosenBy::Operator,
+            crate::model::ChosenBy::Member,
+        ),
         hosted: None,
         proof: crate::model::BackendProof::Unproven,
         last: None,
@@ -275,7 +337,7 @@ impl Waking {
                 carried.iter().filter(|one| !told.contains(one)).count()
             });
             kept.told = Some(carried.iter().cloned().collect());
-            for one in &mut kept.endpoints {
+            for one in kept.endpoints.iter_mut().filter(|one| one.owner.is_none()) {
                 one.owed = one.owed.saturating_add(new).min(MOST_OWED);
             }
             owing = kept

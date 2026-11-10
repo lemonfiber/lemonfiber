@@ -43,6 +43,18 @@ pub enum Asked {
         /// The back-end, by its id.
         id: String,
     },
+    /// What a member may be told on, and what they chose.
+    Mine {
+        /// The member, by their account's id.
+        member: String,
+    },
+    /// Choose which of the ways offered a member is told on.
+    Choose {
+        /// The member, by their account's id.
+        member: String,
+        /// Each back-end they are told on from now on, by its id.
+        backends: Vec<String>,
+    },
 }
 
 /// A back-end to add.
@@ -110,6 +122,12 @@ impl std::fmt::Debug for Asked {
                 .finish_non_exhaustive(),
             Self::Test { id } => out.debug_struct("Test").field("id", id).finish(),
             Self::Remove { id } => out.debug_struct("Remove").field("id", id).finish(),
+            Self::Mine { member } => out.debug_struct("Mine").field("member", member).finish(),
+            Self::Choose { member, backends } => out
+                .debug_struct("Choose")
+                .field("member", member)
+                .field("backends", backends)
+                .finish(),
         }
     }
 }
@@ -121,13 +139,16 @@ impl std::fmt::Debug for Asked {
 /// The [`Problem`] whichever was asked refuses with.
 pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
     match asked {
-        Asked::List => reading::report(ctx),
-        Asked::Add(adding) => add(ctx, &adding),
-        Asked::Set(setting) => set(ctx, &setting),
-        Asked::Test { id } => super::proving::test(ctx, &id).await,
-        Asked::Remove { id } => remove(ctx, &id),
+        Asked::List => reading::report(ctx).map(Outcome::Notify),
+        Asked::Add(adding) => add(ctx, &adding).map(Outcome::Notify),
+        Asked::Set(setting) => set(ctx, &setting).map(Outcome::Notify),
+        Asked::Test { id } => super::proving::test(ctx, &id).await.map(Outcome::Notify),
+        Asked::Remove { id } => remove(ctx, &id).map(Outcome::Notify),
+        Asked::Mine { member } => super::choosing::mine(ctx, &member).map(Outcome::NotifyMine),
+        Asked::Choose { member, backends } => {
+            super::choosing::choose(ctx, &member, &backends).map(Outcome::NotifyMine)
+        }
     }
-    .map(Outcome::Notify)
 }
 
 /// Add a back-end, once its name, its address and what its kind needs are all there.

@@ -46,6 +46,9 @@ pub struct Record {
     /// How many messages it is owed, at most as many alerts as a returning stream replays.
     #[serde(default)]
     pub owed: usize,
+    /// The member whose own phone it is, by their account's id; the operator's where none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
 }
 
 /// Every endpoint this machine keeps, and which alerts have woken them.

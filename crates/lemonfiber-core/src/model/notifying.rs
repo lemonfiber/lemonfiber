@@ -172,3 +172,27 @@ pub struct NotifyReport {
     /// Whether this was a rehearsal of a change, with nothing kept.
     pub rehearsed: bool,
 }
+
+/// One way to be told that the operator offered the household, as a member reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "NotifyOffered")]
+pub struct OfferedBackend {
+    /// What it is chosen by.
+    pub id: String,
+    /// The name the household reads it by.
+    pub name: String,
+    /// Whether this member is told on it.
+    pub receiving: bool,
+}
+
+/// The ways a member may be told that something they asked for is ready, and nothing
+/// technical.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct NotifyMineReport {
+    /// Each way the operator offered the household, in the order it was offered.
+    pub offered: Vec<OfferedBackend>,
+    /// Whether this member's own phone is registered to be woken.
+    pub phone: bool,
+    /// Whether this was a rehearsal of a choice, with nothing kept.
+    pub rehearsed: bool,
+}

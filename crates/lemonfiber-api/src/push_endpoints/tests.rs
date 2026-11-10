@@ -1,17 +1,16 @@
 use axum::http::StatusCode;
 use lemonfiber_core::keys::Scope;
 
-use super::{operator, Registering};
+use super::{owner, Registering};
 use crate::admission::{Caller, Keyed};
 
 #[test]
-fn only_the_operator_keeps_push_endpoints() {
-    assert!(operator(&Caller::Operator).is_ok());
-    assert!(operator(&Caller::Machine).is_ok());
-    let member = operator(&Caller::Member("a7f3".to_owned()));
+fn the_operator_keeps_every_push_endpoint_a_member_their_own_and_a_key_none() {
+    assert_eq!(owner(&Caller::Operator).ok(), Some(None));
+    assert_eq!(owner(&Caller::Machine).ok(), Some(None));
     assert_eq!(
-        member.err().map(|answer| answer.status()),
-        Some(StatusCode::FORBIDDEN)
+        owner(&Caller::Member("a7f3".to_owned())).ok(),
+        Some(Some("a7f3".to_owned()))
     );
     for scope in [Scope::Read, Scope::Act] {
         let key = Caller::Key(Keyed {
@@ -19,7 +18,7 @@ fn only_the_operator_keeps_push_endpoints() {
             scope,
         });
         assert_eq!(
-            operator(&key).err().map(|answer| answer.status()),
+            owner(&key).err().map(|answer| answer.status()),
             Some(StatusCode::FORBIDDEN)
         );
     }

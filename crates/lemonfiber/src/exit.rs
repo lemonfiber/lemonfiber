@@ -251,6 +251,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::PushEndpoint(_)
         | Outcome::PushEndpoints(_)
         | Outcome::Notify(_)
+        | Outcome::NotifyMine(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)

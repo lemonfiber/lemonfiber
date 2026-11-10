@@ -1,10 +1,10 @@
 use lemonfiber_core::alert::Notification;
 use lemonfiber_core::model::{
     BackendKind, BackendProof, BackendReport, ChosenBy, Delivery, DeliveryOutcome, DeliveryRetry,
-    HostedBackend, NotifyReport, NotifyState, UnreadBackend,
+    HostedBackend, NotifyMineReport, NotifyReport, NotifyState, OfferedBackend, UnreadBackend,
 };
 
-use super::backends;
+use super::{backends, mine};
 
 const AT: u64 = 1_793_000_000;
 
@@ -133,4 +133,37 @@ fn every_state_is_said_in_words() {
         let said = backends(&report(state, Vec::new())).text();
         assert!(said.contains(words), "{said}");
     }
+}
+
+#[test]
+fn a_member_reads_each_way_offered_by_name_and_whether_their_phone_is_registered() {
+    let said = mine(&NotifyMineReport {
+        offered: vec![
+            OfferedBackend {
+                id: "phones".to_owned(),
+                name: "Phones".to_owned(),
+                receiving: true,
+            },
+            OfferedBackend {
+                id: "tablets".to_owned(),
+                name: "Tablets".to_owned(),
+                receiving: false,
+            },
+        ],
+        phone: true,
+        rehearsed: false,
+    })
+    .text();
+    let none = mine(&NotifyMineReport {
+        offered: Vec::new(),
+        phone: false,
+        rehearsed: false,
+    })
+    .text();
+
+    assert!(said.contains("Phones  (phones)  told here"), "{said}");
+    assert!(said.contains("Tablets  (tablets)  not chosen"), "{said}");
+    assert!(said.contains("Your phone is registered"), "{said}");
+    assert!(none.contains("Nothing is offered"), "{none}");
+    assert!(none.contains("No phone of yours"), "{none}");
 }

@@ -276,6 +276,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::PushEndpoint(report) => keys::pushed(report),
         Outcome::PushEndpoints(report) => keys::pushes(report),
         Outcome::Notify(report) => notifying::backends(report),
+        Outcome::NotifyMine(report) => notifying::mine(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),

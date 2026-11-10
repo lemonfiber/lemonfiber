@@ -16,6 +16,7 @@
 //! is handed can be settled then, and the port can move down with its answer.
 
 pub(crate) mod backends;
+mod choosing;
 pub mod configuring;
 pub mod fanning;
 mod proving;

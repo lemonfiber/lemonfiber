@@ -245,6 +245,7 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
             endpoint: "https://push.example/abc".to_owned(),
             p256dh: read(&registering("pixel", "x"), "/p256dh"),
             auth: read(&registering("pixel", "x"), "/auth"),
+            owner: None,
         },
     );
     assert!(registered.is_ok());

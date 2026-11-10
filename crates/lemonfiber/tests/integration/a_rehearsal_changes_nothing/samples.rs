@@ -37,7 +37,31 @@ pub(super) fn samples() -> Vec<(&'static str, Command)> {
     let mut all = over_the_stack();
     all.extend(over_the_household());
     all.extend(over_what_this_machine_keeps());
+    all.extend(over_where_alerts_go());
     all
+}
+
+/// The phones that asked to be woken and the back-ends alerts are delivered to.
+fn over_where_alerts_go() -> Vec<(&'static str, Command)> {
+    vec![
+        // The removal rather than the listing: one that leaked through would stop waking a
+        // phone that asked to be woken.
+        (
+            "push-endpoint",
+            Command::PushEndpoints(lemonfiber_core::push::run::Asked::Remove {
+                name: "pixel".to_owned(),
+                owner: None,
+            }),
+        ),
+        // The removal for the reason a push endpoint's is: one that leaked through would
+        // stop delivering to a back-end the operator added.
+        (
+            "notify",
+            Command::Notify(lemonfiber_core::notify::configuring::Asked::Remove {
+                id: "home-ntfy".to_owned(),
+            }),
+        ),
+    ]
 }
 
 /// The stack itself, and the settings that describe it.
@@ -170,14 +194,6 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             Command::Keys(lemonfiber_core::keys::run::Asked::Revoke {
                 name: "home-assistant".to_owned(),
                 by: lemonfiber_core::keys::Minter::Operator,
-            }),
-        ),
-        // The removal rather than the listing: one that leaked through would stop waking a
-        // phone that asked to be woken.
-        (
-            "push-endpoint",
-            Command::PushEndpoints(lemonfiber_core::push::run::Asked::Remove {
-                name: "pixel".to_owned(),
             }),
         ),
         ("outbound", Command::Outbound),

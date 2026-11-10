@@ -1,7 +1,8 @@
 //! The back-ends the stack delivers its alerts to, as the operator reads them.
 
 use lemonfiber_core::model::{
-    BackendProof, BackendReport, ChosenBy, Delivery, DeliveryOutcome, NotifyReport, NotifyState,
+    BackendProof, BackendReport, ChosenBy, Delivery, DeliveryOutcome, NotifyMineReport,
+    NotifyReport, NotifyState,
 };
 
 use super::news::moment;
@@ -27,6 +28,29 @@ pub(super) fn backends(report: &NotifyReport) -> Lines {
             unread.backend, unread.because
         ));
     }
+    lines
+}
+
+/// The ways a member may be told that something they asked for is ready, and which they
+/// chose.
+pub(super) fn mine(report: &NotifyMineReport) -> Lines {
+    let mut lines = Lines::default();
+    if report.offered.is_empty() {
+        lines.put("Nothing is offered to be told on yet.");
+    }
+    for one in &report.offered {
+        let chosen = if one.receiving {
+            "told here"
+        } else {
+            "not chosen"
+        };
+        lines.put(format!("{}  ({})  {chosen}", one.name, one.id));
+    }
+    lines.put(if report.phone {
+        "Your phone is registered to be woken."
+    } else {
+        "No phone of yours is registered to be woken."
+    });
     lines
 }
 

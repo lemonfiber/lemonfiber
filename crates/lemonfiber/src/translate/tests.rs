@@ -35,7 +35,7 @@ fn the_push_endpoint_commands_reach_the_core_as_the_operator_asks_them() {
         super::pushing(RawPushEndpoint {
             action: PushEndpointCommand::List,
         }),
-        Command::PushEndpoints(Asked::List)
+        Command::PushEndpoints(Asked::List { owner: None })
     );
     assert_eq!(
         super::pushing(RawPushEndpoint {
@@ -45,6 +45,7 @@ fn the_push_endpoint_commands_reach_the_core_as_the_operator_asks_them() {
         }),
         Command::PushEndpoints(Asked::Remove {
             name: "pixel".to_owned(),
+            owner: None,
         })
     );
 }
