@@ -5,10 +5,11 @@ name: substitutes
 #
 # Every push to main runs it, and every night, since a substitute's upstream moves under
 # a pin that does not. A pull request runs it where its change reaches what an arm reads:
-# a contract, the bundle's pin, a substitute's pin, the arms themselves or this file. Any
-# other pull request skips every arm, and a skipped job reports, so each arm can be a
-# required check. Medusa's arm runs only where SUBSTITUTES_THETVDB_KEY is set, since it
-# looks a series up under the operator's TheTVDB key, and says so where it is not.
+# a contract, the bundle's pin, a substitute's pin, the arms themselves or this file. On
+# any other pull request every arm still starts and reports by its own name, its steps
+# skipped and the reason given, so each arm can be a required check. Medusa's arm runs
+# only where SUBSTITUTES_THETVDB_KEY is set, since it looks a series up under the
+# operator's TheTVDB key, and says so where it is not.
 on:
   pull_request:
   merge_group:
@@ -82,11 +83,13 @@ jobs:
   arm:
     name: ${{ matrix.arm }}
     needs: scope
-    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.proves == 'true') }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RUNS: ${{ matrix.arm != 'library-curate-medusa' || needs.scope.outputs.looks_up == 'true' }}
+      PROVES: ${{ needs.scope.result != 'success' || needs.scope.outputs.proves == 'true' }}
+      LOOKS_UP: ${{ matrix.arm != 'library-curate-medusa' || needs.scope.outputs.looks_up == 'true' }}
+      RUNS: ${{ (needs.scope.result != 'success' || needs.scope.outputs.proves == 'true') && (matrix.arm != 'library-curate-medusa' || needs.scope.outputs.looks_up == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -100,7 +103,12 @@ jobs:
           - curator-radarr
     steps:
       - name: Why the arm does not run
-        if: env.RUNS != 'true'
+        if: env.PROVES != 'true'
+        env:
+          ARM: ${{ matrix.arm }}
+        run: echo "::notice title=${ARM} is skipped::Nothing an arm reads changed in this pull request."
+      - name: Why Medusa's arm does not run
+        if: env.PROVES == 'true' && env.LOOKS_UP != 'true'
         env:
           ARM: ${{ matrix.arm }}
         run: echo "::notice title=${ARM} is skipped::SUBSTITUTES_THETVDB_KEY is not set, so Medusa cannot look up a series a household asks for."
