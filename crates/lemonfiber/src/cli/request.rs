@@ -16,7 +16,7 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
-    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawPushEndpoint,
+    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPushEndpoint,
     RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding, RawSwitch, RawTrace,
     RawUi, RawUp, RawWhom, UpdateCommand,
 };
@@ -523,6 +523,8 @@ pub enum Request {
     Key(RawKey),
     /// List or remove the phones that asked to be woken when this stack has something to say.
     PushEndpoint(RawPushEndpoint),
+    /// Add, prove, change, list or remove the back-ends the stack delivers its alerts to.
+    Notify(RawNotify),
     /// Restore your configuration from a backup archive.
     ///
     /// Verifies the archive and lists what it holds before anything is

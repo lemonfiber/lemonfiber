@@ -342,10 +342,7 @@ async fn main() -> ExitCode {
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },
-        Request::Remove { name, offer } => Command::Remove {
-            name,
-            agreement: offer.filter(|named| !named.trim().is_empty()),
-        },
+        Request::Remove { name, offer } => taking_out(name, offer),
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Uninstall(asked) => removing(asked),
         Request::Space(RawSpace { offer, only }) => spaced(offer, only),
@@ -354,11 +351,10 @@ async fn main() -> ExitCode {
         Request::Downloads(asked) => translate::pausing(&asked),
         Request::Key(asked) => translate::keyed(asked),
         Request::PushEndpoint(asked) => translate::pushing(asked),
+        Request::Notify(asked) => translate::notifying(asked, &|name| std::env::var(name).ok()),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
-        Request::Reset { offer } => Command::Reset {
-            agreement: offer.filter(|named| !named.trim().is_empty()),
-        },
+        Request::Reset { offer } => resetting(offer),
         // Which of the two was named is the whole of what tells them apart, and clap
         // has already refused a run that named neither — which is the only place
         // somebody can be told what the two objects are while they are still typing.
@@ -387,6 +383,26 @@ async fn main() -> ExitCode {
     };
 
     answered(command, &ctx, cli.json).await
+}
+
+/// Taking `name` out of the household, under what the operator agreed to.
+fn taking_out(name: String, offer: Option<String>) -> Command {
+    Command::Remove {
+        name,
+        agreement: agreed(offer),
+    }
+}
+
+/// Putting back what was changed, under what the operator agreed to.
+fn resetting(offer: Option<String>) -> Command {
+    Command::Reset {
+        agreement: agreed(offer),
+    }
+}
+
+/// What an operator agreed to, where they named anything at all.
+fn agreed(offer: Option<String>) -> Option<String> {
+    offer.filter(|named| !named.trim().is_empty())
 }
 
 /// Put a plugin author's answer in front of them, and end with its code.

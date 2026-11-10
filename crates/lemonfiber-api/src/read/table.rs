@@ -139,6 +139,9 @@ pub const FRONT_DOOR: &str = "/api/front-door";
 /// How the stack runs without lemonfiber.
 pub const STACK: &str = "/api/stack";
 
+/// The back-ends the stack delivers its alerts to, the operator's alone.
+pub const NOTIFY: &str = "/api/notify";
+
 /// What a surface can mark as new, newest first within each kind.
 pub const NEWS: &str = "/api/news";
 
@@ -325,6 +328,7 @@ pub const OFFERED: &[&str] = &[
     HOSTING,
     FRONT_DOOR,
     STACK,
+    NOTIFY,
     NEWS,
     TRACE,
     STUCK,
@@ -481,6 +485,9 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         HOSTING => Ok(Command::Hosting(Keeping::Read)),
         FRONT_DOOR => Ok(Command::FrontDoor),
         STACK => Ok(Command::Stack),
+        NOTIFY => Ok(Command::Notify(
+            lemonfiber_core::notify::configuring::Asked::List,
+        )),
         // Nothing asked of it, because what is new is decided by whoever reads it: the
         // stack answers with everything it orders, and a parameter here would be a way
         // for one surface to be told less than another.

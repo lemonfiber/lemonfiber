@@ -3,7 +3,7 @@
 use lemonfiber_core::model::{WatchPath, WatchState, WatchedTarget, WatcherReport};
 use lemonfiber_core::ports::service::{Covers, MonitorKind};
 
-use super::news::when;
+use super::news::moment;
 use super::Lines;
 
 /// Which part watches, whether it answers, each monitor beside what it covers, and what
@@ -108,11 +108,6 @@ const fn state(state: WatchState) -> &'static str {
         WatchState::ExpectedDown => "down, as the stack was stopped on purpose",
         WatchState::NotReporting => "not reporting",
     }
-}
-
-/// A moment in seconds since the Unix epoch, as a date and a time in UTC.
-fn moment(seconds: u64) -> String {
-    when(&seconds.to_string())
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 
 use lemonfiber_core::model::{BootOutcome, BootReport, BootTunnel, BootVerification};
 
-use super::news::when;
+use super::news::moment;
 use super::Lines;
 
 /// The last restart, the verification after it or why there was none, the newest
@@ -77,11 +77,6 @@ fn verified(lines: &mut Lines, after: &str, verification: &BootVerification) {
     if let Some(said) = &verification.said {
         lines.put(format!("  {said}"));
     }
-}
-
-/// A moment in seconds since the Unix epoch, as a date and a time in UTC.
-fn moment(seconds: u64) -> String {
-    when(&seconds.to_string())
 }
 
 #[cfg(test)]

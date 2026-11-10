@@ -52,6 +52,19 @@ impl Notification {
         }
         Self::Problem
     }
+
+    /// What it is called where it is named.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Problem => "problem",
+            Self::Completion => "completion",
+            Self::Update => "update",
+            Self::Backup => "backup",
+            Self::Request => "request",
+            Self::Member => "member",
+        }
+    }
 }
 
 #[cfg(test)]

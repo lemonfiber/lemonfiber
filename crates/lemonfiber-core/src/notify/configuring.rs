@@ -30,9 +30,9 @@ pub enum Asked {
     /// List them.
     List,
     /// Add one.
-    Add(Adding),
+    Add(Box<Adding>),
     /// Change one.
-    Set(Setting),
+    Set(Box<Setting>),
     /// Send one a test and see whether it arrives.
     Test {
         /// The back-end, by its id.
@@ -180,6 +180,11 @@ fn add(ctx: &Ctx, adding: &Adding) -> Result<NotifyReport, Box<Problem>> {
 
 /// Change a back-end.
 fn set(ctx: &Ctx, setting: &Setting) -> Result<NotifyReport, Box<Problem>> {
+    given(
+        &setting.id,
+        setting.token.as_deref(),
+        setting.reader.as_deref(),
+    )?;
     let path = backends::at(ctx).ok_or_else(nowhere)?;
     let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
     let current = kept
@@ -263,9 +268,32 @@ fn remove(ctx: &Ctx, id: &str) -> Result<NotifyReport, Box<Problem>> {
     reading::report(ctx)
 }
 
+/// Refused where a secret was given that holds nothing, as a variable named and left
+/// unset gives it.
+fn given(id: &str, token: Option<&str>, reader: Option<&str>) -> Result<(), Box<Problem>> {
+    if [token, reader]
+        .into_iter()
+        .flatten()
+        .any(|one| one.trim().is_empty())
+    {
+        return Err(Box::new(refused(
+            BACKEND_INCOMPLETE,
+            &format!("The back-end {id} was given a secret that holds nothing"),
+            "Nothing was changed.",
+            "Set the variable named with --token-env or --reader-env, and ask again",
+        )));
+    }
+    Ok(())
+}
+
 /// The address `adding` is reached at, once its name, its address, its host and what its
 /// kind needs are all as they must be.
 fn checked(adding: &Adding) -> Result<String, Box<Problem>> {
+    given(
+        &adding.id,
+        adding.token.as_deref(),
+        adding.reader.as_deref(),
+    )?;
     if !names_a_key(&adding.id) {
         return Err(Box::new(refused(
             NOT_A_BACKEND_NAME,
@@ -293,7 +321,7 @@ fn checked(adding: &Adding) -> Result<String, Box<Problem>> {
                 ),
                 "A back-end is reached at an http or https address with no login, query or \
                  fragment in it, so nothing was added.",
-                "Give the server's address, and its token with --token",
+                "Give the server's address, and its token with --token-env",
             ))
         })?;
     let missing = match adding.kind {

@@ -438,27 +438,31 @@ fn the_operator_searches_and_asks_for_whoever_they_name_and_a_key_does_neither()
     }
 }
 
-/// How the stack runs is the operator's alone: a member, a key scoped to one, and a
-/// `read` or an `act` key are refused it, and the operator is given it.
+/// How the stack runs and where its alerts are delivered are the operator's alone: a
+/// member, a key scoped to one, and a `read` or an `act` key are refused them, and the
+/// operator is given them.
 #[test]
-fn only_the_operator_reads_how_the_stack_runs() {
+fn only_the_operator_reads_how_the_stack_runs_and_where_its_alerts_go() {
     use lemonfiber_core::keys::Scope;
-    for caller in [Caller::Machine, Caller::Operator] {
-        assert_eq!(
-            may(&caller, Door::Reading, Command::Stack),
-            Permitted::This(Command::Stack)
-        );
-    }
-    let member_key = key(Scope::Member {
-        id: ASKING.to_owned(),
-        name: "ana".to_owned(),
-    });
-    for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
-        assert_eq!(
-            may(&caller, Door::Reading, Command::Stack),
-            Permitted::Nothing,
-            "{caller:?}"
-        );
+    use lemonfiber_core::notify::configuring::Asked;
+    for command in [Command::Stack, Command::Notify(Asked::List)] {
+        for caller in [Caller::Machine, Caller::Operator] {
+            assert_eq!(
+                may(&caller, Door::Reading, command.clone()),
+                Permitted::This(command.clone())
+            );
+        }
+        let member_key = key(Scope::Member {
+            id: ASKING.to_owned(),
+            name: "ana".to_owned(),
+        });
+        for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
+            assert_eq!(
+                may(&caller, Door::Reading, command.clone()),
+                Permitted::Nothing,
+                "{caller:?}"
+            );
+        }
     }
 }
 

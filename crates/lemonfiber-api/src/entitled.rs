@@ -104,7 +104,10 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
                 Permitted::Nothing
             }
             (Scope::Read | Scope::Act, Door::Reading)
-                if matches!(command, Command::Settings(_) | Command::Stack) =>
+                if matches!(
+                    command,
+                    Command::Settings(_) | Command::Stack | Command::Notify(_)
+                ) =>
             {
                 Permitted::Nothing
             }

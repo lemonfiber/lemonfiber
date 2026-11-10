@@ -38,10 +38,12 @@ use lemonfiber::cli::{
 use lemonfiber_core::app::Restarting;
 
 mod credentials;
+mod notifying;
 mod people;
 mod settling;
 
 pub(crate) use credentials::credentials;
+pub(crate) use notifying::notifying;
 pub(crate) use people::{held, household, invitation};
 pub(crate) use settling::settings;
 

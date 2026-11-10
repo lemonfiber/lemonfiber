@@ -44,7 +44,7 @@ codes! {
         meaning: "A back-end is reached at an http or https address with no login, query or \
             fragment in it, and the message names the one that is not. A token is given apart \
             from the address.",
-        remedy: "Give the server's address, and its token with --token.",
+        remedy: "Give the server's address, and its token with --token-env.",
     }
     /// Raised when a back-end is added without what its kind needs.
     BACKEND_INCOMPLETE = "NOTIFY-6" {
