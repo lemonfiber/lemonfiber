@@ -13,7 +13,7 @@ use std::path::Path;
 use crate::project::entry::OPERATOR_FALLBACK;
 
 /// The user and group root is handed over to.
-const HANDED_TO: (u32, u32) = (OPERATOR_FALLBACK, OPERATOR_FALLBACK);
+pub(crate) const HANDED_TO: (u32, u32) = (OPERATOR_FALLBACK, OPERATOR_FALLBACK);
 
 /// The user and group an adapter writes its files as and runs as, for an owner of
 /// `owner`: the owner itself, or the fallback user where that is root.
@@ -58,17 +58,12 @@ pub(crate) fn handed_over(path: &Path, stack: &Path) -> Result<(), String> {
 /// Why something beneath it could not be read or handed over.
 pub(crate) fn handed_over_whole(root: &Path, to: (u32, u32)) -> Result<(), String> {
     chowned(root, to)?;
-    let is_directory = std::fs::symlink_metadata(root)
-        .map_err(|why| format!("{} could not be read: {why}", root.display()))?
-        .is_dir();
-    if !is_directory {
+    let unread = |why: std::io::Error| format!("{} could not be read: {why}", root.display());
+    if !std::fs::symlink_metadata(root).map_err(unread)?.is_dir() {
         return Ok(());
     }
-    let entries = std::fs::read_dir(root)
-        .map_err(|why| format!("{} could not be read: {why}", root.display()))?;
-    for entry in entries {
-        let entry = entry.map_err(|why| format!("{} could not be read: {why}", root.display()))?;
-        handed_over_whole(&entry.path(), to)?;
+    for entry in std::fs::read_dir(root).map_err(unread)? {
+        handed_over_whole(&entry.map_err(unread)?.path(), to)?;
     }
     Ok(())
 }

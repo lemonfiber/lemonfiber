@@ -40,6 +40,12 @@ fn a_case_asking_what_an_operation_must_refuse_is_held_to_the_refusal() {
         .any(|case| case.case == "answers-answers" && case.expect == Expect::Conforms));
 }
 
+#[test]
+fn a_case_held_to_statuses_names_them_and_one_held_to_its_contract_none() {
+    assert_eq!(Expect::Status(&[401]).statuses(), [401]);
+    assert!(Expect::Conforms.statuses().is_empty());
+}
+
 /// Install asks the running adapter only what it can ask without the key.
 #[test]
 fn install_asks_a_running_adapter_its_unkeyed_case_alone() {

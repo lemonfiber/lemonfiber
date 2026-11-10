@@ -18,7 +18,7 @@ async fn a_health_path_that_is_not_a_route_is_never_asked() {
         let mut placed = crate::test_support::a_placed("solver", &[], Some(8191));
         placed.health = Some(path.to_owned());
         let deadline = ctx.seams.clock.now() + Duration::from_secs(30);
-        passed(&ctx, &placed, "http://127.0.0.1:8191", deadline).await;
+        passed(&ctx, Some(&placed), "http://127.0.0.1:8191", deadline).await;
     }
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

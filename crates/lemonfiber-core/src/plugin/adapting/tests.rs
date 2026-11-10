@@ -84,3 +84,34 @@ fn what_is_written_beneath_a_stack_root_owns_is_handed_to_the_fallback_user() {
         );
     }
 }
+
+/// A tree with a directory whose entries cannot be read is not handed over whole, and says
+/// which.
+#[test]
+fn a_tree_that_cannot_be_read_says_where() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-unread").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let closed = dir.join("closed");
+    assert!(std::fs::create_dir_all(closed.join("inside")).is_ok());
+    let operator = owner(&closed);
+    assert!(operator.is_some());
+    let Some(operator) = operator else {
+        return;
+    };
+    assert!(std::fs::set_permissions(&closed, std::fs::Permissions::from_mode(0o000)).is_ok());
+
+    let handed = handed_over_whole(&closed, operator);
+
+    let _ = std::fs::set_permissions(&closed, std::fs::Permissions::from_mode(0o755));
+    if operator.0 == 0 {
+        assert_eq!(handed, Ok(()));
+    } else {
+        assert!(
+            handed
+                .as_ref()
+                .is_err_and(|why| why.contains("closed could not be read")),
+            "{handed:?}"
+        );
+    }
+}

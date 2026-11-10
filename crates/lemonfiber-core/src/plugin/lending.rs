@@ -76,12 +76,13 @@ pub(crate) async fn lent(ctx: &Ctx, borrowing: &Borrowing<'_>) -> Result<Lent, S
     held.hold(KEY_FILE, &key)?;
     super::recording::mountable(adapter, &held)?;
     super::recording::handed_over(&held, &borrowing.credentials)?;
-    let mut operator = Operator::of(ctx);
-    if let Some(owner) = held.owner() {
-        let (uid, gid) = super::adapting::as_adapter(owner);
-        super::adapting::handed_over_whole(held.path(), (uid, gid))?;
-        operator.ids = (uid.to_string(), gid.to_string());
-    }
+    let (uid, gid) =
+        super::adapting::as_adapter(held.owner().unwrap_or(super::adapting::HANDED_TO));
+    super::adapting::handed_over_whole(held.path(), (uid, gid))?;
+    let operator = Operator {
+        ids: (uid.to_string(), gid.to_string()),
+        ..Operator::of(ctx)
+    };
     let serve = Serve {
         command: vec![UPSTREAM_FLAG.to_owned(), borrowing.upstream.clone()],
         reaching: borrowing.reaching.clone(),

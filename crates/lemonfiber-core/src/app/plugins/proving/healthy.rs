@@ -7,16 +7,15 @@ use crate::app::Ctx;
 use crate::ports::http::{Method, Request};
 
 /// Wait, until `deadline`, for the health path `placed` declares to pass at `address`,
-/// where it declares one.
+/// where it is placed and declares one.
 pub(super) async fn passed(
     ctx: &Ctx,
-    placed: &crate::plugin::Placed,
+    placed: Option<&crate::plugin::Placed>,
     address: &str,
     deadline: SystemTime,
 ) {
     let Some(path) = placed
-        .health
-        .as_deref()
+        .and_then(|placed| placed.health.as_deref())
         .filter(|path| lemonfiber_plugin::refusing::carried::is_route(path))
     else {
         return;
