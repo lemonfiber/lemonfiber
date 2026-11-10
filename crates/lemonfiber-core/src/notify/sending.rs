@@ -228,6 +228,7 @@ const fn tag(kind: Notification) -> &'static str {
         Notification::Backup => "floppy_disk",
         Notification::Request => "inbox_tray",
         Notification::Member => "busts_in_silhouette",
+        Notification::Ready => "tada",
     }
 }
 

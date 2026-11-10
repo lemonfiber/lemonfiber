@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use super::backends::{self, Backend, Held, Kept, Owed};
 use super::sending::{self, Message, Sent};
-use crate::alert::Alert;
+use crate::alert::{Alert, Notification};
 use crate::app::Ctx;
 use crate::error::Severity;
 use crate::model::{BackendKind, BackendProof, ChosenBy, Delivery, DeliveryOutcome, DeliveryRetry};
@@ -19,6 +19,9 @@ const MOST_OWED: usize = 50;
 
 /// The most failed deliveries a back-end keeps.
 const MOST_FAILURES: usize = 20;
+
+/// All a member is told: that something they asked for is ready.
+pub const READY: &str = "Something you asked for is ready";
 
 /// Seconds in a minute, which the delays are given in.
 const MINUTE: u64 = 60;
@@ -118,10 +121,39 @@ fn owe(kept: &mut Kept, alerts: &[Alert], now: u64) {
     }
 }
 
-/// Whether `backend` is told the stack's own alerts: the operator's, which a member's are
-/// not, and never a phone's push endpoint, which is woken apart from these.
+/// Whether `backend` is told the stack's own alerts: the operator's own and not offered to
+/// the household, whose members are told only that something they asked for is ready, and
+/// never a phone's push endpoint, which is woken apart from these.
 fn receives_the_stack(backend: &Backend) -> bool {
-    backend.chosen_by == ChosenBy::Operator && backend.kind != BackendKind::Unifiedpush
+    backend.chosen_by == ChosenBy::Operator
+        && backend.members.is_none()
+        && backend.kind != BackendKind::Unifiedpush
+}
+
+/// Owe every back-end `member` receives on that something they asked for is ready, and
+/// nothing more: no title, no service and nothing about the stack.
+pub(crate) fn ready(ctx: &Ctx, member: &str) {
+    let Some(path) = configured_at(ctx) else {
+        return;
+    };
+    let now = super::now(ctx);
+    let _ = backends::changed(&path, &mut |kept: &mut Kept| {
+        for one in kept.backends.iter_mut().filter(|one| {
+            one.members.is_some()
+                && one.receivers.iter().any(|receiver| receiver == member)
+                && one.owed.len() < MOST_OWED
+        }) {
+            one.owed.push(Owed {
+                kind: Notification::Ready,
+                summary: READY.to_owned(),
+                urgent: false,
+                at: now,
+                attempts: 0,
+                next: None,
+            });
+        }
+        Ok(())
+    });
 }
 
 /// Whether `backend` has a message to deliver now.

@@ -169,7 +169,8 @@ pub(crate) fn settled(
 }
 
 /// Mark the ask `reference` names at `path` as `held` by the house, where it was sent or
-/// held in part, and keep `at` as when it arrived where nothing was kept yet.
+/// held in part, and keep `at` as when it arrived where nothing was kept yet; the member
+/// who asked, where this is the first time it arrived.
 ///
 /// # Errors
 ///
@@ -179,7 +180,8 @@ pub(crate) fn arrived(
     reference: Reference,
     held: Standing,
     at: &str,
-) -> Result<(), Failure> {
+) -> Result<Option<String>, Failure> {
+    let mut first = None;
     crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
         if let Some(ask) = kept.asks.iter_mut().find(|ask| {
             ask.named() == reference
@@ -189,10 +191,14 @@ pub(crate) fn arrived(
                 ask.standing = held;
                 ask.settled_at = Some(at.to_owned());
             }
-            ask.arrived_at.get_or_insert_with(|| at.to_owned());
+            if ask.arrived_at.is_none() {
+                ask.arrived_at = Some(at.to_owned());
+                first = Some(ask.member.clone());
+            }
         }
         Ok(())
     })
+    .map(|()| first)
 }
 
 /// The number the next ask of `medium` is given: one past the highest it has given.

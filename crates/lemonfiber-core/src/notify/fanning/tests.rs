@@ -289,3 +289,57 @@ async fn a_new_alert_is_delivered_to_a_configured_back_end_and_confirmed_in_its_
         .count();
     assert_eq!(posted, 1);
 }
+
+#[tokio::test]
+async fn a_member_is_told_only_that_something_is_ready_and_only_on_what_they_chose() {
+    let ctx = machine("notify-ready", Fake::always(Answer::reply(500, "")));
+    let offered = |id: &str, receivers: &[&str]| Backend {
+        members: Some("Phones".to_owned()),
+        receivers: receivers.iter().map(|one| (*one).to_owned()).collect(),
+        ..backend(id, ChosenBy::Operator)
+    };
+    let Some(path) = backends::at(&ctx) else {
+        unreachable!("the machine keeps its files somewhere")
+    };
+    let _ = backends::changed(&path, &mut |kept: &mut Kept| {
+        kept.backends = vec![
+            offered("phones", &["ada"]),
+            offered("tablets", &["bo"]),
+            backend("operator", ChosenBy::Operator),
+        ];
+        Ok(())
+    });
+
+    super::ready(&ctx, "ada");
+
+    let kept = backends::kept(&path).unwrap_or_default();
+    let owing: Vec<(String, Vec<(Notification, String)>)> = kept
+        .backends
+        .iter()
+        .map(|one| {
+            (
+                one.id.clone(),
+                one.owed
+                    .iter()
+                    .map(|owed| (owed.kind, owed.summary.clone()))
+                    .collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        owing,
+        [
+            (
+                "phones".to_owned(),
+                vec![(Notification::Ready, super::READY.to_owned())]
+            ),
+            ("tablets".to_owned(), Vec::new()),
+            ("operator".to_owned(), Vec::new()),
+        ]
+    );
+    let mut stack = kept;
+    stack.told = Some(Vec::new());
+    owe(&mut stack, &[alert("jellyfin", Severity::Error)], NOW);
+    let told: Vec<usize> = stack.backends.iter().map(|one| one.owed.len()).collect();
+    assert_eq!(told, [1, 0, 1]);
+}

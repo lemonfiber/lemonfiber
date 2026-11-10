@@ -38,6 +38,8 @@ pub enum Notification {
     Request,
     /// An invitation accepted, declined or lapsed.
     Member,
+    /// Something a member asked for has arrived; the one kind a member is told.
+    Ready,
 }
 
 /// Every notification kind this build raises.
@@ -63,6 +65,7 @@ impl Notification {
             Self::Backup => "backup",
             Self::Request => "request",
             Self::Member => "member",
+            Self::Ready => "ready",
         }
     }
 }
