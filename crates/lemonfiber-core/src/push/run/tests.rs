@@ -508,7 +508,7 @@ fn an_endpoint_removed_is_owed_nothing() {
         }
     )
     .is_ok());
-    assert!(super::next_owed(&path, "pixel").is_none());
+    assert!(super::read(&path).is_ok_and(|kept| kept.endpoints.is_empty()));
 }
 
 /// Keys a record no longer holds readably send nothing, and the endpoint stays.

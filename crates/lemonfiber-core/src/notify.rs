@@ -26,6 +26,28 @@ pub(crate) mod sending;
 
 use async_trait::async_trait;
 
+use crate::error::codes::notify::{
+    BACKEND_INCOMPLETE, BACKEND_NAME_TAKEN, EVENTS_REFUSED, HOSTED_UNACKNOWLEDGED,
+    NOT_A_BACKEND_ADDRESS, NOT_A_BACKEND_NAME, NOT_A_RETRY_SCHEDULE, NOT_OFFERED, NO_SUCH_BACKEND,
+    NO_SUCH_WAKE,
+};
+use crate::error::Code;
+
+/// Every refusal what is asked of the back-ends, a member's choice, a phone's word and an
+/// event can be answered with.
+pub const REFUSALS: [Code; 10] = [
+    NOT_A_BACKEND_NAME,
+    BACKEND_NAME_TAKEN,
+    NO_SUCH_BACKEND,
+    HOSTED_UNACKNOWLEDGED,
+    NOT_A_BACKEND_ADDRESS,
+    BACKEND_INCOMPLETE,
+    NOT_A_RETRY_SCHEDULE,
+    NOT_OFFERED,
+    NO_SUCH_WAKE,
+    EVENTS_REFUSED,
+];
+
 use crate::alert::Digest;
 
 /// A channel would not take it, in its own words.

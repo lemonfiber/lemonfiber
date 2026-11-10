@@ -71,6 +71,7 @@ fn everything(confirm: bool) -> Arguments {
         unrestricted_for: Some(37),
         dry_run: true.into(),
         inputs: Vec::new(),
+        backends: Vec::new(),
     }
 }
 

@@ -107,6 +107,8 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
         [
             "/api/actions/ask",
             "/api/actions/grant",
+            "/api/actions/notify-choose",
+            "/api/actions/push-woken",
             "/api/actions/watched",
             "/api/askable",
             "/api/askable/kinds",

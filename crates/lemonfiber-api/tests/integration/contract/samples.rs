@@ -3,6 +3,7 @@
 
 mod built;
 mod healing;
+mod notifying;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
@@ -23,12 +24,13 @@ use built::{
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
 ///
-/// Gathered from four lists, one for each part of what the product does.
+/// Gathered from five lists, one for each part of what the product does.
 pub(crate) fn samples() -> Vec<Outcome> {
     let mut every = running();
     every.extend(diagnosing());
     every.extend(serving());
     every.extend(keeping());
+    every.extend(notifying::samples());
     every
 }
 

@@ -383,6 +383,7 @@ pub const TAKES_NAME: &[&str] = &[
     "grant",
     "watched",
     "ask",
+    "push-woken",
 ];
 
 /// The action whose command carries what the household may ask for.
@@ -538,9 +539,11 @@ pub const TAKES_DEVICE: &[&str] = &["grant"];
 /// position and whether they finished it, which are one report.
 pub const TAKES_PROGRESS: &[&str] = &["watched"];
 
-/// The actions whose command carries one title by its id: a player's progress on a title
-/// the house holds, and a member's ask for one it does not.
-pub const TAKES_TITLE: &[&str] = &["watched", "ask"];
+/// The actions whose command carries one thing by its id: a title, or a wake a phone confirms.
+pub const TAKES_TITLE: &[&str] = &["watched", "ask", "push-woken"];
+
+/// The action whose command carries each way to be told a member chooses.
+pub const TAKES_BACKENDS: &[&str] = &["notify-choose"];
 
 /// The action whose command carries what kind of title is asked for and which of its
 /// seasons, which are one wish.

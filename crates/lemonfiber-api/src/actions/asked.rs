@@ -15,13 +15,13 @@ mod takers;
 mod unwanted;
 
 pub use takers::{
-    TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING,
-    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION,
-    TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING,
-    TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING,
-    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING,
-    TAKES_WISH,
+    TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BACKENDS,
+    TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE,
+    TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME,
+    TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
+    TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS,
+    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES,
+    TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -204,9 +204,9 @@ pub struct Arguments {
     /// The id a player keeps for the device it plays on, which a grant opens a session
     /// for.
     pub device: Option<String>,
-    /// The title an action is about: the title or episode a player's progress is on,
-    /// by the identifier the shelf lists it under, or the title a member asks for, by
-    /// the identifier their search listed it under.
+    /// The thing an action is about, by its id: the title or episode a player's progress
+    /// is on, by the identifier the shelf lists it under, the title a member asks for, by
+    /// the identifier their search listed it under, or the wake a phone confirms.
     pub id: Option<String>,
     /// How far into it the member is, in whole seconds.
     pub position: Option<u64>,
@@ -223,6 +223,8 @@ pub struct Arguments {
     /// The seasons of a series asked for. None names every season not already here or
     /// on its way.
     pub seasons: Vec<u32>,
+    /// Each way to be told a member chooses, by the id the operator's offer lists it under.
+    pub backends: Vec<String>,
     /// Whether to say what the action would do and do none of it.
     ///
     /// The command line's `--dry-run`, taken by every action. It is carried on the
@@ -297,6 +299,7 @@ impl Arguments {
             position: Some(1),
             kind: Some("tv".to_owned()),
             seasons: vec![1],
+            backends: vec!["home-ntfy".to_owned()],
             ..Self::default()
         }
     }

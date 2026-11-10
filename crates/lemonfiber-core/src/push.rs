@@ -12,6 +12,7 @@
 pub mod run;
 mod sealing;
 pub(crate) mod telling;
+mod waking;
 pub(crate) mod woken;
 
 use serde::{Deserialize, Serialize};

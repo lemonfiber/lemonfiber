@@ -1,0 +1,18 @@
+{
+  "action": "notify-choose",
+  "arguments": [
+    {
+      "name": "backends",
+      "type": {
+        "default": [],
+        "description": "Each way to be told a member chooses, by the id the operator's offer lists it under.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

@@ -510,3 +510,59 @@ fn only_the_operator_reads_or_changes_the_settings() {
         }
     }
 }
+
+/// What a member is told on, their choice of it and their phone's word that a wake
+/// arrived are theirs whatever the request named, and a key reaches none of them.
+#[test]
+fn a_member_chooses_and_confirms_only_for_themselves_and_a_key_does_neither() {
+    use lemonfiber_core::keys::Scope;
+    use lemonfiber_core::notify::configuring::Asked as Notifying;
+    use lemonfiber_core::push::run::Asked as Pushing;
+    let choose = Command::Notify(Notifying::Choose {
+        member: "somebody-else".to_owned(),
+        backends: vec!["phones".to_owned()],
+    });
+    let woken = Command::PushEndpoints(Pushing::Woken {
+        name: "pixel".to_owned(),
+        id: "w1".to_owned(),
+        owner: None,
+    });
+    let mine = Command::Notify(Notifying::Mine {
+        member: "somebody-else".to_owned(),
+    });
+
+    assert_eq!(
+        may(&member(), Door::Acting, choose.clone()),
+        Permitted::This(Command::Notify(Notifying::Choose {
+            member: ASKING.to_owned(),
+            backends: vec!["phones".to_owned()],
+        }))
+    );
+    assert_eq!(
+        may(&member(), Door::Acting, woken.clone()),
+        Permitted::This(Command::PushEndpoints(Pushing::Woken {
+            name: "pixel".to_owned(),
+            id: "w1".to_owned(),
+            owner: Some(ASKING.to_owned()),
+        }))
+    );
+    assert_eq!(
+        may(&member(), Door::Reading, mine.clone()),
+        Permitted::This(Command::Notify(Notifying::Mine {
+            member: ASKING.to_owned(),
+        }))
+    );
+    assert_eq!(
+        may(&Caller::Operator, Door::Acting, woken.clone()),
+        Permitted::This(woken.clone())
+    );
+    for scope in [Scope::Read, Scope::Act] {
+        for (door, command) in [
+            (Door::Acting, choose.clone()),
+            (Door::Acting, woken.clone()),
+            (Door::Reading, mine.clone()),
+        ] {
+            assert_eq!(may(&key(scope.clone()), door, command), Permitted::Nothing);
+        }
+    }
+}
