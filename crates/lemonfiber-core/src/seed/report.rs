@@ -155,6 +155,7 @@ impl State {
         matches!(
             self,
             Self::Wired
+                | Self::Restarted { .. }
                 | Self::AlreadyWired
                 | Self::Drifted
                 | Self::Kept { .. }
