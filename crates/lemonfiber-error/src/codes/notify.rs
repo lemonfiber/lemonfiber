@@ -52,7 +52,8 @@ codes! {
         status: 400,
         since: "0.18.0",
         meaning: "An ntfy back-end needs a topic and a gotify back-end needs its application \
-            token, and the message names what is missing. Nothing was added.",
+            token, and the message names what is missing. The household's own ntfy lets \
+            lemonfiber post only to topics whose names start with lemonfiber-. Nothing was added.",
         remedy: "Add it again with what the message names.",
     }
     /// Raised when a back-end's attempts and delays do not agree.

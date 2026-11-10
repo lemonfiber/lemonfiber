@@ -157,3 +157,63 @@ fn a_stack_that_cannot_be_read_hands_the_account_to_nobody() {
         None
     );
 }
+
+/// The household's own ntfy added on `ctx` at `topic`, and the topic it was kept with.
+async fn added(ctx: &Ctx, url: &str, topic: Option<&str>) -> Result<Option<String>, String> {
+    let adding = crate::notify::configuring::Adding {
+        id: "home".to_owned(),
+        kind: BackendKind::Ntfy,
+        url: url.to_owned(),
+        topic: topic.map(str::to_owned),
+        token: None,
+        reader: None,
+        hosted: false,
+        attempts: None,
+        delays: None,
+    };
+    crate::notify::configuring::asked(
+        ctx,
+        crate::notify::configuring::Asked::Add(Box::new(adding)),
+    )
+    .await
+    .map_err(|problem| problem.code.to_string())?;
+    Ok(crate::notify::backends::at(ctx)
+        .and_then(|path| crate::notify::backends::kept(&path).ok())
+        .and_then(|kept| kept.backends.into_iter().next())
+        .and_then(|one| one.topic))
+}
+
+#[tokio::test]
+async fn the_households_own_ntfy_is_posted_to_under_lemonfibers_topics_alone() {
+    let named = a_machine("topic-none", true);
+    let chosen = a_machine("topic-chosen", true);
+    let outside = a_machine("topic-outside", true);
+    let bare = a_machine("topic-bare", true);
+
+    assert_eq!(
+        added(&named, "http://127.0.0.1:2586", None).await,
+        Ok(Some("lemonfiber-alerts".to_owned()))
+    );
+    assert_eq!(
+        added(&chosen, "http://127.0.0.1:2586", Some("lemonfiber-house")).await,
+        Ok(Some("lemonfiber-house".to_owned()))
+    );
+    assert_eq!(
+        added(&outside, "http://127.0.0.1:2586", Some("stack")).await,
+        Err("NOTIFY-6".to_owned())
+    );
+    assert_eq!(
+        added(&bare, "http://127.0.0.1:2586", Some("lemonfiber-")).await,
+        Err("NOTIFY-6".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn another_ntfy_keeps_the_topic_it_was_given() {
+    let ctx = a_machine("topic-elsewhere", true);
+
+    assert_eq!(
+        added(&ctx, "https://ntfy.home.example", Some("stack")).await,
+        Ok(Some("stack".to_owned()))
+    );
+}
