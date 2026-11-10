@@ -150,6 +150,7 @@ fn add(ctx: &Ctx, adding: &Adding) -> Result<NotifyReport, Box<Problem>> {
         last: None,
         failures: Vec::new(),
         retry: None,
+        owed: Vec::new(),
         added: super::now(ctx),
     };
     let path = backends::at(ctx).ok_or_else(nowhere)?;

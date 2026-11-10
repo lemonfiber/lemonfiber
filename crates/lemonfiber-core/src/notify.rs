@@ -17,6 +17,7 @@
 
 pub(crate) mod backends;
 pub mod configuring;
+pub mod fanning;
 mod proving;
 pub(crate) mod reading;
 pub(crate) mod run;

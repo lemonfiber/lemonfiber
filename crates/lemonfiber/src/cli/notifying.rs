@@ -56,7 +56,7 @@ pub enum NotifyCommand {
     /// List every back-end, where it reaches, whether it is proven and what became of its
     /// newest delivery.
     List,
-    /// Add a back-end. It delivers nothing until `notify test` proves it.
+    /// Add a back-end, and prove it with `notify test` where its history can be read.
     Add {
         /// What to call it, as in home-ntfy.
         id: String,

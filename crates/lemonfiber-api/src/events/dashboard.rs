@@ -57,6 +57,8 @@ pub struct Dashboard {
     playing: Mutex<(Option<Instant>, Option<String>)>,
     /// What is being delivered to the phones that asked to be woken.
     waking: lemonfiber_core::push::run::Waking,
+    /// What is being delivered to the back-ends.
+    fanning: lemonfiber_core::notify::fanning::Fanning,
 }
 
 impl Dashboard {
@@ -71,6 +73,7 @@ impl Dashboard {
             alerted: Mutex::new(None),
             playing: Mutex::new((None, None)),
             waking: lemonfiber_core::push::run::Waking::default(),
+            fanning: lemonfiber_core::notify::fanning::Fanning::default(),
         }
     }
 }
@@ -83,6 +86,7 @@ impl Gathers for Dashboard {
 
     fn wanted_unheard(&self) -> bool {
         lemonfiber_core::push::run::any_waiting(&self.ctx)
+            || lemonfiber_core::notify::fanning::any_configured(&self.ctx)
     }
 }
 
@@ -99,6 +103,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
     said.extend(newly(dashboard, snapshot, joined).await);
     said.extend(alerted(dashboard, &snapshot.alerts).await);
     dashboard.waking.owing(&dashboard.ctx, &snapshot.alerts);
+    dashboard.fanning.owing(&dashboard.ctx, &snapshot.alerts);
     said.extend(playing(dashboard, joined).await);
     *last = Some(gathered);
     said

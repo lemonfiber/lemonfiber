@@ -344,7 +344,7 @@ fn next_owed(path: &Path, name: &str) -> Option<Record> {
 }
 
 /// What names an alert and which way it went, where anything does.
-fn said_as(alert: &Alert) -> Option<String> {
+pub(crate) fn said_as(alert: &Alert) -> Option<String> {
     Some(format!("{} {}", alert.id.as_ref()?, alert.moment.said()))
 }
 

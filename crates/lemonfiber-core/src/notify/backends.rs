@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::alert::Notification;
 use crate::app::Ctx;
 use crate::config::paths::{NOTIFY_BACKENDS, NOTIFY_SECRETS};
 use crate::config::store::Failure;
@@ -72,8 +73,30 @@ pub(crate) struct Backend {
     /// The delivery still to be tried again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<DeliveryRetry>,
+    /// Each message still to be delivered to it, oldest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owed: Vec<Owed>,
     /// When it was added, in seconds since the Unix epoch.
     pub added: u64,
+}
+
+/// One message still to be delivered to a back-end.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Owed {
+    /// What kind of alert it carries.
+    pub kind: Notification,
+    /// What it says.
+    pub summary: String,
+    /// Whether it matters enough to be loud.
+    pub urgent: bool,
+    /// When the alert was raised, in seconds since the Unix epoch.
+    pub at: u64,
+    /// How many attempts it has been given.
+    #[serde(default)]
+    pub attempts: u32,
+    /// When it is next tried, where an attempt has failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<u64>,
 }
 
 /// The secret each back-end is reached with, by its id.
