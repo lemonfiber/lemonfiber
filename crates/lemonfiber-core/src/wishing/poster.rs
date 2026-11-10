@@ -46,9 +46,41 @@ pub async fn poster(
     }
     let location = detail.poster.ok_or_else(no_picture)?;
     let request = beneath_the_catalogue(&location).ok_or_else(not_working)?;
-    let request = checked(ctx.seams.resolver.as_ref(), request)
+    fetched(ctx, request).await
+}
+
+/// The picture `request` answers with, its host held to addresses out on the internet
+/// first, where it is a raster image of at most [`PICTURE_MOST`] bytes.
+///
+/// # Errors
+///
+/// A [`Problem`] where the host stands for somewhere that is not out on the internet or
+/// does not answer, and where what came back is not a raster image of at most
+/// [`PICTURE_MOST`] bytes.
+async fn fetched(ctx: &Ctx, request: Request) -> Result<Pictured, Box<Problem>> {
+    handed(ctx, outward(ctx, request).await?).await
+}
+
+/// `request`, held to the addresses its host stands for, each out on the internet.
+///
+/// # Errors
+///
+/// A [`Problem`] where the host stands for somewhere that is not out on the internet or
+/// cannot be resolved.
+pub(super) async fn outward(ctx: &Ctx, request: Request) -> Result<Request, Box<Problem>> {
+    checked(ctx.seams.resolver.as_ref(), request)
         .await
-        .map_err(|_| not_working())?;
+        .map_err(|_| not_working())
+}
+
+/// The picture an outward `request` answers with, where it is a raster image of at most
+/// [`PICTURE_MOST`] bytes.
+///
+/// # Errors
+///
+/// A [`Problem`] where the host does not answer, and where what came back is not a
+/// raster image of at most [`PICTURE_MOST`] bytes.
+pub(super) async fn handed(ctx: &Ctx, request: Request) -> Result<Pictured, Box<Problem>> {
     let fetched = ctx
         .seams
         .http
@@ -92,7 +124,7 @@ fn beneath_the_catalogue(location: &str) -> Option<Request> {
 }
 
 /// The refusal for a title with no picture to show.
-fn no_picture() -> Box<Problem> {
+pub(super) fn no_picture() -> Box<Problem> {
     refused(NO_PICTURE, "There's no picture of that title to show.")
 }
 

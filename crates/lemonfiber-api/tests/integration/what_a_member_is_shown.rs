@@ -239,3 +239,67 @@ async fn a_found_titles_poster_for_nobody_is_refused_as_the_search_is() {
     let _ = fs::remove_dir_all(a_directory("found-poster-nobody"));
     let _ = fs::remove_dir_all(a_directory("found-poster-nobody-kept"));
 }
+
+/// The cover of music a search found, and of an ask the core keeps, are the member's own
+/// as the search is: each reaches the core for them, and a unit that names no unit of the
+/// kind is refused before it does.
+#[tokio::test]
+async fn a_member_reaches_a_found_or_kept_cover_as_they_reach_the_search() {
+    let (router, carried) = as_a_member("member-covers").await;
+
+    for read in [
+        "/api/askable/mbid-1/poster?kind=music&unit=album&member=bo",
+        "/api/requests/music-1/poster?member=bo",
+    ] {
+        let answer = asked(router.clone(), "GET", read, &carried, "").await;
+        assert_ne!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{read}: {}",
+            answer.body
+        );
+        assert!(answer.body.contains("WISH-"), "{read}: {}", answer.body);
+    }
+
+    let answer = asked(
+        router.clone(),
+        "GET",
+        "/api/askable/mbid-1/poster?kind=music&unit=book",
+        &carried,
+        "",
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
+    assert!(!answer.body.contains("WISH-"), "{}", answer.body);
+
+    let _ = fs::remove_dir_all(a_directory("member-covers"));
+}
+
+/// The operator reads any kept ask's cover, naming nobody, and one no ask goes by is no
+/// such title rather than nobody asking.
+#[tokio::test]
+async fn the_operator_reads_a_kept_cover_naming_nobody() {
+    let (router, _, _) = over_a_picture("kept-cover-operator");
+    let operator = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering(&chosen()),
+    )
+    .await;
+    let (answer, _) = sent(
+        router,
+        "GET",
+        "/api/requests/music-9/poster",
+        &session(&operator.body),
+        None,
+        "",
+    )
+    .await;
+
+    assert!(answer.body.contains("WISH-3"), "{}", answer.body);
+
+    let _ = fs::remove_dir_all(a_directory("kept-cover-operator"));
+    let _ = fs::remove_dir_all(a_directory("kept-cover-operator-kept"));
+}

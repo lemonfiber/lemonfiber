@@ -2,7 +2,8 @@ use lemonfiber_core::app::answered_under;
 
 use super::{every, Read};
 use crate::read::table::{
-    self, Wanted, ASKABLE_POSTER, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER, THE_STACK, THIS_BINARY,
+    self, Wanted, ASKABLE_POSTER, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER, REQUEST_POSTER,
+    THE_STACK, THIS_BINARY,
 };
 
 /// The read served at `path`, as it is published.
@@ -16,7 +17,14 @@ fn every_read_served_is_published_and_nothing_else() {
     let mut served: Vec<&str> = OFFERED
         .iter()
         .copied()
-        .chain([LOGS, BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER])
+        .chain([
+            LOGS,
+            BUNDLE,
+            POSTER,
+            BACKDROP,
+            ASKABLE_POSTER,
+            REQUEST_POSTER,
+        ])
         .collect();
     let mut listed: Vec<&str> = every().iter().map(|read| read.path).collect();
     served.sort_unstable();
@@ -37,7 +45,7 @@ fn every_read_answers_under_a_kind_or_with_a_file() {
             read.file
         );
     }
-    for file in [BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER] {
+    for file in [BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER, REQUEST_POSTER] {
         assert!(published(file).is_some_and(|read| read.file), "{file}");
     }
 }

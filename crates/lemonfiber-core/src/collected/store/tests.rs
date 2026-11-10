@@ -16,6 +16,7 @@ fn asking(unit: Unit, standing: Standing) -> Asking {
         name: "Kind of Blue".to_owned(),
         by: Some("Miles Davis".to_owned()),
         year: Some(1959),
+        cover: None,
         member: "ada".to_owned(),
         at: "2026-11-08T22:00:00Z".to_owned(),
         standing,

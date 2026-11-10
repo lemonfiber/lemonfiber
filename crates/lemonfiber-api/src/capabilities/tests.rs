@@ -117,6 +117,7 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
             "/api/held/{id}/poster",
             "/api/playing",
             "/api/requests",
+            "/api/requests/{reference}/poster",
             "/api/watching",
         ]
     );
@@ -152,6 +153,7 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
                 crate::read::table::ASKABLE,
                 crate::read::table::ASKABLE_KINDS,
                 crate::read::table::ASKABLE_POSTER,
+                crate::read::table::REQUEST_POSTER,
                 crate::read::table::SETTINGS,
                 crate::read::table::STACK,
             ]
@@ -251,7 +253,7 @@ fn each_credential_is_told_its_scope() {
 
 /// A read served beside the table as a table read is offered to every caller exactly
 /// where that read is: the title read for a title's two pictures, the search read for a
-/// found title's poster.
+/// found title's poster and a kept ask's cover.
 #[test]
 fn a_read_ruled_as_a_table_read_is_offered_where_that_read_is() {
     let ruled_as: Vec<(&str, &str)> = BESIDE
@@ -268,6 +270,10 @@ fn a_read_ruled_as_a_table_read_is_offered_where_that_read_is() {
             (crate::read::table::BACKDROP, crate::read::table::TITLE),
             (
                 crate::read::table::ASKABLE_POSTER,
+                crate::read::table::ASKABLE
+            ),
+            (
+                crate::read::table::REQUEST_POSTER,
                 crate::read::table::ASKABLE
             ),
         ]

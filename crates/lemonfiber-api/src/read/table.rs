@@ -126,6 +126,10 @@ pub const ASKABLE_KINDS: &str = "/api/askable/kinds";
 /// member alone, so their client never reaches the catalogue.
 pub const ASKABLE_POSTER: &str = "/api/askable/{id}/poster";
 
+/// The cover of an ask for music or books the core keeps, named by its reference, fetched
+/// by the core and handed to the member who made it or to whoever runs the house.
+pub const REQUEST_POSTER: &str = "/api/requests/{reference}/poster";
+
 /// What this machine keeps running when no terminal is open.
 pub const HOSTING: &str = "/api/hosting";
 

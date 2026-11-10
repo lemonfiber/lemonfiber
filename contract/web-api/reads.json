@@ -529,6 +529,21 @@
       {
         "name": "kind",
         "repeatable": false
+      },
+      {
+        "name": "unit",
+        "repeatable": false
+      }
+    ],
+    "kinds": [],
+    "file": true
+  },
+  {
+    "path": "/api/requests/{reference}/poster",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
       }
     ],
     "kinds": [],

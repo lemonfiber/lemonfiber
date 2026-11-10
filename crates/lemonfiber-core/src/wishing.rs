@@ -15,6 +15,7 @@
 
 mod ask;
 mod collect;
+mod cover;
 mod find;
 mod kinds;
 mod limits;
@@ -41,6 +42,7 @@ use crate::wiring::Fillers;
 use find::searched;
 use limits::Limits;
 
+pub use cover::{cover, kept_cover};
 pub use poster::poster;
 
 /// Every refusal a member's search, ask or poster answers with, which a client names by
