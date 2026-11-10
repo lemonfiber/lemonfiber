@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A back-end whose record could not be read.",
+  "type": "object",
+  "properties": {
+    "backend": {
+      "description": "The back-end, by its id.",
+      "type": "string"
+    },
+    "because": {
+      "description": "Why.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "backend",
+    "because"
+  ]
+}

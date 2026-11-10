@@ -47,6 +47,8 @@
     "music": "ref:MusicReport",
     "news": "ref:Newest",
     "news-items": "ref:News",
+    "notify": "ref:NotifyReport",
+    "notify-mine": "ref:NotifyMineReport",
     "outbound": "ref:Leaving",
     "pairing": "ref:Pairing",
     "part-way": "ref:PartWayReport",

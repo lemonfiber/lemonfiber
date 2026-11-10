@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where delivery as a whole stands.",
+  "oneOf": [
+    {
+      "description": "No back-end is configured, so nothing is delivered anywhere.",
+      "type": "string",
+      "const": "unconfigured"
+    },
+    {
+      "description": "At least one back-end is proven, and none failed its last delivery or proof.",
+      "type": "string",
+      "const": "ready"
+    },
+    {
+      "description": "A configured back-end failed its last delivery or its proof.",
+      "type": "string",
+      "const": "degraded"
+    },
+    {
+      "description": "No configured back-end is accepting messages.",
+      "type": "string",
+      "const": "unreachable"
+    }
+  ]
+}

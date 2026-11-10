@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "offered": {
+      "type": [
+        "array[ref:NotifyOffered]"
+      ],
+      "required": true
+    },
+    "phone": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

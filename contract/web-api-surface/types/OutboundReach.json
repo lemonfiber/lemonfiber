@@ -1,16 +1,20 @@
 {
   "fields": {},
   "variants": [
+    "\"apprise\"",
     "\"catalogue\"",
     "\"echo\"",
+    "\"gotify\"",
     "\"guides\"",
     "\"household\"",
     "\"indexer\"",
+    "\"ntfy\"",
     "\"plugin-source\"",
     "\"posters\"",
     "\"registry\"",
     "\"updates\"",
     "\"usenet\"",
-    "\"waking\""
+    "\"waking\"",
+    "\"webhook\""
   ]
 }

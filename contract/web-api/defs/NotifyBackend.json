@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One back-end, as the read lists it.",
+  "type": "object",
+  "properties": {
+    "chosen_by": {
+      "description": "Who chose it.",
+      "$ref": "NotifyChosenBy.json"
+    },
+    "failures": {
+      "description": "Every failed delivery since its last confirmed one, newest first.",
+      "type": "array",
+      "items": {
+        "$ref": "NotifyDelivery.json"
+      }
+    },
+    "hosted": {
+      "description": "Where it is hosted, absent where it is the household's own.",
+      "anyOf": [
+        {
+          "$ref": "NotifyHosted.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "id": {
+      "description": "The stack's name for it, the same on every read.",
+      "type": "string"
+    },
+    "kind": {
+      "description": "What it speaks.",
+      "$ref": "NotifyBackendKind.json"
+    },
+    "last": {
+      "description": "Its newest delivery, absent where it has never delivered.",
+      "anyOf": [
+        {
+          "$ref": "NotifyDelivery.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proof": {
+      "description": "How far it is proven.",
+      "$ref": "NotifyProof.json"
+    },
+    "retry": {
+      "description": "The delivery still to be tried again, absent where none is.",
+      "anyOf": [
+        {
+          "$ref": "NotifyRetry.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "where": {
+      "description": "The host and topic or path it reaches, with no credential.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "where",
+    "chosen_by",
+    "proof",
+    "failures"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a message goes: every back-end the stack delivers to.",
+  "type": "object",
+  "properties": {
+    "backends": {
+      "description": "Each back-end, in the order it was added.",
+      "type": "array",
+      "items": {
+        "$ref": "NotifyBackend.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal of a change, with nothing kept.",
+      "type": "boolean"
+    },
+    "state": {
+      "description": "Where delivery as a whole stands.",
+      "$ref": "NotifyState.json"
+    },
+    "unread": {
+      "description": "Each back-end whose record could not be read, with why.",
+      "type": "array",
+      "items": {
+        "$ref": "NotifyUnread.json"
+      }
+    }
+  },
+  "required": [
+    "state",
+    "backends",
+    "unread",
+    "rehearsed"
+  ]
+}

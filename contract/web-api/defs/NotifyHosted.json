@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A back-end on a host that is not the household's own.",
+  "type": "object",
+  "properties": {
+    "host": {
+      "description": "The host it reaches.",
+      "type": "string"
+    },
+    "leaves": {
+      "description": "What leaves for it, in the operator's words.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "host",
+    "leaves"
+  ]
+}

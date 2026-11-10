@@ -21,6 +21,7 @@
 
 use lemonfiber_core::app::{Command, Diagnosing, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
+use lemonfiber_core::notify::configuring::Asked as Notifying;
 
 use crate::admission::Caller;
 
@@ -88,6 +89,7 @@ impl Permitted {
 #[must_use]
 pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
     match caller {
+        Caller::Key(_) if matches!(command, Command::Notify(_)) => Permitted::Nothing,
         // The whole surface, unchanged. Somebody at this machine's terminal and
         // somebody holding this machine's password are the two people this product
         // already answered everything for, and nothing here narrows that.
@@ -104,10 +106,7 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
                 Permitted::Nothing
             }
             (Scope::Read | Scope::Act, Door::Reading)
-                if matches!(
-                    command,
-                    Command::Settings(_) | Command::Stack | Command::Notify(_)
-                ) =>
+                if matches!(command, Command::Settings(_) | Command::Stack) =>
             {
                 Permitted::Nothing
             }
@@ -246,6 +245,20 @@ fn members(id: &str, command: &Command) -> Permitted {
         // their own account and allowance. Whoever the request named is discarded, so a
         // member cannot search under somebody else's limits or spend their allowance.
         Command::Wish(wishing) => Permitted::This(Command::Wish(their_wish(id, wishing))),
+        // Theirs, narrowed the same way: what they may be told on, and their choice of it.
+        // Whoever the request named is discarded, so a member cannot read or set what
+        // another member is told on.
+        Command::Notify(Notifying::Mine { .. }) => {
+            Permitted::This(Command::Notify(Notifying::Mine {
+                member: id.to_owned(),
+            }))
+        }
+        Command::Notify(Notifying::Choose { backends, .. }) => {
+            Permitted::This(Command::Notify(Notifying::Choose {
+                member: id.to_owned(),
+                backends: backends.clone(),
+            }))
+        }
         // **Everything not named above is refused**, and the catch-all is the
         // statement rather than an omission: a command added later is not a
         // member's until somebody decides it is and writes it down. Listing what

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of one delivery.",
+  "oneOf": [
+    {
+      "description": "Its arrival was observed.",
+      "type": "string",
+      "const": "confirmed"
+    },
+    {
+      "description": "The back-end took it, and its arrival was not observed.",
+      "type": "string",
+      "const": "sent"
+    },
+    {
+      "description": "The back-end refused it or did not answer, in its own words.",
+      "type": "object",
+      "properties": {
+        "failed": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "failed"
+      ]
+    }
+  ]
+}

@@ -115,6 +115,7 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
             "/api/held/{id}",
             "/api/held/{id}/backdrop",
             "/api/held/{id}/poster",
+            "/api/notify/mine",
             "/api/playing",
             "/api/requests",
             "/api/requests/{reference}/poster",
@@ -142,9 +143,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
             .collect()
     };
     // Every served read, the logs and the bundle among them, and the event stream, but
-    // a member's search, the kinds they may ask for and the poster of what it found,
-    // which are a member's own and the operator's, and the settings and how the stack
-    // runs, which are the operator's alone.
+    // a member's search, the kinds they may ask for, the poster of what it found and
+    // what they are told on, which are a member's own and the operator's, and the
+    // settings, how the stack runs and where its alerts go, which are the operator's
+    // alone.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(BESIDE.iter().map(|(read, _)| read))
@@ -156,6 +158,8 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
                 crate::read::table::REQUEST_POSTER,
                 crate::read::table::SETTINGS,
                 crate::read::table::STACK,
+                crate::read::table::NOTIFY,
+                crate::read::table::NOTIFY_MINE,
             ]
             .contains(*read)
         })

@@ -74,6 +74,11 @@
           "description": "An invitation accepted, declined or lapsed.",
           "type": "string",
           "const": "member"
+        },
+        {
+          "description": "Something a member asked for has arrived; the one kind a member is told.",
+          "type": "string",
+          "const": "ready"
         }
       ]
     },

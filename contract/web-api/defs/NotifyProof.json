@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How far a back-end is proven.",
+  "oneOf": [
+    {
+      "description": "No test sent to it has been seen arriving.",
+      "type": "string",
+      "const": "unproven"
+    },
+    {
+      "description": "A test was seen arriving, at this instant in seconds since the Unix epoch.",
+      "type": "object",
+      "properties": {
+        "proven": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "proven"
+      ]
+    },
+    {
+      "description": "Nothing is delivered to it until it is proven again, and why.",
+      "type": "object",
+      "properties": {
+        "held": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "held"
+      ]
+    }
+  ]
+}

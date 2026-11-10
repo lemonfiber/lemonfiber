@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One way to be told that the operator offered the household, as a member reads it.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "What it is chosen by.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name the household reads it by.",
+      "type": "string"
+    },
+    "receiving": {
+      "description": "Whether this member is told on it.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "receiving"
+  ]
+}

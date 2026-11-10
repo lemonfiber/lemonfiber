@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A delivery still to be tried again.",
+  "type": "object",
+  "properties": {
+    "attempt": {
+      "description": "Which attempt that will be, from one.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "next": {
+      "description": "When it is tried next, in seconds since the Unix epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "of": {
+      "description": "How many attempts it is given.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "next",
+    "attempt",
+    "of"
+  ]
+}

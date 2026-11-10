@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"degraded\"",
+    "\"ready\"",
+    "\"unconfigured\"",
+    "\"unreachable\""
+  ]
+}

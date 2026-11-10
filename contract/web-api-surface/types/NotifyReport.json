@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "backends": {
+      "type": [
+        "array[ref:NotifyBackend]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:NotifyState"
+      ],
+      "required": true
+    },
+    "unread": {
+      "type": [
+        "array[ref:NotifyUnread]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

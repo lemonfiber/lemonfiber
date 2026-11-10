@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One of the requests lemonfiber makes on its own account.\n\nEleven, and the closed set is the claim. A twelfth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.\n\nThe eighth goes where the operator points it and nowhere else: a plugin's git\nsource, named at install. It is the only entry whose destination nobody chose in\nadvance, which is why it is made only when somebody names one.\n\nThe ninth goes to one place this build names, and only when an operator installs a\nplugin by name: the catalogue's newest release, for its index and the signature over\nit.\n\nThe tenth is made for a member rather than for the operator: the poster of a title\ntheir search found, from the one catalogue address this build names, so their client\ndraws it without ever being sent there.",
+  "description": "One of the requests lemonfiber makes on its own account.\n\nFifteen, and the closed set is the claim. A sixteenth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.\n\nThe eighth goes where the operator points it and nowhere else: a plugin's git\nsource, named at install. It is the only entry whose destination nobody chose in\nadvance, which is why it is made only when somebody names one.\n\nThe ninth goes to one place this build names, and only when an operator installs a\nplugin by name: the catalogue's newest release, for its index and the signature over\nit.\n\nThe tenth is made for a member rather than for the operator: the poster of a title\ntheir search found, from the one catalogue address this build names, so their client\ndraws it without ever being sent there.\n\nThe last four deliver alerts to the back-ends the operator added, one for each kind,\nso each kind is switched off on its own.",
   "oneOf": [
     {
       "description": "Fetching the service images the stack runs.",
@@ -56,6 +56,26 @@
       "description": "Waking a phone that asked to be woken when this stack has something to say.",
       "type": "string",
       "const": "waking"
+    },
+    {
+      "description": "Delivering an alert to an ntfy topic.",
+      "type": "string",
+      "const": "ntfy"
+    },
+    {
+      "description": "Delivering an alert to a gotify server.",
+      "type": "string",
+      "const": "gotify"
+    },
+    {
+      "description": "Posting an alert to a webhook.",
+      "type": "string",
+      "const": "webhook"
+    },
+    {
+      "description": "Delivering an alert to an Apprise API.",
+      "type": "string",
+      "const": "apprise"
     }
   ]
 }

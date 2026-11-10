@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"apprise\"",
+    "\"gotify\"",
+    "\"ntfy\"",
+    "\"unifiedpush\"",
+    "\"webhook\""
+  ]
+}

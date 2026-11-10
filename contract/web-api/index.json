@@ -116,6 +116,8 @@
     "music": "kinds/music.json",
     "news": "kinds/news.json",
     "news-items": "kinds/news-items.json",
+    "notify": "kinds/notify.json",
+    "notify-mine": "kinds/notify-mine.json",
     "outbound": "kinds/outbound.json",
     "pairing": "kinds/pairing.json",
     "part-way": "kinds/part-way.json",
