@@ -1,5 +1,6 @@
-//! The health a service an install started declares, waited for before its proofs are
-//! asked, as a recording is taken only once that health passes.
+//! What an install waits for before it asks a service it started anything: the health it
+//! declares, and, before a first run through an adapter, the adapter's word that its
+//! upstream answers, as a recording waits for both.
 
 use std::time::SystemTime;
 
@@ -35,6 +36,18 @@ pub(super) async fn passed(
             .await
             .is_ok_and(|answered| crate::plugin::health_passes(answered.status))
     {
+        tokio::time::sleep(super::POLL).await;
+    }
+}
+
+/// Wait, until `deadline`, for `adapter` to say the upstream it fronts answers, as a
+/// recording waits before the first run it performs through that adapter.
+pub(super) async fn upstream_answering(
+    ctx: &Ctx,
+    adapter: &lemonfiber_contract::Contracted,
+    deadline: SystemTime,
+) {
+    while ctx.seams.clock.now() < deadline && !adapter.ready().await.is_ok_and(|ready| ready) {
         tokio::time::sleep(super::POLL).await;
     }
 }

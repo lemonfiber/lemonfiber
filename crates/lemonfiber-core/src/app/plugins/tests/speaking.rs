@@ -45,13 +45,14 @@ async fn adapted(
 }
 
 /// The digest the speaking manifest pins the service its adapter fronts by.
-const UPSTREAM: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+pub(super) const UPSTREAM: &str =
+    "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 
 /// Where the speaking adapter's live case asks without the key.
-const UNKEYED: &str = "/lemonfiber/media.serve/v1/signed_in";
+pub(super) const UNKEYED: &str = "/lemonfiber/media.serve/v1/signed_in";
 
 /// An adapter's account of itself: speaking `speaks`, with one release at `digest`.
-fn about(speaks: &str, digest: &str) -> String {
+pub(super) fn about(speaks: &str, digest: &str) -> String {
     format!(
         r#"{{"speaks":{speaks},"upstream":"Komga","releases":[{{"version":"1.11.0","digest":"{digest}"}}]}}"#
     )
@@ -383,7 +384,7 @@ async fn an_adapter_not_recorded_at_its_upstream_or_answering_without_the_key_is
 }
 
 /// The speaking manifest, its adapter also speaking `owner.claim`.
-fn claiming() -> String {
+pub(super) fn claiming() -> String {
     speaking().replace(
         r#"speaks      = ["media.serve@1"]"#,
         r#"speaks      = ["media.serve@1", "owner.claim@1"]"#,
