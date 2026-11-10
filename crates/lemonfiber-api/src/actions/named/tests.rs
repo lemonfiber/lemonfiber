@@ -394,3 +394,24 @@ fn music_and_books_are_asked_for_by_unit() {
         Err(crate::actions::Refused::Unwanted { argument, .. }) if argument == "seasons"
     ));
 }
+
+/// A phone's word that a wake arrived is refused by the argument it lacks.
+#[test]
+fn a_wake_confirmed_without_its_endpoint_or_its_id_is_refused_by_what_it_lacks() {
+    let missing = |argument: &str| crate::actions::Refused::Missing {
+        action: "push-woken".to_owned(),
+        argument: argument.to_owned(),
+    };
+    let named = Arguments {
+        name: Some("pixel".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        super::notifying::asked_for("push-woken", Arguments::default()).err(),
+        Some(missing("name"))
+    );
+    assert_eq!(
+        super::notifying::asked_for("push-woken", named).err(),
+        Some(missing("id"))
+    );
+}

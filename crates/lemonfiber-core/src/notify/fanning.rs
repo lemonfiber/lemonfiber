@@ -205,7 +205,7 @@ async fn delivered(ctx: &Ctx, path: &Path, id: &str) {
         let outcome = confirmed(ctx, &backend, &held, &sent, owed.at).await;
         let failed = matches!(outcome, DeliveryOutcome::Failed(_));
         let _ = backends::changed(path, &mut |kept: &mut Kept| {
-            if let Some(one) = kept.backends.iter_mut().find(|one| one.id == id) {
+            for one in kept.backends.iter_mut().filter(|one| one.id == id) {
                 settled(one, &owed, &outcome, sent.refused_key, super::now(ctx));
             }
             Ok(())

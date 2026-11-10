@@ -18,9 +18,10 @@ use common::stack::project;
 use crate::common;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::{
-    Reaching, Settings, OFFLINE_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY,
-    REACH_INDEXER_KEY, REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY,
-    REACH_UPDATES_KEY, REACH_USENET_KEY, REACH_WAKING_KEY, SWITCHES,
+    Reaching, Settings, OFFLINE_KEY, REACH_APPRISE_KEY, REACH_CATALOGUE_KEY, REACH_GOTIFY_KEY,
+    REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY, REACH_NTFY_KEY,
+    REACH_PLUGIN_SOURCE_KEY, REACH_POSTERS_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY,
+    REACH_USENET_KEY, REACH_WAKING_KEY, REACH_WEBHOOK_KEY, SWITCHES,
 };
 use lemonfiber_core::stack::Source;
 
@@ -50,7 +51,7 @@ async fn listed(settings: Settings) -> lemonfiber_core::outbound::Leaving {
 async fn every_request_this_product_makes_is_listed_with_a_way_to_stop_it() {
     let report = listed(Settings::default()).await;
 
-    assert_eq!(report.ours.len(), 11);
+    assert_eq!(report.ours.len(), 15);
     let switches: Vec<&str> = report
         .ours
         .iter()
@@ -67,6 +68,10 @@ async fn every_request_this_product_makes_is_listed_with_a_way_to_stop_it() {
         REACH_CATALOGUE_KEY,
         REACH_POSTERS_KEY,
         REACH_WAKING_KEY,
+        REACH_NTFY_KEY,
+        REACH_GOTIFY_KEY,
+        REACH_WEBHOOK_KEY,
+        REACH_APPRISE_KEY,
     ] {
         assert!(switches.contains(&key), "{key} switches nothing off");
     }

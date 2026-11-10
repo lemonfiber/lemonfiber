@@ -278,7 +278,7 @@ fn only_an_operation_saying_when_it_is_in_force_publishes_a_reset() {
 }
 
 /// Every operation publishes the minor it was added at, with its operation and with each
-/// of its cases, and only `media.serve@1`'s `astray` was added after its major.
+/// of its cases, and the operations added after their major are exactly these.
 #[test]
 fn every_operation_publishes_the_minor_it_was_added_at() {
     let mut added = Vec::new();
@@ -329,10 +329,12 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
             ("library.curate@1".to_owned(), "downloading"),
             ("library.curate@1".to_owned(), "unqueue"),
             ("library.curate@1".to_owned(), "grab"),
+            ("library.curate@1".to_owned(), "events"),
             ("request.intake@1".to_owned(), "minted_as"),
             ("media.serve@1".to_owned(), "astray"),
             ("media.serve@1".to_owned(), "account"),
             ("media.serve@1".to_owned(), "listed_as"),
+            ("media.serve@1".to_owned(), "events"),
             ("owner.claim@1".to_owned(), "claimed_by"),
         ]
     );

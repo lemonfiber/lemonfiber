@@ -109,16 +109,17 @@ pub(crate) async fn arrived(
     else {
         return false;
     };
-    if !(200..300).contains(&response.status) {
-        return false;
-    }
-    match backend.kind {
-        BackendKind::Ntfy => response
-            .body
+    (200..300).contains(&response.status) && seen(backend.kind, &response.body, id)
+}
+
+/// Whether the message `id` is in `history`, as a back-end of `kind` writes its history.
+fn seen(kind: BackendKind, history: &str, id: &str) -> bool {
+    match kind {
+        BackendKind::Ntfy => history
             .lines()
             .filter_map(|line| serde_json::from_str::<Stored>(line).ok())
             .any(|stored| said(&stored.id) == id),
-        BackendKind::Gotify => serde_json::from_str::<Page>(&response.body)
+        BackendKind::Gotify => serde_json::from_str::<Page>(history)
             .is_ok_and(|page| page.messages.iter().any(|stored| said(&stored.id) == id)),
         BackendKind::Webhook | BackendKind::Apprise | BackendKind::Unifiedpush => false,
     }
@@ -246,3 +247,6 @@ fn failed(reason: &str) -> Sent {
         refused_key: false,
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -87,9 +87,11 @@ fn the_households_own_ntfy_is_signed_in_to_as_its_plugins_account() {
 
     let signed = token(&ctx, &backend(BackendKind::Ntfy, "http://127.0.0.1:2586"));
     let named = token(&ctx, &backend(BackendKind::Ntfy, "http://localhost:2586"));
+    let six = token(&ctx, &backend(BackendKind::Ntfy, "http://[::1]:2586"));
 
     assert_eq!(signed, Some(format!("lemonfiber:{PASSWORD}")));
     assert_eq!(named, signed);
+    assert_eq!(six, signed);
 }
 
 #[test]
@@ -118,17 +120,37 @@ fn no_other_server_is_handed_the_account() {
         backend(BackendKind::Ntfy, "http://192.168.1.20:2586"),
         backend(BackendKind::Ntfy, "http://127.0.0.1:8080"),
         backend(BackendKind::Webhook, "http://127.0.0.1:2586"),
+        backend(BackendKind::Ntfy, "not an address"),
+        backend(BackendKind::Ntfy, "unix:/run/ntfy.sock"),
+        backend(BackendKind::Ntfy, "http://[2001:db8::1]:2586"),
     ]
     .iter()
     .map(|one| token(&ctx, one))
     .collect();
 
-    assert_eq!(handed, [None, None, None, None]);
+    assert_eq!(handed, [None, None, None, None, None, None, None]);
 }
 
 #[test]
 fn with_no_password_kept_nothing_is_signed_in_with() {
     let ctx = a_machine("unkept", false);
+
+    assert_eq!(
+        token(&ctx, &backend(BackendKind::Ntfy, "http://127.0.0.1:2586")),
+        None
+    );
+}
+
+#[test]
+fn a_stack_that_cannot_be_read_hands_the_account_to_nobody() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("bundled-unread").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let ctx = crate::test_support::a_context()
+        .over(crate::stack::Source::External(Box::leak(
+            dir.into_boxed_path(),
+        )))
+        .build();
 
     assert_eq!(
         token(&ctx, &backend(BackendKind::Ntfy, "http://127.0.0.1:2586")),

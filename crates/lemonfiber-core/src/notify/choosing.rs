@@ -47,7 +47,24 @@ pub(crate) fn choose(
     chosen: &[String],
 ) -> Result<NotifyMineReport, Box<Problem>> {
     let path = backends::at(ctx).ok_or_else(nowhere)?;
-    let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
+    let mut choosing = Ok(());
+    if ctx.dry_run {
+        let mut kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
+        choosing = chose(&mut kept, member, chosen);
+    } else {
+        backends::changed(&path, &mut |kept: &mut Kept| {
+            choosing = chose(kept, member, chosen);
+            Ok(())
+        })
+        .map_err(|why| read_failure(&why))?;
+    }
+    choosing?;
+    mine(ctx, member)
+}
+
+/// `kept` with `member` told on each of `chosen` and on no other, or the refusal of one
+/// that was not offered.
+fn chose(kept: &mut Kept, member: &str, chosen: &[String]) -> Result<(), Box<Problem>> {
     if let Some(unoffered) = chosen.iter().find(|id| {
         !kept
             .backends
@@ -64,19 +81,13 @@ pub(crate) fn choose(
             .in_state(State::Guided),
         ));
     }
-    if !ctx.dry_run {
-        backends::changed(&path, &mut |kept: &mut Kept| {
-            for one in kept.backends.iter_mut().filter(|one| one.members.is_some()) {
-                one.receivers.retain(|receiver| receiver != member);
-                if chosen.contains(&one.id) {
-                    one.receivers.push(member.to_owned());
-                }
-            }
-            Ok(())
-        })
-        .map_err(|why| read_failure(&why))?;
+    for one in kept.backends.iter_mut().filter(|one| one.members.is_some()) {
+        one.receivers.retain(|receiver| receiver != member);
+        if chosen.contains(&one.id) {
+            one.receivers.push(member.to_owned());
+        }
     }
-    mine(ctx, member)
+    Ok(())
 }
 
 #[cfg(test)]

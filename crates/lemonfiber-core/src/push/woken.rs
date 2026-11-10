@@ -42,7 +42,7 @@ const fn kind_of(record: &Record) -> Notification {
 /// where its distributor took it, and failed where it did not.
 pub(super) fn sent(path: &Path, name: &str, id: &str, outcome: &DeliveryOutcome, at: u64) {
     let _ = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        if let Some(one) = kept.endpoints.iter_mut().find(|one| one.name == name) {
+        for one in kept.endpoints.iter_mut().filter(|one| one.name == name) {
             let delivery = Delivery {
                 at,
                 kind: kind_of(one),

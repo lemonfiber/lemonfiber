@@ -6,7 +6,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Chance;
 
-use super::{intake, minted, told, Event, Happened};
+use super::{intake, minted, notification, told, Event, Happened};
 use crate::alert::Notification;
 use crate::app::Ctx;
 use crate::config::Settings;
@@ -164,4 +164,33 @@ fn each_happening_is_told_in_words_at_its_severity() {
     }
     let long = told("sonarr", &event(Happened::Failed, &"x".repeat(500), None));
     assert!(long.2.chars().count() < 220, "{}", long.2);
+}
+
+#[test]
+fn a_failure_or_a_health_problem_is_a_problem_and_an_arrival_a_completion() {
+    for (happened, kind) in [
+        (Happened::Failed, Notification::Problem),
+        (Happened::Health, Notification::Problem),
+        (Happened::Imported, Notification::Completion),
+        (Happened::Added, Notification::Completion),
+    ] {
+        assert_eq!(notification(&event(happened, "Dune", None)), kind);
+    }
+}
+
+#[test]
+fn no_key_is_handed_out_that_could_not_be_minted_or_kept() {
+    let keeping_nothing = crate::test_support::a_context().build();
+    let drawing_nothing =
+        machine("notify-events-unrandom").with_random(Arc::new(Chance::exactly(None)));
+    let unwritten = machine("notify-events-unwritten");
+    let record = crate::app::targets::beside_env(&unwritten, crate::config::paths::NOTIFY_EVENTS)
+        .unwrap_or_default();
+    let blocked = crate::test_support::blocking(&record);
+
+    for ctx in [&keeping_nothing, &drawing_nothing, &unwritten] {
+        assert!(minted(ctx, "jellyfin").is_err());
+    }
+    assert!(!record.exists());
+    assert!(std::fs::remove_dir_all(blocked).is_ok());
 }

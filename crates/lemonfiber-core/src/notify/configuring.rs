@@ -174,7 +174,7 @@ fn add(ctx: &Ctx, adding: &Adding) -> Result<NotifyReport, Box<Problem>> {
         owed: Vec::new(),
         added: super::now(ctx),
     };
-    let path = backends::at(ctx).ok_or_else(nowhere)?;
+    let (path, secrets) = places(ctx)?;
     let mut refused = None;
     if ctx.dry_run {
         let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
@@ -189,7 +189,6 @@ fn add(ctx: &Ctx, adding: &Adding) -> Result<NotifyReport, Box<Problem>> {
         })
         .map_err(|why| read_failure(&why))?;
         if refused.is_none() {
-            let secrets = backends::secrets_at(ctx).ok_or_else(nowhere)?;
             let held = Held {
                 token: adding.token.clone(),
                 reader: adding.reader.clone(),
@@ -207,87 +206,96 @@ fn set(ctx: &Ctx, setting: &Setting) -> Result<NotifyReport, Box<Problem>> {
         setting.token.as_deref(),
         setting.reader.as_deref(),
     )?;
-    let path = backends::at(ctx).ok_or_else(nowhere)?;
-    let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
-    let current = kept
-        .backends
-        .iter()
-        .find(|one| one.id == setting.id)
-        .ok_or_else(|| Box::new(no_such(&setting.id)))?;
-    let schedule = if setting.attempts.is_some() || setting.delays.is_some() {
-        Some(scheduled(
-            setting.attempts.or(Some(current.attempts)),
-            setting
-                .delays
-                .clone()
-                .or_else(|| Some(current.delays.clone())),
-        )?)
-    } else {
-        None
-    };
+    let (path, secrets) = places(ctx)?;
+    let mut changing = Ok(());
     if ctx.dry_run {
-        return reading::report(ctx);
+        let mut kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
+        changing = changed(&mut kept, setting);
+    } else {
+        backends::changed(&path, &mut |kept: &mut Kept| {
+            changing = changed(kept, setting);
+            Ok(())
+        })
+        .map_err(|why| read_failure(&why))?;
     }
-    let rekeyed = setting.token.is_some() || setting.reader.is_some();
-    backends::changed(&path, &mut |kept: &mut Kept| {
-        if let Some(one) = kept.backends.iter_mut().find(|one| one.id == setting.id) {
-            if let Some((attempts, delays)) = schedule.clone() {
-                one.attempts = attempts;
-                one.delays = delays;
-            }
-            match &setting.members {
-                Some(Offering::Offer(name)) => one.members = Some(name.clone()),
-                Some(Offering::Withdraw) => {
-                    one.members = None;
-                    one.receivers.clear();
-                }
-                None => {}
-            }
-            if rekeyed {
-                one.proof = BackendProof::Held(CHANGED.to_owned());
-            }
-        }
-        Ok(())
-    })
-    .map_err(|why| read_failure(&why))?;
-    if rekeyed {
-        let secrets = backends::secrets_at(ctx).ok_or_else(nowhere)?;
-        let mut held = backends::secrets(&secrets)
-            .map_err(|why| read_failure(&why))?
-            .held
-            .remove(&setting.id)
-            .unwrap_or_default();
-        if setting.token.is_some() {
-            held.token.clone_from(&setting.token);
-        }
-        if setting.reader.is_some() {
-            held.reader.clone_from(&setting.reader);
-        }
-        backends::hold(&secrets, &setting.id, Some(&held)).map_err(|why| read_failure(&why))?;
+    changing?;
+    if !ctx.dry_run && rekeyed(setting) {
+        crate::settings::kept::changed(&secrets, &mut |kept: &mut backends::Secrets| {
+            let held = kept.held.entry(setting.id.clone()).or_default();
+            held.token = setting.token.clone().or(held.token.take());
+            held.reader = setting.reader.clone().or(held.reader.take());
+            Ok(())
+        })
+        .map_err(|why| read_failure(&why))?;
     }
     reading::report(ctx)
 }
 
+/// Whether `setting` hands a back-end something new to be reached with.
+const fn rekeyed(setting: &Setting) -> bool {
+    setting.token.is_some() || setting.reader.is_some()
+}
+
+/// `kept` with `setting` made to the back-end it names, or the refusal of it.
+fn changed(kept: &mut Kept, setting: &Setting) -> Result<(), Box<Problem>> {
+    let one = kept
+        .backends
+        .iter_mut()
+        .find(|one| one.id == setting.id)
+        .ok_or_else(|| Box::new(no_such(&setting.id)))?;
+    if setting.attempts.is_some() || setting.delays.is_some() {
+        (one.attempts, one.delays) = scheduled(
+            setting.attempts.or(Some(one.attempts)),
+            setting.delays.clone().or_else(|| Some(one.delays.clone())),
+        )?;
+    }
+    match &setting.members {
+        Some(Offering::Offer(name)) => one.members = Some(name.clone()),
+        Some(Offering::Withdraw) => {
+            one.members = None;
+            one.receivers.clear();
+        }
+        None => {}
+    }
+    if rekeyed(setting) {
+        one.proof = BackendProof::Held(CHANGED.to_owned());
+    }
+    Ok(())
+}
+
 /// Remove a back-end and forget its secret.
 fn remove(ctx: &Ctx, id: &str) -> Result<NotifyReport, Box<Problem>> {
-    let path = backends::at(ctx).ok_or_else(nowhere)?;
-    let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
-    if !kept.backends.iter().any(|one| one.id == id) {
-        return Err(Box::new(no_such(id)));
-    }
-    if !ctx.dry_run {
+    let (path, secrets) = places(ctx)?;
+    let mut found = false;
+    if ctx.dry_run {
+        let kept = backends::kept(&path).map_err(|why| read_failure(&why))?;
+        found = kept.backends.iter().any(|one| one.id == id);
+    } else {
         backends::changed(&path, &mut |kept: &mut Kept| {
+            let before = kept.backends.len();
             kept.backends.retain(|one| one.id != id);
+            found = kept.backends.len() < before;
             if kept.backends.is_empty() {
                 kept.told = None;
             }
             Ok(())
         })
         .map_err(|why| read_failure(&why))?;
-        let secrets = backends::secrets_at(ctx).ok_or_else(nowhere)?;
+    }
+    if !found {
+        return Err(Box::new(no_such(id)));
+    }
+    if !ctx.dry_run {
         backends::hold(&secrets, id, None).map_err(|why| read_failure(&why))?;
     }
     reading::report(ctx)
+}
+
+/// Where the back-ends are kept and where their secrets are, where anywhere is configured.
+fn places(ctx: &Ctx) -> Result<(std::path::PathBuf, std::path::PathBuf), Box<Problem>> {
+    backends::at(ctx)
+        .zip(backends::secrets_at(ctx))
+        .ok_or_else(nowhere)
 }
 
 /// Refused where a secret was given that holds nothing, as a variable named and left

@@ -93,7 +93,11 @@ async fn nothing_is_configured_until_a_back_end_is_added_and_its_secret_is_kept_
     let record = file(super::backends::at(&ctx));
     let secrets = file(super::backends::secrets_at(&ctx));
     assert!(!record.contains(TOKEN), "{record}");
-    assert!(secrets.contains(TOKEN), "{secrets}");
+    assert!(secrets.contains(TOKEN));
+    assert_eq!(
+        super::backends::destinations(&ctx),
+        [(BackendKind::Ntfy, "http://ntfy.home:2586/stack".to_owned())]
+    );
 }
 
 #[tokio::test]
@@ -262,10 +266,7 @@ async fn a_changed_secret_holds_a_back_end_and_the_household_is_offered_or_withd
     );
     assert_eq!(kept.and_then(|one| one.members), None);
     let secrets = file(super::backends::secrets_at(&ctx));
-    assert!(
-        secrets.contains("tk_new") && secrets.contains("rd_new"),
-        "{secrets}"
-    );
+    assert!(secrets.contains("tk_new") && secrets.contains("rd_new"));
     assert_eq!(code(&unknown), Some(NO_SUCH_BACKEND));
     assert_eq!(code(&empty), Some(BACKEND_INCOMPLETE));
 }
@@ -405,3 +406,5 @@ async fn a_back_end_refusing_its_token_is_held_and_one_never_seen_stays_unproven
     .await;
     assert_eq!(code(&missing), Some(NO_SUCH_BACKEND));
 }
+
+mod refusing;

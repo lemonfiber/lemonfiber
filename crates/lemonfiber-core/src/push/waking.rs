@@ -163,3 +163,6 @@ async fn woke(ctx: &Ctx, record: &Record, id: &str) -> (DeliveryOutcome, bool) {
         ),
     }
 }
+
+#[cfg(test)]
+mod tests;

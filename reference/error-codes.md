@@ -283,16 +283,16 @@ what to do about it, is in `contract/codes.json` and written for operators at
 
 | Code | Name | Severity | Exit | Status | Since | Summary |
 | ---- | ---- | -------- | ---- | ------ | ----- | ------- |
-| `NOTIFY-1` | `NOT_A_BACKEND_NAME` | error | 1 | 400 | 0.19.0 | Raised when a back-end is added under a word that cannot name one. |
-| `NOTIFY-2` | `BACKEND_NAME_TAKEN` | error | 1 | 409 | 0.19.0 | Raised when a back-end is added under a name another holds. |
-| `NOTIFY-3` | `NO_SUCH_BACKEND` | error | 1 | 404 | 0.19.0 | Raised when no back-end holds the name asked about. |
-| `NOTIFY-4` | `HOSTED_UNACKNOWLEDGED` | error | 1 | 400 | 0.19.0 | Raised when a back-end on a host that is not the household's own is added without saying so. |
-| `NOTIFY-5` | `NOT_A_BACKEND_ADDRESS` | error | 1 | 400 | 0.19.0 | Raised when a back-end's address is not one it can be reached at. |
-| `NOTIFY-6` | `BACKEND_INCOMPLETE` | error | 1 | 400 | 0.19.0 | Raised when a back-end is added without what its kind needs. |
-| `NOTIFY-7` | `NOT_A_RETRY_SCHEDULE` | error | 1 | 400 | 0.19.0 | Raised when a back-end's attempts and delays do not agree. |
-| `NOTIFY-8` | `NOT_OFFERED` | error | 1 | 400 | 0.19.0 | Raised when a member chooses a back-end that is not offered to members. |
-| `NOTIFY-9` | `NO_SUCH_WAKE` | error | 1 | 404 | 0.19.0 | Raised when a phone confirms a wake nobody sent it. |
-| `NOTIFY-10` | `EVENTS_REFUSED` | error | 1 | 401 | 0.19.0 | Raised when an event arrives without the key the core gave its sender. |
+| `NOTIFY-1` | `NOT_A_BACKEND_NAME` | error | 1 | 400 | 0.18.0 | Raised when a back-end is added under a word that cannot name one. |
+| `NOTIFY-2` | `BACKEND_NAME_TAKEN` | error | 1 | 409 | 0.18.0 | Raised when a back-end is added under a name another holds. |
+| `NOTIFY-3` | `NO_SUCH_BACKEND` | error | 1 | 404 | 0.18.0 | Raised when no back-end holds the name asked about. |
+| `NOTIFY-4` | `HOSTED_UNACKNOWLEDGED` | error | 1 | 400 | 0.18.0 | Raised when a back-end on a host that is not the household's own is added without saying so. |
+| `NOTIFY-5` | `NOT_A_BACKEND_ADDRESS` | error | 1 | 400 | 0.18.0 | Raised when a back-end's address is not one it can be reached at. |
+| `NOTIFY-6` | `BACKEND_INCOMPLETE` | error | 1 | 400 | 0.18.0 | Raised when a back-end is added without what its kind needs. |
+| `NOTIFY-7` | `NOT_A_RETRY_SCHEDULE` | error | 1 | 400 | 0.18.0 | Raised when a back-end's attempts and delays do not agree. |
+| `NOTIFY-8` | `NOT_OFFERED` | error | 1 | 400 | 0.18.0 | Raised when a member chooses a back-end that is not offered to members. |
+| `NOTIFY-9` | `NO_SUCH_WAKE` | error | 1 | 404 | 0.18.0 | Raised when a phone confirms a wake nobody sent it. |
+| `NOTIFY-10` | `EVENTS_REFUSED` | error | 1 | 401 | 0.18.0 | Raised when an event arrives without the key the core gave its sender. |
 
 ## `PAIR` — pairing a phone with the stack
 

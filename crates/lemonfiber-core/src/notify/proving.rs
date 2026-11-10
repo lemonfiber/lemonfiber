@@ -34,7 +34,7 @@ pub(crate) async fn test(ctx: &Ctx, id: &str) -> Result<NotifyReport, Box<Proble
     }
     let proof = proved(ctx, &backend).await;
     backends::changed(&path, &mut |kept: &mut Kept| {
-        if let Some(one) = kept.backends.iter_mut().find(|one| one.id == id) {
+        for one in kept.backends.iter_mut().filter(|one| one.id == id) {
             one.proof = proof.clone();
         }
         Ok(())

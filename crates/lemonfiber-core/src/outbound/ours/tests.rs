@@ -222,5 +222,13 @@ fn each_back_end_is_listed_under_the_request_its_kind_is_delivered_by_and_switch
     assert!(at(Reach::Gotify).is_empty() && at(Reach::Apprise).is_empty());
     assert!(!allowed(Reach::Ntfy, &settings));
     assert!(allowed(Reach::Gotify, &settings));
-    assert_eq!(Reach::delivering(BackendKind::Unifiedpush), Reach::Waking);
+    for (kind, reach) in [
+        (BackendKind::Ntfy, Reach::Ntfy),
+        (BackendKind::Gotify, Reach::Gotify),
+        (BackendKind::Webhook, Reach::Webhook),
+        (BackendKind::Apprise, Reach::Apprise),
+        (BackendKind::Unifiedpush, Reach::Waking),
+    ] {
+        assert_eq!(Reach::delivering(kind), reach);
+    }
 }

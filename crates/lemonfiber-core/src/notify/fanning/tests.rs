@@ -343,3 +343,86 @@ async fn a_member_is_told_only_that_something_is_ready_and_only_on_what_they_cho
     let told: Vec<usize> = stack.backends.iter().map(|one| one.owed.len()).collect();
     assert_eq!(told, [1, 0, 1]);
 }
+
+fn keeping(ctx: &Ctx, one: &Backend) -> std::path::PathBuf {
+    let path = backends::at(ctx).unwrap_or_default();
+    let kept = backends::changed(&path, &mut |kept: &mut Kept| {
+        kept.backends = vec![one.clone()];
+        Ok(())
+    });
+    assert!(kept.is_ok());
+    path
+}
+
+#[tokio::test]
+async fn a_delivery_under_way_to_a_back_end_is_not_started_again() {
+    let http = Fake::always(Answer::reply(500, ""));
+    let ctx = machine("notify-under-way", Arc::clone(&http));
+    let path = keeping(
+        &ctx,
+        &Backend {
+            owed: vec![owed("jellyfin stopped")],
+            ..backend("home", ChosenBy::Operator)
+        },
+    );
+    let fanning = Fanning::default();
+    let marked = fanning
+        .delivering
+        .lock()
+        .is_ok_and(|mut delivering| delivering.insert("home".to_owned()));
+    assert!(marked);
+
+    fanning.delivering_to(&ctx, &path, "home".to_owned());
+    tokio::task::yield_now().await;
+
+    assert!(http.requests().is_empty());
+    let attempts = backends::kept(&path)
+        .ok()
+        .and_then(|kept| kept.backends.first().map(|one| first(one).attempts));
+    assert_eq!(attempts, Some(0));
+}
+
+#[tokio::test]
+async fn a_failed_delivery_stops_and_waits_for_its_next_attempt() {
+    let http = Fake::always(Answer::reply(500, "down"));
+    let ctx = machine("notify-failing", Arc::clone(&http));
+    let path = keeping(
+        &ctx,
+        &Backend {
+            owed: vec![owed("first"), owed("second")],
+            ..backend("home", ChosenBy::Operator)
+        },
+    );
+
+    super::delivered(&ctx, &path, "home").await;
+
+    let home = backends::kept(&path)
+        .ok()
+        .and_then(|kept| kept.backends.into_iter().next());
+    assert!(matches!(
+        home.as_ref()
+            .and_then(|one| one.last.as_ref())
+            .map(|last| &last.outcome),
+        Some(DeliveryOutcome::Failed(_))
+    ));
+    assert_eq!(home.map(|one| one.owed.len()), Some(2));
+    assert_eq!(http.requests().len(), 1);
+    assert_eq!(
+        crate::notify::reading::report(&ctx)
+            .ok()
+            .map(|report| report.state),
+        Some(crate::model::NotifyState::Unreachable)
+    );
+}
+
+#[tokio::test]
+async fn a_record_that_cannot_be_read_delivers_nothing() {
+    let http = Fake::always(Answer::reply(200, ""));
+    let ctx = machine("notify-unreadable-fan", Arc::clone(&http));
+    let path = backends::at(&ctx).unwrap_or_default();
+    assert!(std::fs::write(&path, "{ not a record").is_ok());
+
+    super::delivered(&ctx, &path, "home").await;
+
+    assert!(http.requests().is_empty());
+}

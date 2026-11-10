@@ -105,3 +105,32 @@ fn only_whoever_registered_the_phone_confirms_its_wake_and_only_once() {
         Some(DeliveryOutcome::Confirmed)
     );
 }
+
+#[test]
+fn a_wake_to_a_phone_no_longer_registered_is_written_nowhere() {
+    let (_, path) = machine("push-wakes-gone");
+    let before = std::fs::read_to_string(&path).unwrap_or_default();
+
+    sent(&path, "pixel", "w1", &DeliveryOutcome::Sent, 10);
+
+    assert_eq!(std::fs::read_to_string(&path).unwrap_or_default(), before);
+}
+
+#[test]
+fn a_rehearsed_confirmation_keeps_nothing_and_an_unreadable_record_refuses_one() {
+    let (ctx, path) = machine("push-wakes-rehearsed");
+    sent(&path, "ada-phone", "w1", &DeliveryOutcome::Sent, 10);
+
+    let rehearsed = confirmed(&ctx.clone().rehearsing(), "ada-phone", "w1", Some("ada"));
+
+    assert!(rehearsed.is_ok_and(|listing| listing.rehearsed));
+    assert!(
+        endpoint(&path, "ada-phone").is_some_and(|one| one.proven.is_none() && one.wakes == ["w1"])
+    );
+    assert!(std::fs::write(&path, "{ not a record").is_ok());
+    for ctx in [ctx.clone(), ctx.rehearsing()] {
+        assert!(confirmed(&ctx, "ada-phone", "w1", Some("ada")).is_err());
+    }
+    let nowhere = crate::test_support::a_context().build();
+    assert!(confirmed(&nowhere, "ada-phone", "w1", None).is_err());
+}

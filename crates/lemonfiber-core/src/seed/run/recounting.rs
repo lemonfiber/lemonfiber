@@ -98,7 +98,7 @@ async fn asked(ctx: &Ctx, speaker: &Filler, capability: &str, major: u32, at: &s
 }
 
 /// `key` written beside `speaker`'s configuration, readable by its user alone.
-fn written(ctx: &Ctx, speaker: &Filler, key: &str) -> Result<(), String> {
+pub(super) fn written(ctx: &Ctx, speaker: &Filler, key: &str) -> Result<(), String> {
     let within = speaker.confined_to.as_deref().ok_or_else(|| {
         format!(
             "{} has no configuration on this machine to hold the key it tells the core with",
