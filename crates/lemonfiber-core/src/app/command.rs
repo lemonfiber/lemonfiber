@@ -468,6 +468,8 @@ pub enum Command {
     DeviceKeys(crate::device_keys::run::Asked),
     /// Register, list or remove the phones that asked to be woken.
     PushEndpoints(crate::push::run::Asked),
+    /// What was asked of the back-ends alerts are delivered to.
+    Notify(crate::notify::configuring::Asked),
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///

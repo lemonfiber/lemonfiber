@@ -15,7 +15,12 @@
 //! seam anything crosses; when a channel is actually implemented, the question of what it
 //! is handed can be settled then, and the port can move down with its answer.
 
+pub(crate) mod backends;
+pub mod configuring;
+mod proving;
+pub(crate) mod reading;
 pub(crate) mod run;
+pub(crate) mod sending;
 
 use async_trait::async_trait;
 
@@ -44,4 +49,13 @@ pub trait Channel: Send + Sync {
     /// what it was given. The caller records the failure and keeps the alert; a
     /// channel is never trusted to be the only copy.
     async fn deliver(&self, digest: &Digest) -> Result<(), Undelivered>;
+}
+
+/// The clock's now, in seconds since the Unix epoch.
+pub(crate) fn now(ctx: &crate::app::Ctx) -> u64 {
+    ctx.seams
+        .clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |at| at.as_secs())
 }

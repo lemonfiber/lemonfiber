@@ -220,6 +220,32 @@ fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
         .filter(|path| read(path).is_ok_and(|kept| !kept.endpoints.is_empty()))
 }
 
+/// Every endpoint as a back-end the stack delivers to, by the host its distributor is on.
+pub(crate) fn as_backends(ctx: &Ctx) -> Vec<crate::model::BackendReport> {
+    at(ctx)
+        .and_then(|path| read(&path).ok())
+        .map(|kept| kept.endpoints.iter().map(as_backend).collect())
+        .unwrap_or_default()
+}
+
+/// One endpoint as a back-end.
+fn as_backend(record: &Record) -> crate::model::BackendReport {
+    crate::model::BackendReport {
+        id: record.name.clone(),
+        kind: crate::model::BackendKind::Unifiedpush,
+        reaches: url::Url::parse(&record.endpoint)
+            .ok()
+            .and_then(|url| url.host_str().map(str::to_owned))
+            .unwrap_or_default(),
+        chosen_by: crate::model::ChosenBy::Operator,
+        hosted: None,
+        proof: crate::model::BackendProof::Unproven,
+        last: None,
+        failures: Vec::new(),
+        retry: None,
+    }
+}
+
 /// Whether any endpoint is waiting to be woken, so the stack is worth reading with nobody
 /// listening.
 #[must_use]

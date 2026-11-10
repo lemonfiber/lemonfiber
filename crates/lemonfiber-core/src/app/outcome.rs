@@ -192,6 +192,8 @@ outcomes! {
     PushEndpoint(crate::push::Registered) => PUSH_ENDPOINT [rehearsed],
     /// Every push endpoint, and what became of a removal.
     PushEndpoints(crate::push::Listing) => PUSH_ENDPOINTS [rehearsed],
+    /// Where a message goes: every back-end alerts are delivered to.
+    Notify(crate::model::NotifyReport) => NOTIFY [rehearsed],
     /// Somebody taken out of the household, or what taking them would cost.
     Removal(crate::model::HouseholdRemoval) => REMOVAL [rehearsed],
     /// What each service in this stack is for, and what became of the ones that went.

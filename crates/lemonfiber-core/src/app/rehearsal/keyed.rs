@@ -4,6 +4,7 @@ use super::{cannot, reads, reports, Asked};
 use crate::device_keys::run::Asked as Devices;
 use crate::keys::run::Asked as Keyed;
 use crate::model::kind;
+use crate::notify::configuring::Asked as Notifying;
 use crate::push::run::Asked as Pushing;
 
 /// Why minting a key cannot be rehearsed.
@@ -33,6 +34,17 @@ pub(super) const fn devices(asked: &Devices) -> Asked {
         Devices::List => reads("device-key list"),
         Devices::Register { .. } => cannot("device-key register", A_REGISTRATION_IS_PROVED),
         Devices::Revoke { .. } => reports("device-key revoke", &[kind::DEVICE_KEYS]),
+    }
+}
+
+/// A listing reads; every change and a test each say what they would come to.
+pub(super) const fn notifying(asked: &Notifying) -> Asked {
+    match asked {
+        Notifying::List => reads("notify list"),
+        Notifying::Add(_) => reports("notify add", &[kind::NOTIFY]),
+        Notifying::Set(_) => reports("notify set", &[kind::NOTIFY]),
+        Notifying::Test { .. } => reports("notify test", &[kind::NOTIFY]),
+        Notifying::Remove { .. } => reports("notify remove", &[kind::NOTIFY]),
     }
 }
 

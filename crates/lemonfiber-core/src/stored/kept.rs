@@ -249,6 +249,23 @@ pub const EVERY: &[Entry] = &[
         at: Paths::cover_hosts,
     },
     Entry {
+        accessor: "notify_backends",
+        what: "where alerts are delivered",
+        why: "Each notification back-end you added, who chose it, how far it is proven and what \
+              became of its deliveries, so a message that never arrived is told apart from one \
+              that was never sent.",
+        secret: false,
+        at: Paths::notify_backends,
+    },
+    Entry {
+        accessor: "notify_secrets",
+        what: "what each notification back-end is reached with",
+        why: "The token each back-end takes messages with, kept apart from the list of back-ends \
+              so nothing that shows you where alerts go ever reads one.",
+        secret: true,
+        at: Paths::notify_secrets,
+    },
+    Entry {
         accessor: "handoffs",
         what: "when each person was handed a code",
         why: "The media server says which devices are signed in and nothing about a code \

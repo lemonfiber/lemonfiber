@@ -103,6 +103,10 @@ pub(crate) const HALTED: &str = "halted.json";
 pub const DEVICE_KEYS: &str = "device-keys.json";
 /// The phones that asked to be woken, with the `WebPush` secret each is encrypted to.
 pub const PUSH_ENDPOINTS: &str = "push-endpoints.json";
+/// Every notification back-end the stack delivers to.
+pub(crate) const NOTIFY_BACKENDS: &str = "notify-backends.json";
+/// The secret each notification back-end is reached with.
+pub(crate) const NOTIFY_SECRETS: &str = "notify-secrets.json";
 /// The keys other programs reach the web surface with, as digests.
 pub const KEYS: &str = "keys.json";
 /// When each of those keys was last used.
@@ -527,6 +531,7 @@ impl Paths {
 }
 
 mod household;
+mod notifying;
 
 #[cfg(test)]
 mod tests;

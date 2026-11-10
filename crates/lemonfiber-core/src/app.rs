@@ -483,6 +483,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
         Command::DeviceKeys(asked) => crate::device_keys::run::asked(ctx, asked).await,
         Command::PushEndpoints(asked) => crate::push::run::asked(ctx, asked),
+        Command::Notify(asked) => crate::notify::configuring::asked(ctx, asked).await,
         Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.
