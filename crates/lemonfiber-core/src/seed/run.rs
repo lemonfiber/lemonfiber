@@ -220,7 +220,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     wirings.extend(owning::owned(ctx, &fillers, &installed, &mut baseline).await);
     let kept_off = owning::kept_off(&fillers, &installed, &baseline);
-    wirings.extend(furnishing::seed_furnishing(ctx, &fillers, &baseline, &kept_off).await);
 
     // The media server and everything that signs in to it as its administrator.
     wirings.extend(
@@ -431,6 +430,8 @@ async fn seed_media_server(
     // minted and recorded here, and the request gate's key below is minted with it.
     let mut wirings = Vec::new();
     let admin = identity::seed_media_server_admin(ctx, server).await;
+
+    wirings.extend(furnishing::seed_furnishing(ctx, fillers, baseline, kept_off).await);
 
     // Which origins a browser may read the media server from: the front door's alone.
     // After the identity's first half, because that is what records the administrator

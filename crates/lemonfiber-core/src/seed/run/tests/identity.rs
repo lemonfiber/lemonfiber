@@ -622,6 +622,66 @@ async fn a_contracted_server_unanswered_over_its_contract_is_not_set_up() {
     );
 }
 
+/// **A fresh media server is given its libraries once its administrator is set up**, which
+/// is the credential its adapter signs in to it with.
+#[tokio::test]
+async fn a_fresh_media_server_is_given_its_libraries_after_its_administrator_is_set_up() {
+    use crate::test_support::media;
+    let env = config_scratch("jellyfin-furnished");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let http = Fake::by_path_in_turn(vec![
+        (
+            media::identity("startup_completed"),
+            vec![media::answered(&false)],
+        ),
+        (media::identity("create_admin"), vec![media::taken()]),
+        (media::serve("furnish"), vec![Answer::reply(200, "[]")]),
+    ]);
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf())).with_http(http.clone());
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnished-stack");
+    let key = crate::plugin::key_file(&project, media::ADAPTER);
+    let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
+    let mut curator = crate::test_support::contracted("curating", "films", "library.curate");
+    for placed in &mut curator.services {
+        placed.media_types = vec!["movies".to_owned()];
+    }
+    let services = [media_server_svc(), requests_svc()];
+    let installed: Vec<crate::plugin::Installed> = media::moved()
+        .into_iter()
+        .chain(REQUESTS.installed())
+        .chain([curator])
+        .collect();
+    let fillers = fillers_trusting(
+        services.to_vec(),
+        &installed,
+        &project,
+        crate::plugin::first_party::EMBEDDED,
+    );
+
+    let _ = super::super::seed_media_server(
+        &ctx,
+        &services,
+        &fillers,
+        (
+            &mut crate::baseline::Baseline::new(),
+            &std::collections::BTreeSet::new(),
+        ),
+    )
+    .await;
+
+    let asked: Vec<String> = http.requests().into_iter().map(|one| one.url).collect();
+    let first = |fragment: &str| asked.iter().position(|url| url.contains(fragment));
+    let admin = first(media::identity("create_admin"));
+    assert!(admin.is_some(), "{asked:?}");
+    assert!(
+        first(media::serve("furnish")).is_some_and(|furnished| Some(furnished) > admin),
+        "{asked:?}"
+    );
+}
+
 /// Whether the secret store beside `env` holds a credential under `name`.
 fn held(env: &std::path::Path, name: &str) -> bool {
     crate::settings::Secrets::at(&env.with_file_name(crate::config::paths::SECRETS))
