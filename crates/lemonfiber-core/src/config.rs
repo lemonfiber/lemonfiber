@@ -34,10 +34,11 @@ pub use keys::*;
 // recorded value comes to is this module's business, and moving the reading of one
 // would otherwise be a change at every call site that asks.
 pub use reading::{
-    data_root_from_env, data_root_refused, exposed_from_env, front_door_from_env,
-    household_domain_from_env, household_host_from_env, indexer_from_env, ip_echo_from_env,
-    nfs_from_env, port_forward_from_env, project_from_env, provider_host_from_env, quiet_from_env,
-    reads_as_off, reads_as_on, service_user_from_env, unmanaged_from_env, PortForward,
+    data_root_from_env, data_root_refused, events_address_from_env, exposed_from_env,
+    front_door_from_env, household_domain_from_env, household_host_from_env, indexer_from_env,
+    ip_echo_from_env, nfs_from_env, port_forward_from_env, project_from_env,
+    provider_host_from_env, quiet_from_env, reads_as_off, reads_as_on, service_user_from_env,
+    unmanaged_from_env, PortForward,
 };
 
 use std::path::PathBuf;
@@ -196,6 +197,9 @@ pub struct Settings {
     /// machine whose own name is not published on the network. Absent until they
     /// record one, which is the state a fresh install is in.
     pub household_host: Option<String>,
+    /// The `https` address the stack's services reach the core's web surface at to tell it
+    /// what happened, where the operator wrote one.
+    pub events_address: Option<String>,
     /// The domain the stack's proxy publishes the household's services under, where
     /// the operator wrote one.
     ///
@@ -306,6 +310,7 @@ impl Default for Settings {
             admission: None,
             companion: None,
             household_host: None,
+            events_address: None,
             household_domain: None,
             exposed: Vec::new(),
             unmanaged: Vec::new(),

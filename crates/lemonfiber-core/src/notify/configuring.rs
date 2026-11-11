@@ -153,6 +153,7 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
 
 /// Add a back-end, once its name, its address and what its kind needs are all there.
 fn add(ctx: &Ctx, adding: &Adding) -> Result<NotifyReport, Box<Problem>> {
+    let adding = &on_the_households(ctx, adding)?;
     let url = checked(adding)?;
     let (attempts, delays) = scheduled(adding.attempts, adding.delays.clone())?;
     let record = Backend {
@@ -296,6 +297,38 @@ fn places(ctx: &Ctx) -> Result<(std::path::PathBuf, std::path::PathBuf), Box<Pro
     backends::at(ctx)
         .zip(backends::secrets_at(ctx))
         .ok_or_else(nowhere)
+}
+
+/// `adding` with the topic the household's own ntfy is posted to where it is that and
+/// names none, and refused where it names one lemonfiber may not post to there.
+fn on_the_households(ctx: &Ctx, adding: &Adding) -> Result<Adding, Box<Problem>> {
+    if !super::bundled::household(ctx, adding.kind, &adding.url) {
+        return Ok(adding.clone());
+    }
+    let topic = match adding.topic.as_deref().filter(|topic| !topic.is_empty()) {
+        None => super::bundled::ALERTS.to_owned(),
+        Some(topic)
+            if topic
+                .strip_prefix(super::bundled::TOPICS)
+                .is_some_and(|rest| !rest.is_empty()) =>
+        {
+            topic.to_owned()
+        }
+        Some(topic) => {
+            return Err(Box::new(refused(
+                BACKEND_INCOMPLETE,
+                &format!("The household's own ntfy takes no topic {topic} from lemonfiber"),
+                "lemonfiber may post there only to topics whose names start with lemonfiber-, \
+                 so nothing was added.",
+                "Name a topic starting with lemonfiber-, as in lemonfiber-alerts, or leave \
+                 --topic out",
+            )))
+        }
+    };
+    Ok(Adding {
+        topic: Some(topic),
+        ..adding.clone()
+    })
 }
 
 /// Refused where a secret was given that holds nothing, as a variable named and left

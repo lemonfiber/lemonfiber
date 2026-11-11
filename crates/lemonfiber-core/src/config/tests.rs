@@ -343,3 +343,17 @@ fn the_domain_the_proxy_serves_is_read_trimmed_and_a_blank_one_as_none() {
     );
     assert_eq!(household_domain_from_env(&env::EnvFile::parse("")), None);
 }
+
+#[test]
+fn an_events_address_is_read_trimmed_and_a_blank_one_as_absent() {
+    assert_eq!(
+        super::events_address_from_env(&env::EnvFile::parse(
+            "LEMONFIBER_EVENTS_ADDRESS= https://192.168.1.20:8471 \n"
+        )),
+        Some("https://192.168.1.20:8471".to_owned())
+    );
+    assert_eq!(
+        super::events_address_from_env(&env::EnvFile::parse("LEMONFIBER_EVENTS_ADDRESS=  \n")),
+        None
+    );
+}

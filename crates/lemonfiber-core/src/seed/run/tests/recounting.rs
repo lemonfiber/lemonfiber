@@ -16,6 +16,17 @@ const EVENTS: &str = "/lemonfiber/media.serve/v1/events";
 /// Where the core is told what happened, in these cases.
 const TOLD_AT: &str = "https://core.home:8443/api/notify/events";
 
+/// The certificate digest the core presents there, in these cases.
+const PINNED: &str = "ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12";
+
+/// Where the core is told what happened, and what it pins, in these cases.
+fn told_at() -> crate::notify::events::Told {
+    crate::notify::events::Told {
+        address: TOLD_AT.to_owned(),
+        pin: PINNED.to_owned(),
+    }
+}
+
 /// The stack of a media server, trusted as first-party.
 fn stack(project: &std::path::Path) -> crate::wiring::Fillers {
     fillers_trusting(
@@ -37,10 +48,15 @@ async fn with_no_address_known_no_service_is_asked_and_each_says_why() {
     let http = Fake::by_path(vec![(EVENTS, Answer::reply(204, ""))]);
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
 
-    let wirings = super::super::recounting::seed_events(&ctx, &stack(&project), None).await;
+    let wirings = super::super::recounting::seed_events(
+        &ctx,
+        &stack(&project),
+        Err("no address here".to_owned()),
+    )
+    .await;
 
     assert!(
-        matches!(states(&wirings).as_slice(), [crate::seed::State::Skipped { reason }] if reason.contains("no address")),
+        matches!(states(&wirings).as_slice(), [crate::seed::State::Unmatched { reason }] if reason.contains("no address")),
         "{wirings:?}"
     );
     assert!(!http.asked_for(EVENTS));
@@ -53,8 +69,7 @@ async fn a_media_server_is_handed_the_address_and_a_key_minted_for_it_alone() {
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
 
     let wirings =
-        super::super::recounting::seed_events(&ctx, &stack(&project), Some(TOLD_AT.to_owned()))
-            .await;
+        super::super::recounting::seed_events(&ctx, &stack(&project), Ok(told_at())).await;
 
     assert_eq!(states(&wirings), [crate::seed::State::Wired], "{wirings:?}");
     let body = http
@@ -64,6 +79,7 @@ async fn a_media_server_is_handed_the_address_and_a_key_minted_for_it_alone() {
         .and_then(|one| one.body)
         .unwrap_or_default();
     assert!(body.contains(TOLD_AT), "{body}");
+    assert!(body.contains(PINNED), "{body}");
     let key = serde_json::from_str::<serde_json::Value>(&body)
         .ok()
         .and_then(|asked| {
@@ -102,8 +118,7 @@ async fn a_rehearsal_asks_nothing_and_says_where_it_would_point() {
     let ctx = contracted_ctx(&project, SERVICE, true, http.clone()).rehearsing();
 
     let wirings =
-        super::super::recounting::seed_events(&ctx, &stack(&project), Some(TOLD_AT.to_owned()))
-            .await;
+        super::super::recounting::seed_events(&ctx, &stack(&project), Ok(told_at())).await;
 
     assert!(
         matches!(states(&wirings).as_slice(), [crate::seed::State::WouldWire { ours: Some(at), .. }] if at == TOLD_AT),
@@ -138,7 +153,7 @@ async fn a_media_server_on_an_earlier_minor_is_left_as_it_is() {
 
 /// What seeding the events comes to for `fillers`, the core told at [`TOLD_AT`].
 async fn told(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<crate::seed::Wiring> {
-    super::super::recounting::seed_events(ctx, fillers, Some(TOLD_AT.to_owned())).await
+    super::super::recounting::seed_events(ctx, fillers, Ok(told_at())).await
 }
 
 /// The one wiring's failure, where it failed.

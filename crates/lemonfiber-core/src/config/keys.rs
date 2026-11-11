@@ -195,6 +195,10 @@ pub(crate) const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 /// where the operator runs no media server at all.
 pub(crate) const MEDIA_SERVER_MODE_KEY: &str = "MEDIA_SERVER_MODE";
 
+/// The `https` address the stack's services reach the core's web surface at to tell it
+/// what happened, where `host.docker.internal` and the port it was served on are not.
+pub const EVENTS_ADDRESS_KEY: &str = "LEMONFIBER_EVENTS_ADDRESS";
+
 /// The address the household's own links are pointed at.
 ///
 /// The stack's, and the one thing in it that says where this machine is reached
@@ -388,6 +392,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_GOTIFY_KEY,
     REACH_WEBHOOK_KEY,
     REACH_APPRISE_KEY,
+    EVENTS_ADDRESS_KEY,
     EXPLANATIONS_KEY,
     AUTOSTART_ON_BATTERY_KEY,
     MEMBER_KEYS_KEY,

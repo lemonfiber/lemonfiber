@@ -101,6 +101,7 @@ pub(crate) fn unit<'a>(
         secrets_file: secrets_file(placed, reading),
         command: fields.args.clone(),
         granted: &[],
+        reaches_host: !placed.speaks.is_empty(),
     }
 }
 

@@ -194,6 +194,22 @@ pub fn host_is_here(host: Option<&str>, at: &Binding) -> bool {
     host.is_some_and(|host| names_here(host, at))
 }
 
+/// Whether a request is a container on this machine telling the core what happened: it
+/// names `host.docker.internal` at this server's port, and no page sent it.
+///
+/// Only the door a service tells the core what happened at answers to that name, which
+/// is the name a container reaches this machine by and never one a page is served under.
+#[must_use]
+pub fn told_from_a_container(host: Option<&str>, origin: Option<&str>, at: &Binding) -> bool {
+    origin.is_none()
+        && host
+            .and_then(|host| host.rsplit_once(':'))
+            .is_some_and(|(name, port)| {
+                name.eq_ignore_ascii_case(lemonfiber_core::notify::events::HOST)
+                    && port.parse::<u16>().is_ok_and(|port| port == at.port)
+            })
+}
+
 /// Whether a request's `Origin` names the address this server is listening on.
 ///
 /// A request without one is allowed. `Origin` is a browser's word about itself,

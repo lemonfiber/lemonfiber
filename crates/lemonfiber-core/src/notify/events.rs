@@ -59,11 +59,8 @@ pub enum Happened {
     Added,
 }
 
-/// The address the stack's services reach the core at to tell it what happened, where one
-/// is known; nothing yet, so no service is asked.
-pub(crate) const fn address(_ctx: &Ctx) -> Option<String> {
-    None
-}
+pub(crate) use reached::{address, Told};
+pub use reached::{HOST, PATH};
 
 /// Where the keys are kept, where anywhere is configured.
 fn at(ctx: &Ctx) -> Option<PathBuf> {
@@ -100,8 +97,13 @@ pub fn intake(ctx: &Ctx, presented: &str, event: &Event) -> Result<String, Box<P
         .and_then(|kept| {
             kept.keys
                 .into_iter()
-                .find(|(_, digest)| *digest == presented)
-                .map(|(service, _)| service)
+                .fold(None, |found, (service, digest)| {
+                    if same(&digest, &presented) {
+                        Some(service)
+                    } else {
+                        found
+                    }
+                })
         })
         .ok_or_else(refused)?;
     let (kind, severity, said) = told(&service, event);
@@ -153,6 +155,16 @@ const fn notification(event: &Event) -> crate::alert::Notification {
     }
 }
 
+/// Whether two digests are the same, in time that depends on their length alone.
+fn same(kept: &str, presented: &str) -> bool {
+    kept.len() == presented.len()
+        && kept
+            .bytes()
+            .zip(presented.bytes())
+            .fold(0_u8, |differs, (left, right)| differs | (left ^ right))
+            == 0
+}
+
 /// `said` cut short, with no credential in it.
 fn cut(said: &str) -> String {
     crate::error::withheld::without_credentials(said.trim())
@@ -173,6 +185,8 @@ fn refused() -> Box<Problem> {
         .in_state(State::Guided),
     )
 }
+
+mod reached;
 
 #[cfg(test)]
 mod tests;

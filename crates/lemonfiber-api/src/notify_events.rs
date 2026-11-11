@@ -13,6 +13,7 @@ use axum::routing::post;
 use axum::{Extension, Json, Router};
 use lemonfiber_core::notify::events::{intake, Event};
 
+use crate::admission::Door;
 use crate::guard::Arrived;
 use crate::read::went_wrong;
 use crate::refusal::Refusal;
@@ -41,9 +42,20 @@ async fn told(
     headers: HeaderMap,
     given: Result<Json<Event>, JsonRejection>,
 ) -> Response {
-    if !arrived.is_some_and(|Extension(arrived)| arrived.may_carry_a_key()) {
+    let Some(Extension(arrived)) = arrived.filter(|Extension(arrived)| arrived.may_carry_a_key())
+    else {
         return Refusal::KeyInTheClear.answered();
-    }
+    };
+    let now = serving.ctx.seams.clock.now();
+    let ticket = match serving
+        .admitting
+        .attempts
+        .taken_at_a_key(arrived.from, now)
+        .await
+    {
+        Ok(ticket) => ticket,
+        Err(left) => return crate::admission::waiting(left.as_secs().max(1)),
+    };
     let presented = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
@@ -53,7 +65,14 @@ async fn told(
         return Refusal::NotAKeyRequest.answered();
     };
     match intake(&serving.ctx, presented, &event) {
-        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => {
+            serving
+                .admitting
+                .attempts
+                .right(&ticket, Door::Key, now)
+                .await;
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(problem) => went_wrong(&problem),
     }
 }

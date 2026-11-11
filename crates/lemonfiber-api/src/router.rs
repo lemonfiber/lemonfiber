@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Request, State};
+use axum::http::header;
 use axum::middleware::{self, Next};
 use axum::response::Response;
 use axum::Router;
@@ -177,7 +178,21 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
         Knocking::Nobody | Knocking::Unconfirmed | Knocking::Held(_) | Knocking::Exposed => None,
     };
     let known = at_the_door || caller.is_some();
-    match admitted(known, request.headers(), &serving.bound) {
+    let told = request.method() == axum::http::Method::POST
+        && request.uri().path() == crate::notify_events::EVENTS;
+    let headers = request.headers();
+    let said = |name: header::HeaderName| headers.get(name).and_then(|value| value.to_str().ok());
+    let addressed = if told
+        && crate::guard::told_from_a_container(
+            said(header::HOST),
+            said(header::ORIGIN),
+            &serving.bound,
+        ) {
+        Ok(())
+    } else {
+        admitted(known, headers, &serving.bound)
+    };
+    match addressed {
         Ok(()) => {
             // Carried on the request rather than looked up again, so a handler
             // asking who this is gets the answer the guard actually admitted

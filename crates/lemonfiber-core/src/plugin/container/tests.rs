@@ -272,6 +272,26 @@ fn the_port_an_adapter_speaks_on_is_published_on_loopback_at_a_port_the_engine_p
     assert!(!silent.contains("ports:"), "got: {silent}");
 }
 
+/// A service that speaks a contract resolves the name containers reach this machine by to
+/// the engine's host gateway, so it can tell the core what happened; one that speaks none
+/// resolves nothing extra.
+#[test]
+fn an_adapter_reaches_this_machine_by_the_name_containers_do() {
+    let adapter = document(Placed {
+        speaks: vec!["library.curate@1".to_owned()],
+        listens: Some(8080),
+        ..placed()
+    });
+    let hosts = list(&adapter, "komga", "extra_hosts");
+
+    assert_eq!(
+        hosts,
+        ["host.docker.internal:host-gateway"],
+        "got: {adapter}"
+    );
+    assert!(!document(placed()).contains("extra_hosts"));
+}
+
 /// A service that speaks a contract runs as the operator, so it can read the key written
 /// readable by that uid alone; one that speaks none is written with no user at all.
 #[test]
@@ -449,6 +469,7 @@ const KEYS: &[&str] = &[
     "pids_limit",
     "read_only",
     "mem_limit",
+    "extra_hosts",
 ];
 
 /// Every key one generated entry carries, read off the document itself.

@@ -33,6 +33,9 @@ pub(crate) const LIBRARY_TARGET: &str = "/data";
 /// The uid and gid written while the operator's environment file names neither.
 pub(crate) const OPERATOR_FALLBACK: &str = "1000";
 
+/// What the engine resolves to this machine from inside a container.
+const HOST_GATEWAY: &str = "host-gateway";
+
 /// What brings a container back after it stops for any reason but being taken down.
 const RESTART: &str = "unless-stopped";
 
@@ -139,6 +142,9 @@ pub struct Unit<'a> {
     /// The capabilities it alone is given back, whatever its posture: a fence's, and none
     /// for any other service.
     pub granted: &'static [&'static str],
+    /// Whether it reaches this machine by the name containers do, as an adapter telling
+    /// the core what happened does.
+    pub reaches_host: bool,
 }
 
 /// What an entry's values are read from beyond its unit.
@@ -168,6 +174,9 @@ pub struct Entry {
     /// Who it runs as, where not the image's choice.
     #[serde(skip_serializing_if = "Option::is_none")]
     user: Option<String>,
+    /// The names it resolves to this machine.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    extra_hosts: Vec<String>,
     /// The arguments its image's program is run with, where not the image's own.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     command: Vec<String>,
@@ -285,6 +294,11 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
                 operated(values, PGID_KEY, OPERATOR_FALLBACK)
             )
         }),
+        extra_hosts: unit
+            .reaches_host
+            .then(|| format!("{}:{HOST_GATEWAY}", crate::notify::events::HOST))
+            .into_iter()
+            .collect(),
         command: unit.command.iter().map(|word| literal(word)).collect(),
         environment: environment(unit, values),
         env_file: unit

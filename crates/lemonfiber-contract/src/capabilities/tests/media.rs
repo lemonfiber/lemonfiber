@@ -271,10 +271,16 @@ const READ_AT_START: &str = "/config/lemonfiber/internal.p12";
 
 #[async_trait]
 impl Recounting for Upstream {
-    async fn events(&self, address: Option<&str>, key: Option<&str>) -> Result<(), Failure> {
+    async fn events(
+        &self,
+        address: Option<&str>,
+        pin: Option<&str>,
+        key: Option<&str>,
+    ) -> Result<(), Failure> {
         self.tell(format!(
-            "events {} {}",
+            "events {} {} {}",
             address.unwrap_or("nowhere"),
+            pin.unwrap_or("unpinned"),
             key.map_or("none", |_| "keyed")
         ));
         Ok(())

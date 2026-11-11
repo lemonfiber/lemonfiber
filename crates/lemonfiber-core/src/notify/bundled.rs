@@ -29,29 +29,50 @@ pub(crate) fn reached_with(ctx: &Ctx, backend: &Backend, held: Held) -> Held {
     }
 }
 
-/// `lemonfiber:<password>`, where `backend` is ntfy at the port this machine publishes the
-/// ntfy plugin's own service on, and the secret store holds the password minted for it.
+/// The start of every topic the household's own ntfy lets lemonfiber post to and read.
+pub(crate) const TOPICS: &str = "lemonfiber-";
+
+/// The topic the household's own ntfy is posted to where the operator names none.
+pub(crate) const ALERTS: &str = "lemonfiber-alerts";
+
+/// `lemonfiber:<password>`, where `backend` is the household's own ntfy and the secret store
+/// holds the password minted for it.
 fn login(ctx: &Ctx, backend: &Backend) -> Option<String> {
-    if backend.kind != BackendKind::Ntfy {
-        return None;
-    }
-    let url = Url::parse(&backend.url).ok()?;
-    let here = match url.host()? {
-        Host::Domain(name) => name.eq_ignore_ascii_case("localhost"),
-        Host::Ipv4(address) => address.is_loopback(),
-        Host::Ipv6(address) => address.is_loopback(),
-    };
-    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let fillers = crate::app::targets::fillers_here(ctx, &manifest);
-    let ntfy = fillers
-        .service(NTFY)
-        .filter(|filler| filler.brought_by() == Some(NTFY))?;
-    if !here || ntfy.published != url.port_or_known_default() {
+    if !household(ctx, backend.kind, &backend.url) {
         return None;
     }
     let password =
         crate::app::targets::stored_secret(ctx, &crate::settings::named(NTFY, PASSWORD))?;
     Some(format!("{ACCOUNT}:{password}"))
+}
+
+/// Whether a back-end speaking `kind` at `url` is the household's own ntfy: ntfy at a
+/// loopback address on the port this machine publishes the ntfy plugin's service on.
+pub(crate) fn household(ctx: &Ctx, kind: BackendKind, url: &str) -> bool {
+    if kind != BackendKind::Ntfy {
+        return false;
+    }
+    let Some(url) = Url::parse(url).ok() else {
+        return false;
+    };
+    let here = match url.host() {
+        Some(Host::Domain(name)) => name.eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(address)) => address.is_loopback(),
+        Some(Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    if !here {
+        return false;
+    }
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        return false;
+    };
+    crate::app::targets::fillers_here(ctx, &manifest)
+        .service(NTFY)
+        .filter(|filler| filler.brought_by() == Some(NTFY))
+        .is_some_and(|ntfy| {
+            ntfy.published.is_some() && ntfy.published == url.port_or_known_default()
+        })
 }
 
 #[cfg(test)]

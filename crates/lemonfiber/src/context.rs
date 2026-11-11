@@ -191,6 +191,7 @@ pub(crate) fn settings_at(run: Option<&Ctx>, paths: Option<&Paths>) -> Settings 
         admission: paths.map(Paths::admission),
         companion: paths.map(Paths::companion),
         household_host: household_host_from_env(&recorded),
+        events_address: lemonfiber_core::config::events_address_from_env(&recorded),
         household_domain: lemonfiber_core::config::household_domain_from_env(&recorded),
         exposed: exposed_from_env(&recorded),
         unmanaged: lemonfiber_core::config::unmanaged_from_env(&recorded),
