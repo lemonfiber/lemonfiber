@@ -21,6 +21,44 @@ async fn a_choice_for_the_household_answers_with_the_household() {
     assert!(said.starts_with("the household"), "{said}");
 }
 
+/// A member whose own account holds another arrangement is named as keeping it, with the
+/// command that changes theirs; one already under the choice is not named.
+#[tokio::test]
+async fn a_member_keeping_their_own_is_named_with_how_to_change_theirs() {
+    let choose = |policy, quota| Chosen {
+        member: None,
+        policy: Some(policy),
+        quota,
+    };
+
+    let trusted = allowing(&a_household("keeps"), &choose(Policy::Trusted, None))
+        .await
+        .unwrap_or_default();
+    let matching = allowing(
+        &a_household("matches"),
+        &choose(Policy::WithinALimit, Some(FIVE_A_WEEK)),
+    )
+    .await
+    .unwrap_or_default();
+
+    assert_eq!(
+        trusted.findings.get(1),
+        Some(&kept_line("Alex")),
+        "{:?}",
+        trusted.findings
+    );
+    assert!(
+        kept_line("Alex").contains("`lemonfiber household allow --member Alex`"),
+        "{}",
+        kept_line("Alex")
+    );
+    assert!(
+        !matching.findings.contains(&kept_line("Alex")),
+        "{:?}",
+        matching.findings
+    );
+}
+
 /// A choice for one person names them, and leaves the household's own alone.
 #[tokio::test]
 async fn a_choice_for_one_person_names_them() {
@@ -116,6 +154,11 @@ async fn a_rehearsal_says_what_it_would_do_and_writes_nothing() {
     .await
     .unwrap_or_default();
 
+    assert!(
+        report.findings.contains(&kept_line("Alex")),
+        "{:?}",
+        report.findings
+    );
     for said in [report, one_person] {
         let first = said.findings.first().cloned().unwrap_or_default();
         assert!(first.contains("rehearsed"), "{first}");
