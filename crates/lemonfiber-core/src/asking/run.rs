@@ -169,8 +169,8 @@ async fn kept_as_they_were(
 /// changes theirs.
 fn kept_line(name: &str) -> String {
     format!(
-        "{name} keeps an arrangement of their own, which this does not change — \
-         `lemonfiber household allow --member {name}` changes theirs"
+        "{name} keeps an arrangement of their own, which this does not change; \
+         lemonfiber household allow --member {name} changes theirs"
     )
 }
 
