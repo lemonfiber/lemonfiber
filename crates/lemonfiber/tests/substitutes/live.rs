@@ -48,8 +48,8 @@ const APPLIED: &str = "applied";
 /// definition name it is listed under, which Prowlarr releases differ on.
 const NEWZNAB: (&str, &str, &str) = ("Newznab", "Generic Newznab", "generic-newznab");
 
-/// The household policy the arm runs under, so the member's ask reaches the curator
-/// without the operator's yes.
+/// The policy the member asks under, so their ask reaches the curator without the
+/// operator's yes.
 const TRUSTED: &str = "trusted";
 
 /// The member who asks.
@@ -267,6 +267,30 @@ fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
     }
 }
 
+/// The member invited, let ask under [`TRUSTED`], and asking for `asked` through the web
+/// surface `core` serves.
+fn member_asked(core: &Core, asked: &Asked) {
+    step(&core.run(&["invite", MEMBER], ""), "invite");
+    step(
+        &core.agreed(&[
+            "household",
+            "allow",
+            "--member",
+            MEMBER,
+            "--policy",
+            TRUSTED,
+        ]),
+        "the member's policy",
+    );
+    let served = member::Served::by(core);
+    assert!(served.is_ok(), "{:?}", served.err());
+    let Ok(served) = served else {
+        return;
+    };
+    let ask = member::asked(core, &served, MEMBER, asked);
+    assert!(ask.is_ok(), "the member's ask: {ask:?}");
+}
+
 /// Run `asked` live through a stack this build sets up beneath `root`, with the usenet
 /// login `usenet` gives setup, and `substitution` put in place once it is first seeded.
 ///
@@ -345,18 +369,7 @@ pub fn run(
     assert!(added.is_ok(), "{added:?}");
     step(&core.run(&["seed"], ""), "seed after the indexer");
 
-    step(&core.run(&["invite", MEMBER], ""), "invite");
-    step(
-        &core.agreed(&["household", "allow", "--policy", TRUSTED]),
-        "the household's policy",
-    );
-    let served = member::Served::by(&core);
-    assert!(served.is_ok(), "{:?}", served.err());
-    let Ok(served) = served else {
-        return;
-    };
-    let ask = member::asked(&core, &served, MEMBER, asked);
-    assert!(ask.is_ok(), "the member's ask: {ask:?}");
+    member_asked(&core, asked);
 
     assert!(
         waited(GRAB_WITHIN, || site.grabbed()),
