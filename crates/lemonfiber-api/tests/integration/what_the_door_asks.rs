@@ -335,7 +335,9 @@ async fn everything_else_still_needs_a_secret_this_run_admits() {
 
 /// Exactly three paths on this surface are let through the token half of the guard: the
 /// door a password is exchanged at, the door a key minted as a claim is collected at, and
-/// the door a service tells the core what happened at.
+/// the door a service tells the core what happened at. The path is read for one thing
+/// besides: whether a request naming `host.docker.internal` is at that last door, the only
+/// one answering that name.
 ///
 /// Read from the guard's own source rather than by trying every path, because the
 /// failure worth catching is a further exemption written beside these three, and a sweep
@@ -356,8 +358,12 @@ fn only_the_three_doors_are_let_through_without_a_token() {
         .collect();
     assert_eq!(
         compared,
-        [&"let at_the_door = DOORS.contains(&request.uri().path());"],
-        "the guard reads the path somewhere other than the list of doors"
+        [
+            &"let at_the_door = DOORS.contains(&request.uri().path());",
+            &"&& request.uri().path() == crate::notify_events::EVENTS;",
+        ],
+        "the guard reads the path somewhere other than the list of doors and the door a \
+         container tells the core what happened at"
     );
     let doors: String = code
         .iter()

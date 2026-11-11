@@ -175,6 +175,16 @@ pub fn household_host_from_env(file: &env::EnvFile) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The address the stack's services tell the core what happened at, where the operator
+/// wrote one; a blank is read as absent.
+#[must_use]
+pub fn events_address_from_env(file: &env::EnvFile) -> Option<String> {
+    file.get(super::EVENTS_ADDRESS_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+}
+
 /// The domain the stack's proxy publishes the household's services under, where one
 /// is written.
 ///

@@ -61,6 +61,9 @@ const NOWHERE: &str = "00000000000000000000000000000000";
 /// nothing answers at.
 const TOLD_AT: &str = "https://core.conformance.invalid/api/notify/events";
 
+/// The certificate digest the conformance cases hand a filler to pin, of no certificate.
+const TOLD_PINNED: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
 /// The key the conformance cases hand a filler to tell the core with, which no core minted.
 const TOLD_WITH: &str = "00000000000000000000000000000000";
 

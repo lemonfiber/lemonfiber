@@ -18,7 +18,7 @@ use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
 use serde_json::Value;
 
-use super::{FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_WITH};
+use super::{FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_PINNED, TOLD_WITH};
 use crate::conformance::Placeholder;
 
 /// The host the conformance cases name a download client on.
@@ -321,8 +321,9 @@ crate::contract! {
             fn grab(value kind: Kind, value id: i64, str release: &str) -> Grabbed where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, release: FINGERPRINT.to_owned() };
         }
         impl Recounting {
-            /// Send each happening to the core's address with the key the core minted for it.
-            fn events(opt_str address: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), key: Some(TOLD_WITH.to_owned()) };
+            /// Send each happening to the core's address, pinning the certificate it presents
+            /// there, with the key the core minted for it.
+            fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()) };
         }
     }
 }

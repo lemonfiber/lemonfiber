@@ -18,7 +18,7 @@ use lemonfiber_ports::service::{
 };
 use serde_json::Value;
 
-use super::{FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_WITH};
+use super::{FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_PINNED, TOLD_WITH};
 use crate::conformance::Placeholder;
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
@@ -172,8 +172,9 @@ crate::contract! {
             };
         }
         impl Recounting {
-            /// Send each happening to the core's address with the key the core minted for it.
-            fn events(opt_str address: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), key: Some(TOLD_WITH.to_owned()) };
+            /// Send each happening to the core's address, pinning the certificate it presents
+            /// there, with the key the core minted for it.
+            fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()) };
         }
     }
 }

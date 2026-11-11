@@ -124,6 +124,7 @@ impl<'a> Fencing<'a> {
             secrets_file: None,
             command: Vec::new(),
             granted: &crate::fence::GRANTED,
+            reaches_host: false,
         }
     }
 }

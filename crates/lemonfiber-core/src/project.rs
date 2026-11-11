@@ -353,6 +353,7 @@ fn pass_unit<'a>(
         secrets_file: None,
         command: crate::pass::command(at),
         granted: &[],
+        reaches_host: false,
     })
 }
 
@@ -425,6 +426,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
             .flatten(),
         command: Vec::new(),
         granted: &[],
+        reaches_host: false,
     }
 }
 

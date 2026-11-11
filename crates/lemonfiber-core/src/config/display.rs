@@ -187,6 +187,12 @@ pub const SHOWN: &[(&str, &str)] = &[
          quiet",
     ),
     (
+        super::EVENTS_ADDRESS_KEY,
+        "the https address the stack's services tell the core what happened at, in place of \
+         host.docker.internal and the port the web interface was served on, which explains \
+         services that were never asked to tell it",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

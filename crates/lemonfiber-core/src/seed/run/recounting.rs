@@ -1,5 +1,6 @@
 //! Each curator and media server asked to tell the core what happened, at the address it
-//! reaches the core at and with a key minted for it alone.
+//! reaches the core at, pinning the certificate the core presents there, and with a key
+//! minted for it alone.
 //!
 //! A fresh key each time it is asked, its digest kept in place of the last, so a key that
 //! leaked stops working at the next wiring. A service speaking a minor from before
@@ -11,26 +12,23 @@ use lemonfiber_contract::capabilities::media::serve;
 
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
+use crate::notify::events::Told;
 use crate::ports::filesystem::Readable;
 use crate::ports::service::{Failure, Recounting};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Filler, Fillers};
-
-/// Why no service is asked, where nothing names the address it would reach the core at.
-const NOWHERE: &str = "no address the stack's services reach the core at is set, so none is \
-                       asked to tell it what happened";
 
 /// What the report calls this connection for the service `name`.
 fn connection(name: &str) -> String {
     format!("{name} telling the core what happened")
 }
 
-/// Ask every curator and media server here to tell the core what happened at `address`,
-/// where there is one.
+/// Ask every curator and media server here to tell the core what happened where `told`
+/// says, or say why none is where it says nothing can be.
 pub(super) async fn seed_events(
     ctx: &Ctx,
     fillers: &Fillers,
-    address: Option<String>,
+    told: Result<Told, String>,
 ) -> Vec<Wiring> {
     let speakers: Vec<(&Filler, &'static str, u32)> = fillers
         .services()
@@ -47,23 +45,24 @@ pub(super) async fn seed_events(
     let mut wirings = Vec::new();
     for (speaker, capability, major) in speakers {
         let part = fillers.fronted_by(speaker).unwrap_or(speaker);
-        let state = match (&address, ctx.dry_run) {
-            (None, _) => State::Skipped {
-                reason: NOWHERE.to_owned(),
+        let state = match (&told, ctx.dry_run) {
+            (Err(why), _) => State::Skipped {
+                reason: why.clone(),
             },
-            (Some(at), true) => State::WouldWire {
+            (Ok(told), true) => State::WouldWire {
                 yours: None,
-                ours: Some(at.clone()),
+                ours: Some(told.address.clone()),
             },
-            (Some(at), false) => asked(ctx, speaker, capability, major, at).await,
+            (Ok(told), false) => asked(ctx, speaker, capability, major, told).await,
         };
         wirings.push(Wiring::settled(connection(&part.name), state));
     }
     wirings
 }
 
-/// What became of asking `speaker`, over `capability` at `major`, to tell the core at `at`.
-async fn asked(ctx: &Ctx, speaker: &Filler, capability: &str, major: u32, at: &str) -> State {
+/// What became of asking `speaker`, over `capability` at `major`, to tell the core where
+/// `told` says.
+async fn asked(ctx: &Ctx, speaker: &Filler, capability: &str, major: u32, told: &Told) -> State {
     let Spoken::Over(adapter) = spoken(ctx, speaker, capability, major).await else {
         return State::Skipped {
             reason: format!(
@@ -81,9 +80,13 @@ async fn asked(ctx: &Ctx, speaker: &Filler, capability: &str, major: u32, at: &s
         return State::Failed { detail };
     }
     let answer = if capability == curate::CAPABILITY {
-        curate::Adapter(adapter).events(Some(at), Some(&key)).await
+        curate::Adapter(adapter)
+            .events(Some(&told.address), Some(&told.pin), Some(&key))
+            .await
     } else {
-        serve::Adapter(adapter).events(Some(at), Some(&key)).await
+        serve::Adapter(adapter)
+            .events(Some(&told.address), Some(&told.pin), Some(&key))
+            .await
     };
     match answer {
         Ok(()) => State::Wired,

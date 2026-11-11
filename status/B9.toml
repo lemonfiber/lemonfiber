@@ -5,7 +5,7 @@ requirement = [
   { id = "B9-R1", state = "done", evidence = ["crates/lemonfiber-core/src/notify/configuring.rs", "crates/lemonfiber-core/src/notify/backends.rs"] },
   { id = "B9-R2", state = "done", evidence = ["crates/lemonfiber-core/src/notify/fanning.rs", "crates/lemonfiber-core/src/notify/events.rs", "crates/lemonfiber-api/src/notify_events.rs"] },
   { id = "B9-R3", state = "done", evidence = ["crates/lemonfiber-core/src/notify/proving.rs", "crates/lemonfiber-core/src/notify/sending.rs", "crates/lemonfiber-core/src/push/woken.rs"] },
-  { id = "B9-R4", state = "partial", evidence = ["crates/lemonfiber-core/src/seed/run/recounting.rs", "crates/lemonfiber-core/src/notify/events.rs", "crates/lemonfiber-contract/src/capabilities/library.rs", "crates/lemonfiber-contract/src/capabilities/media.rs"] },
+  { id = "B9-R4", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/recounting.rs", "crates/lemonfiber-core/src/notify/events.rs", "crates/lemonfiber-core/src/notify/events/reached.rs", "crates/lemonfiber-contract/src/capabilities/library.rs", "crates/lemonfiber-contract/src/capabilities/media.rs"] },
   { id = "B9-R5", state = "done", evidence = ["crates/lemonfiber-core/src/notify/choosing.rs", "crates/lemonfiber-core/src/notify/fanning.rs", "crates/lemonfiber-core/src/notify/events.rs"] },
   { id = "B9-R6", state = "done", evidence = ["crates/lemonfiber-core/src/notify/fanning.rs", "crates/lemonfiber-core/src/notify/reading.rs"] },
   { id = "B9-R7", state = "done", evidence = ["crates/lemonfiber-core/src/notify/fanning.rs"] },
