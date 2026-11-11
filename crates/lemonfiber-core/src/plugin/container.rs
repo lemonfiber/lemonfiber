@@ -110,7 +110,7 @@ fn published(placed: &Placed) -> Vec<(Tier, u16, u16)> {
         return Vec::new();
     };
     let tier = match reached {
-        Reached::Loopback { .. } => Tier::Loopback,
+        Reached::Loopback { .. } | Reached::Proxied { .. } => Tier::Loopback,
         Reached::Household { .. } => Tier::Household,
     };
     let first = reached.port();

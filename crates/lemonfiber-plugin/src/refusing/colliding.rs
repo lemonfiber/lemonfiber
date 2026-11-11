@@ -168,12 +168,11 @@ fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
     }
 }
 
-/// Every service lemonfiber writes a proxy stanza for: a port, on the household tier.
+/// Every service lemonfiber writes a proxy stanza for: a port, on a tier the proxy routes.
 fn proxied(manifest: &Manifest) -> impl Iterator<Item = &crate::schema::Service> {
-    manifest
-        .services
-        .iter()
-        .filter(|service| service.port.is_some() && service.bind == Some(crate::schema::Bind::Lan))
+    manifest.services.iter().filter(|service| {
+        service.port.is_some() && service.bind.is_some_and(crate::schema::Bind::routed)
+    })
 }
 
 #[cfg(test)]

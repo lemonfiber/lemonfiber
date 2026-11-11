@@ -21,13 +21,15 @@
     "tier": {
       "type": [
         "const:\"household\"",
-        "const:\"loopback\""
+        "const:\"loopback\"",
+        "const:\"proxied\""
       ],
       "required": true
     }
   },
   "variants": [
     "\"household\"",
-    "\"loopback\""
+    "\"loopback\"",
+    "\"proxied\""
   ]
 }

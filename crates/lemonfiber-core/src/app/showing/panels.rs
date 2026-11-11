@@ -34,6 +34,9 @@ struct Listing<'a> {
     port: Option<u16>,
     /// Whether the household reaches it.
     household: bool,
+    /// The label the household reaches it at through the stack's proxy alone, where its
+    /// port is published on this machine and nowhere else.
+    proxied: Option<&'a str>,
     /// The path it answers over HTTP to say it is up.
     health: Option<&'a str>,
 }
@@ -57,6 +60,7 @@ impl<'a> Listing<'a> {
             hidden: dashboard.hidden,
             port: service.port,
             household: service.bind == Some(Bind::Lan),
+            proxied: None,
             health: service
                 .health
                 .as_ref()
@@ -75,7 +79,14 @@ impl<'a> Listing<'a> {
             icon: placed.icon(),
             hidden: placed.hidden,
             port: placed.published(),
-            household: matches!(placed.reached, Some(Reached::Household { .. })),
+            household: matches!(
+                placed.reached,
+                Some(Reached::Household { .. } | Reached::Proxied { .. })
+            ),
+            proxied: match &placed.reached {
+                Some(Reached::Proxied { hostname, .. }) => Some(hostname),
+                _ => None,
+            },
             health: placed.health.as_deref(),
         }
     }
@@ -117,7 +128,7 @@ pub(crate) fn panels(
         let entry = Entry {
             name: listing.name.to_owned(),
             icon: listing.icon.clone(),
-            link: link(place, port, reached.household),
+            link: link(place, port, reached),
             description: listing.description.to_owned(),
             check: check(fillers.service(listing.id), listing.health),
             widget: None,
@@ -160,16 +171,21 @@ fn guarded<'b, 'a>(
     Some((media.id, guard))
 }
 
-/// Where a browser goes for a service on `port`: the address the household is handed for
-/// a household service, and this machine for an operator surface.
-fn link(place: &Place<'_>, port: u16, household: bool) -> String {
-    household
-        .then(|| crate::door::address(place.named, place.recorded, place.environment, port))
-        .flatten()
-        .map_or_else(
-            || format!("http://{}:{port}", crate::door::ONLY_HERE),
-            |address| address.url,
-        )
+/// Where a browser goes for `listing` on `port`: its name through the stack's proxy for a
+/// proxied service, the address the household is handed for another household service, and
+/// this machine for an operator surface or where neither can be worked out.
+fn link(place: &Place<'_>, port: u16, listing: &Listing<'_>) -> String {
+    let household = match listing.proxied {
+        Some(label) => crate::door::proxied(label, place.domain),
+        None => listing
+            .household
+            .then(|| crate::door::address(place.named, place.recorded, place.environment, port))
+            .flatten(),
+    };
+    household.map_or_else(
+        || format!("http://{}:{port}", crate::door::ONLY_HERE),
+        |address| address.url,
+    )
 }
 
 /// Where the dashboard asks whether a service is up: its health path, at the address the

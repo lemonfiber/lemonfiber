@@ -16,7 +16,7 @@ use lemonfiber_core::app::putting_back::Reversal;
 use lemonfiber_core::doctor::Verdict as Checked;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
-    asked, Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Verdict,
+    asked, Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Verdict,
     Verification,
 };
 
@@ -25,11 +25,13 @@ use super::super::Lines;
 mod answering;
 mod demanded;
 mod listed;
+mod reaching;
 mod removed;
 mod reproved;
 mod updated;
 mod wired;
 
+use reaching::reached;
 use wired::{asking, contesting};
 
 /// What is installed on this machine, and what installing one came to.
@@ -56,7 +58,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             named(&install.would)
         ));
         lines.put(format!("    from {}", listed::origin(&install.would)));
-        lines.extend(services(&install.would));
+        lines.extend(services(&install.would, report.unproxied));
         lines.extend(contesting(&install.contests, install.recorded));
         lines.extend(asking(&install.asks, install.recorded));
         lines.extend(changes(&install.changes, acted));
@@ -128,7 +130,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
     for one in &report.installed {
         lines.spaced(format!("  {}", named(one)));
         lines.extend(listed::provenance(one, report));
-        lines.extend(services(one));
+        lines.extend(services(one, report.unproxied));
     }
     lines
 }
@@ -485,7 +487,7 @@ fn named(one: &Installed) -> String {
 /// tag is a label its publisher can repoint and the digest is what is actually on
 /// this machine. Both are shown: one is what an operator recognises and the other is
 /// what they can check.
-fn services(one: &Installed) -> Lines {
+fn services(one: &Installed, unproxied: bool) -> Lines {
     let mut lines = Lines::default();
     for service in &one.services {
         lines.put(format!("    {}", service.service));
@@ -494,43 +496,13 @@ fn services(one: &Installed) -> Lines {
         lines.put(format!("      config  {}", service.config_path));
         lines.put(format!(
             "      reached {}",
-            reached(service.reached.as_ref())
+            reached(service.reached.as_ref(), unproxied)
         ));
         if service.takes_data {
             lines.put("      library mounted".to_owned());
         }
     }
     lines
-}
-
-/// How a service is reached, in the terms the tier decides.
-///
-/// A loopback service says so and names no address: lemonfiber renders one from the
-/// tier, and a line here that spelled one out would be a second answer free to
-/// disagree with the one the stack is written from.
-fn reached(reached: Option<&Reached>) -> String {
-    match reached {
-        None => "nothing — it publishes no port".to_owned(),
-        Some(Reached::Loopback { port, group }) => {
-            format!(
-                "this machine only, on port {port}{}",
-                panel(group.as_deref())
-            )
-        }
-        Some(Reached::Household {
-            port,
-            hostname,
-            group,
-        }) => format!(
-            "the household, as {hostname}, on port {port}{}",
-            panel(group.as_deref())
-        ),
-    }
-}
-
-/// The dashboard group, where the manifest named one.
-fn panel(group: Option<&str>) -> String {
-    group.map_or_else(String::new, |group| format!(", under {group}"))
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@
 use super::*;
 
 /// A listing of `installed`, with nothing else on the page.
-fn listing(installed: Vec<Installed>) -> Installs {
+pub(super) fn listing(installed: Vec<Installed>) -> Installs {
     Installs {
         demand: None,
         nonconforming: Vec::new(),
@@ -18,6 +18,7 @@ fn listing(installed: Vec<Installed>) -> Installs {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }
 }
 
@@ -68,68 +69,6 @@ fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
     );
 }
 
-/// A loopback service says so and names no address: lemonfiber renders one from
-/// the tier, and a line here spelling one out would be a second answer.
-#[test]
-fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
-    let said = installs(&Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        agreement: None,
-        removal: None,
-        installed: vec![recorded(
-            "komga",
-            Some(Reached::Loopback {
-                port: 9000,
-                group: Some("Operators".to_owned()),
-            }),
-        )],
-        install: None,
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-        unvetted: None,
-        guards: Vec::new(),
-    })
-    .text();
-    assert!(said.contains("this machine only, on port 9000"), "{said}");
-    assert!(said.contains("under Operators"), "{said}");
-    assert!(
-        !said.contains("as komga"),
-        "a loopback service was given a name: {said}"
-    );
-}
-
-#[test]
-fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
-    let said = installs(&Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        agreement: None,
-        removal: None,
-        installed: vec![recorded(
-            "komga",
-            Some(Reached::Loopback {
-                port: 9000,
-                group: None,
-            }),
-        )],
-        install: None,
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
-        unvetted: None,
-        guards: Vec::new(),
-    })
-    .text();
-    assert!(said.contains("this machine only, on port 9000"), "{said}");
-    assert!(!said.contains("under"), "{said}");
-}
-
 #[test]
 fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
     let one = recorded("komga", Some(household()));
@@ -147,6 +86,7 @@ fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
@@ -179,6 +119,7 @@ fn the_install_shows_the_container_that_is_written_for_it() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(
@@ -216,6 +157,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
             sources: Vec::new(),
             unvetted: None,
             guards: Vec::new(),
+            unproxied: false,
         })
         .text()
     };
@@ -253,6 +195,7 @@ fn a_rehearsal_states_every_change_every_proof_and_every_override() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(
@@ -328,6 +271,7 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     let keyed = said
@@ -374,6 +318,7 @@ fn an_install_states_the_same_three_in_the_past_tense() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(said.contains("What it put on this machine:"), "{said}");
@@ -406,6 +351,7 @@ fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(
@@ -489,6 +435,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     for expected in [
@@ -539,6 +486,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(
@@ -570,6 +518,7 @@ fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(said.starts_with("Would install komga 1.2.0:"), "{said}");
@@ -602,6 +551,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
             sources: Vec::new(),
             unvetted: None,
             guards: Vec::new(),
+            unproxied: false,
         })
         .text();
         let header = said.lines().nth(1).unwrap_or_default();
@@ -633,6 +583,7 @@ fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(
@@ -661,6 +612,7 @@ fn the_printer_reaches_this_renderer_for_this_outcome() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }))
     .text();
     assert!(drawn.contains("komga 1.2.0"), "{drawn}");
@@ -723,6 +675,7 @@ fn a_source_that_cannot_be_fetched_is_said_to_leave_the_plugin_unupdatable() {
         ],
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
 
@@ -761,6 +714,7 @@ fn an_answer_kept_against_a_plugin_is_named_with_when_why_and_what_it_stops() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(

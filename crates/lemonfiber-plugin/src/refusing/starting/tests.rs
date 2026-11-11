@@ -72,3 +72,13 @@ fn an_argument_that_is_not_a_string_is_refused() {
 
     assert!(names(&said, &["args"]), "{said:?}");
 }
+
+#[test]
+fn an_argument_carrying_what_a_diff_cannot_show_is_refused_naming_it() {
+    let said = with_args("[\"ser\\u202eve\"]");
+
+    assert!(
+        names(&said, &["service komga.args[0]", "U+202E"]),
+        "{said:?}"
+    );
+}

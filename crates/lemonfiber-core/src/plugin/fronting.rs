@@ -46,7 +46,10 @@ pub fn routes(installed: &[Installed], domain: &str) -> Vec<Route> {
         .iter()
         .flat_map(|plugin| &plugin.services)
         .filter_map(|placed| {
-            let Some(Reached::Household { port, hostname, .. }) = &placed.reached else {
+            let Some(
+                Reached::Household { port, hostname, .. } | Reached::Proxied { port, hostname, .. },
+            ) = &placed.reached
+            else {
                 return None;
             };
             let at = inside(*port, placed.listens);

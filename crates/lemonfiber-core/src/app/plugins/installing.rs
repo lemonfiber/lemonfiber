@@ -184,11 +184,6 @@ pub(super) async fn install(
     let standing = if recorded { after } else { held };
 
     Ok(Installs {
-        demand: None,
-        nonconforming: Vec::new(),
-        proof: None,
-        rehearsed: false,
-        removal: None,
         installed: standing.installed().to_vec(),
         install: Some(Box::new(Install {
             granting: crate::plugin::granting(&would),
@@ -208,12 +203,8 @@ pub(super) async fn install(
             recipes_ran,
             taking,
         })),
-        update: None,
-        substituted: Vec::new(),
-        sources: Vec::new(),
         agreement: Some(offer),
-        unvetted: None,
-        guards: Vec::new(),
+        ..Installs::default()
     })
 }
 

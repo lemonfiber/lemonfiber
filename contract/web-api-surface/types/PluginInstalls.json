@@ -66,6 +66,12 @@
       ],
       "required": false
     },
+    "unproxied": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
     "unvetted": {
       "type": [
         "anyOf(null,ref:Unvetted)"

@@ -266,6 +266,59 @@ fn an_installed_plugins_service_is_listed_in_place_of_the_stack_service_it_moved
     );
 }
 
+/// A proxied service links to its name through the stack's proxy where a domain is
+/// configured, and to this machine where none is: never to the household's address, where
+/// its port is not published.
+#[test]
+fn a_proxied_service_links_through_the_proxy_or_to_this_machine() {
+    let mut placed = crate::test_support::a_placed("ntfy", &[], Some(2586));
+    placed.name = "Push".to_owned();
+    placed.reached = Some(Reached::Proxied {
+        port: 2586,
+        hostname: "push".to_owned(),
+        group: None,
+    });
+    let installed = crate::test_support::an_installed("ntfy", vec![placed]);
+    let manifest = Manifest::from_toml(lemonfiber_bundled::STACK);
+    let fillers = manifest
+        .map(|manifest| {
+            Fillers::of(
+                &manifest,
+                std::slice::from_ref(&installed),
+                &Chosen::default(),
+                None,
+            )
+        })
+        .unwrap_or_default();
+    let named = Place {
+        domain: Some("home.lemonfiber.app"),
+        ..place()
+    };
+    let link = |at: &Place<'_>| {
+        entry(
+            &panels(
+                &carried(),
+                std::slice::from_ref(&installed),
+                &fillers,
+                at,
+                SEARCH,
+            ),
+            "Push",
+        )
+        .map(|one| one.link.clone())
+    };
+
+    assert_eq!(
+        link(&named).as_deref(),
+        Some("https://push.home.lemonfiber.app")
+    );
+    assert_eq!(link(&place()).as_deref(), Some("http://localhost:2586"));
+    assert_eq!(
+        group_of(&listed(&carried(), &[installed]), "Push"),
+        Some(HOUSEHOLD_GROUP)
+    );
+}
+
 /// The defaults are the stack's answer rather than this module's, so they are held to the
 /// dashboard the stack ships: each is a group there, holding the tier it is the default
 /// for.

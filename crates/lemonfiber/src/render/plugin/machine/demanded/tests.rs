@@ -48,6 +48,7 @@ fn asked(ran: Option<Ran>) -> Installs {
         rehearsed: false,
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }
 }
 
