@@ -302,6 +302,12 @@ fn each_arrangement_reads_back_as_its_own_line() {
         "may ask for 5 requests a week without anybody seeing it first"
     );
     assert!(now_reads(&holding(false, Some(FIVE_A_WEEK))).starts_with("waits for you"));
-    assert!(now_reads(&holding(true, None)).contains("everything anybody asks for"));
-    assert!(now_reads(&holding(false, None)).contains("until you have said yes"));
+    assert_eq!(
+        now_reads(&holding(true, None)),
+        "is set so that everything anybody asks for arrives, however much of it"
+    );
+    assert_eq!(
+        now_reads(&holding(false, None)),
+        "is set so that nothing arrives until you have said yes to it"
+    );
 }

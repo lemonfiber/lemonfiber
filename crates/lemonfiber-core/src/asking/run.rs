@@ -238,7 +238,7 @@ fn now_reads(wanted: &Asking) -> String {
             "waits for you, and is counted against {}",
             crate::asking::limit(quota)
         ),
-        None => format!("now {}", policy.means()),
+        None => format!("is set so that {}", policy.means()),
     }
 }
 
