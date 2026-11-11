@@ -151,39 +151,51 @@ fn providing(plugin: &str, capability: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The first address `docker` prints for `args`, of the words it prints.
+fn docker_address(args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("docker")
+        .args(args)
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .find(|word| word.parse::<std::net::IpAddr>().is_ok())
+        .map(str::to_owned)
+}
+
 /// The gateway of the network the indexer's container sits on, which reaches this machine.
 fn gateway() -> Option<String> {
     let output = std::process::Command::new("docker")
         .args([
             "inspect",
             "--format",
-            "{{range .NetworkSettings.Networks}}{{.Gateway}} {{end}}",
+            "{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}",
             &format!("lemonfiber-{INDEXER}-1"),
         ])
         .output()
         .ok()?;
     String::from_utf8_lossy(&output.stdout)
         .split_whitespace()
-        .next()
-        .map(str::to_owned)
+        .find_map(|network| {
+            docker_address(&[
+                "network",
+                "inspect",
+                network,
+                "--format",
+                "{{range .IPAM.Config}}{{.Gateway}} {{end}}",
+            ])
+        })
 }
 
 /// This machine's address on Docker's default bridge, which the household's links name.
 fn bridged() -> Option<String> {
-    let output = std::process::Command::new("docker")
-        .args([
-            "network",
-            "inspect",
-            "bridge",
-            "--format",
-            "{{range .IPAM.Config}}{{.Gateway}} {{end}}",
-        ])
-        .output()
-        .ok()?;
-    String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .next()
-        .map(str::to_owned)
+    docker_address(&[
+        "network",
+        "inspect",
+        "bridge",
+        "--format",
+        "{{range .IPAM.Config}}{{.Gateway}} {{end}}",
+    ])
 }
 
 /// The site added to the indexer as the operator adds one: its own Newznab definition
