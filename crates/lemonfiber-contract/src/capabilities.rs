@@ -233,11 +233,7 @@ pub const FACETS: [&str; 2] = [indexer::pull::CAPABILITY, owner::claim::CAPABILI
 
 /// Every capability whose contract is published before a bundled part provides it, which the
 /// vocabulary carries only once one does.
-pub const AWAITING_A_BUNDLED_CLAIMANT: [&str; 3] = [
-    status::watch::CAPABILITY,
-    music::curate::CAPABILITY,
-    books::curate::CAPABILITY,
-];
+pub const AWAITING_A_BUNDLED_CLAIMANT: [&str; 1] = [status::watch::CAPABILITY];
 
 /// Whether the capability `name` is a facet.
 #[must_use]

@@ -171,6 +171,70 @@
       ]
     },
     {
+      "name": "music.curate",
+      "summary": "Looks albums and artists up by words, and takes a member's ask for one.",
+      "contract": "Answers a lookup of albums or artists by words with what the catalogue holds, takes an ask for one album or artist into its wanted list at the profile it is given, and says the units it answers for. Nothing it holds is readable without the operator's credential.",
+      "declared_by": ["lidarr"],
+      "probes": [
+        {
+          "id": "guarded",
+          "kind": "request",
+          "title": "An anonymous caller is refused a lookup",
+          "asks": "a lookup by words, presenting nothing",
+          "why": "A curator holds every key the stack was given and can be made to download anything. Its API answering the network at all is the failure; whatever the lookup would have found is beside the point.",
+          "credential": "none",
+          "requires": {
+            "status": [401, 403],
+            "body": []
+          }
+        },
+        {
+          "id": "looked-up",
+          "kind": "request",
+          "title": "It answers a lookup with what the catalogue holds",
+          "asks": "the same lookup, with the credential the operator holds",
+          "why": "A lookup is what a member's ask starts from, and the half of this that can be demonstrated without asking for anything.",
+          "credential": "operator",
+          "requires": {
+            "status": [200],
+            "body": ["json", "json_array_min"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "books.curate",
+      "summary": "Looks books and authors up by words, and takes a member's ask for one.",
+      "contract": "Answers a lookup of books or authors by words with what the catalogue holds, takes an ask for one book or author into its wanted list at the profile it is given, and says the units it answers for. Nothing it holds is readable without the operator's credential.",
+      "declared_by": ["bindery"],
+      "probes": [
+        {
+          "id": "guarded",
+          "kind": "request",
+          "title": "An anonymous caller is refused a lookup",
+          "asks": "a lookup by words, presenting nothing",
+          "why": "A curator holds every key the stack was given and can be made to download anything. Its API answering the network at all is the failure; whatever the lookup would have found is beside the point.",
+          "credential": "none",
+          "requires": {
+            "status": [401, 403],
+            "body": []
+          }
+        },
+        {
+          "id": "looked-up",
+          "kind": "request",
+          "title": "It answers a lookup with what the catalogue holds",
+          "asks": "the same lookup, with the credential the operator holds",
+          "why": "A lookup is what a member's ask starts from, and the half of this that can be demonstrated without asking for anything.",
+          "credential": "operator",
+          "requires": {
+            "status": [200],
+            "body": ["json", "json_array_min"]
+          }
+        }
+      ]
+    },
+    {
       "name": "subtitles.fetch",
       "summary": "Finds subtitles for what is already filed and puts them beside it.",
       "contract": "Reads what the library already holds, finds subtitles for it in the languages the operator asked for, and writes them beside the media. Its own configuration and the provider accounts in it are not readable without the operator's credential.",

@@ -23,7 +23,7 @@ use self::site::{Release, Site};
 const INDEXER: &str = "prowlarr";
 
 /// The credential the indexer's key is held under.
-const INDEXER_KEY: &str = "PROWLARR_API_KEY";
+const INDEXER_KEY: &str = "prowlarr:upstream-key";
 
 /// The Usenet login setup is given: a provider over TLS, which nothing in the run
 /// downloads from, since the grab is proved where the download is queued.

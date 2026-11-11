@@ -9,8 +9,11 @@
 //! concerns. Nothing here decides anything; it is the table the module reads.
 
 mod configured;
+mod curating;
 
 use lemonfiber_manifest::container::MEDIA_SERVE;
+
+use curating::{BOOKS_CURATE, MUSIC_CURATE};
 
 use configured::{
     ARCHIVE_EXTRACT, DASHBOARD_SHOW, INVITE_DECLINE, PROXY_FRONT, QUALITY_SYNC, REQUEST_GATE,
@@ -250,6 +253,8 @@ pub(super) const CARRIED: &[Capability] = &[
         ],
         listens: true,
     },
+    MUSIC_CURATE,
+    BOOKS_CURATE,
     Capability {
         name: "subtitles.fetch",
         summary: "Finds subtitles for what is already filed and puts them beside it.",
