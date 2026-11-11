@@ -19,6 +19,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_contract::adapter::EVENTS_KEY_FILE;
+use lemonfiber_ports::narration::Narrator;
+use lemonfiber_ports::random::Random;
 use lemonfiber_ports::service::{Event, Failure, Heard, Hearing, Recounting, EVERY, EVERY_DEFAULT};
 use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
@@ -101,11 +103,28 @@ pub struct Recounter {
 }
 
 /// The upstream's connection, and the address it reaches the adapter at.
+#[derive(Clone)]
 struct Pushed {
     /// The connection.
     connection: Arc<dyn Connection>,
     /// The adapter's own address as its upstream reaches it, without a trailing slash.
     reached_at: String,
+}
+
+/// What a recounter is made of.
+struct Parts {
+    /// The upstream, as its failures name it.
+    service: String,
+    /// The adapter's configuration directory.
+    configuration: PathBuf,
+    /// The upstream's history.
+    history: Arc<dyn History>,
+    /// The upstream's connection, where it has one.
+    pushed: Option<Pushed>,
+    /// Where a push path's secret is drawn from.
+    random: Arc<dyn Random>,
+    /// Where what it says is said.
+    narrator: Arc<dyn Narrator>,
 }
 
 /// What the task shares with the asks.
@@ -124,6 +143,10 @@ pub(crate) struct Shared {
     secret: Held<Option<String>>,
     /// Woken by each push.
     woken: Notify,
+    /// Where a push path's secret is drawn from.
+    random: Arc<dyn Random>,
+    /// Where what it says is said.
+    narrator: Arc<dyn Narrator>,
 }
 
 /// What is kept and the task running.
@@ -136,15 +159,24 @@ pub(crate) struct Running {
 }
 
 impl Recounter {
-    /// A recounter for `service`, reading `history` and keeping its cursor beneath
-    /// `configuration`, polling alone.
+    /// A recounter for `service`, reading `history`, keeping its cursor beneath
+    /// `configuration` and saying through `narrator` what the adapter's log is told,
+    /// polling alone, drawing a push path's secret from the operating system.
     #[must_use]
     pub fn new(
         service: impl Into<String>,
         configuration: impl Into<PathBuf>,
         history: Arc<dyn History>,
+        narrator: Arc<dyn Narrator>,
     ) -> Self {
-        Self::built(service.into(), configuration.into(), history, None)
+        Self::built(Parts {
+            service: service.into(),
+            configuration: configuration.into(),
+            history,
+            pushed: None,
+            random: Arc::new(crate::random::Os),
+            narrator,
+        })
     }
 
     /// The same recounter, pushed to through `connection` where it can be, at
@@ -155,34 +187,50 @@ impl Recounter {
         connection: Arc<dyn Connection>,
         reached_at: impl Into<String>,
     ) -> Self {
-        let shared = &self.shared;
-        Self::built(
-            shared.service.clone(),
-            shared.configuration.clone(),
-            Arc::clone(&shared.history),
-            Some(Pushed {
+        Self::built(Parts {
+            pushed: Some(Pushed {
                 connection,
                 reached_at: reached_at.into().trim_end_matches('/').to_owned(),
             }),
-        )
+            ..self.parts()
+        })
     }
 
-    /// A recounter of its parts.
-    fn built(
-        service: String,
-        configuration: PathBuf,
-        history: Arc<dyn History>,
-        pushed: Option<Pushed>,
-    ) -> Self {
+    /// The same recounter, drawing a push path's secret from `random`.
+    #[must_use]
+    pub fn drawing_from(self, random: Arc<dyn Random>) -> Self {
+        Self::built(Parts {
+            random,
+            ..self.parts()
+        })
+    }
+
+    /// What this recounter was made of.
+    fn parts(&self) -> Parts {
+        let shared = &self.shared;
+        Parts {
+            service: shared.service.clone(),
+            configuration: shared.configuration.clone(),
+            history: Arc::clone(&shared.history),
+            pushed: shared.pushed.clone(),
+            random: Arc::clone(&shared.random),
+            narrator: Arc::clone(&shared.narrator),
+        }
+    }
+
+    /// A recounter of `parts`, asked nothing yet.
+    fn built(parts: Parts) -> Self {
         Self {
             shared: Arc::new(Shared {
-                service,
-                configuration,
-                history,
-                pushed,
+                service: parts.service,
+                configuration: parts.configuration,
+                history: parts.history,
+                pushed: parts.pushed,
                 running: Mutex::new(Running::default()),
                 secret: Held::new(None),
                 woken: Notify::new(),
+                random: parts.random,
+                narrator: parts.narrator,
             }),
         }
     }
@@ -194,15 +242,19 @@ impl Recounter {
         let kept = match kept::read(&shared.configuration) {
             Ok(Some(kept)) => kept,
             Ok(None) => return,
-            Err(why) => return shared.said(&format!("what it kept could not be read: {why}")),
+            Err(why) => {
+                return shared
+                    .said(&format!("what it kept could not be read: {why}"))
+                    .await
+            }
         };
         let key = std::fs::read_to_string(shared.configuration.join(EVENTS_KEY_FILE))
             .map(|key| key.trim().to_owned())
             .unwrap_or_default();
         let Some(told) = Told::new(&kept.address, &kept.pin, &key) else {
-            return shared.said(
-                "what it kept or the key it tells the core with will not do, so it waits to be asked again",
-            );
+            return shared
+                .said("what it kept or the key it tells the core with will not do, so it waits to be asked again")
+                .await;
         };
         let mut running = shared.running.lock().await;
         if running.kept.is_none() {
@@ -274,8 +326,10 @@ impl Recounter {
         let Some(pushed) = &shared.pushed else {
             return Ok(None);
         };
-        let Some(secret) = kept.or_else(made) else {
-            shared.said("no secret could be made for a push, so it polls");
+        let Some(secret) = kept.or_else(|| made(shared.random.as_ref())) else {
+            shared
+                .said("no secret could be made for a push, so it polls")
+                .await;
             return Ok(None);
         };
         let at = format!("{}{PUSHED}/{secret}", pushed.reached_at);
@@ -339,6 +393,19 @@ impl Recounting for Recounter {
         key: Option<&str>,
         every: Option<u32>,
     ) -> Result<Option<Heard>, Failure> {
+        self.asked(address, pin, key, every).await
+    }
+}
+
+impl Recounter {
+    /// Send from now on as `events` was asked, or stop where it was asked with nothing.
+    async fn asked(
+        &self,
+        address: Option<&str>,
+        pin: Option<&str>,
+        key: Option<&str>,
+        every: Option<u32>,
+    ) -> Result<Option<Heard>, Failure> {
         let shared = &self.shared;
         match (address, pin, key) {
             (None, None, None) => self.stopped().await.map(|()| None),
@@ -366,9 +433,11 @@ impl Recounting for Recounter {
 }
 
 impl Shared {
-    /// `what` said in the adapter's log, naming the upstream.
-    fn said(&self, what: &str) {
-        eprintln!("{} events: {what}", self.service);
+    /// `what` said in the adapter's log.
+    async fn said(&self, what: &str) {
+        self.narrator
+            .say(&format!("telling the core what happened: {what}"))
+            .await;
     }
 
     /// An ask refused for `detail`.
@@ -388,12 +457,13 @@ impl Shared {
     }
 }
 
-/// A fresh secret for a push path, or nothing where no randomness could be had.
-fn made() -> Option<String> {
-    let mut bytes = [0_u8; SECRET_BYTES];
-    getrandom::fill(&mut bytes)
-        .ok()
-        .map(|()| lemonfiber_ports::digest::hex(&bytes))
+/// A fresh secret for a push path drawn from `random`, or nothing where no randomness
+/// could be had.
+fn made(random: &dyn Random) -> Option<String> {
+    random
+        .bytes(SECRET_BYTES)
+        .filter(|bytes| bytes.len() == SECRET_BYTES)
+        .map(|bytes| lemonfiber_ports::digest::hex(&bytes))
 }
 
 #[cfg(test)]

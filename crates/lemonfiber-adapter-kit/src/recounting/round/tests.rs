@@ -5,7 +5,11 @@ use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_ports::service::Hearing;
 
 use super::super::kept::Kept;
-use super::super::tests::{kept_in, names, recounter, Script};
+use std::sync::Arc;
+
+use lemonfiber_fixtures::heard::Heard;
+
+use super::super::tests::{kept_in, names, recounter, recounter_heard, Script};
 use super::super::told::tests::{address, core, KEY};
 use super::super::told::Told;
 use super::{round, Waiting};
@@ -40,7 +44,8 @@ async fn a_cursor_the_upstream_no_longer_holds_moves_to_its_newest_and_sends_not
     let Some((served, posts)) = core(StatusCode::ACCEPTED) else {
         return;
     };
-    let recounter = recounter(dir.path(), &history);
+    let heard = Arc::new(Heard::default());
+    let recounter = recounter_heard(dir.path(), &history, &heard);
     let told = Told::new(&address(&served), &served.pin, KEY);
     recounter.shared.running.lock().await.kept =
         Some(kept(address(&served), served.pin.clone(), "1"));
@@ -54,6 +59,10 @@ async fn a_cursor_the_upstream_no_longer_holds_moves_to_its_newest_and_sends_not
         Some("3")
     );
     assert!(names(&posts).is_empty());
+    assert!(heard
+        .said()
+        .iter()
+        .any(|said| said.contains("no longer holds 1") && said.contains("its newest, 3")));
 }
 
 #[tokio::test]

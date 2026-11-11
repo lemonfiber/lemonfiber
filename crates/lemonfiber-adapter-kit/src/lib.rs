@@ -14,6 +14,7 @@ pub mod endpoint;
 mod gate;
 pub mod members;
 pub mod picture;
+pub mod random;
 pub mod recounting;
 pub mod settings;
 pub mod shared;

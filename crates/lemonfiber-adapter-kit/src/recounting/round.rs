@@ -56,7 +56,9 @@ pub(crate) async fn round(shared: &Shared, told: &Told) -> bool {
             Ok(Some(page)) => page,
             Ok(None) => return moved(shared, &cursor).await,
             Err(failure) => {
-                shared.said(&format!("its history could not be read: {failure}"));
+                shared
+                    .said(&format!("its history could not be read: {failure}"))
+                    .await;
                 return false;
             }
         };
@@ -97,7 +99,7 @@ async fn sent(shared: &Shared, told: &Told, entry: Entry) -> bool {
         }
     }
     kept.cursor = entry.position;
-    kept_again(shared, kept)
+    kept_again(shared, kept).await
 }
 
 /// The cursor moved from `gone`, a position the upstream no longer holds, to its newest
@@ -106,7 +108,9 @@ async fn moved(shared: &Shared, gone: &str) -> bool {
     let newest = match shared.history.newest().await {
         Ok(newest) => newest,
         Err(failure) => {
-            shared.said(&format!("its history could not be read: {failure}"));
+            shared
+                .said(&format!("its history could not be read: {failure}"))
+                .await;
             return false;
         }
     };
@@ -117,18 +121,26 @@ async fn moved(shared: &Shared, gone: &str) -> bool {
     if kept.cursor != gone {
         return false;
     }
-    shared.said(&format!(
-        "its history no longer holds {gone}, so it reads on from its newest, {newest}"
-    ));
+    shared
+        .said(&format!(
+            "its history no longer holds {gone}, so it reads on from its newest, {newest}"
+        ))
+        .await;
     kept.cursor = newest;
-    kept_again(shared, kept)
+    kept_again(shared, kept).await
 }
 
 /// `kept` written again; whether it was, said where it was not.
-fn kept_again(shared: &Shared, kept: &Kept) -> bool {
-    kept::write(&shared.configuration, kept)
-        .map_err(|why| shared.said(&format!("the cursor could not be kept: {why}")))
-        .is_ok()
+async fn kept_again(shared: &Shared, kept: &Kept) -> bool {
+    match kept::write(&shared.configuration, kept) {
+        Ok(()) => true,
+        Err(why) => {
+            shared
+                .said(&format!("the cursor could not be kept: {why}"))
+                .await;
+            false
+        }
+    }
 }
 
 #[cfg(test)]

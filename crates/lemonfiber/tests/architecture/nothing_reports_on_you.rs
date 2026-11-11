@@ -224,9 +224,15 @@ const MINTING: &[(&str, &str)] = &[
 /// nothing.
 const MINTED_BY: (&str, &str) = ("Random", ".bytes(");
 
-/// The one adapter allowed to reach the operating system's randomness, and the call
-/// it reaches it with.
-const OS_RANDOMNESS: (&str, &str) = ("crates/lemonfiber-adapters/src/random.rs", "getrandom");
+/// The one adapter in each kind of process allowed to reach the operating system's
+/// randomness, the core's and a plugin adapter's, and the call they reach it with.
+const OS_RANDOMNESS: ([&str; 2], &str) = (
+    [
+        "crates/lemonfiber-adapter-kit/src/random.rs",
+        "crates/lemonfiber-adapters/src/random.rs",
+    ],
+    "getrandom",
+);
 
 /// The text inside double quotes on one line.
 fn quoted(line: &str) -> impl Iterator<Item = &str> {
@@ -457,7 +463,8 @@ fn nothing_mints_a_value_this_installation_would_be_known_by() {
     );
 }
 
-/// One adapter reaches the operating system's randomness, and nothing else does.
+/// One adapter in each kind of process reaches the operating system's randomness, and
+/// nothing else does.
 ///
 /// The port is only a seam while it is the only way through. A file taking bytes
 /// from the platform directly would be outside the sweep above entirely, and the
@@ -472,8 +479,8 @@ fn one_file_reaches_the_platform_for_randomness() {
         .collect();
     assert_eq!(
         reaching,
-        vec![allowed.to_owned()],
-        "the platform's randomness is reached from somewhere other than the one adapter, or \
+        allowed.map(str::to_owned).to_vec(),
+        "the platform's randomness is reached from somewhere other than its adapters, or \
          from nowhere at all — either way the port below is no longer the only way through"
     );
 }
