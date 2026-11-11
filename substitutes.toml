@@ -26,8 +26,8 @@
 # One [[curator]] table per curator the bundle pins that is run live through its own
 # media's household request: set up and started by this build, wired by its seed alone,
 # asked for one title by a household member, proved to grab it where the indexer site the
-# operator gave the stack serves the release and the core's queue read lists it, and
-# undone.
+# operator gave the stack serves the release and the core's trace of the title reaches a
+# grab, and undone.
 #
 #   arm            the name of the arm, which its job and its line in the report carry.
 #   plugin         the curator's `[plugin].id`.

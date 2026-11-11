@@ -4,7 +4,7 @@
 //!
 //! The one thing faked is the indexer site the operator gives the stack's indexer, which
 //! [`site`] serves: the grab is proved where it serves the release's NZB, and again where
-//! the core's own queue read lists the download.
+//! the core's own trace of the title reaches a grab.
 
 mod core;
 mod http;
@@ -58,6 +58,16 @@ const MEMBER: &str = "arm";
 /// How long the request may take to reach a grab, and the grab the queue.
 const GRAB_WITHIN: Duration = Duration::from_secs(20 * 60);
 
+/// Every stage a trace reports once a release was sent to the download client.
+const GRABBED: [&str; 6] = [
+    "grabbed",
+    "downloading",
+    "downloaded",
+    "importing",
+    "imported",
+    "available",
+];
+
 /// How often a wait looks again.
 const LOOKING: Duration = Duration::from_secs(15);
 
@@ -74,6 +84,8 @@ pub struct Asked {
     pub id: &'static str,
     /// The seasons asked for, for a series.
     pub seasons: &'static [&'static str],
+    /// What the operator calls it, which a trace follows it by.
+    pub traced: &'static str,
     /// The release the site holds for it.
     pub release: &'static str,
     /// The Newznab category the release is filed under.
@@ -88,6 +100,7 @@ pub const ASKED: [Asked; 2] = [
         kind: "movies",
         id: "10378",
         seasons: &[],
+        traced: "Big Buck Bunny",
         release: "Big.Buck.Bunny.2008.1080p.BluRay.x264-LEMONFIBER",
         category: "2000",
     },
@@ -97,6 +110,7 @@ pub const ASKED: [Asked; 2] = [
         kind: "tv",
         id: "1399",
         seasons: &["1"],
+        traced: "Game of Thrones",
         release: "Game.of.Thrones.S01.1080p.BluRay.x264-LEMONFIBER",
         category: "5000",
     },
@@ -377,12 +391,12 @@ pub fn run(
     );
     assert!(
         waited(GRAB_WITHIN, || {
-            core.run(&["queue", "heal"], "")
-                .printed
-                .contains(asked.release)
+            strings_under(&core.run(&["trace", asked.traced], "").said, "furthest")
+                .iter()
+                .any(|stage| GRABBED.contains(&stage.as_str()))
         }),
-        "no pass over the queue listed {}",
-        asked.release
+        "no trace of {} reached a grab",
+        asked.traced
     );
 
     let history = core.run(&["history"], "");
