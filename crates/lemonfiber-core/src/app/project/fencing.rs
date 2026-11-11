@@ -7,11 +7,12 @@
 use std::path::Path;
 use std::time::Duration;
 
-use lemonfiber_manifest::Manifest;
+use lemonfiber_manifest::Service;
 
 use super::super::Ctx;
 use crate::config::{store, REACH_REGISTRY_KEY};
 use crate::fence::HELD;
+use crate::plugin::Installed;
 use crate::ports::program::{Bound, Ended, Joined, Run};
 use crate::project::entry::{DROPPED, PROCESSES, SECURITY};
 
@@ -27,12 +28,17 @@ const READ_AT_MOST: usize = 256 * 1024;
 /// The memory it is held to, in bytes.
 const MEMORY: i64 = 64 * 1024 * 1024;
 
-/// Ask the engine for its host's addresses where a service of `manifest`'s or an
-/// installed plugin's is fenced and `image` is the fence this build pins, and keep the
-/// answer where the project reads it; say why none is kept, where none is. A rehearsal
-/// runs and keeps nothing.
-pub(crate) async fn readied(ctx: &Ctx, manifest: &Manifest, image: Option<&str>) -> Option<String> {
-    if ctx.dry_run || !fenced(ctx, manifest) {
+/// Ask the engine for its host's addresses where a service of `stack`'s or of
+/// `installed`'s is fenced and `image` is the fence this build pins, and keep the answer
+/// where the project reads it; say why none is kept, where none is. A rehearsal runs and
+/// keeps nothing.
+pub(crate) async fn readied(
+    ctx: &Ctx,
+    stack: &[Service],
+    installed: &[Installed],
+    image: Option<&str>,
+) -> Option<String> {
+    if ctx.dry_run || !fenced(stack, installed) {
         return None;
     }
     let image = image?;
@@ -50,22 +56,16 @@ pub(crate) async fn readied(ctx: &Ctx, manifest: &Manifest, image: Option<&str>)
     answered.err().or(why)
 }
 
-/// Whether a service of `manifest`'s, or of a plugin installed here, declares itself
-/// fenced.
-fn fenced(ctx: &Ctx, manifest: &Manifest) -> bool {
-    manifest
-        .services
-        .iter()
-        .any(lemonfiber_manifest::Service::fenced)
-        || super::super::plugins::read(ctx).is_ok_and(|register| {
-            register.installed().iter().any(|installed| {
-                installed.services.iter().any(|placed| {
-                    placed
-                        .fields
-                        .network
-                        .as_ref()
-                        .is_some_and(|network| network.fenced)
-                })
+/// Whether a service of `stack`'s or of `installed`'s declares itself fenced.
+fn fenced(stack: &[Service], installed: &[Installed]) -> bool {
+    stack.iter().any(Service::fenced)
+        || installed.iter().any(|one| {
+            one.services.iter().any(|placed| {
+                placed
+                    .fields
+                    .network
+                    .as_ref()
+                    .is_some_and(|network| network.fenced)
             })
         })
 }

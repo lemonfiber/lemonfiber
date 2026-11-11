@@ -20,13 +20,14 @@
 //! container leaves something Compose will never be asked about again. So the container
 //! comes off first and the rest is somebody else's machinery.
 
+mod declaring;
+mod healthy;
 mod restarting;
 
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
-use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_plugin::Manifest;
 
@@ -34,7 +35,6 @@ use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
-use crate::ports::service::Declaring as _;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 pub(in crate::app::plugins) use restarting::Restarted;
@@ -184,7 +184,8 @@ pub(crate) fn rehearsed(ctx: &Ctx, installed: &Installed, acting: bool) -> Optio
 
 /// Ask every proof of the service it names, now that there is one to ask, once an egress
 /// guard among its services is asked to hold its control credential: what that came to,
-/// where it was more than held at once.
+/// where it was more than held at once. Each adapter is asked first, and performs its
+/// upstream's first run, so a proof meets the service its recording was taken from.
 ///
 /// The stated list and the manifest's own proofs are one list read twice — the first
 /// is built one entry per declared proof, in the manifest's order — so they walk
@@ -211,6 +212,13 @@ pub(crate) async fn asked(
     // Where each of this plugin's services answers, read through the one answer every
     // caller that asks a plugin's service reads: a second way of composing an address
     // is a second port to be wrong about.
+    let speaking = installed
+        .services
+        .iter()
+        .filter(|placed| !placed.speaks.is_empty());
+    for (placed, stated) in speaking.zip(stated.iter_mut().skip(manifest.proofs.len())) {
+        stated.came_to = Some(spoken(ctx, stack, installed, placed, deadline).await);
+    }
     let reached = crate::plugin::answering(std::slice::from_ref(installed));
     for (proof, stated) in manifest.proofs.iter().zip(stated.iter_mut()) {
         let placed = stated
@@ -222,7 +230,8 @@ pub(crate) async fn asked(
             (None, Some(run), Some(placed), _) => {
                 running(ctx, placed, run, &proof.expect, source).await
             }
-            (Some(request), None, _, Some(address)) => {
+            (Some(request), None, placed, Some(address)) => {
+                healthy::passed(ctx, placed, address, deadline).await;
                 answering(ctx, request, &proof.expect, address, deadline).await
             }
             (Some(_), None, _, None) => Verdict::Unproven {
@@ -237,13 +246,6 @@ pub(crate) async fn asked(
                     .to_owned(),
             },
         });
-    }
-    let speaking = installed
-        .services
-        .iter()
-        .filter(|placed| !placed.speaks.is_empty());
-    for (placed, stated) in speaking.zip(stated.iter_mut().skip(manifest.proofs.len())) {
-        stated.came_to = Some(spoken(ctx, stack, installed, placed, deadline).await);
     }
     secured
 }
@@ -265,7 +267,22 @@ pub(super) async fn spoken(
         };
         match (reached, asked) {
             (Ok(adapter), Ok(about)) => {
-                return held_to(ctx, stack, &adapter, (installed, placed), &about).await
+                return held_to(
+                    ctx,
+                    (stack, deadline),
+                    &adapter,
+                    (installed, placed),
+                    &about,
+                )
+                .await
+            }
+            (Err(why), _) if ctx.seams.clock.now() >= deadline => {
+                return Verdict::Unproven {
+                    why: format!(
+                        "{why}{}",
+                        crate::app::engine::standing(ctx, &placed.service).await
+                    ),
+                }
             }
             (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
             _ => tokio::time::sleep(POLL).await,
@@ -282,7 +299,7 @@ pub(super) async fn spoken(
 /// digest, so it may list no release; one it does list is held to its own pin.
 async fn held_to(
     ctx: &Ctx,
-    stack: &Path,
+    (stack, deadline): (&Path, std::time::SystemTime),
     adapter: &lemonfiber_contract::Contracted,
     (installed, placed): (&Installed, &crate::plugin::Placed),
     about: &lemonfiber_contract::adapter::About,
@@ -324,10 +341,8 @@ async fn held_to(
         })
         .collect();
     for capability in &spoken {
-        for case in lemonfiber_contract::conformance::cases(capability) {
-            let lemonfiber_contract::conformance::Expect::Status(statuses) = case.expect else {
-                continue;
-            };
+        for case in lemonfiber_contract::conformance::live(capability) {
+            let statuses = case.expect.statuses();
             match adapter.unkeyed(case.operation).await {
                 Ok(status) if statuses.contains(&status) => {}
                 Ok(status) => faults.push(format!(
@@ -338,7 +353,7 @@ async fn held_to(
             }
         }
     }
-    faults.extend(undeclarable(adapter, placed).await);
+    faults.extend(declaring::undeclarable(adapter, placed).await);
     if !faults.is_empty() {
         return Verdict::Failed { faults };
     }
@@ -349,27 +364,7 @@ async fn held_to(
         placed,
         adapter,
     };
-    claiming(ctx, adapter, (installed, placed), &restarted).await
-}
-
-/// Why the declaration an adapter speaking `media.serve` gives does not hold, where it
-/// does not: one that admits a byte path without a question, or whose template host is
-/// not its base, is refused at install rather than first met by the guard.
-async fn undeclarable(
-    adapter: &lemonfiber_contract::Contracted,
-    placed: &crate::plugin::Placed,
-) -> Option<String> {
-    let spoken = lemonfiber_contract::spoken(serve::CAPABILITY, serve::MAJOR);
-    if !placed.speaks.contains(&spoken) {
-        return None;
-    }
-    match serve::Adapter(adapter.clone()).declared().await {
-        Ok(declared) => declared
-            .checked()
-            .err()
-            .map(|refused| format!("{spoken}: its declaration was refused: {refused}")),
-        Err(failure) => Some(format!("{spoken}: declared: {failure}")),
-    }
+    claiming(ctx, (adapter, deadline), (installed, placed), &restarted).await
 }
 
 /// What claiming the part an adapter speaking `owner.claim` stands in front of came to:
@@ -378,7 +373,7 @@ async fn undeclarable(
 /// takes a code nobody entered; failed otherwise.
 async fn claiming(
     ctx: &Ctx,
-    adapter: &lemonfiber_contract::Contracted,
+    (adapter, deadline): (&lemonfiber_contract::Contracted, std::time::SystemTime),
     (installed, placed): (&Installed, &crate::plugin::Placed),
     restarts: &dyn crate::seed::run::owning::Restarts,
 ) -> Verdict {
@@ -387,6 +382,7 @@ async fn claiming(
     if !placed.speaks.contains(&spoken) {
         return Verdict::Passed;
     }
+    healthy::upstream_answering(ctx, adapter, deadline).await;
     let part = claim::Adapter(adapter.clone());
     let reaching = crate::seed::run::owning::Reaching {
         part: &part,

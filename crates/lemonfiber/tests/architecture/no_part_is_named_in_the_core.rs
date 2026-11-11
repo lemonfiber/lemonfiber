@@ -247,10 +247,12 @@ const NAMED: &[Named] = &[
     },
 ];
 
-/// Every part id the bundle pins, except the core's own words.
+/// Every part id the bundle pins, except the core's own words. A plugin the bundle only
+/// offers is no part: nothing of the stack is it until an operator installs it.
 fn parts() -> Vec<String> {
     lemonfiber_bundled::PINNED
         .iter()
+        .filter(|pinned| pinned.stage != Some(lemonfiber_bundled::Stage::Offered))
         .map(|pinned| pinned.first_party.plugin.to_owned())
         .filter(|id| !OWNED.iter().any(|(owned, _)| owned == id))
         .collect()

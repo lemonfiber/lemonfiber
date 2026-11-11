@@ -92,6 +92,12 @@ pub(crate) fn carry_out(
             }
             crate::plugin::Lands::Key => {
                 keyed(ctx, plugin, stamp, &journal, (&write.path, &stack))?;
+                for path in [Some(write.path.as_path()), write.path.parent()]
+                    .into_iter()
+                    .flatten()
+                {
+                    handed_over(path, &stack)?;
+                }
             }
             crate::plugin::Lands::Secrets(variables) => {
                 let text = crate::settings::text(ctx, variables)
@@ -123,10 +129,22 @@ pub(crate) fn carry_out(
                     &write.path,
                     (fields, awaited),
                 )?;
+                handed_over(&write.path, &stack)?;
             }
         }
     }
     Ok(())
+}
+
+/// `path`, written for an adapter, handed to the user the adapter runs as.
+///
+/// # Errors
+///
+/// Where it could not be handed over, since an adapter that cannot read its own key
+/// cannot be asked anything.
+fn handed_over(path: &Path, stack: &Path) -> Result<(), Box<Problem>> {
+    crate::plugin::adapting::handed_over(path, stack)
+        .map_err(|why| Box::new(unwritable(path, &why)))
 }
 
 /// Why a path beneath the stack directory is not written to.

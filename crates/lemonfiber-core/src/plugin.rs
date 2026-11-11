@@ -18,6 +18,7 @@
 //! one, because a plugin author will trust it.
 
 // The bundled stack's own claims, judged by the reader and the judge a plugin's meet.
+pub(crate) mod adapting;
 pub mod bundled;
 // The catalogue's signed index, and what a name resolves to through it.
 pub mod catalogue;
@@ -105,6 +106,7 @@ pub use profiled::{profile_of, profiled, Profiled};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
+pub(crate) use recording::health_passes;
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{

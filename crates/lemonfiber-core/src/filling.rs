@@ -20,15 +20,18 @@
 /// The capabilities the core asks over their contracts and nothing the bundle carries
 /// asks: each is filled for the core's own use. It holds the curators to their quality
 /// preset, points the subtitle finder at them, unpacks what a download client finished,
-/// guards the household's streams, opens the request service, and hands an invitation's
-/// refusal to the service that declines it.
-pub const ASKED_BY_THE_CORE_ALONE: [&str; 6] = [
+/// guards the household's streams, opens the request service, hands an invitation's
+/// refusal to the service that declines it, and carries a member's ask for music or books
+/// to the curator that files it.
+pub const ASKED_BY_THE_CORE_ALONE: [&str; 8] = [
     lemonfiber_contract::capabilities::quality::sync::CAPABILITY,
     lemonfiber_contract::capabilities::subtitles::fetch::CAPABILITY,
     lemonfiber_contract::capabilities::archive::extract::CAPABILITY,
     lemonfiber_contract::capabilities::stream::guard::CAPABILITY,
     lemonfiber_contract::capabilities::request::intake::CAPABILITY,
     lemonfiber_contract::capabilities::invite::decline::CAPABILITY,
+    lemonfiber_contract::capabilities::music::curate::CAPABILITY,
+    lemonfiber_contract::capabilities::books::curate::CAPABILITY,
 ];
 
 /// How far a claim has been shown.

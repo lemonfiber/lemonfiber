@@ -14,12 +14,14 @@ use crate::agreement::over;
 use crate::app::plugins::moving_in::{uninstalled, Ran};
 use crate::app::plugins::Consent;
 use crate::app::Ctx;
+use crate::doctor::Verdict;
 use crate::error::codes::life::{
     OFFLINE_INSTALL_MOVED, OFFLINE_INSTALL_UNANSWERED, OFFLINE_INSTALL_UNHELD,
     OFFLINE_INSTALL_UNREAD,
 };
 use crate::error::{Problem, Remedy, State};
 use crate::model::LifecycleReport;
+use crate::plugin::{Proving, Verdict as ProofVerdict, Verification};
 use crate::stack::closure::Plan;
 
 /// Every refusal a start answering what it offers to install may meet, beside the offer
@@ -56,7 +58,8 @@ pub struct Offline {
 }
 
 /// Every part the bundle installs that `plan` holds, whose plugin is not installed and
-/// whose stack service has never run on this machine: nothing where the record of what is
+/// whose stack service has never run on this machine, in the order a start installs them:
+/// nothing where the record of what is
 /// installed cannot be read, since an install offered over one already there is one
 /// nothing can take, nor where lemonfiber keeps no files of its own here, since nothing
 /// is set up for an install to be made into.
@@ -68,7 +71,7 @@ async fn unrun(ctx: &Ctx, plan: &Plan) -> Vec<&'static Pinned> {
         return Vec::new();
     };
     let ran = Ran::here(ctx).await;
-    uninstalled(PINNED, register.installed())
+    let unrun = uninstalled(PINNED, register.installed())
         .into_iter()
         .filter(|one| {
             plan.services
@@ -76,16 +79,77 @@ async fn unrun(ctx: &Ctx, plan: &Plan) -> Vec<&'static Pinned> {
                 .any(|service| service == one.first_party.plugin)
         })
         .filter(|one| !ran.has_run(one.first_party.plugin))
-        .collect()
+        .collect();
+    in_order(unrun)
 }
 
-/// What a start offers to install over `plan`, each install read through the plugin path:
-/// nothing where every part the form holds is installed or has run here.
+/// `parts` in the order a start installs them: each after every other one among them
+/// whose services provide a capability it asks for, since its proofs ask what that one
+/// answers, and otherwise in the order given.
+fn in_order(parts: Vec<&'static Pinned>) -> Vec<&'static Pinned> {
+    let mut left: Vec<(&'static Pinned, Read)> =
+        parts.into_iter().map(|one| (one, Read::of(one))).collect();
+    let mut ordered = Vec::with_capacity(left.len());
+    while !left.is_empty() {
+        let ready = left
+            .iter()
+            .position(|(_, one)| {
+                !left
+                    .iter()
+                    .any(|(_, other)| !std::ptr::eq(one, other) && other.answers(one))
+            })
+            .unwrap_or_default();
+        ordered.push(left.remove(ready).0);
+    }
+    ordered
+}
+
+/// What a part's manifest asks for and what its services provide.
+struct Read {
+    /// Every capability it asks for.
+    asks: Vec<String>,
+    /// Every capability its services provide.
+    provides: Vec<String>,
+}
+
+impl Read {
+    /// What `pinned`'s manifest says, and nothing where it does not read.
+    fn of(pinned: &Pinned) -> Self {
+        let manifest = lemonfiber_plugin::Manifest::from_toml(pinned.copy).ok();
+        Self {
+            asks: manifest
+                .iter()
+                .flat_map(|one| one.asking.iter().map(|ask| ask.capability.clone()))
+                .collect(),
+            provides: manifest
+                .iter()
+                .flat_map(|one| {
+                    one.services
+                        .iter()
+                        .flat_map(|service| service.provides.clone())
+                })
+                .collect(),
+        }
+    }
+
+    /// Whether it provides something `other` asks for.
+    fn answers(&self, other: &Self) -> bool {
+        other.asks.iter().any(|asked| self.provides.contains(asked))
+    }
+}
+
+/// What a start offers to install over `plan`, each install read through the plugin path
+/// beside every one offered before it, as answering installs them in turn: nothing where
+/// every part the form holds is installed or has run here.
 pub(crate) async fn offered(ctx: &Ctx, plan: &Plan) -> Option<Offline> {
     let mut installs = Vec::new();
+    let mut before = Vec::new();
     for pinned in unrun(ctx, plan).await {
         let plugin = pinned.first_party.plugin;
-        let read = crate::app::plugins::from_this_build(ctx, plugin, Consent::default()).await;
+        let read = crate::app::plugins::read_after(ctx, plugin, &before).await;
+        if let Some(install) = read.as_ref().ok().and_then(|one| one.install.as_ref()) {
+            before.push(install.would.clone());
+        }
         installs.push(InstallOffered {
             plugin: plugin.to_owned(),
             offer: read
@@ -159,8 +223,14 @@ pub(crate) async fn answer(
             ..Consent::default()
         };
         let installs = crate::app::plugins::from_this_build(ctx, &one.plugin, consent).await?;
-        if !installs.install.is_some_and(|install| install.recorded) {
-            return Err(Box::new(unheld(&one.plugin)));
+        match installs.install {
+            Some(install) if install.recorded => {}
+            install => {
+                let why = install
+                    .map(|install| held_back(&install.proofs, install.verified.as_ref()))
+                    .unwrap_or_default();
+                return Err(Box::new(unheld(&one.plugin, &why)));
+            }
         }
         ctx.narrator
             .say(&format!(
@@ -324,9 +394,9 @@ fn unread(offline: &Offline) -> Problem {
     .in_state(State::Guided)
 }
 
-/// An install agreed to that did not hold.
-fn unheld(plugin: &str) -> Problem {
-    Problem::new(
+/// An install agreed to that did not hold, with `held_back`, what held it back.
+fn unheld(plugin: &str, held_back: &[String]) -> Problem {
+    let problem = Problem::new(
         OFFLINE_INSTALL_UNHELD,
         format!("The install of {plugin} from this build did not hold"),
         "It was put back, and nothing of the form was started.",
@@ -335,7 +405,34 @@ fn unheld(plugin: &str) -> Problem {
              the form again"
         )),
     )
-    .in_state(State::Guided)
+    .in_state(State::Guided);
+    if held_back.is_empty() {
+        problem
+    } else {
+        problem.with_detail(held_back.join("; "))
+    }
+}
+
+/// Every proof among `proofs` that failed or could not be run, and every check `verified`
+/// says the install broke.
+fn held_back(proofs: &[Proving], verified: Option<&Verification>) -> Vec<String> {
+    let proofs = proofs.iter().filter_map(|one| match &one.came_to {
+        Some(ProofVerdict::Failed { faults }) => {
+            Some(format!("{}: {}", one.proof, faults.join(", ")))
+        }
+        Some(ProofVerdict::Unproven { why }) => Some(format!("{}: {why}", one.proof)),
+        _ => None,
+    });
+    let checks = verified
+        .into_iter()
+        .flat_map(|verified| &verified.broke)
+        .map(|broke| match &broke.now.verdict {
+            Verdict::Fail(why) | Verdict::Warn(why) => {
+                format!("{}: {}", broke.now.check, why.summary)
+            }
+            _ => format!("{}: {}", broke.now.check, broke.now.title),
+        });
+    proofs.chain(checks).collect()
 }
 
 /// The plugins `offline` offers, as a list a sentence reads.
@@ -348,3 +445,6 @@ pub(crate) fn plugins(offline: &Offline) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
+
+#[cfg(test)]
+mod tests;

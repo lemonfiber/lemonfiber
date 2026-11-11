@@ -45,13 +45,14 @@ async fn adapted(
 }
 
 /// The digest the speaking manifest pins the service its adapter fronts by.
-const UPSTREAM: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+pub(super) const UPSTREAM: &str =
+    "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 
 /// Where the speaking adapter's live case asks without the key.
-const UNKEYED: &str = "/lemonfiber/media.serve/v1/signed_in";
+pub(super) const UNKEYED: &str = "/lemonfiber/media.serve/v1/signed_in";
 
 /// An adapter's account of itself: speaking `speaks`, with one release at `digest`.
-fn about(speaks: &str, digest: &str) -> String {
+pub(super) fn about(speaks: &str, digest: &str) -> String {
     format!(
         r#"{{"speaks":{speaks},"upstream":"Komga","releases":[{{"version":"1.11.0","digest":"{digest}"}}]}}"#
     )
@@ -157,6 +158,92 @@ async fn an_adapter_that_speaks_otherwise_or_cannot_be_reached_is_not_installed(
             "{name}"
         );
     }
+}
+
+/// An adapter refusing every call without the key, whose contract asks under the key what
+/// it must refuse, is installed: install asks the running adapter its unkeyed case alone.
+#[tokio::test]
+async fn an_adapter_is_asked_live_only_what_needs_no_key() {
+    let name = "adapter-refusing-unkeyed";
+    let manifest = speaking().replace("media.serve", "indexer.proxy");
+    let mut ctx = proving(
+        name,
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        Fake::by_path(vec![
+            (
+                "/api/v1/libraries",
+                lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+            ),
+            (
+                "/lemonfiber/adapter/v1/about",
+                lemonfiber_fixtures::http::Answer::reply(
+                    200,
+                    about(r#"["indexer.proxy@1"]"#, UPSTREAM),
+                ),
+            ),
+            (
+                "/lemonfiber/indexer.proxy/v1/solve",
+                lemonfiber_fixtures::http::Answer::reply(401, ""),
+            ),
+        ]),
+    );
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+
+    let outcome = installing(&ctx, &source(name, &manifest)).await;
+
+    assert_eq!(
+        verdicts(outcome)
+            .iter()
+            .map(|verdict| came_to(verdict.as_ref()))
+            .collect::<Vec<_>>(),
+        ["passed", "passed"]
+    );
+}
+
+#[tokio::test]
+async fn an_adapter_never_published_is_unproven_with_where_its_container_stands() {
+    let outcome = adapted("adapter-standing", &[], r#"["media.serve@1"]"#).await;
+    let why = verdicts(outcome)
+        .into_iter()
+        .flatten()
+        .find_map(|verdict| match verdict {
+            Verdict::Unproven { why } => Some(why),
+            _ => None,
+        });
+    assert!(
+        why.as_deref().is_some_and(|why| why.contains(
+            "komga-adapter publishes no port on this machine's loopback for 8080; its \
+             container is running"
+        )),
+        "{why:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_adapter_never_published_is_unproven_with_what_its_container_last_said() {
+    let name = "adapter-said";
+    let mut ctx = adapting(name, &[], r#"["media.serve@1"]"#);
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .saying("komga-adapter", "bound to nothing"),
+    );
+    let outcome = installing(&ctx, &source(name, &speaking())).await;
+    let why = verdicts(outcome)
+        .into_iter()
+        .flatten()
+        .find_map(|verdict| match verdict {
+            Verdict::Unproven { why } => Some(why),
+            _ => None,
+        });
+    assert!(
+        why.as_deref().is_some_and(
+            |why| why.contains("its container is running, and it last said: bound to nothing")
+        ),
+        "{why:?}"
+    );
 }
 
 #[tokio::test]
@@ -297,7 +384,7 @@ async fn an_adapter_not_recorded_at_its_upstream_or_answering_without_the_key_is
 }
 
 /// The speaking manifest, its adapter also speaking `owner.claim`.
-fn claiming() -> String {
+pub(super) fn claiming() -> String {
     speaking().replace(
         r#"speaks      = ["media.serve@1"]"#,
         r#"speaks      = ["media.serve@1", "owner.claim@1"]"#,
@@ -601,6 +688,47 @@ async fn an_adapter_declaring_what_no_guard_could_enforce_is_not_installed() {
             Some(Verdict::Failed { faults })
                 if faults.iter().any(|fault| fault.contains("media.serve@1: its declaration was refused"))
         ),
+        "{verdicts:?}"
+    );
+}
+
+/// An adapter answering that no guard of lemonfiber's stands in front of its server, as
+/// one for a server no member reaches through the guard does, declares nothing to hold
+/// and is installed.
+#[tokio::test]
+async fn an_adapter_with_no_declaration_to_offer_is_installed() {
+    let http = Fake::by_path(vec![
+        (
+            crate::test_support::media::serve("declared"),
+            lemonfiber_fixtures::http::Answer::served(
+                500,
+                "application/problem+json",
+                r#"{"type":"unsupported","detail":"it serves no member through a guard of lemonfiber's"}"#,
+            ),
+        ),
+        (
+            "/api/v1/libraries",
+            lemonfiber_fixtures::http::Answer::reply(200, "[]"),
+        ),
+        (
+            "/lemonfiber/adapter/v1/about",
+            lemonfiber_fixtures::http::Answer::reply(200, about(r#"["media.serve@1"]"#, UPSTREAM)),
+        ),
+        (UNKEYED, lemonfiber_fixtures::http::Answer::reply(401, "")),
+    ]);
+    let name = "adapter-undeclared";
+    let mut ctx = proving(name, Arc::new(Recording::answering(Ok(spoke("")))), http);
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
+            .publishing(&[("komga-adapter", "127.0.0.1", 8080)]),
+    );
+    let verdicts = verdicts(installing(&ctx, &source(name, &speaking())).await);
+    assert_eq!(
+        verdicts
+            .iter()
+            .map(|verdict| came_to(verdict.as_ref()))
+            .collect::<Vec<_>>(),
+        ["passed", "passed"],
         "{verdicts:?}"
     );
 }

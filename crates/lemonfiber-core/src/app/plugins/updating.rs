@@ -310,7 +310,9 @@ enum Came {
 /// reading taken before anything moved. It carries out no reversal of its own; the
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
-    let put = super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source))
+    let asked = super::planned::asked(ctx, coming.would).await;
+    let put = super::planned::fenced(ctx, coming.would, &asked)
+        .and_then(|()| super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source)))
         .and_then(|planned| {
             super::writing::unlinked(ctx, coming.would, coming.stack)
                 .and_then(|()| {
@@ -343,8 +345,11 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
     if !proving::held(&install.proofs) {
         return Came::NotHeld;
     }
-    let checked =
-        crate::plugin::against(coming.before, &verifying::again(ctx, coming.standing).await);
+    let checked = crate::plugin::against(
+        coming.before,
+        &verifying::again(ctx, coming.standing).await,
+        &coming.would.service_ids(),
+    );
     let held = checked.held();
     install.verified = Some(checked);
     if !held {
@@ -431,11 +436,13 @@ pub(super) fn brought_back(
 /// started where the files would not land, since a container started without its
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
+    let asked = super::planned::asked(ctx, was).await;
+    let startable = super::planned::fenced(ctx, was, &asked).is_ok();
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()
         && super::planned::writes(ctx, was, stack, None)
             .and_then(|planned| carry_out(ctx, &was.plugin, stamp, &planned))
             .is_ok();
-    let running = placed && proving::up(ctx, was, stack).await.is_none();
+    let running = placed && startable && proving::up(ctx, was, stack).await.is_none();
     Restored {
         version: was.version.clone(),
         placed,

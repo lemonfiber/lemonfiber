@@ -16,6 +16,25 @@
 #   claimed        `false` where the substitute's upstream is claimed against an account
 #                  outside the house and runs unclaimed, so its arm proves install and the
 #                  reading that names it `Open` alone.
+#
+# A substitute the bundle offers is pinned at the revision the bundle offers it at. One
+# standing in for a curator is run live as a curator arm is, put in the curator's place
+# once the stack is first seeded. Medusa looks a series up under the operator's TheTVDB
+# key, the job's secret SUBSTITUTES_THETVDB_KEY (and SUBSTITUTES_THETVDB_PIN for a key
+# that needs one); its arm is skipped, saying so, where the key is not set.
+#
+# One [[curator]] table per curator the bundle pins that is run live through its own
+# media's household request: set up and started by this build, wired by its seed alone,
+# asked for one title by a household member, proved to grab it where the indexer site the
+# operator gave the stack serves the release and the core's trace of the title reaches a
+# grab, and undone.
+#
+#   arm            the name of the arm, which its job and its line in the report carry.
+#   plugin         the curator's `[plugin].id`.
+#   origin         the curator's repository, as an https URL.
+#   revision       the full 40-hex commit the bundle pins it at, which is the tree this
+#                  build carries and the only one it installs the curator from.
+#   media_type     the media type its household asks for.
 
 schema = 1
 
@@ -58,3 +77,30 @@ revision      = "93efbedde3ab37384cdeb63cc3763d8c608bcc62"
 stands_in_for = "jellyfin"
 media_type    = "movies"
 claimed       = false
+
+[[substitute]]
+arm           = "media-serve-emby"
+capability    = "media.serve"
+plugin        = "emby"
+origin        = "https://github.com/lemonfiber/plugin-emby"
+revision      = "79a5e015cef557a481002438d04e2373796ed944"
+stands_in_for = "jellyfin"
+media_type    = "movies"
+claimed       = true
+
+[[substitute]]
+arm           = "library-curate-medusa"
+capability    = "library.curate"
+plugin        = "medusa"
+origin        = "https://github.com/lemonfiber/plugin-medusa"
+revision      = "471bc95fe6ad4b3aed2da55922c7d7cceec3b8a7"
+stands_in_for = "sonarr"
+media_type    = "tv"
+claimed       = true
+
+[[curator]]
+arm        = "curator-radarr"
+plugin     = "radarr"
+origin     = "https://github.com/lemonfiber/plugin-radarr"
+revision   = "8254128a737e9bda11310fb0f7e5748f2f4c966b"
+media_type = "movies"

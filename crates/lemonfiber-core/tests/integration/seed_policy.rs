@@ -94,11 +94,14 @@ fn the_three_way_comparison_reads_every_row_of_the_merge_table() {
 
 #[test]
 fn only_a_wired_preserved_or_stale_connection_is_settled() {
-    // Settled: written, already correct, the operator's own edit, an adopted or
-    // pre-existing value theirs to keep, or lemonfiber's own value merely behind its
-    // intent — all working states.
+    // Settled: written, written and in force once its service started again, already
+    // correct, the operator's own edit, an adopted or pre-existing value theirs to keep,
+    // or lemonfiber's own value merely behind its intent — all working states.
     for settled in [
         State::Wired,
+        State::Restarted {
+            service: "jellyfin".to_owned(),
+        },
         State::AlreadyWired,
         State::Drifted,
         State::Stale,

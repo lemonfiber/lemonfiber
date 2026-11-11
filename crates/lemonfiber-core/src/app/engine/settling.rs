@@ -228,6 +228,34 @@ pub(crate) async fn lately(ctx: &Ctx, services: &[String]) -> Vec<LogLine> {
     said
 }
 
+/// Where `service`'s container stands and the last lines it wrote, as a clause said after
+/// why it could not be asked: nothing where the engine will not say.
+pub(crate) async fn standing(ctx: &Ctx, service: &str) -> String {
+    let containers = ctx
+        .seams
+        .engine
+        .list(&ctx.settings.project)
+        .await
+        .unwrap_or_default();
+    let state = containers
+        .iter()
+        .find(|container| container.service == service)
+        .map_or_else(
+            || "it has no container".to_owned(),
+            |container| format!("its container is {:?}", container.lifecycle).to_lowercase(),
+        );
+    let said: Vec<String> = lately(ctx, &[service.to_owned()])
+        .await
+        .into_iter()
+        .map(|line| line.line)
+        .collect();
+    if said.is_empty() {
+        format!("; {state}")
+    } else {
+        format!("; {state}, and it last said: {}", said.join(" | "))
+    }
+}
+
 /// Wait for what was started to be usable, and record what it came to.
 ///
 /// Shared rather than written twice, because anything that starts services owes the

@@ -159,6 +159,17 @@ pub enum Expect {
     Conforms,
 }
 
+impl Expect {
+    /// The statuses an answer is held to, and none where it is held to its contract.
+    #[must_use]
+    pub const fn statuses(self) -> &'static [u16] {
+        match self {
+            Self::Status(statuses) => statuses,
+            Self::Conforms => &[],
+        }
+    }
+}
+
 /// One case of a capability's conformance.
 #[derive(Debug, Clone)]
 pub struct Case<'c> {
@@ -193,6 +204,15 @@ pub fn cases(capability: &Capability) -> Vec<Case<'_>> {
     unkeyed
         .into_iter()
         .chain(capability.operations.iter().flat_map(keyed))
+        .collect()
+}
+
+/// Every case of `capability` install asks of the running adapter.
+#[must_use]
+pub fn live(capability: &Capability) -> Vec<Case<'_>> {
+    cases(capability)
+        .into_iter()
+        .filter(|case| case.live)
         .collect()
 }
 

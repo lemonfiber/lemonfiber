@@ -30,8 +30,9 @@ pub(crate) const LIBRARY_VOLUME: &str = "data";
 /// Where the library lands inside every container that takes it.
 pub(crate) const LIBRARY_TARGET: &str = "/data";
 
-/// The uid and gid written while the operator's environment file names neither.
-pub(crate) const OPERATOR_FALLBACK: &str = "1000";
+/// The uid and gid written in place of root's, and where neither the operator's environment
+/// file nor the stack directory's owner names one.
+pub(crate) const OPERATOR_FALLBACK: u32 = 1000;
 
 /// What the engine resolves to this machine from inside a container.
 const HOST_GATEWAY: &str = "host-gateway";
@@ -160,6 +161,9 @@ pub struct Values<'a> {
     /// The operator's value for a variable of their environment file, where one is
     /// written.
     pub operator: &'a dyn Fn(&str) -> Option<String>,
+    /// The user and group owning the stack directory, root's handed to the fallback user,
+    /// where that owner can be read.
+    pub owner: Option<(u32, u32)>,
 }
 
 /// One service's entry, and the whole of what one can carry.
@@ -288,11 +292,8 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         profiles: vec![unit.profile.clone()],
         restart: RESTART,
         user: (unit.user == UserMode::Uid).then(|| {
-            format!(
-                "{}:{}",
-                operated(values, PUID_KEY, OPERATOR_FALLBACK),
-                operated(values, PGID_KEY, OPERATOR_FALLBACK)
-            )
+            let (uid, gid) = ids(unit, values);
+            format!("{uid}:{gid}")
         }),
         extra_hosts: unit
             .reaches_host
@@ -386,14 +387,27 @@ fn environment(unit: &Unit<'_>, values: &Values<'_>) -> BTreeMap<String, String>
         operated(values, ZONE_KEY, DEFAULT_ZONE),
     );
     if let Some(variables) = unit.user.ids_in() {
-        for (variable, key) in [
-            (&variables.uid_env, PUID_KEY),
-            (&variables.gid_env, PGID_KEY),
-        ] {
-            written.insert(variable.clone(), operated(values, key, OPERATOR_FALLBACK));
-        }
+        let (uid, gid) = ids(unit, values);
+        written.insert(variables.uid_env.clone(), uid);
+        written.insert(variables.gid_env.clone(), gid);
     }
     written
+}
+
+/// The uid and gid `unit` runs as: the stack directory's owner for a service that speaks
+/// a contract, and for any other the operator's `PUID` and `PGID`, each falling back to
+/// that owner; the fallback user's where the owner cannot be read.
+fn ids(unit: &Unit<'_>, values: &Values<'_>) -> (String, String) {
+    let (uid, gid) = values
+        .owner
+        .unwrap_or((OPERATOR_FALLBACK, OPERATOR_FALLBACK));
+    if unit.contract.is_some() {
+        return (uid.to_string(), gid.to_string());
+    }
+    (
+        operated(values, PUID_KEY, &uid.to_string()),
+        operated(values, PGID_KEY, &gid.to_string()),
+    )
 }
 
 /// The operator's value for `key`, or `fallback` while their environment file names

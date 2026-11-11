@@ -289,12 +289,19 @@ fn verified(checked: Option<&Verification>) -> Lines {
         lines.put(format!("        now  {}", stood(Some(&one.now.verdict))));
     }
     for one in &verification.unsettled {
-        lines.put(format!(
-            "      {}: nothing could be told either way, so it is not counted against the \
-             install — {}",
-            one.now.check,
-            stood(Some(&one.now.verdict))
-        ));
+        lines.put(match (&one.now.verdict, &one.now.service) {
+            (Checked::Warn(caveat), Some(service)) => format!(
+                "      {} on {service}, a service it brings: {} — reported, and not counted \
+                 against the install",
+                one.now.check, caveat.summary
+            ),
+            _ => format!(
+                "      {}: nothing could be told either way, so it is not counted against the \
+                 install — {}",
+                one.now.check,
+                stood(Some(&one.now.verdict))
+            ),
+        });
     }
     lines
 }

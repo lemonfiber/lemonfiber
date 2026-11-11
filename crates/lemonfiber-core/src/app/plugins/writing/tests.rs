@@ -119,3 +119,33 @@ fn a_key_whose_directory_is_a_planted_link_is_refused_and_nothing_lands_outside(
         Some(0)
     );
 }
+
+/// What is written for an adapter of a stack directory root owns goes to the fallback
+/// user, and a hand-over the machine refuses stops the install naming the path.
+#[test]
+fn a_hand_over_the_machine_refuses_names_what_was_not_handed_over() {
+    use std::os::unix::fs::MetadataExt as _;
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("writing-handed").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(std::fs::create_dir_all(&dir).is_ok());
+    let key = dir.join("lemonfiber.key");
+    assert!(std::fs::write(&key, "key").is_ok());
+    let runner = std::fs::metadata(&key).map(|held| held.uid()).ok();
+
+    let handed = super::handed_over(&key, std::path::Path::new("/"));
+
+    if matches!(runner, Some(0 | 1000)) {
+        assert!(handed.is_ok(), "{handed:?}");
+    } else {
+        assert!(
+            handed.as_ref().is_err_and(|problem| problem
+                .summary
+                .contains(&key.display().to_string())
+                && problem
+                    .detail
+                    .as_deref()
+                    .is_some_and(|why| why.contains("1000:1000"))),
+            "{handed:?}"
+        );
+    }
+}

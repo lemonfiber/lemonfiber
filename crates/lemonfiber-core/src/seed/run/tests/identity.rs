@@ -77,16 +77,51 @@ async fn identity_at(
 }
 
 #[tokio::test]
-async fn identity_does_nothing_without_both_the_media_server_and_the_request_service() {
+async fn identity_does_nothing_without_the_media_server() {
     let ctx = seed_ctx(true, None, None);
-    // The request service present but no media server, and the other way round: either
-    // alone is nothing to wire.
     let base = crate::baseline::Baseline::new();
     assert!(identity(&ctx, &[requests_svc()], &base).await.0.is_empty());
-    assert!(identity(&ctx, &[media_server_svc()], &base)
-        .await
-        .0
-        .is_empty());
+}
+
+/// **A media server nothing asks for still gets its administrator**, recorded and handed
+/// to its adapter, which signs in to it with that password; nothing else is wired.
+#[tokio::test]
+async fn a_media_server_no_request_service_asks_for_is_given_its_administrator() {
+    let env = config_scratch("jellyfin-alone");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf()))
+        .with_http(household(false, false));
+
+    let (wirings, _, project) = identity_in(
+        &ctx,
+        &[media_server_svc()],
+        &[],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+
+    assert_eq!(
+        wirings
+            .iter()
+            .map(|wiring| (wiring.connection.as_str(), &wiring.state))
+            .collect::<Vec<_>>(),
+        vec![(ADMINISTRATOR_SET_UP, &crate::seed::State::Wired)]
+    );
+    assert!(
+        held(&env, "IDENTITY_SOURCE_ADMIN_PASSWORD"),
+        "the minted password is recorded"
+    );
+    let handed = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER)
+        .with_file_name(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    assert!(
+        std::fs::read_to_string(&handed)
+            .is_ok_and(|held| held.contains(lemonfiber_contract::adapter::UPSTREAM_PASSWORD)),
+        "the adapter is handed the password"
+    );
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
 /// **The stack's administrator's password is never sent to a plugin.** A plugin's
@@ -124,7 +159,12 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
     .await;
 
     let sent = http.requests();
-    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(
+        wirings
+            .iter()
+            .all(|one| one.connection == ADMINISTRATOR_SET_UP),
+        "{wirings:?}"
+    );
     assert!(
         !sent.iter().any(|asked| asked.url.contains(":5999")),
         "{sent:?}"
@@ -619,6 +659,105 @@ async fn a_contracted_server_unanswered_over_its_contract_is_not_set_up() {
             .iter()
             .any(|one| one.url.contains(":8080") || one.url.contains(":9000")),
         "{asked:?}"
+    );
+}
+
+/// **A fresh media server is given its libraries once its administrator is set up**, which
+/// is the credential its adapter signs in to it with.
+#[tokio::test]
+async fn a_fresh_media_server_is_given_its_libraries_after_its_administrator_is_set_up() {
+    use crate::test_support::media;
+    let env = config_scratch("jellyfin-furnished");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let http = Fake::by_path_in_turn(vec![
+        (
+            media::identity("startup_completed"),
+            vec![media::answered(&false)],
+        ),
+        (media::identity("create_admin"), vec![media::taken()]),
+        (media::serve("furnish"), vec![Answer::reply(200, "[]")]),
+    ]);
+    let ctx = seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf())).with_http(http.clone());
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnished-stack");
+    let key = crate::plugin::key_file(&project, media::ADAPTER);
+    let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
+    let mut curator = crate::test_support::contracted("curating", "films", "library.curate");
+    for placed in &mut curator.services {
+        placed.media_types = vec!["movies".to_owned()];
+    }
+    let services = [media_server_svc(), requests_svc()];
+    let installed: Vec<crate::plugin::Installed> = media::moved()
+        .into_iter()
+        .chain(REQUESTS.installed())
+        .chain([curator])
+        .collect();
+    let fillers = fillers_trusting(
+        services.to_vec(),
+        &installed,
+        &project,
+        crate::plugin::first_party::EMBEDDED,
+    );
+
+    let _ = super::super::seed_media_server(
+        &ctx,
+        &services,
+        &fillers,
+        (
+            &mut crate::baseline::Baseline::new(),
+            &std::collections::BTreeSet::new(),
+        ),
+    )
+    .await;
+
+    let asked: Vec<String> = http.requests().into_iter().map(|one| one.url).collect();
+    let first = |fragment: &str| asked.iter().position(|url| url.contains(fragment));
+    let admin = first(media::identity("create_admin"));
+    assert!(admin.is_some(), "{asked:?}");
+    assert!(
+        first(media::serve("furnish")).is_some_and(|furnished| Some(furnished) > admin),
+        "{asked:?}"
+    );
+}
+
+/// **A media server nothing asks for has no administrator set up where it is claimed over
+/// `owner.claim`**, and one that cannot be asked over its contract is said on the
+/// administrator's line.
+#[tokio::test]
+async fn a_media_server_nothing_asks_for_is_set_up_over_its_contract_or_said() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let ctx = seed_ctx(true, None, None).with_http(http);
+    let mut claimed = crate::test_support::a_contracted_media_server(Some("jellyfin"));
+    for adapter in claimed
+        .services
+        .iter_mut()
+        .filter(|placed| placed.fronts.is_some())
+    {
+        adapter.speaks.push("owner.claim@1".to_owned());
+    }
+
+    let (wirings, _) =
+        identity_beside(&ctx, &[], &[claimed], &crate::baseline::Baseline::new()).await;
+    assert!(wirings.is_empty(), "{wirings:?}");
+
+    let (wirings, _) = identity_beside(
+        &ctx,
+        &[],
+        &[crate::test_support::a_contracted_media_server(Some(
+            "upstream",
+        ))],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+    assert!(
+        matches!(wirings.as_slice(), [one]
+            if one.connection.ends_with("'s administrator, which its adapter signs in with")
+                && matches!(&one.state, State::Skipped { reason }
+                    if reason.ends_with(" speaks the identity source's contract and cannot \
+                                         be asked over it"))),
+        "{wirings:?}"
     );
 }
 

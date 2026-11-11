@@ -25,6 +25,10 @@ use crate::test_support::{
 };
 use lemonfiber_fixtures::http::{Answer, Fake};
 
+/// What the report calls the stack's media server's administrator where no request service
+/// asks for the server.
+const ADMINISTRATOR_SET_UP: &str = "Jellyfin's administrator, which its adapter signs in with";
+
 /// A manifest service with the few fields the seed passes read, and filler for the rest,
 /// answering on `port` where it publishes one.
 pub(super) fn manifest_service(id: &str, port: Option<u16>) -> lemonfiber_manifest::Service {

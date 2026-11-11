@@ -301,6 +301,45 @@ async fn a_published_port_is_said_to_be_reached_around_this_machines_own_rules()
     );
 }
 
+/// Each service reached around this machine's own rules is said on its own, about that
+/// service, so an install is held to what it adds rather than to the whole list.
+#[tokio::test]
+async fn each_service_reached_around_this_machines_own_rules_is_its_own_finding() {
+    let findings = BindingsCheck::new(
+        Arc::new(engine(
+            &["jellyfin", "audiobookshelf"],
+            &[
+                ("jellyfin", "0.0.0.0", 8096),
+                ("audiobookshelf", "0.0.0.0", 13378),
+            ],
+        )),
+        PROJECT.to_owned(),
+        &[
+            service("jellyfin", Bind::Lan),
+            service("audiobookshelf", Bind::Lan),
+        ],
+        Environment::LinuxNative,
+        &[],
+    )
+    .run()
+    .await;
+
+    let warned: Vec<(Option<&str>, String)> = findings
+        .iter()
+        .filter_map(|finding| match &finding.verdict {
+            Verdict::Warn(problem) => Some((finding.service.as_deref(), format!("{problem:?}"))),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(warned.len(), 2, "{findings:?}");
+    for (service, said) in &warned {
+        assert!(
+            service.is_some_and(|service| said.contains(service)),
+            "{service:?}: {said}"
+        );
+    }
+}
+
 /// It is not said where the arrangement does not hold.
 ///
 /// Docker Desktop puts the engine behind a virtual machine and forwards from a

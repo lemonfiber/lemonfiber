@@ -64,7 +64,7 @@ fn a_check_this_install_made_worse_is_named_and_one_already_failing_is_not() {
         finding("providers.usenet", raised(true)),
     ];
 
-    let verification = against(&before, &after);
+    let verification = against(&before, &after, &[]);
     assert_eq!(named(&verification.broke), vec!["network.bindings"]);
     assert!(verification.unsettled.is_empty());
     assert!(!verification.held(), "a broken check stops the install");
@@ -78,7 +78,7 @@ fn a_warning_this_install_turned_into_a_failure_is_named() {
     let before = vec![finding("storage.space", raised(false))];
     let after = vec![finding("storage.space", raised(true))];
 
-    let verification = against(&before, &after);
+    let verification = against(&before, &after, &[]);
     assert_eq!(named(&verification.broke), vec!["storage.space"]);
 }
 
@@ -92,7 +92,7 @@ fn a_check_that_stopped_being_raised_is_no_event_at_all() {
     ];
     let after = vec![finding("storage.space", Verdict::Pass { note: None })];
 
-    let verification = against(&before, &after);
+    let verification = against(&before, &after, &[]);
     assert!(
         verification.broke.is_empty(),
         "an improvement is not a break"
@@ -108,7 +108,7 @@ fn a_check_that_stopped_being_raised_is_no_event_at_all() {
 fn a_check_that_was_not_raised_before_and_fails_now_counts_against_the_install() {
     let after = vec![finding("network.bindings", raised(true))];
 
-    let verification = against(&[], &after);
+    let verification = against(&[], &after, &[]);
     assert_eq!(named(&verification.broke), vec!["network.bindings"]);
 }
 
@@ -120,7 +120,7 @@ fn a_check_that_could_no_longer_be_told_is_unsettled_rather_than_broken() {
     let before = vec![finding("providers.usenet", Verdict::Pass { note: None })];
     let after = vec![finding("providers.usenet", untold())];
 
-    let verification = against(&before, &after);
+    let verification = against(&before, &after, &[]);
     assert!(verification.broke.is_empty());
     assert_eq!(named(&verification.unsettled), vec!["providers.usenet"]);
     assert!(
@@ -136,7 +136,7 @@ fn a_check_that_could_not_be_told_before_and_fails_now_is_unsettled_too() {
     let before = vec![finding("guides.reachable", untold())];
     let after = vec![finding("guides.reachable", raised(true))];
 
-    let verification = against(&before, &after);
+    let verification = against(&before, &after, &[]);
     assert!(verification.broke.is_empty());
     assert_eq!(named(&verification.unsettled), vec!["guides.reachable"]);
     assert_eq!(
@@ -163,7 +163,7 @@ fn what_could_never_be_told_and_what_came_right_are_both_silent() {
         finding("vpn.egress-match", Verdict::Pass { note: None }),
     ];
 
-    let verification = against(&before, &after);
+    let verification = against(&before, &after, &[]);
     assert!(verification.broke.is_empty());
     assert!(verification.unsettled.is_empty());
 }
@@ -185,7 +185,7 @@ fn a_skipped_check_holds_and_a_run_that_skips_more_is_not_a_break() {
         after.first().and_then(|one| standing(&one.verdict)),
         Some(Standing::Held)
     );
-    assert!(against(&before, &after).held());
+    assert!(against(&before, &after, &[]).held());
 }
 
 /// Every verdict the doctor can reach has a rung or says it has none, and the one
@@ -210,4 +210,77 @@ fn a_run_that_changed_nothing_holds() {
         unsettled: Vec::new(),
     };
     assert!(verification.held());
+}
+
+/// A finding under a named check about `service`.
+fn about(check: &str, service: &str, verdict: Verdict) -> Finding {
+    Finding {
+        service: Some(service.to_owned()),
+        ..finding(check, verdict)
+    }
+}
+
+/// A warning about a service the plugin brings is reported and keeps the install; one
+/// about any other service, and a failure about its own, reverse it.
+#[test]
+fn a_caveat_about_its_own_service_is_reported_and_anything_worse_reverses_it() {
+    let before = vec![
+        about(
+            "network.bindings",
+            "audiobookshelf",
+            Verdict::Pass { note: None },
+        ),
+        about("services.health", "jellyfin", Verdict::Pass { note: None }),
+        about(
+            "services.running",
+            "audiobookshelf",
+            Verdict::Pass { note: None },
+        ),
+    ];
+    let own = ["audiobookshelf", "audiobookshelf-adapter"];
+
+    let caveat = against(
+        &before,
+        &[about("network.bindings", "audiobookshelf", raised(false))],
+        &own,
+    );
+    assert!(caveat.held());
+    assert_eq!(named(&caveat.unsettled), ["network.bindings"]);
+    assert_eq!(
+        caveat
+            .unsettled
+            .first()
+            .and_then(|one| one.now.service.as_deref()),
+        Some("audiobookshelf")
+    );
+
+    let elsewhere = against(
+        &before,
+        &[about("services.health", "jellyfin", raised(false))],
+        &own,
+    );
+    assert!(!elsewhere.held());
+    assert_eq!(named(&elsewhere.broke), ["services.health"]);
+
+    let failing = against(
+        &before,
+        &[about("services.running", "audiobookshelf", raised(true))],
+        &own,
+    );
+    assert!(!failing.held());
+    assert_eq!(named(&failing.broke), ["services.running"]);
+}
+
+/// The second reading is taken before the install is recorded, so a move onto the very
+/// plugin being installed would read as still on offer; that check is left out.
+#[test]
+fn whether_a_move_is_on_offer_is_not_held_against_the_install_making_it() {
+    let before = vec![finding(
+        crate::doctor::moving::CHECK,
+        Verdict::Pass { note: None },
+    )];
+    let after = vec![finding(crate::doctor::moving::CHECK, raised(false))];
+    let verification = against(&before, &after, &["audiobookshelf"]);
+    assert!(verification.held());
+    assert!(verification.unsettled.is_empty());
 }

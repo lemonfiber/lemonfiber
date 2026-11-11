@@ -415,3 +415,35 @@ async fn moving_a_part_in_place_renames_and_migrates_nothing() {
         .collect();
     assert!(migrated.is_empty(), "{migrated:?}");
 }
+
+/// A part the bundle installs after another reads as it does once that one is recorded,
+/// which is not how it reads with nothing beside it: so a start installing them in turn
+/// meets at each the reading it offered.
+#[tokio::test]
+async fn a_part_read_after_another_reads_as_it_does_once_that_one_is_recorded() {
+    let serving = Arc::new(Serving::listing(""));
+    let ctx = served("embedded-read-after", &serving)
+        .with_http(lemonfiber_fixtures::http::Fake::silent())
+        .with_patience(std::time::Duration::ZERO);
+    let agreement = |read: Result<Installs, Box<crate::error::Problem>>| {
+        read.ok().and_then(|one| one.agreement)
+    };
+    let first = super::super::read_after(&ctx, "audiobookshelf", &[])
+        .await
+        .ok()
+        .and_then(|one| one.install)
+        .map(|install| install.would);
+
+    let alone = agreement(super::super::read_after(&ctx, "door", &[]).await);
+    let beside = agreement(super::super::read_after(&ctx, "door", first.as_slice()).await);
+    let mut held = crate::plugin::Register::empty();
+    assert!(first.is_some_and(|one| held.record(one).is_ok()));
+    assert!(crate::app::record::keep(super::super::kept_at(&ctx).as_deref(), &held).is_ok());
+    let recorded = agreement(
+        super::super::from_this_build(&ctx, "door", super::super::Consent::default()).await,
+    );
+
+    assert!(beside.is_some());
+    assert_eq!(beside, recorded);
+    assert_ne!(alone, recorded);
+}

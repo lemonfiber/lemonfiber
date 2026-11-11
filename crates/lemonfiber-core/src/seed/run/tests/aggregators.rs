@@ -1,8 +1,10 @@
 //! Telling a curator that pulls its indexers where its aggregator is.
 
+use super::super::connecting::{Connection, Unmade};
 use super::*;
 use crate::ports::service::{AggregatorAt, Protocol};
 use crate::test_support::books;
+use lemonfiber_manifest::ApiKind;
 
 /// The key lemonfiber minted for the moved indexer.
 const KEYED: &str = "the-key";
@@ -368,11 +370,37 @@ const ADD: &str = "/lemonfiber/indexer.pull/v1/add_aggregator";
 /// Where the adapter answers `aggregators`.
 const HELD: &str = "/lemonfiber/indexer.pull/v1/aggregators";
 
-/// [`PULLER`]: a curator filing `media` that asks for an indexer, and the adapter in front
-/// of it speaking `indexer.pull`.
-fn puller(media: &str) -> crate::plugin::Installed {
+/// What [`PULLER`]'s curator files, and the API it answers in where it names one.
+#[derive(Debug, Clone, Copy)]
+struct Pulling<'a> {
+    /// The media it files.
+    media: &'a str,
+    /// The API it answers in.
+    native: Option<ApiKind>,
+}
+
+/// A curator filing `media` in an API of its own, which no indexer syncs.
+const fn filing(media: &str) -> Pulling<'_> {
+    Pulling {
+        media,
+        native: None,
+    }
+}
+
+/// A curator filing `media` in the Servarr API, which the indexer syncs.
+const fn servarr_filing(media: &str) -> Pulling<'_> {
+    Pulling {
+        media,
+        native: Some(ApiKind::Servarr),
+    }
+}
+
+/// [`PULLER`]: a curator filing as `pulling` says that asks for an indexer, and the adapter
+/// in front of it speaking `indexer.pull`.
+fn puller(pulling: Pulling<'_>) -> crate::plugin::Installed {
     let mut curator = crate::test_support::a_placed(PULLER, &[], Some(8787));
-    curator.media_types = vec![media.to_owned()];
+    curator.media_types = vec![pulling.media.to_owned()];
+    curator.native = pulling.native.map(|kind| kind.name().to_owned());
     curator.asks = vec![crate::plugin::Asking {
         capability: "indexer.search".to_owned(),
         each: false,
@@ -393,11 +421,11 @@ fn puller(media: &str) -> crate::plugin::Installed {
     installed
 }
 
-/// The stack's indexer moved into its plugin beside [`puller`] filing `media`, written at
-/// `project`, trusting `trusted` beside the bundle's plugins.
+/// The stack's indexer moved into its plugin beside [`puller`] filing as `pulling` says,
+/// written at `project`, trusting `trusted` beside the bundle's plugins.
 fn beside_the_puller_trusting(
     project: &std::path::Path,
-    media: &str,
+    pulling: Pulling<'_>,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
     let trusted: Vec<crate::plugin::first_party::FirstParty> = crate::plugin::first_party::EMBEDDED
@@ -408,23 +436,23 @@ fn beside_the_puller_trusting(
     let installed: Vec<crate::plugin::Installed> = INDEXER
         .installed()
         .into_iter()
-        .chain([puller(media)])
+        .chain([puller(pulling)])
         .collect();
     fillers_trusting(vec![indexer()], &installed, project, &trusted)
 }
 
 /// The same, with [`puller`] first-party.
-fn beside_the_puller(project: &std::path::Path, media: &str) -> crate::wiring::Fillers {
-    beside_the_puller_trusting(project, media, &crate::test_support::first_party(PULLER))
+fn beside_the_puller(project: &std::path::Path, pulling: Pulling<'_>) -> crate::wiring::Fillers {
+    beside_the_puller_trusting(project, pulling, &crate::test_support::first_party(PULLER))
 }
 
-/// What the pass tells [`puller`] filing `media`, beside the stack's indexer, with the
-/// adapter answering `added` to `add_aggregator`.
-async fn pulled(tag: &str, media: &str, added: Answer) -> (Vec<Wiring>, Arc<Fake>) {
+/// What the pass tells [`puller`] filing as `pulling` says, beside the stack's indexer,
+/// with the adapter answering `added` to `add_aggregator`.
+async fn pulled(tag: &str, pulling: Pulling<'_>, added: Answer) -> (Vec<Wiring>, Arc<Fake>) {
     let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("pulled-{tag}"));
     let http = Fake::by_path(vec![(HELD, Answer::reply(200, "[]")), (ADD, added)]);
     let ctx = contracted_ctx(&project, PULLER_ADAPTER, true, http.clone());
-    let fillers = beside_the_puller(&project, media);
+    let fillers = beside_the_puller(&project, pulling);
     (
         super::super::aggregators::seed_aggregators(&ctx, &fillers).await,
         http,
@@ -433,7 +461,7 @@ async fn pulled(tag: &str, media: &str, added: Answer) -> (Vec<Wiring>, Arc<Fake
 
 #[tokio::test]
 async fn a_curator_pulling_over_the_contract_is_told_the_indexer_in_its_native_api() {
-    let (wirings, http) = pulled("told", "books", Answer::reply(204, "")).await;
+    let (wirings, http) = pulled("told", filing("books"), Answer::reply(204, "")).await;
 
     assert!(
         matches!(wirings.as_slice(), [one] if one.state == crate::seed::State::Wired
@@ -455,7 +483,7 @@ async fn a_curator_pulling_over_the_contract_is_told_the_indexer_in_its_native_a
 async fn a_curator_that_cannot_pull_from_the_indexer_is_left_unpaired() {
     let (wirings, _) = pulled(
         "unsupported",
-        "books",
+        filing("books"),
         Answer::served(
             500,
             crate::ports::http::PROBLEM,
@@ -473,10 +501,25 @@ async fn a_curator_that_cannot_pull_from_the_indexer_is_left_unpaired() {
 
 #[tokio::test]
 async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull() {
-    let (wirings, http) = pulled("synced", "tv", Answer::reply(204, "")).await;
+    let (wirings, http) = pulled("synced", servarr_filing("tv"), Answer::reply(204, "")).await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+#[tokio::test]
+async fn a_curator_filing_synced_media_in_an_api_of_its_own_is_told_the_indexer() {
+    let (wirings, http) = pulled("own-api", filing("tv"), Answer::reply(204, "")).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    assert!(
+        http.requests().iter().any(|asked| asked.url.ends_with(ADD)),
+        "{:?}",
+        http.requests()
+    );
 }
 
 #[tokio::test]
@@ -485,19 +528,46 @@ async fn a_curator_pulling_over_the_contract_its_adapter_does_not_answer_is_told
     let http = Fake::always(Answer::reply(204, ""));
     let ctx = seed_ctx(true, None, None).with_http(http.clone());
 
-    let wirings =
-        super::super::aggregators::seed_aggregators(&ctx, &beside_the_puller(&project, "books"))
-            .await;
+    let wirings = super::super::aggregators::seed_aggregators(
+        &ctx,
+        &beside_the_puller(&project, filing("books")),
+    )
+    .await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// What the pairing of [`puller`], filing as `pulling` says, with the stack's indexer
+/// comes to.
+fn connected(tag: &str, pulling: Pulling<'_>) -> Vec<Result<Connection, Unmade>> {
+    let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("connected-{tag}"));
+    let fillers = beside_the_puller(&project, pulling);
+    super::super::connecting::pairings(&fillers)
+        .into_iter()
+        .filter(|pairing| pairing.asker.id == PULLER)
+        .map(|pairing| pairing.made.map(|(made, _, _)| made))
+        .collect()
+}
+
+#[test]
+fn only_a_curator_answering_in_the_servarr_api_is_left_to_the_indexers_app_sync() {
+    assert_eq!(
+        connected("servarr", servarr_filing("tv")),
+        vec![Err(Unmade::Synced)]
+    );
+    assert_eq!(
+        connected("own-api", filing("tv")),
+        vec![Ok(Connection::Aggregator)]
+    );
 }
 
 #[test]
 fn a_curator_the_indexers_app_sync_serves_is_reported_as_synced() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("pulled-synced-said");
 
-    let unmatched = super::super::connecting::unmatched(&beside_the_puller(&project, "tv"));
+    let unmatched =
+        super::super::connecting::unmatched(&beside_the_puller(&project, servarr_filing("tv")));
 
     assert!(
         unmatched.iter().any(|one| matches!(&one.state,
@@ -517,7 +587,7 @@ async fn a_third_party_curator_pulling_over_the_contract_is_never_told_the_index
         (ADD, Answer::reply(204, "")),
     ]);
     let ctx = contracted_ctx(&project, PULLER_ADAPTER, true, http.clone());
-    let fillers = beside_the_puller_trusting(&project, "books", &[]);
+    let fillers = beside_the_puller_trusting(&project, filing("books"), &[]);
 
     let wirings = super::super::aggregators::seed_aggregators(&ctx, &fillers).await;
 

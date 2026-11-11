@@ -78,12 +78,13 @@ async fn a_part_proved_by_its_own_program_is_installed_once_the_run_holds() {
         vec!["passed".to_owned()]
     );
     let asked = program.asked();
+    let owner = crate::plugin::adapting::running_as(&stack_of(&ctx))
+        .map(|(uid, gid)| format!("{uid}:{gid}"));
     assert_eq!(asked.len(), 1);
-    assert!(asked
-        .first()
-        .is_some_and(|one| one.user.as_deref() == Some("1000:1000")
-            && one.args == vec!["--version".to_owned()]
-            && one.bound.is_some()));
+    assert!(asked.first().is_some_and(|one| one.user.is_some()
+        && one.user == owner
+        && one.args == vec!["--version".to_owned()]
+        && one.bound.is_some()));
     let record = read(&record_of(&ctx));
     assert!(
         record.contains("\"run_proofs\"") && record.contains("\"starting\":\"sha256:"),

@@ -99,3 +99,4 @@ private = { ignore = true }
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+allow-git = ["https://github.com/lemonfiber/sdk-rust"]

@@ -49,7 +49,14 @@ fn machine(name: &str, fenced: bool, program: &Arc<Proving>) -> (Ctx, PathBuf) {
 
 async fn readied(ctx: &Ctx, image: Option<&str>) -> Option<String> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    super::readied(ctx, &manifest, image).await
+    super::readied(ctx, &manifest.services, &installed(ctx), image).await
+}
+
+/// What `ctx`'s register holds.
+fn installed(ctx: &Ctx) -> Vec<crate::plugin::Installed> {
+    crate::app::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default()
 }
 
 #[tokio::test]

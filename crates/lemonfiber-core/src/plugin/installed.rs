@@ -364,6 +364,15 @@ pub struct Installed {
 }
 
 impl Installed {
+    /// The ids of the services it brings.
+    #[must_use]
+    pub fn service_ids(&self) -> Vec<&str> {
+        self.services
+            .iter()
+            .map(|placed| placed.service.as_str())
+            .collect()
+    }
+
     /// The service of this plugin `speaker` answers its contracts for: the one it
     /// `fronts`, or itself where it fronts none.
     #[must_use]

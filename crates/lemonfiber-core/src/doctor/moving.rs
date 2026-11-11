@@ -11,7 +11,7 @@ use crate::error::codes::plugin::MOVE_OFFERED;
 use crate::error::{Problem, Remedy, State};
 
 /// The name this check and anything answering it share.
-const CHECK: &str = "services.move-offered";
+pub(crate) const CHECK: &str = "services.move-offered";
 
 /// The heading an operator reads this under.
 const TITLE: &str = "Parts this release runs as plugins";

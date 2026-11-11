@@ -49,14 +49,28 @@ fn serving<'a>(
         .filter(move |placed| placed.service == id || placed.fronts.as_deref() == Some(id))
 }
 
+/// Every ask of `capability` among `parts`, naming no API it talks in, so it reaches the
+/// adapter in front of whatever fills it.
+fn in_no_api(parts: &mut [crate::plugin::Installed], capability: &str) {
+    for ask in parts
+        .iter_mut()
+        .flat_map(|part| part.services.iter_mut())
+        .flat_map(|placed| placed.asks.iter_mut())
+        .filter(|ask| ask.capability == capability)
+    {
+        ask.native = None;
+    }
+}
+
 /// The shipped stack's asks with every part moved in, its Usenet client's upstream as
-/// `shaping` leaves it.
+/// `shaping` leaves it, and every ask of a Usenet client naming no API it talks in.
 fn usenet_as(shaping: fn(&mut crate::plugin::Placed)) -> Fillers {
     moved(
         &[],
         &Chosen::default(),
         |_| (),
         |parts| {
+            in_no_api(parts, "download.usenet");
             for upstream in parts
                 .iter_mut()
                 .flat_map(|part| part.services.iter_mut())
@@ -125,9 +139,10 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
 }
 
 /// Every curator the shipped stack's curation asks reach comes to the connection its
-/// media makes it, and the ones nothing connects are said — the download clients to the
-/// book curator, the music and book curators to the two askers that deal in neither, and
-/// not the book curator to the indexer, which it reaches itself through what it asks for.
+/// media makes it, and the ones nothing connects are said: the music curator to the two
+/// askers that deal in Servarr's API and not in music, and the music and book curators to
+/// the request service. The book curator answers in no API those two ask in, so neither
+/// reaches it.
 #[test]
 fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
@@ -208,9 +223,7 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
     assert_eq!(
         said,
         vec![
-            "Bindery into Bazarr",
             "Lidarr into Bazarr",
-            "Bindery into Recyclarr",
             "Lidarr into Recyclarr",
             "Bindery into Seerr",
             "Lidarr into Seerr",
@@ -368,12 +381,18 @@ fn an_asker_withheld_or_an_ask_answered_elsewhere_is_not_paired() {
 /// and not while the curator asks the indexer for its searches.
 #[test]
 fn a_curator_reaching_the_indexer_itself_is_not_said_to_be_reached_by_nothing() {
-    let connected = shipped(&[], &Chosen::default(), |_| ());
-    let apart = shipped(&[], &Chosen::default(), |manifest| {
-        manifest
-            .wirings
-            .retain(|wiring| wiring.asks.as_deref() != Some("indexer.search"));
-    });
+    let curating = |parts: &mut Vec<crate::plugin::Installed>| in_no_api(parts, "library.curate");
+    let connected = moved(&[], &Chosen::default(), |_| (), curating);
+    let apart = moved(
+        &[],
+        &Chosen::default(),
+        |manifest| {
+            manifest
+                .wirings
+                .retain(|wiring| wiring.asks.as_deref() != Some("indexer.search"));
+        },
+        curating,
+    );
     let said = |fillers: &crate::wiring::Fillers| {
         unmatched(fillers)
             .into_iter()

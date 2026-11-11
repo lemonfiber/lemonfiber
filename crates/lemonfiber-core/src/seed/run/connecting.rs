@@ -148,8 +148,9 @@ pub(super) enum Unmade {
     /// The filler is a curator the request gate would ask, and nothing in front of it
     /// speaks the curator's contract.
     Uncontracted,
-    /// The filler's application sync serves the media the asker files, so the filler is
-    /// told about the asker rather than the asker about the filler.
+    /// The asker answers in the Servarr API and the filler's application sync serves the
+    /// media it files, so the filler is told about the asker rather than the asker about
+    /// the filler.
     Synced,
     /// The two are connected for some media, and the filler files none of them.
     Files,
@@ -208,19 +209,19 @@ pub(super) struct Pairing<'a> {
     pub(super) made: Result<(Connection, &'a Address, Cleared<'a>), Unmade>,
 }
 
-/// The connection the table holds for an asker paired by the contract `asker`, asking for
-/// `capability`, of a filler speaking `filler`.
+/// The connection the table holds for `asker`, paired by `contract`, asking for
+/// `capability` of a filler speaking `filler` and filing `media`.
 ///
 /// A curator comes to whatever its media makes it in the asker, through the same
 /// mapping each asker's own pass uses.
 fn connection(
-    asker: &str,
+    contract: &str,
     capability: &str,
     filler: ApiKind,
     media: &[String],
-    files: &[String],
+    asker: &Filler,
 ) -> Result<Connection, Unmade> {
-    match (asker, capability, filler) {
+    match (contract, capability, filler) {
         (curate::CAPABILITY, USENET, ApiKind::Sabnzbd)
         | (curate::CAPABILITY, TORRENT, ApiKind::Qbittorrent) => Ok(Connection::DownloadClient(
             Protocol(filler.name().to_owned()),
@@ -236,11 +237,7 @@ fn connection(
         (sync::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Quality)
             .ok_or(Unmade::Files),
-        (pull::CAPABILITY, SEARCHES, _)
-            if super::applications::application_kind(files).is_some() =>
-        {
-            Err(Unmade::Synced)
-        }
+        (pull::CAPABILITY, SEARCHES, _) if synced(asker) => Err(Unmade::Synced),
         (pull::CAPABILITY, SEARCHES, _) => Ok(Connection::Aggregator),
         (extract::CAPABILITY, CURATES, ApiKind::Servarr) => media
             .first()
@@ -253,6 +250,13 @@ fn connection(
             .ok_or(Unmade::Files),
         _ => Err(Unmade::Unpaired),
     }
+}
+
+/// Whether the indexer's application sync reaches `asker`: a curator answering in the
+/// Servarr API, filing media that sync covers.
+fn synced(asker: &Filler) -> bool {
+    asker.talks_in() == Some(ApiKind::Servarr)
+        && super::applications::application_kind(&asker.media_types).is_some()
 }
 
 /// Every asker paired with each service that fills what it asked for, for the asks
@@ -319,7 +323,7 @@ fn made<'a>(
         &ask.capability,
         speaks,
         &filler.media_types,
-        &asker.media_types,
+        asker,
     )?;
     if made.hands_over_the_askers_key()
         && !crate::wiring::crosses(answering.holder(), filler.holder())

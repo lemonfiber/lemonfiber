@@ -14,13 +14,16 @@ use crate::app::targets::MediaServer;
 
 /// The media server's administrator, as the first half of the identity left it: how the
 /// request service's owner signs in, or the state the identity rests in without a way to,
-/// and the request service that asked for it.
+/// and the request service that asked for it, where one does.
 pub(super) struct Admin {
     /// How the request service's owner signs in, or the state the identity rests in
     /// without a way to.
     administered: Result<Signing, crate::seed::State>,
-    /// The request service that asks for the server, as the gate cleared it.
-    requests: crate::wiring::Filler,
+    /// The request service that asks for the server, as the gate cleared it, where one
+    /// does.
+    requests: Option<crate::wiring::Filler>,
+    /// Whether lemonfiber recorded the administrator's password before this run.
+    held: bool,
 }
 
 /// How the request service's owner signs in through the media server.
@@ -36,8 +39,8 @@ enum Signing {
 /// service signs in against: the media server's administrator, minted where its first-run
 /// setup has not run.
 ///
-/// Nothing where nothing fills the identity source, or where nothing the trust gate lets
-/// the administrator's password reach asks for it: without both there is nothing to wire. The admin
+/// Nothing where nothing fills the identity source. Minted whether or not a request
+/// service asks for the server, since the server's adapter signs in with it. The admin
 /// password is the one credential minted rather than read — recorded under the server's
 /// own setting on the run that mints it, before the setup is given it, and read back on a
 /// later run. Recorded here, before the second half, so the steps between the two can
@@ -47,11 +50,12 @@ pub(super) async fn seed_media_server_admin(
     server: Option<&MediaServer>,
 ) -> Option<Admin> {
     let server = server?;
-    let requests = server.asked_by.clone()?;
+    let requests = server.asked_by.clone();
     if server.claimed() {
         return Some(Admin {
             administered: Ok(Signing::Claimed),
             requests,
+            held: false,
         });
     }
     let Some(client) = server.identifying(ctx).await else {
@@ -63,6 +67,7 @@ pub(super) async fn seed_media_server_admin(
                 ),
             }),
             requests,
+            held: false,
         });
     };
     let recorded = server.recorded_password(ctx);
@@ -80,6 +85,7 @@ pub(super) async fn seed_media_server_admin(
     Some(Admin {
         administered,
         requests,
+        held: recorded.is_some(),
     })
 }
 
@@ -126,10 +132,23 @@ pub(super) async fn seed_request_identity(
         Some(Admin {
             administered,
             requests,
+            held,
         }),
     ) = (server, admin)
     else {
         return (Vec::new(), records);
+    };
+    let Some(requests) = requests else {
+        let state = match administered {
+            Ok(Signing::Claimed) => return (Vec::new(), records),
+            Ok(Signing::Administrator(_)) if held => crate::seed::State::AlreadyWired,
+            Ok(Signing::Administrator(_)) => crate::seed::State::Wired,
+            Err(state) => state,
+        };
+        return (
+            vec![crate::seed::Wiring::settled(administrator(server), state)],
+            records,
+        );
     };
     let Some(pairing) = server.pairing.as_ref() else {
         return (vec![unpaired(server)], records);
@@ -244,6 +263,15 @@ fn unpaired(server: &MediaServer) -> crate::seed::Wiring {
                 server.name()
             ),
         },
+    )
+}
+
+/// What the report calls the media server's administrator, set up with no request service
+/// asking for the server.
+fn administrator(server: &MediaServer) -> String {
+    format!(
+        "{}'s administrator, which its adapter signs in with",
+        server.name()
     )
 }
 
