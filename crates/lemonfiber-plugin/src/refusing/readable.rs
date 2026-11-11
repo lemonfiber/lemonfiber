@@ -96,6 +96,9 @@ pub(super) fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         if let Some(path) = &service.config_path {
             every.push((format!("{at}.config_path"), path.as_str()));
         }
+        for (index, arg) in service.args.iter().flatten().enumerate() {
+            every.push((format!("{at}.args[{index}]"), arg.as_str()));
+        }
         for (field, text) in [
             ("reaches", service.reaches.as_deref()),
             ("asks_for", service.asks_for.as_deref()),

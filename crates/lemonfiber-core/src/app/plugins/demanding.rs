@@ -64,6 +64,7 @@ pub(super) async fn demand(
         rehearsed: ctx.dry_run,
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
 }
 

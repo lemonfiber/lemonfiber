@@ -462,6 +462,17 @@ pub enum Bind {
     Loopback,
     /// Reachable from the local network.
     Lan,
+    /// Published on the host's loopback alone, and reached by the household by name through
+    /// the stack's proxy.
+    Proxied,
+}
+
+impl Bind {
+    /// Whether the household reaches a service on this tier by name, through the proxy.
+    #[must_use]
+    pub const fn routed(self) -> bool {
+        matches!(self, Self::Lan | Self::Proxied)
+    }
 }
 
 /// How much a plugin's service costs when it is absent.

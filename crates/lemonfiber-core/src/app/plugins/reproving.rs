@@ -120,5 +120,6 @@ fn answering(held: &Register, proof: Reproof, offer: String) -> Installs {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }
 }

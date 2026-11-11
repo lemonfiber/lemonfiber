@@ -39,7 +39,19 @@ pub fn recorded(ctx: &Ctx) -> Result<Installs, Box<Problem>> {
         agreement: None,
         unvetted: None,
         guards: Vec::new(),
+        unproxied: unproxied(ctx),
     })
+}
+
+/// Whether the stack this machine runs has no service filling the proxy's capability.
+pub(super) fn unproxied(ctx: &Ctx) -> bool {
+    ctx.stack
+        .checked_manifest(ctx.today())
+        .is_ok_and(|manifest| {
+            crate::app::targets::fillers_here(ctx, &manifest)
+                .filling(lemonfiber_contract::capabilities::proxy::front::CAPABILITY)
+                .is_none()
+        })
 }
 
 /// What is installed, as [`recorded`] reads it, with whether each source can still be

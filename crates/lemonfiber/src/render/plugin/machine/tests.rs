@@ -163,6 +163,7 @@ fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> 
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }
 }
 
@@ -243,6 +244,7 @@ fn a_guard_restarted_to_take_up_its_control_credential_is_said_to_have_been() {
 
 mod installed;
 mod proven;
+mod reached;
 mod reversed;
 
 /// One placeholder naming `secret` in `form`.

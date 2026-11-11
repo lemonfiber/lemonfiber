@@ -231,7 +231,7 @@ pub struct Substituted {
 /// One answer for the reading and for the verb, because they are one question: an
 /// operator who has just installed something wants to see it among what they had, and
 /// a rehearsal that showed only the new entry would not say what it is joining.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "PluginInstalls")]
 pub struct Installs {
     /// Every plugin the record holds.
@@ -312,6 +312,10 @@ pub struct Installs {
     /// could not move stays on offer and says why.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guards: Vec<crate::update::run::Moved>,
+    /// Whether the stack runs no proxy, so a proxied service is reached on this machine
+    /// alone.
+    #[serde(default)]
+    pub unproxied: bool,
 }
 
 /// What asking for one of an installed plugin's demand recipes came to.

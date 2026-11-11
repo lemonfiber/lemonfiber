@@ -424,6 +424,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }
 }
 

@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 /// How an installed service is reached, where it is reached at all.
 ///
 /// The tier is the arm, so the label a tier earns lives only in the arm entitled to
-/// one. Only a household service is proxied — the bundled policy is that an admin
-/// surface does not get a name on the household network — and a record able to carry
+/// one. Only a household or a proxied service has a label — the bundled policy is that an
+/// admin surface does not get a name on the household network — and a record able to carry
 /// a loopback service with a hostname would be a record able to describe the thing
 /// that policy exists to prevent.
 ///
@@ -29,6 +29,17 @@ pub enum Reached {
     Loopback {
         /// The port the service listens on.
         port: u16,
+        /// The group on the bundled dashboard, where the manifest named one.
+        #[serde(default)]
+        group: Option<String>,
+    },
+    /// From this machine on its port, and from the household by name through the stack's
+    /// own proxy alone.
+    Proxied {
+        /// The port the service listens on.
+        port: u16,
+        /// The single label in front of the operator's domain.
+        hostname: String,
         /// The group on the bundled dashboard, where the manifest named one.
         #[serde(default)]
         group: Option<String>,
@@ -60,6 +71,11 @@ impl Reached {
                 hostname: entry.hostname.to_owned(),
                 group,
             }),
+            (Some(port), Some(Bind::Proxied)) => Some(Self::Proxied {
+                port,
+                hostname: entry.hostname.to_owned(),
+                group,
+            }),
             (Some(port), Some(Bind::Loopback)) => Some(Self::Loopback { port, group }),
             (Some(_), None) | (None, _) => None,
         }
@@ -73,7 +89,9 @@ impl Reached {
     #[must_use]
     pub const fn port(&self) -> u16 {
         match self {
-            Self::Loopback { port, .. } | Self::Household { port, .. } => *port,
+            Self::Loopback { port, .. }
+            | Self::Proxied { port, .. }
+            | Self::Household { port, .. } => *port,
         }
     }
 
@@ -81,7 +99,9 @@ impl Reached {
     #[must_use]
     pub fn group(&self) -> Option<&str> {
         match self {
-            Self::Loopback { group, .. } | Self::Household { group, .. } => group.as_deref(),
+            Self::Loopback { group, .. }
+            | Self::Proxied { group, .. }
+            | Self::Household { group, .. } => group.as_deref(),
         }
     }
 
@@ -90,7 +110,7 @@ impl Reached {
     pub fn hostname(&self) -> Option<&str> {
         match self {
             Self::Loopback { .. } => None,
-            Self::Household { hostname, .. } => Some(hostname),
+            Self::Proxied { hostname, .. } | Self::Household { hostname, .. } => Some(hostname),
         }
     }
 }

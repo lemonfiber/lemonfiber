@@ -97,6 +97,23 @@ fn a_household_service_is_routed_at_its_label_to_its_name_and_the_port_it_listen
     );
 }
 
+/// A proxied service is routed at its label exactly as a household one is.
+#[test]
+fn a_proxied_service_is_routed_at_its_label() {
+    let proxied = placed(
+        "ntfy",
+        Some(Reached::Proxied {
+            port: 2586,
+            hostname: "push".to_owned(),
+            group: None,
+        }),
+    );
+    assert_eq!(
+        routes(&[installed(vec![proxied])], "home.example"),
+        vec![route("push", "ntfy", 2586)]
+    );
+}
+
 /// The bundled policy holding: an operator surface is never given a route.
 #[test]
 fn an_operator_surface_and_a_service_nothing_reaches_are_not_routed() {

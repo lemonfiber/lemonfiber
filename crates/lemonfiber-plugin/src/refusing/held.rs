@@ -174,7 +174,9 @@ fn labels(parts: &[(&str, crate::Manifest)]) -> Vec<Answered> {
         .flat_map(|(plugin, part)| {
             part.services
                 .iter()
-                .filter(|service| service.port.is_some() && service.bind == Some(crate::Bind::Lan))
+                .filter(|service| {
+                    service.port.is_some() && service.bind.is_some_and(crate::Bind::routed)
+                })
                 .map(move |service| Answered {
                     label: part.entry(service).hostname.to_owned(),
                     plugin: (*plugin).to_owned(),

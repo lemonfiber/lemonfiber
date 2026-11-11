@@ -135,6 +135,7 @@ fn taking(
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     }
 }
 
@@ -304,6 +305,7 @@ fn an_install_that_went_back_names_what_went_and_what_stayed() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(
@@ -360,6 +362,7 @@ fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
     .text();
     assert!(

@@ -389,6 +389,7 @@ fn installed(
         sources: Vec::new(),
         unvetted: None,
         guards: Vec::new(),
+        unproxied: false,
     })
 }
 
@@ -442,6 +443,7 @@ fn only_a_proof_asked_again_that_did_not_hold_is_a_refusal() {
             sources: Vec::new(),
             unvetted: None,
             guards: Vec::new(),
+            unproxied: false,
         })
     };
     assert_eq!(shown(settled(&proved(false, false))), success());
@@ -481,6 +483,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
             sources: Vec::new(),
             unvetted: None,
             guards: Vec::new(),
+            unproxied: false,
         })
     };
 
@@ -564,6 +567,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
             sources: Vec::new(),
             unvetted: None,
             guards: Vec::new(),
+            unproxied: false,
         })
     };
     assert_eq!(
@@ -602,6 +606,7 @@ fn reading_what_is_installed_always_succeeds() {
                 sources: Vec::new(),
                 unvetted: None,
                 guards: Vec::new(),
+                unproxied: false,
             }
         ))),
         success()

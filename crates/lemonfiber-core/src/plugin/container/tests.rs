@@ -202,6 +202,36 @@ fn each_tier_is_published_on_the_interface_the_tier_decides() {
     assert!(!operator.contains(HOUSEHOLD), "got: {operator}");
 }
 
+/// A proxied service and every further port it publishes are on this machine's loopback
+/// alone: the household reaches it by name through the proxy, never at a port.
+#[test]
+fn a_proxied_service_publishes_on_loopback_alone() {
+    let mut proxied = Placed {
+        reached: Some(Reached::Proxied {
+            port: 25600,
+            hostname: "comics".to_owned(),
+            group: None,
+        }),
+        ..placed()
+    };
+    proxied.fields.publish = vec![lemonfiber_manifest::container::Publish {
+        port: 25601,
+        listens: None,
+    }];
+
+    let entry = document(proxied);
+
+    assert!(
+        entry.contains(&format!("{LOOPBACK}:25600:25600")),
+        "got: {entry}"
+    );
+    assert!(
+        entry.contains(&format!("{LOOPBACK}:25601:25601")),
+        "got: {entry}"
+    );
+    assert!(!entry.contains(HOUSEHOLD), "got: {entry}");
+}
+
 /// A service with no listener is written with no ports at all.
 ///
 /// Not a port mapping onto nothing, and not an empty list: a service that

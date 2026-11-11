@@ -108,6 +108,21 @@ fn a_service_proxied_at_an_id_the_stack_answers_on_is_refused() {
     );
 }
 
+/// A proxied service gets a stanza as a household one does, so its label is held to the
+/// names the stack answers on.
+#[test]
+fn a_proxied_service_at_a_hostname_the_stack_answers_on_is_refused() {
+    let said = said(
+        &INSTALLABLE
+            .replace(
+                r#"hostname        = "comics""#,
+                r#"hostname        = "watch""#,
+            )
+            .replace(r#"bind        = "lan""#, r#"bind        = "proxied""#),
+    );
+    assert!(names(&said, &["wiring.hostname", "watch"]), "got: {said:?}");
+}
+
 /// A service on the operator's tier gets no stanza, so its id is no label at all.
 #[test]
 fn a_loopback_service_takes_no_label() {

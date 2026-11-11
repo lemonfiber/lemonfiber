@@ -304,7 +304,12 @@ fn fronted(installed: &[Installed], proxy: Option<String>) -> Vec<Ask> {
     installed
         .iter()
         .flat_map(|one| &one.services)
-        .filter(|placed| matches!(placed.reached, Some(Reached::Household { .. })))
+        .filter(|placed| {
+            matches!(
+                placed.reached,
+                Some(Reached::Household { .. } | Reached::Proxied { .. })
+            )
+        })
         .map(|placed| Ask {
             asker: placed.service.clone(),
             capability: front::CAPABILITY.to_owned(),

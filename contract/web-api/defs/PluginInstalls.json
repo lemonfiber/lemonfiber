@@ -96,6 +96,11 @@
         "$ref": "PluginSubstituted.json"
       }
     },
+    "unproxied": {
+      "description": "Whether the stack runs no proxy, so a proxied service is reached on this machine\nalone.",
+      "type": "boolean",
+      "default": false
+    },
     "unvetted": {
       "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this run would start, and held to nothing lemonfiber vets.",
       "anyOf": [

@@ -65,7 +65,7 @@ fn routed() -> &'static [(String, String)] {
 fn labelled(part: &crate::Manifest) -> Vec<(String, String)> {
     part.services
         .iter()
-        .filter(|service| service.port.is_some() && service.bind == Some(crate::Bind::Lan))
+        .filter(|service| service.port.is_some() && service.bind.is_some_and(crate::Bind::routed))
         .map(|service| {
             (
                 part.entry(service).hostname.to_owned(),

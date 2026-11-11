@@ -242,6 +242,7 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
     Ok(Installs {
         unvetted: crate::overlay::unvetted(ctx).filter(|_| starts),
         guards,
+        unproxied: listing::unproxied(ctx),
         ..installs
     })
 }
