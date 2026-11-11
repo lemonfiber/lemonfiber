@@ -128,6 +128,12 @@ pub struct Profile {
     /// renamed profile from silently losing its guard.
     #[serde(default)]
     pub protocol: Option<Protocol>,
+    /// Whether it runs beside whichever forms run rather than being one of them.
+    ///
+    /// No form lists it, and it joins a plan only once the forms named leave a profile
+    /// of their own, so it never counts toward a form being able to run.
+    #[serde(default)]
+    pub beside: bool,
 }
 
 /// A download provider a profile can depend on.

@@ -97,6 +97,17 @@ fn a_form_naming_an_undeclared_profile_is_caught() {
 }
 
 #[test]
+fn a_form_naming_a_profile_that_runs_beside_the_forms_is_caught() {
+    let text = edited(
+        r#"protocol = "usenet""#,
+        "protocol = \"usenet\"\nbeside = true",
+    );
+    assert!(messages(&text).iter().any(
+        |m| m.contains("names profile usenet, which runs beside the forms rather than in one")
+    ));
+}
+
+#[test]
 fn a_service_in_an_undeclared_profile_is_caught() {
     let text = edited(r#"profile = "search""#, r#"profile = "telly""#);
     assert!(messages(&text)

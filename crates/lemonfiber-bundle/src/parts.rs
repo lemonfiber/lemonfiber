@@ -196,26 +196,32 @@ fn staged(pin: &Pin, part: &Part, bundle: &Bundle, broken: &mut Vec<String>) {
     let Some(profile) = &pin.profile else {
         return;
     };
-    if !bundle
+    let Some(declared) = bundle
         .profile
         .iter()
-        .any(|declared| declared.id == *profile)
-    {
+        .find(|declared| declared.id == *profile)
+    else {
         broken.push(format!(
             "plugin {id}.profile {profile} is not a declared profile"
         ));
-    }
+        return;
+    };
     let holding: BTreeSet<&str> = bundle
         .form
         .iter()
-        .filter(|form| form.profiles.iter().any(|one| one == profile))
+        .filter(|form| declared.beside || form.profiles.iter().any(|one| one == profile))
         .map(|form| form.id.as_str())
         .collect();
     let named: BTreeSet<&str> = part.forms.iter().map(String::as_str).collect();
     if holding != named {
+        let which = if declared.beside {
+            "every form, as it runs beside them,"
+        } else {
+            "the forms holding it"
+        };
         broken.push(format!(
-            "plugin {id}'s [plugin].forms names {named:?}, and the forms holding profile \
-             {profile} are {holding:?}"
+            "plugin {id}'s [plugin].forms names {named:?}, and for profile {profile} \
+             {which} are {holding:?}"
         ));
     }
 }
