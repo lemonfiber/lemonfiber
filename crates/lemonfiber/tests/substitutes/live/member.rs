@@ -78,7 +78,7 @@ pub fn asked(
 ) -> Result<(), String> {
     let minted = core.run(
         &[
-            "keys",
+            "key",
             "mint",
             &format!("{member}-asks"),
             "--scope",

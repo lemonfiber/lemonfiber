@@ -48,6 +48,10 @@ const APPLIED: &str = "applied";
 /// definition name it is listed under, which Prowlarr releases differ on.
 const NEWZNAB: (&str, &str, &str) = ("Newznab", "Generic Newznab", "generic-newznab");
 
+/// The household policy the arm runs under, so the member's ask reaches the curator
+/// without the operator's yes.
+const TRUSTED: &str = "trusted";
+
 /// The member who asks.
 const MEMBER: &str = "arm";
 
@@ -341,7 +345,11 @@ pub fn run(
     assert!(added.is_ok(), "{added:?}");
     step(&core.run(&["seed"], ""), "seed after the indexer");
 
-    step(&core.run(&["invite", MEMBER, "--confirm"], ""), "invite");
+    step(&core.run(&["invite", MEMBER], ""), "invite");
+    step(
+        &core.agreed(&["household", "allow", "--policy", TRUSTED]),
+        "the household's policy",
+    );
     let served = member::Served::by(&core);
     assert!(served.is_ok(), "{:?}", served.err());
     let Ok(served) = served else {
