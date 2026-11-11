@@ -52,6 +52,7 @@ use lemonfiber_core::app::{
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::notify::configuring::Asked as Notifying;
 
 use crate::refusal::Refusal;
 
@@ -138,6 +139,12 @@ pub const FRONT_DOOR: &str = "/api/front-door";
 
 /// How the stack runs without lemonfiber.
 pub const STACK: &str = "/api/stack";
+
+/// The back-ends the stack delivers its alerts to, the operator's alone.
+pub const NOTIFY: &str = "/api/notify";
+
+/// The ways a member may be told that something they asked for is ready.
+pub const NOTIFY_MINE: &str = "/api/notify/mine";
 
 /// What a surface can mark as new, newest first within each kind.
 pub const NEWS: &str = "/api/news";
@@ -325,6 +332,8 @@ pub const OFFERED: &[&str] = &[
     HOSTING,
     FRONT_DOOR,
     STACK,
+    NOTIFY,
+    NOTIFY_MINE,
     NEWS,
     TRACE,
     STUCK,
@@ -474,16 +483,13 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         WATCHING => part_way(member, most),
         ASKABLE => askable(member, term, after, kind.as_deref(), unit.as_deref()),
         ASKABLE_KINDS => Ok(askable_kinds(member)),
-        // Nothing asked of it, because what is hosted is a property of the machine
-        // rather than of the caller: the two words that change it are actions, at the
-        // other door, and a parameter here would let one surface be told a different
-        // answer from another.
         HOSTING => Ok(Command::Hosting(Keeping::Read)),
         FRONT_DOOR => Ok(Command::FrontDoor),
         STACK => Ok(Command::Stack),
-        // Nothing asked of it, because what is new is decided by whoever reads it: the
-        // stack answers with everything it orders, and a parameter here would be a way
-        // for one surface to be told less than another.
+        NOTIFY => Ok(Command::Notify(Notifying::List)),
+        NOTIFY_MINE => Ok(Command::Notify(Notifying::Mine {
+            member: member.unwrap_or_default(),
+        })),
         NEWS => Ok(Command::News),
         TRACE => following(term, season.as_deref()),
         STUCK => Ok(Command::Stuck),

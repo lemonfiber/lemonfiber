@@ -13,11 +13,12 @@ use lemonfiber_ports::media::{Kind, MEDIA};
 use lemonfiber_ports::service::{
     AppKeys, Applied, Astray, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
     Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
-    OutsideServer, Picture, Playback, Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
+    OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Upkeep, PICTURE_MOST,
+    SERIES_MOST,
 };
 use serde_json::Value;
 
-use super::{FOLDER, NOWHERE, PROXY};
+use super::{FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_WITH};
 use crate::conformance::Placeholder;
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
@@ -169,6 +170,10 @@ crate::contract! {
                 path: Placeholder::Certificate.written(),
                 pin: Placeholder::Pinned.written(),
             };
+        }
+        impl Recounting {
+            /// Send each happening to the core's address with the key the core minted for it.
+            fn events(opt_str address: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), key: Some(TOLD_WITH.to_owned()) };
         }
     }
 }

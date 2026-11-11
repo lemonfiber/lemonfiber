@@ -194,7 +194,10 @@ pub(crate) async fn arrivals(ctx: &Ctx) {
                 _ => continue,
             };
             let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
-            let _ = store::arrived(&path, ask.named(), held, &at);
+            if let Ok(Some(member)) = store::arrived(&path, ask.named(), held, &at) {
+                crate::notify::fanning::ready(ctx, &member);
+                crate::push::telling::ready(ctx, &member);
+            }
         }
     }
 }

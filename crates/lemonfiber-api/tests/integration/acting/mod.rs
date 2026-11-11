@@ -5,12 +5,12 @@
 //! same question differently the first time one of them was updated.
 pub(crate) use lemonfiber_api::actions::{
     named, Arguments, Only, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE,
-    TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT,
-    TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM,
-    TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET,
-    TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
-    TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
-    TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
+    TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BACKENDS, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK,
+    TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
+    TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY,
+    TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN,
+    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM,
+    TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -56,6 +56,11 @@ fn settings_for(action: &str, takers: &[&str]) -> impl Iterator<Item = String> {
 /// everything any action could need is what hid this: the one sweep shaped to
 /// catch a dropped argument named `forms`, `key`, `value` and `preset`, and never
 /// sent `services` or `confirm`.
+/// `value` alone where an action takes it, and nothing where it does not.
+fn listed(taken: bool, value: &str) -> Vec<String> {
+    taken.then(|| value.to_owned()).into_iter().collect()
+}
+
 pub(crate) fn exactly_what(action: &str) -> Arguments {
     let takes = |takers: &[&str]| takers.contains(&action);
     Arguments {
@@ -130,16 +135,9 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         plugin: takes(TAKES_PLUGIN).then(|| PLUGIN.to_owned()),
         recipe: takes(TAKES_RECIPE).then(|| RECIPE.to_owned()),
         source: takes(TAKES_SOURCE).then(|| SOURCE.to_owned()),
-        approved: if takes(TAKES_APPROVED) {
-            vec![APPROVAL.to_owned()]
-        } else {
-            Vec::new()
-        },
-        inputs: if takes(TAKES_APPROVED) {
-            vec![INPUT.to_owned()]
-        } else {
-            Vec::new()
-        },
+        approved: listed(takes(TAKES_APPROVED), APPROVAL),
+        inputs: listed(takes(TAKES_APPROVED), INPUT),
+        backends: listed(takes(TAKES_BACKENDS), "home-ntfy"),
         kept: takes(TAKES_KEPT).then(|| KEPT.to_owned()),
         tier: takes(TAKES_TIER).then(|| REMOVAL.to_owned()),
         down: takes(TAKES_SHARING).then(|| SHARE.to_owned()),

@@ -102,3 +102,20 @@ fn an_unreachable_engine_is_absent_rather_than_guessed_at() {
     };
     assert!(json(&Envelope::new(kind::VERSION, report)).contains(r#""compose":null"#));
 }
+
+#[test]
+fn a_back_end_kind_is_named_as_the_contract_spells_it() {
+    use super::BackendKind;
+    for kind in [
+        BackendKind::Ntfy,
+        BackendKind::Gotify,
+        BackendKind::Webhook,
+        BackendKind::Apprise,
+        BackendKind::Unifiedpush,
+    ] {
+        assert_eq!(
+            serde_json::to_value(kind).ok(),
+            Some(serde_json::Value::from(kind.word()))
+        );
+    }
+}

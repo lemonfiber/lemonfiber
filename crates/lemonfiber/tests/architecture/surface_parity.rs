@@ -130,10 +130,13 @@ const DASHBOARD: &str = "dashboard";
 /// nothing but the claim: the operator mints the claim at the command line, and the
 /// command line has no key to collect. The device-key routes are a phone's: a device
 /// key proves the operator for a mint asked over the web, and a command line at the
-/// machine proves nothing to anybody, so it registers, lists and challenges none.
+/// machine proves nothing to anybody, so it registers, lists and challenges none. The door
+/// a service tells the core what happened at is a curator's or the media server's, holding
+/// nothing but the key the core minted for it, and nobody at a command line has anything
+/// to tell it.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 9] = [
+const UNREQUESTED: [&str; 10] = [
     "/api/events",
     "/api/capabilities",
     "/api/actions/{action}",
@@ -143,6 +146,7 @@ const UNREQUESTED: [&str; 9] = [
     "/api/device-keys",
     "/api/device-keys/{name}",
     "/api/device-keys/{name}/challenge",
+    "/api/notify/events",
 ];
 
 /// One row of the parity table.

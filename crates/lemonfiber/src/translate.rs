@@ -38,10 +38,12 @@ use lemonfiber::cli::{
 use lemonfiber_core::app::Restarting;
 
 mod credentials;
+mod notifying;
 mod people;
 mod settling;
 
 pub(crate) use credentials::credentials;
+pub(crate) use notifying::notifying;
 pub(crate) use people::{held, household, invitation};
 pub(crate) use settling::settings;
 
@@ -414,8 +416,8 @@ pub(crate) const fn paired(asked: &RawCompanion) -> Command {
 /// What was asked of the push endpoints, as the operator at this machine's terminal asks it.
 pub(crate) fn pushing(asked: RawPushEndpoint) -> Command {
     Command::PushEndpoints(match asked.action {
-        PushEndpointCommand::List => Pushing::List,
-        PushEndpointCommand::Remove { name } => Pushing::Remove { name },
+        PushEndpointCommand::List => Pushing::List { owner: None },
+        PushEndpointCommand::Remove { name } => Pushing::Remove { name, owner: None },
     })
 }
 

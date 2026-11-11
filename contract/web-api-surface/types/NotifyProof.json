@@ -1,0 +1,19 @@
+{
+  "fields": {
+    "held": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "proven": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"unproven\""
+  ]
+}

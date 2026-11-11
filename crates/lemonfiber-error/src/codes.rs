@@ -125,6 +125,7 @@ families! {
     library => "LIBRARY": "what the media server holds",
     life => "LIFE": "starting and stopping",
     migrate => "MIGRATE": "taking over a setup already here",
+    notify => "NOTIFY": "where alerts are delivered",
     pair => "PAIR": "pairing a phone with the stack",
     play => "PLAY": "playing what the household holds",
     plugin => "PLUGIN": "installing and running plugins" [pinned, conforming],

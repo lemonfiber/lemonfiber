@@ -16,7 +16,7 @@
       "name": "id",
       "type": {
         "default": null,
-        "description": "The title an action is about: the title or episode a player's progress is on,\nby the identifier the shelf lists it under, or the title a member asks for, by\nthe identifier their search listed it under.",
+        "description": "The thing an action is about, by its id: the title or episode a player's progress\nis on, by the identifier the shelf lists it under, the title a member asks for, by\nthe identifier their search listed it under, or the wake a phone confirms.",
         "type": [
           "string",
           "null"

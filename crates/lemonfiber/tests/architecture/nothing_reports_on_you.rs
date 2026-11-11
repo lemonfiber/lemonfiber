@@ -401,7 +401,7 @@ fn what_the_source_asks_for_is_what_the_operator_is_told_about() {
         &lemonfiber_core::config::Settings::default(),
         &[],
         &[],
-        &[],
+        &lemonfiber_core::outbound::Noted::default(),
     )
     .ours
     .into_iter()

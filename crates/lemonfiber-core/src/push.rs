@@ -11,6 +11,9 @@
 
 pub mod run;
 mod sealing;
+pub(crate) mod telling;
+mod waking;
+pub(crate) mod woken;
 
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +49,21 @@ pub struct Record {
     /// How many messages it is owed, at most as many alerts as a returning stream replays.
     #[serde(default)]
     pub owed: usize,
+    /// The member whose own phone it is, by their account's id; the operator's where none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    /// Each wake sent and not yet confirmed by the phone, by the id it carried.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wakes: Vec<String>,
+    /// Its newest delivery.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last: Option<crate::model::Delivery>,
+    /// Every failed delivery since its last confirmed one, newest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<crate::model::Delivery>,
+    /// When the phone last confirmed a wake, in seconds since the Unix epoch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proven: Option<u64>,
 }
 
 /// Every endpoint this machine keeps, and which alerts have woken them.

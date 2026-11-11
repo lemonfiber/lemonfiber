@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One delivery to one back-end.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When it was sent, in seconds since the Unix epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "kind": {
+      "description": "Which kind of alert it carried.",
+      "$ref": "NotificationKind.json"
+    },
+    "outcome": {
+      "description": "What became of it.",
+      "$ref": "NotifyOutcome.json"
+    }
+  },
+  "required": [
+    "at",
+    "kind",
+    "outcome"
+  ]
+}

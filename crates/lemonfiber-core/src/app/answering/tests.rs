@@ -28,6 +28,16 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::Hosting(Keeping::Read), kind::HOSTING),
         (Command::FrontDoor, kind::FRONT_DOOR),
         (Command::Stack, kind::STACK),
+        (
+            Command::Notify(crate::notify::configuring::Asked::List),
+            kind::NOTIFY,
+        ),
+        (
+            Command::Notify(crate::notify::configuring::Asked::Mine {
+                member: "ana".to_owned(),
+            }),
+            kind::NOTIFY_MINE,
+        ),
         (Command::News, kind::NEWS_ITEMS),
         (
             Command::Trace(Tracing {

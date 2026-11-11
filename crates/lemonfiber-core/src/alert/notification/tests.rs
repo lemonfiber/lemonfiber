@@ -23,7 +23,7 @@ fn work_finishing_is_a_completion() {
     );
 }
 
-/// The closed union reads as the contract publishes it.
+/// The closed union reads as the contract publishes it, and each kind is named by that word.
 #[test]
 fn every_kind_is_spelled_as_the_union_publishes_it() {
     let spelled = |kind: Notification| serde_json::to_value(kind).unwrap_or_default();
@@ -34,8 +34,10 @@ fn every_kind_is_spelled_as_the_union_publishes_it() {
         (Notification::Backup, "backup"),
         (Notification::Request, "request"),
         (Notification::Member, "member"),
+        (Notification::Ready, "ready"),
     ] {
         assert_eq!(spelled(kind), word);
+        assert_eq!(kind.word(), word);
     }
     assert!(RAISED.contains(&Notification::Problem));
 }

@@ -1,6 +1,6 @@
 use lemonfiber_core::config::{Reaching, Settings};
 use lemonfiber_core::origin::Origin;
-use lemonfiber_core::outbound::{leaving as gathered, Elsewhere, Leaving};
+use lemonfiber_core::outbound::{leaving as gathered, Elsewhere, Leaving, Noted};
 
 use super::leaving;
 
@@ -8,7 +8,7 @@ use super::leaving;
 /// which is every entry lemonfiber makes on its own account, and nothing of the
 /// stack's, since what the services reach is read from the services there are.
 fn shown(settings: &Settings) -> String {
-    leaving(&gathered(settings, &[], &[], &[])).text()
+    leaving(&gathered(settings, &[], &[], &Noted::default())).text()
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn a_service_that_reaches_nothing_says_nothing_leaves_rather_than_nowhere() {
 /// reaches renders nowhere however good the renderer under it is.
 #[test]
 fn the_printer_reaches_this_renderer_for_this_outcome() {
-    let report = gathered(&Settings::default(), &[], &[], &[]);
+    let report = gathered(&Settings::default(), &[], &[], &Noted::default());
     let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Outbound(report)).text();
     assert!(drawn.contains("What lemonfiber sends"), "{drawn}");
     assert!(drawn.contains("registry"), "{drawn}");

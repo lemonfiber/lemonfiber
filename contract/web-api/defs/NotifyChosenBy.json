@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Who chose a back-end.",
+  "oneOf": [
+    {
+      "description": "Whoever runs the house.",
+      "type": "string",
+      "const": "operator"
+    },
+    {
+      "description": "A household member, by their account's id.",
+      "type": "object",
+      "properties": {
+        "member": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "member"
+      ]
+    }
+  ]
+}

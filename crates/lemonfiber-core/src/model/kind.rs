@@ -188,6 +188,10 @@ kinds! {
     START = "start",
     /// How the stack runs without lemonfiber.
     STACK = "stack",
+    /// Where a message goes: every back-end alerts are delivered to.
+    NOTIFY = "notify",
+    /// The ways a member may be told that something they asked for is ready.
+    NOTIFY_MINE = "notify-mine",
     /// What each service is doing.
     STATUS = "status",
     /// One step of a walkthrough, said the moment it is true.

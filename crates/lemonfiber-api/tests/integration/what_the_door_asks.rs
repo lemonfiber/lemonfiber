@@ -333,14 +333,15 @@ async fn everything_else_still_needs_a_secret_this_run_admits() {
     let _ = fs::remove_dir_all(a_directory("guarded"));
 }
 
-/// Exactly two paths on this surface are let through the token half of the guard: the
-/// door a password is exchanged at, and the door a key minted as a claim is collected at.
+/// Exactly three paths on this surface are let through the token half of the guard: the
+/// door a password is exchanged at, the door a key minted as a claim is collected at, and
+/// the door a service tells the core what happened at.
 ///
 /// Read from the guard's own source rather than by trying every path, because the
-/// failure worth catching is a further exemption written beside these two, and a sweep
+/// failure worth catching is a further exemption written beside these three, and a sweep
 /// over the paths that exist today would not see one added tomorrow.
 #[test]
-fn only_the_two_doors_are_let_through_without_a_token() {
+fn only_the_three_doors_are_let_through_without_a_token() {
     let Ok(guard) = fs::read_to_string("src/router.rs") else {
         unreachable!("the guard this crate ships is in the tree this test is built from")
     };
@@ -358,14 +359,17 @@ fn only_the_two_doors_are_let_through_without_a_token() {
         [&"let at_the_door = DOORS.contains(&request.uri().path());"],
         "the guard reads the path somewhere other than the list of doors"
     );
-    let doors: Vec<&&str> = code
+    let doors: String = code
         .iter()
-        .filter(|line| line.starts_with("const DOORS"))
+        .skip_while(|line| !line.starts_with("const DOORS"))
+        .take_while(|line| !line.ends_with("];"))
+        .chain(code.iter().filter(|line| **line == "];").take(1))
+        .copied()
         .collect();
     assert_eq!(
         doors,
-        [&"const DOORS: [&str; 2] = [crate::admission::SESSION, crate::keys::COLLECTING];"],
-        "the doors let through without a token are not the sign-in door and the claim door"
+        "const DOORS: [&str; 3] = [crate::admission::SESSION,crate::keys::COLLECTING,crate::notify_events::EVENTS,];",
+        "the doors let through without a token are not the sign-in, claim and events doors"
     );
 }
 

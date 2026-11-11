@@ -42,6 +42,7 @@ mod minted;
 pub(crate) mod owning;
 mod published;
 mod quality;
+mod recounting;
 pub(crate) mod replacing;
 pub(crate) mod request_keys;
 mod showing;
@@ -262,6 +263,8 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     );
     wirings.extend(showing::seed_dashboard(ctx, &manifest.services, &installed, &fillers).await);
     wirings.extend(watching::seed_watcher(ctx, &manifest.services, &installed, &fillers).await);
+    let told_at = crate::notify::events::address(ctx);
+    wirings.extend(recounting::seed_events(ctx, &fillers, told_at).await);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the

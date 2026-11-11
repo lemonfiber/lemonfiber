@@ -3,7 +3,9 @@
 use super::super::acting::{DEVICE, POSITION, SEASON, TITLE};
 use lemonfiber_api::actions::Arguments;
 use lemonfiber_core::app::{Command, Viewing, Wishing};
+use lemonfiber_core::notify::configuring::Asked as Notifying;
 use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::push::run::Asked as Pushing;
 
 pub(super) fn give_device(given: &mut Arguments) {
     given.device = Some(DEVICE.to_owned());
@@ -18,10 +20,22 @@ pub(super) fn give_title(given: &mut Arguments) {
     given.id = Some(TITLE.to_owned());
 }
 
-/// Whether the command has the title a player reported on, or a member asked for, in it.
+/// Whether the command has the title a player reported on, a member asked for, or the
+/// wake a phone confirms, in it.
 pub(super) fn carries_title(command: &Command) -> bool {
     matches!(command, Command::Viewing(Viewing::Watched { id, .. }) if id == TITLE)
         || matches!(command, Command::Wish(Wishing::Ask { wish, .. }) if wish.id == TITLE)
+        || matches!(command, Command::PushEndpoints(Pushing::Woken { id, .. }) if id == TITLE)
+}
+
+pub(super) fn give_backends(given: &mut Arguments) {
+    given.backends = vec!["another-way".to_owned()];
+}
+
+/// Whether the command has the ways to be told a member chose in it.
+pub(super) fn carries_backends(command: &Command) -> bool {
+    matches!(command, Command::Notify(Notifying::Choose { backends, .. })
+        if backends == &["another-way".to_owned()])
 }
 
 pub(super) fn give_kind(given: &mut Arguments) {

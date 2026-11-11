@@ -21,6 +21,7 @@ pub mod frontend;
 pub mod guard;
 pub mod jobs;
 pub mod keys;
+pub mod notify_events;
 pub mod push_endpoints;
 pub mod read;
 pub mod refusal;

@@ -40,6 +40,7 @@ mod peering;
 mod providers;
 mod proxying;
 mod quality;
+mod recounting;
 mod requests;
 mod screening;
 mod searching;
@@ -110,6 +111,7 @@ pub use providers::{
 };
 pub use proxying::{Proxying, Route, Routing, Tls};
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
+pub use recounting::Recounting;
 pub use requests::{
     HouseholdRequest, IdentitySource, MediaServerLink, MediaStatus, Occasion, RequestStatus,
     Requesting, Requests, Telling,

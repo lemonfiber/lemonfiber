@@ -43,6 +43,7 @@ pub(super) fn about_the_household(action: &str) -> bool {
     ADDRESSED.contains(&action)
         || super::viewing::about_viewing(action)
         || super::wishing::about_wishing(action)
+        || super::notifying::about_notifying(action)
 }
 
 /// The command one of them names, or why it names none.
@@ -58,6 +59,9 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
     }
     if super::wishing::about_wishing(action) {
         return super::wishing::asked_for(given);
+    }
+    if super::notifying::about_notifying(action) {
+        return super::notifying::asked_for(action, given);
     }
     let Arguments {
         name,

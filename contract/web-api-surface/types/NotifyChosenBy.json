@@ -1,0 +1,13 @@
+{
+  "fields": {
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"operator\""
+  ]
+}

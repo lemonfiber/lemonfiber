@@ -104,14 +104,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // A held quality choice was not recorded — it needs the operator to
         // confirm a preset this machine would software-transcode, so a script sees
         // a non-zero result it can act on rather than a false success.
-        Outcome::Quality(report) => match report.disposition {
-            Disposition::Held => ExitCode::from(VALIDATION),
-            Disposition::Shown
-            | Disposition::Recorded
-            | Disposition::Rehearsed
-            | Disposition::Reapplied
-            | Disposition::WouldReapply => ExitCode::SUCCESS,
-        },
+        Outcome::Quality(report) => choosing(report.disposition),
         Outcome::Upgrade(report) => upgrade_exit(report),
         // The music choice is recorded even when the service could not be reached, so
         // only a service that refused the change is a failure; a rehearsal or a service
@@ -257,6 +250,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::DeviceKeys(_)
         | Outcome::PushEndpoint(_)
         | Outcome::PushEndpoints(_)
+        | Outcome::Notify(_)
+        | Outcome::NotifyMine(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)
@@ -290,6 +285,18 @@ pub(crate) fn shown(code: std::process::ExitCode) -> String {
 #[cfg(test)]
 pub(crate) fn success() -> String {
     shown(std::process::ExitCode::SUCCESS)
+}
+
+/// A quality choice held for the operator's confirmation is a non-zero result.
+fn choosing(disposition: Disposition) -> ExitCode {
+    match disposition {
+        Disposition::Held => ExitCode::from(VALIDATION),
+        Disposition::Shown
+        | Disposition::Recorded
+        | Disposition::Rehearsed
+        | Disposition::Reapplied
+        | Disposition::WouldReapply => ExitCode::SUCCESS,
+    }
 }
 
 fn restarted(report: &lemonfiber_core::model::SettingsReport) -> ExitCode {

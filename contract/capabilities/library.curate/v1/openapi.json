@@ -111,6 +111,9 @@
     "/lemonfiber/library.curate/v1/downloading": {
       "$ref": "operations/downloading.json"
     },
+    "/lemonfiber/library.curate/v1/events": {
+      "$ref": "operations/events.json"
+    },
     "/lemonfiber/library.curate/v1/find_items": {
       "$ref": "operations/find_items.json"
     },

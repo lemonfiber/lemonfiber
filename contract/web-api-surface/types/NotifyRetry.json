@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "attempt": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "next": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "of": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

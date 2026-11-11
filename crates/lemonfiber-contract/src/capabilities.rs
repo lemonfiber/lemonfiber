@@ -57,6 +57,13 @@ pub const FOLDER: &str = "/data/conformance";
 /// An id no media server holds anything under.
 const NOWHERE: &str = "00000000000000000000000000000000";
 
+/// Where the conformance cases ask a filler to tell the core what happened: an address
+/// nothing answers at.
+const TOLD_AT: &str = "https://core.conformance.invalid/api/notify/events";
+
+/// The key the conformance cases hand a filler to tell the core with, which no core minted.
+const TOLD_WITH: &str = "00000000000000000000000000000000";
+
 /// A SHA-256, in lower-case hexadecimal, that no token the conformance cases present
 /// hashes to.
 const TOKEN_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";

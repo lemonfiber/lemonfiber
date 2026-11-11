@@ -15,9 +15,40 @@
 //! seam anything crosses; when a channel is actually implemented, the question of what it
 //! is handed can be settled then, and the port can move down with its answer.
 
+pub(crate) mod backends;
+mod bundled;
+mod choosing;
+pub mod configuring;
+pub mod events;
+pub mod fanning;
+mod proving;
+pub(crate) mod reading;
 pub(crate) mod run;
+pub(crate) mod sending;
 
 use async_trait::async_trait;
+
+use crate::error::codes::notify::{
+    BACKEND_INCOMPLETE, BACKEND_NAME_TAKEN, EVENTS_REFUSED, HOSTED_UNACKNOWLEDGED,
+    NOT_A_BACKEND_ADDRESS, NOT_A_BACKEND_NAME, NOT_A_RETRY_SCHEDULE, NOT_OFFERED, NO_SUCH_BACKEND,
+    NO_SUCH_WAKE,
+};
+use crate::error::Code;
+
+/// Every refusal what is asked of the back-ends, a member's choice, a phone's word and an
+/// event can be answered with.
+pub const REFUSALS: [Code; 10] = [
+    NOT_A_BACKEND_NAME,
+    BACKEND_NAME_TAKEN,
+    NO_SUCH_BACKEND,
+    HOSTED_UNACKNOWLEDGED,
+    NOT_A_BACKEND_ADDRESS,
+    BACKEND_INCOMPLETE,
+    NOT_A_RETRY_SCHEDULE,
+    NOT_OFFERED,
+    NO_SUCH_WAKE,
+    EVENTS_REFUSED,
+];
 
 use crate::alert::Digest;
 
@@ -44,4 +75,13 @@ pub trait Channel: Send + Sync {
     /// what it was given. The caller records the failure and keeps the alert; a
     /// channel is never trusted to be the only copy.
     async fn deliver(&self, digest: &Digest) -> Result<(), Undelivered>;
+}
+
+/// The clock's now, in seconds since the Unix epoch.
+pub(crate) fn now(ctx: &crate::app::Ctx) -> u64 {
+    ctx.seams
+        .clock
+        .now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |at| at.as_secs())
 }

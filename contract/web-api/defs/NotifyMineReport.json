@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The ways a member may be told that something they asked for is ready, and nothing\ntechnical.",
+  "type": "object",
+  "properties": {
+    "offered": {
+      "description": "Each way the operator offered the household, in the order it was offered.",
+      "type": "array",
+      "items": {
+        "$ref": "NotifyOffered.json"
+      }
+    },
+    "phone": {
+      "description": "Whether this member's own phone is registered to be woken.",
+      "type": "boolean"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal of a choice, with nothing kept.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "offered",
+    "phone",
+    "rehearsed"
+  ]
+}

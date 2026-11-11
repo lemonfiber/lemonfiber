@@ -1,0 +1,14 @@
+{
+  "fields": {
+    "failed": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"confirmed\"",
+    "\"sent\""
+  ]
+}

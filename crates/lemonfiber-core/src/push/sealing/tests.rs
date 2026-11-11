@@ -4,7 +4,7 @@ use ring::agreement::{self, EphemeralPrivateKey, UnparsedPublicKey, ECDH_P256};
 use ring::rand::{self, SystemRandom};
 use ring::{aead, hkdf};
 
-use super::{composed, readable, sealed, Long, Parties, WAKE};
+use super::{composed, readable, sealed, Long, Parties};
 
 /// Base64url, read for a test.
 fn read(written: &str) -> Vec<u8> {
@@ -72,7 +72,7 @@ fn a_phone_reads_what_was_sealed_to_it_and_it_says_only_to_wake() {
     let secret = rand::generate::<[u8; 16]>(&random)
         .map(rand::Random::expose)
         .unwrap_or_default();
-    let coded = sealed(public.as_ref(), &secret).unwrap_or_default();
+    let coded = sealed(public.as_ref(), &secret, "w-1").unwrap_or_default();
 
     let salt = coded.get(..16).unwrap_or_default();
     let ours = coded.get(21..86).unwrap_or_default();
@@ -98,7 +98,10 @@ fn a_phone_reads_what_was_sealed_to_it_and_it_says_only_to_wake() {
             )
             .map(|opened| opened.to_vec())
     });
-    assert_eq!(opened.ok(), Some([WAKE, &[2]].concat()));
+    assert_eq!(
+        opened.ok(),
+        Some([b"{\"id\":\"w-1\",\"wake\":true}".as_slice(), &[2]].concat())
+    );
 }
 
 /// Keys that cannot be encrypted to are not readable.

@@ -215,6 +215,27 @@
     "file": false
   },
   {
+    "path": "/api/notify",
+    "parameters": [],
+    "kinds": [
+      "notify"
+    ],
+    "file": false
+  },
+  {
+    "path": "/api/notify/mine",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "notify-mine"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/news",
     "parameters": [],
     "kinds": [

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "backend": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

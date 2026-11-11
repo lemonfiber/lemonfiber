@@ -7,14 +7,10 @@
 //! answering that it is gone among them. Nothing reverses one: only the phone holds what a
 //! registration is made from.
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
-
+pub use super::waking::Waking;
 use super::{sealing, Kept, Listed, Listing, Record, Registered, FILE};
 use crate::alert::Alert;
 use crate::app::{Ctx, Outcome};
@@ -26,23 +22,22 @@ use crate::error::codes::push::{
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::journal::{Change, Kind};
 use crate::keys::names_a_key;
-use crate::ports::http::{Method, Request};
 
 /// What the endpoint's distributor is asked to hold a message for, a day being as long as
 /// a returning stream is replayed.
-const HELD_FOR_SECONDS: &str = "86400";
+pub(super) const HELD_FOR_SECONDS: &str = "86400";
 
 /// How long one endpoint is waited for on one message.
 pub const WAITED_FOR: Duration = Duration::from_secs(10);
 
 /// The most messages an endpoint is owed: as many alerts as a returning stream replays.
-const MOST_OWED: usize = crate::alert::KEPT;
+pub(super) const MOST_OWED: usize = crate::alert::KEPT;
 
 /// The operation every journal entry about a push endpoint is written under.
 const OPERATION: &str = "push-endpoint";
 
 /// The statuses a distributor answers an endpoint that is no more with.
-const GONE: [u16; 2] = [404, 410];
+pub(super) const GONE: [u16; 2] = [404, 410];
 
 /// What was asked of the push endpoints.
 #[derive(Clone, PartialEq, Eq)]
@@ -57,13 +52,29 @@ pub enum Asked {
         p256dh: String,
         /// The phone's `WebPush` secret, in base64url.
         auth: String,
+        /// The member registering their own phone, by their account's id.
+        owner: Option<String>,
     },
-    /// List the endpoints.
-    List,
-    /// Remove the endpoint holding a name.
+    /// List the endpoints, or a member's own.
+    List {
+        /// The member listing their own, by their account's id.
+        owner: Option<String>,
+    },
+    /// Remove the endpoint holding a name, which a member may only do to their own.
     Remove {
         /// The endpoint's name.
         name: String,
+        /// The member removing their own, by their account's id.
+        owner: Option<String>,
+    },
+    /// The phone's word that a wake arrived, by the id it carried.
+    Woken {
+        /// The endpoint's name.
+        name: String,
+        /// The id the wake carried.
+        id: String,
+        /// The member whose own phone it is, by their account's id.
+        owner: Option<String>,
     },
 }
 
@@ -75,8 +86,17 @@ impl std::fmt::Debug for Asked {
                 .debug_struct("Register")
                 .field("name", name)
                 .finish_non_exhaustive(),
-            Self::List => out.write_str("List"),
-            Self::Remove { name } => out.debug_struct("Remove").field("name", name).finish(),
+            Self::List { owner } => out.debug_struct("List").field("owner", owner).finish(),
+            Self::Remove { name, owner } => out
+                .debug_struct("Remove")
+                .field("name", name)
+                .field("owner", owner)
+                .finish(),
+            Self::Woken { name, owner, .. } => out
+                .debug_struct("Woken")
+                .field("name", name)
+                .field("owner", owner)
+                .finish_non_exhaustive(),
         }
     }
 }
@@ -98,38 +118,46 @@ pub fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             endpoint,
             p256dh,
             auth,
-        } => register(ctx, name, endpoint, p256dh, auth).map(Outcome::PushEndpoint),
-        Asked::List => listing(ctx, None).map(Outcome::PushEndpoints),
-        Asked::Remove { name } => remove(ctx, &name).map(Outcome::PushEndpoints),
+            owner,
+        } => register(
+            ctx,
+            &Record {
+                name,
+                endpoint,
+                p256dh,
+                auth,
+                registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+                owed: 0,
+                owner,
+                wakes: Vec::new(),
+                last: None,
+                failures: Vec::new(),
+                proven: None,
+            },
+        )
+        .map(Outcome::PushEndpoint),
+        Asked::List { owner } => listing(ctx, None, owner.as_deref()).map(Outcome::PushEndpoints),
+        Asked::Remove { name, owner } => {
+            remove(ctx, &name, owner.as_deref()).map(Outcome::PushEndpoints)
+        }
+        Asked::Woken { name, id, owner } => {
+            super::woken::confirmed(ctx, &name, &id, owner.as_deref()).map(Outcome::PushEndpoints)
+        }
     }
 }
 
 /// Register an endpoint, once its name, its address and its keys can be used.
-fn register(
-    ctx: &Ctx,
-    name: String,
-    endpoint: String,
-    p256dh: String,
-    auth: String,
-) -> Result<Registered, Box<Problem>> {
-    if !names_a_key(&name) {
-        return Err(Box::new(bad_name(&name)));
+fn register(ctx: &Ctx, record: &Record) -> Result<Registered, Box<Problem>> {
+    if !names_a_key(&record.name) {
+        return Err(Box::new(bad_name(&record.name)));
     }
-    if !is_https(&endpoint) {
-        return Err(Box::new(not_https(&name)));
+    if !is_https(&record.endpoint) {
+        return Err(Box::new(not_https(&record.name)));
     }
-    if sealing::readable(&p256dh, &auth).is_none() {
-        return Err(Box::new(unreadable_keys(&name)));
+    if sealing::readable(&record.p256dh, &record.auth).is_none() {
+        return Err(Box::new(unreadable_keys(&record.name)));
     }
     let path = at(ctx).ok_or_else(nowhere)?;
-    let record = Record {
-        name,
-        endpoint,
-        p256dh,
-        auth,
-        registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
-        owed: 0,
-    };
     let answer = Registered {
         name: record.name.clone(),
         endpoint: record.endpoint.clone(),
@@ -161,18 +189,23 @@ fn register(
     refused.map_or(Ok(answer), Err)
 }
 
-/// Remove the endpoint holding `name`.
-fn remove(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
+/// Remove the endpoint holding `name`, where it is `owner`'s own or nobody is named.
+fn remove(ctx: &Ctx, name: &str, owner: Option<&str>) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(nowhere)?;
     let mut refused = None;
+    let held = |kept: &Kept| {
+        kept.endpoints
+            .iter()
+            .any(|one| one.name == name && owned_by(one, owner))
+    };
     if ctx.dry_run {
         let kept = read(&path).map_err(|failure| Box::new(failure.problem()))?;
-        if !kept.endpoints.iter().any(|one| one.name == name) {
+        if !held(&kept) {
             return Err(Box::new(not_registered(name)));
         }
     } else {
         crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
-            refused = if kept.endpoints.iter().any(|one| one.name == name) {
+            refused = if held(kept) {
                 forgotten(ctx, kept, name).err()
             } else {
                 Some(Box::new(not_registered(name)))
@@ -181,7 +214,12 @@ fn remove(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
         })
         .map_err(|failure| Box::new(failure.problem()))?;
     }
-    refused.map_or_else(|| listing(ctx, Some(name.to_owned())), Err)
+    refused.map_or_else(|| listing(ctx, Some(name.to_owned()), owner), Err)
+}
+
+/// Whether `record` is `owner`'s own, where a member is named.
+fn owned_by(record: &Record, owner: Option<&str>) -> bool {
+    owner.is_none_or(|owner| record.owner.as_deref() == Some(owner))
 }
 
 /// Take `name` out of `kept`, once the journal says so, and forget what was sent with the
@@ -201,12 +239,22 @@ fn forgotten(ctx: &Ctx, kept: &mut Kept, name: &str) -> Result<(), Box<Problem>>
     Ok(())
 }
 
-/// Every endpoint, and the one this request removed.
-fn listing(ctx: &Ctx, removed: Option<String>) -> Result<Listing, Box<Problem>> {
+/// Every endpoint, or `owner`'s own where a member is named, and the one this request
+/// removed.
+fn listing(
+    ctx: &Ctx,
+    removed: Option<String>,
+    owner: Option<&str>,
+) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(nowhere)?;
     let kept = read(&path).map_err(|failure| Box::new(failure.problem()))?;
     Ok(Listing {
-        endpoints: kept.endpoints.iter().map(Listed::from).collect(),
+        endpoints: kept
+            .endpoints
+            .iter()
+            .filter(|one| owned_by(one, owner))
+            .map(Listed::from)
+            .collect(),
         removed,
         rehearsed: ctx.dry_run,
     })
@@ -214,7 +262,7 @@ fn listing(ctx: &Ctx, removed: Option<String>) -> Result<Listing, Box<Problem>> 
 
 /// Where the record of the endpoints waiting to be woken is, where any are: nowhere where
 /// waking is switched off, or where the record cannot be read.
-fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
+pub(super) fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
     at(ctx)
         .filter(|_| ctx.settings.reaching.allows(REACH_WAKING_KEY))
         .filter(|path| read(path).is_ok_and(|kept| !kept.endpoints.is_empty()))
@@ -227,143 +275,41 @@ pub fn any_waiting(ctx: &Ctx) -> bool {
     waiting_at(ctx).is_some()
 }
 
-/// The deliveries under way, one to an endpoint, each apart from whatever reads the stack
-/// and from every other endpoint's, so one that hangs delays nothing but itself.
-#[derive(Debug, Clone, Default)]
-pub struct Waking {
-    /// The name of each endpoint a delivery is under way to.
-    delivering: Arc<Mutex<BTreeSet<String>>>,
-}
-
-impl Waking {
-    /// Owe every endpoint one message for each alert in `alerts` none has been owed, and
-    /// start delivering to each endpoint owed any. Waits on no endpoint.
-    pub fn owing(&self, ctx: &Arc<Ctx>, alerts: &[Alert]) {
-        let Some(path) = waiting_at(ctx) else {
-            return;
-        };
-        let carried: BTreeSet<String> = alerts.iter().filter_map(said_as).collect();
-        let mut owing = Vec::new();
-        let written = crate::settings::kept::changed(&path, &mut |kept: &mut Kept| {
-            let new = kept.told.as_ref().map_or(0, |told| {
-                carried.iter().filter(|one| !told.contains(one)).count()
-            });
-            kept.told = Some(carried.iter().cloned().collect());
-            for one in &mut kept.endpoints {
-                one.owed = one.owed.saturating_add(new).min(MOST_OWED);
-            }
-            owing = kept
-                .endpoints
-                .iter()
-                .filter(|one| one.owed > 0)
-                .map(|one| one.name.clone())
-                .collect();
-            Ok(())
-        });
-        for name in owing.into_iter().filter(|_| written.is_ok()) {
-            self.delivering_to(ctx, &path, name);
-        }
-    }
-
-    /// Deliver what `name` is owed, unless a delivery to it is already under way.
-    ///
-    /// One that has just found nothing owed can miss what is owed a moment later, and the
-    /// next reading starts another for it.
-    fn delivering_to(&self, ctx: &Arc<Ctx>, path: &Path, name: String) {
-        let started = self
-            .delivering
-            .lock()
-            .is_ok_and(|mut delivering| delivering.insert(name.clone()));
-        if started {
-            let delivering = Arc::clone(&self.delivering);
-            let ctx = Arc::clone(ctx);
-            let path = path.to_path_buf();
-            tokio::spawn(async move {
-                delivered(&ctx, &path, &name).await;
-                let _ = delivering
-                    .lock()
-                    .map(|mut delivering| delivering.remove(&name));
-            });
-        }
-    }
-}
-
-/// Send `name` everything it is owed, one message at a time, and forget it if its
-/// distributor answers that it is gone.
-async fn delivered(ctx: &Ctx, path: &Path, name: &str) {
-    while let Some(record) = next_owed(path, name) {
-        if woke(ctx, &record).await {
-            forget(ctx, path, name);
-            return;
-        }
-    }
-}
-
-/// `name`'s record, with the message about to be sent no longer owed: nothing where it owes
-/// none, has been removed, or the record cannot be written, so nothing is sent twice.
-fn next_owed(path: &Path, name: &str) -> Option<Record> {
-    let mut next = None;
-    let written = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        next = kept
-            .endpoints
-            .iter_mut()
-            .find(|one| one.name == name && one.owed > 0)
-            .map(|one| {
-                one.owed -= 1;
-                one.clone()
-            });
-        Ok(())
-    });
-    written.ok().and(next)
-}
-
 /// What names an alert and which way it went, where anything does.
-fn said_as(alert: &Alert) -> Option<String> {
+pub(crate) fn said_as(alert: &Alert) -> Option<String> {
     Some(format!("{} {}", alert.id.as_ref()?, alert.moment.said()))
-}
-
-/// The message that wakes `record`, where its keys can be read.
-fn sealed_for(record: &Record) -> Option<Vec<u8>> {
-    let public = URL_SAFE_NO_PAD.decode(&record.p256dh).ok()?;
-    let secret = URL_SAFE_NO_PAD.decode(&record.auth).ok()?;
-    sealing::sealed(&public, &secret)
-}
-
-/// Send `record` one message, and whether its distributor answered that it is gone.
-async fn woke(ctx: &Ctx, record: &Record) -> bool {
-    let Some(sealed) = sealed_for(record) else {
-        return false;
-    };
-    let request = Request {
-        method: Method::Post,
-        url: record.endpoint.clone(),
-        headers: vec![
-            ("Content-Encoding".to_owned(), "aes128gcm".to_owned()),
-            (
-                "Content-Type".to_owned(),
-                "application/octet-stream".to_owned(),
-            ),
-            ("TTL".to_owned(), HELD_FOR_SECONDS.to_owned()),
-            ("Urgency".to_owned(), "high".to_owned()),
-        ],
-        body: None,
-        pinned: None,
-    };
-    let sent = tokio::time::timeout(WAITED_FOR, ctx.seams.http.send_octets(&request, &sealed));
-    matches!(sent.await, Ok(Ok(answered)) if GONE.contains(&answered.status))
-}
-
-/// Forget `name`, best effort: one still kept is told again and answers again.
-fn forget(ctx: &Ctx, path: &Path, name: &str) {
-    let _ = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        let _ = forgotten(ctx, kept, name);
-        Ok(())
-    });
 }
 
 /// The record at `path`.
 fn read(path: &Path) -> Result<Kept, Failure> {
     crate::settings::kept::read(path)
+}
+
+/// Where the endpoints are kept.
+///
+/// # Errors
+///
+/// A [`Problem`] where there is nowhere to keep them.
+pub(super) fn kept_at(ctx: &Ctx) -> Result<PathBuf, Box<Problem>> {
+    at(ctx).ok_or_else(nowhere)
+}
+
+/// The record at `path`, as a refusal where it cannot be read.
+///
+/// # Errors
+///
+/// A [`Problem`] where the record cannot be read.
+pub(super) fn read_kept(path: &Path) -> Result<Kept, Box<Problem>> {
+    read(path).map_err(|failure| Box::new(failure.problem()))
+}
+
+/// Every endpoint `owner` registered, or every one where nobody is named.
+///
+/// # Errors
+///
+/// A [`Problem`] where the record cannot be read.
+pub(super) fn listed_for(ctx: &Ctx, owner: Option<&str>) -> Result<Listing, Box<Problem>> {
+    listing(ctx, None, owner)
 }
 
 /// The refusal of a registration under a name `kept` holds, where it holds it.

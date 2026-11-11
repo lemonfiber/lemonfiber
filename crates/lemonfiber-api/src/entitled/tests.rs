@@ -438,27 +438,31 @@ fn the_operator_searches_and_asks_for_whoever_they_name_and_a_key_does_neither()
     }
 }
 
-/// How the stack runs is the operator's alone: a member, a key scoped to one, and a
-/// `read` or an `act` key are refused it, and the operator is given it.
+/// How the stack runs and where its alerts are delivered are the operator's alone: a
+/// member, a key scoped to one, and a `read` or an `act` key are refused them, and the
+/// operator is given them.
 #[test]
-fn only_the_operator_reads_how_the_stack_runs() {
+fn only_the_operator_reads_how_the_stack_runs_and_where_its_alerts_go() {
     use lemonfiber_core::keys::Scope;
-    for caller in [Caller::Machine, Caller::Operator] {
-        assert_eq!(
-            may(&caller, Door::Reading, Command::Stack),
-            Permitted::This(Command::Stack)
-        );
-    }
-    let member_key = key(Scope::Member {
-        id: ASKING.to_owned(),
-        name: "ana".to_owned(),
-    });
-    for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
-        assert_eq!(
-            may(&caller, Door::Reading, Command::Stack),
-            Permitted::Nothing,
-            "{caller:?}"
-        );
+    use lemonfiber_core::notify::configuring::Asked;
+    for command in [Command::Stack, Command::Notify(Asked::List)] {
+        for caller in [Caller::Machine, Caller::Operator] {
+            assert_eq!(
+                may(&caller, Door::Reading, command.clone()),
+                Permitted::This(command.clone())
+            );
+        }
+        let member_key = key(Scope::Member {
+            id: ASKING.to_owned(),
+            name: "ana".to_owned(),
+        });
+        for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
+            assert_eq!(
+                may(&caller, Door::Reading, command.clone()),
+                Permitted::Nothing,
+                "{caller:?}"
+            );
+        }
     }
 }
 
@@ -503,6 +507,62 @@ fn only_the_operator_reads_or_changes_the_settings() {
                 Permitted::This(Command::Settings(settling)),
                 "{caller:?}"
             );
+        }
+    }
+}
+
+/// What a member is told on, their choice of it and their phone's word that a wake
+/// arrived are theirs whatever the request named, and a key reaches none of them.
+#[test]
+fn a_member_chooses_and_confirms_only_for_themselves_and_a_key_does_neither() {
+    use lemonfiber_core::keys::Scope;
+    use lemonfiber_core::notify::configuring::Asked as Notifying;
+    use lemonfiber_core::push::run::Asked as Pushing;
+    let choose = Command::Notify(Notifying::Choose {
+        member: "somebody-else".to_owned(),
+        backends: vec!["phones".to_owned()],
+    });
+    let woken = Command::PushEndpoints(Pushing::Woken {
+        name: "pixel".to_owned(),
+        id: "w1".to_owned(),
+        owner: None,
+    });
+    let mine = Command::Notify(Notifying::Mine {
+        member: "somebody-else".to_owned(),
+    });
+
+    assert_eq!(
+        may(&member(), Door::Acting, choose.clone()),
+        Permitted::This(Command::Notify(Notifying::Choose {
+            member: ASKING.to_owned(),
+            backends: vec!["phones".to_owned()],
+        }))
+    );
+    assert_eq!(
+        may(&member(), Door::Acting, woken.clone()),
+        Permitted::This(Command::PushEndpoints(Pushing::Woken {
+            name: "pixel".to_owned(),
+            id: "w1".to_owned(),
+            owner: Some(ASKING.to_owned()),
+        }))
+    );
+    assert_eq!(
+        may(&member(), Door::Reading, mine.clone()),
+        Permitted::This(Command::Notify(Notifying::Mine {
+            member: ASKING.to_owned(),
+        }))
+    );
+    assert_eq!(
+        may(&Caller::Operator, Door::Acting, woken.clone()),
+        Permitted::This(woken.clone())
+    );
+    for scope in [Scope::Read, Scope::Act] {
+        for (door, command) in [
+            (Door::Acting, choose.clone()),
+            (Door::Acting, woken.clone()),
+            (Door::Reading, mine.clone()),
+        ] {
+            assert_eq!(may(&key(scope.clone()), door, command), Permitted::Nothing);
         }
     }
 }

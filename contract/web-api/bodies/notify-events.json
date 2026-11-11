@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NotifyEvent",
+  "description": "What happened, as a service tells it.",
+  "type": "object",
+  "properties": {
+    "cleared": {
+      "description": "Whether a problem the service raised about itself is cleared.",
+      "type": "boolean",
+      "default": false
+    },
+    "event": {
+      "description": "Which of the four happenings it is.",
+      "$ref": "../defs/NotifyHappened.json"
+    },
+    "name": {
+      "description": "The title's name, or the service's own words for a problem about itself.",
+      "type": "string"
+    },
+    "reason": {
+      "description": "What the service said went wrong, where something did.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "reference": {
+      "description": "The title it is about, by the service's own reference, where it is about one.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "event",
+    "name"
+  ]
+}

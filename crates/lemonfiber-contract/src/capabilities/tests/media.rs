@@ -8,8 +8,8 @@ use lemonfiber_ports::service::{
     Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
     EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
     Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, OutsideAccount,
-    OutsideServer, Picture, Playback, Ports, Presentation, Question, Screening, SeasonDetail,
-    SeriesHeld, Statuses, Token, Upkeep,
+    OutsideServer, Picture, Playback, Ports, Presentation, Question, Recounting, Screening,
+    SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -268,6 +268,18 @@ const PIN: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f2001
 
 /// Where the script's upstream reads a certificate only once it restarts.
 const READ_AT_START: &str = "/config/lemonfiber/internal.p12";
+
+#[async_trait]
+impl Recounting for Upstream {
+    async fn events(&self, address: Option<&str>, key: Option<&str>) -> Result<(), Failure> {
+        self.tell(format!(
+            "events {} {}",
+            address.unwrap_or("nowhere"),
+            key.map_or("none", |_| "keyed")
+        ));
+        Ok(())
+    }
+}
 
 #[async_trait]
 impl Encrypting for Upstream {

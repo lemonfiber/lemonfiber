@@ -8,7 +8,8 @@ use super::EVERY;
 /// of addition nobody thinks to mention.
 const LAYOUT: &str = concat!(
     include_str!("../../config/paths.rs"),
-    include_str!("../../config/paths/household.rs")
+    include_str!("../../config/paths/household.rs"),
+    include_str!("../../config/paths/notifying.rs")
 );
 
 /// Every location the layout names, by the accessor that names it.

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "host": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "leaves": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

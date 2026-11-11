@@ -90,6 +90,8 @@ fn settings_of(
             | Outcome::DeviceKeys(_)
             | Outcome::PushEndpoint(_)
             | Outcome::PushEndpoints(_)
+            | Outcome::Notify(_)
+            | Outcome::NotifyMine(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)

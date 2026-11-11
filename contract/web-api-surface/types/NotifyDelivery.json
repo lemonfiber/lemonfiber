@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "kind": {
+      "type": [
+        "ref:NotificationKind"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "ref:NotifyOutcome"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

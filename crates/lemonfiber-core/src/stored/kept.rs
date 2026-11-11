@@ -7,7 +7,7 @@
 
 use crate::config::paths::Paths;
 
-use super::{Kept, Root};
+use super::Kept;
 
 /// One thing kept: the accessor that locates it, what it is, why, and whether it
 /// holds a credential.
@@ -247,6 +247,32 @@ pub const EVERY: &[Entry] = &[
               them.",
         secret: false,
         at: Paths::cover_hosts,
+    },
+    Entry {
+        accessor: "notify_backends",
+        what: "where alerts are delivered",
+        why: "Each notification back-end you added, who chose it, how far it is proven and what \
+              became of its deliveries, so a message that never arrived is told apart from one \
+              that was never sent.",
+        secret: false,
+        at: Paths::notify_backends,
+    },
+    Entry {
+        accessor: "notify_secrets",
+        what: "what each notification back-end is reached with",
+        why: "The token each back-end takes messages with, kept apart from the list of back-ends \
+              so nothing that shows you where alerts go ever reads one.",
+        secret: true,
+        at: Paths::notify_secrets,
+    },
+    Entry {
+        accessor: "notify_events",
+        what: "what each service tells the core what happened with",
+        why: "The digest of the key each curator and the media server send what happened with, \
+              so an event is taken only from the service the key was handed to and the key \
+              itself is kept nowhere but there.",
+        secret: false,
+        at: Paths::notify_events,
     },
     Entry {
         accessor: "handoffs",
@@ -502,28 +528,11 @@ pub const EVERY: &[Entry] = &[
     },
 ];
 
-/// The two directories everything above sits under.
-pub(super) fn roots(paths: &Paths) -> Vec<Root> {
-    vec![
-        Root {
-            at: paths.config_dir().display().to_string(),
-            what: "Your answers, and lemonfiber's memory of what it wrote. Small, worth keeping a \
-                   copy of, and the half that cannot be made again."
-                .to_owned(),
-        },
-        Root {
-            at: paths.data_dir().display().to_string(),
-            what: "What can be made again: the materialised stack, each service's own \
-                   configuration, the archives, the bundles, and what a command this machine \
-                   keeps running has said."
-                .to_owned(),
-        },
-    ]
-}
-
 mod outside;
+mod roots;
 
 pub use outside::beside;
+pub(super) use roots::roots;
 
 #[cfg(test)]
 mod tests;

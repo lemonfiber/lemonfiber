@@ -1,8 +1,9 @@
 //! Registering, listing and removing the phones that asked to be woken.
 //!
-//! **The operator's alone.** A member session and a key of any scope are refused at all
-//! three routes: an endpoint is told when the stack speaks, whichever member's business it
-//! is about.
+//! **The operator's, and each member's own.** The operator's phones are told when the
+//! stack speaks; a member session registers, lists and removes only its own phone, which is
+//! told only that something they asked for is ready. A key of any scope is refused at all
+//! three routes.
 //!
 //! **A registration carries a secret**, so it takes the connection a key may cross.
 
@@ -65,8 +66,8 @@ pub fn routes() -> Router<Serving> {
 
 /// Every push endpoint.
 async fn listed(State(serving): State<Serving>, caller: Caller) -> Response {
-    match operator(&caller) {
-        Ok(()) => carried_out(&serving.ctx, Command::PushEndpoints(Asked::List)).await,
+    match owner(&caller) {
+        Ok(owner) => carried_out(&serving.ctx, Command::PushEndpoints(Asked::List { owner })).await,
         Err(refused) => *refused,
     }
 }
@@ -78,9 +79,10 @@ async fn registered(
     arrived: Option<Extension<Arrived>>,
     given: Result<Json<Registering>, JsonRejection>,
 ) -> Response {
-    if let Err(refused) = operator(&caller) {
-        return *refused;
-    }
+    let owner = match owner(&caller) {
+        Ok(owner) => owner,
+        Err(refused) => return *refused,
+    };
     if !arrived.is_some_and(|Extension(arrived)| arrived.may_carry_a_key()) {
         return Refusal::KeyInTheClear.answered();
     }
@@ -92,6 +94,7 @@ async fn registered(
         endpoint: given.endpoint,
         p256dh: given.p256dh,
         auth: given.auth,
+        owner,
     };
     let answer = carried_out(&serving.ctx, Command::PushEndpoints(asked)).await;
     serving.live.roused();
@@ -104,20 +107,25 @@ async fn removed(
     caller: Caller,
     Path(name): Path<String>,
 ) -> Response {
-    match operator(&caller) {
-        Ok(()) => carried_out(&serving.ctx, Command::PushEndpoints(Asked::Remove { name })).await,
+    match owner(&caller) {
+        Ok(owner) => {
+            carried_out(
+                &serving.ctx,
+                Command::PushEndpoints(Asked::Remove { name, owner }),
+            )
+            .await
+        }
         Err(refused) => *refused,
     }
 }
 
-/// Nothing where this caller is the operator, by a session or by this run's own token,
-/// and the refusal it is answered with otherwise.
-fn operator(caller: &Caller) -> Result<(), Box<Response>> {
+/// Whose phones this caller reaches: every one for the operator, by a session or by this
+/// run's own token, a member's own for a member session, and the refusal a key is answered
+/// with.
+fn owner(caller: &Caller) -> Result<Option<String>, Box<Response>> {
     match caller {
-        Caller::Operator | Caller::Machine => Ok(()),
-        Caller::Member(_) => Err(Box::new(
-            Refusal::NotYours.saying("Push endpoints are the operator's, and only theirs."),
-        )),
+        Caller::Operator | Caller::Machine => Ok(None),
+        Caller::Member(id) => Ok(Some(id.clone())),
         Caller::Key(_) => Err(Box::new(Refusal::NotForAKey.saying(
             "A key may not register, list or remove push endpoints, whatever its scope.",
         ))),

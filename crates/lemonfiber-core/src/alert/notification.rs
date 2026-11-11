@@ -38,6 +38,8 @@ pub enum Notification {
     Request,
     /// An invitation accepted, declined or lapsed.
     Member,
+    /// Something a member asked for has arrived; the one kind a member is told.
+    Ready,
 }
 
 /// Every notification kind this build raises.
@@ -51,6 +53,20 @@ impl Notification {
             return Self::Completion;
         }
         Self::Problem
+    }
+
+    /// What it is called where it is named.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Problem => "problem",
+            Self::Completion => "completion",
+            Self::Update => "update",
+            Self::Backup => "backup",
+            Self::Request => "request",
+            Self::Member => "member",
+            Self::Ready => "ready",
+        }
     }
 }
 

@@ -167,6 +167,26 @@ pub const SHOWN: &[(&str, &str)] = &[
          nothing until it is opened",
     ),
     (
+        super::REACH_NTFY_KEY,
+        "whether alerts may be delivered to an ntfy topic, which explains a topic that stays \
+         quiet",
+    ),
+    (
+        super::REACH_GOTIFY_KEY,
+        "whether alerts may be delivered to a gotify server, which explains a server that \
+         stays quiet",
+    ),
+    (
+        super::REACH_WEBHOOK_KEY,
+        "whether alerts may be posted to a webhook, which explains a webhook that is never \
+         called",
+    ),
+    (
+        super::REACH_APPRISE_KEY,
+        "whether alerts may be delivered to an Apprise API, which explains one that stays \
+         quiet",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

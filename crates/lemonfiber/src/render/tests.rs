@@ -82,6 +82,19 @@ fn every_outcome() -> Vec<Outcome> {
         removed: None,
         rehearsed: false,
     }));
+    every.push(Outcome::Notify(lemonfiber_core::model::NotifyReport {
+        state: lemonfiber_core::model::NotifyState::Unconfigured,
+        backends: Vec::new(),
+        unread: Vec::new(),
+        rehearsed: false,
+    }));
+    every.push(Outcome::NotifyMine(
+        lemonfiber_core::model::NotifyMineReport {
+            offered: Vec::new(),
+            phone: false,
+            rehearsed: false,
+        },
+    ));
     every.push(Outcome::Settings(lemonfiber_core::model::SettingsReport {
         settings: Vec::new(),
         secrets: Vec::new(),

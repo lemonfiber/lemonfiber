@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a back-end speaks.",
+  "oneOf": [
+    {
+      "description": "An ntfy server's topic.",
+      "type": "string",
+      "const": "ntfy"
+    },
+    {
+      "description": "A gotify server's application.",
+      "type": "string",
+      "const": "gotify"
+    },
+    {
+      "description": "An address that is posted each message as JSON.",
+      "type": "string",
+      "const": "webhook"
+    },
+    {
+      "description": "An Apprise API address.",
+      "type": "string",
+      "const": "apprise"
+    },
+    {
+      "description": "A phone's `UnifiedPush` endpoint.",
+      "type": "string",
+      "const": "unifiedpush"
+    }
+  ]
+}

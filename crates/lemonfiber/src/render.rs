@@ -33,6 +33,7 @@ mod keys;
 mod migration;
 pub(crate) mod moving;
 mod news;
+mod notifying;
 mod outbound;
 mod overlay;
 mod playing;
@@ -274,6 +275,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::DeviceKeys(report) => keys::devices(report),
         Outcome::PushEndpoint(report) => keys::pushed(report),
         Outcome::PushEndpoints(report) => keys::pushes(report),
+        Outcome::Notify(report) => notifying::backends(report),
+        Outcome::NotifyMine(report) => notifying::mine(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),

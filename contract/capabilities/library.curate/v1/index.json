@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "library.curate/v1/openapi.json",
-      "sha256": "922fe625fc223f053cfa4e6f3186eb14d398e0228c17bbf11f890f0c10c897b8"
+      "sha256": "67ba3e59cfea04d75fe54468f2f0b221f7adb87d0b0952ca6bc9775ce89c58a7"
     },
     {
       "path": "library.curate/v1/operations/identity.json",
@@ -154,12 +154,16 @@
       "sha256": "acead4062adb508734ef1a9486b6f191145ca067a19cd85fc7e369048254573a"
     },
     {
+      "path": "library.curate/v1/operations/events.json",
+      "sha256": "d62c4d3d68c9d25005ac2676901a7948f177633a0bb6f25c91d6d3ee1118bd6d"
+    },
+    {
       "path": "library.curate/v1/holds.json",
       "sha256": "8a7d3d8a60bbdce030c0687527bfe434999553978a7d86f5a600221c591eea92"
     },
     {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "fba33e41f8e0b55411aeb3844a8d924901ecea00ae8a4903a2055dad7bb49222"
+      "sha256": "3f13303c8c2ee5dec167d0c06716f32b846e0f46605edc976ee4fe4f00414355"
     }
   ],
   "major": 1

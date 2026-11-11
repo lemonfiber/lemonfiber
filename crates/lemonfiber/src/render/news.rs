@@ -97,5 +97,10 @@ pub(super) fn when(onset: &str) -> String {
         .map_or_else(|| onset.to_owned(), |written| format!("{written} UTC"))
 }
 
+/// A moment in seconds since the Unix epoch, as a date and a time in UTC.
+pub(super) fn moment(seconds: u64) -> String {
+    when(&seconds.to_string())
+}
+
 #[cfg(test)]
 mod tests;

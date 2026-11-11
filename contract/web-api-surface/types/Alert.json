@@ -44,7 +44,7 @@
     },
     "notification": {
       "type": [
-        "oneOf(const:\"backup\",const:\"completion\",const:\"member\",const:\"problem\",const:\"request\",const:\"update\")"
+        "oneOf(const:\"backup\",const:\"completion\",const:\"member\",const:\"problem\",const:\"ready\",const:\"request\",const:\"update\")"
       ],
       "required": false
     },
@@ -72,6 +72,7 @@
     "\"completion\"",
     "\"member\"",
     "\"problem\"",
+    "\"ready\"",
     "\"request\"",
     "\"update\""
   ]

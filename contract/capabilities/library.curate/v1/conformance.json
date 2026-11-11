@@ -68,6 +68,7 @@
     {"asked":{"blocklist":true,"id":0,"kind":"tv"},"case":"unqueue-answers-tv","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"tv","operation":"unqueue","since":2},
     {"asked":{"blocklist":true,"id":0,"kind":"movies"},"case":"unqueue-answers-movies","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"movies","operation":"unqueue","since":2},
     {"asked":{"id":0,"kind":"tv","release":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"grab-answers-tv","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"tv","operation":"grab","since":2},
-    {"asked":{"id":0,"kind":"movies","release":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"grab-answers-movies","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"movies","operation":"grab","since":2}
+    {"asked":{"id":0,"kind":"movies","release":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"grab-answers-movies","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"movies","operation":"grab","since":2},
+    {"asked":{"address":"https://core.conformance.invalid/api/notify/events","key":"00000000000000000000000000000000"},"case":"events-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"events","since":3}
   ]
 }

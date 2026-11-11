@@ -37,6 +37,7 @@ mod choosing;
 mod extending;
 mod household;
 mod migrating;
+mod notifying;
 mod settling;
 mod sharing;
 mod viewing;
@@ -89,6 +90,8 @@ pub const OFFERED: &[&str] = &[
     "grant",
     "watched",
     "ask",
+    "notify-choose",
+    "push-woken",
     "support",
     "restore",
     "watch",

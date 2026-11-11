@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "chosen_by": {
+      "type": [
+        "ref:NotifyChosenBy"
+      ],
+      "required": true
+    },
+    "failures": {
+      "type": [
+        "array[ref:NotifyDelivery]"
+      ],
+      "required": true
+    },
+    "hosted": {
+      "type": [
+        "anyOf(null,ref:NotifyHosted)"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "kind": {
+      "type": [
+        "ref:NotifyBackendKind"
+      ],
+      "required": true
+    },
+    "last": {
+      "type": [
+        "anyOf(null,ref:NotifyDelivery)"
+      ],
+      "required": false
+    },
+    "proof": {
+      "type": [
+        "ref:NotifyProof"
+      ],
+      "required": true
+    },
+    "retry": {
+      "type": [
+        "anyOf(null,ref:NotifyRetry)"
+      ],
+      "required": false
+    },
+    "where": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

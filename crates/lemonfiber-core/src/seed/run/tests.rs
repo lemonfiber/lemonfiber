@@ -729,6 +729,7 @@ mod plex;
 mod proxies;
 mod publishing;
 mod quality;
+mod recounting;
 mod replacing;
 mod requests;
 mod showing;

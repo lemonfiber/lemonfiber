@@ -94,6 +94,7 @@ fn registering(name: &str, endpoint: &str) -> Asked {
         endpoint: endpoint.to_owned(),
         p256dh: p256dh(),
         auth: URL_SAFE_NO_PAD.encode([9_u8; 16]),
+        owner: None,
     }
 }
 
@@ -121,7 +122,7 @@ fn alert(check: &str, moment: Moment) -> Alert {
 
 /// What is listed by name.
 fn names(ctx: &Ctx) -> Vec<String> {
-    match asked(ctx, Asked::List) {
+    match asked(ctx, Asked::List { owner: None }) {
         Ok(Outcome::PushEndpoints(listing)) => {
             listing.endpoints.into_iter().map(|one| one.name).collect()
         }
@@ -187,6 +188,7 @@ fn what_cannot_be_registered_is_refused_by_name() {
                 endpoint: "https://push.example/a".to_owned(),
                 p256dh: "not a key".to_owned(),
                 auth: "not a secret".to_owned(),
+                owner: None,
             }
         ),
         Some(PUSH_KEYS_UNREADABLE)
@@ -208,6 +210,7 @@ fn a_removal_takes_the_endpoint_and_one_nothing_holds_is_refused() {
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
     let removal = || Asked::Remove {
         name: "pixel".to_owned(),
+        owner: None,
     };
 
     let rehearsing = ctx.clone().rehearsing();
@@ -255,6 +258,14 @@ async fn soon(settled: impl Fn() -> bool) -> bool {
     })
     .await
     .is_ok()
+}
+
+/// How many failed deliveries the first endpoint shows.
+fn failures(ctx: &Ctx) -> usize {
+    super::at(ctx)
+        .and_then(|path| super::read(&path).ok())
+        .and_then(|kept| kept.endpoints.first().map(|one| one.failures.len()))
+        .unwrap_or_default()
 }
 
 /// What is owed each endpoint, as kept.
@@ -310,9 +321,10 @@ async fn each_onset_and_resolution_is_sent_once_to_every_endpoint() {
     }));
 }
 
-/// An endpoint its distributor says is gone is forgotten, journaled, and sent nothing more.
+/// An endpoint its distributor says is gone stays, its failure shown, and is sent nothing
+/// more until it is woken again.
 #[tokio::test]
-async fn an_endpoint_its_distributor_says_is_gone_is_forgotten() {
+async fn an_endpoint_its_distributor_says_is_gone_stays_with_its_failure_shown() {
     for status in [404, 410] {
         let (ctx, distributor) = machine(&format!("push-gone-{status}"), status);
         assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_ok());
@@ -329,10 +341,9 @@ async fn an_endpoint_its_distributor_says_is_gone_is_forgotten() {
             ],
         );
 
-        assert!(soon(|| !any_waiting(&ctx)).await, "{status}");
-        assert!(names(&ctx).is_empty(), "{status}");
+        assert!(soon(|| failures(&ctx) == 1).await, "{status}");
+        assert_eq!(names(&ctx), ["pixel"], "{status}");
         assert_eq!(distributor.took(), 1, "{status}");
-        assert!(journal(&ctx).contains("pixel"));
     }
 }
 
@@ -492,11 +503,12 @@ fn an_endpoint_removed_is_owed_nothing() {
     assert!(asked(
         &ctx,
         Asked::Remove {
-            name: "pixel".to_owned()
+            name: "pixel".to_owned(),
+            owner: None,
         }
     )
     .is_ok());
-    assert!(super::next_owed(&path, "pixel").is_none());
+    assert!(super::read(&path).is_ok_and(|kept| kept.endpoints.is_empty()));
 }
 
 /// Keys a record no longer holds readably send nothing, and the endpoint stays.
@@ -530,17 +542,22 @@ fn what_was_asked_prints_no_key_and_no_address() {
         endpoint: "https://push.example/the-address".to_owned(),
         p256dh: "the-public-key".to_owned(),
         auth: "the-secret".to_owned(),
+        owner: None,
     };
     let said = format!("{asking:?}");
     assert!(said.contains("pixel"), "{said}");
     for withheld in ["the-address", "the-public-key", "the-secret"] {
         assert!(!said.contains(withheld), "{said}");
     }
-    assert_eq!(format!("{:?}", Asked::List), "List");
+    assert_eq!(
+        format!("{:?}", Asked::List { owner: None }),
+        "List { owner: None }"
+    );
     assert!(format!(
         "{:?}",
         Asked::Remove {
-            name: "pixel".to_owned()
+            name: "pixel".to_owned(),
+            owner: None,
         }
     )
     .contains("pixel"));
@@ -551,11 +568,12 @@ fn what_was_asked_prints_no_key_and_no_address() {
 fn a_machine_keeping_no_configuration_keeps_no_endpoint() {
     let ctx = crate::test_support::a_context().build();
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_err());
-    assert!(asked(&ctx, Asked::List).is_err());
+    assert!(asked(&ctx, Asked::List { owner: None }).is_err());
     assert!(asked(
         &ctx,
         Asked::Remove {
-            name: "pixel".to_owned()
+            name: "pixel".to_owned(),
+            owner: None,
         }
     )
     .is_err());
@@ -574,6 +592,7 @@ fn a_removal_the_journal_cannot_record_is_refused() {
 
     let removal = Asked::Remove {
         name: "pixel".to_owned(),
+        owner: None,
     };
     assert!(asked(&ctx, removal).is_err());
     assert_eq!(names(&ctx), ["pixel"]);
@@ -588,10 +607,11 @@ fn a_record_that_cannot_be_read_refuses_every_request() {
     assert!(std::fs::write(&path, "{ not a record").is_ok());
     let removal = || Asked::Remove {
         name: "pixel".to_owned(),
+        owner: None,
     };
 
     assert!(asked(&ctx, registering("pixel", "https://push.example/a")).is_err());
-    assert!(asked(&ctx, Asked::List).is_err());
+    assert!(asked(&ctx, Asked::List { owner: None }).is_err());
     assert!(asked(&ctx, removal()).is_err());
     assert!(asked(&ctx.clone().rehearsing(), removal()).is_err());
     assert_eq!(
@@ -617,7 +637,8 @@ fn removing_one_endpoint_of_two_keeps_what_was_sent() {
     assert!(asked(
         &ctx,
         Asked::Remove {
-            name: "pixel".to_owned()
+            name: "pixel".to_owned(),
+            owner: None,
         }
     )
     .is_ok());
@@ -626,3 +647,6 @@ fn removing_one_endpoint_of_two_keeps_what_was_sent() {
     assert_eq!(kept.told, Some(vec!["service.sonarr#1 started".to_owned()]));
     assert_eq!(names(&ctx), ["tablet"]);
 }
+
+mod owning;
+mod telling;
