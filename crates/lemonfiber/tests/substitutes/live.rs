@@ -44,6 +44,10 @@ pub const USENET: [&str; 10] = [
 /// stack's first start offers, which `up` then agrees to.
 const APPLIED: &str = "applied";
 
+/// The indexer's generic Newznab definition: its implementation, and the name or the
+/// definition name it is listed under, which Prowlarr releases differ on.
+const NEWZNAB: (&str, &str, &str) = ("Newznab", "Generic Newznab", "generic-newznab");
+
 /// The member who asks.
 const MEMBER: &str = "arm";
 
@@ -193,16 +197,25 @@ fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
         .into_iter()
         .flatten()
         .find(|one| {
-            one.get("implementation")
-                .and_then(serde_json::Value::as_str)
-                == Some("Newznab")
-                && one
-                    .get("definitionName")
-                    .and_then(serde_json::Value::as_str)
-                    == Some("generic-newznab")
+            let said = |field: &str| one.get(field).and_then(serde_json::Value::as_str);
+            said("implementation") == Some(NEWZNAB.0)
+                && (said("name") == Some(NEWZNAB.1) || said("definitionName") == Some(NEWZNAB.2))
         })
         .cloned()
-        .ok_or_else(|| format!("no generic Newznab definition in {}", schema.body))?;
+        .ok_or_else(|| {
+            let listed: Vec<&str> = schemas
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|one| {
+                    one.get("implementation")
+                        .and_then(serde_json::Value::as_str)
+                        == Some(NEWZNAB.0)
+                })
+                .filter_map(|one| one.get("name").and_then(serde_json::Value::as_str))
+                .collect();
+            format!("no generic Newznab definition among {listed:?}")
+        })?;
     if let Some(fields) = definition
         .get_mut("fields")
         .and_then(serde_json::Value::as_array_mut)
