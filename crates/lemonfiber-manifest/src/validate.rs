@@ -135,7 +135,8 @@ fn check_profiles(manifest: &Manifest, found: &mut Vec<Violation>) -> BTreeSet<S
     declared
 }
 
-/// Form ids must be unique, and every profile a form names must exist.
+/// Form ids must be unique, and every profile a form names must exist and be one of
+/// its own rather than one that runs beside the forms.
 fn check_forms(manifest: &Manifest, profiles: &BTreeSet<String>, found: &mut Vec<Violation>) {
     let mut declared = BTreeSet::new();
     for form in &manifest.forms {
@@ -151,6 +152,17 @@ fn check_forms(manifest: &Manifest, profiles: &BTreeSet<String>, found: &mut Vec
                 found.push(Violation {
                     location: location.clone(),
                     message: format!("names profile {named}, which is not declared"),
+                });
+            } else if manifest
+                .profiles
+                .iter()
+                .any(|profile| profile.id == *named && profile.beside)
+            {
+                found.push(Violation {
+                    location: location.clone(),
+                    message: format!(
+                        "names profile {named}, which runs beside the forms rather than in one"
+                    ),
                 });
             }
         }

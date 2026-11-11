@@ -302,6 +302,7 @@
       "description": "A Compose profile — one service's role in the stack.",
       "type": "object",
       "properties": {
+        "beside": {"description": "Whether it runs beside whichever forms run rather than being one of them.\n\nNo form lists it, and it joins a plan only once the forms named leave a profile\nof their own, so it never counts toward a form being able to run.", "type": "boolean", "default": false},
         "description": {"description": "Shown in form previews.", "type": "string"},
         "id": {"description": "Unique, and matches a Compose profile name exactly.", "type": "string"},
         "name": {"description": "Human-facing name.", "type": "string"},

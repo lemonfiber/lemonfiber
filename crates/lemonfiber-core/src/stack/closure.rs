@@ -285,7 +285,13 @@ pub fn everything(manifest: &Manifest, protocols: Protocols) -> Result<Plan, Fai
 }
 
 /// What a set of profiles comes to, once the ones this configuration cannot support
-/// have been left out of it.
+/// have been left out of it, with each profile that runs beside the forms added once
+/// something of their own is left.
+///
+/// A beside profile never decides whether anything is left to run, nor whether a form
+/// is narrowed: a form whose own profiles all need a provider nobody configured has
+/// nothing to run, whatever runs beside it, and a beside profile needing one is left
+/// out without the forms reading as narrowed.
 ///
 /// The half of resolving that does not care how the profiles were arrived at, so
 /// naming forms and asking for everything cannot come to differently-shaped answers.
@@ -295,6 +301,17 @@ fn planned(
     closure: BTreeSet<String>,
     protocols: Protocols,
 ) -> Result<Plan, Failure> {
+    let beside: BTreeSet<String> = manifest
+        .profiles
+        .iter()
+        .filter(|profile| profile.beside)
+        .map(|profile| profile.id.clone())
+        .collect();
+    let closure: BTreeSet<String> = closure
+        .into_iter()
+        .filter(|id| !beside.contains(id))
+        .collect();
+
     // Which profiles are guarded is the manifest's answer, not one this code
     // remembers. A stack that renames its download profiles keeps working.
     let dropped: Vec<Dropped> = manifest
@@ -308,8 +325,7 @@ fn planned(
             needs,
         })
         .collect();
-
-    let profiles: BTreeSet<String> = closure
+    let mut profiles: BTreeSet<String> = closure
         .into_iter()
         .filter(|id| !dropped.iter().any(|out| &out.profile == id))
         .collect();
@@ -318,6 +334,14 @@ fn planned(
             forms: forms.to_vec(),
         });
     }
+    profiles.extend(
+        manifest
+            .profiles
+            .iter()
+            .filter(|profile| beside.contains(&profile.id))
+            .filter(|profile| profile.protocol.is_none_or(|needed| protocols.has(needed)))
+            .map(|profile| profile.id.clone()),
+    );
 
     // The stack's own order rather than an alphabetical one: a manifest lists
     // its services in the order somebody thought about them, and a preview read

@@ -365,6 +365,42 @@ fn a_part_s_forms_are_the_ones_holding_its_profile() {
 }
 
 #[test]
+fn a_part_whose_profile_runs_beside_the_forms_names_every_form() {
+    let beside = "[[profile]]
+id = \"usenet\"
+name = \"Usenet\"
+description = \"Usenet downloading\"
+beside = true
+
+[[profile]]
+id = \"media\"
+name = \"Media\"
+description = \"Serving what you have\"
+
+[[form]]
+id = \"tv\"
+name = \"TV\"
+description = \"Television\"
+profiles = [\"media\"]
+
+[[form]]
+id = \"films\"
+name = \"Films\"
+description = \"Films\"
+profiles = [\"media\"]
+";
+    let one = broken("beside-one", PART, &files(), &[], beside);
+    let every = PART.replace("forms = [\"tv\"]", "forms = [\"tv\", \"films\"]");
+    let both = broken("beside-every", &every, &files(), &[], beside);
+
+    assert!(
+        names(&one, &["[plugin].forms", "profile usenet", "every form"]),
+        "{one:?}"
+    );
+    assert!(!names(&both, &["[plugin].forms"]), "{both:?}");
+}
+
+#[test]
 fn a_first_party_service_says_where_it_reaches_and_what_it_asks_for() {
     let silent = PART.replace("asks_for = \"The articles each download is made of\"\n", "");
     let said = broken("silent", &silent, &files(), &[], TABLES);
