@@ -2,15 +2,59 @@ use super::{ran, ReleasesCheck, NONE};
 use crate::doctor::credentials::Target;
 use crate::doctor::narrowing::Narrowing;
 use crate::doctor::{Disruptive, Verdict};
+use crate::ports::media::TitleKind;
+
+/// The curator `id`, filing `kind`, not yet asked through any adapter.
+fn filing(id: &str, kind: TitleKind) -> Target {
+    Target {
+        id: id.to_owned(),
+        name: id.to_owned(),
+        kind: Some(kind),
+        asked: None,
+    }
+}
 
 /// The television curator, filing video by resolution.
 fn television() -> Target {
-    Target {
-        id: "sonarr".to_owned(),
-        name: "Sonarr".to_owned(),
-        kind: Some(crate::ports::media::Kind::Tv),
-        asked: None,
-    }
+    filing("sonarr", TitleKind::Tv)
+}
+
+#[tokio::test]
+async fn music_is_searched_at_its_chosen_quality_and_books_which_have_none_are_not() {
+    let check = ReleasesCheck::new(
+        vec![
+            filing("lidarr", TitleKind::Music),
+            filing("bindery", TitleKind::Books),
+        ],
+        true,
+    );
+
+    let findings = ran(&check).await;
+
+    let checked: Vec<(&str, &str)> = findings
+        .iter()
+        .map(|found| (found.check.as_str(), found.title.as_str()))
+        .collect();
+    assert_eq!(
+        checked,
+        [(
+            "services.releases.lidarr",
+            "Releases for music at the chosen quality"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn a_stack_filing_books_alone_has_no_releases_to_check() {
+    let check = ReleasesCheck::new(vec![filing("bindery", TitleKind::Books)], true);
+
+    let findings = ran(&check).await;
+
+    let verdicts: Vec<&Verdict> = findings.iter().map(|found| &found.verdict).collect();
+    assert!(
+        matches!(verdicts.as_slice(), [Verdict::Skipped { .. }]),
+        "{verdicts:?}"
+    );
 }
 
 #[tokio::test]

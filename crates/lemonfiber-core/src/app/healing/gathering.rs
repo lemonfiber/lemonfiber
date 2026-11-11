@@ -11,7 +11,7 @@ use crate::app::targets::{
 };
 use crate::app::Ctx;
 use crate::model::Unreached;
-use crate::ports::media::Kind;
+use crate::ports::media::TitleKind;
 use crate::ports::service::{Download, Downloading, Failure};
 
 /// Why a client's downloads are judged from their curators' view alone.
@@ -23,7 +23,7 @@ pub(super) struct Curator {
     /// Its id.
     pub(super) id: String,
     /// What it files.
-    pub(super) kind: Kind,
+    pub(super) kind: TitleKind,
     /// What it is asked through.
     pub(super) asked: Arc<dyn curate::Fills>,
     /// Every entry of its queue.
@@ -135,7 +135,12 @@ async fn clients(gathered: &mut Gathered, target: &DownloadTarget) {
 
 /// What the curator `id` holds of `kind`, into `gathered`, held back where its download
 /// clients do not answer it or one files outside its folder.
-async fn curator(gathered: &mut Gathered, id: String, kind: Kind, asked: Arc<dyn curate::Fills>) {
+async fn curator(
+    gathered: &mut Gathered,
+    id: String,
+    kind: TitleKind,
+    asked: Arc<dyn curate::Fills>,
+) {
     let held_back = match asked.test_download_clients().await {
         Ok(probes) => probes
             .iter()

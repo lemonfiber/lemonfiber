@@ -10,7 +10,7 @@ use crate::app::Ctx;
 use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::{Check, Finding, Verdict};
 use crate::model::TraceReport;
-use crate::ports::media::Kind;
+use crate::ports::media::TitleKind;
 use crate::ports::service::{
     Indexers, ItemPart, QualityReleases, QueueItem, ReleaseProbe, TraceEvent,
 };
@@ -50,7 +50,7 @@ pub(crate) enum Searched {
 /// A search that will not run settles nothing rather than becoming an absence. An
 /// indexer that could not be reached is not an indexer carrying nothing, and reading it
 /// as one would send an operator to ease a preset that was never the problem.
-pub(crate) async fn asking(service: &dyn QualityReleases, kind: Kind) -> Searched {
+pub(crate) async fn asking(service: &dyn QualityReleases, kind: TitleKind) -> Searched {
     match service.probe_releases(kind).await {
         Ok(ReleaseProbe::NoneMatch) => Searched::NoneAtTheQuality,
         Ok(ReleaseProbe::NoneFound) => Searched::Nothing,
@@ -129,7 +129,7 @@ pub(crate) fn beside(reason: String, said: &[String]) -> String {
 /// inferring an availability it has not confirmed.
 pub(crate) async fn library_presence(
     library: Option<&dyn crate::ports::service::Library>,
-    kind: Kind,
+    kind: TitleKind,
     title: &str,
 ) -> Option<Presence> {
     match library?.has_item(kind, title).await {

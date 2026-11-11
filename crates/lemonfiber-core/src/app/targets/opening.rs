@@ -17,7 +17,7 @@ use crate::collected::{Collector, Medium};
 use crate::ports::service::UsenetAccounts;
 use crate::wiring::{Filler, Fillers};
 
-use crate::ports::media::Kind;
+use crate::ports::media::{Kind, TitleKind};
 
 use super::curators::curator_targets;
 use super::downloads::{download_targets, DownloadTarget};
@@ -33,18 +33,18 @@ pub(crate) fn declined_server(fillers: &Fillers) -> Option<super::MediaServer> {
     super::MediaServer::at(fillers, fillers.fronting(named).unwrap_or(named))
 }
 
-/// One curator a read can be made against: the kind of video it files, the curator over
-/// its contract, and the name a report calls it by.
-pub(crate) struct OpenCurator {
+/// One curator a read can be made against: the kind it files, the curator over its
+/// contract, and the name a report calls it by.
+pub(crate) struct OpenCurator<K = TitleKind> {
     /// The service's display name, as a report names where a fact came from.
     pub name: String,
-    /// Which of the two media services it is.
-    pub kind: Kind,
+    /// The kind it files.
+    pub kind: K,
     /// The curator, asked through the adapter in front of it.
     pub service: Arc<dyn curate::Fills>,
 }
 
-/// Every curator of video that can be asked, ready to be asked something.
+/// Every curator that can be asked, ready to be asked something.
 ///
 /// One whose adapter cannot be asked yet is left out. That is deliberately not a failed
 /// read: a service still coming up holds nothing to report, so its absence understates
@@ -66,6 +66,24 @@ pub(crate) async fn open_curators(
         }
     }
     open
+}
+
+/// Every curator of video that can be asked, as [`open_curators`] opens it.
+pub(crate) async fn open_video_curators(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+) -> Vec<OpenCurator<Kind>> {
+    open_curators(ctx, manifest)
+        .await
+        .into_iter()
+        .filter_map(|curator| {
+            Some(OpenCurator {
+                name: curator.name,
+                kind: curator.kind.video()?,
+                service: curator.service,
+            })
+        })
+        .collect()
 }
 
 /// What reading the household's requests needs: the request service, asked as its

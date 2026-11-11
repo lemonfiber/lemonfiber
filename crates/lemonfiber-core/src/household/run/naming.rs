@@ -11,7 +11,7 @@ use std::time::SystemTime;
 
 use futures_util::future::join_all;
 
-use crate::app::targets::open_curators;
+use crate::app::targets::open_video_curators;
 use crate::app::Ctx;
 use crate::asking::Reasons;
 use crate::model::{MemberAccess, Restriction};
@@ -119,8 +119,8 @@ pub(super) async fn library_titles(
 ) -> (BTreeMap<(Kind, i64), Titled>, bool) {
     let mut titles = BTreeMap::new();
     let mut named = true;
-    for curator in open_curators(ctx, manifest).await {
-        match curator.service.library(curator.kind).await {
+    for curator in open_video_curators(ctx, manifest).await {
+        match curator.service.library(curator.kind.into()).await {
             Ok(items) => titles.extend(items.into_iter().map(|item| {
                 let item_named = Titled {
                     title: item.title,

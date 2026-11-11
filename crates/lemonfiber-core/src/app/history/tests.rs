@@ -170,7 +170,7 @@ fn a_guard_moved_in_place_reads_as_moved_for_good() {
 fn a_stuck_download_dropped_reads_as_its_title() {
     assert_eq!(
         did(&crate::journal::Kind::Unqueued {
-            kind: crate::ports::media::Kind::Tv,
+            kind: crate::ports::media::TitleKind::Tv,
             title: 9,
             release: "9f86d081".to_owned(),
         }),

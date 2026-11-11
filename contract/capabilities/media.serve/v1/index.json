@@ -39,7 +39,7 @@
     },
     {
       "path": "media.serve/v1/operations/has_item.json",
-      "sha256": "5fbc452c0f4c74b73cfd4a2300f149e40b7adc75087d480d3ddbc27aad5be003"
+      "sha256": "5cedf6e57590d8a0e12f2c04d3d48271a1201abed99e1a54c2d717d21885021e"
     },
     {
       "path": "media.serve/v1/operations/rescan.json",

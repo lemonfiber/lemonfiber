@@ -7,10 +7,11 @@
 
 use crate::app::targets::OpenCurator;
 use crate::app::Ctx;
+use crate::ports::media::Kind;
 use crate::walkthrough::Why;
 
 /// What this stack should be offered.
-pub(super) async fn offered(ctx: &Ctx, curators: &[OpenCurator]) -> Why {
+pub(super) async fn offered(ctx: &Ctx, curators: &[OpenCurator<Kind>]) -> Why {
     let protocols = ctx.settings.protocols;
     Why::of(
         protocols.usenet || protocols.torrent,
@@ -26,7 +27,7 @@ pub(super) async fn offered(ctx: &Ctx, curators: &[OpenCurator]) -> Why {
 ///
 /// A service that cannot be asked contributes nothing rather than a zero, for the same
 /// reason: it is the difference between "there are none" and "I could not tell".
-async fn has_indexers(curators: &[OpenCurator]) -> bool {
+async fn has_indexers(curators: &[OpenCurator<Kind>]) -> bool {
     for curator in curators {
         if curator.service.indexer_count().await.unwrap_or(0) > 0 {
             return true;

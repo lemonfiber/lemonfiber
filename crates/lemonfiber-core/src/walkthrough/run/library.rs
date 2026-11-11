@@ -58,7 +58,7 @@ pub(super) async fn walk(
 /// wrong answer to a question they did not ask.
 async fn holds(server: &dyn crate::ports::service::Library, term: &str) -> bool {
     for kind in Kind::ALL {
-        if server.has_item(kind, term).await.unwrap_or(false) {
+        if server.has_item(kind.into(), term).await.unwrap_or(false) {
             return true;
         }
     }

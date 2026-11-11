@@ -235,7 +235,7 @@ pub fn conformance(capability: &Capability) -> Value {
             let mut listed = json!({
                 "case": case.case,
                 "operation": case.operation.name,
-                "since": case.operation.since,
+                "since": case.since,
                 "keyed": case.keyed,
                 "expect": expect,
                 "live": case.live,

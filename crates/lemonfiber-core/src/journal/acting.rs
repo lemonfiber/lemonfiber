@@ -196,7 +196,7 @@ pub enum Action {
     Regrab {
         /// The kind of media the curator files it as.
         #[schemars(with = "crate::model::VideoKind")]
-        kind: crate::ports::media::Kind,
+        kind: crate::ports::media::TitleKind,
         /// The curator's id for the title.
         title: i64,
         /// The release's fingerprint.

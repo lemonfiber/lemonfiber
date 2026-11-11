@@ -8,7 +8,7 @@ use super::{heal, kept, paced, queue};
 use crate::app::Ctx;
 use crate::journal::{Action, Change, Kind, Undo};
 use crate::model::{Act, ActOutcome, ActTaken, Healed, HealingSwitch, QueueHealth, Wedge};
-use crate::ports::media::Kind as Media;
+use crate::ports::media::TitleKind as Media;
 use crate::ports::service::{
     ClientProbe, CuratedTitle, Download, DownloadState, Downloading, Filed, Grabbed, TransferState,
 };
@@ -698,3 +698,5 @@ fn an_act_refused_for_no_reason_and_an_item_no_service_holds_are_said_plainly() 
         "healed Some.Release, because it stalled: drop: not done, blocklist: not done"
     );
 }
+
+mod albums;

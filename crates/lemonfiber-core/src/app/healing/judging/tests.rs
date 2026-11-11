@@ -10,7 +10,7 @@ use super::judged;
 use crate::app::healing::gathering::{Curator, Gathered, Item};
 use crate::config::Healing;
 use crate::model::{Act, Wedge};
-use crate::ports::media::Kind;
+use crate::ports::media::TitleKind;
 use crate::ports::service::{Download, DownloadState, Downloading, TransferState};
 use crate::queue::healing::Struck;
 
@@ -81,7 +81,7 @@ fn gathered(entries: Vec<Downloading>, items: Vec<Item>) -> Gathered {
     Gathered {
         curators: vec![Curator {
             id: CURATOR.to_owned(),
-            kind: Kind::Tv,
+            kind: TitleKind::Tv,
             asked: Arc::new(asked),
             entries,
             titles: BTreeMap::from([(9, "The Office".to_owned())]),

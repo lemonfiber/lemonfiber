@@ -9,7 +9,7 @@
 //! own services; what a guard in front of it enforces; the certificate its internal
 //! TLS port presents; and a library for each media type the stack files.
 
-use lemonfiber_ports::media::{Kind, MEDIA};
+use lemonfiber_ports::media::{TitleKind, MEDIA};
 use lemonfiber_ports::service::{
     AppKeys, Applied, Astray, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
     Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
@@ -111,8 +111,8 @@ crate::contract! {
         }
         impl Library {
             /// Whether the library holds an item of one kind for a term yet.
-            fn has_item(value kind: Kind, str term: &str) -> bool where asks = Asked {
-                kind: Kind::Movies,
+            fn has_item(value kind: TitleKind, str term: &str) -> bool where asks = Asked {
+                kind: TitleKind::Movies,
                 term: TERM.to_owned(),
             };
             /// Look over the library again.
@@ -199,7 +199,11 @@ pub fn capability() -> crate::Capability {
                 if let Some(at) = asked.pointer_mut("/filed/0/media_type") {
                     *at = Value::String((*media_type).to_owned());
                 }
-                (*media_type, asked)
+                crate::MediaCase {
+                    media_type,
+                    asks: asked,
+                    since: 0,
+                }
             })
             .collect();
     }

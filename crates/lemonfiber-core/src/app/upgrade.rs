@@ -14,7 +14,7 @@ use super::Ctx;
 use crate::doctor::credentials::Target;
 use crate::error::{Diagnose, Problem};
 use crate::model::{Triggered, UpgradeMedia, UpgradeReport};
-use crate::ports::media::Kind;
+use crate::ports::media::{Kind, TitleKind};
 
 /// State the cost of upgrading existing content to the chosen quality, per media
 /// type, and — only when confirmed — ask each resolution curator to re-search its
@@ -42,7 +42,7 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
 
     let mut media = Vec::new();
     for target in curator_targets(ctx, &fillers_here(ctx, &manifest)).await {
-        let Some(kind) = target.kind else {
+        let Some(kind) = target.kind.and_then(TitleKind::video) else {
             continue;
         };
         let preset = selection.for_type(kind.media_type());

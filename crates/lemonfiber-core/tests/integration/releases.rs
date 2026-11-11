@@ -15,7 +15,7 @@ use lemonfiber_core::doctor::releases::ReleasesCheck;
 use lemonfiber_core::doctor::{Category, Check, Narrowing, Verdict};
 use lemonfiber_core::error::codes::qual::NONE_AVAILABLE;
 use lemonfiber_core::error::codes::qual::PRESET_UNMET;
-use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::ports::media::TitleKind;
 use lemonfiber_core::ports::service::ReleaseProbe;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_testing::adapted::Adapted;
@@ -23,7 +23,7 @@ use lemonfiber_testing::curators::{answered, curating, unavailable, FILM, TELEVI
 
 /// `curator`, filing `kind`, asked through its adapter answering `probe_releases` as
 /// `answer`.
-fn probing(curator: Adapted, kind: Kind, answer: Answer) -> Target {
+fn probing(curator: Adapted, kind: TitleKind, answer: Answer) -> Target {
     let http = Fake::by_path(vec![(curating(curator, "probe_releases"), answer)]);
     Target {
         id: curator.plugin.to_owned(),
@@ -35,7 +35,7 @@ fn probing(curator: Adapted, kind: Kind, answer: Answer) -> Target {
 
 /// The television curator, its search answered with `probe`.
 fn curator(probe: ReleaseProbe) -> Target {
-    probing(TELEVISION, Kind::Tv, answered(&probe))
+    probing(TELEVISION, TitleKind::Tv, answered(&probe))
 }
 
 /// Run a disruptive check over one curator and return its single verdict.
@@ -110,7 +110,7 @@ async fn a_clean_search_that_finds_nothing_warns_that_none_are_available() {
 /// about releases, so it is unverified, never a warning.
 #[tokio::test]
 async fn a_search_that_cannot_run_is_unverified_not_a_verdict_on_the_preset() {
-    let target = probing(TELEVISION, Kind::Tv, unavailable());
+    let target = probing(TELEVISION, TitleKind::Tv, unavailable());
     assert!(matches!(
         curator_verdict(target).await,
         Verdict::Unverified { .. }
@@ -139,7 +139,6 @@ async fn a_service_whose_adapter_cannot_be_asked_is_skipped() {
 
 #[tokio::test]
 async fn no_resolution_service_is_skipped() {
-    // A stack with no television or film service has no releases to check.
     let check = ReleasesCheck::new(Vec::new(), true);
     let verdict = check.run().await.pop().map(|found| found.verdict);
     assert!(matches!(verdict, Some(Verdict::Skipped { .. })));
@@ -240,7 +239,7 @@ async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
 
 #[tokio::test]
 async fn a_film_service_is_searched_through_its_own_adapter() {
-    let movie_curator = probing(FILM, Kind::Movies, answered(&ReleaseProbe::Matching));
+    let movie_curator = probing(FILM, TitleKind::Movies, answered(&ReleaseProbe::Matching));
     let verdict = ReleasesCheck::new(vec![movie_curator], true)
         .run()
         .await

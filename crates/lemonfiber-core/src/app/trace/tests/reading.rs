@@ -27,7 +27,7 @@ struct Holding(Option<bool>);
 impl crate::ports::service::Library for Holding {
     async fn has_item(
         &self,
-        _kind: Kind,
+        _kind: TitleKind,
         _term: &str,
     ) -> Result<bool, crate::ports::service::Failure> {
         self.0
@@ -123,14 +123,15 @@ async fn tracing_a_matched_item_present_in_the_library_reports_available() {
 #[tokio::test]
 async fn a_media_server_with_nothing_reads_as_absent() {
     // The library answers, holding nothing: a confirmed absence, not an unknown.
-    let presence = library_presence(Some(&Holding(Some(false))), Kind::Tv, "The Expanse").await;
+    let presence =
+        library_presence(Some(&Holding(Some(false))), TitleKind::Tv, "The Expanse").await;
     assert_eq!(presence, Some(Presence::Absent));
 }
 
 #[tokio::test]
 async fn a_media_server_that_will_not_answer_leaves_presence_unknown() {
     // The library cannot be read: presence is unknown — never inferred as absent.
-    let presence = library_presence(Some(&Holding(None)), Kind::Movies, "The Expanse").await;
+    let presence = library_presence(Some(&Holding(None)), TitleKind::Movies, "The Expanse").await;
     assert_eq!(presence, None);
 }
 

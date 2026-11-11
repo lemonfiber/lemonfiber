@@ -19,10 +19,10 @@
 //! which is a cost to state rather than a thing to take away.
 //!
 //! An ordinary run reports it unverified rather than skipped. Skipped is for a check
-//! that does not apply, and this one applies perfectly well: television and film are
-//! configured, content is wanted, and the only reason nothing was established is that
-//! no search was spent on it. Calling that inapplicable would let a stack read as
-//! healthy on the strength of a search nobody made.
+//! that does not apply, and this one applies perfectly well: a curator of a kind a
+//! quality is chosen for is configured, content is wanted, and the only reason nothing
+//! was established is that no search was spent on it. Calling that inapplicable would
+//! let a stack read as healthy on the strength of a search nobody made.
 
 use async_trait::async_trait;
 
@@ -30,7 +30,7 @@ use super::{Category, Check, Disruptive, Finding, Verdict};
 use crate::doctor::credentials::Target;
 use crate::error::codes::qual::{NONE_AVAILABLE, PRESET_UNMET};
 use crate::error::{Problem, Remedy, State};
-use crate::ports::media::Kind;
+use crate::ports::media::{chosen_for, TitleKind};
 use crate::ports::service::ReleaseProbe;
 
 /// The id under which the check reports where there is nothing to run it against.
@@ -65,8 +65,9 @@ fn disruption() -> Disruptive {
     }
 }
 
-/// Searches the resolution services for the operator's wanted content, so a preset that
-/// asks for releases the indexers do not carry is told apart from an indexer failure.
+/// Searches the curators of every kind a quality is chosen for, for the operator's wanted
+/// content, so a preset that asks for releases the indexers do not carry is told apart
+/// from an indexer failure.
 pub struct ReleasesCheck {
     targets: Vec<Target>,
     disruptive: bool,
@@ -84,7 +85,7 @@ impl ReleasesCheck {
     }
 
     /// Search one service and read the result into a verdict.
-    async fn probe(target: &Target, kind: Kind) -> Verdict {
+    async fn probe(target: &Target, kind: TitleKind) -> Verdict {
         let media = kind.media_type();
         let Some(service) = &target.asked else {
             return Verdict::Skipped {
@@ -133,20 +134,21 @@ impl Check for ReleasesCheck {
 
 /// Whether anything is actually available at the quality in force.
 async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
-    let resolution: Vec<(&Target, Kind)> = check
+    let chosen: Vec<(&Target, TitleKind)> = check
         .targets
         .iter()
-        .filter_map(|target| target.kind.map(|kind| (target, kind)))
+        .filter_map(|target| Some((target, target.kind?)))
+        .filter(|(_, kind)| chosen_for().contains(&kind.media_type()))
         .collect();
 
-    if resolution.is_empty() {
+    if chosen.is_empty() {
         return vec![Finding::in_category(
             Category::Services,
             NONE,
             "Releases for the chosen quality",
             Verdict::Skipped {
-                reason: "no television or film service is configured, so there are no releases \
-                         to check"
+                reason: "no television, film or music service is configured, so there are no \
+                         releases to check"
                     .to_owned(),
             },
         )];
@@ -164,7 +166,7 @@ async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
     }
 
     let mut findings = Vec::new();
-    for (target, kind) in resolution {
+    for (target, kind) in chosen {
         let verdict = ReleasesCheck::probe(target, kind).await;
         findings.push(
             Finding::in_category(

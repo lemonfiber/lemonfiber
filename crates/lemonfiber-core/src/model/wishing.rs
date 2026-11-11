@@ -8,45 +8,18 @@ use serde::Serialize;
 
 use super::MemberAsking;
 use crate::collected::{Medium, Unit};
-use crate::ports::media::Kind;
 use crate::ports::service::{BookUnit, MusicUnit};
 
-/// What kind of title a member's search and ask name: a series, a film, music or books.
-///
-/// The web surface's own name for what a member asks for, whose name an SDK already gives
-/// to the kinds of envelope: the same words on the wire, under a name nothing else takes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum TitleKind {
-    /// A series.
-    Tv,
-    /// A film.
-    Movies,
-    /// An album or a whole artist.
-    Music,
-    /// A book, a whole author or a series of books.
-    Books,
-}
+pub use crate::ports::media::TitleKind;
 
-impl TitleKind {
-    /// What a household calls a title of this kind, one of them.
-    #[must_use]
-    pub const fn noun(self) -> &'static str {
-        match self {
-            Self::Tv => Kind::Tv.noun(),
-            Self::Movies => Kind::Movies.noun(),
-            Self::Music => "album and artist",
-            Self::Books => "book, author and series",
-        }
-    }
-}
-
-impl From<Kind> for TitleKind {
-    fn from(kind: Kind) -> Self {
-        match kind {
-            Kind::Tv => Self::Tv,
-            Kind::Movies => Self::Movies,
-        }
+/// What a household calls a title of `kind`, one of them, as a search names what it
+/// looked among.
+#[must_use]
+pub const fn asked_noun(kind: TitleKind) -> &'static str {
+    match kind {
+        TitleKind::Music => "album and artist",
+        TitleKind::Books => "book, author and series",
+        TitleKind::Tv | TitleKind::Movies => kind.noun(),
     }
 }
 

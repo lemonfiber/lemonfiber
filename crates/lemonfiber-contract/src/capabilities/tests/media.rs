@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
     Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
     EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
@@ -103,8 +103,8 @@ impl Screening for Upstream {
 
 #[async_trait]
 impl Library for Upstream {
-    async fn has_item(&self, kind: Kind, term: &str) -> Result<bool, Failure> {
-        Ok(kind == Kind::Movies && term == "sintel")
+    async fn has_item(&self, kind: TitleKind, term: &str) -> Result<bool, Failure> {
+        Ok(matches!(kind, TitleKind::Movies | TitleKind::Music) && term == "sintel")
     }
     async fn rescan(&self) -> Result<(), Failure> {
         self.tell("rescan".to_owned());
@@ -345,7 +345,9 @@ async fn script<
         format!("{:?}", server.holdings(Some("a7f3"), 2).await),
         format!("{:?}", server.holdings(None, 1).await),
         format!("{:?}", server.playing(None).await),
-        format!("{:?}", server.has_item(Kind::Movies, "sintel").await),
+        format!("{:?}", server.has_item(TitleKind::Movies, "sintel").await),
+        format!("{:?}", server.has_item(TitleKind::Music, "sintel").await),
+        format!("{:?}", server.has_item(TitleKind::Books, "sintel").await),
         format!("{:?}", server.rescan().await),
         format!("{:?}", server.series_held(2).await),
         format!("{:?}", server.refresh("s0").await),

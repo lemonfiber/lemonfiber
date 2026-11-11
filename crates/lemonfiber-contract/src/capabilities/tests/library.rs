@@ -3,7 +3,7 @@
 //! alike: a failure is named after the service the core called, as the core names it.
 
 use async_trait::async_trait;
-use lemonfiber_ports::media::{Format, Kind};
+use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::stage::Stage;
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
@@ -146,10 +146,12 @@ impl Queues for Upstream {
 
 #[async_trait]
 impl QualityReleases for Upstream {
-    async fn probe_releases(&self, kind: Kind) -> Result<ReleaseProbe, Failure> {
+    async fn probe_releases(&self, kind: TitleKind) -> Result<ReleaseProbe, Failure> {
         Ok(match kind {
-            Kind::Tv => ReleaseProbe::Matching,
-            Kind::Movies => ReleaseProbe::NoneFound,
+            TitleKind::Tv => ReleaseProbe::Matching,
+            TitleKind::Movies => ReleaseProbe::NoneFound,
+            TitleKind::Music => ReleaseProbe::NoneMatch,
+            TitleKind::Books => ReleaseProbe::NothingWanted,
         })
     }
 }
@@ -164,34 +166,34 @@ impl MusicQuality for Upstream {
 
 #[async_trait]
 impl Pipeline for Upstream {
-    async fn library(&self, kind: Kind) -> Result<Vec<FoundItem>, Failure> {
+    async fn library(&self, kind: TitleKind) -> Result<Vec<FoundItem>, Failure> {
         self.tell(format!("library {kind:?}"));
         Ok(Vec::new())
     }
-    async fn find_items(&self, kind: Kind, term: &str) -> Result<Vec<FoundItem>, Failure> {
+    async fn find_items(&self, kind: TitleKind, term: &str) -> Result<Vec<FoundItem>, Failure> {
         self.tell(format!("find {kind:?} {term}"));
         Ok(Vec::new())
     }
-    async fn item_history(&self, kind: Kind, id: i64) -> Result<Vec<TraceEvent>, Failure> {
+    async fn item_history(&self, kind: TitleKind, id: i64) -> Result<Vec<TraceEvent>, Failure> {
         self.tell(format!("history {kind:?} {id}"));
         Ok(Vec::new())
     }
-    async fn item_queue(&self, kind: Kind, id: i64) -> Result<Vec<QueueItem>, Failure> {
+    async fn item_queue(&self, kind: TitleKind, id: i64) -> Result<Vec<QueueItem>, Failure> {
         self.tell(format!("queued {kind:?} {id}"));
         Ok(Vec::new())
     }
     async fn item_parts(
         &self,
-        kind: Kind,
+        kind: TitleKind,
         id: i64,
         season: Option<u32>,
     ) -> Result<Vec<ItemPart>, Failure> {
         self.tell(format!("parts {kind:?} {id} {season:?}"));
         Ok(Vec::new())
     }
-    async fn stuck_items(&self, kind: Kind) -> Result<Vec<StuckItem>, Failure> {
+    async fn stuck_items(&self, kind: TitleKind) -> Result<Vec<StuckItem>, Failure> {
         self.tell(format!("stuck {kind:?}"));
-        if kind == Kind::Movies {
+        if kind == TitleKind::Movies {
             return Err(Failure::Unavailable {
                 service: SERVICE.to_owned(),
             });
@@ -234,7 +236,7 @@ impl Fulfilling for Upstream {
         self.tell(format!("catalogued {kind:?} {reference}"));
         Ok((reference != 0).then(|| held(reference, None)))
     }
-    async fn titles(&self, kind: Kind) -> Result<Vec<CuratedTitle>, Failure> {
+    async fn titles(&self, kind: TitleKind) -> Result<Vec<CuratedTitle>, Failure> {
         self.tell(format!("titles {kind:?}"));
         Ok(vec![held(73244, Some(9))])
     }
@@ -246,7 +248,7 @@ impl Fulfilling for Upstream {
         self.tell(format!("request {kind:?} {}", json(request)));
         Ok(held(request.reference, Some(9)))
     }
-    async fn search(&self, kind: Kind, id: i64) -> Result<(), Failure> {
+    async fn search(&self, kind: TitleKind, id: i64) -> Result<(), Failure> {
         self.tell(format!("search {kind:?} {id}"));
         Ok(())
     }
@@ -257,7 +259,7 @@ impl Fulfilling for Upstream {
             detail: "it holds no title 0".to_owned(),
         })
     }
-    async fn unqueue(&self, kind: Kind, id: i64, blocklist: bool) -> Result<String, Failure> {
+    async fn unqueue(&self, kind: TitleKind, id: i64, blocklist: bool) -> Result<String, Failure> {
         self.tell(format!("unqueue {kind:?} {id} {blocklist}"));
         if id == 0 {
             return Err(Failure::Refused {
@@ -267,7 +269,7 @@ impl Fulfilling for Upstream {
         }
         Ok(FINGERPRINT.to_owned())
     }
-    async fn grab(&self, kind: Kind, id: i64, release: &str) -> Result<Grabbed, Failure> {
+    async fn grab(&self, kind: TitleKind, id: i64, release: &str) -> Result<Grabbed, Failure> {
         self.tell(format!("grab {kind:?} {id} {release}"));
         Ok(if release == FINGERPRINT {
             Grabbed::Grabbed
@@ -275,7 +277,7 @@ impl Fulfilling for Upstream {
             Grabbed::Gone
         })
     }
-    async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure> {
+    async fn downloading(&self, kind: TitleKind) -> Result<Vec<Downloading>, Failure> {
         self.tell(format!("downloading {kind:?}"));
         Ok(vec![Downloading {
             title_id: 9,
@@ -380,29 +382,58 @@ where
         format!("{:?}", curator.add(Kind::Movies, &entry, &plan).await),
         format!("{:?}", curator.indexer_count().await),
         format!("{:?}", curator.queue().await),
-        format!("{:?}", curator.probe_releases(Kind::Tv).await),
-        format!("{:?}", curator.probe_releases(Kind::Movies).await),
+        format!("{:?}", curator.probe_releases(TitleKind::Tv).await),
+        format!("{:?}", curator.probe_releases(TitleKind::Movies).await),
         format!("{:?}", curator.apply_music_format(Format::Lossless).await),
-        format!("{:?}", curator.library(Kind::Movies).await),
-        format!("{:?}", curator.find_items(Kind::Tv, "office").await),
-        format!("{:?}", curator.item_history(Kind::Tv, 12).await),
-        format!("{:?}", curator.item_queue(Kind::Movies, 13).await),
-        format!("{:?}", curator.item_parts(Kind::Tv, 14, Some(2)).await),
-        format!("{:?}", curator.item_parts(Kind::Tv, 14, None).await),
-        format!("{:?}", curator.stuck_items(Kind::Movies).await),
+        format!("{:?}", curator.library(TitleKind::Movies).await),
+        format!("{:?}", curator.find_items(TitleKind::Tv, "office").await),
+        format!("{:?}", curator.item_history(TitleKind::Tv, 12).await),
+        format!("{:?}", curator.item_queue(TitleKind::Movies, 13).await),
+        format!("{:?}", curator.item_parts(TitleKind::Tv, 14, Some(2)).await),
+        format!("{:?}", curator.item_parts(TitleKind::Tv, 14, None).await),
+        format!("{:?}", curator.stuck_items(TitleKind::Movies).await),
         format!("{:?}", curator.catalogued(Kind::Tv, 73244).await),
         format!("{:?}", curator.catalogued(Kind::Movies, 0).await),
-        format!("{:?}", curator.titles(Kind::Tv).await),
+        format!("{:?}", curator.titles(TitleKind::Tv).await),
         format!("{:?}", curator.held_title(Kind::Movies, 3).await),
         format!("{:?}", curator.request(Kind::Tv, &request).await),
-        format!("{:?}", curator.search(Kind::Tv, 9).await),
+        format!("{:?}", curator.search(TitleKind::Tv, 9).await),
         format!("{:?}", curator.remove(Kind::Movies, 0).await),
-        format!("{:?}", curator.downloading(Kind::Tv).await),
-        format!("{:?}", curator.stuck_items(Kind::Tv).await),
-        format!("{:?}", curator.unqueue(Kind::Tv, 41, true).await),
-        format!("{:?}", curator.unqueue(Kind::Movies, 0, false).await),
-        format!("{:?}", curator.grab(Kind::Tv, 9, FINGERPRINT).await),
-        format!("{:?}", curator.grab(Kind::Movies, 7, "elsewhere").await),
+        format!("{:?}", curator.downloading(TitleKind::Tv).await),
+        format!("{:?}", curator.stuck_items(TitleKind::Tv).await),
+    ]
+    .into_iter()
+    .chain(albums_and_books(curator).await)
+    .collect()
+}
+
+/// Dropping and grabbing again, then each operation taking music and books asked of one of
+/// them, each answer written down.
+async fn albums_and_books<C: QualityReleases + Pipeline + Fulfilling>(curator: &C) -> Vec<String> {
+    vec![
+        format!("{:?}", curator.unqueue(TitleKind::Tv, 41, true).await),
+        format!("{:?}", curator.unqueue(TitleKind::Movies, 0, false).await),
+        format!("{:?}", curator.grab(TitleKind::Tv, 9, FINGERPRINT).await),
+        format!(
+            "{:?}",
+            curator.grab(TitleKind::Movies, 7, "elsewhere").await
+        ),
+        format!("{:?}", curator.probe_releases(TitleKind::Music).await),
+        format!("{:?}", curator.probe_releases(TitleKind::Books).await),
+        format!("{:?}", curator.library(TitleKind::Music).await),
+        format!("{:?}", curator.find_items(TitleKind::Books, "dune").await),
+        format!("{:?}", curator.item_history(TitleKind::Music, 21).await),
+        format!("{:?}", curator.item_queue(TitleKind::Books, 22).await),
+        format!("{:?}", curator.item_parts(TitleKind::Music, 21, None).await),
+        format!("{:?}", curator.stuck_items(TitleKind::Books).await),
+        format!("{:?}", curator.titles(TitleKind::Music).await),
+        format!("{:?}", curator.search(TitleKind::Books, 22).await),
+        format!("{:?}", curator.downloading(TitleKind::Music).await),
+        format!("{:?}", curator.unqueue(TitleKind::Books, 42, true).await),
+        format!(
+            "{:?}",
+            curator.grab(TitleKind::Music, 21, FINGERPRINT).await
+        ),
     ]
 }
 
@@ -444,6 +475,17 @@ async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process(
             "unqueue",
             "unqueue",
             "grab",
+            "grab",
+            "library",
+            "find",
+            "history",
+            "queued",
+            "parts",
+            "stuck",
+            "titles",
+            "search",
+            "downloading",
+            "unqueue",
             "grab"
         ]
     );

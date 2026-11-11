@@ -606,7 +606,7 @@ fn a_dropped_stuck_download_is_said_to_be_grabbed_again_by_its_title() {
     let undos = vec![Undo {
         target: "sonarr".to_owned(),
         action: Action::Regrab {
-            kind: lemonfiber_core::ports::media::Kind::Tv,
+            kind: lemonfiber_core::ports::media::TitleKind::Tv,
             title: 9,
             release: "9f86d081".to_owned(),
         },

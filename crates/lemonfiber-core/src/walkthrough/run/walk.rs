@@ -8,6 +8,7 @@
 use crate::app::targets::OpenCurator;
 use crate::app::Ctx;
 use crate::model::WalkthroughReport;
+use crate::ports::media::Kind;
 use crate::walkthrough::{
     Handover, Line, Link, Narrator, Reason, Shape, State, Step, Stopped, Suggestion,
 };
@@ -120,7 +121,7 @@ impl<'a> Walk<'a> {
     pub(super) fn already_here(
         &mut self,
         item: &str,
-        curators: &[OpenCurator],
+        curators: &[OpenCurator<Kind>],
     ) -> WalkthroughReport {
         let mut report = self.ending(
             Shape::Pipeline,

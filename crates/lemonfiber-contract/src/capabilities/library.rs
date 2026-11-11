@@ -6,7 +6,7 @@
 //! and how a household's request reaches it. Every kind of media is named by what it is,
 //! never by the service that files it.
 
-use lemonfiber_ports::media::{Format, Kind, BOOKS, MUSIC};
+use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
     Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed,
@@ -43,12 +43,20 @@ const ASKED_BY: &str = "mode";
 /// of the download filler the bundle ships, as the core names the clients it registers.
 const CLIENT_PROTOCOL: &str = "sabnzbd";
 
-/// Every operation that takes a `Kind`, each asked once for each kind.
-const BY_KIND: [&str; 20] = [
+/// Every operation that takes a `Kind`, each asked once for each kind of video.
+const BY_KIND: [&str; 8] = [
     "search_upgrades",
     "lookup",
     "add_plan",
     "add",
+    "catalogued",
+    "held_title",
+    "request",
+    "remove",
+];
+
+/// Every operation that takes a `TitleKind`, each asked once for each kind.
+const BY_TITLE_KIND: [&str; 12] = [
     "probe_releases",
     "library",
     "find_items",
@@ -56,16 +64,15 @@ const BY_KIND: [&str; 20] = [
     "item_queue",
     "item_parts",
     "stuck_items",
-    "catalogued",
     "titles",
-    "held_title",
-    "request",
     "search",
-    "remove",
     "downloading",
     "unqueue",
     "grab",
 ];
+
+/// The minor at which every operation of [`BY_TITLE_KIND`] takes music and books.
+const ALBUMS_AND_BOOKS: u32 = 3;
 
 /// The operations the request gate asks a curator under its request key, and no other.
 pub const REQUESTED: [&str; 10] = [
@@ -269,7 +276,7 @@ crate::contract! {
         }
         impl QualityReleases {
             /// What it would grab for one wanted item of one kind.
-            fn probe_releases(value kind: Kind) -> ReleaseProbe where asks = Asked { kind: Kind::Tv };
+            fn probe_releases(value kind: TitleKind) -> ReleaseProbe where asks = Asked { kind: TitleKind::Tv };
         }
         impl MusicQuality {
             /// Apply a music format.
@@ -277,23 +284,23 @@ crate::contract! {
         }
         impl Pipeline {
             /// Everything it holds of one kind.
-            fn library(value kind: Kind) -> Vec<FoundItem> where asks = Asked { kind: Kind::Tv };
+            fn library(value kind: TitleKind) -> Vec<FoundItem> where asks = Asked { kind: TitleKind::Tv };
             /// What it holds of one kind for a term.
-            fn find_items(value kind: Kind, str term: &str) -> Vec<FoundItem> where asks = Asked { kind: Kind::Tv, term: NAMED.to_owned() };
+            fn find_items(value kind: TitleKind, str term: &str) -> Vec<FoundItem> where asks = Asked { kind: TitleKind::Tv, term: NAMED.to_owned() };
             /// What happened to one item.
-            fn item_history(value kind: Kind, value id: i64) -> Vec<TraceEvent> where asks = Asked { kind: Kind::Tv, id: NO_ITEM };
+            fn item_history(value kind: TitleKind, value id: i64) -> Vec<TraceEvent> where asks = Asked { kind: TitleKind::Tv, id: NO_ITEM };
             /// What of one item is queued.
-            fn item_queue(value kind: Kind, value id: i64) -> Vec<QueueItem> where asks = Asked { kind: Kind::Tv, id: NO_ITEM };
+            fn item_queue(value kind: TitleKind, value id: i64) -> Vec<QueueItem> where asks = Asked { kind: TitleKind::Tv, id: NO_ITEM };
             /// The parts of one item, in one season where it has seasons.
-            fn item_parts(value kind: Kind, value id: i64, value season: Option<u32>) -> Vec<ItemPart> where asks = Asked { kind: Kind::Tv, id: NO_ITEM, season: None };
+            fn item_parts(value kind: TitleKind, value id: i64, value season: Option<u32>) -> Vec<ItemPart> where asks = Asked { kind: TitleKind::Tv, id: NO_ITEM, season: None };
             /// What of one kind is stuck.
-            fn stuck_items(value kind: Kind) -> Vec<StuckItem> where asks = Asked { kind: Kind::Tv };
+            fn stuck_items(value kind: TitleKind) -> Vec<StuckItem> where asks = Asked { kind: TitleKind::Tv };
         }
         impl Fulfilling {
             /// The title of one kind its catalogue holds by a reference, or none.
             fn catalogued(value kind: Kind, value reference: i64) -> Option<CuratedTitle> where since = 1, asks = Asked { kind: Kind::Tv, reference: NO_ITEM };
             /// Every title of one kind it holds.
-            fn titles(value kind: Kind) -> Vec<CuratedTitle> where since = 1, asks = Asked { kind: Kind::Tv };
+            fn titles(value kind: TitleKind) -> Vec<CuratedTitle> where since = 1, asks = Asked { kind: TitleKind::Tv };
             /// One title of one kind it holds, or none.
             fn held_title(value kind: Kind, value id: i64) -> Option<CuratedTitle> where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
             /// Take a household's request for one title.
@@ -310,15 +317,15 @@ crate::contract! {
                 },
             };
             /// Search for what it wants of one title it holds.
-            fn search(value kind: Kind, value id: i64) -> () where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
+            fn search(value kind: TitleKind, value id: i64) -> () where since = 1, asks = Asked { kind: TitleKind::Tv, id: NO_ITEM };
             /// Remove one title it holds, with its files.
             fn remove(value kind: Kind, value id: i64) -> () where since = 1, asks = Asked { kind: Kind::Tv, id: NO_ITEM };
             /// What it is downloading of one kind.
-            fn downloading(value kind: Kind) -> Vec<Downloading> where since = 1, asks = Asked { kind: Kind::Tv };
+            fn downloading(value kind: TitleKind) -> Vec<Downloading> where since = 1, asks = Asked { kind: TitleKind::Tv };
             /// Drop one queue entry from its download client, blocklisting its release where asked.
-            fn unqueue(value kind: Kind, value id: i64, value blocklist: bool) -> String where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, blocklist: true };
+            fn unqueue(value kind: TitleKind, value id: i64, value blocklist: bool) -> String where since = 2, asks = Asked { kind: TitleKind::Tv, id: NO_ITEM, blocklist: true };
             /// Grab a release again by its fingerprint, lifting its blocklist entry.
-            fn grab(value kind: Kind, value id: i64, str release: &str) -> Grabbed where since = 2, asks = Asked { kind: Kind::Tv, id: NO_ITEM, release: FINGERPRINT.to_owned() };
+            fn grab(value kind: TitleKind, value id: i64, str release: &str) -> Grabbed where since = 2, asks = Asked { kind: TitleKind::Tv, id: NO_ITEM, release: FINGERPRINT.to_owned() };
         }
         impl Recounting {
             /// Send each happening to the core's address, pinning the certificate it presents
@@ -341,15 +348,19 @@ pub fn capability() -> crate::Capability {
 
 /// What the case of `operation`, which otherwise posts `asks`, posts for each media type
 /// it is bound to; nothing where it is bound to none.
-fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
-    let each = |pointer: &str, by: Vec<(&'static str, Value)>| {
+fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
+    let each = |pointer: &str, by: Vec<(&'static str, Value, u32)>| {
         by.into_iter()
-            .map(|(media_type, value)| {
+            .map(|(media_type, value, since)| {
                 let mut asked = asks.clone();
                 if let Some(at) = asked.pointer_mut(pointer) {
                     *at = value;
                 }
-                (media_type, asked)
+                crate::MediaCase {
+                    media_type,
+                    asks: asked,
+                    since,
+                }
             })
             .collect()
     };
@@ -358,7 +369,23 @@ fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
             "/kind",
             Kind::ALL
                 .iter()
-                .map(|kind| (kind.media_type(), wire(kind)))
+                .map(|kind| (kind.media_type(), wire(kind), 0))
+                .collect(),
+        );
+    }
+    if BY_TITLE_KIND.contains(&operation) {
+        return each(
+            "/kind",
+            TitleKind::ALL
+                .iter()
+                .map(|kind| {
+                    let since = if kind.video().is_some() {
+                        0
+                    } else {
+                        ALBUMS_AND_BOOKS
+                    };
+                    (kind.media_type(), wire(kind), since)
+                })
                 .collect(),
         );
     }
@@ -367,22 +394,20 @@ fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
             "/sort",
             Record::FOLLOWED
                 .iter()
-                .map(|(media_type, sort)| (*media_type, wire(sort)))
+                .map(|(media_type, sort)| (*media_type, wire(sort), 0))
                 .collect(),
         );
     }
     if operation == BY_FOLDER {
         return each(
             "/folder/media_type",
-            [
-                Kind::Tv.media_type(),
-                Kind::Movies.media_type(),
-                MUSIC,
-                BOOKS,
-            ]
-            .into_iter()
-            .map(|media_type| (media_type, Value::String(media_type.to_owned())))
-            .collect(),
+            TitleKind::ALL
+                .into_iter()
+                .map(|kind| {
+                    let media_type = kind.media_type();
+                    (media_type, Value::String(media_type.to_owned()), 0)
+                })
+                .collect(),
         );
     }
     Vec::new()

@@ -277,8 +277,9 @@ fn only_an_operation_saying_when_it_is_in_force_publishes_a_reset() {
     );
 }
 
-/// Every operation publishes the minor it was added at, with its operation and with each
-/// of its cases, and the operations added after their major are exactly these.
+/// Every operation publishes the minor it was added at, each of its cases the later of that
+/// and the minor its media type was added at, and the operations added after their major
+/// are exactly these.
 #[test]
 fn every_operation_publishes_the_minor_it_was_added_at() {
     let mut added = Vec::new();
@@ -309,11 +310,19 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
         assert!(!cases.is_empty(), "{}", capability.name);
         for case in cases {
             let operation = case.get("operation").and_then(serde_json::Value::as_str);
+            let media_type = case.get("media_type").and_then(serde_json::Value::as_str);
             let since = capability
                 .operations
                 .iter()
                 .find(|one| Some(one.name) == operation)
-                .map(|one| u64::from(one.since));
+                .map(|one| {
+                    let filed = one
+                        .filed
+                        .iter()
+                        .find(|filed| Some(filed.media_type) == media_type)
+                        .map_or(0, |filed| filed.since);
+                    u64::from(one.since.max(filed))
+                });
             assert_eq!(case.get("since").and_then(serde_json::Value::as_u64), since);
         }
     }

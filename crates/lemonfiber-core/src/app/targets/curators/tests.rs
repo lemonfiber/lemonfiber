@@ -75,7 +75,7 @@ async fn a_moved_curator_is_listed_whether_or_not_its_adapter_can_be_asked() {
     );
     assert_eq!(
         reached.map(|target| (target.kind, target.asked.is_some())),
-        Some((Some(crate::ports::media::Kind::Tv), true))
+        Some((Some(crate::ports::media::TitleKind::Tv), true))
     );
     assert!(
         curator_targets(&asked_ctx, &alone(service("theirs", Some(8989))))

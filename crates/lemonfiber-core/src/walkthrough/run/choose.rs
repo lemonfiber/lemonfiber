@@ -22,7 +22,7 @@ use crate::walkthrough::{Line, Reason, Step, Suggestion};
 /// be tested either.
 pub(super) struct Chosen<'a> {
     /// The service that will hold it, already open.
-    pub curator: &'a OpenCurator,
+    pub curator: &'a OpenCurator<Kind>,
     /// The catalogue entry to ask for.
     pub entry: CatalogueEntry,
     /// What to call it in every line from here on.
@@ -53,7 +53,7 @@ pub(super) enum NotChosen {
 /// could handle.
 pub(super) async fn choose<'a>(
     walk: &mut Walk<'_>,
-    curators: &'a [OpenCurator],
+    curators: &'a [OpenCurator<Kind>],
     term: Option<&str>,
 ) -> Result<Chosen<'a>, NotChosen> {
     // Every service is asked, not only the likely one: the operator typed a title, not a

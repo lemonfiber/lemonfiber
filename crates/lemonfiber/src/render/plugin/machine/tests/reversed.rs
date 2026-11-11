@@ -551,7 +551,7 @@ fn a_device_key_put_back_is_said_by_its_name() {
     );
     assert_eq!(
         undone(Action::Regrab {
-            kind: lemonfiber_core::ports::media::Kind::Tv,
+            kind: lemonfiber_core::ports::media::TitleKind::Tv,
             title: 9,
             release: "9f86d081".to_owned(),
         }),
