@@ -6,10 +6,10 @@ use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
     Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
-    EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
-    Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, OutsideAccount,
-    OutsideServer, Picture, Playback, Ports, Presentation, Question, Recounting, Screening,
-    SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
+    EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Heard, Hearing, Held, Holds,
+    HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming,
+    OutsideAccount, OutsideServer, Picture, Playback, Ports, Presentation, Question, Recounting,
+    Screening, SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -276,14 +276,19 @@ impl Recounting for Upstream {
         address: Option<&str>,
         pin: Option<&str>,
         key: Option<&str>,
-    ) -> Result<(), Failure> {
+        every: Option<u32>,
+    ) -> Result<Option<Heard>, Failure> {
         self.tell(format!(
-            "events {} {} {}",
+            "events {} {} {} {}",
             address.unwrap_or("nowhere"),
             pin.unwrap_or("unpinned"),
-            key.map_or("none", |_| "keyed")
+            key.map_or("none", |_| "keyed"),
+            every.unwrap_or_default()
         ));
-        Ok(())
+        Ok(address.map(|_| Heard {
+            hearing: Hearing::Poll,
+            every,
+        }))
     }
 }
 

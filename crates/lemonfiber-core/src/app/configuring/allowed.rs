@@ -36,7 +36,8 @@ pub(super) async fn refusal(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -
         PUID_KEY | PGID_KEY => identity(key, value),
         BESIDE_KEY => beside(value),
         _ => crate::config::resending::refusal(key, value)
-            .or_else(|| crate::config::healing::refusal(key, value)),
+            .or_else(|| crate::config::healing::refusal(key, value))
+            .or_else(|| crate::config::polling::refusal(key, value)),
     }
 }
 

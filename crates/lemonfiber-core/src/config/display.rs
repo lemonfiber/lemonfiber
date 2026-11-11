@@ -193,6 +193,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          services that were never asked to tell it",
     ),
     (
+        super::EVENTS_POLL_KEY,
+        "how many seconds apart a service that cannot tell the core what happened as it \
+         happens is looked at for it",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

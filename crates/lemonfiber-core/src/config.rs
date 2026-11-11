@@ -17,6 +17,7 @@ pub mod healing;
 pub(crate) mod held;
 mod keys;
 pub mod paths;
+pub mod polling;
 pub mod reaching;
 mod reading;
 pub(crate) mod renamed;
@@ -53,6 +54,7 @@ pub use healing::{
     Healing, QUEUE_EVERY_MINUTES_KEY, QUEUE_GRACE_MINUTES_KEY, QUEUE_SLOW_DAYS_KEY,
     QUEUE_STRIKES_KEY,
 };
+pub use polling::{events_poll_from_env, EVENTS_POLL_KEY};
 pub use resending::{Resending, IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY};
 
 pub use reaching::{

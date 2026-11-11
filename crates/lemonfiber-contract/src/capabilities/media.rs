@@ -12,13 +12,13 @@
 use lemonfiber_ports::media::{TitleKind, MEDIA};
 use lemonfiber_ports::service::{
     AppKeys, Applied, Astray, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
-    Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
+    Furnishing, Heard, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
     OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Upkeep, PICTURE_MOST,
     SERIES_MOST,
 };
 use serde_json::Value;
 
-use super::{FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_PINNED, TOLD_WITH};
+use super::{FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_EVERY, TOLD_PINNED, TOLD_WITH};
 use crate::conformance::Placeholder;
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
@@ -173,8 +173,9 @@ crate::contract! {
         }
         impl Recounting {
             /// Send each happening to the core's address, pinning the certificate it presents
-            /// there, with the key the core minted for it.
-            fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()) };
+            /// there, with the key the core minted for it, polling every so many seconds where
+            /// it polls; answers how it hears, or nothing where it stopped.
+            fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>, value every: Option<u32>) -> Option<Heard> where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()), every: Some(TOLD_EVERY) };
         }
     }
 }
