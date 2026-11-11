@@ -377,9 +377,11 @@ pub fn run(
     );
     assert!(
         waited(GRAB_WITHIN, || {
-            core.run(&["queue"], "").printed.contains(asked.release)
+            core.run(&["queue", "heal"], "")
+                .printed
+                .contains(asked.release)
         }),
-        "the queue never listed {}",
+        "no pass over the queue listed {}",
         asked.release
     );
 
