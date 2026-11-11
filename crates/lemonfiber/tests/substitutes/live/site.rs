@@ -35,6 +35,13 @@ pub struct Site {
     served: Arc<Mutex<Vec<String>>>,
 }
 
+/// The release's size in bytes.
+const SIZE: u64 = 1_073_741_824;
+
+/// The size of one article of it, as a Usenet poster splits a file; a download client
+/// refuses an article far larger as malformed.
+const ARTICLE: u64 = 768_000;
+
 /// The id the site names its release by.
 const ID: &str = "lemonfiber-arm-release";
 
@@ -145,7 +152,6 @@ fn caps() -> String {
 
 /// The one release, as every search made of the site at `host` finds it.
 fn found(release: &Release, host: &str) -> String {
-    let size = 1_073_741_824_u64;
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\" \
          xmlns:newznab=\"http://www.newznab.com/DTD/2010/feeds/attributes/\"><channel>\
@@ -156,16 +162,26 @@ fn found(release: &Release, host: &str) -> String {
          <newznab:attr name=\"size\" value=\"{size}\"/></item></channel></rss>",
         title = release.title,
         category = release.category,
+        size = SIZE,
     )
 }
 
-/// The release's NZB: one file of one segment.
+/// The release's NZB: one file, in articles of [`ARTICLE`] bytes that add up to [`SIZE`].
 fn nzb(release: &Release) -> String {
+    let articles = SIZE.div_ceil(ARTICLE);
+    let segments = (1..=articles).fold(String::new(), |mut held, number| {
+        let bytes = ARTICLE.min(SIZE - (number - 1) * ARTICLE);
+        let _ = write!(
+            held,
+            "<segment bytes=\"{bytes}\" number=\"{number}\">{ID}-{number}@lemonfiber.invalid</segment>"
+        );
+        held
+    });
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\
-         <file poster=\"arm@lemonfiber.invalid\" date=\"1793491200\" subject=\"{title} &quot;{title}.mkv&quot; yEnc (1/1)\">\
+         <file poster=\"arm@lemonfiber.invalid\" date=\"1793491200\" subject=\"{title} &quot;{title}.mkv&quot; yEnc (1/{articles})\">\
          <groups><group>alt.binaries.lemonfiber</group></groups>\
-         <segments><segment bytes=\"1073741824\" number=\"1\">{ID}@lemonfiber.invalid</segment></segments>\
+         <segments>{segments}</segments>\
          </file></nzb>",
         title = release.title,
     )
