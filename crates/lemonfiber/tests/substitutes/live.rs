@@ -71,6 +71,31 @@ const GRABBED: [&str; 6] = [
 /// How often a wait looks again.
 const LOOKING: Duration = Duration::from_secs(15);
 
+/// The size of a film's or a series' release, which its curator takes.
+const VIDEO: u64 = 1_073_741_824;
+
+/// The size of an album's release, which its curator takes.
+const ALBUM: u64 = 314_572_800;
+
+/// The size of a book's release, which its curator takes.
+const BOOK: u64 = 2_097_152;
+
+/// The title a member asks for.
+#[derive(Debug, Clone, Copy)]
+pub enum Title {
+    /// By the request service's catalogue id, where a request service holds the ask.
+    Catalogued(&'static str),
+    /// As the member finds it through the curator's lookup, where the core holds the ask.
+    Found {
+        /// The unit asked for.
+        unit: &'static str,
+        /// The words searched for.
+        term: &'static str,
+        /// What the candidate asked for is called.
+        named: &'static str,
+    },
+}
+
 /// What an arm's household asks for, by the media its curator files.
 #[derive(Debug, Clone, Copy)]
 pub struct Asked {
@@ -80,8 +105,8 @@ pub struct Asked {
     pub forms: &'static [&'static str],
     /// The kind `household ask` is given.
     pub kind: &'static str,
-    /// The title, by the request service's catalogue id.
-    pub id: &'static str,
+    /// The title.
+    pub title: Title,
     /// The seasons asked for, for a series.
     pub seasons: &'static [&'static str],
     /// What the operator calls it, which a trace follows it by.
@@ -90,29 +115,61 @@ pub struct Asked {
     pub release: &'static str,
     /// The Newznab category the release is filed under.
     pub category: &'static str,
+    /// The release's size in bytes.
+    pub size: u64,
 }
 
 /// What each media type's household asks for.
-pub const ASKED: [Asked; 2] = [
+pub const ASKED: [Asked; 4] = [
     Asked {
         media: "movies",
         forms: &["movies", "library"],
         kind: "movies",
-        id: "10378",
+        title: Title::Catalogued("10378"),
         seasons: &[],
         traced: "Big Buck Bunny",
         release: "Big.Buck.Bunny.2008.1080p.BluRay.x264-LEMONFIBER",
         category: "2000",
+        size: VIDEO,
     },
     Asked {
         media: "tv",
         forms: &["tv", "library"],
         kind: "tv",
-        id: "1399",
+        title: Title::Catalogued("1399"),
         seasons: &["1"],
         traced: "Game of Thrones",
         release: "Game.of.Thrones.S01.1080p.BluRay.x264-LEMONFIBER",
         category: "5000",
+        size: VIDEO,
+    },
+    Asked {
+        media: "music",
+        forms: &["music", "library"],
+        kind: "music",
+        title: Title::Found {
+            unit: "album",
+            term: "Nine Inch Nails The Slip",
+            named: "The Slip",
+        },
+        seasons: &[],
+        release: "Nine Inch Nails - The Slip (2008) [FLAC]",
+        category: "3000",
+        size: ALBUM,
+    },
+    Asked {
+        media: "books",
+        forms: &["books", "library"],
+        kind: "books",
+        title: Title::Found {
+            unit: "book",
+            term: "Pride and Prejudice Jane Austen",
+            named: "Pride and Prejudice",
+        },
+        seasons: &[],
+        release: "Jane Austen - Pride and Prejudice (1813) [EPUB]",
+        category: "7000",
+        size: BOOK,
     },
 ];
 
@@ -320,6 +377,7 @@ pub fn run(
     let site = Site::serving(Release {
         title: asked.release.to_owned(),
         category: asked.category,
+        size: asked.size,
     });
     let core = Core::beneath(root);
     let media = root.join("media");
