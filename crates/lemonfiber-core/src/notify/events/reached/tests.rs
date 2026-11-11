@@ -136,3 +136,17 @@ fn with_nowhere_to_keep_a_certificate_no_service_is_told_anywhere() {
 
     assert!(address(&ctx).is_err_and(|why| why.contains("configuration directory")));
 }
+
+#[test]
+fn a_certificate_kept_without_its_key_tells_no_service_and_says_why() {
+    let ctx = machine(
+        "half-kept",
+        Environment::LinuxNative,
+        Some("https://192.168.1.20:8471"),
+    );
+    if let Some(dir) = ctx.settings.companion.as_deref() {
+        let _ = std::fs::write(dir.join(crate::certificate::own().certificate), "half");
+    }
+
+    assert!(address(&ctx).is_err_and(|why| why.contains("certificate the web interface")));
+}

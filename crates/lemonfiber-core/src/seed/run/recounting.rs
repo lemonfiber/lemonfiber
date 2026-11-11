@@ -46,7 +46,7 @@ pub(super) async fn seed_events(
     for (speaker, capability, major) in speakers {
         let part = fillers.fronted_by(speaker).unwrap_or(speaker);
         let state = match (&told, ctx.dry_run) {
-            (Err(why), _) => State::Skipped {
+            (Err(why), _) => State::Unmatched {
                 reason: why.clone(),
             },
             (Ok(told), true) => State::WouldWire {

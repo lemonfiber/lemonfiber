@@ -56,7 +56,7 @@ async fn with_no_address_known_no_service_is_asked_and_each_says_why() {
     .await;
 
     assert!(
-        matches!(states(&wirings).as_slice(), [crate::seed::State::Skipped { reason }] if reason.contains("no address")),
+        matches!(states(&wirings).as_slice(), [crate::seed::State::Unmatched { reason }] if reason.contains("no address")),
         "{wirings:?}"
     );
     assert!(!http.asked_for(EVENTS));
