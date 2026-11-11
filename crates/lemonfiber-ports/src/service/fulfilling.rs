@@ -13,7 +13,8 @@ use crate::media::{Kind, TitleKind};
 )]
 #[serde(deny_unknown_fields)]
 pub struct CuratedTitle {
-    /// Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film.
+    /// Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film, and
+    /// 0 for an album or a book.
     pub reference: i64,
     /// The curator's own id for it, where it holds it.
     pub id: Option<i64>,

@@ -119,19 +119,19 @@
     },
     {
       "path": "library.curate/v1/operations/catalogued.json",
-      "sha256": "eb0c0894b38316a96a6613289fdcd3fa61e1c522849f20346378d43afc3ab8d4"
+      "sha256": "633eb0373f457e1d8db78b7df3cd90e16343a5ad6b4f8df11c863f9e8baeb342"
     },
     {
       "path": "library.curate/v1/operations/titles.json",
-      "sha256": "0d189d4d67211824ad1f42c29e674294ca3b0c4f5720fbd939cd76da7f4a54c6"
+      "sha256": "2426b2f1f70eba0ccf87cc38b71acfa031c2a0279398bb2a4a396c76e95b00e4"
     },
     {
       "path": "library.curate/v1/operations/held_title.json",
-      "sha256": "b18ae4fab9eb0745dff2df1cc8c8c8821ee4c125f4d1f9b5c275e36d9148b99f"
+      "sha256": "c320a48fb1908d24a6078b1b816aca7c183b4ca7d0437774666d26c18315f6b5"
     },
     {
       "path": "library.curate/v1/operations/request.json",
-      "sha256": "4bc86bd56e491aa898f9463fe8c7a39dd069796a2d6450115d8326d7a0ca66a3"
+      "sha256": "c00c56a630c3aa396059296ec609823e1fde99f81d861fc5f8b2b48655276894"
     },
     {
       "path": "library.curate/v1/operations/search.json",

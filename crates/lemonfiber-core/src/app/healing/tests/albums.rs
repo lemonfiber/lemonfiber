@@ -106,3 +106,19 @@ async fn an_album_wedged_on_enough_passes_is_named_dropped_searched_again_and_jo
         }]
     );
 }
+
+#[tokio::test]
+async fn a_curator_whose_adapter_is_not_running_is_left_out_of_the_pass() {
+    let http = album_wedged();
+    let mut ctx = ctx("healing-album-alone", &ACTING, &http);
+    ctx.seams.engine = Arc::new(curators::running(&[MUSIC]));
+
+    let (read, _) = healed(&ctx).await;
+
+    assert!(
+        read.items.iter().all(|item| item.service == MUSIC.plugin),
+        "{read:?}"
+    );
+    assert!(!read.items.is_empty(), "{read:?}");
+    assert!(told::<Media>(&http.requests(), TELEVISION, "downloading", "kind").is_empty());
+}

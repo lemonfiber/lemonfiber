@@ -336,19 +336,39 @@ pub enum Outcome {
     Removed,
 }
 
+/// The vocabulary a curator's history names its events in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum History {
+    /// Sonarr's, Radarr's and Lidarr's.
+    Servarr,
+    /// Bindery's.
+    Bindery,
+}
+
 impl Outcome {
-    /// The outcome an \*arr history event denotes, or `None` for an event that is not a
-    /// notable step in the item's history. Named as the television and film services each
-    /// serialise their history event types.
+    /// The outcome a history event named `event_type` in `history`'s vocabulary denotes, or
+    /// `None` for an event that is not a notable step in the item's history.
+    ///
+    /// A track imported alone is no album imported, an import still being retried is no
+    /// failed download, and Bindery's `downloadFolderImported` hands a download on rather
+    /// than importing it, so none of them denotes anything.
     #[must_use]
-    pub fn of_event(event_type: &str) -> Option<Self> {
-        match event_type {
-            "grabbed" => Some(Self::Grabbed),
-            "downloadFailed" => Some(Self::DownloadFailed),
-            "downloadFolderImported" | "seriesFolderImported" | "movieFolderImported" => {
-                Some(Self::Imported)
+    pub fn of_event(history: History, event_type: &str) -> Option<Self> {
+        match (history, event_type) {
+            (_, "grabbed") => Some(Self::Grabbed),
+            (_, "downloadFailed") | (History::Bindery, "downloadStalled") => {
+                Some(Self::DownloadFailed)
             }
-            "episodeFileDeleted" | "movieFileDeleted" => Some(Self::Removed),
+            (
+                History::Servarr,
+                "downloadFolderImported"
+                | "seriesFolderImported"
+                | "movieFolderImported"
+                | "downloadImported",
+            )
+            | (History::Bindery, "bookImported") => Some(Self::Imported),
+            (History::Servarr, "episodeFileDeleted" | "movieFileDeleted" | "trackFileDeleted")
+            | (History::Bindery, "bookFileDeleted") => Some(Self::Removed),
             _ => None,
         }
     }

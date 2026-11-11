@@ -10,9 +10,9 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::super::context::a_context;
 use super::{
-    add_aggregator, added, aggregators, asking, clients_registered, curating, download_clients,
-    folders_registered, keyed, moved, pulling, reaching, reading_from, root_folders, running,
-    taken, ADAPTER, PLUGIN,
+    add_aggregator, added, aggregators, asking, clients_registered, curating, curating_here,
+    download_clients, folders_registered, keyed, moved, pulling, reaching, reading_from,
+    root_folders, running, taken, ADAPTER, PLUGIN,
 };
 
 #[test]
@@ -43,6 +43,10 @@ fn each_operation_is_asked_on_its_contracts_path() {
     assert_eq!(
         curating("root_folders"),
         "/lemonfiber/library.curate/v1/root_folders"
+    );
+    assert_eq!(
+        curating_here("find_items"),
+        "127.0.0.1:8080/lemonfiber/library.curate/v1/find_items"
     );
 }
 
