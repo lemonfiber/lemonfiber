@@ -6,6 +6,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use lemonfiber_sdk::contract::actions::Ask;
+use lemonfiber_sdk::contract::reads;
 use lemonfiber_sdk::{Address, Client, Credential};
 
 use super::core::{strings_under, Core};
@@ -97,12 +98,6 @@ pub fn asked(
         .iter()
         .map(|season| season.parse::<u32>().map_err(|why| why.to_string()))
         .collect::<Result<Vec<_>, _>>()?;
-    let ask = Ask {
-        id: Some(asked.id.to_owned()),
-        kind: Some(asked.kind.to_owned()),
-        seasons: (!seasons.is_empty()).then_some(seasons),
-        ..Ask::default()
-    };
     let address = Address::new(&format!("http://127.0.0.1:{}", served.port), None)
         .map_err(|why| why.to_string())?;
     let client = Client::new(
@@ -110,11 +105,59 @@ pub fn asked(
         Credential::new(secret).map_err(|why| why.to_string())?,
     )
     .map_err(|why| why.to_string())?;
-    tokio::runtime::Builder::new_current_thread()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|why| why.to_string())?
+        .map_err(|why| why.to_string())?;
+    let (id, unit) = match asked.title {
+        super::Title::Catalogued(id) => (id.to_owned(), None),
+        super::Title::Found { unit, term, named } => (
+            runtime.block_on(found(&client, member, asked.kind, unit, term, named))?,
+            Some(unit.to_owned()),
+        ),
+    };
+    let ask = Ask {
+        id: Some(id),
+        kind: Some(asked.kind.to_owned()),
+        seasons: (!seasons.is_empty()).then_some(seasons),
+        unit,
+        ..Ask::default()
+    };
+    runtime
         .block_on(client.act(&ask))
         .map(|acted| println!("asked: {acted:?}"))
         .map_err(|why| format!("{why:?}"))
+}
+
+/// The id of the candidate called `named` that `member`'s search for `term`, as a `unit`
+/// of `kind`, finds first.
+///
+/// # Errors
+///
+/// Where the search is refused, or finds nothing by that name.
+async fn found(
+    client: &Client,
+    member: &str,
+    kind: &str,
+    unit: &str,
+    term: &str,
+    named: &str,
+) -> Result<String, String> {
+    let search = reads::Askable {
+        member: Some(member.to_owned()),
+        term: Some(term.to_owned()),
+        kind: Some(kind.to_owned()),
+        unit: Some(unit.to_owned()),
+        ..reads::Askable::default()
+    };
+    let page = client
+        .read(&search)
+        .await
+        .map_err(|why| format!("{why:?}"))?
+        .data;
+    page.titles
+        .iter()
+        .find(|one| one.title.contains(named))
+        .map(|one| one.id.clone())
+        .ok_or_else(|| format!("no {named} among what {term} finds: {page:?}"))
 }

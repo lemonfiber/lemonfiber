@@ -25,6 +25,8 @@ pub struct Release {
     pub title: String,
     /// The Newznab category it is filed under.
     pub category: &'static str,
+    /// Its size in bytes, within what its curator takes for a release of its kind.
+    pub size: u64,
 }
 
 /// The site, listening.
@@ -34,9 +36,6 @@ pub struct Site {
     /// Every NZB it served, by the release's id.
     served: Arc<Mutex<Vec<String>>>,
 }
-
-/// The release's size in bytes.
-const SIZE: u64 = 1_073_741_824;
 
 /// The size of one article of it, as a Usenet poster splits a file; a download client
 /// refuses an article far larger as malformed.
@@ -162,15 +161,16 @@ fn found(release: &Release, host: &str) -> String {
          <newznab:attr name=\"size\" value=\"{size}\"/></item></channel></rss>",
         title = release.title,
         category = release.category,
-        size = SIZE,
+        size = release.size,
     )
 }
 
-/// The release's NZB: one file, in articles of [`ARTICLE`] bytes that add up to [`SIZE`].
+/// The release's NZB: one file, in articles of [`ARTICLE`] bytes that add up to its size.
 fn nzb(release: &Release) -> String {
-    let articles = SIZE.div_ceil(ARTICLE);
+    let size = release.size;
+    let articles = size.div_ceil(ARTICLE);
     let segments = (1..=articles).fold(String::new(), |mut held, number| {
-        let bytes = ARTICLE.min(SIZE - (number - 1) * ARTICLE);
+        let bytes = ARTICLE.min(size - (number - 1) * ARTICLE);
         let _ = write!(
             held,
             "<segment bytes=\"{bytes}\" number=\"{number}\">{ID}-{number}@lemonfiber.invalid</segment>"
