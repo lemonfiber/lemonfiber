@@ -14,10 +14,10 @@ lemonfiber-contract = { workspace = true }
 lemonfiber-error = { workspace = true }
 lemonfiber-pinned = { workspace = true }
 lemonfiber-ports = { workspace = true }
+lemonfiber-random = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 form_urlencoded = { workspace = true }
-getrandom = { workspace = true }
 reqwest = { workspace = true }
 rustix = { workspace = true }
 rustls = { workspace = true }

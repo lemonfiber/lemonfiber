@@ -1580,13 +1580,13 @@ dependencies = [
  "async-trait",
  "axum",
  "form_urlencoded",
- "getrandom 0.4.3",
  "lemonfiber-adapters",
  "lemonfiber-contract",
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-pinned",
  "lemonfiber-ports",
+ "lemonfiber-random",
  "reqwest",
  "rustix",
  "rustls",
@@ -1605,11 +1605,11 @@ dependencies = [
  "base64 0.23.1",
  "bollard",
  "futures-util",
- "getrandom 0.4.3",
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-outward",
  "lemonfiber-ports",
+ "lemonfiber-random",
  "libc",
  "reqwest",
  "rustix",
@@ -1835,6 +1835,14 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "lemonfiber-random"
+version = "0.17.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "lemonfiber-ports",
 ]
 
 [[package]]

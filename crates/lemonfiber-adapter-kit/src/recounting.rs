@@ -174,7 +174,7 @@ impl Recounter {
             configuration: configuration.into(),
             history,
             pushed: None,
-            random: Arc::new(crate::random::Os),
+            random: Arc::new(lemonfiber_random::Os),
             narrator,
         })
     }

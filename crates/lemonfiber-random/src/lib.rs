@@ -1,4 +1,5 @@
-//! The operating system's randomness.
+//! The operating system's randomness, behind the randomness port: the one place any
+//! lemonfiber process reaches it.
 
 use lemonfiber_ports::random::Random;
 
