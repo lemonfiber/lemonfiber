@@ -1,6 +1,6 @@
 //! How often an adapter that polls looks.
 
-use super::{events_poll_from_env, refusal, DEFAULT_SECONDS, EVENTS_POLL_KEY};
+use super::{events_poll_from_env, refusal, EVENTS_POLL_KEY, EVERY_DEFAULT};
 use crate::config::env::EnvFile;
 
 #[test]
@@ -8,9 +8,9 @@ fn a_recorded_interval_in_range_is_read_and_anything_else_is_the_default() {
     let read = |text: &str| events_poll_from_env(&EnvFile::parse(text));
 
     assert_eq!(read("LEMONFIBER_EVENTS_POLL=\"120\"\n"), 120);
-    assert_eq!(read("LEMONFIBER_EVENTS_POLL=5\n"), DEFAULT_SECONDS);
-    assert_eq!(read("LEMONFIBER_EVENTS_POLL=soon\n"), DEFAULT_SECONDS);
-    assert_eq!(read(""), DEFAULT_SECONDS);
+    assert_eq!(read("LEMONFIBER_EVENTS_POLL=5\n"), EVERY_DEFAULT);
+    assert_eq!(read("LEMONFIBER_EVENTS_POLL=soon\n"), EVERY_DEFAULT);
+    assert_eq!(read(""), EVERY_DEFAULT);
 }
 
 #[test]

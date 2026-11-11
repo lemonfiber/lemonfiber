@@ -13,7 +13,7 @@ use rustls::{ClientConfig, RootCertStore};
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// How long one call may take, its answer read whole.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// The most of an answer read.
 pub const BODY_LIMIT: usize = 16 * 1024 * 1024;

@@ -44,7 +44,7 @@ fn every(ctx: &Ctx) -> u32 {
         .env_file
         .as_deref()
         .and_then(|path| crate::config::store::read(path).ok())
-        .map_or(crate::config::polling::DEFAULT_SECONDS, |file| {
+        .map_or(crate::ports::service::EVERY_DEFAULT, |file| {
             crate::config::events_poll_from_env(&file)
         })
 }

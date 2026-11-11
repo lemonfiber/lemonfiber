@@ -5,7 +5,7 @@ use axum::routing::get;
 use axum::Router;
 
 use super::fake::{tls, tls12};
-use super::{client, presents, sha256};
+use super::{client, is_pin, presents, sha256};
 
 /// Long enough for a loopback server, short enough that a test never hangs.
 const WITHIN: Duration = Duration::from_secs(10);
@@ -91,4 +91,13 @@ async fn a_handshake_presents_a_pin_only_where_the_certificate_is_that_one() {
     assert!(presents(&served.base, &served.pin, WITHIN).await);
     assert!(!presents(&served.base, &"0".repeat(64), WITHIN).await);
     assert!(!presents(&served.base, "", WITHIN).await);
+}
+
+#[test]
+fn a_pin_is_a_sha_256_in_lower_case_hexadecimal_and_nothing_else() {
+    assert!(is_pin(&sha256(b"a certificate")));
+    assert!(!is_pin(&sha256(b"a certificate").to_uppercase()));
+    assert!(!is_pin(&"a".repeat(63)));
+    assert!(!is_pin(&"g".repeat(64)));
+    assert!(!is_pin(""));
 }

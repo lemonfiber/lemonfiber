@@ -68,7 +68,7 @@ const TOLD_PINNED: &str = "00000000000000000000000000000000000000000000000000000
 const TOLD_WITH: &str = "00000000000000000000000000000000";
 
 /// How often the conformance cases ask a filler that polls to look, in seconds.
-const TOLD_EVERY: u32 = 60;
+const TOLD_EVERY: u32 = lemonfiber_ports::service::EVERY_DEFAULT;
 
 /// A SHA-256, in lower-case hexadecimal, that no token the conformance cases present
 /// hashes to.
