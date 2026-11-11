@@ -48,7 +48,7 @@ async fn a_member_keeping_their_own_is_named_with_how_to_change_theirs() {
         trusted.findings
     );
     assert!(
-        kept_line("Alex").contains("`lemonfiber household allow --member Alex`"),
+        kept_line("Alex").ends_with("lemonfiber household allow --member Alex changes theirs"),
         "{}",
         kept_line("Alex")
     );
