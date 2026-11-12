@@ -9,9 +9,11 @@ use super::{named, STACK};
 /// The profile these cases run beside the forms.
 const BESIDE: &str = "notify";
 
-/// The committed stack with a profile running beside its forms, needing `protocol`.
+/// The committed stack with its profile running beside the forms declared as needing
+/// `protocol`.
 fn beside(protocol: Option<Protocol>) -> Option<Manifest> {
     let mut manifest = Manifest::from_toml(STACK).ok()?;
+    manifest.profiles.retain(|profile| profile.id != BESIDE);
     manifest.profiles.push(Profile {
         id: BESIDE.to_owned(),
         name: "Notifications".to_owned(),
