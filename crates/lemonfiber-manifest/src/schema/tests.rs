@@ -364,7 +364,7 @@ fn parses_the_stack_this_binary_embeds() {
             manifest.services.len(),
         )
     });
-    assert_eq!(counted, Some((12, 11, 23)));
+    assert_eq!(counted, Some((13, 11, 23)));
 }
 
 #[test]
