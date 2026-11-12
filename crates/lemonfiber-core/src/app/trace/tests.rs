@@ -8,7 +8,7 @@ use super::{
 };
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy};
-use crate::ports::media::Kind;
+use crate::ports::media::TitleKind;
 use crate::ports::service::{FoundItem, ItemPart, QueueItem, StuckItem, TraceEvent};
 use crate::test_support::curators::{self, answered, curated, curating, refusing, TELEVISION};
 use crate::test_support::{a_context, nowhere};
@@ -189,6 +189,7 @@ fn finding(title: &str, verdict: Verdict) -> Finding {
     Finding::in_category(Category::Providers, "providers.test", title, verdict)
 }
 
+mod albums;
 mod reading;
 mod searching;
 mod seasons;

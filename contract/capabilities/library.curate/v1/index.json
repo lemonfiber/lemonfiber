@@ -87,7 +87,7 @@
     },
     {
       "path": "library.curate/v1/operations/probe_releases.json",
-      "sha256": "975286abdc75151fb174ee7092018ab3996f5355fbba4b8bd75b65449481e479"
+      "sha256": "9493aa727616ac42ee812dddb20b7dd315c97a83a185b2b707e15d5cec059134"
     },
     {
       "path": "library.curate/v1/operations/apply_music_format.json",
@@ -95,47 +95,47 @@
     },
     {
       "path": "library.curate/v1/operations/library.json",
-      "sha256": "13e1c6612a1b799c4fc26028646838d669699dcf72276e89536cfe5071d13534"
+      "sha256": "f3fd6d4b406192ae4354e988ca14ff1223a5d241274f712ecccac605e0486d2b"
     },
     {
       "path": "library.curate/v1/operations/find_items.json",
-      "sha256": "342dfd1a633ce7a04ba74f3295f8e6e49d4cba1b17cd2f3c08bb36bfad81f6ef"
+      "sha256": "06fb5d8e3c019c5179f404fcdc7646891d9ac2cb73afe09c90dcc6e6f795338d"
     },
     {
       "path": "library.curate/v1/operations/item_history.json",
-      "sha256": "e6e3ddd030bf369bff30ff7c10e4e4f25b690b256cd85d627c277e82c733aa59"
+      "sha256": "a53f973a20f2cea497fff03dc7d7e2b4b800f49c7582260bb96acabdc018f119"
     },
     {
       "path": "library.curate/v1/operations/item_queue.json",
-      "sha256": "15f3fa3f3af4ffa7c8be2f01b3dfe367dea9f03823af77af032005652cdeb54c"
+      "sha256": "11762807a5af4b65cceb0d63ace77fc3df34426d6ac72069c035f6501db58970"
     },
     {
       "path": "library.curate/v1/operations/item_parts.json",
-      "sha256": "9f012d00befbe6937338c86b1a260ccace08845eacab1f712ebe92852108b8cb"
+      "sha256": "f597c1881acfc9bbb9e4a6eae937e758f761e7804e2e541db708c0feeaac1008"
     },
     {
       "path": "library.curate/v1/operations/stuck_items.json",
-      "sha256": "817e9015d2dcbb7a1ccbb90b389d61e03eba6798d144e52072cac281febcb73b"
+      "sha256": "c40d988ead41f46467377de4732bf000a8c79ffede335af3da29ac5fda65b14c"
     },
     {
       "path": "library.curate/v1/operations/catalogued.json",
-      "sha256": "eb0c0894b38316a96a6613289fdcd3fa61e1c522849f20346378d43afc3ab8d4"
+      "sha256": "633eb0373f457e1d8db78b7df3cd90e16343a5ad6b4f8df11c863f9e8baeb342"
     },
     {
       "path": "library.curate/v1/operations/titles.json",
-      "sha256": "808e53eb09a88c901a129f23262b6eb02a93dfb7a45037f7ac88971583c4be6d"
+      "sha256": "2426b2f1f70eba0ccf87cc38b71acfa031c2a0279398bb2a4a396c76e95b00e4"
     },
     {
       "path": "library.curate/v1/operations/held_title.json",
-      "sha256": "b18ae4fab9eb0745dff2df1cc8c8c8821ee4c125f4d1f9b5c275e36d9148b99f"
+      "sha256": "c320a48fb1908d24a6078b1b816aca7c183b4ca7d0437774666d26c18315f6b5"
     },
     {
       "path": "library.curate/v1/operations/request.json",
-      "sha256": "4bc86bd56e491aa898f9463fe8c7a39dd069796a2d6450115d8326d7a0ca66a3"
+      "sha256": "c00c56a630c3aa396059296ec609823e1fde99f81d861fc5f8b2b48655276894"
     },
     {
       "path": "library.curate/v1/operations/search.json",
-      "sha256": "007762bd5071a975f119e42f8e3f09751d708322ddbd68dc02b918a43b48d19f"
+      "sha256": "8aa4c0cebddf195c6aa869b41f4af98b1cae06a9e87197bac4093ac2fb6579d8"
     },
     {
       "path": "library.curate/v1/operations/remove.json",
@@ -143,15 +143,15 @@
     },
     {
       "path": "library.curate/v1/operations/downloading.json",
-      "sha256": "7bee09d16cd21ca945edd50bb4cd3b106e309180b2ea1db372eb31f5632e5125"
+      "sha256": "12d31fb11c15417c049492eadb31138447ae25a38754c642bc21fb87b09626e1"
     },
     {
       "path": "library.curate/v1/operations/unqueue.json",
-      "sha256": "610cbf9c57ca934a47c763de34b5b92918e6dfa120346c73d51f5df57baaba87"
+      "sha256": "e6518d5793d00631312e8e27cea626344ec91f0330171dda4d45fed6003fef92"
     },
     {
       "path": "library.curate/v1/operations/grab.json",
-      "sha256": "acead4062adb508734ef1a9486b6f191145ca067a19cd85fc7e369048254573a"
+      "sha256": "57ca88545b299773c59f077df0a9af6514dd9284593a7d62ba5c32cab8de344a"
     },
     {
       "path": "library.curate/v1/operations/events.json",
@@ -163,7 +163,7 @@
     },
     {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "82ae3ee2525c74f1cbe7541fc617f2ab9a89d64818dec323055aa5fb857b3cf9"
+      "sha256": "c63f4f8948c286536688f5e5b5a073716563da94700199f7930de261d8ce18f9"
     }
   ],
   "major": 1

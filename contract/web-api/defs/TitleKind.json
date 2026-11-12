@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "What kind of title a member's search and ask name: a series, a film, music or books.\n\nThe web surface's own name for what a member asks for, whose name an SDK already gives\nto the kinds of envelope: the same words on the wire, under a name nothing else takes.",
+  "description": "What kind of title a curator files, a member asks for and a media server holds: a\nseries, a film, music or books.",
   "oneOf": [
     {
       "description": "A series.",
@@ -13,12 +13,12 @@
       "const": "movies"
     },
     {
-      "description": "An album or a whole artist.",
+      "description": "An album, or a whole artist asked for.",
       "type": "string",
       "const": "music"
     },
     {
-      "description": "A book, a whole author or a series of books.",
+      "description": "A book, or a whole author or series of books asked for.",
       "type": "string",
       "const": "books"
     }

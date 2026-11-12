@@ -36,7 +36,7 @@ pub(super) async fn acquire(walk: &mut Walk<'_>, chosen: &Chosen<'_>) -> Result<
 
     // The add asked the service to go and look, so what the indexers carry can now be
     // read back. This is the one place the two identical-looking absences are told apart.
-    match curator.service.probe_releases(chosen.kind()).await {
+    match curator.service.probe_releases(chosen.kind().into()).await {
         Err(_) => Err(Reason::IndexersFailed),
         Ok(ReleaseProbe::NoneFound) => Err(Reason::NothingMatched),
         Ok(ReleaseProbe::NoneMatch) => Err(Reason::NoneMetThePreset),

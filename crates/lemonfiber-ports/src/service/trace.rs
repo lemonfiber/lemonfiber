@@ -122,7 +122,7 @@ pub trait Pipeline: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
-    async fn library(&self, kind: crate::media::Kind) -> Result<Vec<FoundItem>, Failure>;
+    async fn library(&self, kind: crate::media::TitleKind) -> Result<Vec<FoundItem>, Failure>;
 
     /// Find library items whose title matches a human term — a show name or a film
     /// title, never an internal id.
@@ -132,7 +132,7 @@ pub trait Pipeline: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn find_items(
         &self,
-        kind: crate::media::Kind,
+        kind: crate::media::TitleKind,
         term: &str,
     ) -> Result<Vec<FoundItem>, Failure>;
 
@@ -144,7 +144,7 @@ pub trait Pipeline: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn item_history(
         &self,
-        kind: crate::media::Kind,
+        kind: crate::media::TitleKind,
         id: i64,
     ) -> Result<Vec<TraceEvent>, Failure>;
 
@@ -157,7 +157,7 @@ pub trait Pipeline: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn item_queue(
         &self,
-        kind: crate::media::Kind,
+        kind: crate::media::TitleKind,
         id: i64,
     ) -> Result<Vec<QueueItem>, Failure>;
 
@@ -170,7 +170,7 @@ pub trait Pipeline: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn item_parts(
         &self,
-        kind: crate::media::Kind,
+        kind: crate::media::TitleKind,
         id: i64,
         season: Option<u32>,
     ) -> Result<Vec<ItemPart>, Failure>;
@@ -182,7 +182,7 @@ pub trait Pipeline: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses.
-    async fn stuck_items(&self, kind: crate::media::Kind) -> Result<Vec<StuckItem>, Failure>;
+    async fn stuck_items(&self, kind: crate::media::TitleKind) -> Result<Vec<StuckItem>, Failure>;
 }
 
 /// Reading a media server's library to answer the last question a trace has left — is
@@ -195,13 +195,14 @@ pub trait Pipeline: Send + Sync {
 #[async_trait]
 pub trait Library: Send + Sync {
     /// Whether an item whose title matches `term` is present in the library, for the
-    /// media type `kind` names — a series for television, a movie for film.
+    /// media type `kind` names — a series for television, a movie for film, an album for
+    /// music, a book for books.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the media server is unreachable or refuses — which a
     /// trace reads as "cannot tell", never as "not there".
-    async fn has_item(&self, kind: crate::media::Kind, term: &str) -> Result<bool, Failure>;
+    async fn has_item(&self, kind: crate::media::TitleKind, term: &str) -> Result<bool, Failure>;
 
     /// Tell the media server to look at what is on disk now.
     ///

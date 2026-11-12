@@ -42,7 +42,7 @@ pub trait QualityReleases: Send + Sync {
     ///
     /// Returns [`Failure`] when the service or its indexers are unreachable or refuse
     /// the search — the indexer-failure case, kept distinct from an empty result.
-    async fn probe_releases(&self, kind: crate::media::Kind) -> Result<ReleaseProbe, Failure>;
+    async fn probe_releases(&self, kind: crate::media::TitleKind) -> Result<ReleaseProbe, Failure>;
 }
 
 /// Applying an audio quality to a music curator, whose quality axis is a format rather

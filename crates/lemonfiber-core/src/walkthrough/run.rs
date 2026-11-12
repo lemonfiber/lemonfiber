@@ -25,10 +25,11 @@ mod settle;
 mod walk;
 mod watch;
 
-use crate::app::targets::open_curators;
+use crate::app::targets::open_video_curators;
 use crate::app::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::WalkthroughReport;
+use crate::ports::media::Kind;
 use crate::walkthrough::{Narrator, Shape, Why};
 
 pub(crate) use walk::Walk;
@@ -54,7 +55,7 @@ pub async fn walkthrough(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let curators = open_curators(ctx, &manifest).await;
+    let curators = open_video_curators(ctx, &manifest).await;
     let mut walk = Walk::new(ctx, narrator);
 
     match offer::offered(ctx, &curators).await {
@@ -69,7 +70,7 @@ pub async fn walkthrough(
 /// The full walk: choose, ask for it, wait on it, and see it land.
 async fn pipeline(
     walk: &mut Walk<'_>,
-    curators: &[crate::app::targets::OpenCurator],
+    curators: &[crate::app::targets::OpenCurator<Kind>],
     manifest: &lemonfiber_manifest::Manifest,
     term: Option<&str>,
 ) -> Result<WalkthroughReport, Box<Problem>> {
@@ -119,7 +120,7 @@ pub async fn worth_offering(ctx: &Ctx) -> Result<Why, Box<Problem>> {
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let curators = open_curators(ctx, &manifest).await;
+    let curators = open_video_curators(ctx, &manifest).await;
     Ok(offer::offered(ctx, &curators).await)
 }
 

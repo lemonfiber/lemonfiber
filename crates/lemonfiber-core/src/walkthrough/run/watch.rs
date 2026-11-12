@@ -45,12 +45,12 @@ pub(super) async fn watch(walk: &mut Walk<'_>, chosen: &Chosen<'_>, item: &Added
     loop {
         let events = curator
             .service
-            .item_history(chosen.kind(), item.id)
+            .item_history(chosen.kind().into(), item.id)
             .await
             .unwrap_or_default();
         let queue = curator
             .service
-            .item_queue(chosen.kind(), item.id)
+            .item_queue(chosen.kind().into(), item.id)
             .await
             .unwrap_or_default();
 

@@ -132,7 +132,7 @@ pub async fn judged(root: &Path, speakers: &[Speaker], published: &[Capability])
                 Ok(recorded) => verdict_of(one, &recorded).await,
                 Err(unrunnable) => unproven(&unrunnable.0),
             }
-        } else if one.case.operation.since > recorded_minor(root, &owed, one) {
+        } else if one.case.since > recorded_minor(root, &owed, one) {
             Verdict::Passed
         } else {
             Verdict::Unrecorded
@@ -178,7 +178,7 @@ fn recorded_minor(root: &Path, owed: &[Owed<'_>], one: &Owed<'_>) -> u32 {
     owed.iter()
         .filter(|other| other.service == one.service && other.contract == one.contract)
         .filter(|other| root.join(&other.recording).exists())
-        .map(|other| other.case.operation.since)
+        .map(|other| other.case.since)
         .max()
         .unwrap_or_default()
 }

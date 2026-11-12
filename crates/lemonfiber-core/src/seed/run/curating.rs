@@ -42,9 +42,9 @@ impl<'a> Curator<'a> {
         self.named.media_types.as_slice()
     }
 
-    /// The kind of video it files, where it files video by resolution.
-    pub(crate) fn kind(self) -> Option<crate::ports::media::Kind> {
-        crate::ports::media::Kind::of_declared(self.media_types())
+    /// The kind it files, where it files one.
+    pub(crate) fn kind(self) -> Option<crate::ports::media::TitleKind> {
+        crate::ports::media::TitleKind::of_declared(self.media_types())
     }
 
     /// The curator over `library.curate`, through the service asked for it: nothing where

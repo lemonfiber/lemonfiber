@@ -1,7 +1,7 @@
 //! A member's search for a title, and what asking for one came to, printed.
 
 use lemonfiber_core::model::{
-    AskableKindsReport, AskableReport, AskedReport, Stands, TitleKind, TitleUnit,
+    asked_noun, AskableKindsReport, AskableReport, AskedReport, Stands, TitleKind, TitleUnit,
 };
 
 use super::Lines;
@@ -9,7 +9,7 @@ use super::Lines;
 /// One page of what a search found, a title a line, and where the next page begins.
 pub(super) fn askable(report: &AskableReport) -> Lines {
     let mut lines = Lines::default();
-    let kinds: Vec<&str> = report.kinds.iter().map(|kind| kind.noun()).collect();
+    let kinds: Vec<&str> = report.kinds.iter().map(|kind| asked_noun(*kind)).collect();
     lines.put(format!(
         "{} — \"{}\", among every {}",
         report.member,
@@ -27,7 +27,7 @@ pub(super) fn askable(report: &AskableReport) -> Lines {
         lines.put(format!(
             "  {}{by}{year} · {} · {} · {}",
             title.title,
-            title.unit.map_or(title.kind.noun(), TitleUnit::noun),
+            title.unit.map_or(asked_noun(title.kind), TitleUnit::noun),
             stands(title.stands),
             title.id
         ));

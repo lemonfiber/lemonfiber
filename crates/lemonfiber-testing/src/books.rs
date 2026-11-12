@@ -47,6 +47,13 @@ pub fn curating(operation: &str) -> &'static str {
     path_of(curate::CAPABILITY, curate::MAJOR, operation)
 }
 
+/// Where `operation` of `library.curate` is asked of the book curator, by its address as
+/// well as its path, so a script answers it apart from every other curator.
+#[must_use]
+pub fn curating_here(operation: &str) -> &'static str {
+    MOVED.at(curate::CAPABILITY, curate::MAJOR, operation)
+}
+
 /// Bindery's plugin as the bundle pins it, recorded as installed from its embedded tree.
 #[must_use]
 pub fn moved() -> Option<Installed> {

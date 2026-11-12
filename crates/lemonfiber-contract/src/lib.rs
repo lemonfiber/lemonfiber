@@ -58,6 +58,17 @@ type Reading = for<'c> fn(
     Bounds,
 ) -> Pin<Box<dyn Future<Output = Result<(), Failure>> + Send + 'c>>;
 
+/// The case of one media type an operation bound to a kind of media is asked for.
+#[derive(Debug, Clone)]
+pub struct MediaCase {
+    /// The media type.
+    pub media_type: &'static str,
+    /// What its conformance case posts instead of the operation's own case.
+    pub asks: serde_json::Value,
+    /// The minor of its major its case was added at, `0` where it came with the operation.
+    pub since: u32,
+}
+
 /// One operation of one capability's contract: what it is called, and the shapes of what
 /// is asked and what is answered.
 #[derive(Debug, Clone)]
@@ -81,7 +92,7 @@ pub struct Operation {
     pub asks: serde_json::Value,
     /// For an operation bound to a kind of media, what its case for each media type posts
     /// instead, by media type; none for every other operation.
-    pub filed: Vec<(&'static str, serde_json::Value)>,
+    pub filed: Vec<MediaCase>,
     /// Whether it may answer that what it applied is in force once the upstream restarts.
     pub restarts: bool,
     /// The statuses its conformance case is to be refused with, where what the case asks

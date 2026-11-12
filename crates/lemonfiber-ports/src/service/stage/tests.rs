@@ -1,3 +1,5 @@
+use lemonfiber_manifest::ApiKind;
+
 use super::{Confidence, Coverage, Outcome, Part, Stage};
 
 #[test]
@@ -115,9 +117,12 @@ fn the_furthest_stage_is_the_latest_reached() {
 
 #[test]
 fn history_events_map_to_the_outcome_they_denote() {
-    assert_eq!(Outcome::of_event("grabbed"), Some(Outcome::Grabbed));
     assert_eq!(
-        Outcome::of_event("downloadFailed"),
+        Outcome::of_event(ApiKind::Servarr, "grabbed"),
+        Some(Outcome::Grabbed)
+    );
+    assert_eq!(
+        Outcome::of_event(ApiKind::Servarr, "downloadFailed"),
         Some(Outcome::DownloadFailed)
     );
     for imported in [
@@ -125,16 +130,79 @@ fn history_events_map_to_the_outcome_they_denote() {
         "movieFolderImported",
         "seriesFolderImported",
     ] {
-        assert_eq!(Outcome::of_event(imported), Some(Outcome::Imported));
+        assert_eq!(
+            Outcome::of_event(ApiKind::Servarr, imported),
+            Some(Outcome::Imported)
+        );
     }
     assert_eq!(
-        Outcome::of_event("episodeFileDeleted"),
+        Outcome::of_event(ApiKind::Servarr, "episodeFileDeleted"),
         Some(Outcome::Removed)
     );
     assert_eq!(
-        Outcome::of_event("movieFileDeleted"),
+        Outcome::of_event(ApiKind::Servarr, "movieFileDeleted"),
         Some(Outcome::Removed)
     );
+}
+
+#[test]
+fn lidarrs_history_events_read_in_servarrs_vocabulary() {
+    assert_eq!(
+        Outcome::of_event(ApiKind::Servarr, "downloadImported"),
+        Some(Outcome::Imported)
+    );
+    assert_eq!(
+        Outcome::of_event(ApiKind::Servarr, "trackFileDeleted"),
+        Some(Outcome::Removed)
+    );
+    for unmapped in ["trackFileImported", "albumImportIncomplete", "bookImported"] {
+        assert_eq!(
+            Outcome::of_event(ApiKind::Servarr, unmapped),
+            None,
+            "{unmapped}"
+        );
+    }
+}
+
+#[test]
+fn binderys_history_events_read_in_its_own_vocabulary() {
+    let mapped: Vec<Option<Outcome>> = [
+        "grabbed",
+        "bookImported",
+        "downloadFailed",
+        "downloadStalled",
+        "bookFileDeleted",
+    ]
+    .into_iter()
+    .map(|event| Outcome::of_event(ApiKind::Bindery, event))
+    .collect();
+    assert_eq!(
+        mapped,
+        [
+            Some(Outcome::Grabbed),
+            Some(Outcome::Imported),
+            Some(Outcome::DownloadFailed),
+            Some(Outcome::DownloadFailed),
+            Some(Outcome::Removed),
+        ]
+    );
+}
+
+#[test]
+fn binderys_hand_off_and_an_import_being_retried_read_as_nothing() {
+    for unmapped in [
+        "downloadFolderImported",
+        "importFailed",
+        "bookRenamed",
+        "downloadRequeued",
+        "episodeFileDeleted",
+    ] {
+        assert_eq!(
+            Outcome::of_event(ApiKind::Bindery, unmapped),
+            None,
+            "{unmapped}"
+        );
+    }
 }
 
 #[test]
@@ -181,8 +249,11 @@ fn queue_states_map_to_the_stage_they_are_at() {
 fn an_event_that_is_not_notable_maps_to_no_outcome() {
     // A rename, a grab-from-interactive-search test, or an unknown event is not one
     // of the history moments a trace shows.
-    assert_eq!(Outcome::of_event("episodeFileRenamed"), None);
-    assert_eq!(Outcome::of_event(""), None);
+    assert_eq!(
+        Outcome::of_event(ApiKind::Servarr, "episodeFileRenamed"),
+        None
+    );
+    assert_eq!(Outcome::of_event(ApiKind::Servarr, ""), None);
 }
 
 /// A part at a given season, number and stage — the shape the aggregation groups.
@@ -292,4 +363,10 @@ fn confidence_serialises_under_its_label() {
         serde_json::to_string(&Confidence::Uncertain).unwrap_or_default(),
         r#""uncertain""#
     );
+}
+
+#[test]
+fn an_api_that_keeps_no_curators_history_names_no_outcome() {
+    assert_eq!(Outcome::of_event(ApiKind::Jellyfin, "grabbed"), None);
+    assert_eq!(Outcome::of_event(ApiKind::Sabnzbd, "downloadFailed"), None);
 }

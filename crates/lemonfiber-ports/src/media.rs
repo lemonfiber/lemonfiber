@@ -1,9 +1,9 @@
 //! What kind of thing lemonfiber is handling — the words the boundary needs to name it.
 //!
-//! Which kind of video an item is, and how good an operator wants their music. Both are
-//! choices made well above this, and both have to cross the boundary: a port that could not
-//! say which service it is asking about, or what quality to apply, would push the naming
-//! into every caller.
+//! Which kind of video or title an item is, and how good an operator wants their music.
+//! Each is a choice made well above this, and each has to cross the boundary: a port that
+//! could not say which service it is asking about, or what quality to apply, would push
+//! the naming into every caller.
 //!
 //! The definitions live here and are re-exported by the modules that own the *decisions* —
 //! a port cannot reach up into the layer it serves, and the layer above is free to keep
@@ -115,6 +115,81 @@ impl Kind {
         match self {
             Self::Tv => "series",
             Self::Movies => "film",
+        }
+    }
+}
+
+/// What kind of title a curator files, a member asks for and a media server holds: a
+/// series, a film, music or books.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum TitleKind {
+    /// A series.
+    Tv,
+    /// A film.
+    Movies,
+    /// An album, or a whole artist asked for.
+    Music,
+    /// A book, or a whole author or series of books asked for.
+    Books,
+}
+
+impl TitleKind {
+    /// Every kind, the kinds of video first.
+    pub const ALL: [Self; 4] = [Self::Tv, Self::Movies, Self::Music, Self::Books];
+
+    /// The media type a service declares for this kind.
+    #[must_use]
+    pub const fn media_type(self) -> &'static str {
+        match self {
+            Self::Tv => Kind::Tv.media_type(),
+            Self::Movies => Kind::Movies.media_type(),
+            Self::Music => MUSIC,
+            Self::Books => BOOKS,
+        }
+    }
+
+    /// The plain word for one item of it, as a curator files it.
+    #[must_use]
+    pub const fn noun(self) -> &'static str {
+        match self {
+            Self::Tv => Kind::Tv.noun(),
+            Self::Movies => Kind::Movies.noun(),
+            Self::Music => "album",
+            Self::Books => "book",
+        }
+    }
+
+    /// The kind of video it is, or `None` for music and books.
+    #[must_use]
+    pub const fn video(self) -> Option<Kind> {
+        match self {
+            Self::Tv => Some(Kind::Tv),
+            Self::Movies => Some(Kind::Movies),
+            Self::Music | Self::Books => None,
+        }
+    }
+
+    /// The kind a curator files, read from the media types it declares, or `None` for a
+    /// service that files none.
+    ///
+    /// In [`TitleKind::ALL`]'s order whatever order they are declared in, so a service
+    /// declaring more than one is filed as the same one every run.
+    #[must_use]
+    pub fn of_declared(media_types: &[String]) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| {
+            media_types
+                .iter()
+                .any(|media| media.as_str() == kind.media_type())
+        })
+    }
+}
+
+impl From<Kind> for TitleKind {
+    fn from(kind: Kind) -> Self {
+        match kind {
+            Kind::Tv => Self::Tv,
+            Kind::Movies => Self::Movies,
         }
     }
 }

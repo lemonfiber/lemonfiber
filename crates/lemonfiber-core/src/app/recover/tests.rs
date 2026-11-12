@@ -741,7 +741,7 @@ fn a_key_is_left_standing_and_named() {
         ),
         (
             Action::Regrab {
-                kind: crate::ports::media::Kind::Tv,
+                kind: crate::ports::media::TitleKind::Tv,
                 title: 9,
                 release: "9f86d081".to_owned(),
             },

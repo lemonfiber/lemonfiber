@@ -268,3 +268,57 @@ fn a_kind_bound_case_posts_its_own_kind() {
         Some(&Value::from("sabnzbd"))
     );
 }
+
+#[test]
+fn a_curator_of_music_or_books_is_asked_the_pipeline_reads_and_the_queue_at_the_minor_that_widened_them(
+) {
+    let curate = crate::capabilities::library::capability();
+    let since = |case: &str| {
+        cases(&curate)
+            .into_iter()
+            .find(|one| one.case == case)
+            .map(|one| (one.since, one.asks.pointer("/kind").cloned()))
+    };
+    for operation in [
+        "library",
+        "find_items",
+        "item_history",
+        "item_queue",
+        "item_parts",
+        "stuck_items",
+        "titles",
+        "search",
+        "probe_releases",
+        "downloading",
+        "unqueue",
+        "grab",
+    ] {
+        let added = curate
+            .operations
+            .iter()
+            .find(|one| one.name == operation)
+            .map_or(0, |one| one.since);
+        assert_eq!(
+            since(&format!("{operation}-answers-music")),
+            Some((3, Some(Value::from("music")))),
+            "{operation}"
+        );
+        assert_eq!(
+            since(&format!("{operation}-answers-books")),
+            Some((3, Some(Value::from("books")))),
+            "{operation}"
+        );
+        assert_eq!(
+            since(&format!("{operation}-answers-tv")),
+            Some((added, Some(Value::from("tv")))),
+            "{operation}"
+        );
+    }
+    for operation in ["lookup", "request", "add", "catalogued"] {
+        assert_eq!(
+            since(&format!("{operation}-answers-music")),
+            None,
+            "{operation}"
+        );
+    }
+}

@@ -111,7 +111,7 @@
                       "type": "boolean"
                     },
                     "reference": {
-                      "description": "Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film.",
+                      "description": "Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film, and\n0 for an album or a book.",
                       "format": "int64",
                       "type": "integer"
                     },

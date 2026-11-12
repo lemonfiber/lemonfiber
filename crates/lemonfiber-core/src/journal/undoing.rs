@@ -38,7 +38,7 @@ impl Action {
 
     /// Ask a curator to grab the release fingerprinted `release` of its `kind` title
     /// `title` again.
-    fn regrab(kind: crate::ports::media::Kind, title: i64, release: &str) -> Self {
+    fn regrab(kind: crate::ports::media::TitleKind, title: i64, release: &str) -> Self {
         Self::Regrab {
             kind,
             title,

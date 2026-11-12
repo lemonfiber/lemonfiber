@@ -36,9 +36,9 @@ pub struct Target {
     pub id: String,
     /// Its name, such as `Sonarr`; what the operator reads.
     pub name: String,
-    /// The kind of video it files, read from the media types it declares; nothing for
-    /// one that files video by no resolution, such as music.
-    pub kind: Option<crate::ports::media::Kind>,
+    /// The kind it files, read from the media types it declares; nothing for one that
+    /// files none.
+    pub kind: Option<crate::ports::media::TitleKind>,
     /// The adapter it is asked through, or nothing where it cannot be asked.
     pub asked: Option<Arc<dyn curate::Fills>>,
 }

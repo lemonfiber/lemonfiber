@@ -1,4 +1,4 @@
-use super::{offered, Kind};
+use super::{offered, Kind, TitleKind, BOOKS, MUSIC};
 
 fn declared(of: &[&str]) -> Vec<String> {
     of.iter().map(|&media| media.to_owned()).collect()
@@ -65,4 +65,42 @@ fn three_or_more_words_are_listed_with_the_last_offered_after_or() {
         ]),
         "tv, movies, music, or books"
     );
+}
+
+#[test]
+fn every_kind_a_curator_files_is_read_from_what_it_declares_video_first() {
+    assert_eq!(
+        TitleKind::of_declared(&declared(&["music"])),
+        Some(TitleKind::Music)
+    );
+    assert_eq!(
+        TitleKind::of_declared(&declared(&["books"])),
+        Some(TitleKind::Books)
+    );
+    assert_eq!(
+        TitleKind::of_declared(&declared(&["books", "music", "movies"])),
+        Some(TitleKind::Movies)
+    );
+    assert_eq!(TitleKind::of_declared(&declared(&["comics"])), None);
+}
+
+#[test]
+fn each_kind_names_its_media_type_its_item_and_whether_it_is_video() {
+    let named: Vec<(&str, &str, Option<Kind>)> = TitleKind::ALL
+        .into_iter()
+        .map(|kind| (kind.media_type(), kind.noun(), kind.video()))
+        .collect();
+    assert_eq!(
+        named,
+        [
+            ("tv", "series", Some(Kind::Tv)),
+            ("movies", "film", Some(Kind::Movies)),
+            (MUSIC, "album", None),
+            (BOOKS, "book", None),
+        ]
+    );
+    for kind in Kind::ALL {
+        assert_eq!(TitleKind::from(kind).video(), Some(kind));
+        assert_eq!(TitleKind::from(kind).media_type(), kind.media_type());
+    }
 }

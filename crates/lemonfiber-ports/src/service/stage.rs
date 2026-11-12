@@ -12,6 +12,7 @@
 //! grabbed, and so on. Reading the fragments and joining them is a separate concern;
 //! nothing here reaches a service.
 
+use lemonfiber_manifest::ApiKind;
 use serde::{Deserialize, Serialize};
 
 /// How many of an item's most recent history events a trace reads — the bounded horizon
@@ -337,18 +338,29 @@ pub enum Outcome {
 }
 
 impl Outcome {
-    /// The outcome an \*arr history event denotes, or `None` for an event that is not a
-    /// notable step in the item's history. Named as the television and film services each
-    /// serialise their history event types.
+    /// The outcome a history event named `event_type` in the vocabulary of the native API
+    /// `history` denotes, or `None` for an event that is not a notable step in the item's
+    /// history, and for every event of an API that keeps no curator's history.
+    ///
+    /// A track imported alone is no album imported, an import still being retried is no
+    /// failed download, and Bindery's `downloadFolderImported` hands a download on rather
+    /// than importing it, so none of them denotes anything.
     #[must_use]
-    pub fn of_event(event_type: &str) -> Option<Self> {
-        match event_type {
-            "grabbed" => Some(Self::Grabbed),
-            "downloadFailed" => Some(Self::DownloadFailed),
-            "downloadFolderImported" | "seriesFolderImported" | "movieFolderImported" => {
-                Some(Self::Imported)
-            }
-            "episodeFileDeleted" | "movieFileDeleted" => Some(Self::Removed),
+    pub fn of_event(history: ApiKind, event_type: &str) -> Option<Self> {
+        match (history, event_type) {
+            (ApiKind::Servarr | ApiKind::Bindery, "grabbed") => Some(Self::Grabbed),
+            (ApiKind::Servarr | ApiKind::Bindery, "downloadFailed")
+            | (ApiKind::Bindery, "downloadStalled") => Some(Self::DownloadFailed),
+            (
+                ApiKind::Servarr,
+                "downloadFolderImported"
+                | "seriesFolderImported"
+                | "movieFolderImported"
+                | "downloadImported",
+            )
+            | (ApiKind::Bindery, "bookImported") => Some(Self::Imported),
+            (ApiKind::Servarr, "episodeFileDeleted" | "movieFileDeleted" | "trackFileDeleted")
+            | (ApiKind::Bindery, "bookFileDeleted") => Some(Self::Removed),
             _ => None,
         }
     }

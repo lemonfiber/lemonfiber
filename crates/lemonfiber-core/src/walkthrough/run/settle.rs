@@ -44,7 +44,7 @@ pub(super) async fn settle(
     let _ = server.rescan().await;
 
     let visible = server
-        .has_item(chosen.kind(), &chosen.entry.title)
+        .has_item(chosen.kind().into(), &chosen.entry.title)
         .await
         .unwrap_or(false);
     if !visible {

@@ -10,7 +10,7 @@ pub(super) async fn regrabbed(
     ctx: &Ctx,
     fillers: &crate::wiring::Fillers,
     undo: &Undo,
-    (kind, title, release): (crate::ports::media::Kind, i64, &str),
+    (kind, title, release): (crate::ports::media::TitleKind, i64, &str),
     reached: &mut super::Reached,
 ) {
     let curator = super::super::targets::target_named(ctx, fillers, &undo.target)

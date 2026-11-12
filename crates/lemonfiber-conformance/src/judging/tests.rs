@@ -267,3 +267,22 @@ fn a_build_script_with_no_runtime_of_its_own_judges_it_to_the_end() {
     assert_eq!(judged.len(), 3);
     assert!(judged.iter().all(|one| one.verdict == Verdict::Passed));
 }
+
+#[tokio::test]
+async fn a_media_type_added_at_a_later_minor_is_owed_only_by_an_adapter_recorded_at_it() {
+    let curator = vec![Speaker {
+        service: "lidarr-adapter".to_owned(),
+        speaks: vec!["library.curate@1".to_owned()],
+        pinned: Some(PINNED.to_owned()),
+        files: vec!["music".to_owned()],
+    }];
+    let published = vec![lemonfiber_contract::capabilities::library::capability()];
+
+    let judged = judged(&source("albums", &[]), &curator, &published).await;
+
+    assert_eq!(of(&judged, "library-answers-music"), Some(&Verdict::Passed));
+    assert_eq!(
+        of(&judged, "records-answers-music"),
+        Some(&Verdict::Unrecorded)
+    );
+}

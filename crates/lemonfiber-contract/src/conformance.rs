@@ -187,6 +187,8 @@ pub struct Case<'c> {
     pub asks: Value,
     /// The media type it is asked for, where its operation is bound to one.
     pub media_type: Option<&'static str>,
+    /// The minor of its major it was added at.
+    pub since: u32,
 }
 
 /// Every case of `capability`, in the order they are published.
@@ -200,6 +202,7 @@ pub fn cases(capability: &Capability) -> Vec<Case<'_>> {
         live: true,
         asks: Value::Object(serde_json::Map::new()),
         media_type: None,
+        since: operation.since,
     });
     unkeyed
         .into_iter()
@@ -231,7 +234,7 @@ pub fn filed<'c>(capability: &'c Capability, files: &[String]) -> Vec<Case<'c>> 
 
 /// The cases asking `operation` under the key: one, or one per media type it is bound to.
 fn keyed(operation: &Operation) -> Vec<Case<'_>> {
-    let asked = |case: String, asks: &Value, media_type| Case {
+    let asked = |case: String, asks: &Value, media_type, since: u32| Case {
         case,
         operation,
         keyed: true,
@@ -239,21 +242,23 @@ fn keyed(operation: &Operation) -> Vec<Case<'_>> {
         live: false,
         asks: asks.clone(),
         media_type,
+        since: operation.since.max(since),
     };
     if operation.refused.is_some() {
-        return vec![asked(refuses(operation.name), &operation.asks, None)];
+        return vec![asked(refuses(operation.name), &operation.asks, None, 0)];
     }
     if operation.filed.is_empty() {
-        return vec![asked(answers(operation.name), &operation.asks, None)];
+        return vec![asked(answers(operation.name), &operation.asks, None, 0)];
     }
     operation
         .filed
         .iter()
-        .map(|(media_type, asks)| {
+        .map(|filed| {
             asked(
-                format!("{}-{media_type}", answers(operation.name)),
-                asks,
-                Some(*media_type),
+                format!("{}-{}", answers(operation.name), filed.media_type),
+                &filed.asks,
+                Some(filed.media_type),
+                filed.since,
             )
         })
         .collect()

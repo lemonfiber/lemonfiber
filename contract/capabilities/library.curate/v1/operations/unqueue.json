@@ -6,17 +6,27 @@
         "application/json": {
           "schema": {
             "$defs": {
-              "Kind": {
-                "description": "The two kinds of video a household files by resolution.",
+              "TitleKind": {
+                "description": "What kind of title a curator files, a member asks for and a media server holds: a\nseries, a film, music or books.",
                 "oneOf": [
                   {
                     "const": "tv",
-                    "description": "Television: series, seasons and episodes.",
+                    "description": "A series.",
                     "type": "string"
                   },
                   {
                     "const": "movies",
-                    "description": "Film.",
+                    "description": "A film.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "music",
+                    "description": "An album, or a whole artist asked for.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "books",
+                    "description": "A book, or a whole author or series of books asked for.",
                     "type": "string"
                   }
                 ]
@@ -36,7 +46,7 @@
                 "type": "integer"
               },
               "kind": {
-                "$ref": "#/$defs/Kind",
+                "$ref": "#/$defs/TitleKind",
                 "description": "The port's `kind`."
               }
             },

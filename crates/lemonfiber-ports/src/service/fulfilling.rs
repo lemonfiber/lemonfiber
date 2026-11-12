@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 
 use super::Failure;
-use crate::media::Kind;
+use crate::media::{Kind, TitleKind};
 
 /// A title as a curator holds it, or as its catalogue knows it where it holds none.
 #[derive(
@@ -13,7 +13,8 @@ use crate::media::Kind;
 )]
 #[serde(deny_unknown_fields)]
 pub struct CuratedTitle {
-    /// Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film.
+    /// Its catalogue reference: its `TheTVDB` id for a series, its `TMDB` id for a film, and
+    /// 0 for an album or a book.
     pub reference: i64,
     /// The curator's own id for it, where it holds it.
     pub id: Option<i64>,
@@ -146,7 +147,7 @@ pub trait Fulfilling: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
-    async fn titles(&self, kind: Kind) -> Result<Vec<CuratedTitle>, Failure>;
+    async fn titles(&self, kind: TitleKind) -> Result<Vec<CuratedTitle>, Failure>;
 
     /// The title of `kind` it holds as `id`, or none.
     ///
@@ -171,7 +172,7 @@ pub trait Fulfilling: Send + Sync {
     ///
     /// Returns [`Failure::Refused`] where it holds no such title, and [`Failure`] when the
     /// curator is unreachable.
-    async fn search(&self, kind: Kind, id: i64) -> Result<(), Failure>;
+    async fn search(&self, kind: TitleKind, id: i64) -> Result<(), Failure>;
 
     /// Remove the title of `kind` it holds as `id`, with its files, excluding nothing from a
     /// later import.
@@ -187,7 +188,7 @@ pub trait Fulfilling: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
-    async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure>;
+    async fn downloading(&self, kind: TitleKind) -> Result<Vec<Downloading>, Failure>;
 
     /// Remove the queue entry of `kind` it holds as `id` from the download client holding
     /// it, blocklisting its release where `blocklist`; the release's fingerprint.
@@ -196,7 +197,7 @@ pub trait Fulfilling: Send + Sync {
     ///
     /// Returns [`Failure::Refused`] where it holds no such entry, and [`Failure`] when the
     /// curator or its download client is unreachable.
-    async fn unqueue(&self, kind: Kind, id: i64, blocklist: bool) -> Result<String, Failure>;
+    async fn unqueue(&self, kind: TitleKind, id: i64, blocklist: bool) -> Result<String, Failure>;
 
     /// Lift the blocklist entry of the release fingerprinted `release` for the title of
     /// `kind` it holds as `id`, search the indexers for the title and grab the release whose
@@ -206,7 +207,7 @@ pub trait Fulfilling: Send + Sync {
     ///
     /// Returns [`Failure::Refused`] where it holds no such title, and [`Failure`] when the
     /// curator is unreachable.
-    async fn grab(&self, kind: Kind, id: i64, release: &str) -> Result<Grabbed, Failure>;
+    async fn grab(&self, kind: TitleKind, id: i64, release: &str) -> Result<Grabbed, Failure>;
 }
 
 /// What grabbing a release again came to.
