@@ -49,7 +49,7 @@ fn a_run_aimed_elsewhere_names_the_machine_ahead_of_the_subcommand() {
             "--project-name lemonfiber ",
             "--project-directory /opt/lemonfiber/stack ",
             "--file /opt/lemonfiber/stack/compose.generated.yml ",
-            "--profile media up --detach"
+            "--profile media --profile notify up --detach"
         ))
     );
 }
@@ -62,7 +62,7 @@ fn starts_a_form_detached_with_its_profiles() {
             "docker compose --project-name lemonfiber ",
             "--project-directory /opt/lemonfiber/stack ",
             "--file /opt/lemonfiber/stack/compose.generated.yml ",
-            "--profile media up --detach"
+            "--profile media --profile notify up --detach"
         ))
     );
 }
@@ -118,9 +118,10 @@ fn the_same_request_always_produces_the_same_command() {
     let second = line(&["tv"], &Action::Up, &Settings::default());
     assert_eq!(first, second);
     assert_eq!(
-        first.as_deref().map(|command| command.contains(
-            "--profile search --profile subs --profile torrent --profile tv --profile usenet"
-        )),
+        first.as_deref().map(|command| command.contains(concat!(
+            "--profile notify --profile search --profile subs ",
+            "--profile torrent --profile tv --profile usenet"
+        ))),
         Some(true),
         "profiles are sorted: {first:?}"
     );
@@ -221,7 +222,7 @@ fn each_action_becomes_its_own_subcommand() {
     let ending = |action: &Action| {
         line(&["library"], action, &settings).and_then(|command| {
             command
-                .split("--profile media ")
+                .split("--profile notify ")
                 .nth(1)
                 .map(ToOwned::to_owned)
         })

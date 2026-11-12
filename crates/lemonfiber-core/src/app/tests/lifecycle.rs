@@ -22,7 +22,7 @@ async fn starting_a_form_reports_what_it_would_run_and_runs_nothing() {
         )),
         Some((
             "up".to_owned(),
-            vec!["media".to_owned()],
+            vec!["media".to_owned(), "notify".to_owned()],
             true,
             None,
             Some("--detach".to_owned())

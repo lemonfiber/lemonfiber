@@ -41,14 +41,16 @@ fn offered(forms: &[&str]) -> Option<String> {
 fn a_form_resolves_to_the_closure_it_declares() {
     assert_eq!(
         profiles(&["tv"], Protocols::both()),
-        Some(named(&["search", "subs", "torrent", "tv", "usenet"]))
+        Some(named(&[
+            "notify", "search", "subs", "torrent", "tv", "usenet"
+        ]))
     );
 }
 
 #[test]
 fn several_forms_are_the_union_of_their_closures() {
     let combined = profiles(&["search", "library"], Protocols::both());
-    assert_eq!(combined, Some(named(&["media", "search"])));
+    assert_eq!(combined, Some(named(&["media", "notify", "search"])));
 }
 
 #[test]
@@ -67,7 +69,7 @@ fn narrowing_removes_a_protocol_that_is_not_configured() {
     };
     assert_eq!(
         profiles(&["dl"], usenet_only),
-        Some(named(&["usenet"])),
+        Some(named(&["notify", "usenet"])),
         "the closure asked for both; only the configured one runs"
     );
 }
@@ -99,7 +101,7 @@ fn closure_runs_before_narrowing() {
     };
     assert_eq!(
         profiles(&["tv"], usenet_only),
-        Some(named(&["search", "subs", "tv", "usenet"]))
+        Some(named(&["notify", "search", "subs", "tv", "usenet"]))
     );
 }
 
@@ -107,7 +109,7 @@ fn closure_runs_before_narrowing() {
 fn a_form_that_needs_no_protocol_runs_without_one() {
     assert_eq!(
         profiles(&["library"], Protocols::none()),
-        Some(named(&["media"])),
+        Some(named(&["media", "notify"])),
         "serving what you already have needs no provider"
     );
 }
@@ -434,8 +436,8 @@ fn everything_is_every_profile_the_stack_declares() {
     assert_eq!(
         all_profiles(Protocols::both()),
         Some(named(&[
-            "books", "dash", "media", "movies", "music", "proxy", "search", "subs", "torrent",
-            "tuning", "tv", "usenet",
+            "books", "dash", "media", "movies", "music", "notify", "proxy", "search", "subs",
+            "torrent", "tuning", "tv", "usenet",
         ]))
     );
 }
@@ -452,8 +454,8 @@ fn everything_leaves_out_what_the_configuration_cannot_support() {
     assert_eq!(
         all_profiles(usenet_only),
         Some(named(&[
-            "books", "dash", "media", "movies", "music", "proxy", "search", "subs", "tuning", "tv",
-            "usenet",
+            "books", "dash", "media", "movies", "music", "notify", "proxy", "search", "subs",
+            "tuning", "tv", "usenet",
         ])),
         "the torrent profile is the one left out"
     );
