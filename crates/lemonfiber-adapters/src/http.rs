@@ -28,10 +28,6 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// connection but never sends a reply cannot hang a seed run without end.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Why a request whose deadline asked for a client of its own was not sent.
-const UNBUILT: &str =
-    "no client could be built to connect within its deadline, so nothing was asked";
-
 /// Where a request is allowed to end up: at the address it was sent to, and
 /// nowhere else.
 ///
@@ -167,7 +163,9 @@ fn oversized(request: &Request, limit: usize) -> Unreachable {
 impl Web {
     /// The client a request is sent with: the shared one, one held to the addresses the
     /// request was checked against, or one that connects within a deadline shorter than
-    /// the shared one waits to connect. A clone of the shared one is a handle to it.
+    /// the shared one waits to connect. A clone of the shared one is a handle to it, and it
+    /// is the client where the shorter one could not be built, which happens only where the
+    /// TLS the shared one was built with could not be set up.
     fn client_for(&self, request: &Request) -> Result<reqwest::Client, Unreachable> {
         let connect = request.connect_within(CONNECT_TIMEOUT);
         if let Some(addresses) = request.pinned.as_deref() {
@@ -176,9 +174,9 @@ impl Web {
         if connect >= CONNECT_TIMEOUT {
             return Ok(self.client.clone());
         }
-        builder(&self.cookies, connect)
+        Ok(builder(&self.cookies, connect)
             .and_then(|built| built.build().ok())
-            .ok_or_else(|| Unreachable::once(&without_credentials(&request.url), UNBUILT))
+            .unwrap_or(self.client.clone()))
     }
 }
 

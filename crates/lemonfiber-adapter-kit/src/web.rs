@@ -74,14 +74,15 @@ impl Web {
     }
 
     /// The client `request` is sent through: the shared one, or one that connects within
-    /// a deadline shorter than the shared one waits to connect.
-    fn client_for(&self, request: &Request) -> Result<reqwest::Client, Unreachable> {
+    /// a deadline shorter than the shared one waits to connect. Building that one fails
+    /// only where the TLS the shared one was built with could not be set up, so the shared
+    /// one is the client where it does.
+    fn client_for(&self, request: &Request) -> reqwest::Client {
         let connect = request.connect_within(CONNECT_TIMEOUT);
         if connect >= CONNECT_TIMEOUT {
-            return Ok(self.client.clone());
+            return self.client.clone();
         }
-        client(self.sessions.as_ref(), self.within, connect)
-            .map_err(|why| unanswered(request, false, why))
+        client(self.sessions.as_ref(), self.within, connect).unwrap_or(self.client.clone())
     }
 }
 
@@ -138,11 +139,11 @@ fn with_tls(tls: Option<ClientConfig>) -> reqwest::ClientBuilder {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        read_as_text(&self.client_for(request)?, request, BODY_LIMIT).await
+        read_as_text(&self.client_for(request), request, BODY_LIMIT).await
     }
 
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
-        sent(&self.client_for(request)?, request, most.min(BODY_LIMIT)).await
+        sent(&self.client_for(request), request, most.min(BODY_LIMIT)).await
     }
 }
 
