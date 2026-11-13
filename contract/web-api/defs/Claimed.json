@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Everything a plugin's source says, and what this build makes of it.",
+  "type": "object",
+  "properties": {
+    "against": {
+      "description": "What every verdict in this report was reached against.",
+      "$ref": "PluginEvidence.json"
+    },
+    "capabilities": {
+      "description": "What its services declare they can do.",
+      "type": "array",
+      "items": {
+        "$ref": "Claiming.json"
+      }
+    },
+    "checks": {
+      "description": "The checks it contributes, against the recordings they name.\n\nReported and never counted against the install. A contributed check reports on a\nrunning stack rather than gating one, so a check that its own recording refuses\nis a check doing its job on a machine in the state it was recorded in — which is\na different fact from a claim its recordings refute.",
+      "type": "array",
+      "items": {
+        "$ref": "Asserted.json"
+      }
+    },
+    "contributions": {
+      "description": "What it adds to lemonfiber's own registers.",
+      "type": "array",
+      "items": {
+        "$ref": "Contributed.json"
+      }
+    },
+    "extension_points_version": {
+      "description": "The extension points generation it was held to.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "id": {
+      "description": "The plugin's id.",
+      "type": "string"
+    },
+    "installable": {
+      "description": "Whether this plugin would be installed as it stands.\n\nCarried rather than left for a reader to work out. It is one rule over two of\nthe fields above, and a consumer deciding it for itself would be a second copy\nof that rule — free to disagree with the exit status this same answer produces.",
+      "type": "boolean"
+    },
+    "name": {
+      "description": "Its human-facing name.",
+      "type": "string"
+    },
+    "proofs": {
+      "description": "What must hold before it is installed, against the recordings it ships.",
+      "type": "array",
+      "items": {
+        "$ref": "Asserted.json"
+      }
+    },
+    "refusals": {
+      "description": "Everything the two published vocabularies refuse, in one pass.",
+      "type": "array",
+      "items": {
+        "$ref": "Violation.json"
+      }
+    },
+    "version": {
+      "description": "The author's own version of it.",
+      "type": "string"
+    },
+    "vocabulary_version": {
+      "description": "The capability vocabulary generation it was held to.\n\nCarried for the reason every other read under this word carries one: an author\ncomparing what they were refused for with what they read needs to know whether\nthe difference is their manifest or this build.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "version",
+    "vocabulary_version",
+    "extension_points_version",
+    "against",
+    "refusals",
+    "capabilities",
+    "proofs",
+    "checks",
+    "contributions",
+    "installable"
+  ]
+}

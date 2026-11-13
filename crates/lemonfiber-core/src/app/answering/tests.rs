@@ -2,7 +2,7 @@ use super::answered_under;
 use crate::app::command::{
     Asking, Diagnosing, Keeping, Linking, MigrateAction, Queueing, Settling, Tracing, Whom, Wishing,
 };
-use crate::app::{plugins, rehearsal, Command};
+use crate::app::{authoring, plugins, rehearsal, Command};
 use crate::model::kind::{self, Kind};
 
 /// Each command that only reads, and the kind it answers with.
@@ -97,10 +97,45 @@ fn reading() -> Vec<(Command, Kind)> {
     ]
 }
 
+/// Each question an author asks of a plugin's source, and the kind it answers with.
+fn authoring() -> Vec<(Command, Kind)> {
+    vec![
+        (
+            Command::Authoring(authoring::Asked::Claims {
+                path: "subber".into(),
+            }),
+            kind::PLUGIN_CLAIMS,
+        ),
+        (
+            Command::Authoring(authoring::Asked::Conform {
+                path: "subber".into(),
+            }),
+            kind::PLUGIN_CONFORMANCE,
+        ),
+        (
+            Command::Authoring(authoring::Asked::Provenance {
+                path: "subber".into(),
+                keys: Vec::new(),
+            }),
+            kind::PLUGIN_PROVENANCE,
+        ),
+        (
+            Command::Authoring(authoring::Asked::Record {
+                path: "subber".into(),
+                taking: crate::plugin::Retaking {
+                    check: true,
+                    ..crate::plugin::Retaking::default()
+                },
+            }),
+            kind::PLUGIN_RECORDING,
+        ),
+    ]
+}
+
 /// A command that only reads answers with the one kind its outcome is written under.
 #[test]
 fn each_reading_answers_with_its_own_kind() {
-    for (command, expected) in reading() {
+    for (command, expected) in reading().into_iter().chain(authoring()) {
         assert_eq!(
             answered_under(&command),
             &[expected],

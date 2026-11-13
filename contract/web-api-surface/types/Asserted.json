@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "kind": {
+      "type": [
+        "ref:Assertion"
+      ],
+      "required": true
+    },
+    "says": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "verdict": {
+      "type": [
+        "ref:PluginVerdict"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

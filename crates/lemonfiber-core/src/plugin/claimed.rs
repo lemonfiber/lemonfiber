@@ -141,6 +141,7 @@ pub struct FailingAsDeclared {
 
 /// One probe a claim binds, and what running it against its recording came to.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[schemars(rename = "ProbeRan")]
 pub struct Ran {
     /// The probe the vocabulary declares, by name.
     pub probe: String,

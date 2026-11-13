@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "for": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "says": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

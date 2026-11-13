@@ -212,6 +212,22 @@ const fn queued(queueing: Queueing) -> Asked {
     }
 }
 
+/// What a doctor run is.
+///
+/// The killswitch check *is* the disruption. It takes the tunnel's own route down
+/// inside the container and watches what the rest of the stack does, which is the only
+/// way to find out whether anything leaks. A rehearsal of it could report the intent and
+/// nothing about the outcome, and the outcome is the whole of what was asked for.
+const fn diagnosed(diagnosing: &Diagnosing) -> Asked {
+    match diagnosing {
+        Diagnosing {
+            disruptive: true, ..
+        } => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
+        Diagnosing { accept: None, .. } => reads("doctor"),
+        Diagnosing { .. } => reports("doctor --accept", &[kind::DOCTOR]),
+    }
+}
+
 const fn viewed(viewing: &Viewing) -> Asked {
     match viewing {
         Viewing::Title { .. } => reports("title", &[kind::TITLE]),
@@ -285,21 +301,12 @@ pub const fn asked(command: &Command) -> Asked {
         // a rehearsal is one the operator no longer has.
         Command::Trace(tracing) => traced(tracing),
 
-        // The killswitch check *is* the disruption. It takes the tunnel's own route
-        // down inside the container and watches what the rest of the stack does,
-        // which is the only way to find out whether anything leaks. A rehearsal of it
-        // could report the intent and nothing about the outcome, and the outcome is
-        // the whole of what was asked for.
-        Command::Doctor(Diagnosing {
-            disruptive: true, ..
-        }) => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
-        Command::Doctor(Diagnosing { accept: None, .. }) => reads("doctor"),
-        Command::Doctor(_) => reports("doctor --accept", &[kind::DOCTOR]),
+        Command::Doctor(diagnosing) => diagnosed(diagnosing),
 
-        // Same shape, for the same reason: a walk adds an item, waits for the stack to
-        // do something with it, and reports what actually happened at each stage. What
-        // it would report is what the stack did, and a rehearsal has no stack doing
-        // anything.
+        // The same shape as the disruptive doctor run: a walk adds an item, waits for the
+        // stack to do something with it, and reports what actually happened at each
+        // stage. What it would report is what the stack did, and a rehearsal has no stack
+        // doing anything.
         Command::Walkthrough { .. } => cannot("walkthrough", THE_WALK_IS_THE_OBSERVATION),
 
         // Reports. Each of these builds the report it would have filled in and stops
@@ -442,6 +449,7 @@ mod withheld;
 
 pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
+
 /// What reading a plugin's own source reads and writes: recording writes what it takes,
 /// unless it is holding what it takes to what is there.
 const fn authored(asked: &authoring::Asked) -> Asked {

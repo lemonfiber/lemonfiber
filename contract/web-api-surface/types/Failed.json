@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "log": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "step": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -14,7 +14,6 @@ use crate::autostart::run as autostart;
 use crate::backup::run as backup;
 use crate::bandwidth::run as bandwidth;
 use crate::bundle::run as bundle;
-use crate::doctor::Narrowing;
 use crate::door::run as door;
 use crate::error::codes::life::{
     ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
@@ -222,14 +221,9 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
 /// Named apart for the reason [`lifecycle`] is: the run happens first and what it found
 /// is then read against what was accepted, which is two steps rather than a
 /// pass-along.
-async fn diagnosed(
-    ctx: &Ctx,
-    narrowing: Narrowing,
-    disruptive: bool,
-    accept: Option<String>,
-) -> Result<Outcome, Box<Problem>> {
-    let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
-    let mut report = accepted::acknowledge(ctx, accept.as_deref(), report)?;
+async fn diagnosed(ctx: &Ctx, asked: &Diagnosing) -> Result<Outcome, Box<Problem>> {
+    let report = engine::diagnose(ctx, &asked.narrowing, asked.disruptive).await?;
+    let mut report = accepted::acknowledge(ctx, asked.accept.as_deref(), report)?;
     // Dated after an acceptance is applied, so a warning the operator has just
     // accepted is not remembered as wrong.
     report.findings = conditions::dated(ctx, report.findings);
@@ -447,11 +441,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => upgraded(ctx, confirm).await,
         Command::Status { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
-        Command::Doctor(Diagnosing {
-            narrowing,
-            disruptive,
-            accept,
-        }) => diagnosed(ctx, narrowing, disruptive, accept).await,
+        Command::Doctor(asked) => diagnosed(ctx, &asked).await,
         Command::Repair {
             consent,
             disruptive,

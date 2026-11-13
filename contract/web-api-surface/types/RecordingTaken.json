@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "fixture": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "named": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "took": {
+      "type": [
+        "ref:Took"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

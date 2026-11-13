@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every recording a plugin's manifest names, taken again.",
+  "type": "object",
+  "properties": {
+    "failed": {
+      "description": "Each service whose recordings were not taken.",
+      "type": "array",
+      "items": {
+        "$ref": "Failed.json"
+      }
+    },
+    "holds": {
+      "description": "Whether every recording was written or reproduced, each with a note, and each no\ncase asked removed.",
+      "type": "boolean"
+    },
+    "id": {
+      "description": "The plugin's id.",
+      "type": "string"
+    },
+    "recordings": {
+      "description": "Each recording, in the order the manifest names them.",
+      "type": "array",
+      "items": {
+        "$ref": "RecordingTaken.json"
+      }
+    },
+    "refusals": {
+      "description": "Everything this build refuses about the manifest; nothing is taken where any is.",
+      "type": "array",
+      "items": {
+        "$ref": "Violation.json"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "refusals",
+    "recordings",
+    "failed",
+    "holds"
+  ]
+}

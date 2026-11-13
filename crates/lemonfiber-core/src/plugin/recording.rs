@@ -122,6 +122,7 @@ pub enum Took {
 
 /// One recording a manifest names, and what taking it came to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "RecordingTaken")]
 pub struct Taken {
     /// What names it: a proof, a claim's probe or a contributed check.
     pub named: String,

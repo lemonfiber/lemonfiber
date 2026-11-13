@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A service none of whose recordings was written, and why.",
+  "type": "object",
+  "properties": {
+    "log": {
+      "description": "The last lines its container wrote, scrubbed and with nothing a terminal obeys.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "service": {
+      "description": "The service.",
+      "type": "string"
+    },
+    "step": {
+      "description": "The step it failed at.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "step",
+    "why",
+    "log"
+  ]
+}

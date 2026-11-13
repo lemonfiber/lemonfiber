@@ -1,6 +1,6 @@
 use lemonfiber_core::plugin::{CaseVerdict as Verdict, Conformed, Judged, Violation};
 
-use super::conformed;
+use super::judged;
 
 fn case(contract: &str, case: &str, verdict: Verdict) -> Judged {
     Judged {
@@ -21,9 +21,7 @@ fn read(refusals: Vec<Violation>, cases: Vec<Judged>, conforms: bool) -> Conform
 }
 
 fn said(read: &Conformed) -> String {
-    conformed(read, false)
-        .map(|lines| lines.text())
-        .unwrap_or_default()
+    judged(read).text()
 }
 
 #[test]
@@ -95,7 +93,12 @@ fn each_case_is_said_under_its_contract_and_the_whole_is_judged() {
 
     assert!(said(&read(Vec::new(), Vec::new(), true))
         .contains("It speaks no contract, so there is nothing to judge."));
-    assert!(conformed(&passing, true)
-        .map(|lines| lines.text())
-        .is_some_and(|json| json.contains("\"conforms\": true")));
+    let json = crate::render::answer(
+        &lemonfiber_core::app::Outcome::PluginConformance(passing),
+        true,
+    )
+    .text();
+    assert!(json.contains(r#""kind":"plugin-conformance""#), "{json}");
+    assert!(json.contains(r#""api_version""#), "{json}");
+    assert!(json.contains(r#""conforms":true"#), "{json}");
 }

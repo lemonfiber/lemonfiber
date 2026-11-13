@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "host": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "const:\"left\"",
+        "const:\"overran\"",
+        "const:\"removed\"",
+        "const:\"reproduced\"",
+        "const:\"unasked\"",
+        "const:\"unnoted\"",
+        "const:\"unrecorded\"",
+        "const:\"unreproduced\"",
+        "const:\"written\""
+      ],
+      "required": true
+    },
+    "seconds": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"left\"",
+    "\"overran\"",
+    "\"removed\"",
+    "\"reproduced\"",
+    "\"unasked\"",
+    "\"unnoted\"",
+    "\"unrecorded\"",
+    "\"unreproduced\"",
+    "\"written\""
+  ]
+}
