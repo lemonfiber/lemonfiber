@@ -389,8 +389,10 @@ fn a_plan_names_each_plugin_naming_a_form_the_stack_no_longer_declares() {
         ..a_plan("tv", Vec::new())
     })
     .text();
-    assert!(
-        text.contains("komga names forms this stack no longer declares: comics, cartoons"),
+    assert_eq!(
+        text.matches("komga names forms this stack no longer declares: comics, cartoons")
+            .count(),
+        1,
         "{text}"
     );
 }
