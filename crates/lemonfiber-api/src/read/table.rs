@@ -469,7 +469,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         ASKABLE => askable(member, term, after, kind.as_deref(), unit.as_deref()),
         ASKABLE_KINDS => Ok(askable_kinds(member)),
         HOSTING => Ok(Command::Hosting(Keeping::Read)),
-        FRONT_DOOR => Ok(Command::FrontDoor),
+        FRONT_DOOR => Ok(Command::FrontDoor(lemonfiber_core::app::Doorway::default())),
         STACK => Ok(Command::Stack),
         SETTLED => Ok(Command::Settled),
         NOTIFY => Ok(Command::Notify(Notifying::List)),

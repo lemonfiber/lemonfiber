@@ -26,18 +26,21 @@ mod pictures;
 pub mod published;
 pub mod table;
 
+use std::net::IpAddr;
+
 use axum::body::Body;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
-use axum::Router;
-use lemonfiber_core::app::{dispatch, Command, Ctx};
+use axum::{Extension, Router};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Doorway};
 use lemonfiber_core::error::{Code, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
+use crate::guard::Arrived;
 use crate::read::table::{named, wanted, Wanted, OFFERED, TITLE};
 use crate::refusal::{Refusal, UNRENDERED};
 use crate::router::Serving;
@@ -62,8 +65,10 @@ pub fn routes() -> Router<Serving> {
                 get(
                     move |State(serving): State<Serving>,
                           caller: Caller,
+                          arrived: Option<Extension<Arrived>>,
                           RawQuery(query): RawQuery| async move {
-                        reading(&serving, &caller, read, query.as_deref()).await
+                        let from = arrived.map(|Extension(arrived)| arrived.from);
+                        reading(&serving, &caller, read, query.as_deref(), from).await
                     },
                 ),
             )
@@ -87,7 +92,7 @@ async fn title(
                 title: Some(id),
                 ..given
             };
-            answering(&serving, &caller, TITLE, given).await
+            answering(&serving, &caller, TITLE, given, None).await
         }
         Err(problem) => went_wrong(&problem),
     }
@@ -104,16 +109,23 @@ pub(crate) async fn reading(
     caller: &Caller,
     read: &str,
     query: Option<&str>,
+    from: Option<IpAddr>,
 ) -> Response {
     match wanted(read, query) {
-        Ok(given) => answering(serving, caller, read, given).await,
+        Ok(given) => answering(serving, caller, read, given, from).await,
         Err(problem) => went_wrong(&problem),
     }
 }
 
 /// Carry out the read a name reaches with what it was given, or say why it cannot be.
-async fn answering(serving: &Serving, caller: &Caller, read: &str, given: Wanted) -> Response {
-    match named(read, given) {
+async fn answering(
+    serving: &Serving,
+    caller: &Caller,
+    read: &str,
+    given: Wanted,
+    from: Option<IpAddr>,
+) -> Response {
+    match named(read, given).map(|command| arrived_from(command, from)) {
         // Ruled on between naming the command and carrying it out, so what is
         // carried out is what this caller may have — narrowed where they may have
         // part of it, and nothing where it is not theirs at all.
@@ -135,6 +147,14 @@ async fn answering(serving: &Serving, caller: &Caller, read: &str, given: Wanted
             Err(refused) => *refused,
         },
         Err(why) => why.answered(),
+    }
+}
+
+/// `command`, asked from `from` where that is part of its answer.
+fn arrived_from(command: Command, from: Option<IpAddr>) -> Command {
+    match command {
+        Command::FrontDoor(doorway) => Command::FrontDoor(Doorway { from, ..doorway }),
+        other => other,
     }
 }
 

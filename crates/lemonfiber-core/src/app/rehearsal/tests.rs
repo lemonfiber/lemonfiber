@@ -245,7 +245,7 @@ fn reads() -> Vec<Command> {
         Command::History,
         Command::Status { forms: Vec::new() },
         Command::Stuck,
-        Command::FrontDoor,
+        Command::FrontDoor(crate::app::Doorway::default()),
         Command::Stack,
         Command::Settled,
         Command::News,

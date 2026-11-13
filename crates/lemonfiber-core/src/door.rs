@@ -24,6 +24,7 @@
 
 mod address;
 mod chosen;
+mod reaching;
 pub(crate) mod run;
 
 use serde::Serialize;
@@ -39,6 +40,8 @@ use crate::plugin::{Installed, Placed};
 
 pub use address::{address, proxied, publishes_a_name, Address, Place, ONLY_HERE};
 pub use chosen::{chosen, Chosen, Refusal, KEPT};
+pub use reaching::Reaches;
+pub(crate) use reaching::{reaches, whence, Whence};
 
 /// What a service published to the local network is to the people in the house.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -86,6 +89,17 @@ impl Facing {
                 "nothing here says what this is to the household, so it is not offered \
                  as somewhere to begin"
             }
+        }
+    }
+
+    /// What this is, in the household's words, where a member may be handed the way there.
+    #[must_use]
+    pub const fn household(self) -> Option<&'static str> {
+        match self {
+            Self::Asking => Some("Where you ask for something, and see how it's coming along."),
+            Self::Watching => Some("Where you watch what the house has."),
+            Self::Shelf => Some("Where the house keeps one kind of thing, such as music or books."),
+            Self::Operators | Self::Carriage | Self::Unstated => None,
         }
     }
 
