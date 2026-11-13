@@ -18,6 +18,10 @@ pub enum ApiKind {
     Sabnzbd,
     /// qBittorrent's `WebUI` API.
     Qbittorrent,
+    /// Transmission's RPC API.
+    Transmission,
+    /// `NZBGet`'s JSON-RPC API.
+    Nzbget,
     /// Seerr.
     Seerr,
     /// Bindery.
@@ -44,6 +48,8 @@ impl ApiKind {
             Self::Servarr => "servarr",
             Self::Sabnzbd => "sabnzbd",
             Self::Qbittorrent => "qbittorrent",
+            Self::Transmission => "transmission",
+            Self::Nzbget => "nzbget",
             Self::Seerr => "seerr",
             Self::Bindery => "bindery",
             Self::Jellyfin => "jellyfin",
@@ -60,10 +66,12 @@ impl ApiKind {
     }
 
     /// Every API lemonfiber speaks.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 11] = [
         Self::Servarr,
         Self::Sabnzbd,
         Self::Qbittorrent,
+        Self::Transmission,
+        Self::Nzbget,
         Self::Seerr,
         Self::Bindery,
         Self::Jellyfin,

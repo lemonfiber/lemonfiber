@@ -81,8 +81,11 @@ impl Held {
     }
 }
 
-/// Every download client's credential that is in hand: a Usenet client's key and a
-/// torrent client's account, each the one lemonfiber minted for it.
+/// The download clients a curator signs in to with an account rather than a key.
+const SIGNED_INTO: [ApiKind; 3] = [ApiKind::Qbittorrent, ApiKind::Transmission, ApiKind::Nzbget];
+
+/// Every download client's credential that is in hand: `SABnzbd`'s key and the account of
+/// each client in [`SIGNED_INTO`], each the one lemonfiber minted for it.
 ///
 /// A client missing from the answer has nothing minted for it yet, and nothing is told
 /// about it until a later run finds it.
@@ -94,7 +97,10 @@ pub(super) fn held(ctx: &Ctx, fillers: &Fillers) -> Held {
                 .insert(Holder::of(filler), Credential::ApiKey(key));
         }
     }
-    for filler in fillers.talking(ApiKind::Qbittorrent) {
+    for filler in SIGNED_INTO
+        .into_iter()
+        .flat_map(|kind| fillers.talking(kind))
+    {
         if let Some(account) = super::keys::minted_account(ctx, fillers, filler) {
             held.keys.insert(Holder::of(filler), account);
         }

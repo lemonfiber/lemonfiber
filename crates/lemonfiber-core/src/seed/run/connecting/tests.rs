@@ -82,6 +82,26 @@ fn usenet_as(shaping: fn(&mut crate::plugin::Placed)) -> Fillers {
     )
 }
 
+/// The shipped stack's asks with every part moved in, its `service`'s upstream answering in
+/// `api`, and every ask of `capability` naming no API it talks in.
+fn answering_in(service: &str, capability: &str, api: &str) -> Fillers {
+    moved(
+        &[],
+        &Chosen::default(),
+        |_| (),
+        |parts| {
+            in_no_api(parts, capability);
+            for upstream in parts
+                .iter_mut()
+                .flat_map(|part| part.services.iter_mut())
+                .filter(|placed| placed.service == service)
+            {
+                upstream.native = Some(api.to_owned());
+            }
+        },
+    )
+}
+
 /// The reasons the shipped stack's TV curator is given for each pairing that comes to
 /// nothing.
 fn reasons(fillers: &Fillers) -> Vec<String> {
@@ -136,6 +156,56 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
             client("sonarr", "qbittorrent"),
         ]
     );
+}
+
+/// A curator is told about each download client in the API that client answers in, where
+/// a client of the kind it asked for answers in that API.
+#[test]
+fn a_curator_is_told_each_download_client_in_the_api_it_answers_in() {
+    for (service, capability, api) in [
+        ("sabnzbd", "download.usenet", "nzbget"),
+        ("qbittorrent", "download.torrent", "transmission"),
+    ] {
+        let fillers = answering_in(service, capability, api);
+
+        let told: Vec<Option<Connection>> = pairings(&fillers)
+            .iter()
+            .filter(|pairing| pairing.asker.id == "sonarr" && pairing.filler.id == service)
+            .map(|pairing| {
+                pairing
+                    .made
+                    .clone()
+                    .ok()
+                    .map(|(connection, _, _)| connection)
+            })
+            .collect();
+        assert_eq!(
+            told,
+            vec![Some(Connection::DownloadClient(Protocol(api.to_owned())))],
+            "{service} answering in {api}"
+        );
+    }
+}
+
+/// A Usenet client answering in a torrent client's API, and a torrent client in a Usenet
+/// client's, come to nothing, and each is said.
+#[test]
+fn a_download_client_answering_in_the_other_kinds_api_is_reported() {
+    for (service, capability, api, named) in [
+        ("sabnzbd", "download.usenet", "transmission", "SABnzbd"),
+        ("qbittorrent", "download.torrent", "nzbget", "qBittorrent"),
+    ] {
+        let fillers = answering_in(service, capability, api);
+
+        assert_eq!(
+            reasons(&fillers),
+            vec![format!(
+                "{named} fills {capability}, which Sonarr asks for, and nothing in lemonfiber \
+                 tells Sonarr about a service answering in {named}'s API"
+            )],
+            "{service} answering in {api}"
+        );
+    }
 }
 
 /// Every curator the shipped stack's curation asks reach comes to the connection its

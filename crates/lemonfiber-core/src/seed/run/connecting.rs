@@ -222,10 +222,10 @@ fn connection(
     asker: &Filler,
 ) -> Result<Connection, Unmade> {
     match (contract, capability, filler) {
-        (curate::CAPABILITY, USENET, ApiKind::Sabnzbd)
-        | (curate::CAPABILITY, TORRENT, ApiKind::Qbittorrent) => Ok(Connection::DownloadClient(
-            Protocol(filler.name().to_owned()),
-        )),
+        (curate::CAPABILITY, USENET, ApiKind::Sabnzbd | ApiKind::Nzbget)
+        | (curate::CAPABILITY, TORRENT, ApiKind::Qbittorrent | ApiKind::Transmission) => Ok(
+            Connection::DownloadClient(Protocol(filler.name().to_owned())),
+        ),
         (search::CAPABILITY, CURATES, ApiKind::Servarr) => {
             super::applications::application_kind(media)
                 .map(Connection::Application)
