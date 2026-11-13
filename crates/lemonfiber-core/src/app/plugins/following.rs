@@ -243,7 +243,7 @@ pub(super) struct Following<'a> {
     /// Every service the stack declares.
     pub(super) services: &'a [lemonfiber_manifest::Service],
     /// The stamp what is kept is journalled under.
-    pub(super) stamp: &'a str,
+    pub(super) stamp: Instant,
 }
 
 /// Run `recipes` in order under `consent`, and keep what they capture.
@@ -483,7 +483,7 @@ pub(super) fn kept(
             .iter()
             .zip(replaced)
             .map(|(one, replacing)| Change {
-                at: stamp.to_owned(),
+                at: stamp,
                 operation: crate::plugin::owner(&would.plugin),
                 target: one.name.to_owned(),
                 kind: Kind::Secret {

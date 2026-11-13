@@ -90,7 +90,7 @@ pub(crate) fn credentials(ctx: &Ctx) -> Result<(), Failure> {
                     .iter()
                     .find(|(_, name, _)| name == one.name)
                     .map(|(key, _, _)| key.clone());
-                filed_secret(one, current.clone(), key, &stamp)
+                filed_secret(one, current.clone(), key, stamp)
             })
             .collect();
         crate::app::recover::journalled(&journal, &changes)
@@ -150,7 +150,7 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
     super::secrets::filed(&env.with_file_name(SECRETS), &keeping, random, &|absent| {
         let changes: Vec<Change> = absent
             .iter()
-            .map(|(one, current)| change(one, current.clone(), &filings, &stamp))
+            .map(|(one, current)| change(one, current.clone(), &filings, stamp))
             .collect();
         crate::app::recover::journalled(&journal, &changes)
     })?;
@@ -211,7 +211,7 @@ fn change(
     stamp: Instant,
 ) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: one.name.to_owned(),
         kind: Kind::Secret {
@@ -270,7 +270,7 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
         super::secrets::filed(&env.with_file_name(SECRETS), &keeping, random, &|absent| {
             let changes: Vec<Change> = absent
                 .iter()
-                .map(|(one, current)| filed_secret(one, current.clone(), key_of(one.name), &stamp))
+                .map(|(one, current)| filed_secret(one, current.clone(), key_of(one.name), stamp))
                 .collect();
             crate::app::recover::journalled(&journal, &changes)
         })?;
@@ -282,7 +282,7 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
         super::store::filed(&settings, &filing, &|absent| {
             let changes: Vec<Change> = absent
                 .iter()
-                .map(|(name, value)| filed_setting(name, value, key_of(name), &stamp))
+                .map(|(name, value)| filed_setting(name, value, key_of(name), stamp))
                 .collect();
             crate::app::recover::journalled(&journal, &changes)
         })?;
@@ -424,7 +424,7 @@ fn nas_folded(
     let folded = export.written();
     let stamp = ctx.stamp();
     let set = |key: &str, previous: Option<&str>, current: &str| Change {
-        at: stamp.clone(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: key.to_owned(),
         kind: Kind::Set {
@@ -451,7 +451,7 @@ fn filed_secret(
     stamp: Instant,
 ) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: one.name.to_owned(),
         kind: Kind::Secret {
@@ -466,7 +466,7 @@ fn filed_secret(
 
 fn filed_setting(name: &str, value: &str, key: Option<String>, stamp: Instant) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: name.to_owned(),
         kind: Kind::Setting {

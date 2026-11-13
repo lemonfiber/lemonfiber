@@ -170,11 +170,11 @@ async fn substituting(
     let reasons = held.reasons_with(&filling.capability, reason);
     let before = held.reasons();
     let stamp = ctx.stamp();
-    let mut changes = super::parted(&substitution, &stamp);
+    let mut changes = super::parted(&substitution, stamp);
     changes.push(super::recorded(
         &substitution,
         held.setting().as_deref(),
-        &stamp,
+        stamp,
     ));
     let mut writes = vec![(super::FILLS_KEY, substitution.setting.as_str())];
     if reasons != before {
@@ -182,7 +182,7 @@ async fn substituting(
             &substitution,
             before.as_deref(),
             reasons.as_deref(),
-            &stamp,
+            stamp,
         ));
         writes.push((super::FILLS_WHY_KEY, reasons.as_deref().unwrap_or_default()));
     }
@@ -190,7 +190,7 @@ async fn substituting(
     changes.extend(
         overwrites
             .iter()
-            .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
+            .map(|overwrite| overwrite.journalled(super::OPERATION, stamp)),
     );
     crate::app::recover::journalled(&paths.journal(), &changes)
         .map_err(|failure| Box::new(failure.problem()))?;

@@ -51,7 +51,7 @@ impl Plan {
     pub fn changes(&self, current: &EnvFile, stamp: Instant) -> Vec<Change> {
         self.written()
             .map(|(key, value)| Change {
-                at: stamp.to_owned(),
+                at: stamp,
                 operation: APPLY.to_owned(),
                 target: ENV_FILE.to_owned(),
                 kind: Kind::Set {

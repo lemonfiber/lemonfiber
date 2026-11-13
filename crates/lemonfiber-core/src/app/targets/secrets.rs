@@ -140,7 +140,7 @@ pub(crate) fn record_secret(
                     one.previous.clone(),
                     one.current.clone(),
                     operation,
-                    &stamp,
+                    stamp,
                 )
             })
             .collect();
@@ -212,7 +212,7 @@ fn secret_changed(
     stamp: Instant,
 ) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: operation.to_owned(),
         target: name.to_owned(),
         kind: Kind::Secret {

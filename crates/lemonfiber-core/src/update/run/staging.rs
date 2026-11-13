@@ -23,6 +23,7 @@ use lemonfiber_manifest::Manifest;
 
 use crate::docker::survey_beside;
 use crate::error::{Diagnose, Problem};
+use crate::instant::Instant;
 use crate::journal::{Change as Journalled, Kind};
 use crate::stack::compose::Action;
 use crate::update::{self, Applied, Change, Ending, Reversal};
@@ -133,12 +134,12 @@ pub(super) async fn apply(
 /// of the endings by name. The two readings would otherwise be free to drift, and the
 /// one that decides what a report offers is the one that must decide what is written
 /// down.
-fn recorded(applied: &[Applied], backup: &str, at: &str) -> Vec<Journalled> {
+fn recorded(applied: &[Applied], backup: &str, at: Instant) -> Vec<Journalled> {
     applied
         .iter()
         .filter(|one| one.reversal == Reversal::Restore)
         .map(|one| Journalled {
-            at: at.to_owned(),
+            at,
             operation: OPERATION.to_owned(),
             target: one.service.clone(),
             kind: Kind::Pinned {

@@ -58,7 +58,7 @@ pub(crate) async fn update(
     let stamp = ctx.stamp();
     let stack_manifest = super::writing::stack_manifest(ctx)?;
     let (mut would, _) =
-        super::installing::settled(&stack_manifest, held.installed(), &read, path, from, &stamp);
+        super::installing::settled(&stack_manifest, held.installed(), &read, path, from, stamp);
     let was = installed_as(&held, &would.plugin)?;
     let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
@@ -71,7 +71,7 @@ pub(crate) async fn update(
     super::granting::aimed(&would, trusted)?;
     let granting =
         super::granting::asked(ctx, &stack_manifest, without.installed(), &would, trusted);
-    would.granted = super::granting::approved(&granting, &stamp);
+    would.granted = super::granting::approved(&granting, Some(stamp));
     let planned = super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?;
     let changes = crate::plugin::changes(&planned);
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
@@ -142,7 +142,7 @@ pub(crate) async fn update(
                 was.version,
                 why.detail.unwrap_or(why.summary)
             ));
-            account.restored = Some(restored(ctx, &was, stack, &stamp).await);
+            account.restored = Some(restored(ctx, &was, stack, stamp).await);
             return Ok(answering(held.installed().to_vec(), account, offer));
         }
     }
@@ -154,7 +154,7 @@ pub(crate) async fn update(
         would: &would,
         stack,
         source: &crate::plugin::root(path),
-        stamp: &stamp,
+        stamp: stamp,
         standing: &standing,
         before: &before,
         services: &stack_manifest.services,
@@ -179,8 +179,8 @@ pub(crate) async fn update(
     if let Came::Stopped(why) = came {
         account.stopped = Some(why);
     }
-    account.install.reversed = Some(super::reversing(ctx, &would, stack, &stamp).await);
-    account.restored = Some(restored(ctx, &was, stack, &stamp).await);
+    account.install.reversed = Some(super::reversing(ctx, &would, stack, stamp).await);
+    account.restored = Some(restored(ctx, &was, stack, stamp).await);
     Ok(answering(held.installed().to_vec(), account, offer))
 }
 
@@ -281,7 +281,7 @@ struct Coming<'a> {
     /// The new version's own source.
     source: &'a Path,
     /// The stamp the whole update is journalled under.
-    stamp: &'a str,
+    stamp: Instant,
     /// The stack as it was read before anything moved.
     standing: &'a super::super::engine::Stack,
     /// What the stack's own checks said then.

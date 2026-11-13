@@ -1,3 +1,4 @@
+use crate::instant::Instant;
 use crate::test_support::a_fresh_write;
 use std::path::Path;
 
@@ -16,7 +17,7 @@ use crate::wizard::{Answer, Guarded, Library, Phase, Vpn, Wizard};
 /// What an apply writes with, over a real directory and a real machine's
 /// randomness — the key the journal's credentials are sealed under is made from
 /// the latter.
-fn applying<'a>(paths: &'a Paths, source: Source, stamp: &'a str) -> Applying<'a> {
+fn applying<'a>(paths: &'a Paths, source: Source, stamp: Instant) -> Applying<'a> {
     Applying {
         paths,
         source,

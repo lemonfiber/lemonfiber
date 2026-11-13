@@ -1,6 +1,7 @@
 //! The record a reversal keeps of itself: each change it put back, written the other way
 //! round.
 
+use crate::instant::Instant;
 use crate::journal::{Change, Undo};
 
 use super::OPERATION;
@@ -17,12 +18,12 @@ use super::OPERATION;
 /// and `Made` would say it had been created; what a service created is never put back at
 /// all, so there is nothing to record. Neither has an inverse this record can spell, and
 /// inventing one would put a line in the journal that replaying would not reproduce.
-pub(super) fn recording(run: &[&Change], reversed: &[Undo], at: &str) -> Vec<Change> {
+pub(super) fn recording(run: &[&Change], reversed: &[Undo], at: Instant) -> Vec<Change> {
     run.iter()
         .filter(|change| reversed.iter().any(|undo| undo.target == change.target))
         .filter_map(|change| {
             inverted(&change.kind).map(|kind| Change {
-                at: at.to_owned(),
+                at,
                 operation: OPERATION.to_owned(),
                 target: change.target.clone(),
                 kind,

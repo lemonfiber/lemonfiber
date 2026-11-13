@@ -8,6 +8,7 @@ use super::{
     observe_or_skip, observe_or_untold, same_base_url, unreached, wire_one, AppSync, Application,
     Journal, MediaServer, Naming, Random, Requests, State, Wiring, ADMIN,
 };
+use crate::instant::Instant;
 use crate::ports::media::Kind;
 use crate::ports::service::{
     Credential, Endpoint, Failure, FulfilmentTarget, IdentitySource, Protocol,
@@ -39,7 +40,7 @@ pub async fn wire_fulfilment_targets(
     requests: &dyn Requests,
     wanted: &[FulfilmentTarget],
     journal: &mut Journal,
-    at: &str,
+    at: Instant,
     rehearsing: bool,
 ) -> Vec<Wiring> {
     // Read as the owner, which a rehearsal is not: it opens no session, so the answer
@@ -185,7 +186,7 @@ pub async fn wire_applications(
     service: &str,
     wanted: &[Application],
     journal: &mut Journal,
-    at: &str,
+    at: Instant,
     rehearsing: bool,
 ) -> Vec<Wiring> {
     let existing = match observe_or_skip(indexer.applications().await, wanted, |application| {

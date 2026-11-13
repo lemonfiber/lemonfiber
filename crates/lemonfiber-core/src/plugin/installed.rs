@@ -353,11 +353,15 @@ pub struct Installed {
     /// the epoch.
     ///
     /// The install's own stamp, the one its changes are journalled under, so the
-    /// listing and the history name the same moment. `0` where the record predates
-    /// it; a rehearsal's account carries the moment it was asked, which is the stamp
-    /// the install would have run under.
-    #[serde(default, deserialize_with = "crate::instant::kept")]
-    pub installed_at: crate::instant::Instant,
+    /// listing and the history name the same moment. Absent where the record predates
+    /// it, and on an offer's account of what installing would record, which is not yet
+    /// stamped.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::instant::kept_option"
+    )]
+    pub installed_at: Option<crate::instant::Instant>,
     /// Each credential of another service the operator granted it, as a third-party plugin.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub granted: Vec<super::granted::Grant>,
@@ -427,7 +431,7 @@ impl Installed {
             signed: String::new(),
             manifest: String::new(),
             tree: String::new(),
-            installed_at: crate::instant::Instant::EPOCH,
+            installed_at: None,
         }
     }
 
@@ -440,7 +444,7 @@ impl Installed {
     pub fn installed(self, from: &std::path::Path, at: crate::instant::Instant) -> Self {
         Self {
             from: from.display().to_string(),
-            installed_at: at,
+            installed_at: Some(at),
             ..self
         }
     }

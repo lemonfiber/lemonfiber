@@ -511,7 +511,7 @@ pub(crate) fn change(
 ) -> Change {
     let path = at.display().to_string();
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: operation.to_owned(),
         target: path.clone(),
         kind: match previous {

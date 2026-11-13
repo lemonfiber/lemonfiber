@@ -170,7 +170,8 @@ pub fn kept<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Instant, D::Er
         .ok_or_else(|| serde::de::Error::custom("not an instant"))
 }
 
-/// An instant kept in a file on disk, where one may be absent: [`kept`], or null.
+/// An instant kept in a file on disk, where one may be absent: [`kept`], or null, or the
+/// empty text an earlier build wrote where it knew none.
 ///
 /// # Errors
 ///
@@ -178,12 +179,14 @@ pub fn kept<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Instant, D::Er
 pub fn kept_option<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Instant>, D::Error> {
-    Option::<Kept>::deserialize(deserializer)?
-        .map(|kept| {
-            kept.instant()
-                .ok_or_else(|| serde::de::Error::custom("not an instant"))
-        })
-        .transpose()
+    match Option::<Kept>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(Kept::Text(text)) if text.is_empty() => Ok(None),
+        Some(kept) => kept
+            .instant()
+            .map(Some)
+            .ok_or_else(|| serde::de::Error::custom("not an instant")),
+    }
 }
 
 /// An instant an adapter answered with, where it answered one: whole seconds, or the ISO

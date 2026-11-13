@@ -54,7 +54,7 @@ pub struct Applying<'a> {
     /// Where the stack this apply materialises comes from.
     pub source: Source,
     /// The time to stamp the journal with, which the wizard has no clock to do itself.
-    pub stamp: &'a str,
+    pub stamp: Instant,
     /// Where the secret store's key is drawn from, where the store has none yet.
     pub random: &'a dyn Random,
     /// How the stack's files are written into directories containers can write.
@@ -290,7 +290,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
     let held = crate::settings::Settings::at(&settings_at)?;
     let kept = crate::settings::keyed_at(&secrets_at, applying.random)?;
     let changed = |target: &str, kind: Kind| Change {
-        at: applying.stamp.to_owned(),
+        at: applying.stamp,
         operation: crate::wizard::APPLY.to_owned(),
         target: target.to_owned(),
         kind,
@@ -324,7 +324,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
         .map(|(name, value)| (name.as_str(), Some(value.as_str())))
         .collect();
     crate::settings::store::recorded(&settings_at, &changing)?;
-    let at = applying.stamp.parse().unwrap_or_default();
+    let at = applying.stamp.seconds();
     let keeping: Vec<Keeping<'_>> = secrets
         .iter()
         .map(|(name, value)| Keeping {
@@ -391,7 +391,7 @@ fn made_by(root: &Path) -> Vec<PathBuf> {
 fn made(path: &Path, stamp: Instant) -> Change {
     let path = path.display().to_string();
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: crate::wizard::APPLY.to_owned(),
         target: path.clone(),
         kind: Kind::Made { path },
