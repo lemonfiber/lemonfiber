@@ -131,6 +131,10 @@ impl PullsIndexers for Upstream {
         self.tell(format!("pull from {aggregator:?}"));
         Ok(())
     }
+    async fn pull(&self) -> Result<(), Failure> {
+        self.tell("again".to_owned());
+        Ok(())
+    }
 }
 
 /// Every operation of `indexer.pull`, once, each answer written down.
@@ -147,12 +151,13 @@ async fn pulled<P: PullsIndexers>(curator: &P) -> Vec<String> {
             "{:?}",
             PullsIndexers::add_aggregator(curator, &aggregator).await
         ),
+        format!("{:?}", PullsIndexers::pull(curator).await),
     ]
 }
 
 #[tokio::test]
 async fn a_curator_that_pulls_answers_and_is_told_through_its_contract_as_it_is_in_process() {
-    crosses_alike!(pulled, pull::Adapter, ["pull"]);
+    crosses_alike!(pulled, pull::Adapter, ["pull", "again"]);
 }
 
 #[async_trait]
