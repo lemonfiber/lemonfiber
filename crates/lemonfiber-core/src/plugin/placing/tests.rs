@@ -87,6 +87,7 @@ fn installed(plugin: &str, services: &[&str]) -> Installed {
         manifest: String::new(),
         tree: String::new(),
         installed_at: None,
+        forms: Vec::new(),
     }
 }
 

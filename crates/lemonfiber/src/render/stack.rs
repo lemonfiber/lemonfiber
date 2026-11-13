@@ -58,6 +58,7 @@ fn reverting(report: &ResetReport) -> Lines {
 /// number before it is a screenful.
 pub(super) fn preview(plan: &Plan) -> Lines {
     let mut lines = affects(plan, Doing::Starting);
+    lines.extend(vanished(plan));
     lines.extend(running(&plan.running));
     lines.extend(estimate(&plan.footprint));
     lines
@@ -164,6 +165,20 @@ fn left_out(plan: &Plan) -> Lines {
             "left out: {} — {}",
             out.profile,
             wanting(out.needs)
+        ));
+    }
+    lines.extend(vanished(plan));
+    lines
+}
+
+/// Each installed plugin naming forms the stack no longer declares, with those forms.
+fn vanished(plan: &Plan) -> Lines {
+    let mut lines = Lines::default();
+    for one in &plan.vanished {
+        lines.put(format!(
+            "{} names forms this stack no longer declares: {}",
+            one.plugin,
+            one.forms.join(", ")
         ));
     }
     lines

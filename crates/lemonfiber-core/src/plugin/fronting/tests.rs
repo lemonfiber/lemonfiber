@@ -56,6 +56,7 @@ fn installed(services: Vec<Placed>) -> Installed {
         manifest: String::new(),
         tree: String::new(),
         installed_at: None,
+        forms: Vec::new(),
     }
 }
 

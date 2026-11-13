@@ -82,3 +82,23 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         disturbs: crate::model::Disturbances::all(ctx.patience),
     })
 }
+
+/// The forms whose every service the engine reports up, or none where it cannot be asked.
+pub(crate) async fn active(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<String> {
+    let Ok(containers) = ctx.seams.engine.list(&ctx.settings.project).await else {
+        return Vec::new();
+    };
+    let protocols = ctx.settings.protocols;
+    let surveyed = survey_beside(
+        manifest,
+        &crate::app::plugins::profiled(ctx),
+        &manifest.profile_ids::<Vec<String>>(),
+        &containers,
+        &super::halted::load(ctx),
+        protocols,
+    );
+    brought(manifest, protocols, &surveyed)
+        .into_iter()
+        .map(|(form, _)| form)
+        .collect()
+}

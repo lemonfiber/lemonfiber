@@ -33,6 +33,13 @@
       ],
       "default": null
     },
+    "forms": {
+      "description": "The forms its manifest names its services join.\n\nEmpty on a record written before they were kept, which joins every form, as such a\nplugin always ran.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "from": {
       "description": "The source it was installed from, as the operator named it.\n\nEmpty for a record written before this was kept. A rehearsal's account carries\nthe source it was asked about, because that is what it would record.",
       "type": "string",

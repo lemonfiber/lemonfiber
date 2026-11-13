@@ -169,6 +169,7 @@ fn a_compose_invocation_names_one_project() {
             filtered: Vec::new(),
             footprint: lemonfiber_core::stack::closure::Footprint::default(),
             running: lemonfiber_core::stack::closure::Running::Unasked,
+            vanished: Vec::new(),
         },
         &Settings::default(),
         Path::new("/tmp/lemonfiber-one-host"),

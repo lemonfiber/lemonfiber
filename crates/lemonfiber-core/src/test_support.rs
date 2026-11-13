@@ -307,6 +307,7 @@ pub(crate) fn an_installed(
         manifest: String::new(),
         tree: String::new(),
         installed_at: None,
+        forms: Vec::new(),
     }
 }
 

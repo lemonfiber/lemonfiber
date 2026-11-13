@@ -4,7 +4,7 @@ use lemonfiber_core::docker::{Condition, State};
 use lemonfiber_core::model::{
     LifecycleReport, ResetReport, StackEdit, StatusReport, SupervisionReport,
 };
-use lemonfiber_core::stack::closure::{Dropped, Filtered, Footprint, Running};
+use lemonfiber_core::stack::closure::{Dropped, Filtered, Footprint, Running, Vanished};
 
 #[test]
 fn a_reset_names_every_change_it_would_revert() {
@@ -377,6 +377,22 @@ fn a_plan_says_what_starts_and_what_the_configuration_left_out() {
         "the services, counted, in the operator's own words: {text}"
     );
     assert!(text.contains("left out: torrent — no VPN and torrent client are configured"));
+}
+
+#[test]
+fn a_plan_names_each_plugin_naming_a_form_the_stack_no_longer_declares() {
+    let text = preview(&Plan {
+        vanished: vec![Vanished {
+            plugin: "komga".to_owned(),
+            forms: vec!["comics".to_owned(), "cartoons".to_owned()],
+        }],
+        ..a_plan("tv", Vec::new())
+    })
+    .text();
+    assert!(
+        text.contains("komga names forms this stack no longer declares: comics, cartoons"),
+        "{text}"
+    );
 }
 
 #[test]

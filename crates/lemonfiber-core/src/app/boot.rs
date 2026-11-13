@@ -442,6 +442,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
             filtered: Vec::new(),
             footprint: crate::stack::closure::Footprint::default(),
             running: crate::stack::closure::Running::Unasked,
+            vanished: Vec::new(),
         },
         command: Vec::new(),
         rehearsed: false,

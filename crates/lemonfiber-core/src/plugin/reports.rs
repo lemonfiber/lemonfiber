@@ -90,6 +90,10 @@ pub struct Install {
     pub sharing: Vec<super::Sharing>,
     /// The services held back once the install is made, each with what it waits for.
     pub waiting: Vec<crate::model::Waiting>,
+    /// The forms it joins, where none of them was running once it was installed: its
+    /// services were stopped then, and start with the first of these that is started.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub awaits: Vec<String>,
     /// What asking the egress guard among its services to hold its control server to the
     /// credential its adapter was handed came to, where it was more than held at once:
     /// the guard restarted to take it up, or why it did not. Absent where none of its

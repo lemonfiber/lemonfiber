@@ -38,6 +38,7 @@ pub(super) fn updated(one: &Update) -> Lines {
     lines.extend(super::answering::sharing(&one.install.sharing, acted));
     lines.extend(super::answering::granting(&one.install.would, acted));
     lines.extend(crate::render::waiting::waiting(&one.install.waiting));
+    lines.extend(super::awaiting(&one.install.awaits));
     lines.extend(super::proving(
         &one.install.proofs,
         one.install.against,

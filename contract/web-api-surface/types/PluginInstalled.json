@@ -18,6 +18,12 @@
       ],
       "required": false
     },
+    "forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "from": {
       "type": [
         "string"

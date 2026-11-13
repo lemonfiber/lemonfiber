@@ -52,6 +52,13 @@
       "items": {
         "type": "string"
       }
+    },
+    "vanished": {
+      "description": "Each installed plugin naming a form this stack no longer declares, with those\nforms: a plugin that joins none of the rest does not run.",
+      "type": "array",
+      "items": {
+        "$ref": "Vanished.json"
+      }
     }
   },
   "required": [

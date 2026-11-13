@@ -351,6 +351,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         manifest: String::new(),
         tree: String::new(),
         installed_at: None,
+        forms: Vec::new(),
     }
 }
 
@@ -379,6 +380,7 @@ fn installed(
             asks: Vec::new(),
             contests: Vec::new(),
             recipes_ran: Vec::new(),
+            awaits: Vec::new(),
             taking: Vec::new(),
             granting: Vec::new(),
             sharing: Vec::new(),
@@ -550,6 +552,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
                     asks: Vec::new(),
                     contests: Vec::new(),
                     recipes_ran: Vec::new(),
+                    awaits: Vec::new(),
                     taking: Vec::new(),
                     granting: Vec::new(),
                     sharing: Vec::new(),

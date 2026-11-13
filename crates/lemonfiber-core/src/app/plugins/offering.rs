@@ -271,6 +271,7 @@ pub(super) fn answered(
 fn the_plugin(read: &str, would: &Installed) -> String {
     let source = Installed {
         installed_at: None,
+        forms: Vec::new(),
         granted: super::granting::approved(&would.granted, None),
         ..would.clone()
     };
