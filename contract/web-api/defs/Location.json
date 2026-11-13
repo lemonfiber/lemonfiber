@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where something a service keeps is on this machine, or why that is not said.",
+  "oneOf": [
+    {
+      "description": "The host path it is mounted from.",
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "at"
+      ]
+    },
+    {
+      "description": "It could not be read, and why, in the operator's words.",
+      "type": "object",
+      "properties": {
+        "unread": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "unread"
+      ]
+    },
+    {
+      "description": "The service keeps none, and why, in the operator's words.",
+      "type": "object",
+      "properties": {
+        "none": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "none"
+      ]
+    }
+  ]
+}

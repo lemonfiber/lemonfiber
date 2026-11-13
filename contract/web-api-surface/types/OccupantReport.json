@@ -6,6 +6,18 @@
       ],
       "required": true
     },
+    "config": {
+      "type": [
+        "ref:Location"
+      ],
+      "required": true
+    },
+    "library": {
+      "type": [
+        "ref:Location"
+      ],
+      "required": true
+    },
     "ports": {
       "type": [
         "array[integer/uint16]"

@@ -7,6 +7,14 @@
       "description": "Whether lemonfiber knows this service and could take it over as it stands.",
       "type": "boolean"
     },
+    "config": {
+      "description": "Where it reads its configuration from on this machine.",
+      "$ref": "Location.json"
+    },
+    "library": {
+      "description": "Where its library is on this machine.",
+      "$ref": "Location.json"
+    },
     "ports": {
       "description": "Every host port it publishes, lowest first.",
       "type": "array",
@@ -30,6 +38,8 @@
     "service",
     "running",
     "ports",
-    "adoptable"
+    "adoptable",
+    "config",
+    "library"
   ]
 }

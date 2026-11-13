@@ -19,7 +19,7 @@ use lemonfiber_fixtures::serving::Serves;
 use lemonfiber_fixtures::support::{Reporting, SeedFs};
 use lemonfiber_ports::serving::Standing;
 use lemonfiber_testing::curators::{curating, refusing, taken, told, unavailable, TELEVISION};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 /// What a report names as not carried.
