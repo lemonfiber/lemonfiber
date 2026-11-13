@@ -222,6 +222,11 @@ pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
     beneath::make(path, within).map_err(|refusal| fault(refusal, path, within))
 }
 
+/// The names `path` steps through beneath `within`.
+pub(super) fn steps<'a>(path: &'a Path, within: &Path) -> Result<Vec<&'a std::ffi::OsStr>, Fault> {
+    beneath::steps(path, within).map_err(|refusal| fault(refusal, path, within))
+}
+
 /// What a refusal beneath `within` means for `path`, in the port's words.
 fn fault(refusal: Refusal, path: &Path, within: &Path) -> Fault {
     match refusal {

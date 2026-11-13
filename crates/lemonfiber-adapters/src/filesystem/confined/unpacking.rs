@@ -34,8 +34,7 @@ pub(crate) fn unpacked(archive: &[u8], into: &Path, within: &Path) -> Result<(),
 /// The same, refusing an archive whose files hold more than `at_most` bytes.
 fn bounded(archive: &[u8], into: &Path, within: &Path, at_most: u64) -> Result<(), Fault> {
     super::make(into, within)?;
-    let below =
-        beneath::steps(into, within).map_err(|refusal| super::fault(refusal, into, within))?;
+    let below = super::steps(into, within)?;
     let mut entries = tar::Archive::new(archive);
     let mut written: u64 = 0;
     for entry in entries.entries().map_err(unreadable)? {

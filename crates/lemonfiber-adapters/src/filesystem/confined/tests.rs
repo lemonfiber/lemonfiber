@@ -5,7 +5,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_ports::filesystem::{Beneath, Confined, Lying, Readable, READ_LIMIT};
 
 use super::super::Disk;
-use super::landed;
+use super::{landed, steps};
 
 /// A container's own directory holding one plain file, and a file of the operator's
 /// beside it that nothing written into the directory may reach. Each of its own, by a
@@ -285,3 +285,11 @@ fn a_file_written_where_no_plain_file_can_be_is_refused() {
 
 mod moving;
 mod replacing;
+
+#[test]
+fn a_path_outside_the_root_has_no_steps_beneath_it() {
+    let (_dir, owned, _) = owned();
+
+    assert!(steps(&owned.join("inside"), &owned).is_ok());
+    assert!(steps(std::path::Path::new("/elsewhere"), &owned).is_err());
+}
