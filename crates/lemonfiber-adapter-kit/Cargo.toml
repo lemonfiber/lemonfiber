@@ -18,6 +18,7 @@ lemonfiber-random = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 form_urlencoded = { workspace = true }
+futures-util = { workspace = true }
 reqwest = { workspace = true }
 rustix = { workspace = true }
 rustls = { workspace = true }

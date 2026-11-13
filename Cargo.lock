@@ -1580,6 +1580,7 @@ dependencies = [
  "async-trait",
  "axum",
  "form_urlencoded",
+ "futures-util",
  "lemonfiber-adapters",
  "lemonfiber-contract",
  "lemonfiber-error",

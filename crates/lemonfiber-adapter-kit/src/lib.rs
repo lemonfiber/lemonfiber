@@ -195,9 +195,10 @@ pub async fn serving(
     listener: TcpListener,
     stopped: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    if let Some(recounter) = &kit.recounter {
-        recounter.resumed().await;
-    }
+    futures_util::future::OptionFuture::from(
+        kit.recounter.as_ref().map(recounting::Recounter::resumed),
+    )
+    .await;
     axum::serve(listener, kit.router())
         .with_graceful_shutdown(stopped)
         .await
