@@ -24,6 +24,7 @@ use axum::Extension;
 use lemonfiber_api::admission::Caller;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
+use lemonfiber_api::jobs::ended::Ending;
 use lemonfiber_api::jobs::{accepted, leased, routes, Job, Jobs, Lease, Standing};
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
@@ -402,7 +403,10 @@ async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
     assert!(by_now > 1, "the guard was guarding: {by_now}");
 
     let released = jobs.stop(job.as_str()).await;
-    assert_eq!(released.map(|work| work.standing), Some(Standing::Ended));
+    assert_eq!(
+        released.map(|work| work.standing),
+        Some(Standing::Ended(Ending::Released))
+    );
 
     looks_ahead().await;
     assert_eq!(
@@ -440,18 +444,37 @@ async fn releasing_work_that_already_finished_answers_with_what_it_came_to() {
 }
 
 #[tokio::test]
-async fn work_that_was_ended_is_answered_with_the_name_rather_than_an_outcome() {
-    // Under the status finished work answers with, and the kind the start answered
-    // with: the work is over, and there is no outcome because it did not reach one.
+async fn work_that_was_released_is_answered_as_ended_and_released() {
     let jobs = Jobs::default();
     let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
     let released = jobs.stop(job.as_str()).await;
-    assert_eq!(released.map(|work| work.standing), Some(Standing::Ended));
+    assert_eq!(
+        released.map(|work| work.standing),
+        Some(Standing::Ended(Ending::Released))
+    );
 
     let (status, body) = asked(jobs, job.as_str()).await;
     assert_eq!(status, StatusCode::OK.as_u16(), "{body}");
-    assert!(body.contains(r#""kind":"job""#), "{body}");
+    assert!(body.contains(r#""kind":"ended""#), "{body}");
     assert!(body.contains(r#""action":"watch""#), "{body}");
+    assert!(body.contains(r#""ended":"released""#), "{body}");
+}
+
+#[tokio::test]
+async fn work_nobody_asked_about_is_answered_as_ended_and_let_go() {
+    let jobs = Jobs::default();
+    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    jobs.sweep().await;
+    assert_eq!(jobs.sweep().await, 1);
+
+    let (status, body) = asked(jobs, job.as_str()).await;
+    assert_eq!(status, StatusCode::OK.as_u16(), "{body}");
+    assert!(body.contains(r#""kind":"ended""#), "{body}");
+    assert!(
+        body.contains(&format!(r#""job":"{}""#, job.as_str())),
+        "{body}"
+    );
+    assert!(body.contains(r#""ended":"let-go""#), "{body}");
 }
 
 #[tokio::test]
@@ -462,10 +485,11 @@ async fn releasing_a_name_over_the_route_says_where_the_work_now_stands() {
     let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
     let (status, body) = released(jobs.clone(), job.as_str()).await;
     assert_eq!(status, StatusCode::OK.as_u16(), "{body}");
-    assert!(body.contains(r#""kind":"job""#), "{body}");
+    assert!(body.contains(r#""kind":"ended""#), "{body}");
+    assert!(body.contains(r#""ended":"released""#), "{body}");
     assert_eq!(
         jobs.about(job.as_str()).await.map(|work| work.standing),
-        Some(Standing::Ended)
+        Some(Standing::Ended(Ending::Released))
     );
 }
 
@@ -525,7 +549,7 @@ async fn a_guard_nobody_asks_about_is_let_go_on_the_second_look() {
     assert_eq!(jobs.sweep().await, 1, "then nothing was asking");
     assert_eq!(
         jobs.about(job.as_str()).await.map(|work| work.standing),
-        Some(Standing::Ended)
+        Some(Standing::Ended(Ending::LetGo))
     );
 }
 

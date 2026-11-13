@@ -42,6 +42,7 @@
 //! survive the process doing it, and a record that did would describe jobs nothing
 //! is running.
 
+pub mod ended;
 pub mod started;
 
 use std::collections::HashMap;
@@ -58,6 +59,7 @@ use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
 
+use ended::{Ended, Ending};
 use lemonfiber_core::ports::random::Random;
 use started::Started;
 use tokio::sync::Mutex;
@@ -149,10 +151,8 @@ pub enum Standing {
     /// and a refusal cannot carry two statuses depending on which door it arrived
     /// through.
     Failed(String, StatusCode),
-    /// Ended before it finished, and on purpose — released by name, or let go
-    /// because nothing was asking about it any more. There is no outcome, because
-    /// it did not reach one.
-    Ended,
+    /// Ended before it finished, and why.
+    Ended(Ending),
 }
 
 impl Standing {
@@ -340,7 +340,7 @@ impl Jobs {
     pub async fn stop(&self, job: &str) -> Option<Work> {
         let mut register = self.0.lock().await;
         let entry = register.held.get_mut(job)?;
-        Some(ended(entry))
+        Some(ended(entry, Ending::Released))
     }
 
     /// End the work with no ending of its own that nobody has asked about, and let
@@ -367,7 +367,7 @@ impl Jobs {
                 return !untouched;
             }
             if entry.lease == Lease::WhileAsked && untouched {
-                ended(entry);
+                ended(entry, Ending::LetGo);
                 let_go += 1;
             }
             true
@@ -392,12 +392,12 @@ impl Jobs {
 /// The task is aborted rather than asked to stop: there is nothing to ask, and a
 /// run abandoned at its next await point is exactly what a terminal's own
 /// interruption leaves behind.
-fn ended(entry: &mut Held) -> Work {
+fn ended(entry: &mut Held, why: Ending) -> Work {
     if entry.work.standing == Standing::Running {
         if let Some(ends) = entry.ends.take() {
             ends.abort();
         }
-        entry.work.standing = Standing::Ended;
+        entry.work.standing = Standing::Ended(why);
     }
     entry.work.clone()
 }
@@ -458,10 +458,14 @@ fn stands(job: &str, work: &Work) -> Response {
         // succeed. The body is still the envelope, because a caller that asked for
         // something it could parse asked about the failures most of all.
         Standing::Failed(rendered, status) => enveloped(*status, Some(rendered.clone())),
-        // The name and the action again, under the status finished work answers
-        // with and the kind the start answered with. There is no outcome to give:
-        // the work was ended rather than finished, and the kind is what says so.
-        Standing::Ended => over(job, &work.action, StatusCode::OK),
+        Standing::Ended(why) => {
+            let ended = Ended {
+                job: job.to_owned(),
+                action: work.action.clone(),
+                ended: *why,
+            };
+            enveloped(StatusCode::OK, Envelope::new(kind::ENDED, ended).to_json())
+        }
     }
 }
 
@@ -478,16 +482,14 @@ pub fn accepted(job: &Job, action: &str) -> Response {
 /// and what it was for — so a caller that can read the first can read the second
 /// without learning a second shape.
 fn still(job: &str, action: &str) -> Response {
-    over(job, action, StatusCode::ACCEPTED)
-}
-
-/// The name and the action, at whichever status the moment warrants.
-fn over(job: &str, action: &str, status: StatusCode) -> Response {
     let started = Started {
         job: job.to_owned(),
         action: action.to_owned(),
     };
-    enveloped(status, Envelope::new(kind::JOB, started).to_json())
+    enveloped(
+        StatusCode::ACCEPTED,
+        Envelope::new(kind::JOB, started).to_json(),
+    )
 }
 
 /// A name this run never handed out.
