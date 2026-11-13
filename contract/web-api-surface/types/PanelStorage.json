@@ -9,6 +9,7 @@
     },
     "panel": {
       "type": [
+        "const:\"pending\"",
         "const:\"ready\"",
         "const:\"unavailable\""
       ],
@@ -22,6 +23,7 @@
     }
   },
   "variants": [
+    "\"pending\"",
     "\"ready\"",
     "\"unavailable\""
   ]

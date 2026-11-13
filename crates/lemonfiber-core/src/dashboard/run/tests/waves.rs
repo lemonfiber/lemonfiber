@@ -103,7 +103,7 @@ async fn a_slow_tunnel_is_pending_in_the_first_wave_and_the_summary_is_never_hea
         .map(|firsts| firsts.clone())
         .unwrap_or_default();
     let [early] = firsts.as_slice() else {
-        panic!("one first wave, where the tunnel was slower than it: {firsts:?}");
+        unreachable!("one first wave, where the tunnel was slower than it: {firsts:?}");
     };
     assert_eq!(early.vpn, Some(Panel::Pending));
     assert_eq!(early.health.standing, Standing::Unknown);
@@ -160,7 +160,7 @@ async fn a_panel_the_last_gather_filled_is_carried_rather_than_pending() {
         .map(|firsts| firsts.clone())
         .unwrap_or_default();
     let [early] = firsts.as_slice() else {
-        panic!("one first wave: {firsts:?}");
+        unreachable!("one first wave: {firsts:?}");
     };
     assert_eq!(early.vpn, filled.snapshot.vpn);
     assert_eq!(early.health.standing, Standing::Healthy);
@@ -199,7 +199,7 @@ async fn a_first_wave_writes_nothing_down() {
         .map(|firsts| firsts.clone())
         .unwrap_or_default();
     let [early] = firsts.as_slice() else {
-        panic!("one first wave: {firsts:?}");
+        unreachable!("one first wave: {firsts:?}");
     };
     assert_eq!(early.health.standing, Standing::Unknown);
     assert!(early.alerts.is_empty(), "{:?}", early.alerts);

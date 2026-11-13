@@ -232,7 +232,7 @@ async fn a_rehearsal_never_probes_the_data_root() {
     };
     let hardlink = |snapshot: &crate::dashboard::Snapshot| match &snapshot.storage {
         Panel::Ready(storage) => Some(storage.hardlink),
-        Panel::Unavailable { .. } => None,
+        Panel::Unavailable { .. } | Panel::Pending => None,
     };
 
     let rehearsed = gather(&on_disk(true), None).await;
@@ -276,11 +276,14 @@ fn each_download_client_says_whether_it_is_paused_or_that_it_could_not_be_asked(
         now: None,
         unreached: None,
     };
-    let panel = super::super::downloaders(Some(Ok(vec![
-        said("sabnzbd", Some(Pulling::Stopped)),
-        said("qbittorrent", Some(Pulling::Fetching)),
-        said("nzbget", None),
-    ])));
+    let panel = super::super::downloaders(
+        super::super::Asked::Read(Ok(vec![
+            said("sabnzbd", Some(Pulling::Stopped)),
+            said("qbittorrent", Some(Pulling::Fetching)),
+            said("nzbget", None),
+        ])),
+        None,
+    );
     assert_eq!(
         panel,
         Panel::Ready(vec![
@@ -299,9 +302,13 @@ fn each_download_client_says_whether_it_is_paused_or_that_it_could_not_be_asked(
         ])
     );
     assert!(matches!(
-        super::super::downloaders(None),
+        super::super::downloaders(super::super::Asked::Late, None),
         Panel::Unavailable { reason } if reason.contains("the download clients")
     ));
+    assert_eq!(
+        super::super::downloaders(super::super::Asked::Pending, None),
+        Panel::Pending
+    );
     let refused = crate::error::Problem::new(
         crate::error::Code::new("TEST-1"),
         "the stack could not be read",
@@ -309,7 +316,7 @@ fn each_download_client_says_whether_it_is_paused_or_that_it_could_not_be_asked(
         crate::error::Remedy::new("read it again"),
     );
     assert!(matches!(
-        super::super::downloaders(Some(Err(Box::new(refused)))),
+        super::super::downloaders(super::super::Asked::Read(Err(Box::new(refused))), None),
         Panel::Unavailable { reason } if reason == "the stack could not be read"
     ));
 }
@@ -322,7 +329,6 @@ async fn no_stack_directory_leaves_the_configuration_volume_unknown() {
     let due = super::super::Due(std::collections::BTreeSet::from([
         super::super::Paced::FreeSpace,
     ]));
-    let (_, kept, _) =
-        super::super::volume(&ctx, Some(std::path::Path::new("/")), None, &due).await;
+    let kept = super::super::config_free(&ctx, Some(std::path::Path::new("/")), None, &due).await;
     assert!(matches!(kept, super::super::Asked::Read(Reading::Unknown)));
 }

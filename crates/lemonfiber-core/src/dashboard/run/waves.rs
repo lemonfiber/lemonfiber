@@ -68,7 +68,7 @@ impl<T> Asked<T> {
 /// What every source answered, or has answered so far.
 pub(super) struct Answers {
     /// The services the engine reports, and the containers the stack does not declare.
-    pub(super) seen: Asked<Result<(Vec<Service>, Vec<Undeclared>), String>>,
+    pub(super) seen: Asked<Seen>,
     /// The tunnel, or nothing where the stack has none.
     pub(super) tunnel: Asked<Option<Panel<crate::dashboard::Vpn>>>,
     /// The household's requests and standing.
@@ -78,7 +78,7 @@ pub(super) struct Answers {
     /// The active transfers.
     pub(super) moving: Asked<Panel<Vec<Transfer>>>,
     /// Each curator's queue, and what each answered.
-    pub(super) queued: Asked<(Panel<Vec<crate::dashboard::Queue>>, Vec<(String, Answered)>)>,
+    pub(super) queued: Asked<Queued>,
     /// Whether each download client is paused.
     pub(super) asked: Asked<Pausing>,
     /// The data location's free space.
@@ -90,6 +90,12 @@ pub(super) struct Answers {
     /// The forwarded port, passed on.
     pub(super) forwarded: Asked<Option<forwarding::Pass>>,
 }
+
+/// What the engine said of the services, and the containers the stack does not declare.
+type Seen = Result<(Vec<Service>, Vec<Undeclared>), String>;
+
+/// Each curator's queue, and what each answered.
+type Queued = (Panel<Vec<crate::dashboard::Queue>>, Vec<(String, Answered)>);
 
 /// What the download clients said of whether each is paused.
 type Pausing = Result<Vec<crate::bandwidth::pausing::Paused>, Box<crate::error::Problem>>;
@@ -225,10 +231,7 @@ pub(super) async fn assembled(
 /// The services panel, and the containers the stack does not declare: what the
 /// engine answered, the last gather's panel where it is still being asked, and
 /// otherwise why it could not be read.
-fn engine(
-    seen: Asked<Result<(Vec<Service>, Vec<Undeclared>), String>>,
-    last: Option<&Snapshot>,
-) -> (Panel<Vec<Service>>, Vec<Undeclared>) {
+fn engine(seen: Asked<Seen>, last: Option<&Snapshot>) -> (Panel<Vec<Service>>, Vec<Undeclared>) {
     match seen {
         Asked::Read(Ok((surveyed, undeclared))) => (Panel::Ready(surveyed), undeclared),
         Asked::Read(Err(reason)) => (Panel::unavailable(reason), Vec::new()),
@@ -368,7 +371,7 @@ pub(super) fn carried_link(linked: Asked<Hardlink>, last: Option<&Snapshot>) -> 
 /// for a client that could not be asked, the panel unavailable where the stack could
 /// not be read or the clients did not answer in time, and the last gather's panel
 /// where they are still being asked.
-fn downloaders(
+pub(super) fn downloaders(
     asked: Asked<Pausing>,
     last: Option<&Snapshot>,
 ) -> Panel<Vec<crate::dashboard::Downloader>> {
