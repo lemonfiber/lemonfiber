@@ -24,7 +24,7 @@ use lemonfiber_core::config::{
     reads_as_off, reads_as_on, service_user_from_env, store, Protocols, Reaching, Settings,
     AUTOSTART_ON_BATTERY_KEY, EXPLANATIONS_KEY,
 };
-use lemonfiber_core::platform::{engine_is_desktop, manager, Environment, HOST_OS};
+use lemonfiber_core::platform::{self, engine_is_desktop, Environment, HOST_OS};
 use lemonfiber_core::ports::hosting::Manager;
 use lemonfiber_core::ports::{Host, Runner};
 use lemonfiber_core::stack::Source;
@@ -138,7 +138,7 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
     let Ok(strategy) = etcetera::choose_base_strategy() else {
         return Arc::new(Unhosted);
     };
-    match manager(HOST_OS) {
+    match platform::manager(HOST_OS) {
         Manager::Launchd => Arc::new(Launchd::over(
             strategy.home_dir().join("Library/LaunchAgents"),
             Arc::clone(runner),
