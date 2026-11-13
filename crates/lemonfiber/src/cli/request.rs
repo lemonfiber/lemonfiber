@@ -16,9 +16,9 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
-    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPushEndpoint,
-    RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding, RawSwitch, RawTrace,
-    RawUi, RawUp, RawWhom, UpdateCommand,
+    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPlay,
+    RawPushEndpoint, RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding,
+    RawSwitch, RawTrace, RawTune, RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -220,38 +220,13 @@ pub enum Request {
     /// five minutes after it is issued. Ask again with `--stream` before then to keep it,
     /// and with `--stop` as well to close it. Every location is also drawn as a code to
     /// point a camera at.
-    Tune {
-        /// The channel, by the id the channels list gives it.
-        channel: Option<String>,
-        /// Who watches it, named the way they sign in.
-        #[arg(long)]
-        member: Option<String>,
-        /// The live stream to keep or close, as an earlier answer named it.
-        #[arg(long)]
-        stream: Option<String>,
-        /// Close the live stream named rather than keep it.
-        #[arg(long)]
-        stop: bool,
-    },
+    Tune(RawTune),
     /// Say where one title plays in a member's browser, on a pass holding a session on
     /// their own account.
     ///
     /// The pass lapses five minutes after it is issued; hand it back with `--pass` before
     /// then to keep playing. The location is also drawn as a code to point a camera at.
-    Play {
-        /// The title, by the id the shelf lists it under.
-        item: String,
-        /// Who it plays as, named the way they sign in.
-        #[arg(long)]
-        member: Option<String>,
-        /// The id the browser keeps for itself: eight to sixty-four letters, digits and
-        /// dashes.
-        #[arg(long)]
-        device: Option<String>,
-        /// The pass the browser holds, kept for longer around the same session.
-        #[arg(long)]
-        pass: Option<String>,
-    },
+    Play(RawPlay),
     /// Add one thing, end to end, and watch every step of it happen.
     ///
     /// The walk a first run is offered: search the indexers, grab a release, download

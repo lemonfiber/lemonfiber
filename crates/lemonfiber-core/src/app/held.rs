@@ -17,7 +17,7 @@
 //! the member's side without reading any member's.
 
 use super::targets::media;
-use super::{Asker, Ctx, Whom};
+use super::{Asker, Ctx, Outcome, Shelf, Whom};
 
 use crate::error::{Diagnose, Problem};
 use crate::model::HeldReport;
@@ -31,7 +31,16 @@ use crate::screening::door::{located, Door};
 /// answers them; an operator types a name, so it is the second that answers an operator.
 /// One resolution for both rather than two paths that could come to disagree about who
 /// was meant.
-pub(crate) async fn held(
+pub(crate) async fn asked(ctx: &Ctx, shelf: Shelf) -> Result<Outcome, Box<Problem>> {
+    let Shelf {
+        member,
+        most,
+        asker,
+    } = shelf;
+    held(ctx, &member, most, asker).await.map(Outcome::Held)
+}
+
+async fn held(
     ctx: &Ctx,
     whose: &Whom,
     most: u32,

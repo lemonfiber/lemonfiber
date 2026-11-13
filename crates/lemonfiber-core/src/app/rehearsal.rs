@@ -318,7 +318,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Alerts(_) => reports("alerts", &[kind::ALERTS]),
         Command::QualityMusic { .. } => reports("quality music", &[kind::MUSIC]),
         Command::Household { .. } => reports("household", HOUSEHOLD),
-        Command::Held { .. } => reports("held", &[kind::HELD]),
+        Command::Held(_) => reports("held", &[kind::HELD]),
         Command::Viewing(viewing) => viewed(viewing),
         Command::Wish(wishing) => wished(wishing),
         Command::Allowing(_) => reports("allow", HOUSEHOLD),

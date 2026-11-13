@@ -116,7 +116,7 @@ pub(crate) async fn closed(ctx: &Ctx, server: &dyn Tuning, which: impl Fn(&Open)
     }
     if !gone.is_empty() {
         changed(ctx, |open| {
-            open.retain(|one| !gone.contains(&one.closes_by))
+            open.retain(|one| !gone.contains(&one.closes_by));
         });
     }
 }

@@ -116,7 +116,7 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
 pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
     match seen(ctx, server, asker).await {
         Door::Unknown(why) => Door::Unknown(told(asker, why)),
-        door => door,
+        door @ Door::At { .. } => door,
     }
 }
 
@@ -215,7 +215,7 @@ const UNPLAYABLE: &str = "This cannot be played here yet. Whoever looks after th
 /// The address the stack's front door serves the guard at for a browser, with a
 /// certificate a browser trusts: the label the guard's route is published under, in front
 /// of the domain the household's proxy serves; or why there is none.
-pub(crate) async fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
+pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())

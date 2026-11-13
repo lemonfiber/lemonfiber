@@ -43,7 +43,7 @@ pub use diagnosing::Diagnosing;
 pub use filling::{Filling, Linking};
 pub use gathering::Gathering;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
-pub use household::{Answer, Arranged, Asker, Chosen, Decision, Whom};
+pub use household::{Answer, Arranged, Asker, Chosen, Decision, Shelf, Whom};
 pub use inviting::Inviting;
 pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
@@ -215,14 +215,7 @@ pub enum Command {
     /// is what the household has *asked for*, and this is what is already here. One
     /// member rather than all of them, because the shelf is different for every account
     /// and a single answer would be wrong for whoever it was not read as.
-    Held {
-        /// Whose shelf — a member, or somebody invited with the household's defaults.
-        member: Whom,
-        /// How many to answer with, newest first.
-        most: u32,
-        /// Who asked, which decides the words a title that cannot be located says why in.
-        asker: Asker,
-    },
+    Held(Shelf),
     /// One title, what a member was part-way through, a grant for a device to play on,
     /// or how far a member got.
     Viewing(Viewing),

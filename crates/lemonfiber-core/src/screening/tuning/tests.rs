@@ -9,17 +9,25 @@ use crate::ports::service::{Certificate, Channel, Programme, Unrated};
 use crate::screening::tuned::Open;
 use crate::test_support::{media, moved_household};
 
-/// A channel called `id` showing a programme certified `certificate`, or none at all.
-fn showing(id: &str, certificate: Option<Option<&str>>) -> Channel {
+/// A channel called `id` showing nothing the server knows of.
+fn idle(id: &str) -> Channel {
     Channel {
         id: id.to_owned(),
         name: id.to_owned(),
         number: None,
-        now: certificate.map(|certificate| Programme {
+        now: None,
+    }
+}
+
+/// A channel called `id` showing a programme certified `certificate`, or uncertified.
+fn showing(id: &str, certificate: Option<&str>) -> Channel {
+    Channel {
+        now: Some(Programme {
             title: format!("On {id}"),
             certificate: certificate.map(str::to_owned),
             ends: None,
         }),
+        ..idle(id)
     }
 }
 
@@ -48,7 +56,7 @@ fn held_to(
     let mut routes = vec![
         (media::identity("household"), media::answered(&[ada])),
         (media::identity("ratings"), media::answered(&table)),
-        (media::serve("channels"), media::answered(watchable)),
+        (media::serve("channels"), media::answered(&watchable)),
     ];
     routes.extend(more);
     Transport::by_path(routes)
@@ -58,9 +66,9 @@ fn held_to(
 /// and one showing nothing the server knows of.
 fn evening() -> Vec<Channel> {
     vec![
-        showing("kids", Some(Some("U"))),
-        showing("late", Some(Some("18"))),
-        showing("quiet", None),
+        showing("kids", Some("U")),
+        showing("late", Some("18")),
+        idle("quiet"),
     ]
 }
 
@@ -96,9 +104,9 @@ async fn a_channel_whose_programme_now_is_outside_the_members_limits_is_left_out
 #[tokio::test]
 async fn a_channel_showing_nothing_certified_is_held_to_the_members_unrated_policy() {
     let watchable = vec![
-        showing("kids", Some(Some("U"))),
-        showing("quiet", None),
-        showing("uncertified", Some(None)),
+        showing("kids", Some("U")),
+        idle("quiet"),
+        showing("uncertified", None),
     ];
     let transport = held_to(Unrated::HeldBack, &watchable, Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "unrated");
