@@ -155,3 +155,62 @@ async fn what_a_source_hands_over_early_is_heard_before_the_rest_of_its_gather()
         .unwrap_or_default();
     assert!(second.contains("202"), "then the rest: {second}");
 }
+
+/// A source handing over its first wave and finishing in the same breath.
+struct AtOnce;
+
+#[async_trait::async_trait]
+impl super::Gathers for AtOnce {
+    async fn gather(&self, _joined: bool) -> Vec<Rendered> {
+        InWaves::said(202).into_iter().collect()
+    }
+
+    async fn waves(&self, joined: bool, early: &super::Early) -> Vec<Rendered> {
+        early.say(InWaves::said(101));
+        self.gather(joined).await
+    }
+}
+
+/// What a source hands over early is heard before the rest even where its gather is done
+/// before anything was heard.
+#[tokio::test(start_paused = true)]
+async fn what_is_handed_over_early_is_heard_first_even_from_a_gather_already_done() {
+    let live = Live::opening(Stopped::at(0).as_ref());
+    let mut listening = live.listening(None).await;
+
+    live.refresh(&AtOnce).await;
+
+    let mut heard = Vec::new();
+    for _ in 0..2 {
+        heard.push(
+            tokio::time::timeout(Duration::from_secs(1), listening.next())
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+        );
+    }
+    assert!(
+        heard.first().is_some_and(|said| said.contains("101")),
+        "{heard:?}"
+    );
+    assert!(
+        heard.get(1).is_some_and(|said| said.contains("202")),
+        "{heard:?}"
+    );
+}
+
+/// Several sources gathered as one answer with what each says, in the order given.
+#[tokio::test]
+async fn sources_gathered_together_say_each_in_turn() {
+    use super::Gathers as _;
+    let together = crate::events::extending::Together(vec![
+        std::sync::Arc::new(AtOnce),
+        std::sync::Arc::new(InWaves),
+    ]);
+
+    let said = together.gather(true).await;
+
+    assert_eq!(said.len(), 2);
+    assert!(said.iter().all(|one| one.said().contains("202")));
+}

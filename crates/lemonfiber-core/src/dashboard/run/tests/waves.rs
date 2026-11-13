@@ -11,11 +11,13 @@ use crate::dashboard::Snapshot;
 use crate::ports::docker::{Container, Engine, ExecOutput, Failure, LogLine, LogQuery, Stats};
 use crate::test_support::guard;
 
-/// An engine that lists at once and takes `delay` over every command run inside a
-/// container, which is how the tunnel is asked what it is doing.
+/// An engine that takes `listing` to list the containers and `delay` over every command
+/// run inside one, which is how the tunnel is asked what it is doing.
 struct SlowInside {
     /// The engine that answers once the delay is over.
     engine: Reporting,
+    /// How long listing the containers takes.
+    listing: Duration,
     /// How long each command inside a container takes.
     delay: Duration,
 }
@@ -23,6 +25,7 @@ struct SlowInside {
 #[async_trait]
 impl Engine for SlowInside {
     async fn list(&self, project: &str) -> Result<Vec<Container>, Failure> {
+        tokio::time::sleep(self.listing).await;
         self.engine.list(project).await
     }
 
@@ -52,6 +55,12 @@ fn tunnel_taking(name: &str, delay: Duration) -> Ctx {
 
 /// A stack behind `tunnel`, which takes `delay` to answer each question.
 fn through(name: &str, tunnel: Tunnel, delay: Duration) -> Ctx {
+    engine_taking(name, tunnel, Duration::ZERO, delay)
+}
+
+/// A stack behind `tunnel`, its engine taking `listing` to list the containers and its
+/// tunnel `delay` to answer each question.
+fn engine_taking(name: &str, tunnel: Tunnel, listing: Duration, delay: Duration) -> Ctx {
     let env = env_without_password(name);
     let settings = Settings {
         protocols: Protocols::both(),
@@ -65,7 +74,11 @@ fn through(name: &str, tunnel: Tunnel, delay: Duration) -> Ctx {
     let engine = tunnel_engine(true, Some(tunnel)).alongside(guard::running());
     guard::keyed(
         a_context()
-            .engine(Arc::new(SlowInside { engine, delay }))
+            .engine(Arc::new(SlowInside {
+                engine,
+                listing,
+                delay,
+            }))
             .settings(settings)
             .build()
             .with_patience(Duration::ZERO)
@@ -206,4 +219,40 @@ async fn a_first_wave_writes_nothing_down() {
     assert_eq!(seen.lock().ok().and_then(|seen| *seen), Some(false));
     assert_eq!(second.snapshot.health.standing, Standing::Critical);
     assert!(history.as_deref().is_some_and(std::path::Path::exists));
+}
+
+/// An engine slower than the first wave leaves the services and the front door pending in
+/// a first snapshot, or the door the last gather showed where there was one.
+#[tokio::test(start_paused = true)]
+async fn a_slow_engine_leaves_the_services_and_the_door_pending_or_as_they_were() {
+    let ctx = engine_taking(
+        "waves-slow-engine",
+        healthy_tunnel(),
+        FIRST_WAVE * 3,
+        Duration::ZERO,
+    );
+    let (firsts, first) = handed();
+    let second = waves(&ctx, None, first).await;
+    let (again, first_again) = handed();
+    let _ = waves(&ctx, Some(&second), first_again).await;
+
+    let early: Vec<Snapshot> = firsts
+        .lock()
+        .map(|firsts| firsts.clone())
+        .unwrap_or_default();
+    let carried: Vec<Snapshot> = again.lock().map(|again| again.clone()).unwrap_or_default();
+    assert_eq!(
+        early
+            .iter()
+            .map(|one| (one.services.clone(), one.door.clone()))
+            .collect::<Vec<_>>(),
+        [(Panel::Pending, Panel::Pending)]
+    );
+    assert_eq!(
+        carried
+            .iter()
+            .map(|one| one.door.clone())
+            .collect::<Vec<_>>(),
+        std::slice::from_ref(&second.snapshot.door)
+    );
 }

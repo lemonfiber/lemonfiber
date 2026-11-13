@@ -346,6 +346,18 @@ fn a_queue_with_something_stuck_says_how_many() {
 }
 
 #[test]
+fn a_panel_whose_source_has_not_answered_says_it_is_waiting() {
+    let waiting = ["waiting for an answer".to_owned()];
+    assert_eq!(said(&vpn(Some(&Panel::Pending), WIDE)), waiting);
+    assert_eq!(said(&transfers(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&queues(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&storage(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&services(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&front_door(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&household(&Panel::Pending, WIDE)), waiting);
+}
+
+#[test]
 fn an_unavailable_queue_or_storage_or_service_panel_says_why() {
     let queue: Panel<Vec<Queue>> = Panel::unavailable("the stack could not be read");
     let store: Panel<Storage> = Panel::unavailable("no data location is configured");
