@@ -188,3 +188,4 @@ mod pacing;
 mod panels;
 mod refreshing;
 mod tunnel;
+mod waves;

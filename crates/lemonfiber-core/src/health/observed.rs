@@ -50,6 +50,8 @@ pub enum Egress {
     Leaking,
     /// It could not be established either way.
     Unreadable,
+    /// The tunnel has not answered yet, so nothing is said of it either way.
+    Awaited,
 }
 
 /// Every check this surface ran, and what it found.
@@ -60,7 +62,7 @@ pub enum Egress {
 #[must_use]
 pub fn observed(services: &[Service], egress: Egress) -> Vec<(String, Option<Fault>)> {
     let mut looked: Vec<(String, Option<Fault>)> = Vec::new();
-    if egress != Egress::NotApplicable {
+    if !matches!(egress, Egress::NotApplicable | Egress::Awaited) {
         looked.push((EGRESS_CHECK.to_owned(), tunnel(egress, services)));
     }
     looked.extend(
@@ -88,7 +90,7 @@ fn check_of(service: &Service) -> String {
 /// exists to prevent.
 fn tunnel(egress: Egress, services: &[Service]) -> Option<Fault> {
     let fault = match egress {
-        Egress::NotApplicable | Egress::Behind => return None,
+        Egress::NotApplicable | Egress::Behind | Egress::Awaited => return None,
         Egress::Leaking => Fault::new(
             LEAKING,
             Severity::Critical,

@@ -106,12 +106,14 @@ impl<T: Clone> Reading<T> {
     }
 }
 
-/// A panel's content, or the reason its source could not fill it.
+/// A panel's content, the reason its source could not fill it, or that its source
+/// is still being read.
 ///
 /// The difference between "this panel is up to date" and "this panel's source is
 /// unreachable" is the whole of degrading honestly: an unavailable panel says so,
 /// in its own words, rather than showing stale data as current or blank data as
-/// zero — and the panels beside it stay live.
+/// zero — and the panels beside it stay live. A pending panel is neither: its source
+/// has not answered within the first wave of a gather, and the second fills it in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case", tag = "panel", content = "data")]
 #[schemars(rename = "Panel{T}")]
@@ -123,6 +125,8 @@ pub enum Panel<T> {
         /// Why the panel could not be filled, in the operator's terms.
         reason: String,
     },
+    /// The source has not answered yet; a snapshot that follows fills the panel.
+    Pending,
 }
 
 impl<T> Panel<T> {
@@ -138,6 +142,13 @@ impl<T> Panel<T> {
     #[must_use]
     pub const fn is_available(&self) -> bool {
         matches!(self, Self::Ready(_))
+    }
+
+    /// Whether the panel's source could not be reached, which a pending panel's
+    /// has not yet been found to be.
+    #[must_use]
+    pub const fn is_unavailable(&self) -> bool {
+        matches!(self, Self::Unavailable { .. })
     }
 }
 

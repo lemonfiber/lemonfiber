@@ -10,17 +10,24 @@
 //! So each slow panel is read at its own pace, and between readings the screen
 //! carries the last one forward unchanged: a panel read at its own pace is current
 //! until its next reading is due. Each reading also has a bound, so one source that
-//! will not answer marks its own panel and leaves every other one refreshing.
+//! will not answer marks its own panel and leaves every other one refreshing, and
+//! what answers within [`FIRST_WAVE`] is shown without waiting for the rest.
 
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
 
 /// How long a panel's reading may take before the panel is reported unavailable.
 ///
-/// Ten seconds, against reads that answer in well under one on a healthy stack. The
-/// whole refresh waits on its slowest panel, so this is also the longest a frozen
-/// source can hold the screen.
+/// Ten seconds, against reads that answer in well under one on a healthy stack. Only
+/// the panel waits this long: the panels beside it went out in the first wave.
 pub(crate) const PANEL_WITHIN: Duration = Duration::from_secs(10);
+
+/// How long a gather waits before it hands over what has answered so far.
+///
+/// One second, against reads that answer in well under one on a healthy stack: the
+/// panels whose sources answered by then go out at once, and every other one is
+/// filled in by a second snapshot once its source answers or runs out its bound.
+pub(crate) const FIRST_WAVE: Duration = Duration::from_secs(1);
 
 /// How long the household's reading may take.
 ///
