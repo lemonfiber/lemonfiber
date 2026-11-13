@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "media_type": {
-      "description": "The media type — `tv` or `movies`.",
+      "description": "The media type: `tv`, `movies` or `music`.",
       "type": "string"
     },
     "outcome": {
@@ -19,17 +19,17 @@
       ]
     },
     "preset": {
-      "description": "The preset in force for it.",
+      "description": "The preset in force for it, or for music the format.",
       "type": "string"
     },
-    "size_per_hour": {
-      "description": "Roughly what an hour of it costs at that preset.",
-      "type": "string"
+    "total": {
+      "description": "What upgrading it costs in total: the runtime its curator holds below the cutoff\ntimes the bytes an hour takes at that preset or format.",
+      "$ref": "Total.json"
     }
   },
   "required": [
     "media_type",
     "preset",
-    "size_per_hour"
+    "total"
   ]
 }
