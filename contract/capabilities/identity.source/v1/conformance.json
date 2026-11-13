@@ -21,6 +21,8 @@
     {"asked":{"id":"{identity.source@1/invite-answers#/id}"},"case":"suspend-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"suspend","since":0},
     {"asked":{"member":"{identity.source@1/household-answers#/0/id}"},"case":"sessions-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"sessions","since":0},
     {"asked":{},"case":"signs_devices_in-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"signs_devices_in","since":0},
-    {"asked":{"id":"{identity.source@1/invite-answers#/id}"},"case":"withdraw-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"withdraw","since":0}
+    {"asked":{"id":"{identity.source@1/invite-answers#/id}"},"case":"withdraw-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"withdraw","since":0},
+    {"asked":{"device":"conformance-sign_in_by_code"},"case":"sign_in_by_code-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"sign_in_by_code","since":1},
+    {"asked":{"id":"{identity.source@1/sign_in_by_code-answers#/id}"},"case":"signed_by_code-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"signed_by_code","since":1}
   ]
 }

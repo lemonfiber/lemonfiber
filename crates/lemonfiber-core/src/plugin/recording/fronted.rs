@@ -239,8 +239,11 @@ impl Asking<'_> {
                 .map_err(|why| Faulted::new(enveloping::STEP, why, made.clone()))?;
         }
         let contracts = contracts(self.adapter.service);
+        let claimed = contracts
+            .iter()
+            .any(|(spoken, _)| *spoken == claiming::owning());
         let mut heard = BTreeMap::new();
-        if contracts.iter().any(|(spoken, _)| *spoken == identity()) {
+        if !claimed && contracts.iter().any(|(spoken, _)| *spoken == identity()) {
             let (password, first) = self
                 .first_run(&reached)
                 .await
@@ -248,11 +251,7 @@ impl Asking<'_> {
             made.push(password);
             heard = first;
         }
-        if contracts
-            .iter()
-            .any(|(spoken, _)| *spoken == claiming::owning())
-            && !self.claim_left()
-        {
+        if claimed && !self.claim_left() {
             heard.extend(
                 self.claimed(&reached)
                     .await
@@ -281,6 +280,7 @@ impl Asking<'_> {
             made,
             hashed: Vec::new(),
             certificate: self.certificate.cloned(),
+            claimed,
         };
         let asked = self
             .every_case(&reached, &mut filling, &contracts, &heard)

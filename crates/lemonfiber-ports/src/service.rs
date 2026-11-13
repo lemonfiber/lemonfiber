@@ -96,7 +96,7 @@ pub use gating::{
 pub use guarding::{Guarded, Guarding, Presented};
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Playback, Session,
-    Signed, Unrated,
+    SignInCode, Signed, Unrated,
 };
 pub use metering::{Metering, Moved};
 pub use monitoring::{

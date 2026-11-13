@@ -5,11 +5,12 @@
 //! and whether a signed-in account still stands; invitations made, taken back and
 //! withdrawn; the libraries and the certificates an account's limits are said in, and the
 //! country they are named for; what one account may watch; switching an account off; the
-//! devices signed in to one; and whether a new device signs in by a code.
+//! devices signed in to one; whether a new device signs in by a code; and a member signed in
+//! by a code the outside service holding the accounts issues.
 
 use lemonfiber_ports::service::{
-    Allowed, Certificate, Household, Invited, MediaServer, Member, NamedLibrary, Session, Signed,
-    Unrated,
+    Allowed, Certificate, Household, Invited, MediaServer, Member, NamedLibrary, Session,
+    SignInCode, Signed, Unrated,
 };
 
 use crate::conformance::Placeholder;
@@ -121,6 +122,14 @@ crate::contract! {
             fn signs_devices_in() -> bool where asks = Asked {};
             /// Withdraw an account.
             fn withdraw(str id: &str) -> () where asks = Asked { id: invited() };
+            /// A code the outside service holding the accounts issues for a device to sign in by.
+            fn sign_in_by_code(str device: &str) -> SignInCode where since = 1, asks = Asked {
+                device: device("sign_in_by_code"),
+            };
+            /// The member an approved code proved.
+            fn signed_by_code(str id: &str) -> Option<Signed> where since = 1, secret = &["/token"], asks = Asked {
+                id: earlier("sign_in_by_code", "/id"),
+            };
         }
     }
 }

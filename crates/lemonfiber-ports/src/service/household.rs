@@ -35,6 +35,23 @@ impl std::fmt::Debug for Signed {
     }
 }
 
+/// A code the outside service holding the source's accounts issued for one device to sign
+/// in by, which the member approves there.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct SignInCode {
+    /// What [`Household::signed_by_code`] is asked with to learn whom the code proved.
+    pub id: String,
+    /// The code the member enters where they approve it.
+    pub code: String,
+    /// Where the member approves the code.
+    pub approve_at: String,
+    /// When the code lapses, as an RFC 3339 instant.
+    pub lapses_at: String,
+}
+
 /// Making and withdrawing the accounts a household signs in with.
 ///
 /// Apart from the media server's setup because it is a different errand entirely:
@@ -110,6 +127,26 @@ pub trait Household: Send + Sync {
     /// facts, and a guard that read them alike would sign a household out for the
     /// length of a reboot.
     async fn standing(&self, signed: &Signed) -> Result<bool, Failure>;
+
+    /// A code the outside service holding the accounts issues for `device` to sign in by,
+    /// approved by the member at that service rather than by a password passing through
+    /// lemonfiber.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses, and
+    /// [`Failure::Unsupported`] where the source holds its accounts itself.
+    async fn sign_in_by_code(&self, device: &str) -> Result<SignInCode, Failure>;
+
+    /// The member the code `id` named proved, once it is approved and the account is one
+    /// [`Household::household`] answers: nothing while it waits, once it lapses, or where
+    /// the account is no member.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the service is unreachable or refuses, and
+    /// [`Failure::Unsupported`] where the source holds its accounts itself.
+    async fn signed_by_code(&self, id: &str) -> Result<Option<Signed>, Failure>;
 
     /// Make an account somebody can claim by setting a password on it.
     ///

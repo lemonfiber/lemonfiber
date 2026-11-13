@@ -123,6 +123,12 @@
     "/lemonfiber/identity.source/v1/sessions": {
       "$ref": "operations/sessions.json"
     },
+    "/lemonfiber/identity.source/v1/sign_in_by_code": {
+      "$ref": "operations/sign_in_by_code.json"
+    },
+    "/lemonfiber/identity.source/v1/signed_by_code": {
+      "$ref": "operations/signed_by_code.json"
+    },
     "/lemonfiber/identity.source/v1/signs_devices_in": {
       "$ref": "operations/signs_devices_in.json"
     },
