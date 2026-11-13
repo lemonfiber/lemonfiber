@@ -58,7 +58,6 @@ fn reverting(report: &ResetReport) -> Lines {
 /// number before it is a screenful.
 pub(super) fn preview(plan: &Plan) -> Lines {
     let mut lines = affects(plan, Doing::Starting);
-    lines.extend(vanished(plan));
     lines.extend(running(&plan.running));
     lines.extend(estimate(&plan.footprint));
     lines
