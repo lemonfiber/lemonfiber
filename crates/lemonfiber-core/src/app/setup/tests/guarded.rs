@@ -60,7 +60,7 @@ async fn the_guard_is_asked_question_by_question_and_what_it_is_given_is_kept_wh
     let outcome = run(
         &mut wizard,
         (&prompt, Some(&guard)),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &guarded(&paths, &guard),
     )
@@ -89,7 +89,7 @@ async fn a_run_leaving_the_guard_short_is_refused_with_nothing_of_it_kept() {
     let outcome = run(
         &mut wizard,
         (&prompt, Some(&guard)),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &guarded(&paths, &guard),
     )
@@ -119,7 +119,7 @@ async fn a_resumed_run_whose_vpn_answer_the_guard_no_longer_takes_asks_it_again(
     let outcome = run(
         &mut wizard,
         (&prompt, Some(&guard)),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &guarded(&paths, &guard),
     )

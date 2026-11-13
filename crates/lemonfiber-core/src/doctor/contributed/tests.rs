@@ -615,7 +615,7 @@ async fn a_run_narrowed_to_a_bundled_family_leaves_a_plugin_s_row_alone() {
 /// that plugin's check having not run, rather than as the family being unsure.
 #[tokio::test(start_paused = true)]
 async fn a_row_abandoned_at_its_budget_names_the_check_and_the_plugin() {
-    let never = Arc::new(Hanging) as Arc<dyn Http>;
+    let never = Fake::hanging() as Arc<dyn Http>;
     let checks = checks_of(DECLARING, &never);
     let report = examine(&checks, &Narrowing::Suite).await;
     assert_eq!(report.findings.len(), 1, "{report:?}");
@@ -678,18 +678,5 @@ impl Check for Bundled {
             "Room to grow",
             Verdict::Pass { note: None },
         )]
-    }
-}
-
-/// A transport that never answers, to prove the budget is what abandons a row.
-struct Hanging;
-
-#[async_trait]
-impl Http for Hanging {
-    async fn send(
-        &self,
-        _request: &crate::ports::http::Request,
-    ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-        std::future::pending().await
     }
 }

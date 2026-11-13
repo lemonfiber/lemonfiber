@@ -111,26 +111,22 @@ async fn a_replacement_with_nobody_to_hand_it_says_so() {
 /// A transport that writes `left` over the certificate at `spoiled`, or takes it away
 /// where `left` is nothing, once the media server is asked to serve one, as a disk that
 /// fails part-way through a replacement leaves it.
-struct Spoiling {
+fn spoiling(
     inner: Arc<dyn crate::ports::http::Http>,
     spoiled: std::path::PathBuf,
     left: Option<&'static str>,
-}
-
-#[async_trait::async_trait]
-impl crate::ports::http::Http for Spoiling {
-    async fn send(
-        &self,
-        request: &crate::ports::http::Request,
-    ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-        if request.url.ends_with(&media::serve("serve_tls")) {
-            let _ = match self.left {
-                Some(left) => std::fs::write(&self.spoiled, left),
-                None => std::fs::remove_file(&self.spoiled),
+) -> Arc<lemonfiber_fixtures::http::Fake> {
+    let serving = media::serve("serve_tls");
+    lemonfiber_fixtures::http::Fake::handing(move |request| {
+        if request.url.ends_with(&serving) {
+            let _ = match left {
+                Some(left) => std::fs::write(&spoiled, left),
+                None => std::fs::remove_file(&spoiled),
             };
         }
-        self.inner.send(request).await
-    }
+        let inner = Arc::clone(&inner);
+        Box::pin(async move { inner.send(&request).await })
+    })
 }
 
 #[tokio::test(start_paused = true)]
@@ -142,11 +138,11 @@ async fn a_replacement_whose_outcome_cannot_be_read_back_is_never_reported_as_la
         .ok()
         .and_then(|read| read.offer)
         .unwrap_or_default();
-    ctx.seams.http = Arc::new(Spoiling {
-        inner: beside(http.clone(), &gate),
-        spoiled: internal::path(&config(&at)),
-        left: Some("not a certificate"),
-    });
+    ctx.seams.http = spoiling(
+        beside(http.clone(), &gate),
+        internal::path(&config(&at)),
+        Some("not a certificate"),
+    );
 
     let spoiled = rotated(&ctx, &at, Some(&offer)).await;
 
@@ -159,11 +155,7 @@ async fn a_replacement_whose_outcome_cannot_be_read_back_is_never_reported_as_la
     );
 
     let (mut ctx, at, _, gate) = machine("rotating-lost", http.clone());
-    ctx.seams.http = Arc::new(Spoiling {
-        inner: beside(http, &gate),
-        spoiled: internal::path(&config(&at)),
-        left: None,
-    });
+    ctx.seams.http = spoiling(beside(http, &gate), internal::path(&config(&at)), None);
 
     let lost = replace(&ctx, &at).await;
 
@@ -250,5 +242,7 @@ async fn a_replacement_that_cannot_be_put_in_place_is_never_served() {
 
 /// `http`, with `gate` answering every `request.gate` call beside it.
 fn beside(http: Arc<Fake>, gate: &Arc<Gate>) -> Arc<dyn crate::ports::http::Http> {
-    Arc::new(crate::test_support::guards::Serving::beside(http).gate(gate))
+    crate::test_support::guards::Serving::beside(http)
+        .gate(gate)
+        .transport()
 }

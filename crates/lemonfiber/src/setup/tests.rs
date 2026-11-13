@@ -2,17 +2,14 @@ use crate::exit::{shown, success};
 use std::path::Path;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use lemonfiber_core::config::{Protocols, Settings};
 
 use super::{concluded, document, SetupOutcome};
 
-use lemonfiber_core::ports::docker::{
-    Container, Engine, ExecOutput, Failure as DockerFailure, LogLine, LogQuery, Stats,
-};
-use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
+use lemonfiber_core::ports::docker::{Engine, Health, Lifecycle};
+use lemonfiber_core::ports::process::{Output, Runner};
 use lemonfiber_core::stack::Source;
-use tokio::sync::mpsc::Receiver;
+use lemonfiber_fixtures::support::{spoke, Keyed, Question, Reporting};
 
 use super::{
     already_set_up, bare_run, confirm_setup, default_data_location, greeting, setting_up, stamp,
@@ -157,106 +154,49 @@ impl crate::prompt::Answers for Echoing {
     }
 }
 
-/// A stand-in engine, in the two shapes setup meets: one that is down and
-/// answers nothing, and one that answers with nothing running — which is what
-/// a machine looks like the moment an empty stack has been brought up.
-///
-/// One fake rather than two, because a second implementation of a four-method
-/// trait leaves three methods nothing calls.
-pub(crate) struct FakeEngine {
-    /// Whether listing answers at all.
-    lists: bool,
+/// An engine that is not running, so nothing about a stack can be read.
+pub(crate) fn engine_down() -> Reporting {
+    Reporting::absent().refusing(&[Question::Exec, Question::Stats, Question::Logs])
 }
 
-impl FakeEngine {
-    /// An engine that is not running, so nothing about a stack can be read.
-    pub(crate) const fn down() -> Self {
-        Self { lists: false }
-    }
-
-    /// An engine that answers, with nothing running.
-    pub(crate) const fn quiet() -> Self {
-        Self { lists: true }
-    }
-}
-
-#[async_trait]
-impl Engine for FakeEngine {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, DockerFailure> {
-        if self.lists {
-            return Ok(Vec::new());
-        }
-        Err(down())
-    }
-    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, DockerFailure> {
-        Err(down())
-    }
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, DockerFailure> {
-        Err(down())
-    }
-    async fn logs(
-        &self,
-        _project: &str,
-        _services: &[String],
-        _query: LogQuery,
-    ) -> Result<Receiver<LogLine>, DockerFailure> {
-        Err(down())
-    }
-}
-
-fn down() -> DockerFailure {
-    DockerFailure::Unreachable {
-        reason: "nothing is running here".to_owned(),
-    }
+/// An engine that answers listings with nothing running, which is what a machine looks
+/// like the moment an empty stack has been brought up, and answers nothing else.
+pub(crate) fn engine_quiet() -> Reporting {
+    Reporting::holding(&[], Lifecycle::Running, Health::Healthy).refusing(&[
+        Question::Exec,
+        Question::Stats,
+        Question::Logs,
+    ])
 }
 
 /// A runner that refuses everything, so the environment cannot pass.
-struct DeadRunner;
-
-#[async_trait]
-impl Runner for DeadRunner {
-    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
-        Ok(Output {
-            status: Some(1),
-            stdout: String::new(),
-            stderr: "no compose here".to_owned(),
-        })
-    }
+fn dead_runner() -> Arc<dyn Runner> {
+    Arc::new(lemonfiber_fixtures::support::Scripted(Ok(Output {
+        status: Some(1),
+        stdout: String::new(),
+        stderr: "no compose here".to_owned(),
+    })))
 }
 
-/// A runner that answers as a working Docker would, so setup gets past its
-/// environment check and on to the questions.
-struct WorkingRunner;
-
-#[async_trait]
-impl Runner for WorkingRunner {
-    async fn run(&self, argv: &[String]) -> Result<Output, RunFailure> {
-        let spoken = argv.join(" ");
-        // Three fields now, separated the way the check asks for them: the
-        // daemon's release, then the API generation at each end. A double
-        // answering with the release alone reads as a client that would not say
-        // which generations are in play, which is an unverified environment.
-        let stdout = if spoken.contains("Server.Version") {
-            "27.0.0|1.45|1.45"
-        } else if spoken.contains("compose version") {
-            "2.29.0"
-        } else {
-            ""
-        };
-        Ok(Output {
-            status: Some(0),
-            stdout: stdout.to_owned(),
-            stderr: String::new(),
-        })
-    }
+/// A runner that answers as a working Docker would, so setup gets past its environment
+/// check and on to the questions: the daemon's release and the API generation at each
+/// end, then the Compose plugin's version.
+fn working_runner() -> Arc<dyn Runner> {
+    Keyed::by_spoken(
+        vec![
+            ("Server.Version", Ok(spoke("27.0.0|1.45|1.45"))),
+            ("compose version", Ok(spoke("2.29.0"))),
+        ],
+        Ok(spoke("")),
+    )
 }
 
 /// A context whose engine is absent but whose client answers — enough for the
 /// environment check to pass, which is all setup asks of it before the walk.
 pub(crate) fn working_ctx() -> Ctx {
     lemonfiber_testing::a_context()
-        .runner(Arc::new(WorkingRunner))
-        .engine(Arc::new(FakeEngine::down()))
+        .runner(working_runner())
+        .engine(Arc::new(engine_down()))
         .clock(lemonfiber_fixtures::ports::Following::started())
         .over(Source::Embedded(&lemonfiber::carried::STACK))
         .build()
@@ -271,8 +211,8 @@ fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
 
 pub(crate) fn ctx() -> Ctx {
     lemonfiber_testing::a_context()
-        .runner(Arc::new(DeadRunner))
-        .engine(Arc::new(FakeEngine::down()))
+        .runner(dead_runner())
+        .engine(Arc::new(engine_down()))
         .clock(lemonfiber_fixtures::ports::Following::started())
         .over(Source::Embedded(&lemonfiber::carried::STACK))
         .build()
@@ -698,7 +638,7 @@ fn the_answers_a_script_gives_are_empty_whichever_way_they_are_asked_for() {
 #[tokio::test(start_paused = true)]
 async fn the_capabilities_setup_never_asks_the_engine_for_answer_plainly() {
     use lemonfiber_core::ports::docker::LogQuery;
-    let engine = FakeEngine::down();
+    let engine = engine_down();
     assert!(engine.list("p").await.is_err());
     assert!(engine.exec("c", &[]).await.is_err());
     assert!(engine.stats("p").await.is_err());

@@ -505,7 +505,7 @@ fn three_moved(http: Arc<Fake>) -> (Ctx, crate::wiring::Fillers) {
             .alongside(books::running())
             .alongside(listening::MOVED.running()),
     );
-    ctx.seams.confined = media::Keyed::holding(
+    ctx.seams.confined = media::holding_keys(
         Arc::clone(&ctx.seams.confined),
         &[aggregator::ADAPTER, books::ADAPTER, listening::ADAPTER],
     );

@@ -161,9 +161,11 @@ fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
             stack: crate::stack::Source::External(project),
             ..context
         })
-        .with_http(Arc::new(
-            Serving::beside(Transport::silent()).decline(&decline),
-        ))
+        .with_http(
+            Serving::beside(Transport::silent())
+                .decline(&decline)
+                .transport(),
+        )
 }
 
 /// The token its offer carries claims an account's standing invitation, and nothing

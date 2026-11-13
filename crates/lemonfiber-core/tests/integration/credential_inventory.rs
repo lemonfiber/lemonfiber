@@ -25,7 +25,7 @@ use lemonfiber_core::app::{dispatch, Asking, Command, Ctx, Outcome};
 use lemonfiber_core::config::{store, Protocols, Settings};
 use lemonfiber_core::credential::Inventory;
 use lemonfiber_core::ports::filesystem::FileSystem;
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::Reporting;
 
@@ -92,21 +92,18 @@ fn sealed(path: &Path) {
 /// A transport that seals the settings file and the secret store once it has carried a
 /// request for `at`:
 /// a record that was written before that request and will not be written after it.
-struct Sealing {
-    inner: Arc<Fake>,
-    env: PathBuf,
-    at: &'static str,
-}
-
-#[async_trait::async_trait]
-impl Http for Sealing {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let answer = self.inner.send(request).await;
-        if request.url.contains(self.at) {
-            sealed(&self.env);
-        }
-        answer
-    }
+fn sealing(inner: Arc<Fake>, env: PathBuf, at: &'static str) -> Arc<Fake> {
+    Fake::handing(move |request| {
+        let inner = Arc::clone(&inner);
+        let env = env.clone();
+        Box::pin(async move {
+            let answer = inner.send(&request).await;
+            if request.url.contains(at) {
+                sealed(&env);
+            }
+            answer
+        })
+    })
 }
 
 /// What one credential or setting reads as now, straight off the secret store or the file

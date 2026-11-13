@@ -28,7 +28,7 @@ fn moved(name: &str, serving: &Arc<Serving>) -> Ctx {
 
 #[tokio::test]
 async fn a_plugin_the_bundle_installs_is_read_from_this_build_at_its_pin() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = moved("embedded-installed", &serving);
 
     let would = report(from_git(&ctx, BUNDLED).await)
@@ -101,7 +101,7 @@ const ADAPTER: &str = "jellyfin-adapter";
 /// that service's name and ports hold nothing against it, and the plugin is recorded.
 #[tokio::test]
 async fn a_plugin_the_bundle_installs_moves_in_place_of_the_stack_service_it_replaces() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = unmoved("embedded-held", &serving);
 
     let recorded = report(from_git(&ctx, BUNDLED).await)
@@ -123,16 +123,15 @@ async fn a_move_put_back_starts_the_stack_service_again_where_the_stack_runs() {
         ("embedded-put-back-refused", true, Some("up")),
     ] {
         let watching = super::offline::refusing(refusing);
-        let mut ctx = unmoved(name, &watching.serving).with_http(
-            lemonfiber_fixtures::http::Fake::by_path(vec![
+        let mut ctx =
+            unmoved(name, &watching).with_http(lemonfiber_fixtures::http::Fake::by_path(vec![
                 super::speaking::declares(),
                 (
                     "/lemonfiber/adapter/v1/about",
                     lemonfiber_fixtures::http::Answer::reply(200, ABOUT),
                 ),
                 ("", lemonfiber_fixtures::http::Answer::reply(500, "")),
-            ]),
-        );
+            ]));
         let others: &[&str] = if running {
             &[BUNDLED, ADAPTER, "sonarr"]
         } else {
@@ -160,11 +159,7 @@ async fn a_move_put_back_starts_the_stack_service_again_where_the_stack_runs() {
             .collect();
         assert_eq!(left.is_empty(), refusing.is_none(), "{name}: {left:?}");
 
-        let asked = watching
-            .seen
-            .lock()
-            .map(|seen| seen.clone())
-            .unwrap_or_default();
+        let asked = watching.ran();
         let taken_off = asked
             .iter()
             .position(|argv| argv.iter().any(|word| word == "rm"));
@@ -195,7 +190,7 @@ fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
 /// indexer aggregators', the indexer proxy's and the request service's, and takes none.
 #[tokio::test]
 async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = unmoved("embedded-rehearsed", &serving);
 
     let read = crate::update::run::update(&ctx, updating(None, false))
@@ -240,7 +235,7 @@ async fn a_rehearsal_of_an_update_names_every_move_on_offer() {
 /// install offer, and leaves the other moves on offer; a rehearsal of it takes nothing.
 #[tokio::test]
 async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = unmoved("embedded-update", &serving);
 
     let read = crate::update::run::update(&ctx, updating(Some(BUNDLED), false))
@@ -298,7 +293,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
 /// on offer, every other move stays on offer and nothing more is installed.
 #[tokio::test]
 async fn an_update_narrowed_to_a_part_already_moved_takes_no_move_and_leaves_the_rest_on_offer() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = unmoved("embedded-narrowed", &serving);
     let moved = crate::update::run::update(&ctx, updating(Some(BUNDLED), true)).await;
     assert_eq!(counted(reading(&ctx).await), Some(1), "{moved:?}");
@@ -331,7 +326,7 @@ async fn a_machine_not_set_up_has_nowhere_to_write_the_tree() {
 
 #[tokio::test]
 async fn a_tree_that_cannot_be_written_out_installs_nothing() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = moved("embedded-unwritten", &serving);
     let data = crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().to_path_buf());
     let _ = data.map(|data| {
@@ -369,7 +364,7 @@ fn names_held(ctx: &Ctx) -> Vec<(String, Option<String>)> {
 /// no value moved from one name to another.
 #[tokio::test]
 async fn moving_a_part_in_place_renames_and_migrates_nothing() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = unmoved("embedded-names", &serving);
     assert!(crate::app::targets::record_secret(
         &ctx,
@@ -421,7 +416,7 @@ async fn moving_a_part_in_place_renames_and_migrates_nothing() {
 /// meets at each the reading it offered.
 #[tokio::test]
 async fn a_part_read_after_another_reads_as_it_does_once_that_one_is_recorded() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = served("embedded-read-after", &serving)
         .with_http(lemonfiber_fixtures::http::Fake::silent())
         .with_patience(std::time::Duration::ZERO);

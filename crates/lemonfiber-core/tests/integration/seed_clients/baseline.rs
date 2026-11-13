@@ -13,7 +13,7 @@ async fn a_wired_client_records_its_category_as_the_expected_baseline() {
     // client's endpoint, so a later run can tell an operator's re-filing from
     // lemonfiber's own value.
     let (states, baseline) = seed_clients_recording(
-        FakeService::with_clients(Mode::Normal, Vec::new()),
+        Receiving::with_clients(Mode::Normal, Vec::new()),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
@@ -39,7 +39,7 @@ async fn a_client_already_at_lemonfibers_value_is_recorded_as_the_baseline_too()
         }),
     }];
     let (states, baseline) = seed_clients_recording(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
@@ -70,7 +70,7 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
     expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
-        &FakeService::with_clients(Mode::Normal, existing),
+        &Receiving::with_clients(Mode::Normal, existing),
         "sonarr",
         &[client("SABnzbd", "sabnzbd", 8080)],
         &mut journal,

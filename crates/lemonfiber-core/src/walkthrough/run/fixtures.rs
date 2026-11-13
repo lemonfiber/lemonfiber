@@ -258,37 +258,6 @@ pub(super) fn acquires_nothing() -> Settings {
     }
 }
 
-/// A clock that moves on every reading, so a bounded wait reaches its bound without
-/// anything actually waiting. The step is larger than nothing and smaller than the
-/// patience the tests set, which is what makes a loop run more than once and then stop.
-pub(super) struct Ticking {
-    step: std::time::Duration,
-    readings: std::sync::atomic::AtomicU64,
-}
-
-/// Where the ticking clock starts: the day every test validating the stack shares.
-const TODAY: std::time::Duration =
-    std::time::Duration::from_secs(lemonfiber_fixtures::ports::TODAY);
-
-impl Ticking {
-    /// A clock moving `step` further on each reading.
-    pub(super) const fn by(step: std::time::Duration) -> Self {
-        Self {
-            step,
-            readings: std::sync::atomic::AtomicU64::new(0),
-        }
-    }
-}
-
-impl crate::ports::time::Clock for Ticking {
-    fn now(&self) -> std::time::SystemTime {
-        let taken = self
-            .readings
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        std::time::UNIX_EPOCH + TODAY + self.step * u32::try_from(taken).unwrap_or(u32::MAX)
-    }
-}
-
 /// A stack with torrents configured, which is the one that has a tunnel to prove.
 pub(super) fn ctx_with_torrents(fake: &Fake) -> Ctx {
     let mut ctx = ctx_with(fake);

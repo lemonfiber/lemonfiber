@@ -14,8 +14,8 @@ use lemonfiber_fixtures::support::Reporting;
 use super::super::adapted::KEY;
 use super::super::context::{a_context, unguarded_embedded, unguarded_stack};
 use super::{
-    both_installed, moved, responded, with_decline, with_gate, Alongside, Decline, Gate, Serving,
-    BOTH, DECLINE, GATE, PAGE,
+    both_installed, moved, responded, with_decline, with_gate, Decline, Gate, Serving, BOTH,
+    DECLINE, GATE, PAGE,
 };
 
 /// A route to the media server under `path`, admitting `tokens`.
@@ -58,12 +58,10 @@ fn invitations() -> Invitations {
 
 /// A transport answering both guards' contracts from `gate` and `decline`, and
 /// everything else with `beside`.
-fn serving(gate: &Arc<Gate>, decline: &Arc<Decline>) -> Arc<Serving> {
-    Arc::new(
-        Serving::beside(Fake::by_path(vec![("/elsewhere", Answer::reply(204, ""))]))
-            .gate(gate)
-            .decline(decline),
-    )
+fn serving(gate: &Arc<Gate>, decline: &Arc<Decline>) -> Serving {
+    Serving::beside(Fake::by_path(vec![("/elsewhere", Answer::reply(204, ""))]))
+        .gate(gate)
+        .decline(decline)
 }
 
 /// A call to `operation` of `capability` carrying no key.
@@ -190,16 +188,17 @@ async fn each_guard_is_asked_over_its_contract_and_everything_else_beside_it() {
     let gate = Arc::new(Gate::admitting(Vec::new()).refusing(&["record"]));
     let decline = Arc::new(Decline::default().paging(PAGE));
     let serving = serving(&gate, &decline);
+    let transport = serving.transport();
 
-    let gating = gate::Adapter(GATE.contracted(serving.clone()));
-    let declining = decline::Adapter(DECLINE.contracted(serving.clone()));
+    let gating = gate::Adapter(GATE.contracted(transport.clone()));
+    let declining = decline::Adapter(DECLINE.contracted(transport.clone()));
     assert!(gating.admit(&[route("media", &[])]).await.is_ok());
     assert!(gating.record(0).await.is_err());
     assert_eq!(declining.page().await.ok().as_deref(), Some(PAGE));
     assert_eq!(gate.routes(), vec![route("media", &[])]);
     assert_eq!(serving.asked().len(), 3);
 
-    let beside = serving
+    let beside = transport
         .send(&Request {
             method: Method::Get,
             url: "http://127.0.0.1:9/elsewhere".to_owned(),
@@ -216,16 +215,18 @@ async fn each_guard_is_asked_over_its_contract_and_everything_else_beside_it() {
 async fn a_guard_asked_without_its_key_is_refused_unheard() {
     let gate = Arc::new(Gate::admitting(Vec::new()));
     let decline = Arc::new(Decline::default());
-    let serving = serving(&gate, &decline);
+    let transport = serving(&gate, &decline).transport();
 
     for request in [
         unkeyed(gate::CAPABILITY, gate::MAJOR, "admitted"),
         unkeyed(decline::CAPABILITY, decline::MAJOR, "page"),
     ] {
-        let answered = serving.send(&request).await;
+        let answered = transport.send(&request).await;
         assert_eq!(answered.ok().map(|answer| answer.status), Some(401));
     }
-    let alone = Serving::beside(Fake::silent()).decline(&decline);
+    let alone = Serving::beside(Fake::silent())
+        .decline(&decline)
+        .transport();
     let answered = alone
         .send(&unkeyed(decline::CAPABILITY, decline::MAJOR, "page"))
         .await;
@@ -251,7 +252,7 @@ fn what_a_guard_served_crosses_the_wire_as_its_contract_says() {
 
 #[tokio::test]
 async fn an_engine_alongside_another_lists_both_and_asks_it_everything_else() {
-    let alongside = Alongside::new(Arc::new(Reporting::absent()), GATE.running());
+    let alongside = GATE.running().over(Arc::new(Reporting::absent()));
     let listed = alongside.list("lemonfiber").await.unwrap_or_default();
     assert!(listed.iter().any(|one| one.service == GATE.adapter));
 

@@ -441,7 +441,7 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
             .publishing(&[(MEDIA_ADAPTER, "127.0.0.1", CONTRACTED_PORT)])
             .alongside(REQUESTS.running()),
     );
-    ctx.seams.confined = media::Keyed::holding(Arc::clone(&ctx.seams.confined), &[MEDIA_ADAPTER]);
+    ctx.seams.confined = media::holding_keys(Arc::clone(&ctx.seams.confined), &[MEDIA_ADAPTER]);
 
     let (wirings, _) = identity_beside(
         &ctx,

@@ -1,23 +1,9 @@
+use std::sync::Arc;
+
 use super::{leaves_this_machine, line, Recording};
 use crate::ports::http::{Http, Method, Request};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Stopped;
-
-/// The fixture hands back a shared handle and a decorator wraps what it is
-/// given, so the handle is what gets wrapped. A newtype here rather than an
-/// implementation on `Arc` in the port, because this is a fact about how the
-/// fixture is built and not about what a transport is.
-struct Shared(std::sync::Arc<Fake>);
-
-#[async_trait::async_trait]
-impl Http for Shared {
-    async fn send(
-        &self,
-        request: &Request,
-    ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-        self.0.send(request).await
-    }
-}
 
 /// A request carrying everything a real one does, credential included.
 fn asking() -> Request {
@@ -217,7 +203,7 @@ async fn a_request_that_stayed_on_this_machine_is_not_written_down() {
     let _ = std::fs::remove_dir_all(&dir);
     let at_file = dir.join("outbound.log");
     let transport = Recording::around(
-        Shared(Fake::always(Answer::Reply(200, String::new()))),
+        Fake::always(Answer::Reply(200, String::new())) as Arc<dyn Http>,
         Some(at_file.clone()),
         Stopped::at(1),
     );
@@ -249,7 +235,7 @@ async fn a_request_that_went_somewhere_is_written_down_there() {
     let at = dir.join("outbound.log");
 
     let transport = Recording::around(
-        Shared(Fake::always(Answer::Reply(200, String::new()))),
+        Fake::always(Answer::Reply(200, String::new())) as Arc<dyn Http>,
         Some(at.clone()),
         Stopped::at(1),
     );
@@ -281,7 +267,7 @@ async fn a_request_that_went_somewhere_is_written_down_there() {
 #[tokio::test]
 async fn a_run_with_nowhere_to_write_still_sends() {
     let transport = Recording::around(
-        Shared(Fake::always(Answer::Reply(200, String::new()))),
+        Fake::always(Answer::Reply(200, String::new())) as Arc<dyn Http>,
         None,
         Stopped::at(1),
     );
@@ -297,7 +283,7 @@ async fn a_fetch_that_went_somewhere_is_written_down_there() {
     let _ = std::fs::remove_dir_all(&dir);
     let at = dir.join("outbound.log");
     let transport = Recording::around(
-        Shared(Fake::always(Answer::Reply(200, "picture".to_owned()))),
+        Fake::always(Answer::Reply(200, "picture".to_owned())) as Arc<dyn Http>,
         Some(at.clone()),
         Stopped::at(1),
     );
@@ -320,7 +306,7 @@ async fn octets_that_went_somewhere_are_written_down_there() {
     let _ = std::fs::remove_dir_all(&dir);
     let at = dir.join("outbound.log");
     let transport = Recording::around(
-        Shared(Fake::always(Answer::Reply(201, String::new()))),
+        Fake::always(Answer::Reply(201, String::new())) as Arc<dyn Http>,
         Some(at.clone()),
         Stopped::at(1),
     );

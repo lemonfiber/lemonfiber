@@ -49,9 +49,8 @@ pub mod usenet;
 
 pub(crate) mod collecting;
 mod crossing;
-mod typing;
 pub(crate) use crossing::{a_crossing_reader, a_grant, a_trusted_crossing_reader, crossing_stack};
-pub(crate) use typing::Typing;
+pub(crate) use lemonfiber_fixtures::typing::Typing;
 mod conforming;
 mod contracting;
 mod declining;

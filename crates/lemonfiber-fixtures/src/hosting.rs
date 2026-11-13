@@ -10,10 +10,12 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lemonfiber_ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
+use tokio::sync::{Notify, Semaphore};
 
 /// Where this fake pretends definitions are kept.
 const SOMEWHERE: &str = "/services";
@@ -25,19 +27,53 @@ pub struct Hosting {
     refuses: Option<String>,
     placed: Mutex<Vec<Hosted>>,
     withdrawn: Mutex<Vec<String>>,
+    /// Permits to finish a withdrawal, one taken by each.
+    permits: Semaphore,
+    /// Told each time a withdrawal begins.
+    begun: Notify,
+    /// Whether the next withdrawal falls over rather than finishing.
+    falls_over: AtomicBool,
 }
 
 impl Hosting {
     /// A manager of the given kind, holding nothing and agreeing to everything.
     #[must_use]
     pub fn with(manager: Manager) -> Arc<Self> {
+        Self::built(manager, None, Semaphore::MAX_PERMITS)
+    }
+
+    /// A manager of the given kind whose withdrawals each wait until [`Hosting::open`].
+    #[must_use]
+    pub fn shut(manager: Manager) -> Arc<Self> {
+        Self::built(manager, None, 0)
+    }
+
+    fn built(manager: Manager, refuses: Option<String>, permits: usize) -> Arc<Self> {
         Arc::new(Self {
             manager,
             held: Mutex::new(BTreeMap::new()),
-            refuses: None,
+            refuses,
             placed: Mutex::new(Vec::new()),
             withdrawn: Mutex::new(Vec::new()),
+            permits: Semaphore::new(permits),
+            begun: Notify::new(),
+            falls_over: AtomicBool::new(false),
         })
+    }
+
+    /// Lets every withdrawal waiting, and every one after, finish.
+    pub fn open(&self) {
+        self.permits.add_permits(Semaphore::MAX_PERMITS);
+    }
+
+    /// Waits until a withdrawal has begun.
+    pub async fn begun(&self) {
+        self.begun.notified().await;
+    }
+
+    /// Makes the next withdrawal fall over in the middle rather than finish.
+    pub fn fall_over(&self) {
+        self.falls_over.store(true, Ordering::SeqCst);
     }
 
     /// A machine whose platform lemonfiber does not configure.
@@ -49,13 +85,7 @@ impl Hosting {
     /// A manager that refuses everything asked of it, in its own words.
     #[must_use]
     pub fn refusing(manager: Manager, reason: &str) -> Arc<Self> {
-        Arc::new(Self {
-            manager,
-            held: Mutex::new(BTreeMap::new()),
-            refuses: Some(reason.to_owned()),
-            placed: Mutex::new(Vec::new()),
-            withdrawn: Mutex::new(Vec::new()),
-        })
+        Self::built(manager, Some(reason.to_owned()), Semaphore::MAX_PERMITS)
     }
 
     /// A manager already holding one name, in the state given.
@@ -145,6 +175,13 @@ impl Host for Hosting {
     }
 
     async fn withdraw(&self, name: &str) -> Result<Vec<PathBuf>, Failure> {
+        self.begun.notify_one();
+        if let Ok(permit) = self.permits.acquire().await {
+            permit.forget();
+        }
+        if self.falls_over.swap(false, Ordering::SeqCst) {
+            std::panic::resume_unwind(Box::new("the service manager fell over"));
+        }
         withdrawn(self, name)
     }
 }

@@ -2,7 +2,7 @@ use super::{handed, said};
 use lemonfiber_core::door::{Address, Chosen, Facing};
 use lemonfiber_core::model::{FrontDoorReport, Standing};
 
-use crate::setup::tests::{ctx, working_ctx, FakeEngine};
+use crate::setup::tests::{ctx, engine_quiet, working_ctx};
 
 /// An answer naming a door, with the address this machine would be reached at.
 fn answered(address: Option<Address>) -> FrontDoorReport {
@@ -75,7 +75,7 @@ async fn a_working_stack_is_asked_and_answers() {
     // than a failure to reach one — and it is the core's answer, arrived at
     // through the command every other surface asks.
     let mut ctx = working_ctx();
-    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(engine_quiet());
     let lines = handed(&ctx).await;
     assert!(
         lines.iter().any(|line| line.contains("front door")),

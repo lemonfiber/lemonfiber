@@ -47,39 +47,6 @@ async fn a_plugin_whose_proof_holds_is_started_asked_and_then_recorded() {
     );
 }
 
-impl LostToTheInstall {
-    /// One of them, before anything has started.
-    pub(super) fn losing(once_up: &'static str) -> Arc<Self> {
-        Arc::new(Self {
-            once_up,
-            started: std::sync::atomic::AtomicBool::new(false),
-        })
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::ports::Runner for LostToTheInstall {
-    async fn run(
-        &self,
-        argv: &[String],
-    ) -> Result<lemonfiber_ports::process::Output, lemonfiber_ports::process::Failure> {
-        let said = |named: &str| argv.iter().any(|word| word == named);
-        if said("up") {
-            self.started
-                .store(true, std::sync::atomic::Ordering::SeqCst);
-        }
-        if said("version")
-            && said(self.once_up)
-            && self.started.load(std::sync::atomic::Ordering::SeqCst)
-        {
-            return Err(lemonfiber_ports::process::Failure::NotFound {
-                program: "docker".to_owned(),
-            });
-        }
-        Ok(spoke("25.0.5|1.44|1.44"))
-    }
-}
-
 /// The whole of what the second half of an install buys. The plugin's own proofs
 /// held — its service answered exactly what the manifest said it would — and the
 /// stack was still taken back, because a check that was passing before the install
@@ -91,11 +58,7 @@ impl crate::ports::Runner for LostToTheInstall {
 /// before and does not now, which is the honest claim and the one worth acting on.
 #[tokio::test]
 async fn a_plugin_that_holds_its_own_proofs_and_breaks_the_stack_is_still_put_back() {
-    let ctx = proving(
-        "collateral",
-        LostToTheInstall::losing("version"),
-        answering(200),
-    );
+    let ctx = proving("collateral", losing("version"), answering(200));
 
     let install =
         report(installing(&ctx, &source("collateral", PROVING)).await).and_then(|one| one.install);
@@ -142,11 +105,7 @@ async fn a_plugin_that_holds_its_own_proofs_and_breaks_the_stack_is_still_put_ba
 /// reversed on it would be punishing a plugin for something nobody established.
 #[tokio::test]
 async fn a_check_nothing_could_establish_is_reported_rather_than_held_against_it() {
-    let ctx = proving(
-        "unsettled",
-        LostToTheInstall::losing("compose"),
-        answering(200),
-    );
+    let ctx = proving("unsettled", losing("compose"), answering(200));
 
     let install =
         report(installing(&ctx, &source("unsettled", PROVING)).await).and_then(|one| one.install);

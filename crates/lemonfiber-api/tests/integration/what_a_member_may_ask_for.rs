@@ -28,7 +28,7 @@ pub(crate) const WHO: &str = "ana";
 pub(crate) async fn as_a_member(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
     let (router, _, _) = door_with(
         Some(keeping(named)),
-        AHousehold::knowing(MEMBER),
+        Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let mut carried = from_here();
@@ -61,7 +61,7 @@ pub(crate) async fn signed_in(router: axum::Router) -> String {
 fn as_the_machine(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
     let (router, token, _) = door_with(
         Some(keeping(named)),
-        AHousehold::knowing(MEMBER),
+        Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let mut carried = from_here();
@@ -241,7 +241,7 @@ async fn the_machine_is_refused_none_of_the_three() {
 #[tokio::test]
 async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked() {
     let named = "member-unreachable-read";
-    let household = AHousehold::knowing(MEMBER);
+    let household = Recognising::knowing(MEMBER);
     let (router, _, _) = door_with(
         Some(keeping(named)),
         Arc::clone(&household),
@@ -286,7 +286,7 @@ async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked()
 #[tokio::test]
 async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
     let named = "member-unreachable-stream";
-    let household = AHousehold::knowing(MEMBER);
+    let household = Recognising::knowing(MEMBER);
     let (router, _, _) = door_with(
         Some(keeping(named)),
         Arc::clone(&household),
@@ -319,7 +319,7 @@ async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
 #[tokio::test]
 async fn the_door_is_still_open_to_somebody_who_could_not_be_checked() {
     let named = "member-unreachable-door";
-    let household = AHousehold::knowing(MEMBER);
+    let household = Recognising::knowing(MEMBER);
     let (router, _, _) = door_with(
         Some(keeping(named)),
         Arc::clone(&household),
@@ -442,7 +442,7 @@ async fn a_request_that_reached_a_handler_unnamed_is_not_served() {
 #[tokio::test]
 async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
     let named = "stream-alone";
-    let household = AHousehold::knowing(MEMBER);
+    let household = Recognising::knowing(MEMBER);
     let (router, _, admitting) = door_with(
         Some(keeping(named)),
         Arc::clone(&household),
@@ -480,7 +480,7 @@ async fn the_stream_tells_a_member_only_what_is_theirs() {
     let named = "stream-alone-open";
     let (router, token, admitting) = door_with(
         Some(keeping(named)),
-        AHousehold::knowing(MEMBER),
+        Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let answer = asked(
@@ -584,7 +584,7 @@ async fn the_session_a_member_buys_says_which_member() {
     let named = "member-named-on-the-wire";
     let (router, _, _) = door_with(
         Some(keeping(named)),
-        AHousehold::knowing(MEMBER),
+        Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let answer = asked(
@@ -634,7 +634,7 @@ async fn an_empty_password_opens_no_session() {
     let named = "member-empty-password";
     let (router, _, _) = door_with(
         Some(keeping(named)),
-        AHousehold::knowing(MEMBER),
+        Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let answer = asked(

@@ -1,108 +1,17 @@
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Mutex};
+use std::collections::BTreeSet;
+use std::sync::Arc;
 
-use async_trait::async_trait;
+use lemonfiber_fixtures::filing::Filer;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{categories, completed, field, filed};
 use crate::baseline::Baseline;
-use crate::ports::service::{Failure, Filed, Filing};
+use crate::ports::service::Filed;
 use crate::seed::State;
 use crate::test_support::{a_context, torrent};
 
 /// The id the client is recorded under.
 const CLIENT: &str = "sabnzbd";
-
-/// A client holding each category's folder in memory, answering a write with `refusing`
-/// where it is set, filing nothing it is told where `ignoring`, and answering only as many
-/// reads as `answering` says where it says.
-#[derive(Default)]
-struct Holding {
-    held: Mutex<BTreeMap<String, String>>,
-    told: Mutex<Vec<Filed>>,
-    reads: Mutex<usize>,
-    refusing: bool,
-    ignoring: bool,
-    answering: Option<usize>,
-}
-
-impl Holding {
-    fn with(held: &[(&str, &str)]) -> Self {
-        Self {
-            held: Mutex::new(
-                held.iter()
-                    .map(|(category, folder)| ((*category).to_owned(), (*folder).to_owned()))
-                    .collect(),
-            ),
-            ..Self::default()
-        }
-    }
-
-    fn told(&self) -> Vec<Filed> {
-        self.told
-            .lock()
-            .map(|told| told.clone())
-            .unwrap_or_default()
-    }
-
-    fn holds(&self, category: &str) -> Option<String> {
-        self.held
-            .lock()
-            .ok()
-            .and_then(|held| held.get(category).cloned())
-    }
-}
-
-#[async_trait]
-impl Filing for Holding {
-    async fn filed(&self) -> Result<Vec<Filed>, Failure> {
-        let read = self
-            .reads
-            .lock()
-            .map(|mut reads| {
-                *reads += 1;
-                *reads
-            })
-            .unwrap_or_default();
-        if self.answering.is_some_and(|answered| read > answered) {
-            return Err(Failure::Unavailable {
-                service: CLIENT.to_owned(),
-            });
-        }
-        Ok(self
-            .held
-            .lock()
-            .map(|held| {
-                held.iter()
-                    .map(|(category, folder)| Filed {
-                        category: category.clone(),
-                        folder: folder.clone(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-
-    async fn file_under(&self, folders: &[Filed]) -> Result<(), Failure> {
-        if let Ok(mut told) = self.told.lock() {
-            told.extend_from_slice(folders);
-        }
-        if self.refusing {
-            return Err(Failure::Refused {
-                service: CLIENT.to_owned(),
-                detail: "no".to_owned(),
-            });
-        }
-        if !self.ignoring {
-            if let Ok(mut held) = self.held.lock() {
-                for one in folders {
-                    held.insert(one.category.clone(), one.folder.clone());
-                }
-            }
-        }
-        Ok(())
-    }
-}
 
 /// Television and films, as two curators hand a client them.
 fn tv_and_movies() -> BTreeSet<String> {
@@ -179,7 +88,7 @@ fn reaching_the_torrent_client(
 
 #[tokio::test]
 async fn a_client_holding_its_own_defaults_is_told_the_shared_folders_and_they_are_recorded() {
-    let client = Holding::with(&[("tv", "/data/downloads/usenet/complete/tv")]);
+    let client = Filer::with(&[("tv", "/data/downloads/usenet/complete/tv")]);
     let mut baseline = Baseline::new();
 
     let state = filed(
@@ -203,7 +112,7 @@ async fn a_client_holding_its_own_defaults_is_told_the_shared_folders_and_they_a
 
 #[tokio::test]
 async fn a_client_already_filing_both_is_told_nothing() {
-    let client = Holding::with(&[("tv", &completed("tv")), ("movies", &completed("movies"))]);
+    let client = Filer::with(&[("tv", &completed("tv")), ("movies", &completed("movies"))]);
 
     let state = filed(
         &a_context().build(),
@@ -221,7 +130,7 @@ async fn a_client_already_filing_both_is_told_nothing() {
 
 #[tokio::test]
 async fn a_folder_the_operator_moved_after_lemonfiber_filed_it_is_kept_as_drift() {
-    let client = Holding::with(&[("tv", "/data/elsewhere"), ("movies", &completed("movies"))]);
+    let client = Filer::with(&[("tv", "/data/elsewhere"), ("movies", &completed("movies"))]);
     let mut baseline = filed_before("tv");
 
     let state = filed(
@@ -245,7 +154,7 @@ async fn a_folder_the_operator_moved_after_lemonfiber_filed_it_is_kept_as_drift(
 
 #[tokio::test]
 async fn a_category_gone_from_the_client_is_filed_again() {
-    let client = Holding::with(&[("movies", &completed("movies"))]);
+    let client = Filer::with(&[("movies", &completed("movies"))]);
 
     let state = filed(
         &a_context().build(),
@@ -269,7 +178,7 @@ async fn a_category_gone_from_the_client_is_filed_again() {
 
 #[tokio::test]
 async fn a_rehearsal_says_what_it_would_file_and_files_nothing() {
-    let client = Holding::with(&[("tv", "/data/downloads/usenet/complete/tv")]);
+    let client = Filer::with(&[("tv", "/data/downloads/usenet/complete/tv")]);
     let mut baseline = Baseline::new();
 
     let state = filed(
@@ -301,10 +210,7 @@ async fn a_rehearsal_says_what_it_would_file_and_files_nothing() {
 
 #[tokio::test]
 async fn a_client_that_refuses_is_said_and_nothing_is_recorded() {
-    let client = Holding {
-        refusing: true,
-        ..Holding::default()
-    };
+    let client = Filer::default().refusing();
     let mut baseline = Baseline::new();
 
     let state = filed(
@@ -326,10 +232,7 @@ async fn a_client_that_refuses_is_said_and_nothing_is_recorded() {
 
 #[tokio::test]
 async fn a_client_that_takes_a_folder_and_files_elsewhere_is_said_as_that() {
-    let client = Holding {
-        ignoring: true,
-        ..Holding::with(&[("tv", "/data/downloads/usenet/complete/tv")])
-    };
+    let client = Filer::with(&[("tv", "/data/downloads/usenet/complete/tv")]).ignoring();
 
     let state = filed(
         &a_context().build(),
@@ -350,10 +253,7 @@ async fn a_client_that_takes_a_folder_and_files_elsewhere_is_said_as_that() {
 
 #[tokio::test]
 async fn a_client_that_will_not_say_what_it_files_is_told_nothing() {
-    let client = Holding {
-        answering: Some(0),
-        ..Holding::default()
-    };
+    let client = Filer::default().answering(0);
 
     let state = filed(
         &a_context().build(),
@@ -374,10 +274,7 @@ async fn a_client_that_will_not_say_what_it_files_is_told_nothing() {
 
 #[tokio::test]
 async fn a_client_that_files_and_then_will_not_say_where_is_said_and_nothing_is_recorded() {
-    let client = Holding {
-        answering: Some(1),
-        ..Holding::with(&[("tv", "/data/downloads/usenet/complete/tv")])
-    };
+    let client = Filer::with(&[("tv", "/data/downloads/usenet/complete/tv")]).answering(1);
     let mut baseline = Baseline::new();
 
     let (state, now) = filed(
@@ -399,7 +296,7 @@ async fn a_client_that_files_and_then_will_not_say_where_is_said_and_nothing_is_
 
 #[tokio::test]
 async fn a_moved_folder_stays_drift_while_a_missing_one_is_filed_beside_it() {
-    let client = Holding::with(&[("tv", "/data/elsewhere")]);
+    let client = Filer::with(&[("tv", "/data/elsewhere")]);
     let mut baseline = filed_before("tv");
 
     let state = filed(

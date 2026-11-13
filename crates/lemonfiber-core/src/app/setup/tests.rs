@@ -12,13 +12,11 @@ use crate::alert::Appetite;
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
 use crate::platform::Environment;
-use crate::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
-};
 use crate::prerequisites::PrerequisiteMap;
 use crate::stack::Source;
 use crate::validate::{Validation, Validator};
 use crate::wizard::{Answer, Guarded, Library, Phase, Plan, Progress, Vpn, Wizard};
+use lemonfiber_fixtures::probing::Probing;
 
 /// A validator that answers with scripted outcomes, so a run is driven with no
 /// network. Each call takes the next outcome, and the last is repeated once they
@@ -68,103 +66,6 @@ fn proving() -> Proving {
     Proving::giving(vec![Validation::Valid {
         observed: "unused".to_owned(),
     }])
-}
-
-/// A filesystem the tests script, so a run is driven without touching a real
-/// disk. It answers the few calls the data-location probe makes; the rest it
-/// is never asked, and stubs plainly.
-struct ProbeFs {
-    /// Whether `canonicalize` finds the path — false makes the probe walk up
-    /// and, finding nothing, report the location untestable.
-    reachable: bool,
-    /// How many `canonicalize` calls fail before they start resolving, so a
-    /// chosen leaf can be absent while a parent of it is found — the case where
-    /// a link is proven on a parent rather than on the path itself.
-    missing_leaves: AtomicUsize,
-    /// Whether a probe file can be created there.
-    writable: bool,
-    /// How many link attempts fail before they start taking, so one chosen
-    /// location can refuse to link and the next one accept it.
-    failing_links: AtomicUsize,
-    /// The file number the linked name reads back as; a value other than the
-    /// probe's own models a link that could not be confirmed.
-    confirmed_file: u64,
-    /// The filesystem type reported, for naming why a link failed.
-    kind: FsKind,
-}
-
-impl ProbeFs {
-    /// A filesystem that links: reachable, writable, and confirming its links.
-    fn links() -> Self {
-        Self {
-            reachable: true,
-            missing_leaves: AtomicUsize::new(0),
-            writable: true,
-            failing_links: AtomicUsize::new(0),
-            confirmed_file: 7,
-            kind: FsKind::Linking("apfs".to_owned()),
-        }
-    }
-}
-
-#[async_trait]
-impl FileSystem for ProbeFs {
-    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        if !self.reachable {
-            return Err(Fault::new("no such file or directory"));
-        }
-        let missing = self.missing_leaves.load(Ordering::SeqCst);
-        if missing > 0 {
-            self.missing_leaves.store(missing - 1, Ordering::SeqCst);
-            return Err(Fault::new("no such file or directory"));
-        }
-        Ok(path.to_owned())
-    }
-    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-        if self.writable {
-            Ok(())
-        } else {
-            Err(Fault::new("permission denied"))
-        }
-    }
-    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        let remaining = self.failing_links.load(Ordering::SeqCst);
-        if remaining > 0 {
-            self.failing_links.store(remaining - 1, Ordering::SeqCst);
-            Err(Fault::new("operation not permitted"))
-        } else {
-            Ok(())
-        }
-    }
-    async fn identify(&self, path: &Path) -> Result<Identity, Fault> {
-        let file = if path.to_string_lossy().ends_with(".link") {
-            self.confirmed_file
-        } else {
-            7
-        };
-        Ok(Identity { file, links: 2 })
-    }
-    async fn remove(&self, _path: &Path) {}
-    async fn read(&self, _path: &Path) -> Option<String> {
-        None
-    }
-    async fn write(&self, _path: &Path, _contents: &str) {}
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
-    }
-}
-
-#[async_trait]
-impl Storage for ProbeFs {
-    async fn describe(&self, _path: &Path) -> StorageFacts {
-        StorageFacts {
-            point: std::path::PathBuf::new(),
-            kind: self.kind.clone(),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
 }
 
 /// What the scripted operator answers when warned a location cannot hardlink.

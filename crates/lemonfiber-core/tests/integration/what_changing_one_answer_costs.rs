@@ -129,7 +129,7 @@ fn stood_up(settings: Settings, stack: Source, http: Arc<Fake>, missing: Vec<&'s
     let mut ctx = unkeyed(settings, stack, http, missing);
     let adapters: Vec<&str> = ALL.iter().map(|curator| curator.adapter).collect();
     ctx.seams.confined =
-        lemonfiber_testing::adapted::Keyed::holding(Arc::clone(&ctx.seams.confined), &adapters);
+        lemonfiber_testing::adapted::holding_keys(Arc::clone(&ctx.seams.confined), &adapters);
     ctx
 }
 

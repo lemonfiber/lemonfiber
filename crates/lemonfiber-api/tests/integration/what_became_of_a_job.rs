@@ -9,13 +9,10 @@
 //! Driven from outside the crate, because what a caller can reach is the thing
 //! worth holding still.
 
-use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::idle::ctx;
-use async_trait::async_trait;
 use axum::body::to_bytes;
 
 use crate::reading::{refused, Refusal};
@@ -29,6 +26,7 @@ use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::filesystem::{Presence, Volume};
+use lemonfiber_fixtures::mounted::Drive;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// A name this run can hand out.
@@ -95,15 +93,9 @@ fn guarding(volume: Arc<dyn Volume>) -> Ctx {
         .with_volume(volume)
 }
 
-/// A volume that is always there, and counts how often it was asked.
-struct Counting(Arc<AtomicUsize>);
-
-#[async_trait]
-impl Volume for Counting {
-    async fn presence(&self, _path: &Path) -> Presence {
-        self.0.fetch_add(1, Ordering::SeqCst);
-        Presence::On(9)
-    }
+/// A location that is always there, counting how often it was looked at.
+fn there() -> Arc<Drive> {
+    Arc::new(Drive::settling(vec![Presence::On(9)]))
 }
 
 /// A guard started under a name, over a location that will not go away.
@@ -386,8 +378,8 @@ async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
     // Time is moved rather than waited on: a guard looks again every few seconds,
     // and a test that sat through two of them is a test somebody deletes.
     let jobs = Jobs::default();
-    let looked = Arc::new(AtomicUsize::new(0));
-    let job = watching(&jobs, Arc::new(Counting(Arc::clone(&looked)))).await;
+    let looked = there();
+    let job = watching(&jobs, Arc::clone(&looked) as Arc<dyn Volume>).await;
 
     // Long enough that a guard still running would have looked several times over.
     // Advanced a look at a time, because the next one is only scheduled once the
@@ -398,7 +390,7 @@ async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
         }
     };
     looks_ahead().await;
-    let by_now = looked.load(Ordering::SeqCst);
+    let by_now = looked.looked();
     assert!(by_now > 1, "the guard was guarding: {by_now}");
 
     let released = jobs.stop(job.as_str()).await;
@@ -406,7 +398,7 @@ async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
 
     looks_ahead().await;
     assert_eq!(
-        looked.load(Ordering::SeqCst),
+        looked.looked(),
         by_now,
         "it stopped looking, which is what a browser has no interrupt to say"
     );
@@ -444,7 +436,7 @@ async fn work_that_was_ended_is_answered_with_the_name_rather_than_an_outcome() 
     // Under the status finished work answers with, and the kind the start answered
     // with: the work is over, and there is no outcome because it did not reach one.
     let jobs = Jobs::default();
-    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let job = watching(&jobs, there()).await;
     let released = jobs.stop(job.as_str()).await;
     assert_eq!(released.map(|work| work.standing), Some(Standing::Ended));
 
@@ -459,7 +451,7 @@ async fn releasing_a_name_over_the_route_says_where_the_work_now_stands() {
     // Releasing and asking are two questions with one answer, so a caller that
     // released a name need not ask again to find out what it released.
     let jobs = Jobs::default();
-    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let job = watching(&jobs, there()).await;
     let (status, body) = released(jobs.clone(), job.as_str()).await;
     assert_eq!(status, StatusCode::OK.as_u16(), "{body}");
     assert!(body.contains(r#""kind":"job""#), "{body}");
@@ -513,7 +505,7 @@ async fn a_guard_nobody_asks_about_is_let_go_on_the_second_look() {
     // between sweeps, and ending it on the first look would be a race with the
     // sweep's timing rather than a bound on how long nobody was interested.
     let jobs = Jobs::default();
-    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let job = watching(&jobs, there()).await;
 
     assert_eq!(jobs.sweep().await, 0, "it survives the first look");
     assert_eq!(
@@ -596,7 +588,7 @@ async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
     // lease, so a test that watched for the ending by asking would renew the very
     // thing it was waiting to see let go.
     let jobs = Jobs::default();
-    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let job = watching(&jobs, there()).await;
     let beating = tokio::spawn(jobs.clone().sweeping(BEAT));
 
     tokio::time::sleep(BEAT * 20).await;

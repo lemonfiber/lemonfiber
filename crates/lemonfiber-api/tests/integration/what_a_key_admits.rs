@@ -88,7 +88,7 @@ pub(crate) fn keeping_keys(named: &str) -> Keys {
 }
 
 /// A surface admitting those keys, its household holding `household`.
-fn surface_with(keys: &Keys, household: Arc<AHousehold>) -> (axum::Router, Arc<Admitting>) {
+fn surface_with(keys: &Keys, household: Arc<Recognising>) -> (axum::Router, Arc<Admitting>) {
     let admitting = Arc::new(Admitting {
         keys: Keyring::at(Some(keys.kept.clone()), Some(keys.used.clone())),
         household: Some(Arc::new(household as Arc<dyn Household>) as Arc<dyn HouseholdAtHand>),
@@ -166,7 +166,7 @@ pub(crate) fn code(answer: &Answer) -> String {
 #[tokio::test]
 async fn a_read_key_from_this_machine_reads() {
     let keys = keeping_keys("reads");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let read = presented(
         router,
         "GET",
@@ -181,7 +181,7 @@ async fn a_read_key_from_this_machine_reads() {
 #[tokio::test]
 async fn a_key_from_another_machine_is_read_only_over_tls() {
     let keys = keeping_keys("over-tls");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let plain = presented(
         router.clone(),
         "GET",
@@ -206,7 +206,7 @@ async fn a_key_from_another_machine_is_read_only_over_tls() {
 #[tokio::test]
 async fn a_key_over_a_connection_nobody_placed_is_refused_before_it_is_looked_at() {
     let keys = keeping_keys("unplaced");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let refused = presented(
         router,
         "GET",
@@ -221,7 +221,7 @@ async fn a_key_over_a_connection_nobody_placed_is_refused_before_it_is_looked_at
 #[tokio::test]
 async fn a_revoked_or_unknown_key_is_refused_exactly_as_a_wrong_token_is() {
     let keys = keeping_keys("as-a-wrong-token");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let wrong_token = presented(
         router.clone(),
         "GET",
@@ -256,7 +256,7 @@ async fn a_revoked_or_unknown_key_is_refused_exactly_as_a_wrong_token_is() {
 #[tokio::test]
 async fn a_read_key_is_refused_every_action_naming_its_scope() {
     let keys = keeping_keys("read-acts");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let refused = presented(
         router,
         "POST",
@@ -273,7 +273,7 @@ async fn a_read_key_is_refused_every_action_naming_its_scope() {
 #[tokio::test]
 async fn an_act_key_is_refused_what_no_key_may_call() {
     let keys = keeping_keys("act-refused");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     for action in ["seed", "reset", "forget", "backup"] {
         let refused = presented(
             router.clone(),
@@ -291,7 +291,7 @@ async fn an_act_key_is_refused_what_no_key_may_call() {
 #[tokio::test]
 async fn an_act_key_is_let_through_to_what_a_key_may_call() {
     let keys = keeping_keys("act-called");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let called = presented(
         router,
         "POST",
@@ -306,7 +306,7 @@ async fn an_act_key_is_let_through_to_what_a_key_may_call() {
 #[tokio::test]
 async fn no_key_may_mint_list_or_revoke_keys_whatever_its_scope() {
     let keys = keeping_keys("about-keys");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     for secret in [&keys.read, &keys.act] {
         for (method, path) in [
             ("GET", "/api/keys"),
@@ -343,7 +343,7 @@ async fn no_key_may_mint_list_or_revoke_keys_whatever_its_scope() {
 #[tokio::test]
 async fn a_member_key_is_that_member_and_nothing_more() {
     let keys = keeping_keys("member");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let theirs = presented(
         router.clone(),
         "GET",
@@ -415,7 +415,7 @@ const BEFORE_IT_ENDS: usize = 8;
 #[tokio::test(start_paused = true)]
 async fn a_member_keys_stream_ends_once_the_key_is_revoked() {
     let keys = keeping_keys("member-stream-revoked");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let said = heard_until_it_ends(router, keys.member.as_str(), BEFORE_IT_ENDS, || {
         let Ok(mut kept) = Kept::at(&keys.kept) else {
             unreachable!("the keys this test kept can be read back")
@@ -437,7 +437,7 @@ async fn a_member_keys_stream_ends_once_the_key_is_revoked() {
 #[tokio::test(start_paused = true)]
 async fn a_member_keys_stream_ends_once_the_key_no_longer_names_the_member() {
     let keys = keeping_keys("member-stream-rescoped");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let said = heard_until_it_ends(router, keys.member.as_str(), BEFORE_IT_ENDS, || {
         let Ok(mut kept) = Kept::at(&keys.kept) else {
             unreachable!("the keys this test kept can be read back")
@@ -459,7 +459,7 @@ async fn a_member_keys_stream_ends_once_the_key_no_longer_names_the_member() {
 #[tokio::test(start_paused = true)]
 async fn a_member_keys_stream_ends_once_the_member_has_left() {
     let keys = keeping_keys("member-stream-left");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     let (router, _) = surface_with(&keys, Arc::clone(&household));
     let said = heard_until_it_ends(router, keys.member.as_str(), BEFORE_IT_ENDS, || {
         household.withdraw();
@@ -474,7 +474,7 @@ async fn a_member_keys_stream_ends_once_the_member_has_left() {
 #[tokio::test]
 async fn a_member_key_whose_account_has_left_is_refused_as_nobody() {
     let keys = keeping_keys("member-gone");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     household.withdraw();
     let (router, _) = surface_with(&keys, household);
     let refused = presented(
@@ -491,7 +491,7 @@ async fn a_member_key_whose_account_has_left_is_refused_as_nobody() {
 #[tokio::test]
 async fn a_member_key_is_unconfirmed_while_the_household_cannot_be_asked() {
     let keys = keeping_keys("member-dark");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     household.go_dark();
     let (router, admitting) = surface_with(&keys, household);
     let refused = presented(
@@ -514,7 +514,7 @@ async fn a_member_key_is_unconfirmed_while_the_household_cannot_be_asked() {
 #[tokio::test]
 async fn wrong_keys_from_many_machines_at_once_meet_the_shared_wait() {
     let keys = keeping_keys("many-machines");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let mut held = None;
     for last in 1..=40u8 {
         let answer = presented(
@@ -538,7 +538,7 @@ async fn wrong_keys_from_many_machines_at_once_meet_the_shared_wait() {
 #[tokio::test]
 async fn wrong_keys_earn_the_wait_wrong_passwords_do_and_a_right_key_meets_it_too() {
     let keys = keeping_keys("guessed");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let mut held = None;
     for guess in 0..12u8 {
         let answer = presented(
@@ -573,7 +573,7 @@ async fn wrong_keys_earn_the_wait_wrong_passwords_do_and_a_right_key_meets_it_to
 #[tokio::test]
 async fn a_revoked_key_presented_again_and_again_earns_no_wait() {
     let keys = keeping_keys("revoked-again");
-    let (router, admitting) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, admitting) = surface_with(&keys, Recognising::knowing("a7f3"));
     for _ in 0..20 {
         let refused = presented(
             router.clone(),
@@ -595,7 +595,7 @@ async fn a_revoked_key_presented_again_and_again_earns_no_wait() {
 #[tokio::test]
 async fn a_member_key_whose_account_has_left_earns_no_wait() {
     let keys = keeping_keys("member-gone-again");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     household.withdraw();
     let (router, admitting) = surface_with(&keys, household);
     for _ in 0..20 {
@@ -619,7 +619,7 @@ async fn a_member_key_whose_account_has_left_earns_no_wait() {
 #[tokio::test]
 async fn a_right_key_forgives_nothing_but_itself() {
     let keys = keeping_keys("forgives-nothing");
-    let (router, admitting) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, admitting) = surface_with(&keys, Recognising::knowing("a7f3"));
     let guess = |byte: u8| {
         let router = router.clone();
         async move {
@@ -654,7 +654,7 @@ async fn a_right_key_forgives_nothing_but_itself() {
 #[tokio::test]
 async fn a_use_is_written_down_and_the_secret_is_not() {
     let keys = keeping_keys("used");
-    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let (router, _) = surface_with(&keys, Recognising::knowing("a7f3"));
     let _ = presented(
         router,
         "GET",

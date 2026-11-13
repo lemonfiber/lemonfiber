@@ -1,35 +1,15 @@
 //! A part whose upstream takes its claim only once it restarts.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use lemonfiber_fixtures::owning::Part;
 
 use super::*;
-use crate::ports::service::{Claim, Failure, Owner, Ownership};
+use crate::ports::service::{Failure, Owner};
 use crate::seed::run::owning::{claimed, Reaching, Restarts};
 
-/// A part that takes its claim on restart, answering who holds it as `after` once it has.
+/// A part that takes its claim on restart, its restart refused where `refuses`.
 struct Restarting {
-    after: Owner,
-    restarted: AtomicUsize,
+    part: Part,
     refuses: bool,
-}
-
-#[async_trait::async_trait]
-impl Ownership for Restarting {
-    async fn owner(&self) -> Result<Owner, Failure> {
-        if self.restarted.load(Ordering::Relaxed) == 0 {
-            Ok(Owner::Open)
-        } else {
-            Ok(self.after)
-        }
-    }
-
-    async fn claimed_by(&self) -> Result<Option<String>, crate::ports::service::Failure> {
-        Ok(None)
-    }
-
-    async fn claim(&self) -> Result<Claim, Failure> {
-        Ok(Claim::ON_RESTART)
-    }
 }
 
 #[async_trait::async_trait]
@@ -41,7 +21,7 @@ impl Restarts for Restarting {
                 detail: "the engine refused".to_owned(),
             });
         }
-        self.restarted.fetch_add(1, Ordering::Relaxed);
+        self.part.restart();
         Ok(())
     }
 }
@@ -49,8 +29,7 @@ impl Restarts for Restarting {
 /// A part answering `after` once restarted, its restart refused where `refuses`.
 fn restarting(after: Owner, refuses: bool) -> Restarting {
     Restarting {
-        after,
-        restarted: AtomicUsize::new(0),
+        part: Part::taken_on_restart(after),
         refuses,
     }
 }
@@ -58,7 +37,7 @@ fn restarting(after: Owner, refuses: bool) -> Restarting {
 /// What claiming `part` comes to.
 async fn claiming(part: &Restarting) -> Result<Owner, Failure> {
     claimed(Reaching {
-        part,
+        part: &part.part,
         restarts: part,
     })
     .await
@@ -68,7 +47,7 @@ async fn claiming(part: &Restarting) -> Result<Owner, Failure> {
 async fn a_claim_taken_on_restart_restarts_the_upstream_and_asks_who_holds_it_again() {
     let part = restarting(Owner::Ours, false);
     assert!(matches!(claiming(&part).await, Ok(Owner::Ours)));
-    assert_eq!(part.restarted.load(Ordering::Relaxed), 1);
+    assert_eq!(part.part.restarts(), 1);
 }
 
 #[tokio::test]
@@ -87,7 +66,7 @@ async fn an_upstream_that_cannot_be_started_again_fails_the_claim_naming_it() {
         matches!(&failed, Err(Failure::Refused { service, .. }) if service == SERVICE),
         "{failed:?}"
     );
-    assert_eq!(part.restarted.load(Ordering::Relaxed), 0);
+    assert_eq!(part.part.restarts(), 0);
 }
 
 #[tokio::test]

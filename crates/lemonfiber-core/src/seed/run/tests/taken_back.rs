@@ -3,8 +3,7 @@
 
 use crate::app::gating::PORT;
 use crate::ports::digest::sha256;
-use async_trait::async_trait;
-use lemonfiber_ports::filesystem::{Fault, FileSystem, Identity, Ownership, StorageFacts};
+use lemonfiber_fixtures::files::Files;
 
 use super::*;
 use crate::baseline::Baseline;
@@ -61,53 +60,6 @@ fn moved(
     project: &std::path::Path,
 ) -> crate::wiring::Fillers {
     moving(services, project, &every_part())
-}
-
-/// Nothing on disk.
-struct Taking;
-
-#[async_trait]
-impl FileSystem for Taking {
-    async fn canonicalize(&self, path: &std::path::Path) -> Result<std::path::PathBuf, Fault> {
-        Ok(path.to_path_buf())
-    }
-
-    async fn touch(&self, _path: &std::path::Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-
-    async fn link(&self, _from: &std::path::Path, _to: &std::path::Path) -> Result<(), Fault> {
-        Err(Fault::new("unused"))
-    }
-
-    async fn identify(&self, _path: &std::path::Path) -> Result<Identity, Fault> {
-        Err(Fault::new("unused"))
-    }
-
-    async fn remove(&self, _path: &std::path::Path) {}
-
-    async fn read(&self, _path: &std::path::Path) -> Option<String> {
-        None
-    }
-
-    async fn write(&self, _path: &std::path::Path, _contents: &str) {}
-
-    async fn ownership(&self, _path: &std::path::Path) -> Option<Ownership> {
-        None
-    }
-}
-
-#[async_trait]
-impl Storage for Taking {
-    async fn describe(&self, _path: &std::path::Path) -> StorageFacts {
-        StorageFacts {
-            point: std::path::PathBuf::new(),
-            kind: lemonfiber_ports::filesystem::FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
 }
 
 /// The gate reaching the curator under [`OLD_KEY`] and the media server, accepting
@@ -238,7 +190,7 @@ fn taking_with(
     let _ = std::fs::create_dir_all(&project);
     let mut ctx = seed_ctx(true, None, Some(recorded_admin(name)))
         .with_http(http.clone())
-        .with_filesystem(Arc::new(Taking))
+        .with_filesystem(Files::empty())
         .with_random(Arc::new(FixedRandom(
             random.then(|| vec![RANDOM; crate::secret::SECRET_BYTES]),
         )));

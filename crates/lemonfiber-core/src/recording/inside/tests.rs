@@ -1,41 +1,12 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use tokio::sync::mpsc::Receiver;
-
 use super::{Inside, Ledger};
-use crate::ports::docker::{Container, Engine, ExecOutput, Failure, LogLine, LogQuery, Stats};
+use crate::ports::docker::{Engine, ExecOutput, Health, Lifecycle, LogQuery};
 use lemonfiber_fixtures::ports::Stopped;
-
-/// An engine whose every command answers as given, and which holds nothing else.
-struct Answering(ExecOutput);
-
-#[async_trait]
-impl Engine for Answering {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, Failure> {
-        Ok(Vec::new())
-    }
-
-    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, Failure> {
-        Ok(self.0.clone())
-    }
-
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
-        Ok(tokio::sync::mpsc::channel(1).1)
-    }
-
-    async fn logs(
-        &self,
-        _project: &str,
-        _services: &[String],
-        _query: LogQuery,
-    ) -> Result<Receiver<LogLine>, Failure> {
-        Ok(tokio::sync::mpsc::channel(1).1)
-    }
-}
+use lemonfiber_fixtures::support::Reporting;
 
 fn answering(output: ExecOutput) -> Arc<dyn Engine> {
-    Arc::new(Answering(output))
+    Arc::new(Reporting::holding(&[], Lifecycle::Running, Health::Healthy).answering_exec(output))
 }
 
 /// Everything but `exec` is the engine's own answer, passed through untouched.

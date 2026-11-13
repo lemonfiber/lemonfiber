@@ -231,7 +231,7 @@ async fn a_password_the_media_server_will_not_take_keeps_the_claim() {
 /// holds is claimable and nothing is spent.
 #[tokio::test]
 async fn a_household_keeping_no_record_offers_no_claim() {
-    let at: Arc<dyn Household> = AHousehold::knowing("a7f3");
+    let at: Arc<dyn Household> = Recognising::knowing("a7f3");
 
     assert!(!at.offers_claim("a7f3", CLAIM).await);
     at.claim_spent("a7f3");

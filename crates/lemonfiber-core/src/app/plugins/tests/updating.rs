@@ -346,7 +346,7 @@ async fn an_update_that_breaks_the_stack_puts_the_old_version_back() {
         counted(installing(&ctx, &source("update-collateral", PROVING)).await),
         Some(1)
     );
-    ctx.seams.runner = LostToTheInstall::losing("version");
+    ctx.seams.runner = losing("version");
 
     let failed = update(updating(&ctx, &source("update-collateral-next", &next())).await);
 
@@ -389,26 +389,6 @@ async fn an_update_whose_record_cannot_be_written_puts_the_old_version_back() {
     assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
 }
 
-/// A runner answering every call as a plain one does, which makes the journal impossible
-/// to rewrite once a service is started.
-struct JournalLostOnceUp {
-    journal: PathBuf,
-    answering: Recording,
-}
-
-#[async_trait::async_trait]
-impl crate::ports::Runner for JournalLostOnceUp {
-    async fn run(
-        &self,
-        argv: &[String],
-    ) -> Result<lemonfiber_ports::process::Output, lemonfiber_ports::process::Failure> {
-        if argv.iter().any(|word| word == "up") {
-            let _ = unrewritable(&self.journal);
-        }
-        self.answering.run(argv).await
-    }
-}
-
 /// A grant the version being replaced holds and the new one does not ask is journalled as
 /// ended, and an update that cannot journal it is stopped and the old version put back on.
 #[tokio::test]
@@ -433,10 +413,12 @@ async fn an_update_whose_ended_grant_cannot_be_journalled_puts_the_old_version_b
     let journal = crate::app::targets::layout(&ctx)
         .map(|paths| paths.journal())
         .unwrap_or_default();
-    ctx.seams.runner = Arc::new(JournalLostOnceUp {
-        journal: journal.clone(),
-        answering: Recording::answering(Ok(spoke(""))),
-    });
+    ctx.seams.runner = {
+        let journal = journal.clone();
+        Arc::new(Recording::answering(Ok(spoke(""))).on("up", move || {
+            let _ = unrewritable(&journal);
+        }))
+    };
 
     let failed = update(updating(&ctx, &source("update-unjournalled-next", &next())).await);
 
