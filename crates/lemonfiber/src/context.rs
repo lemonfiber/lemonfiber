@@ -24,7 +24,7 @@ use lemonfiber_core::config::{
     reads_as_off, reads_as_on, service_user_from_env, store, Protocols, Reaching, Settings,
     AUTOSTART_ON_BATTERY_KEY, EXPLANATIONS_KEY,
 };
-use lemonfiber_core::platform::{Environment, HOST_OS};
+use lemonfiber_core::platform::{engine_is_desktop, manager, Environment, HOST_OS};
 use lemonfiber_core::ports::hosting::Manager;
 use lemonfiber_core::ports::{Host, Runner};
 use lemonfiber_core::stack::Source;
@@ -57,8 +57,7 @@ pub(crate) async fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bo
 
     // Docker Engine and Docker Desktop are told apart by where the engine was found,
     // which the settings already carry.
-    let environment =
-        Environment::resolve(HOST_OS, Environment::engine_is_desktop(&settings.docker));
+    let environment = Environment::resolve(HOST_OS, engine_is_desktop(&settings.docker));
 
     // Every engine seam is built from the one resolved target the settings carry,
     // which is the same field the Compose invocation is built from. That is the whole
@@ -139,7 +138,7 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
     let Ok(strategy) = etcetera::choose_base_strategy() else {
         return Arc::new(Unhosted);
     };
-    match HOST_OS.manager() {
+    match manager(HOST_OS) {
         Manager::Launchd => Arc::new(Launchd::over(
             strategy.home_dir().join("Library/LaunchAgents"),
             Arc::clone(runner),

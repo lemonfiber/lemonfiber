@@ -68,36 +68,22 @@ pub(crate) fn handed_over_whole(root: &Path, to: (u32, u32)) -> Result<(), Strin
     Ok(())
 }
 
-/// The user and group owning `path`, read without following a link.
-#[cfg(unix)]
+/// The user and group owning `path`, read without following a link; nobody where the
+/// platform names no owner.
 fn owner(path: &Path) -> Option<(u32, u32)> {
-    use std::os::unix::fs::MetadataExt as _;
-    std::fs::symlink_metadata(path)
-        .ok()
-        .map(|held| (held.uid(), held.gid()))
+    let held = std::fs::symlink_metadata(path).ok()?;
+    lemonfiber_platform::fs::owned(&held).map(|owned| (owned.uid, owned.gid))
 }
 
-/// Nobody, where the platform names no owner.
-#[cfg(not(unix))]
-fn owner(_path: &Path) -> Option<(u32, u32)> {
-    None
-}
-
-/// `path` given to `to`, without following a link.
-#[cfg(unix)]
+/// `path` given to `to`, without following a link; nothing to hand over where the
+/// platform names no owner.
 fn chowned(path: &Path, (uid, gid): (u32, u32)) -> Result<(), String> {
-    std::os::unix::fs::lchown(path, Some(uid), Some(gid)).map_err(|why| {
+    lemonfiber_platform::fs::hand_over(path, uid, gid).map_err(|why| {
         format!(
             "{} could not be handed to {uid}:{gid}: {why}",
             path.display()
         )
     })
-}
-
-/// Nothing to hand over, where the platform names no owner.
-#[cfg(not(unix))]
-fn chowned(_path: &Path, _to: (u32, u32)) -> Result<(), String> {
-    Ok(())
 }
 
 #[cfg(test)]

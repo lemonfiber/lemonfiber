@@ -29,6 +29,7 @@
 
 use std::path::{Path, PathBuf};
 
+use lemonfiber_platform::fs;
 use thiserror::Error;
 
 use super::env::{is_one_line, EnvFile};
@@ -198,6 +199,11 @@ pub(crate) fn write(path: &Path, text: &str) -> Result<(), Failure> {
 
 /// Write `bytes` whole at `path`, owner-only, as [`write`] writes text.
 ///
+/// The directory it lands in is then flushed, so the rename survives a power cut and not
+/// only the bytes it moved. A flush that fails is not the write's failure: the record is
+/// in place and reads back whole, and reporting it as unsaved would send an operator to
+/// repeat a change that was made.
+///
 /// # Errors
 ///
 /// Returns [`Failure::NotWritten`] where the directory could not be created or
@@ -207,13 +213,13 @@ pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), Failure> {
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
-    if let Err(err) = make_private_dir(parent) {
+    if let Err(err) = fs::private_directory(parent, true) {
         return Err(unwritable(path, &err));
     }
     if let Err(err) = write_owner_only(path, bytes) {
         return Err(unwritable(path, &err));
     }
-    settled(parent);
+    let _ = fs::sync_directory(parent);
     Ok(())
 }
 
@@ -248,7 +254,7 @@ fn write_owner_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let (staging, mut file) = staged(path)?;
     let moved = file
         .write_all(bytes)
-        .and_then(|()| make_private(&file))
+        .and_then(|()| fs::set_mode(&file, fs::OWNER_FILE))
         .and_then(|()| file.sync_all())
         .and_then(|()| std::fs::rename(&staging, path));
     if moved.is_err() {
@@ -272,70 +278,8 @@ fn staged(path: &Path) -> std::io::Result<(PathBuf, std::fs::File)> {
 
 /// A file made new at `path`, owner-only from the moment it exists where the platform
 /// tracks a file mode.
-#[cfg(unix)]
 fn created(path: &Path) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-}
-
-/// Where the platform has no owner-only mode to set at creation, a file made new.
-#[cfg(not(unix))]
-fn created(path: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-}
-
-/// Flush the directory a record was just renamed into, so the rename itself survives
-/// a power cut and not only the bytes it moved.
-///
-/// Its failure is not the write's: the record is in place and reads back whole, and
-/// reporting it as unsaved would send an operator to repeat a change that was made.
-#[cfg(unix)]
-fn settled(parent: &Path) {
-    let _ = std::fs::File::open(parent).and_then(|directory| directory.sync_all());
-}
-
-/// Where a directory cannot be opened to be flushed, the platform's own rename is what
-/// there is.
-#[cfg(not(unix))]
-fn settled(_parent: &Path) {}
-
-/// Create the configuration directory, private to its owner where the platform
-/// tracks ownership. The mode is set as the directory is created, so an existing
-/// one — a parent like `~/.config` this does not own — is left exactly as it was.
-#[cfg(unix)]
-pub(crate) fn make_private_dir(parent: &Path) -> std::io::Result<()> {
-    use std::os::unix::fs::DirBuilderExt as _;
-    std::fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(parent)
-}
-
-/// Elsewhere there is no owner-only notion to honour, so this is an ordinary
-/// recursive create.
-#[cfg(not(unix))]
-pub(crate) fn make_private_dir(parent: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(parent)
-}
-
-/// Tighten a file being written to its owner alone, through its handle.
-#[cfg(unix)]
-fn make_private(file: &std::fs::File) -> std::io::Result<()> {
-    use std::os::unix::fs::PermissionsExt as _;
-    file.set_permissions(std::fs::Permissions::from_mode(0o600))
-}
-
-/// A no-op where the platform has no owner-only file mode to set.
-#[cfg(not(unix))]
-fn make_private(_file: &std::fs::File) -> std::io::Result<()> {
-    Ok(())
+    fs::owner_only(std::fs::OpenOptions::new().write(true).create_new(true)).open(path)
 }
 
 /// The failure for a location that would not take what was written to it.

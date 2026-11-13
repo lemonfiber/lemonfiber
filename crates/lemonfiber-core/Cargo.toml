@@ -17,6 +17,9 @@ lemonfiber-bundle = { workspace = true }
 lemonfiber-error = { workspace = true }
 lemonfiber-manifest = { workspace = true }
 lemonfiber-outward = { workspace = true }
+# Which machine this is, and every file operation that differs from one platform to the
+# next.
+lemonfiber-platform = { workspace = true }
 # The plugin manifest types, the capability vocabulary and the extension points —
 # the three things this crate generates a published artefact from. One way only:
 # nothing there reaches back here, which is what lets it be read with no stack.
@@ -50,11 +53,6 @@ serde_norway = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 chacha20poly1305 = { workspace = true }
-
-[target.'cfg(unix)'.dependencies]
-# The flags that refuse to open the keys' hold through a link or to wait on a pipe;
-# confined to `keys/held.rs`.
-libc = { workspace = true }
 
 [dev-dependencies]
 lemonfiber-error = { workspace = true, features = ["testing"] }

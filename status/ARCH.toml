@@ -18,7 +18,7 @@ requirement = [
   { id = "ARCH-R20", state = "done", evidence = [".github/dependabot.yml", ".github/labeler.yml", ".github/workflows/awaiting-maintainer.yml", ".github/workflows/build.yml"] },
   { id = "ARCH-R23", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs"] },
   { id = "ARCH-R27", state = "done", evidence = ["crates/lemonfiber/src/context.rs", "crates/lemonfiber-core/src/platform.rs"] },
-  { id = "ARCH-R35", state = "partial", evidence = ["crates/lemonfiber-core/src/platform.rs", "crates/lemonfiber-core/src/config/store.rs"] },
+  { id = "ARCH-R35", state = "done", evidence = ["crates/lemonfiber-platform/src/host.rs", "crates/lemonfiber-platform/src/fs.rs", "crates/lemonfiber-platform/src/beneath.rs", "crates/lemonfiber-core/src/platform.rs", "crates/lemonfiber/tests/architecture/the_platform_is_asked_in_one_place.rs::only_the_platform_crate_asks_which_platform_this_is", "crates/lemonfiber/tests/architecture/the_platform_is_asked_in_one_place.rs::only_the_platform_crate_depends_on_the_platform", "crates/lemonfiber-platform/src/host/tests.rs::linux_splits_on_whether_the_daemon_is_desktop"] },
   { id = "ARCH-R36", state = "partial" },
   { id = "ARCH-R38", state = "partial" },
   { id = "ARCH-R40", state = "partial" },

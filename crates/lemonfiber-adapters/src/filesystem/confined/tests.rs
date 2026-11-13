@@ -284,3 +284,6 @@ fn a_file_written_where_no_plain_file_can_be_is_refused() {
     assert!(piped.is_err_and(|fault| fault.message.contains("not a plain file")));
     assert!(nameless.is_err_and(|fault| fault.message.contains("not a plain file")));
 }
+
+mod moving;
+mod replacing;

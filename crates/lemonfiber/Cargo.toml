@@ -31,6 +31,8 @@ lemonfiber-core = { workspace = true }
 # The endpoints and the app the web surface serves. Only this crate starts a
 # server; the core cannot, and the api crate does not choose an address.
 lemonfiber-api = { workspace = true }
+# The archive and the directory it is kept in, made private to their owner.
+lemonfiber-platform = { workspace = true }
 axum = { workspace = true }
 hyper = { workspace = true }
 hyper-util = { workspace = true }

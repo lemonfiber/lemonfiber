@@ -130,40 +130,22 @@ fn walked(
 /// directory holds, so the container has to be as private as the tightest thing inside
 /// it; the entry modes below say what an extracted file gets and say nothing about who
 /// may read the archive.
-#[cfg(unix)]
 fn own_file(path: &Path) -> std::io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-}
-
-/// Where the platform tracks no file mode, an ordinary create.
-#[cfg(not(unix))]
-fn own_file(path: &Path) -> std::io::Result<File> {
-    File::create(path)
+    lemonfiber_platform::fs::owner_only(
+        fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true),
+    )
+    .open(path)
 }
 
 /// The directory archives are kept in, private to its owner.
 ///
 /// The mode is set as it is created, so a parent this does not own — a home directory, a
 /// mount point — is left exactly as it was.
-#[cfg(unix)]
 fn own_dir(dir: &Path) -> std::io::Result<()> {
-    use std::os::unix::fs::DirBuilderExt as _;
-    fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(dir)
-}
-
-/// Elsewhere there is no owner-only notion to honour, so an ordinary recursive create.
-#[cfg(not(unix))]
-fn own_dir(dir: &Path) -> std::io::Result<()> {
-    fs::create_dir_all(dir)
+    lemonfiber_platform::fs::private_directory(dir, true)
 }
 
 /// One entry whose bytes are in hand, held at a mode nobody else can read.
@@ -179,7 +161,7 @@ fn held(
 ) -> std::io::Result<()> {
     let mut header = tar::Header::new_gnu();
     header.set_size(body.len() as u64);
-    header.set_mode(0o600);
+    header.set_mode(lemonfiber_platform::fs::OWNER_FILE);
     header.set_cksum();
     builder.append_data(&mut header, name, body)
 }
