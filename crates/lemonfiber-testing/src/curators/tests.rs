@@ -54,6 +54,7 @@ fn what_a_curator_is_told_is_read_back_from_what_was_posted_to_it_alone() {
         headers: Vec::new(),
         body: Some(serde_json::json!({ "folder": folder }).to_string()),
         pinned: None,
+        deadline: None,
     };
     let sent = [posted(TELEVISION.port), posted(FILM.port)];
 

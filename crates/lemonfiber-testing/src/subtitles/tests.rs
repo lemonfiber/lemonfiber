@@ -147,6 +147,7 @@ fn posted(path: &str, body: &str) -> Request {
         headers: Vec::new(),
         body: Some(body.to_owned()),
         pinned: None,
+        deadline: None,
     }
 }
 

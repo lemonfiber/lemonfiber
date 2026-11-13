@@ -34,6 +34,8 @@ enum Reply {
     Unannounced(&'static str),
     /// A redirect to this address.
     Redirecting(String),
+    /// Nothing: the request is read and never answered.
+    Silent,
 }
 
 /// A running fake server on localhost, and the request it captured.
@@ -112,7 +114,11 @@ async fn served(listener: &TcpListener, reply: Reply, captured: &Arc<Mutex<Strin
         text.clone_into(&mut guard);
     }
 
+    if matches!(reply, Reply::Silent) {
+        std::future::pending::<()>().await;
+    }
     let bytes: Vec<u8> = match reply {
+        Reply::Silent => Vec::new(),
         Reply::Whole(status, body) => format!(
             "HTTP/1.1 {status} X\r\nContent-Length: {}\r\n\r\n{body}",
             body.len()
@@ -169,6 +175,7 @@ fn asking(base: &str) -> Request {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 
@@ -181,6 +188,7 @@ async fn a_get_returns_the_status_and_the_body() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let response = Web::default().send(&request).await;
     let sent = server.request();
@@ -242,6 +250,7 @@ async fn a_post_carries_its_headers_and_body() {
         headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
         body: Some(r#"{"path":"/data/media/tv"}"#.to_owned()),
         pinned: None,
+        deadline: None,
     };
     let response = Web::new().send(&request).await;
     let sent = server.request();
@@ -265,6 +274,7 @@ async fn a_put_carries_its_body_to_replace_a_resource() {
         headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
         body: Some(r#"{"id":1,"upgradeAllowed":true}"#.to_owned()),
         pinned: None,
+        deadline: None,
     };
     let response = Web::new().send(&request).await;
     let sent = server.request();
@@ -289,6 +299,7 @@ async fn a_refusal_is_a_response_rather_than_a_failure() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let response = Web::new().send(&request).await;
     server.stop().await;
@@ -306,6 +317,7 @@ async fn a_service_that_is_not_listening_is_unreachable() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let outcome = Web::new().send(&request).await;
     assert_eq!(
@@ -325,6 +337,7 @@ async fn shown_for(query: &str) -> String {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let unreachable = Web::new().send(&request).await.err();
     assert!(
@@ -394,6 +407,7 @@ async fn a_body_that_does_not_arrive_is_unreachable() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let outcome = Web::new().send(&request).await;
     server.stop().await;
@@ -402,6 +416,50 @@ async fn a_body_that_does_not_arrive_is_unreachable() {
         Some(true),
         "a body that never arrives is unreachable, from a service that took the connection"
     );
+}
+
+/// The deadline a request carries, applied by the adapter.
+const DEADLINE: Duration = Duration::from_secs(1);
+
+#[tokio::test]
+async fn an_answer_past_the_deadline_is_unreachable_from_a_service_that_took_the_call() {
+    let server = serve(Reply::Silent).await;
+    let request = Request {
+        deadline: Some(DEADLINE),
+        ..asking(&server.base)
+    };
+    let started = std::time::Instant::now();
+    let outcome = Web::new().send(&request).await;
+    let waited = started.elapsed();
+    server.stop().await;
+    assert_eq!(outcome.err().map(|failure| failure.connected), Some(true));
+    assert!(waited >= DEADLINE, "{waited:?}");
+    assert!(waited < DEADLINE * 5, "{waited:?}");
+}
+
+#[tokio::test]
+async fn an_answer_within_the_deadline_is_read() {
+    let server = serve(Reply::Whole(200, "in time")).await;
+    let request = Request {
+        deadline: Some(Duration::from_secs(60)),
+        ..asking(&server.base)
+    };
+    let outcome = Web::new().send(&request).await;
+    server.stop().await;
+    assert_eq!(
+        outcome.ok().map(|answer| answer.body),
+        Some("in time".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn a_connection_not_made_within_the_deadline_is_reported_as_never_made() {
+    let request = Request {
+        deadline: Some(Duration::from_millis(400)),
+        ..asking("http://192.0.2.1")
+    };
+    let outcome = Web::new().send(&request).await;
+    assert_eq!(outcome.err().map(|failure| failure.connected), Some(false));
 }
 
 /// The whole reason this adapter does not use the default cookie store.
@@ -469,6 +527,7 @@ async fn a_removal_is_sent_as_a_removal() {
         headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
         body: None,
         pinned: None,
+        deadline: None,
     };
     let response = Web::new().send(&request).await;
     let sent = server.request();

@@ -77,6 +77,7 @@ fn unkeyed(capability: &str, major: u32, operation: &str) -> Request {
         headers: Vec::new(),
         body: Some("{}".to_owned()),
         pinned: None,
+        deadline: None,
     }
 }
 
@@ -206,6 +207,7 @@ async fn each_guard_is_asked_over_its_contract_and_everything_else_beside_it() {
             headers: Vec::new(),
             body: None,
             pinned: None,
+            deadline: None,
         })
         .await;
     assert_eq!(beside.ok().map(|answer| answer.status), Some(204));

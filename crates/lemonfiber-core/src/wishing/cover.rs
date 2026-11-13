@@ -107,6 +107,7 @@ fn public(location: &str) -> Option<(String, Request)> {
             headers: Vec::new(),
             body: None,
             pinned: None,
+            deadline: None,
         },
     ))
 }

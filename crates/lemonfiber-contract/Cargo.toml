@@ -18,7 +18,6 @@ ring = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
 lemonfiber-fixtures = { workspace = true }

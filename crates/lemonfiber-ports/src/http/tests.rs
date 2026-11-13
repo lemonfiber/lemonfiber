@@ -74,6 +74,7 @@ fn a_request_is_plain_data() {
         headers: vec![("X-Api-Key".to_owned(), "secret".to_owned())],
         body: Some("{}".to_owned()),
         pinned: None,
+        deadline: None,
     };
     assert_eq!(request.clone(), request);
     assert_eq!(request.method, Method::Post);
@@ -100,6 +101,7 @@ fn get() -> Request {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 
@@ -156,7 +158,35 @@ async fn octets_reach_a_stand_in_through_a_shared_handle() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let sent = shared.send_octets(&request, b"sealed").await;
     assert_eq!(sent.map(|answered| answered.status), Ok(202));
+}
+
+fn within(deadline: Option<std::time::Duration>) -> Request {
+    Request {
+        method: Method::Get,
+        url: "http://adapter:8080/".to_owned(),
+        headers: Vec::new(),
+        body: None,
+        pinned: None,
+        deadline,
+    }
+}
+
+#[test]
+fn connecting_ends_before_the_deadline_does() {
+    let second = std::time::Duration::from_secs(1);
+    let standing = second * 10;
+    assert_eq!(within(None).connect_within(standing), standing);
+    assert_eq!(within(Some(second * 20)).connect_within(standing), standing);
+    assert_eq!(
+        within(Some(second * 8)).connect_within(standing),
+        second * 6
+    );
+    assert_eq!(
+        within(Some(std::time::Duration::ZERO)).connect_within(standing),
+        std::time::Duration::ZERO
+    );
 }

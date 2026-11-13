@@ -132,6 +132,7 @@ async fn asset(ctx: &Ctx, url: &str) -> Result<Option<String>, String> {
                 headers: vec![("User-Agent".to_owned(), crate::PRODUCT.to_owned())],
                 body: None,
                 pinned: None,
+                deadline: None,
             })
             .await
             .map_err(|failure| failure.to_string())?;

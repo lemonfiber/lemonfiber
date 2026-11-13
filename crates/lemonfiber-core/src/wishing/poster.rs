@@ -120,6 +120,7 @@ fn beneath_the_catalogue(location: &str) -> Option<Request> {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     })
 }
 

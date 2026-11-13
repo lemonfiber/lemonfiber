@@ -93,6 +93,7 @@ fn posted(path: &str, body: &serde_json::Value) -> Request {
         headers: Vec::new(),
         body: Some(body.to_string()),
         pinned: None,
+        deadline: None,
     }
 }
 

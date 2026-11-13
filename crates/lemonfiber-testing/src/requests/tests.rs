@@ -30,6 +30,7 @@ fn what_the_request_service_was_told_is_read_back_from_what_was_posted() {
         headers: Vec::new(),
         body: Some(serde_json::json!({ "members": ["one"] }).to_string()),
         pinned: None,
+        deadline: None,
     }];
 
     let told: Vec<Vec<String>> = told(&sent, "link_members", "members");

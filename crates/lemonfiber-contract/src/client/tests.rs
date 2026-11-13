@@ -344,21 +344,25 @@ async fn a_call_without_the_key_carries_none_and_answers_its_status() {
     }
 }
 
-/// An adapter that takes every request and never answers it.
-struct Silent;
+/// An adapter that takes every call and lets its deadline run out, as a transport reports it.
+struct Late;
 
 #[async_trait]
-impl Http for Silent {
-    async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-        std::future::pending().await
+impl Http for Late {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        tokio::time::sleep(request.deadline.unwrap_or_default()).await;
+        Err(Unreachable {
+            connected: true,
+            ..Unreachable::once(&request.url, "operation timed out")
+        })
     }
 }
 
 #[tokio::test(start_paused = true)]
-async fn an_answer_that_does_not_come_by_the_deadline_is_refused_as_absent() {
+async fn an_answer_past_the_deadline_from_an_adapter_that_took_the_call_is_refused_and_witnessed() {
     let told = Arc::new(Told::default());
     let client = Contracted::new(
-        Arc::new(Silent),
+        Arc::new(Late),
         "http://adapter:8080/",
         "plex-adapter",
         "k3y",
@@ -369,20 +373,48 @@ async fn an_answer_that_does_not_come_by_the_deadline_is_refused_as_absent() {
     let answered: Result<serde_json::Value, Failure> = asked(&client).await;
 
     assert!(
-        matches!(answered, Err(Failure::Unavailable { .. })),
+        matches!(answered, Err(Failure::Refused { .. })),
         "{answered:?}"
     );
     assert_eq!(started.elapsed(), DEADLINE);
+    assert_eq!(told.count(), 1);
+}
+
+#[tokio::test]
+async fn an_adapter_that_refused_the_connection_is_absent_and_not_witnessed() {
+    let (_, client, told) = adapter(Answer::Silent);
+    let answered: Result<serde_json::Value, Failure> = asked(&client).await;
+    assert!(
+        matches!(answered, Err(Failure::Unavailable { .. })),
+        "{answered:?}"
+    );
+    assert!(matches!(
+        client.about().await,
+        Err(Failure::Unavailable { .. })
+    ));
+    assert_eq!(told.count(), 0);
+}
+
+#[tokio::test]
+async fn a_call_carries_its_operations_deadline_to_the_transport() {
+    let (fake, client, _) = adapter(Answer::reply(200, "7"));
+    let _: Result<u32, Failure> = asked(&client).await;
+    assert_eq!(
+        fake.request().and_then(|request| request.deadline),
+        Some(DEADLINE)
+    );
 }
 
 #[tokio::test(start_paused = true)]
 async fn an_operation_declaring_a_longer_deadline_is_awaited_that_long() {
+    let told = Arc::new(Told::default());
     let client = Contracted::new(
-        Arc::new(Silent),
+        Arc::new(Late),
         "http://adapter:8080/",
         "solver-adapter",
         "k3y",
-    );
+    )
+    .witnessed_by(told.clone());
     let solve = crate::capabilities::indexer::proxy::capability();
     let declared = solve
         .operations
@@ -401,12 +433,13 @@ async fn an_operation_declaring_a_longer_deadline_is_awaited_that_long() {
         )
         .await;
 
-    assert!(matches!(answered, Err(Failure::Unavailable { .. })));
+    assert!(matches!(answered, Err(Failure::Refused { .. })));
     assert!(declared.is_some_and(|bounds| bounds.deadline > DEADLINE));
     assert_eq!(
         Some(started.elapsed()),
         declared.map(|bounds| bounds.deadline)
     );
+    assert_eq!(told.count(), 1);
 }
 
 #[tokio::test]

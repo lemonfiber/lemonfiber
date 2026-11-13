@@ -27,6 +27,7 @@ fn asking() -> Request {
         headers: vec![("X-Api-Key".to_owned(), "the-indexer-key".to_owned())],
         body: Some("{\"password\":\"hunter2\"}".to_owned()),
         pinned: None,
+        deadline: None,
     }
 }
 
@@ -90,6 +91,7 @@ fn a_login_written_in_front_of_a_host_is_not_written_down() {
             headers: Vec::new(),
             body: None,
             pinned: None,
+            deadline: None,
         };
         let said = line(1_700_000_000, &asked, Some(200));
 
@@ -157,6 +159,7 @@ fn a_key_named_in_the_path_is_not_written_down() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let said = line(1, &revoking, Some(204));
     assert!(
@@ -177,6 +180,7 @@ fn at(url: &str) -> Request {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 

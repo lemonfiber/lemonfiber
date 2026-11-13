@@ -5,14 +5,18 @@
 //! success whose body decodes as the operation's answer, or a refusal whose body decodes
 //! as one. Anything else, a status nobody declared, a body past the operation's bound
 //! ([`LARGEST`] unless it declares more), an answer after its deadline ([`DEADLINE`]
-//! unless it declares longer), a field the type does not have, is refused, never read,
-//! and told to the [`Witness`], so the plugin's standing records that it answered outside
-//! its contract.
+//! unless it declares longer) from an adapter that took the call, a field the type does
+//! not have, is refused, never read, and told to the [`Witness`], so the plugin's standing
+//! records that it answered outside its contract. An adapter that refused the connection
+//! or could not be reached is absent, and nothing is told.
+//!
+//! The deadline travels on the request and the transport applies it, so a call that was
+//! taken and answered late is told apart from one that never connected.
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_ports::http::{Fetched, Http, Method, Request};
+use lemonfiber_ports::http::{Fetched, Http, Method, Request, Unreachable};
 use lemonfiber_ports::service::Failure;
 
 use crate::wire::{self, Refusal};
@@ -122,9 +126,10 @@ impl Contracted {
     ///
     /// # Errors
     ///
-    /// [`Failure::Unavailable`] where the adapter cannot be reached or does not answer in
-    /// time; the failure a declared refusal names; [`Failure::Unauthorised`] where the
-    /// adapter refused the key; [`Failure::Refused`] for an answer outside the contract.
+    /// [`Failure::Unavailable`] where the adapter refused the connection or cannot be
+    /// reached; the failure a declared refusal names; [`Failure::Unauthorised`] where the
+    /// adapter refused the key; [`Failure::Refused`] for an answer outside the contract,
+    /// one after the deadline included.
     pub async fn call<A, R>(
         &self,
         capability: &str,
@@ -140,7 +145,7 @@ impl Contracted {
         let path = crate::path(capability, major, operation);
         let written = Some(serde_json::to_string(asked));
         let fetched = self
-            .exchange(Method::Post, &path, written, bounds, true)
+            .exchange(Method::Post, &path, operation, written, bounds, true)
             .await?;
         let answer = self.answer(operation, &fetched)?;
         serde_json::from_str(answer)
@@ -170,13 +175,14 @@ impl Contracted {
     ///
     /// # Errors
     ///
-    /// [`Failure::Unavailable`] where the adapter cannot be reached or does not answer in
-    /// time.
+    /// [`Failure::Unavailable`] where the adapter refused the connection or cannot be
+    /// reached; [`Failure::Refused`] where it took the call and did not answer in time.
     pub async fn unkeyed(&self, operation: &crate::Operation) -> Result<u16, Failure> {
         let asked = Some(Ok(UNKEYED_ASKED.to_owned()));
         self.exchange(
             Method::Post,
             &operation.path(),
+            operation.name,
             asked,
             Bounds::STANDARD,
             false,
@@ -192,7 +198,7 @@ impl Contracted {
         name: &str,
     ) -> Result<R, Failure> {
         let fetched = self
-            .exchange(Method::Get, path, None, Bounds::STANDARD, true)
+            .exchange(Method::Get, path, name, None, Bounds::STANDARD, true)
             .await?;
         let answer = self.answer(name, &fetched)?;
         serde_json::from_str(answer)
@@ -208,6 +214,7 @@ impl Contracted {
         &self,
         method: Method,
         path: &str,
+        operation: &str,
         written: Option<serde_json::Result<String>>,
         bounds: Bounds,
         keyed: bool,
@@ -228,15 +235,29 @@ impl Contracted {
                 .collect(),
             body,
             pinned: None,
+            deadline: Some(bounds.deadline),
         };
-        let sent =
-            tokio::time::timeout(bounds.deadline, self.http.fetch(&request, bounds.largest)).await;
-        let Ok(Ok(fetched)) = sent else {
-            return Err(Failure::Unavailable {
-                service: self.service.clone(),
-            });
-        };
-        Ok(fetched)
+        self.http
+            .fetch(&request, bounds.largest)
+            .await
+            .map_err(|unreached| self.unanswered(operation, bounds.deadline, &unreached))
+    }
+
+    /// What a call that drew no answer reads as: outside the contract where the adapter
+    /// took it, absent where it never connected.
+    fn unanswered(&self, operation: &str, deadline: Duration, unreached: &Unreachable) -> Failure {
+        if unreached.connected {
+            return self.outside(
+                operation,
+                &format!(
+                    "it took the call and gave no whole answer within {deadline:?}: {}",
+                    unreached.reason
+                ),
+            );
+        }
+        Failure::Unavailable {
+            service: self.service.clone(),
+        }
     }
 
     /// The JSON one response answers with, if it is an answer the contract declares.

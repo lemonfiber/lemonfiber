@@ -178,6 +178,7 @@ fn request(backend: &Backend, held: &Held, message: &Message) -> Option<Request>
         headers,
         body: Some(body),
         pinned: None,
+        deadline: None,
     })
 }
 
@@ -205,6 +206,7 @@ fn history(backend: &Backend, held: &Held, since: u64) -> Option<Request> {
         headers,
         body: None,
         pinned: None,
+        deadline: None,
     })
 }
 

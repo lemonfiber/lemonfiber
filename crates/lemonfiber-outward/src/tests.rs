@@ -270,6 +270,7 @@ fn calling(url: &str) -> Request {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 

@@ -156,6 +156,7 @@ fn asking(base: &str, key: &str) -> Request {
         headers: vec![(API_KEY_HEADER.to_owned(), key.to_owned())],
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 

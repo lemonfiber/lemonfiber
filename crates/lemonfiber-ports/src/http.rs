@@ -11,6 +11,7 @@
 //! reports is the other kind — nothing answered at all.
 
 use std::net::IpAddr;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -20,6 +21,10 @@ pub const JSON: &str = "application/json";
 
 /// The media type of a refusal written as a problem document.
 pub const PROBLEM: &str = "application/problem+json";
+
+/// The share of a deadline a transport may spend connecting, as parts of a whole: three
+/// quarters.
+const CONNECT_SHARE: (u32, u32) = (3, 4);
 
 /// The method a request uses.
 #[derive(
@@ -59,6 +64,28 @@ pub struct Request {
     /// name that stands for somewhere else by the time the call is made is not asked
     /// again. The port is the URL's: only the address is pinned.
     pub pinned: Option<Vec<IpAddr>>,
+    /// The most the whole exchange may take, connecting and reading the answer whole
+    /// included; nothing where the transport's own bound holds.
+    ///
+    /// The transport applies it, so a deadline that runs out is told apart from a
+    /// connection that was never made: a transport connects within
+    /// [`Self::connect_within`], which ends before the deadline does, and reports
+    /// [`Unreachable::connected`] when the deadline ran out on the answer.
+    pub deadline: Option<Duration>,
+}
+
+impl Request {
+    /// The most connecting may take, for a transport whose own bound is `standing`: that,
+    /// or three quarters of the deadline where that is shorter.
+    ///
+    /// Shorter than the deadline, so a deadline that runs out always finds the connection
+    /// made, and a connection not made within it is reported as never made.
+    #[must_use]
+    pub fn connect_within(&self, standing: Duration) -> Duration {
+        self.deadline.map_or(standing, |deadline| {
+            standing.min(deadline / CONNECT_SHARE.1 * CONNECT_SHARE.0)
+        })
+    }
 }
 
 /// What a service answered.

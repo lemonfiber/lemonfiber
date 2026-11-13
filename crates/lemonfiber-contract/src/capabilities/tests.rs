@@ -482,6 +482,7 @@ async fn every_operation_of_every_capability_refuses_a_body_that_is_not_its_requ
                 headers: Vec::new(),
                 body: Some("not a request".to_owned()),
                 pinned: None,
+                deadline: None,
             };
             let answered = served.send(&request).await.map(|response| response.status);
             assert_eq!(

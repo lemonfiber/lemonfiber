@@ -7,6 +7,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use lemonfiber_error::withheld::REDACTED;
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
+use reqwest::cookie::Jar;
 use rustls::{ClientConfig, RootCertStore};
 
 /// How long reaching the upstream may take.
@@ -21,8 +22,13 @@ pub const BODY_LIMIT: usize = 16 * 1024 * 1024;
 /// An HTTP client that follows no redirect and reads no more than [`BODY_LIMIT`].
 #[derive(Debug, Clone)]
 pub struct Web {
-    /// The client every call is sent through.
+    /// The client every call is sent through, unless its deadline is shorter than the
+    /// client waits to connect.
     client: reqwest::Client,
+    /// The cookies carried from one call to the next, where sessions are kept.
+    sessions: Option<Arc<Jar>>,
+    /// How long a call's answer may take, where the call states no deadline.
+    within: Duration,
 }
 
 impl Web {
@@ -59,14 +65,46 @@ impl Web {
     /// A client, carrying cookies from one call to the next where `sessions` says so,
     /// that waits up to `within` for a call's answer.
     fn built(sessions: bool, within: Duration) -> Result<Self, reqwest::Error> {
-        client_builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .cookie_store(sessions)
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(within)
-            .build()
-            .map(|client| Self { client })
+        let sessions = sessions.then(Arc::default);
+        client(sessions.as_ref(), within, CONNECT_TIMEOUT).map(|client| Self {
+            client,
+            sessions,
+            within,
+        })
     }
+
+    /// The client `request` is sent through: the shared one, or one that connects within
+    /// a deadline shorter than the shared one waits to connect.
+    fn client_for(&self, request: &Request) -> Result<reqwest::Client, Unreachable> {
+        let connect = request.connect_within(CONNECT_TIMEOUT);
+        if connect >= CONNECT_TIMEOUT {
+            return Ok(self.client.clone());
+        }
+        client(self.sessions.as_ref(), self.within, connect).map_err(|why| {
+            Unreachable::once(
+                &withheld(&request.url, query_of(&request.url)),
+                &format!("no client could be built to connect within its deadline: {why}"),
+            )
+        })
+    }
+}
+
+/// A client following no redirect, carrying `sessions` where there are any, that connects
+/// within `connect` and waits up to `within` for a call's answer.
+fn client(
+    sessions: Option<&Arc<Jar>>,
+    within: Duration,
+    connect: Duration,
+) -> Result<reqwest::Client, reqwest::Error> {
+    let builder = client_builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(connect)
+        .timeout(within);
+    match sessions {
+        Some(jar) => builder.cookie_provider(Arc::clone(jar)),
+        None => builder,
+    }
+    .build()
 }
 
 /// A `reqwest` client builder over the TLS an adapter speaks, for a call [`Web`] does not
@@ -104,11 +142,11 @@ fn with_tls(tls: Option<ClientConfig>) -> reqwest::ClientBuilder {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        read_as_text(&self.client, request, BODY_LIMIT).await
+        read_as_text(&self.client_for(request)?, request, BODY_LIMIT).await
     }
 
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
-        sent(&self.client, request, most.min(BODY_LIMIT)).await
+        sent(&self.client_for(request)?, request, most.min(BODY_LIMIT)).await
     }
 }
 
@@ -139,11 +177,11 @@ async fn sent(
     most: usize,
 ) -> Result<Fetched, Unreachable> {
     let query = query_of(&request.url);
-    let unreached = |why: reqwest::Error| {
-        Unreachable::once(
-            &withheld(&request.url, query),
-            &withheld(&why.without_url().to_string(), query),
-        )
+    let unreached = |why: reqwest::Error| Unreachable {
+        url: withheld(&request.url, query),
+        connected: !why.is_connect(),
+        reason: withheld(&why.without_url().to_string(), query),
+        attempts: 1,
     };
     let mut built = client.request(method(request.method), &request.url);
     for (name, value) in &request.headers {
@@ -151,6 +189,9 @@ async fn sent(
     }
     if let Some(body) = &request.body {
         built = built.body(body.clone());
+    }
+    if let Some(deadline) = request.deadline {
+        built = built.timeout(deadline);
     }
     let mut answer = built.send().await.map_err(unreached)?;
     let status = answer.status().as_u16();

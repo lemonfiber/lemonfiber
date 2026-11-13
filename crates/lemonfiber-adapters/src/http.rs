@@ -94,7 +94,7 @@ impl Web {
         // installed and panics — acceptable only because it is unreachable.
         let cookies = Arc::new(PerOrigin::default());
         Self {
-            client: builder(&cookies)
+            client: builder(&cookies, CONNECT_TIMEOUT)
                 .and_then(|built| built.build().ok())
                 .unwrap_or_default(),
             cookies,
@@ -161,19 +161,31 @@ fn oversized(request: &Request, limit: usize) -> Unreachable {
 }
 
 impl Web {
-    /// The client a request is sent with: the shared one, or one held to the addresses
-    /// the request was checked against. A clone of the shared one is a handle to it.
+    /// The client a request is sent with: the shared one, one held to the addresses the
+    /// request was checked against, or one that connects within a deadline shorter than
+    /// the shared one waits to connect. A clone of the shared one is a handle to it.
     fn client_for(&self, request: &Request) -> Result<reqwest::Client, Unreachable> {
-        request.pinned.as_deref().map_or_else(
-            || Ok(self.client.clone()),
-            |addresses| pinned(&self.cookies, &request.url, addresses),
-        )
+        let connect = request.connect_within(CONNECT_TIMEOUT);
+        if let Some(addresses) = request.pinned.as_deref() {
+            return pinned(&self.cookies, &request.url, addresses, connect);
+        }
+        if connect >= CONNECT_TIMEOUT {
+            return Ok(self.client.clone());
+        }
+        builder(&self.cookies, connect)
+            .and_then(|built| built.build().ok())
+            .ok_or_else(|| {
+                Unreachable::once(
+                    &without_credentials(&request.url),
+                    "no client could be built to connect within its deadline, so nothing was asked",
+                )
+            })
     }
 }
 
-/// Every client this adapter sends with, before anything one request asks of it, or
-/// nothing where its TLS could not be set up.
-fn builder(cookies: &Arc<PerOrigin>) -> Option<reqwest::ClientBuilder> {
+/// Every client this adapter sends with, connecting within `connect`, before anything
+/// one request asks of it, or nothing where its TLS could not be set up.
+fn builder(cookies: &Arc<PerOrigin>, connect: Duration) -> Option<reqwest::ClientBuilder> {
     let tls = crate::tls::bundled()?;
     #[expect(
         clippy::disallowed_methods,
@@ -185,13 +197,13 @@ fn builder(cookies: &Arc<PerOrigin>) -> Option<reqwest::ClientBuilder> {
             .tls_backend_preconfigured(tls)
             .cookie_provider(Arc::clone(cookies))
             .redirect(no_redirect())
-            .connect_timeout(CONNECT_TIMEOUT)
+            .connect_timeout(connect)
             .timeout(REQUEST_TIMEOUT),
     )
 }
 
-/// A client that connects to these addresses for the host `url` names, and asks the
-/// resolver nothing about it.
+/// A client that connects to these addresses for the host `url` names within `connect`,
+/// and asks the resolver nothing about it.
 ///
 /// A client of its own, because what a name resolves to is a setting of the client
 /// rather than of a request. A pin to no address is refused rather than read as no pin,
@@ -200,6 +212,7 @@ fn pinned(
     cookies: &Arc<PerOrigin>,
     url: &str,
     addresses: &[IpAddr],
+    connect: Duration,
 ) -> Result<reqwest::Client, Unreachable> {
     let refused = || {
         Unreachable::once(
@@ -216,7 +229,7 @@ fn pinned(
         .iter()
         .map(|address| SocketAddr::new(*address, 0))
         .collect();
-    builder(cookies)
+    builder(cookies, connect)
         .and_then(|built| built.resolve_to_addrs(&host, &held).build().ok())
         .ok_or_else(refused)
 }
@@ -243,6 +256,9 @@ async fn sent(
     }
     if let Some(octets) = octets {
         builder = builder.body(octets.to_vec());
+    }
+    if let Some(deadline) = request.deadline {
+        builder = builder.timeout(deadline);
     }
 
     // A transport error's own words can quote the URL it failed on, and a URL can

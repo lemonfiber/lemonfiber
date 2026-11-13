@@ -25,6 +25,7 @@ fn asking(url: String) -> Request {
         headers: vec![("Accept".to_owned(), "application/json".to_owned())],
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 
@@ -135,6 +136,49 @@ async fn a_waiting_client_reads_an_answer_within_its_wait_and_none_after_it() {
     assert!(hasty);
 }
 
+#[tokio::test]
+async fn a_call_answers_within_its_own_deadline_and_is_late_after_it() {
+    let url = answering_after(std::time::Duration::from_millis(300)).await;
+    let within = |deadline| {
+        url.clone().map(|url| Request {
+            deadline: Some(deadline),
+            ..asking(url)
+        })
+    };
+    let read = match (
+        within(std::time::Duration::from_secs(5)),
+        within(std::time::Duration::from_millis(50)),
+        Web::new(),
+    ) {
+        (Some(patient), Some(hasty), Ok(web)) => Some((
+            web.send(&patient).await.ok().map(|read| read.status),
+            web.send(&hasty).await.err().map(|late| late.connected),
+        )),
+        _ => None,
+    };
+    assert_eq!(read, Some((Some(200), Some(true))));
+}
+
+#[tokio::test]
+async fn nothing_listening_within_a_deadline_never_connected() {
+    let address = match TcpListener::bind("127.0.0.1:0").await {
+        Ok(listener) => listener.local_addr().ok(),
+        Err(_) => None,
+    };
+    let reached = match (address, Web::new()) {
+        (Some(address), Ok(web)) => web
+            .send(&Request {
+                deadline: Some(std::time::Duration::from_millis(400)),
+                ..asking(format!("http://{address}/"))
+            })
+            .await
+            .err()
+            .map(|failure| failure.connected),
+        _ => None,
+    };
+    assert_eq!(reached, Some(false));
+}
+
 const BODY: &str = r#"{"Name":"admin"}"#;
 
 #[tokio::test]
@@ -168,6 +212,7 @@ async fn a_body_is_sent_as_it_was_written() {
                 headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
                 body: Some(BODY.to_owned()),
                 pinned: None,
+                deadline: None,
             })
             .await
             .ok()
