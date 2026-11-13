@@ -198,6 +198,7 @@ impl Live {
         let mut gathering = std::pin::pin!(source.waves(joined, &early));
         let rest = loop {
             tokio::select! {
+                biased;
                 rest = &mut gathering => break rest,
                 Some(said) = heard.recv() => self.say(said).await,
             };

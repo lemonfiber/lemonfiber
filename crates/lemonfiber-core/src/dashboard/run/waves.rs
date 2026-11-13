@@ -171,7 +171,6 @@ pub(super) async fn assembled(
     );
     let door = match (&services, last) {
         (Panel::Pending, Some(was)) => was.door.clone(),
-        (Panel::Pending, None) => Panel::Pending,
         _ => front_door(ctx, manifest, &services, &undeclared, named.as_deref()),
     };
 
