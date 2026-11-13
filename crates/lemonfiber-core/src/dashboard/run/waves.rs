@@ -310,7 +310,7 @@ async fn told(
 
 /// What the screen shows of what the operator has been told: what is owed them, then
 /// what has already been said.
-fn shown(outbox: &crate::alert::outbox::Outbox) -> Vec<crate::alert::Alert> {
+fn shown(outbox: &crate::alert::Outbox) -> Vec<crate::alert::Alert> {
     outbox
         .owing()
         .iter()
