@@ -68,7 +68,7 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
     }
     let mut looking = tokio::time::interval(LOOKING);
     let shared = Arc::new(ctx.clone());
-    let mut asking: Option<JoinHandle<Option<Vec<(String, Lifecycle)>>>> = None;
+    let mut asking: Option<JoinHandle<Doing>> = None;
     let mut exports: JoinSet<String> = JoinSet::new();
     let mut written = 0_usize;
     // The stream ending is not the screen ending. A stopped service has plenty
@@ -85,7 +85,7 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
                     Asked::Export => {
                         written += 1;
                         if let Some((path, text)) = export(&mut viewer, ctx, written) {
-                            exports.spawn(written_apart(Arc::clone(&shared), path, text));
+                            written_apart(&mut exports, Arc::clone(&shared), path, text);
                         }
                     }
                     // Opening them is the asking, so what was opened is recorded.
@@ -133,6 +133,9 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
     let _ = reader.join();
     ExitCode::SUCCESS
 }
+
+/// What each service is doing, where the engine says.
+type Doing = Option<Vec<(String, Lifecycle)>>;
 
 /// The view as an export writes it, and the file it goes into.
 ///
@@ -185,16 +188,12 @@ async fn kept(ctx: &Ctx, path: &Path, text: &str) -> String {
 }
 
 /// An export, written apart from the loop that draws the screen.
-fn written_apart(
-    ctx: Arc<Ctx>,
-    path: PathBuf,
-    text: String,
-) -> impl std::future::Future<Output = String> + Send + 'static {
-    async move { kept(&ctx, &path, &text).await }
+fn written_apart(exports: &mut JoinSet<String>, ctx: Arc<Ctx>, path: PathBuf, text: String) {
+    exports.spawn(async move { kept(&ctx, &path, &text).await });
 }
 
 /// What each service is doing, asked apart from the loop that draws the screen.
-fn asked(ctx: Arc<Ctx>) -> JoinHandle<Option<Vec<(String, Lifecycle)>>> {
+fn asked(ctx: Arc<Ctx>) -> JoinHandle<Doing> {
     tokio::spawn(async move { states(&ctx).await })
 }
 
@@ -204,7 +203,7 @@ fn asked(ctx: Arc<Ctx>) -> JoinHandle<Option<Vec<(String, Lifecycle)>>> {
 /// "everything stopped", and handing the viewer an empty list would both invent that
 /// and throw away what it knew — so a hiccup leaves its account of the stack intact
 /// and the next answer is compared against the last real one.
-async fn states(ctx: &Ctx) -> Option<Vec<(String, Lifecycle)>> {
+async fn states(ctx: &Ctx) -> Doing {
     let containers = ctx.seams.engine.list(&ctx.settings.project).await.ok()?;
     Some(
         containers
