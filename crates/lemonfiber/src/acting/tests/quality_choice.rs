@@ -50,7 +50,7 @@ fn an_upgrade() -> UpgradeReport {
         media: vec![UpgradeMedia {
             media_type: "television".to_owned(),
             preset: Preset::Balanced.label().to_owned(),
-            size_per_hour: Preset::Balanced.consequence().size_per_hour.to_owned(),
+            total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
             outcome: None,
         }],
     }

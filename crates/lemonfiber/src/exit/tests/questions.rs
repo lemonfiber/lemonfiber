@@ -369,7 +369,7 @@ fn an_upgrade_nobody_confirmed_and_one_nothing_answered_are_both_unfinished() {
     let media = |outcome| UpgradeMedia {
         media_type: "tv".to_owned(),
         preset: "Balanced".to_owned(),
-        size_per_hour: "3 GB".to_owned(),
+        total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
         outcome,
     };
     // Stated but not done.

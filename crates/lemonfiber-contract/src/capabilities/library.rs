@@ -9,10 +9,7 @@
 use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed, Heard,
-    Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile,
-    QualityReleases, Queue, QueueItem, Queues, Record, Recounting, RegisteredClient,
-    RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
+    Credential, CuratedTitle, CutoffUnmet, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed, Heard, Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue, QueueItem, Queues, Record, Recounting, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
 };
 use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
@@ -44,8 +41,7 @@ const ASKED_BY: &str = "mode";
 const CLIENT_PROTOCOL: &str = "sabnzbd";
 
 /// Every operation that takes a `Kind`, each asked once for each kind of video.
-const BY_KIND: [&str; 8] = [
-    "search_upgrades",
+const BY_KIND: [&str; 7] = [
     "lookup",
     "add_plan",
     "add",
@@ -73,6 +69,13 @@ const BY_TITLE_KIND: [&str; 12] = [
 
 /// The minor at which every operation of [`BY_TITLE_KIND`] takes music and books.
 const ALBUMS_AND_BOOKS: u32 = 3;
+
+/// Every operation that takes a kind with a quality to upgrade to, each asked once for
+/// each kind of video and for music.
+const BY_UPGRADED_KIND: [&str; 2] = ["search_upgrades", "cutoff_unmet"];
+
+/// The minor at which every operation of [`BY_UPGRADED_KIND`] takes music.
+const UPGRADED_ALBUMS: u32 = 4;
 
 /// The operations the request gate asks a curator under its request key, and no other.
 pub const REQUESTED: [&str; 10] = [
@@ -220,9 +223,11 @@ crate::contract! {
         }
         impl Maintenance {
             /// Re-search what it holds of one kind for a better release.
-            fn search_upgrades(value kind: Kind) -> () where asks = Asked { kind: Kind::Tv };
+            fn search_upgrades(value kind: TitleKind) -> () where asks = Asked { kind: TitleKind::Tv };
             /// Whether anything is on its wanted list, read without searching.
             fn wanting() -> bool where asks = Asked {};
+            /// How many items of one kind it holds below the cutoff, and their runtime.
+            fn cutoff_unmet(value kind: TitleKind) -> CutoffUnmet where since = 4, asks = Asked { kind: TitleKind::Tv };
         }
         impl Importing {
             /// Whether it imports by hard link.
@@ -371,6 +376,23 @@ fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
             Kind::ALL
                 .iter()
                 .map(|kind| (kind.media_type(), wire(kind), 0))
+                .collect(),
+        );
+    }
+    if BY_UPGRADED_KIND.contains(&operation) {
+        return each(
+            "/kind",
+            TitleKind::ALL
+                .iter()
+                .filter(|kind| **kind != TitleKind::Books)
+                .map(|kind| {
+                    let since = if kind.video().is_some() {
+                        0
+                    } else {
+                        UPGRADED_ALBUMS
+                    };
+                    (kind.media_type(), wire(kind), since)
+                })
                 .collect(),
         );
     }

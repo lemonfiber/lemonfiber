@@ -322,3 +322,37 @@ fn a_curator_of_music_or_books_is_asked_the_pipeline_reads_and_the_queue_at_the_
         );
     }
 }
+
+#[test]
+fn a_curator_is_asked_to_upgrade_and_what_it_holds_below_its_cutoff_for_music_at_minor_four_and_never_for_books(
+) {
+    let curate = crate::capabilities::library::capability();
+    let since = |case: &str| {
+        cases(&curate)
+            .into_iter()
+            .find(|one| one.case == case)
+            .map(|one| (one.since, one.asks.pointer("/kind").cloned()))
+    };
+    assert_eq!(
+        since("search_upgrades-answers-tv"),
+        Some((0, Some(Value::from("tv"))))
+    );
+    assert_eq!(
+        since("search_upgrades-answers-music"),
+        Some((4, Some(Value::from("music"))))
+    );
+    for kind in ["tv", "movies", "music"] {
+        assert_eq!(
+            since(&format!("cutoff_unmet-answers-{kind}")),
+            Some((4, Some(Value::from(kind)))),
+            "{kind}"
+        );
+    }
+    for operation in ["search_upgrades", "cutoff_unmet"] {
+        assert_eq!(
+            since(&format!("{operation}-answers-books")),
+            None,
+            "{operation}"
+        );
+    }
+}

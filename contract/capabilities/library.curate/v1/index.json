@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "library.curate/v1/openapi.json",
-      "sha256": "67ba3e59cfea04d75fe54468f2f0b221f7adb87d0b0952ca6bc9775ce89c58a7"
+      "sha256": "c1977de86b463603102246ac5525a4696d79a9da7326c720d0deec447d0a9f57"
     },
     {
       "path": "library.curate/v1/operations/identity.json",
@@ -43,11 +43,15 @@
     },
     {
       "path": "library.curate/v1/operations/search_upgrades.json",
-      "sha256": "39766867b594275d3980f1ccd18a0fe672db4b7ff729db5d0de7b044602d4bdc"
+      "sha256": "c5d43c5eb7480ae2b84d0ba8b880b54a0e150357abf750850f27cb1d139b3b10"
     },
     {
       "path": "library.curate/v1/operations/wanting.json",
       "sha256": "98838b8c293898a3312f5673a44d65b1210d5c5b5c17bd3895724e9819b0246c"
+    },
+    {
+      "path": "library.curate/v1/operations/cutoff_unmet.json",
+      "sha256": "27ca95417d4f930776ca2153c9a218b6baeeb3884defd26b8d45bbfe8a266b98"
     },
     {
       "path": "library.curate/v1/operations/hardlinks.json",
@@ -155,7 +159,7 @@
     },
     {
       "path": "library.curate/v1/operations/events.json",
-      "sha256": "8dd27eb40fa75b77596290bfb1a80851283dc629772b250587d47d32f5084ae6"
+      "sha256": "b428edb8e4ec21efd9e5170ef745d3a21fd68adc42809d5cbb85f6d6f24172e9"
     },
     {
       "path": "library.curate/v1/holds.json",
@@ -163,7 +167,7 @@
     },
     {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "0f4e3d4fb234569791334913de0327e53862ea8bcfc5f6fad728a8b9063de342"
+      "sha256": "dc6b6d5d866902de59f0091eef53ab4b376642fac3616ba968637a269cfb6bc9"
     }
   ],
   "major": 1

@@ -301,8 +301,9 @@ pub trait Maintenance: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when the curator is unreachable or refuses.
-    async fn search_upgrades(&self, kind: crate::media::Kind) -> Result<(), Failure>;
+    /// Returns [`Failure::Unsupported`] for a kind it does not file, and [`Failure`] when
+    /// the curator is unreachable or refuses.
+    async fn search_upgrades(&self, kind: crate::media::TitleKind) -> Result<(), Failure>;
 
     /// Whether anything is on its wanted list, which a release search is spent on: read
     /// from the list alone, so it searches nothing.
@@ -311,6 +312,26 @@ pub trait Maintenance: Send + Sync {
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
     async fn wanting(&self) -> Result<bool, Failure>;
+
+    /// How many items of `kind` it holds a file for below the cutoff of the quality
+    /// profile each is held under, and their runtime summed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Unsupported`] for a kind it does not file, and [`Failure`] when
+    /// the curator is unreachable or refuses.
+    async fn cutoff_unmet(&self, kind: crate::media::TitleKind) -> Result<CutoffUnmet, Failure>;
+}
+
+/// What a curator holds of one kind below the cutoff of its quality profiles.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+pub struct CutoffUnmet {
+    /// How many items: episodes, films or albums.
+    pub items: u64,
+    /// Their runtime summed, in whole seconds.
+    pub seconds: u64,
 }
 
 /// Telling a service how to move files from the download directory into the

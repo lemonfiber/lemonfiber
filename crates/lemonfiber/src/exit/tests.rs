@@ -220,7 +220,7 @@ fn an_upgrade_that_no_service_started_is_not_a_success() {
         media: vec![UpgradeMedia {
             media_type: "tv".to_owned(),
             preset: "Balanced".to_owned(),
-            size_per_hour: "3 GB".to_owned(),
+            total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
             outcome: Some(Triggered::Started),
         }],
     };
@@ -234,7 +234,7 @@ fn an_upgrade_that_no_service_started_is_not_a_success() {
         media: vec![UpgradeMedia {
             media_type: "tv".to_owned(),
             preset: "Balanced".to_owned(),
-            size_per_hour: "3 GB".to_owned(),
+            total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
             outcome: Some(Triggered::Failed {
                 detail: "boom".to_owned(),
             }),

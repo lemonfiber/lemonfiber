@@ -287,6 +287,17 @@ impl Format {
             },
         }
     }
+
+    /// Roughly how many bytes an hour of music at this format takes: the midpoint of the
+    /// range [`Consequence::size_per_hour`] states in words.
+    #[must_use]
+    pub const fn bytes_per_hour(self) -> u64 {
+        match self {
+            Self::Compact => 140_000_000,
+            Self::Lossless => 450_000_000,
+            Self::HiRes => 2_000_000_000,
+        }
+    }
 }
 
 #[cfg(test)]
