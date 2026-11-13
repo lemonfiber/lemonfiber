@@ -50,6 +50,7 @@ pub fn created(path: &Path, within: &Path, _mode: u32) -> Result<File, Refusal> 
     std::fs::OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(false)
         .open(path)
         .map_err(|error| Refusal::Said(error.to_string()))
 }

@@ -35,11 +35,11 @@ fn a_private_directory_is_made_with_its_parents_and_only_where_asked() {
 #[test]
 fn a_directory_already_there_is_left_as_it_was() {
     let dir = Scratch::new("fs");
-    let before = mode(&dir.path());
+    let before = mode(dir.path());
 
-    assert!(directory(&dir.path(), true, OWNER_DIRECTORY).is_ok());
+    assert!(directory(dir.path(), true, OWNER_DIRECTORY).is_ok());
 
-    assert_eq!(mode(&dir.path()), before);
+    assert_eq!(mode(dir.path()), before);
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn a_file_written_has_changed_since_the_epoch() {
 fn a_directory_is_flushed_and_one_not_there_is_said() {
     let dir = Scratch::new("fs");
 
-    assert!(sync_directory(&dir.path()).is_ok());
+    assert!(sync_directory(dir.path()).is_ok());
     #[cfg(unix)]
     assert!(sync_directory(&dir.path().join("absent")).is_err());
 }
