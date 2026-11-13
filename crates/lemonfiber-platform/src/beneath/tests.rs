@@ -139,3 +139,14 @@ fn an_unpacked_file_is_made_new_beneath_and_never_over_one_there() {
     let again = unpacked_file(root, &above, OsStr::new("kept"), SHARED_FILE, b"again");
     assert!(matches!(again, Err(Refusal::Said(why)) if why.contains("was not written")));
 }
+
+#[test]
+fn a_file_is_not_replaced_over_a_directory_standing_at_its_name() {
+    let dir = Scratch::new("beneath");
+    let within = dir.path();
+    let at = within.join("settings.json");
+    let _ = std::fs::create_dir_all(at.join("inside"));
+
+    assert!(replaced(&at, within, b"x", Kept::SHARED).is_err());
+    assert!(at.join("inside").is_dir());
+}
