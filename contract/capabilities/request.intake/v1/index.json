@@ -7,7 +7,7 @@
     },
     {
       "path": "request.intake/v1/operations/establish.json",
-      "sha256": "5ea71bcc52ffa0b8fe38ce723839ae513240c1d0706412db6eb9bc01196f5386"
+      "sha256": "3bc679bad546add45d8a699fbb1fbbeb68de2d725ae9a43d0f1cc4aa0bdab3f8"
     },
     {
       "path": "request.intake/v1/operations/initialized.json",
@@ -15,7 +15,7 @@
     },
     {
       "path": "request.intake/v1/operations/configure_identity.json",
-      "sha256": "df56492b6ee894ebe6f0e9a3d1c871fd93172a5abc7c58d3dfdd2a6e9226004b"
+      "sha256": "0b2e8761f5df77996a0b63f6c60d7d8622e28132eee683412c191b1fd31a7f28"
     },
     {
       "path": "request.intake/v1/operations/answers.json",
@@ -131,7 +131,7 @@
     },
     {
       "path": "request.intake/v1/operations/ask.json",
-      "sha256": "8e713ad45abc6eeef09062bb3eed66d684160f7ebd3ca5155da215faaaef09b8"
+      "sha256": "5c460fb9ca6ad868f8102ad32aed071105248a569fa0dc9c51fff813035390dd"
     },
     {
       "path": "request.intake/v1/holds.json",
@@ -139,7 +139,7 @@
     },
     {
       "path": "request.intake/v1/conformance.json",
-      "sha256": "03380da6d4c17fee9643820f8e86c898de7a1668e71054f6ac4ad80518aa6be0"
+      "sha256": "b801d41edffbc887525d4f75c41accc0920daa99a08dc8f09ba64a00fd117ee9"
     }
   ],
   "major": 1

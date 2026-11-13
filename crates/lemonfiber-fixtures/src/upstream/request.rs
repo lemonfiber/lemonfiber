@@ -228,8 +228,8 @@ impl Searching for Upstream {
         }))
     }
 
-    async fn ask(&self, member: &str, wish: &Wish) -> Result<Asked, Failure> {
-        self.tell(format!("ask {member} {wish:?}"));
+    async fn ask(&self, member: Option<&str>, wish: &Wish) -> Result<Asked, Failure> {
+        self.tell(format!("ask {member:?} {wish:?}"));
         Ok(Asked {
             request: 12,
             waiting: true,

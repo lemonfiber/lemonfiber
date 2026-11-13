@@ -12,6 +12,7 @@ fn inside_the_guard(service: &str, listens: u16) -> crate::plugin::Placed {
     placed.fields.network = Some(Network {
         via: Some(GUARD.to_owned()),
         fenced: false,
+        egress_for: None,
     });
     placed
 }

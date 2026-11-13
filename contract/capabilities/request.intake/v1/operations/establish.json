@@ -70,6 +70,10 @@
                     ],
                     "description": "The credential the request service's owner signs in with, where one is carried:\nnone where the operator signs that owner in through the request service's own page."
                   },
+                  "members_sign_in": {
+                    "description": "Whether the request service's own page offers members sign-in through it.",
+                    "type": "boolean"
+                  },
                   "protocol": {
                     "$ref": "#/$defs/Protocol",
                     "description": "The protocol it is spoken to in."
@@ -77,7 +81,8 @@
                 },
                 "required": [
                   "at",
-                  "protocol"
+                  "protocol",
+                  "members_sign_in"
                 ],
                 "type": "object"
               },

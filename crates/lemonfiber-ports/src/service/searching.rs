@@ -123,11 +123,12 @@ pub trait Searching: Send + Sync {
     /// Returns [`Failure`] when the service is unreachable or refuses.
     async fn detail(&self, kind: Kind, id: &str, region: &str) -> Result<Option<Detail>, Failure>;
 
-    /// Ask for `wish` on behalf of the member the service holds as `member`.
+    /// Ask for `wish` on behalf of the member the service holds as `member`, or, where none
+    /// is named, as the account the service's own credential is: its owner.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the service is unreachable or refuses; a refusal carries
     /// the service's own reason.
-    async fn ask(&self, member: &str, wish: &Wish) -> Result<Asked, Failure>;
+    async fn ask(&self, member: Option<&str>, wish: &Wish) -> Result<Asked, Failure>;
 }

@@ -161,6 +161,7 @@ fn identity() -> IdentitySource {
             username: NAMED.to_owned(),
             password: Placeholder::Minted.written(),
         }),
+        members_sign_in: true,
     }
 }
 
@@ -281,9 +282,9 @@ crate::contract! {
             fn search(str term: &str, slice kinds: &[Kind] as Kind, value page: u32) -> Page where asks = Asked { term: NAMED.to_owned(), kinds: vec![Kind::Movies], page: PAGE };
             /// What one title is, with its certification in a region.
             fn detail(value kind: Kind, str id: &str, str region: &str) -> Option<Detail> where asks = Asked { kind: Kind::Movies, id: NOBODY.to_owned(), region: REGION.to_owned() };
-            /// Ask for a title on behalf of one member.
-            fn ask(str member: &str, refer wish: &Wish as Wish) -> Asked where asks = Asked {
-                member: member(),
+            /// Ask for a title on behalf of one member, or as the request service's owner.
+            fn ask(opt_str member: Option<&str>, refer wish: &Wish as Wish) -> Asked where asks = Asked {
+                member: Some(member()),
                 wish: Wish {
                     id: NOBODY.to_owned(),
                     kind: Kind::Movies,

@@ -736,6 +736,7 @@ fn inside_the_guard() -> Network {
     Network {
         via: Some("network.egress-guard".into()),
         fenced: false,
+        egress_for: None,
     }
 }
 
@@ -753,6 +754,7 @@ fn a_service_inside_a_network_an_adapter_fills_is_written_inside_the_upstream_it
     downloader.fields.network = Some(Network {
         via: Some(guard.to_owned()),
         fenced: false,
+        egress_for: None,
     });
     let project = project(
         &manifest,

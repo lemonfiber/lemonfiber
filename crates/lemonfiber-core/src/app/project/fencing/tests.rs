@@ -35,6 +35,7 @@ fn machine(name: &str, fenced: bool, program: &Arc<Proving>) -> (Ctx, PathBuf) {
     service.fields.network = fenced.then_some(Network {
         via: None,
         fenced: true,
+        egress_for: None,
     });
     let mut register = crate::plugin::Register::empty();
     assert!(register
