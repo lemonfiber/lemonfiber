@@ -33,6 +33,12 @@
 # site under the solver's tag and must find the release it holds, which the site answers
 # only to a request carrying the cookie it hands a browser that ran its challenge.
 #
+# A download client standing in is run live as a curator arm is, put in the place of the
+# client the bundle fills the capability with once the stack is first seeded: the indexer
+# site serves the release as an NZB or a torrent, the curator grabs it through the client,
+# and the core then pauses and resumes every client, the one standing in read back stopped
+# and then fetching, every other being a service of the part it replaced.
+#
 # One [[curator]] table per curator the bundle pins that is run live through its own
 # media's household request: set up and started by this build, wired by its seed alone,
 # asked for one title by a household member, proved to grab it where the indexer site the
@@ -115,6 +121,26 @@ plugin        = "byparr"
 origin        = "https://github.com/lemonfiber/plugin-byparr"
 revision      = "4eee641119f2fc7145ecbdf7939564cc31969751"
 stands_in_for = "flaresolverr"
+claimed       = true
+
+[[substitute]]
+arm           = "download-usenet"
+capability    = "download.usenet"
+plugin        = "nzbget"
+origin        = "https://github.com/lemonfiber/plugin-nzbget"
+revision      = "1776b1e45bf78677c6231cfa75663e6c50304f5f"
+stands_in_for = "sabnzbd"
+media_type    = "movies"
+claimed       = true
+
+[[substitute]]
+arm           = "download-torrent"
+capability    = "download.torrent"
+plugin        = "transmission"
+origin        = "https://github.com/lemonfiber/plugin-transmission"
+revision      = "641fb0ff702824993ceca7f7b24840bad7f592d4"
+stands_in_for = "qbittorrent"
+media_type    = "movies"
 claimed       = true
 
 [[curator]]

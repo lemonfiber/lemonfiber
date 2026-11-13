@@ -120,7 +120,7 @@ fn challenged(key: &str, port: u16, site: &str) -> Result<(), String> {
         .iter()
         .find(|asked| asked.media == CHALLENGED_MEDIA)
         .ok_or_else(|| format!("no release is asked for {CHALLENGED_MEDIA}"))?;
-    let id = super::site_added(key, port, site, &[solver_tag(key, port)?])?;
+    let id = super::site_added(key, port, site, (&USENET, &[solver_tag(key, port)?]))?;
     let path = format!(
         "/api/v1/search?query={}&indexerIds={id}&type=search",
         asked.traced.replace(' ', "%20")

@@ -31,6 +31,13 @@ const FURTHER: [&str; 1] = [SOLVES];
 /// The capability a challenge solver fills.
 const SOLVES: &str = lemonfiber_contract::capabilities::indexer::proxy::CAPABILITY;
 
+/// The download capabilities an arm proves, each as those [`NAMED`] are proved, with the
+/// downloads its arm runs with.
+const DOWNLOADS: [(&str, &live::Downloads); 2] = [
+    ("download.usenet", &live::USENET),
+    ("download.torrent", &live::TORRENT),
+];
+
 /// The capability whose substitute may run unclaimed.
 const CLAIMABLE: &str = "media.serve";
 
@@ -163,7 +170,11 @@ fn every_arm_stands_a_substitute_in_for_what_the_bundle_fills_the_capability_wit
     for one in &pinned.substitute {
         assert!(arms.insert(one.arm.as_str()), "{} is named twice", one.arm);
         assert!(
-            NAMED.contains(&one.capability.as_str()) || FURTHER.contains(&one.capability.as_str()),
+            NAMED.contains(&one.capability.as_str())
+                || FURTHER.contains(&one.capability.as_str())
+                || DOWNLOADS
+                    .iter()
+                    .any(|(capability, _)| *capability == one.capability),
             "{one:?}"
         );
         assert_eq!(
@@ -413,6 +424,7 @@ fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
     let substitution = live::Substitution {
         plugin: one.plugin.clone(),
         capability: one.capability.clone(),
+        stands_in_for: one.stands_in_for.clone(),
         settings,
     };
     live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
@@ -438,6 +450,7 @@ fn a_solver_standing_in_is_told_to_the_indexer_and_fetches_only_pages_outside() 
     let substitution = live::Substitution {
         plugin: one.plugin.clone(),
         capability: one.capability.clone(),
+        stands_in_for: one.stands_in_for.clone(),
         settings: Vec::new(),
     };
     live::solving::run(&scratch(&arm), &substitution);
@@ -448,4 +461,38 @@ fn scratch(arm: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
     let _ = std::fs::remove_dir_all(&root);
     root
+}
+
+#[test]
+fn a_download_client_standing_in_takes_a_household_requests_grab_and_is_paused_and_resumed() {
+    let Ok(arm) = std::env::var(ARM) else {
+        return;
+    };
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let Ok(pinned) = pinned else {
+        return;
+    };
+    let Some((one, downloads)) = pinned.substitute.iter().find_map(|one| {
+        DOWNLOADS
+            .iter()
+            .find(|(capability, _)| one.arm == arm && *capability == one.capability)
+            .map(|(_, downloads)| (one, *downloads))
+    }) else {
+        return;
+    };
+    let asked = live::ASKED
+        .iter()
+        .find(|asked| Some(asked.media) == one.media_type.as_deref());
+    assert!(asked.is_some(), "{one:?}");
+    let Some(asked) = asked else {
+        return;
+    };
+    let substitution = live::Substitution {
+        plugin: one.plugin.clone(),
+        capability: one.capability.clone(),
+        stands_in_for: one.stands_in_for.clone(),
+        settings: Vec::new(),
+    };
+    live::run(&scratch(&arm), asked, downloads, Some(&substitution));
 }
