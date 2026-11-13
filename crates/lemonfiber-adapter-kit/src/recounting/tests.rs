@@ -520,13 +520,13 @@ async fn a_kit_served_with_a_recounter_takes_up_what_was_kept_before_it_answers(
     };
     let kit = crate::tests::kit().recounted_by(recounter(dir.path(), &history));
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-    let server = tokio::spawn(crate::serving(kit, listener, async {
+    let answering = tokio::spawn(crate::serving(kit, listener, async {
         let _ = stopped.await;
     }));
     assert!(settled(|| cursor_is(dir.path(), "2")).await);
     assert_eq!(names(&posts), ["Dune"]);
     let _ = stop.send(());
-    assert!(matches!(server.await, Ok(Ok(()))));
+    assert!(matches!(answering.await, Ok(Ok(()))));
 }
 
 #[tokio::test]
