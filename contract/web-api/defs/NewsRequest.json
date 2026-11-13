@@ -14,6 +14,17 @@
       "description": "Who asked for it, by the name the media server holds them under.",
       "type": "string"
     },
+    "kind": {
+      "description": "The kind of title it asks for, as the household list names it.",
+      "anyOf": [
+        {
+          "$ref": "TitleKind.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "request": {
       "description": "The reference the household list names it with: the request service's number\n(`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.",
       "type": "string"
@@ -23,6 +34,17 @@
       "type": [
         "string",
         "null"
+      ]
+    },
+    "unit": {
+      "description": "What an ask for music or books asks for, as the household list names it.",
+      "anyOf": [
+        {
+          "$ref": "TitleUnit.json"
+        },
+        {
+          "type": "null"
+        }
       ]
     }
   },

@@ -45,6 +45,8 @@ fn asked(states: &[Option<State>]) -> Panel<HouseholdReport> {
                     shelf_id: None,
                     title: Some(format!("A film {at}")),
                     media: Some("film".to_owned()),
+                    kind: None,
+                    unit: None,
                     state: *state,
                     id: "0".to_owned(),
                     asked: None,

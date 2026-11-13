@@ -3,7 +3,7 @@ use crate::asking::Policy;
 use crate::changelog::Record;
 use crate::error::Severity;
 use crate::health::Affected;
-use crate::model::{HouseholdMember, HouseholdReport, MemberRequest};
+use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, TitleKind, TitleUnit};
 
 /// A record holding three releases, a file each, as the pipeline writes them.
 fn record() -> Option<Record> {
@@ -33,6 +33,8 @@ fn asked(id: &str, hour: Option<u32>, title: Option<&str>) -> MemberRequest {
         asked: hour.map(|hour| format!("2026-11-08T{hour:02}:00:00.000Z")),
         title: title.map(str::to_owned),
         media: None,
+        kind: None,
+        unit: None,
         state: None,
         waiting_days: None,
         estimate: None,
@@ -191,4 +193,63 @@ fn the_newest_of_each_kind_is_the_first_ten_by_what_names_them() {
         Some(("check.14", "1014"))
     );
     assert_eq!(newest.requests.last().map(String::as_str), Some("6"));
+}
+
+#[test]
+fn a_request_in_the_news_carries_the_kind_and_unit_the_household_list_names() {
+    let house = household(vec![member(
+        "Anna",
+        vec![
+            MemberRequest {
+                kind: Some(TitleKind::Books),
+                unit: Some(TitleUnit::Author),
+                ..asked("books-2", Some(9), Some("Ursula K. Le Guin"))
+            },
+            MemberRequest {
+                kind: Some(TitleKind::Tv),
+                ..asked("4", Some(8), Some("The Expanse"))
+            },
+            asked("5", Some(7), None),
+        ],
+    )]);
+
+    let news = News::of(None, Some(&house), &[]);
+
+    let said: Vec<(&str, Option<TitleKind>, Option<TitleUnit>)> = news
+        .requests
+        .iter()
+        .map(|one| (one.request.as_str(), one.kind, one.unit))
+        .collect();
+    assert_eq!(
+        said,
+        vec![
+            ("books-2", Some(TitleKind::Books), Some(TitleUnit::Author)),
+            ("4", Some(TitleKind::Tv), None),
+            ("5", None, None),
+        ]
+    );
+    let written: Vec<serde_json::Value> = news
+        .requests
+        .iter()
+        .filter_map(|one| serde_json::to_value(one).ok())
+        .collect();
+    assert_eq!(
+        written
+            .first()
+            .map(|one| (one.get("kind").cloned(), one.get("unit").cloned())),
+        Some((
+            Some(serde_json::json!("books")),
+            Some(serde_json::json!("author"))
+        ))
+    );
+    assert!(
+        written.get(1).is_some_and(|one| one.get("unit").is_none()),
+        "{written:?}"
+    );
+    assert!(
+        written
+            .get(2)
+            .is_some_and(|one| one.get("kind").is_none() && one.get("unit").is_none()),
+        "{written:?}"
+    );
 }

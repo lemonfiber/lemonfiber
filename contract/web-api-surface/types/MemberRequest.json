@@ -24,6 +24,12 @@
       ],
       "required": true
     },
+    "kind": {
+      "type": [
+        "anyOf(null,ref:TitleKind)"
+      ],
+      "required": false
+    },
     "media": {
       "type": [
         "null|string"
@@ -51,6 +57,12 @@
     "title": {
       "type": [
         "null|string"
+      ],
+      "required": false
+    },
+    "unit": {
+      "type": [
+        "anyOf(null,ref:TitleUnit)"
       ],
       "required": false
     },

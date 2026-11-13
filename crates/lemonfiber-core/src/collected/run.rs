@@ -11,7 +11,7 @@ use crate::config::store::Failure;
 use crate::error::codes::quota::UNREACHABLE;
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::household::State;
-use crate::model::MemberRequest;
+use crate::model::{MemberRequest, TitleKind, TitleUnit};
 use crate::ports::service::{CandidateState, Left};
 
 /// Where the asks are kept.
@@ -241,6 +241,8 @@ pub(crate) fn listed(
         arrived: ask.arrived_at.clone(),
         shelf_id: None,
         media: Some(ask.unit.noun().to_owned()),
+        kind: Some(TitleKind::from(ask.unit.medium())),
+        unit: Some(TitleUnit::from(ask.unit)),
         state: Some(state),
         waiting_days: (state == State::WaitingForApproval)
             .then(|| crate::asking::waiting_for(Some(&ask.asked_at), now))

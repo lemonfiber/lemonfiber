@@ -40,6 +40,8 @@ fn request(id: i64, state: State, refused: Option<&str>) -> MemberRequest {
         asked: None,
         title: Some("The Thing".to_owned()),
         media: Some("film".to_owned()),
+        kind: None,
+        unit: None,
         state: Some(state),
         waiting_days: (state == State::WaitingForApproval).then_some(9),
         estimate: Some(Estimate::film(Preset::Balanced)),

@@ -31,7 +31,7 @@ use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, Restriction};
-use crate::ports::media::Kind;
+use crate::ports::media::{Kind, TitleKind};
 use crate::ports::service::{HouseholdRequest, Member};
 
 /// Read the household's requests, grouped by the member who made each one.
@@ -373,6 +373,8 @@ fn grouped(
             arrived: request.arrived.clone(),
             shelf_id: request.shelf_id.clone(),
             media: request.kind.map(Kind::noun).map(str::to_owned),
+            kind: request.kind.map(TitleKind::from),
+            unit: None,
             state,
             waiting_days: allowance::waiting(state, made.as_deref(), naming.now),
             estimate: allowance::estimated(request.kind, naming.quality),

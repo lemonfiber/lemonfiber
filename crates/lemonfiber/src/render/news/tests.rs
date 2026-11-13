@@ -14,6 +14,8 @@ fn report() -> News {
             request: "12".to_owned(),
             asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
             title: Some("Dune".to_owned()),
+            kind: None,
+            unit: None,
             by: "Anna".to_owned(),
         }],
         problems: vec![NewsProblem {
@@ -65,6 +67,8 @@ fn an_item_without_its_words_is_named_by_what_names_it_alone() {
             request: "3".to_owned(),
             asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
             title: None,
+            kind: None,
+            unit: None,
             by: "Bram".to_owned(),
         }],
         problems: vec![NewsProblem {

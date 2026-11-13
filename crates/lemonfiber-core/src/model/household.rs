@@ -36,6 +36,14 @@ pub struct MemberRequest {
     /// What kind of thing it is — a series, a film — in the household's own words.
     /// Absent where the request service names a kind this build does not know.
     pub media: Option<String>,
+    /// The kind of title it asks for: a series, a film, music or books. Absent, not
+    /// null, where the request service names a kind this build does not know.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<super::TitleKind>,
+    /// What an ask for music or books asks for: one album or book, or a whole artist,
+    /// author or series. Absent, not null, on a series or a film.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<super::TitleUnit>,
     /// Where the request stands, or absent where the request service reports a status
     /// this build does not know rather than guessing it into the nearest word.
     pub state: Option<crate::household::State>,

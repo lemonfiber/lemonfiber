@@ -1,6 +1,7 @@
 //! Who asked for what, named by the library that holds it.
 
 use super::*;
+use crate::model::{MemberRequest, TitleKind};
 use crate::ports::service::{MediaStatus, RequestStatus};
 
 /// The assembly, given the two tables these cases turn on and nothing for the two
@@ -697,4 +698,70 @@ fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known()
             "{absent} was written for a request that has not arrived: {written:?}"
         );
     }
+}
+
+#[test]
+fn a_filed_series_or_film_carries_its_kind_and_no_unit() {
+    let report = assembled(
+        vec![account("Alex", true)],
+        vec![
+            request(
+                "Alex",
+                Some(Kind::Tv),
+                Some(11),
+                (RequestStatus::Approved, MediaStatus::Available),
+            ),
+            request(
+                "Alex",
+                Some(Kind::Movies),
+                None,
+                (RequestStatus::Pending, MediaStatus::Unknown),
+            ),
+            request(
+                "Alex",
+                None,
+                None,
+                (RequestStatus::Pending, MediaStatus::Unknown),
+            ),
+        ],
+        &unnamed(),
+        &titles(),
+        None,
+    );
+    let requests: Vec<&MemberRequest> = report
+        .members
+        .iter()
+        .flat_map(|member| member.requests.iter())
+        .collect();
+    let said: Vec<_> = requests
+        .iter()
+        .map(|request| (request.kind, request.unit))
+        .collect();
+    assert_eq!(
+        said,
+        vec![
+            (Some(TitleKind::Tv), None),
+            (Some(TitleKind::Movies), None),
+            (None, None),
+        ]
+    );
+
+    let written: Vec<serde_json::Value> = requests
+        .iter()
+        .filter_map(|request| serde_json::to_value(request).ok())
+        .collect();
+    assert_eq!(
+        written.first().and_then(|first| first.get("kind")),
+        Some(&serde_json::json!("tv"))
+    );
+    assert!(
+        written.iter().all(|request| request.get("unit").is_none()),
+        "{written:?}"
+    );
+    assert!(
+        written
+            .get(2)
+            .is_some_and(|unknown| unknown.get("kind").is_none()),
+        "{written:?}"
+    );
 }

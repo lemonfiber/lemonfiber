@@ -180,9 +180,11 @@ fn diagnosing() -> Vec<Outcome> {
                 delivers: Some("Fixes".to_owned()),
             }],
             requests: vec![lemonfiber_core::news::NewsRequest {
-                request: "12".to_owned(),
+                request: "books-12".to_owned(),
                 asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
                 title: Some("Dune".to_owned()),
+                kind: Some(lemonfiber_core::model::TitleKind::Books),
+                unit: Some(lemonfiber_core::model::TitleUnit::Series),
                 by: "Anna".to_owned(),
             }],
             problems: vec![lemonfiber_core::news::NewsProblem {

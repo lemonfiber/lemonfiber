@@ -101,6 +101,12 @@ pub struct NewsRequest {
     pub asked: Option<String>,
     /// What it is called, where a service has been told about it.
     pub title: Option<String>,
+    /// The kind of title it asks for, as the household list names it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<crate::model::TitleKind>,
+    /// What an ask for music or books asks for, as the household list names it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<crate::model::TitleUnit>,
     /// Who asked for it, by the name the media server holds them under.
     pub by: String,
 }
@@ -215,6 +221,8 @@ fn requests(household: &HouseholdReport) -> Vec<NewsRequest> {
                 request: request.id.clone(),
                 asked: request.asked.clone(),
                 title: request.title.clone(),
+                kind: request.kind,
+                unit: request.unit,
                 by: member.name.clone(),
             })
         })

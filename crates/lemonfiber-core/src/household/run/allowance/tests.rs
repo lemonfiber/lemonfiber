@@ -29,6 +29,8 @@ fn member(asking: Option<Held>, waiting_days: &[u64]) -> HouseholdMember {
                 asked: None,
                 title: None,
                 media: None,
+                kind: None,
+                unit: None,
                 state: Some(State::WaitingForApproval),
                 waiting_days: Some(*days),
                 estimate: None,
