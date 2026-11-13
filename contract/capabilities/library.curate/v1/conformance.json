@@ -93,6 +93,6 @@
     {"asked":{"id":0,"kind":"movies","release":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"grab-answers-movies","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"movies","operation":"grab","since":2},
     {"asked":{"id":0,"kind":"music","release":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"grab-answers-music","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"music","operation":"grab","since":3},
     {"asked":{"id":0,"kind":"books","release":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"grab-answers-books","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"books","operation":"grab","since":3},
-    {"asked":{"address":"https://core.conformance.invalid/api/notify/events","key":"00000000000000000000000000000000","pin":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"events-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"events","since":3}
+    {"asked":{"address":"https://core.conformance.invalid/api/notify/events","every":60,"key":"00000000000000000000000000000000","pin":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"events-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"events","since":3}
   ]
 }
