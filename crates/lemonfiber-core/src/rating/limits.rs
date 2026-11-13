@@ -1,4 +1,5 @@
-//! What one member may be offered, from what their media server account may watch.
+//! What one member may be offered or shown, from what their media server account may
+//! watch.
 //!
 //! A title the request service finds carries no certification of its own, so for a
 //! member held to anything each is looked up in the country the media server's rating
@@ -13,7 +14,7 @@ use crate::ports::service::{Access, Certificate, Failure, Unrated};
 
 /// What one member may be offered.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Limits {
+pub(crate) struct Limits {
     /// The oldest certificate they may watch, where a limit holds them.
     age: Option<u32>,
     /// What becomes of a title with no rating.
@@ -29,11 +30,21 @@ impl Limits {
     /// The limits `access` holds a member to, with the table and the country they are
     /// read against where any limit holds them; nothing where either is needed and
     /// cannot be read, or the server names no certificates or no country.
-    pub(super) async fn of(server: &dyn source::Fills, access: &Access) -> Option<Self> {
+    pub(crate) async fn of(server: &dyn source::Fills, access: &Access) -> Option<Self> {
         if !held_back(access) {
             return Some(Self::open());
         }
         Self::read(access, server.ratings().await, server.country().await)
+    }
+
+    /// The limits `access` holds a member to, against the server's own table alone: for
+    /// what the server certifies itself, so nothing is looked up in a country. Nothing
+    /// where a limit holds them and the table cannot be read or names nothing.
+    pub(crate) async fn certified(server: &dyn source::Fills, access: &Access) -> Option<Self> {
+        if !held_back(access) {
+            return Some(Self::open());
+        }
+        Self::tabled(access, server.ratings().await)
     }
 
     /// The limits nothing holds a member to.
@@ -53,33 +64,42 @@ impl Limits {
         certificates: Result<Vec<Certificate>, Failure>,
         country: Result<Option<String>, Failure>,
     ) -> Option<Self> {
+        let country = country.ok().flatten()?;
+        Some(Self {
+            country,
+            ..Self::tabled(access, certificates)?
+        })
+    }
+
+    /// The limits `access` holds a member to, read against what the server answered for
+    /// its table, with no country; nothing where it did not answer or named nothing.
+    fn tabled(access: &Access, certificates: Result<Vec<Certificate>, Failure>) -> Option<Self> {
         let certificates = certificates
             .ok()
             .filter(|certificates| !certificates.is_empty())?;
-        let country = country.ok().flatten()?;
         Some(Self {
             age: access.age_limit,
             unrated: access.unrated,
             certificates,
-            country,
+            country: String::new(),
         })
     }
 
     /// Whether anything at all holds the member back.
-    pub(super) fn restricted(&self) -> bool {
+    pub(crate) fn restricted(&self) -> bool {
         self.age.is_some() || self.unrated == Unrated::HeldBack
     }
 
     /// The country a certification is looked up in, empty where nothing limits the
     /// member.
-    pub(super) fn region(&self) -> &str {
+    pub(crate) fn region(&self) -> &str {
         &self.country
     }
 
     /// Whether a title certified `certification` may be offered: a rated one at or under
     /// the member's limit, an unrated one where their policy lets it through, and never
     /// one certified in words the table does not name.
-    pub(super) fn admits(&self, certification: Option<&str>) -> bool {
+    pub(crate) fn admits(&self, certification: Option<&str>) -> bool {
         let Some(certified) = certification else {
             return self.unrated == Unrated::LetThrough;
         };

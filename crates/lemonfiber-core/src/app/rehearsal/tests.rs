@@ -355,10 +355,11 @@ fn always_reported() -> Vec<Command> {
             format: crate::audio::Format::Lossless,
         },
         Command::Household { member: None },
-        Command::Held {
+        Command::Held(crate::app::Shelf {
             member: crate::app::Whom::Named("ana".to_owned()),
             most: 25,
-        },
+            asker: crate::app::Asker::Operator,
+        }),
         Command::Allowing(Chosen::default()),
         Command::Deciding(Decision {
             request: crate::collected::Reference::Filed(1),
@@ -409,17 +410,19 @@ fn always_reported() -> Vec<Command> {
 /// Taught to report rather than to act: each stops short of the write and says
 /// what the write would have been.
 fn taught_to_report() -> Vec<Command> {
-    use crate::app::{Viewing, Whom};
+    use crate::app::{Asker, Viewing, Whom};
     use crate::ports::service::HowFar;
     let title = "0123456789abcdef0123456789abcdef".to_owned();
     vec![
         Command::Viewing(Viewing::Title {
             member: Whom::Defaults,
             id: title.clone(),
+            asker: Asker::Operator,
         }),
         Command::Viewing(Viewing::PartWay {
             member: Whom::Named("ana".to_owned()),
             most: 3,
+            asker: Asker::Operator,
         }),
         Command::Viewing(Viewing::Grant {
             member: "ana".to_owned(),

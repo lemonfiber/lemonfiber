@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::{Command, Diagnosing, Viewing, Whom, Wishing};
+use lemonfiber_core::app::{Asker, Command, Diagnosing, Shelf, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::notify::configuring::Asked as Notifying;
 use lemonfiber_core::push::run::Asked as Pushing;
@@ -154,10 +154,11 @@ pub(crate) fn their_household(id: &str) -> Command {
 /// One member's own shelf, `most` of it.
 #[must_use]
 pub(crate) fn their_shelf(id: &str, most: u32) -> Command {
-    Command::Held {
+    Command::Held(Shelf {
         member: Whom::Named(id.to_owned()),
         most,
-    }
+        asker: Asker::Member,
+    })
 }
 
 /// What one member is playing, and nobody else.
@@ -168,16 +169,23 @@ pub(crate) fn their_playing(id: &str) -> Command {
     }
 }
 
-/// One of a member's viewing requests, narrowed to them whatever it named.
+/// One of a member's viewing requests, narrowed to them whatever it named, and asked as
+/// them, so every reason they are given is in the household's words.
 #[must_use]
 pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
     let them = Whom::Named(id.to_owned());
+    let asker = Asker::Member;
     match viewing.clone() {
         Viewing::Title { id: title, .. } => Viewing::Title {
             member: them,
             id: title,
+            asker,
         },
-        Viewing::PartWay { most, .. } => Viewing::PartWay { member: them, most },
+        Viewing::PartWay { most, .. } => Viewing::PartWay {
+            member: them,
+            most,
+            asker,
+        },
         Viewing::Grant { device, .. } => Viewing::Grant {
             member: id.to_owned(),
             device,
@@ -188,6 +196,22 @@ pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
             member: id.to_owned(),
             id: title,
             how_far,
+        },
+        Viewing::Channels { .. } => Viewing::Channels {
+            member: id.to_owned(),
+        },
+        Viewing::Tune { live, .. } => Viewing::Tune {
+            member: id.to_owned(),
+            live,
+            asker,
+        },
+        Viewing::Play {
+            id: title, from, ..
+        } => Viewing::Play {
+            member: id.to_owned(),
+            id: title,
+            from,
+            asker,
         },
     }
 }
@@ -234,15 +258,17 @@ fn members(id: &str, command: &Command) -> Permitted {
         // Theirs, and narrowed the same way. How much of the shelf to answer with
         // is the caller's to choose and is carried through; whose shelf it is
         // never was, so what the request named is discarded rather than checked.
-        Command::Held { most, .. } => Permitted::This(their_shelf(id, *most)),
+        Command::Held(Shelf { most, .. }) => Permitted::This(their_shelf(id, *most)),
         // Theirs, narrowed the same way: what they are playing, and nobody else's.
         // Whatever the request named is discarded, so an operator's narrowing cannot
         // be borrowed to read another member's sessions.
         Command::Playing { .. } => Permitted::This(their_playing(id)),
         // Theirs, narrowed the same way: a title, what they were part-way through, a
-        // grant for their own device and their own progress. Whoever the request named
-        // is discarded, so a member cannot grant a device to somebody else's account or
-        // move somebody else's place in a film.
+        // grant for their own device, their own progress, the channels they may watch,
+        // a live stream opened for them and a title played in their browser. Whoever the
+        // request named is discarded, so a member cannot grant a device to somebody
+        // else's account, move somebody else's place in a film, or renew a pass on
+        // somebody else's live stream.
         Command::Viewing(viewing) => Permitted::This(Command::Viewing(their_viewing(id, viewing))),
         // Theirs, narrowed the same way: a search under their own limits, and an ask on
         // their own account and allowance. Whoever the request named is discarded, so a

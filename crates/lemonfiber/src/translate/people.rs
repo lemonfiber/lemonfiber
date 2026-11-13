@@ -2,7 +2,8 @@
 //! is read, and what they may ask for.
 
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Viewing, Whom, Wishing,
+    Allowance, Answer, Arranged, Asker, Chosen, Command, Decision, Inviting, Live, PlayFrom, Shelf,
+    Viewing, Whom, Wishing,
 };
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::collected::{Medium, Unit};
@@ -12,7 +13,8 @@ use lemonfiber_core::ports::service::{HowFar, Quota, Unrated, Wish};
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    Collected, HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom, Wished, Within,
+    Collected, HouseholdCommand, RawAllowance, RawPlay, RawShelf, RawTune, RawUnrated, RawWhom,
+    Wished, Within,
 };
 
 /// The command line spells what somebody may watch as three flags and the core carries
@@ -58,12 +60,12 @@ fn narrowed(whom: RawWhom) -> Option<Whom> {
 /// number of nought or more than one read answers with is refused rather than rounded:
 /// somebody who asked for a thousand and was shown five hundred has been told that is
 /// the shelf.
-pub(crate) fn held(whom: RawWhom, asked: RawShelf) -> Result<Command, u8> {
+pub(crate) fn held(whom: RawWhom, shelf: RawShelf) -> Result<Command, u8> {
     let RawShelf {
         most,
         title,
         part_way,
-    } = asked;
+    } = shelf;
     let Some(member) = narrowed(whom) else {
         complain!(
             "error: name whose shelf with `--member`, or ask for the household's defaults \
@@ -74,12 +76,17 @@ pub(crate) fn held(whom: RawWhom, asked: RawShelf) -> Result<Command, u8> {
     // Taken from the served read rather than restated, so a terminal and a browser
     // looking at one household cannot come to see two different shelves. A number
     // written down twice is a number that drifts the first time one of them moves.
+    let asker = Asker::Operator;
     if let Some(id) = title {
-        return Ok(Command::Viewing(Viewing::Title { member, id }));
+        return Ok(Command::Viewing(Viewing::Title { member, id, asker }));
     }
     if part_way {
         let most = most.unwrap_or(lemonfiber_core::screening::A_FEW);
-        return Ok(Command::Viewing(Viewing::PartWay { member, most }));
+        return Ok(Command::Viewing(Viewing::PartWay {
+            member,
+            most,
+            asker,
+        }));
     }
     let most = most.unwrap_or(lemonfiber_api::read::table::A_SHELF);
     if most == 0 || most > lemonfiber_api::read::table::MOST_AT_ONCE {
@@ -89,7 +96,75 @@ pub(crate) fn held(whom: RawWhom, asked: RawShelf) -> Result<Command, u8> {
         );
         return Err(USAGE);
     }
-    Ok(Command::Held { member, most })
+    Ok(Command::Held(Shelf {
+        member,
+        most,
+        asker,
+    }))
+}
+
+/// The live TV channels one member may watch. Naming nobody is refused by the core,
+/// which knows who is in the household.
+pub(crate) fn channels(member: Option<String>) -> Command {
+    Command::Viewing(Viewing::Channels {
+        member: member.unwrap_or_default(),
+    })
+}
+
+/// A channel opened, or a live stream kept or closed, for one member: a channel, or a
+/// stream with or without a stop, and never a channel beside a stream.
+pub(crate) fn tuning(asked: RawTune) -> Result<Command, u8> {
+    let RawTune {
+        channel,
+        member,
+        stream,
+        stop,
+    } = asked;
+    let live = match (channel, stream, stop) {
+        (Some(channel), None, false) => Live::Open(channel),
+        (None, Some(stream), false) => Live::Renew(stream),
+        (None, Some(stream), true) => Live::Stop(stream),
+        _ => {
+            complain!(
+                "error: name a channel to open, or `--stream` to keep one open, with `--stop` \
+                 to close it"
+            );
+            return Err(USAGE);
+        }
+    };
+    Ok(Command::Viewing(Viewing::Tune {
+        member: member.unwrap_or_default(),
+        live,
+        asker: Asker::Operator,
+    }))
+}
+
+/// Where one title plays in a member's browser, on a new session for `--device` or the
+/// one `--pass` holds, and never both.
+pub(crate) fn playing(asked: RawPlay) -> Result<Command, u8> {
+    let RawPlay {
+        item,
+        member,
+        device,
+        pass,
+    } = asked;
+    let from = match (device, pass) {
+        (Some(device), None) => PlayFrom::Device(device),
+        (None, Some(pass)) => PlayFrom::Pass(pass),
+        _ => {
+            complain!(
+                "error: name the browser with `--device`, or hand back the pass it holds with \
+                 `--pass`"
+            );
+            return Err(USAGE);
+        }
+    };
+    Ok(Command::Viewing(Viewing::Play {
+        member: member.unwrap_or_default(),
+        id: item,
+        from,
+        asker: Asker::Operator,
+    }))
 }
 
 /// What is being asked about the household: who is here, or what they may ask for.

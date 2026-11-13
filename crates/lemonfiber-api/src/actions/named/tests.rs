@@ -1,7 +1,7 @@
 use lemonfiber_core::app::Command;
 
 use super::{carried, KEY_CALLABLE, OFFERED};
-use crate::actions::{Arguments, TAKES_AGREEMENT};
+use crate::actions::{Arguments, Handed, TAKES_AGREEMENT};
 use crate::entitled::callable_by_a_key;
 
 /// A carrier holding something for every argument any action reads, agreed to or not.
@@ -20,6 +20,9 @@ fn everything(confirm: bool) -> Arguments {
         id: Some("0123456789abcdef0123456789abcdef".to_owned()),
         position: Some(1),
         ended: Some(true),
+        stream: Some("0123456789abcdef0123456789abcdef".to_owned()),
+        stop: Some(true),
+        pass: Some(Handed("a-pass".to_owned())),
         kind: Some("movies".to_owned()),
         unit: None,
         seasons: Vec::new(),

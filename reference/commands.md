@@ -32,6 +32,9 @@ Commands:
   household      Show who is in the household, what each may watch and ask for, and what each asked for
   held           Show what one member can actually watch
   playing        Show what the media server is playing now: who is watching what, and where
+  channels       Show the live TV channels one member may watch, each with what is on it now
+  tune           Open a channel's live stream for one member, and say where it is served
+  play           Say where one title plays in a member's browser, on a pass holding a session on their own account
   walkthrough    Add one thing, end to end, and watch every step of it happen
   explain        Say what one of this product's words means
   history        Show everything lemonfiber changed, newest first, and how far each could be put back
@@ -124,6 +127,9 @@ Options:
 - [`lemonfiber household`](commands/household.md)
 - [`lemonfiber held`](commands/held.md)
 - [`lemonfiber playing`](commands/playing.md)
+- [`lemonfiber channels`](commands/channels.md)
+- [`lemonfiber tune`](commands/tune.md)
+- [`lemonfiber play`](commands/play.md)
 - [`lemonfiber walkthrough`](commands/walkthrough.md)
 - [`lemonfiber explain`](commands/explain.md)
 - [`lemonfiber history`](commands/history.md)

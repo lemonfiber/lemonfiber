@@ -115,6 +115,20 @@ pub trait Fronted: Send + Sync {
     async fn restart(&self) -> Result<(), Failure>;
 }
 
+/// Which origins a browser may read the server from, where more than one may: the
+/// household front door's, and the console a member plays in.
+#[async_trait]
+pub trait Allowing: Send + Sync {
+    /// Allow exactly `origins`, and hold the server to having kept them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where `origins` is empty or holds an empty origin or a
+    /// wildcard, where the server is unreachable or refuses the write, or reads back a
+    /// list other than the one written.
+    async fn allow_origins(&self, origins: &[String]) -> Result<(), Failure>;
+}
+
 /// The keys the server holds for the stack's services, each filed under an app's name.
 #[async_trait]
 pub trait AppKeys: Send + Sync {

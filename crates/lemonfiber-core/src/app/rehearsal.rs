@@ -205,6 +205,9 @@ const fn viewed(viewing: &Viewing) -> Asked {
         Viewing::PartWay { .. } => reports("part-way", &[kind::PART_WAY]),
         Viewing::Grant { .. } => reports("grant", &[kind::GRANT]),
         Viewing::Watched { .. } => reports("watched", &[kind::WATCHED]),
+        Viewing::Channels { .. } => reports("channels", &[kind::CHANNELS]),
+        Viewing::Tune { .. } => reports("tune", &[kind::TUNED]),
+        Viewing::Play { .. } => reports("play", &[kind::PLAY]),
     }
 }
 
@@ -315,7 +318,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Alerts(_) => reports("alerts", &[kind::ALERTS]),
         Command::QualityMusic { .. } => reports("quality music", &[kind::MUSIC]),
         Command::Household { .. } => reports("household", HOUSEHOLD),
-        Command::Held { .. } => reports("held", &[kind::HELD]),
+        Command::Held(_) => reports("held", &[kind::HELD]),
         Command::Viewing(viewing) => viewed(viewing),
         Command::Wish(wishing) => wished(wishing),
         Command::Allowing(_) => reports("allow", HOUSEHOLD),

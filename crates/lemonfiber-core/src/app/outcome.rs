@@ -142,6 +142,12 @@ outcomes! {
     Granted(crate::model::GrantReport) => GRANT [rehearsed],
     /// How far a member got, as the media server now holds it.
     Watched(crate::model::WatchedReport) => WATCHED [rehearsed],
+    /// The live TV channels a member may watch, each with the programme on it now.
+    Channels(crate::model::ChannelsReport) => CHANNELS [rehearsed],
+    /// A channel's live stream opened for a member, on passes.
+    Tuned(crate::model::TunedReport) => TUNED [rehearsed],
+    /// Where a title plays from in a member's browser, on a pass.
+    Play(crate::model::PlayReport) => PLAY [rehearsed],
     /// One page of what a member's search for a title found, under their limits.
     Askable(crate::model::AskableReport) => ASKABLE,
     /// Which kinds a member may ask for now.

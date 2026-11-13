@@ -162,7 +162,7 @@ fn asked_for(
 /// answered with where the ruling granted no title read.
 fn titled(granted: Result<Command, Box<Response>>) -> Result<(Whom, String), Box<Response>> {
     match granted {
-        Ok(Command::Viewing(Viewing::Title { member, id })) => Ok((member, id)),
+        Ok(Command::Viewing(Viewing::Title { member, id, .. })) => Ok((member, id)),
         Ok(_) => Err(Box::new(Refusal::NoSuchRead.answered())),
         Err(refused) => Err(refused),
     }

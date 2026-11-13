@@ -255,7 +255,12 @@ async fn asked_for(app: Option<Source>, path: &str) -> (u16, String) {
     let Ok(request) = request else {
         unreachable!("a request built from a path that is already one cannot fail");
     };
-    let served = tower::ServiceExt::oneshot(routes(app), request).await.ok();
+    let served = tower::ServiceExt::oneshot(
+        routes(app, std::sync::Arc::new(crate::idle::ctx())),
+        request,
+    )
+    .await
+    .ok();
     let Some(response) = served else {
         unreachable!("the router is infallible; its handlers answer rather than fail");
     };

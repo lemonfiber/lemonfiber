@@ -503,10 +503,11 @@ fn a_shelf_asked_for_with_no_count_is_read_to_what_one_screen_holds() {
 
     assert_eq!(
         named,
-        Some(Command::Held {
+        Some(Command::Held(lemonfiber_core::app::Shelf {
             member: lemonfiber_core::app::Whom::Named("ada".to_owned()),
             most: table::A_SHELF,
-        })
+            asker: lemonfiber_core::app::Asker::Operator,
+        }))
     );
 }
 
@@ -534,10 +535,11 @@ fn both_household_reads_answer_as_the_defaults_where_asked() {
     use lemonfiber_core::app::Whom;
     assert_eq!(
         reached(table::HELD, "defaults=true"),
-        Some(Command::Held {
+        Some(Command::Held(lemonfiber_core::app::Shelf {
             member: Whom::Defaults,
             most: table::A_SHELF,
-        })
+            asker: lemonfiber_core::app::Asker::Operator,
+        }))
     );
     assert_eq!(
         reached(table::REQUESTS, "defaults=true"),
@@ -547,10 +549,11 @@ fn both_household_reads_answer_as_the_defaults_where_asked() {
     );
     assert_eq!(
         reached(table::HELD, "member=ada&defaults=false"),
-        Some(Command::Held {
+        Some(Command::Held(lemonfiber_core::app::Shelf {
             member: Whom::Named("ada".to_owned()),
             most: table::A_SHELF,
-        })
+            asker: lemonfiber_core::app::Asker::Operator,
+        }))
     );
     assert_eq!(
         reached(table::REQUESTS, "defaults=false"),

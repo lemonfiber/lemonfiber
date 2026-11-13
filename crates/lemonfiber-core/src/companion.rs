@@ -297,6 +297,27 @@ async fn reached(ctx: &Ctx, port: u16) -> Option<crate::door::Address> {
     )
 }
 
+/// The origin a browser reads the web surface from, as the run that last served it wrote
+/// down: its household address where it was offered to the network, and this machine's
+/// loopback address where it was not. Nothing where no run wrote it down, or a
+/// network one has no household address.
+pub(crate) async fn console_origin(ctx: &Ctx) -> Option<String> {
+    let served = served::last(kept_in(ctx).ok()?)?;
+    let plain = if served.network {
+        reached(ctx, served.port).await?.url
+    } else {
+        format!("http://{LOOPBACK}:{}", served.port)
+    };
+    Some(if served.encrypted {
+        encrypted(&plain)
+    } else {
+        plain
+    })
+}
+
+/// The address a browser on this machine reaches a surface served to it alone at.
+const LOOPBACK: std::net::Ipv4Addr = std::net::Ipv4Addr::LOCALHOST;
+
 /// Replace the certificate the surface presents, or say what replacing it would cost.
 ///
 /// Said first and done second: unconfirmed, nothing changes and the consequence is the

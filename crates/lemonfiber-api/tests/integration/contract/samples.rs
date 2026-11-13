@@ -228,6 +228,9 @@ fn serving() -> Vec<Outcome> {
         Outcome::PartWay(lemonfiber_core::model::PartWayReport::default()),
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
+        Outcome::Channels(the_channels()),
+        Outcome::Tuned(a_tune()),
+        Outcome::Play(a_play()),
         Outcome::Askable(a_search()),
         Outcome::AskableKinds(the_kinds()),
         Outcome::Asked(an_ask()),
@@ -566,6 +569,44 @@ fn a_title() -> lemonfiber_core::model::TitleReport {
             }],
         }),
         rehearsed: false,
+    }
+}
+
+/// One channel with the programme on it now, with every field a channel can carry.
+fn the_channels() -> lemonfiber_core::model::ChannelsReport {
+    use lemonfiber_core::ports::service::{Channel, Programme};
+    lemonfiber_core::model::ChannelsReport {
+        channels: vec![Channel {
+            id: "news".to_owned(),
+            name: "News".to_owned(),
+            number: Some("101".to_owned()),
+            now: Some(Programme {
+                title: "The evening news".to_owned(),
+                certificate: Some("PG".to_owned()),
+                ends: Some("2026-11-13T19:00:00Z".to_owned()),
+            }),
+        }],
+        ..lemonfiber_core::model::ChannelsReport::default()
+    }
+}
+
+/// A live stream opened at the door, on a pass.
+fn a_tune() -> lemonfiber_core::model::TunedReport {
+    lemonfiber_core::model::TunedReport {
+        stream: Some("ls1".to_owned()),
+        direct: Some("https://house.local:8920/live/ls1/stream.ts?lfpass=a.1.b".to_owned()),
+        fingerprint: Some("ab".repeat(32)),
+        lapses: Some(1_800_000_300),
+        ..lemonfiber_core::model::TunedReport::default()
+    }
+}
+
+/// A title playing in a browser from the front door, on a pass.
+fn a_play() -> lemonfiber_core::model::PlayReport {
+    lemonfiber_core::model::PlayReport {
+        stream_from: Some("https://watch.example.org/master.m3u8?lfpass=a.1.b".to_owned()),
+        lapses: Some(1_800_000_300),
+        ..lemonfiber_core::model::PlayReport::default()
     }
 }
 

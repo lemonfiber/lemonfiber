@@ -12,10 +12,10 @@
 
 use lemonfiber_ports::media::{TitleKind, MEDIA};
 use lemonfiber_ports::service::{
-    AppKeys, Applied, Astray, Channel, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted,
-    Furnished, Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
-    OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Tuned, Tuning, Upkeep,
-    PICTURE_MOST, SERIES_MOST,
+    Allowing, AppKeys, Applied, Astray, Channel, Dated, Declared, Declaring, Encrypting, FiledAt,
+    Fronted, Furnished, Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library,
+    OutsideAccount, OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Tuned,
+    Tuning, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
 use serde_json::Value;
 
@@ -51,6 +51,9 @@ const UNTUNED: &str = "conformance-live-stream";
 
 /// An origin a browser reads it from.
 const ORIGIN: &str = "https://watch.example";
+
+/// The console's origin, which a browser plays in.
+const CONSOLE: &str = "https://console.example:8443";
 
 /// The household's first account, as `identity.source` answered it.
 fn member() -> String {
@@ -157,6 +160,12 @@ crate::contract! {
             fn allow_only(str origin: &str) -> () where asks = Asked { origin: ORIGIN.to_owned() };
             /// Start again, so it reads what was written.
             fn restart() -> () where asks = Asked {};
+        }
+        impl Allowing {
+            /// Allow exactly these origins, the front door's and the console's.
+            fn allow_origins(slice origins: &[String] as String) -> () where since = 4, asks = Asked {
+                origins: vec![ORIGIN.to_owned(), CONSOLE.to_owned()],
+            };
         }
         impl Declaring {
             /// What a guard in front of it enforces, and where it serves each item.

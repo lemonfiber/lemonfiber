@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A channel's live stream opened for a member, where its bytes are served at the\nguarded front door, each on a pass for that live stream and that member.",
+  "type": "object",
+  "properties": {
+    "channel": {
+      "description": "The channel, by the identifier the channels list gives it.",
+      "type": "string"
+    },
+    "direct": {
+      "description": "Where the tuner's own stream is served, carrying its pass.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fingerprint": {
+      "description": "SHA-256 over the certificate the door presents, lower-case hex, which a client\npins.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lapses": {
+      "description": "When the passes lapse, in whole seconds since the Unix epoch. A client asks for\nnew ones before then.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "member": {
+      "description": "The member it is opened for, by the name they are known by.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    },
+    "stream": {
+      "description": "The live stream a renewal or a stop names.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "transcoded": {
+      "description": "Where a transcoded playlist of it is served, carrying its pass.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unlocated": {
+      "description": "Why nothing is located, where nothing is.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "channel",
+    "member",
+    "rehearsed"
+  ]
+}

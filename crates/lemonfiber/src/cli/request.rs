@@ -16,9 +16,9 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
-    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPushEndpoint,
-    RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding, RawSwitch, RawTrace,
-    RawUi, RawUp, RawWhom, UpdateCommand,
+    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPlay,
+    RawPushEndpoint, RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding,
+    RawSwitch, RawTrace, RawTune, RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -205,6 +205,28 @@ pub enum Request {
         #[arg(long)]
         member: Option<String>,
     },
+    /// Show the live TV channels one member may watch, each with what is on it now.
+    ///
+    /// Read as that member: a channel whose programme now is outside their limits is left
+    /// out, and a member whose account may not watch live TV is shown none.
+    Channels {
+        /// Whose channels, named the way they sign in.
+        #[arg(long)]
+        member: Option<String>,
+    },
+    /// Open a channel's live stream for one member, and say where it is served.
+    ///
+    /// Each location carries a pass for that live stream and that member, which lapses
+    /// five minutes after it is issued. Ask again with `--stream` before then to keep it,
+    /// and with `--stop` as well to close it. Every location is also drawn as a code to
+    /// point a camera at.
+    Tune(RawTune),
+    /// Say where one title plays in a member's browser, on a pass holding a session on
+    /// their own account.
+    ///
+    /// The pass lapses five minutes after it is issued; hand it back with `--pass` before
+    /// then to keep playing. The location is also drawn as a code to point a camera at.
+    Play(RawPlay),
     /// Add one thing, end to end, and watch every step of it happen.
     ///
     /// The walk a first run is offered: search the indexers, grab a release, download

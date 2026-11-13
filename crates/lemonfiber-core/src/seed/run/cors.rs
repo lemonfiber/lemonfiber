@@ -1,4 +1,5 @@
-//! The media server's cross-origin allow-list, held to the household front door's origin.
+//! The media server's cross-origin allow-list, held to the household front door's origin
+//! and the console's, where the server takes more than one.
 //!
 //! Read and reconciled on every pass rather than written once, because the front
 //! door's address is worked out from what this machine says about itself at the moment
@@ -6,12 +7,18 @@
 //! another address, moves the origin, and the list follows it the next time a pass
 //! runs.
 //!
+//! The console is where a member plays a title in a browser, from the media server
+//! behind the front door, so its origin is allowed beside the door's: as the run that
+//! last served it wrote down. A server whose adapter speaks no list is held to the door's
+//! origin alone.
+//!
 //! **Never empty.** The media server reads an empty list as every origin, so where there is no
 //! front door address to name the list is left as it stands and the pass says so,
 //! rather than writing the one value that opens it.
 
 use super::Ctx;
 use crate::app::targets::MediaServer;
+use crate::ports::service::Failure;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
@@ -62,28 +69,55 @@ pub(super) async fn seed_cors(
         );
         return Some(wiring);
     };
+    let mut wanted = vec![origin.clone()];
+    wanted.extend(
+        crate::companion::console_origin(ctx)
+            .await
+            .filter(|console| *console != origin),
+    );
     let Some(client) = client else {
         return Some(Wiring::settled(
             connection(server),
             State::WouldWire {
                 yours: None,
-                ours: Some(origin),
+                ours: Some(listed(&wanted)),
             },
         ));
     };
     let state = match client.allowed_origins().await {
         Err(failure) => crate::seed::unreached(&failure),
-        Ok(held) if held == [origin.as_str()] => State::AlreadyWired,
+        Ok(held) if alike(&held, &wanted) => State::AlreadyWired,
         Ok(held) if ctx.dry_run => State::WouldWire {
             yours: Some(listed(&held)),
-            ours: Some(origin),
+            ours: Some(listed(&wanted)),
         },
-        Ok(_) => match client.allow_only(&origin).await {
+        Ok(held) => allowed(client.as_ref(), &held, &wanted, &origin).await,
+    };
+    Some(Wiring::settled(connection(server), state))
+}
+
+/// Allow `wanted`, or the front door's `origin` alone where the server takes no list;
+/// the server held `held` before.
+async fn allowed(
+    client: &dyn lemonfiber_contract::capabilities::media::serve::Fills,
+    held: &[String],
+    wanted: &[String],
+    origin: &str,
+) -> State {
+    match client.allow_origins(wanted).await {
+        Ok(()) => State::Wired,
+        Err(Failure::Unsupported { .. }) if held == [origin] => State::AlreadyWired,
+        Err(Failure::Unsupported { .. }) => match client.allow_only(origin).await {
             Ok(()) => State::Wired,
             Err(failure) => crate::seed::unreached(&failure),
         },
-    };
-    Some(Wiring::settled(connection(server), state))
+        Err(failure) => crate::seed::unreached(&failure),
+    }
+}
+
+/// Whether `held` names exactly the origins `wanted` does, in any order.
+fn alike(held: &[String], wanted: &[String]) -> bool {
+    held.len() == wanted.len() && wanted.iter().all(|one| held.contains(one))
 }
 
 /// The origin the household front door is reached at, where the door is the stack's

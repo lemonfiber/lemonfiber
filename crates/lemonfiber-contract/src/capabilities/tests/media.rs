@@ -5,11 +5,12 @@ use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
-    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared, Declaring,
-    Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds,
-    HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming,
-    OutsideAccount, OutsideServer, Picture, Playback, Ports, Presentation, Programme, Question,
-    Recounting, Screening, SeasonDetail, SeriesHeld, Statuses, Token, Tuned, Tuning, Upkeep,
+    Addressee, Allowing, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared,
+    Declaring, Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held,
+    Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium,
+    Naming, OutsideAccount, OutsideServer, Picture, Playback, Ports, Presentation, Programme,
+    Question, Recounting, Screening, SeasonDetail, SeriesHeld, Statuses, Token, Tuned, Tuning,
+    Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -148,6 +149,14 @@ impl Fronted for Upstream {
     }
     async fn restart(&self) -> Result<(), Failure> {
         self.tell("restart".to_owned());
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Allowing for Upstream {
+    async fn allow_origins(&self, origins: &[String]) -> Result<(), Failure> {
+        self.tell(format!("allow {}", origins.join(" ")));
         Ok(())
     }
 }

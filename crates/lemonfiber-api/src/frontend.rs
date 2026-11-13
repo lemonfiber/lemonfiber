@@ -12,15 +12,20 @@
 //!
 //! The token an operator was given reaches this page, so the page says what it may
 //! load and refuses to be framed. Neither costs anything to state and both stop
-//! being available to state once somebody is already relying on the absence.
+//! being available to state once somebody is already relying on the absence. A title a
+//! member plays in a browser streams from the stack's front door, so where the core knows
+//! that origin the page may play media from it and fetch its playlists, and nothing else
+//! beyond itself.
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{header, HeaderValue, Response, StatusCode};
 use axum::routing::any;
 use axum::Router;
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::frontend::{Asset, Source};
 
 use crate::refusal::Refusal;
@@ -35,6 +40,17 @@ use crate::serve::{carrying, SENTENCE};
 const POLICY: &str = "default-src 'self'; img-src 'self' data: blob:; \
                       style-src 'self' 'unsafe-inline'; font-src 'self'; \
                       connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+
+/// What this page may load, and what may load it, where it plays a title from the
+/// front door at `front_door`: media from it, and from memory, and its playlists fetched.
+#[must_use]
+pub fn playing_from(front_door: &str) -> String {
+    format!(
+        "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: {front_door}; \
+         style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' {front_door}; \
+         base-uri 'none'; frame-ancestors 'none'"
+    )
+}
 
 /// What a browser is told a file is, from what the file is called.
 ///
@@ -81,7 +97,7 @@ pub fn served(asset: Asset) -> Response<Body> {
         Cow::Owned(read) => Body::from(read),
     };
     let mut response = carrying(StatusCode::OK, sort, body);
-    allowed(&mut response);
+    allowed(&mut response, None);
     response
 }
 
@@ -130,20 +146,41 @@ pub fn page(app: Option<Source>, asked: &str) -> Response<Body> {
     source.asset(asked).map_or_else(missing, served)
 }
 
+/// What a path is answered with, a page of the app saying it may play a title from the
+/// front door at `front_door`, where the core knows one.
+#[must_use]
+pub fn page_playing(app: Option<Source>, asked: &str, front_door: Option<&str>) -> Response<Body> {
+    let mut response = page(app, asked);
+    if response
+        .headers()
+        .contains_key(header::CONTENT_SECURITY_POLICY)
+    {
+        allowed(&mut response, front_door);
+    }
+    response
+}
+
 /// The routes that serve the app.
 ///
 /// One fallback rather than a route per file. The app's own router reads the path
 /// once the page is loaded, so every path this surface does not answer itself is
 /// the app — which means the endpoints must be merged over this rather than
 /// under it.
-pub fn routes(app: Option<Source>) -> Router {
+pub fn routes(app: Option<Source>, ctx: Arc<Ctx>) -> Router {
     Router::new()
         .fallback(any(
-            |State(app): State<Option<Source>>, request: axum::extract::Request| async move {
-                page(app, request.uri().path())
+            |State((app, ctx)): State<(Option<Source>, Arc<Ctx>)>,
+             request: axum::extract::Request| async move {
+                let asked = request.uri().path();
+                let front_door = if asked.starts_with(ENDPOINTS) {
+                    None
+                } else {
+                    lemonfiber_core::screening::browser_origin(&ctx)
+                };
+                page_playing(app, asked, front_door.as_deref())
             },
         ))
-        .with_state(app)
+        .with_state((app, ctx))
 }
 
 /// A response carrying words this surface wrote.
@@ -152,18 +189,21 @@ pub fn routes(app: Option<Source>) -> Router {
 /// headers, and labelled as the prose it is.
 fn plainly(status: StatusCode, said: &str) -> Response<Body> {
     let mut response = carrying(status, SENTENCE, Body::from(said.to_owned()));
-    allowed(&mut response);
+    allowed(&mut response, None);
     response
 }
 
-/// What the page this surface serves may load, and what may load it.
+/// What the page this surface serves may load, and what may load it: media and fetches
+/// from `front_door` too, where it plays a title from there.
 ///
 /// Only the app's own answers carry it. The endpoints beside them are fetched by
 /// a page rather than drawn as one, and a policy on a document nothing renders
 /// says nothing about what anything may do.
-fn allowed(response: &mut Response<Body>) {
-    response.headers_mut().insert(
-        header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static(POLICY),
-    );
+fn allowed(response: &mut Response<Body>, front_door: Option<&str>) {
+    let policy = front_door
+        .and_then(|origin| HeaderValue::from_str(&playing_from(origin)).ok())
+        .unwrap_or_else(|| HeaderValue::from_static(POLICY));
+    response
+        .headers_mut()
+        .insert(header::CONTENT_SECURITY_POLICY, policy);
 }

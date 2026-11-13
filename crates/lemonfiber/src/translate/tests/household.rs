@@ -50,10 +50,11 @@ fn the_two_things_an_update_can_mean_go_to_two_commands() {
 fn a_shelf_with_no_count_takes_the_one_both_surfaces_share() {
     assert_eq!(
         super::super::held(whom(Some("Ada".to_owned()), false), counted(None)),
-        Ok(Command::Held {
+        Ok(Command::Held(lemonfiber_core::app::Shelf {
             member: Whom::Named("Ada".to_owned()),
             most: lemonfiber_api::read::table::A_SHELF,
-        })
+            asker: lemonfiber_core::app::Asker::Operator,
+        }))
     );
 }
 
@@ -337,10 +338,11 @@ fn a_hand_off_names_whose_device_it_is() {
 fn a_shelf_is_a_members_or_the_defaults() {
     assert_eq!(
         super::super::held(whom(None, true), counted(None)),
-        Ok(Command::Held {
+        Ok(Command::Held(lemonfiber_core::app::Shelf {
             member: Whom::Defaults,
             most: lemonfiber_api::read::table::A_SHELF,
-        })
+            asker: lemonfiber_core::app::Asker::Operator,
+        }))
     );
     assert_eq!(
         super::super::held(whom(None, false), counted(None)),
@@ -395,6 +397,7 @@ fn a_title_or_what_was_part_way_through_is_read_off_the_same_shelf() {
         Ok(Command::Viewing(Viewing::Title {
             member: Whom::Named("Ada".to_owned()),
             id: "f1".to_owned(),
+            asker: lemonfiber_core::app::Asker::Operator,
         }))
     );
     assert_eq!(
@@ -402,6 +405,7 @@ fn a_title_or_what_was_part_way_through_is_read_off_the_same_shelf() {
         Ok(Command::Viewing(Viewing::PartWay {
             member: Whom::Named("Ada".to_owned()),
             most: lemonfiber_core::screening::A_FEW,
+            asker: lemonfiber_core::app::Asker::Operator,
         }))
     );
 }

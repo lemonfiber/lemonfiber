@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The live TV channels one member may watch, each with the programme on it now.",
+  "type": "object",
+  "properties": {
+    "channels": {
+      "description": "Each channel their own account may watch whose programme now is within their\nlimits. Empty where their account may not watch live TV.",
+      "type": "array",
+      "items": {
+        "$ref": "Channel.json"
+      }
+    },
+    "id": {
+      "description": "The identifier the media server files them under.",
+      "type": "string"
+    },
+    "member": {
+      "description": "The member this was asked for, by the name they are known by.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "member",
+    "id",
+    "channels",
+    "rehearsed"
+  ]
+}
