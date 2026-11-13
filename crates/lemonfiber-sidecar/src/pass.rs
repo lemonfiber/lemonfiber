@@ -30,7 +30,7 @@ use ring::{aead, hmac};
 use serde::{Deserialize, Serialize};
 
 use crate::shape::{formatted, read, unreadable, written};
-use crate::Unreadable;
+use crate::{TokenHash, Unreadable};
 
 /// The query parameter a pass travels in.
 pub const PARAMETER: &str = "lfpass";
@@ -262,14 +262,7 @@ impl Key {
 #[must_use]
 pub fn renewed_as(pass: &str) -> Option<String> {
     let [_, _, made] = three(pass)?;
-    let digest = ring::digest::digest(&ring::digest::SHA256, made.as_bytes());
-    Some(
-        digest
-            .as_ref()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect(),
-    )
+    Some(TokenHash::of(made).as_str().to_owned())
 }
 
 /// One renewed pass: the member it was issued to and the moment it now lapses.
