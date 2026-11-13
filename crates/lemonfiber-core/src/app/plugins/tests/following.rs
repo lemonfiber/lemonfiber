@@ -407,6 +407,7 @@ fn the_step_that_ended_a_run_names_its_code() {
         let problem = super::super::following::Unfollowed::Failed(vec![ran(vec![
             step(Came::Answered, true),
             step(Came::Skipped, false),
+            step(Came::Declined, false),
             step(came, false),
             step(Came::NotReached, false),
         ])])
@@ -415,7 +416,7 @@ fn the_step_that_ended_a_run_names_its_code() {
         assert_eq!(problem.meaning, "put back");
         assert!(problem.detail.as_deref().is_some_and(|detail| detail
             .contains("already landed and not put back from here: adopt claim to sonarr")));
-        assert_eq!(problem.steps.len(), 4);
+        assert_eq!(problem.steps.len(), 5);
     }
     let nowhere =
         super::super::following::Unfollowed::Failed(vec![ran(vec![step(Came::Unexpected, false)])])
