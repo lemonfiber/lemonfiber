@@ -276,7 +276,9 @@ async fn a_device_signed_in_is_read_from_the_media_server() {
         vec![HandedSession {
             device: "Pixel 8".to_owned(),
             client: "Jellyfin Android".to_owned(),
-            last_seen: Some("2026-09-29T10:05:00Z".to_owned()),
+            last_seen: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_790_676_300
+            )),
         }],
         "only Ana's own device is hers"
     );

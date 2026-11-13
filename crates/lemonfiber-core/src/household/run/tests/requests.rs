@@ -469,7 +469,7 @@ async fn a_request_awaiting_approval_is_named_from_the_request_services_own_reco
     let context = ctx_with(
         &Fake {
             requests: request_service::answered(&[HouseholdRequest {
-                made: Some("2026-08-30T09:00:00Z".to_owned()),
+                made: Some(crate::instant::Instant::from_seconds(1_788_080_400)),
                 ..awaiting(1)
             }]),
             film: Some(request_service::answered(&Some(the_matrix(true)))),
@@ -631,7 +631,7 @@ fn a_narrowed_read_names_nobody_else() {
 #[test]
 fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known() {
     let arrived = HouseholdRequest {
-        arrived: Some("2026-10-01T20:00:00.000Z".to_owned()),
+        arrived: Some(crate::instant::Instant::from_seconds(1_790_884_800)),
         shelf_id: Some("f00d".to_owned()),
         ..request(
             "Alex",

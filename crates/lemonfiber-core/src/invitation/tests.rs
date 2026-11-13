@@ -128,7 +128,7 @@ fn an_invitation_older_than_the_window_has_run_out() {
 #[test]
 fn a_reset_that_runs_out_is_switched_off_rather_than_removed() {
     let been_in = Member {
-        last_seen: Some("2026-03-01T10:00:00.0000000Z".to_owned()),
+        last_seen: Some(crate::instant::Instant::from_seconds(1_772_359_200)),
         ..member("1", "ana", false)
     };
     let waiting = vec![

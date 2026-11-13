@@ -8,6 +8,7 @@
 
 use std::time::SystemTime;
 
+use lemonfiber_core::instant::Instant;
 use serde::Serialize;
 
 /// A session opened, and the moment it stops being one.
@@ -19,8 +20,8 @@ use serde::Serialize;
 pub struct Admitted {
     /// The secret this session is carried by, sent in the header the per-run token is.
     pub token: String,
-    /// When it stops being one, written as every other instant this product writes.
-    pub until: String,
+    /// When it stops being one.
+    pub until: Instant,
     /// The household member this session is for, where it is a member's.
     ///
     /// **Absent is the operator**, which is the whole of the discriminator. A second
@@ -36,19 +37,13 @@ pub struct Admitted {
 }
 
 impl Admitted {
-    /// A session opened, with its ending written the way a service writes one.
-    ///
-    /// Written here rather than by whoever answers with it, so the one function that
-    /// turns a moment into the text this product uses stays where every other
-    /// instant goes through it. Nothing where the moment is too far past the
-    /// calendar to place — a session with no ending written on it would be one a
-    /// client could not know the end of.
+    /// A session opened, ending at `until`.
     #[must_use]
-    pub fn opened(token: String, until: SystemTime, member: Option<String>) -> Option<Self> {
-        Some(Self {
+    pub fn opened(token: String, until: SystemTime, member: Option<String>) -> Self {
+        Self {
             token,
-            until: lemonfiber_core::instant::written(until)?,
+            until: Instant::of(until),
             member,
-        })
+        }
     }
 }

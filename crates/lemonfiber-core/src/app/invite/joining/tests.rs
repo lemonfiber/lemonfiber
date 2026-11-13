@@ -71,7 +71,7 @@ fn offered(ctx: &Ctx) {
     let offers: Offers = [(
         "9".to_owned(),
         Offer {
-            offered: ctx.hours_ago(0),
+            offered: ctx.stamp(),
             lapses: ctx.hours_ago(-48),
             decline: None,
             claim: None,

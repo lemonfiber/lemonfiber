@@ -177,7 +177,7 @@ fn guided(ctx: &Ctx) -> Outcome {
 /// Put back the last repair, or the run a stamp names.
 ///
 /// Beside the table for the reason [`down`] is.
-async fn undone(ctx: &Ctx, run: Option<&str>) -> Result<Outcome, Box<Problem>> {
+async fn undone(ctx: &Ctx, run: Option<crate::instant::Instant>) -> Result<Outcome, Box<Problem>> {
     putting_back::undo(ctx, run).await.map(Outcome::Undo)
 }
 
@@ -450,7 +450,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             consent,
             disruptive,
         } => mended(ctx, &consent, disruptive).await,
-        Command::Undo { run } => undone(ctx, run.as_deref()).await,
+        Command::Undo { run } => undone(ctx, run).await,
         Command::Credentials(asked) => inventoried(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         Command::Plugins(action) => plugins::plugins(ctx, &action).await.map(Outcome::Plugins),

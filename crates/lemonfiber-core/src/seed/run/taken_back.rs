@@ -78,7 +78,7 @@ pub(super) async fn note_held(
                 &filler.id,
                 &format!("{HELD_KEY}{}", fulfils.filler.id),
                 OWED,
-                &ctx.stamp(),
+                ctx.stamp(),
             );
         }
     }

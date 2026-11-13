@@ -16,7 +16,8 @@ pub struct Grant {
     #[serde(rename = "for")]
     pub serves: String,
     /// When the operator approved it, as the record stamps every change.
-    pub at: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub at: crate::instant::Instant,
 }
 
 impl Grant {

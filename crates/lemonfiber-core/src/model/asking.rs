@@ -50,7 +50,7 @@ pub struct MemberAsking {
     /// could not be read — an invented one would be a promise about a day on which
     /// nothing happens. The period is a window that rolls rather than a month that
     /// ends, so this is the moment their earliest counted request ages out.
-    pub frees_up: Option<String>,
+    pub frees_up: Option<crate::instant::Instant>,
 }
 
 impl MemberAsking {

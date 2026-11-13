@@ -19,8 +19,8 @@ fn member(id: &str, name: &str, claimed: bool) -> Member {
 
 fn offer(decline: Option<&str>) -> Offer {
     Offer {
-        offered: "2026-10-03T10:00:00Z".to_owned(),
-        lapses: "2026-10-05T10:00:00Z".to_owned(),
+        offered: crate::instant::Instant::from_seconds(1_791_021_600),
+        lapses: crate::instant::Instant::from_seconds(1_791_194_400),
         decline: decline.map(TokenHash::of),
         claim: None,
     }

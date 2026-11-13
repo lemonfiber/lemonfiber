@@ -14,9 +14,10 @@ fn flapped(check: &str, severity: Severity, times: u32) -> Condition {
         "nothing that needs it is working",
         "look at it",
     );
-    let mut condition = Condition::raised(check, &fault, "1000");
+    let mut condition =
+        Condition::raised(check, &fault, crate::instant::Instant::from_seconds(1000));
     for n in 0..times {
-        condition.clear("1100");
+        condition.clear(crate::instant::Instant::from_seconds(1100));
         condition.raise(&fault, &format!("{}", 1200 + n));
     }
     condition
@@ -113,9 +114,13 @@ fn a_flapping_service_carries_the_code_it_last_left_with() {
         "nothing that needs it is working",
         "look at it",
     );
-    let mut condition = Condition::raised("service.health", &fault, "1000");
+    let mut condition = Condition::raised(
+        "service.health",
+        &fault,
+        crate::instant::Instant::from_seconds(1000),
+    );
     for n in 0..FLAPPING {
-        condition.clear("1100");
+        condition.clear(crate::instant::Instant::from_seconds(1100));
         condition.raise(&fault.clone().exited(Some(137)), &format!("{}", 1200 + n));
     }
     let digest = Digest::of([&condition], &untold);
@@ -153,7 +158,7 @@ fn stopped(check: &str, severity: Severity) -> Condition {
             "nothing that needs it is working",
             "start it again",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     )
 }
 
@@ -170,7 +175,7 @@ fn stopped_costing(check: &str, means: &str) -> Condition {
             means,
             "start it again",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     )
 }
 
@@ -263,7 +268,7 @@ fn the_same_event_going_two_different_ways_stays_two_alerts() {
     // Two stopped and a third that came back is not one thing that happened.
     let down = stopped("service.aaa", Severity::Error);
     let mut back = stopped("service.zzz", Severity::Error);
-    back.clear("1100");
+    back.clear(crate::instant::Instant::from_seconds(1100));
     // Only the one that came back was ever reported, so only its resolution is
     // news; the other is still an onset nobody has heard.
     let heard = |check: &str| (check == "service.zzz").then_some(0);
@@ -303,7 +308,7 @@ fn what_a_service_already_tells_its_own_users_is_never_repeated_here() {
             "there is nothing left to wait for",
             "open it",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
     assert!(Digest::of([&theirs], &untold).is_empty());
 }
@@ -343,7 +348,7 @@ fn a_channel_that_will_not_take_deliveries_is_reported_even_while_stopped() {
             "alerts are not reaching it",
             "check the channel's configuration",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
     assert!(!Digest::reached(Reach::Stopped, [&refusing], &untold).is_empty());
 }
@@ -361,7 +366,7 @@ fn finished() -> Condition {
             "it is on the disk now",
             "nothing to do",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     )
 }
 
@@ -390,7 +395,7 @@ fn asking_for_completions_hears_them_without_hearing_everything() {
             "this one goes on working meanwhile",
             "upgrade when convenient",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
     let wants = Wants::preset(Appetite::WithCompletions);
     let kinds: Vec<String> = Digest::wanted(Reach::Running, &wants, [&done, &notice], &untold)
@@ -423,7 +428,7 @@ fn something_wrong_is_heard_however_quiet_the_operator_asked_to_be() {
             "this connection's address is visible to every peer",
             "stop the download client",
         ),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
     let quiet = Wants::preset(Appetite::ProblemsOnly);
     assert!(!Digest::wanted(Reach::Running, &quiet, [&leak], &untold).is_empty());
@@ -434,7 +439,7 @@ fn a_resolution_arrives_on_the_same_terms_as_the_onset_that_was_heard() {
     // An operator told a disk filled up and never told it was resolved goes on
     // believing it.
     let mut done = finished();
-    done.clear("1100");
+    done.clear(crate::instant::Instant::from_seconds(1100));
     let mut wants = Wants::preset(Appetite::ProblemsOnly);
     wants.set("download.completed", true);
     let heard = |_: &str| Some(0);

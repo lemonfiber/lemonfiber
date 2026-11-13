@@ -14,7 +14,7 @@ fn line(service: &str, at: Option<&str>, said: &str) -> LogLine {
     LogLine {
         service: service.to_owned(),
         stream: Stream::Stdout,
-        at: at.map(ToOwned::to_owned),
+        stamped: at.map(ToOwned::to_owned),
         line: said.to_owned(),
     }
 }

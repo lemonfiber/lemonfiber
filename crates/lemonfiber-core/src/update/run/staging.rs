@@ -97,7 +97,7 @@ pub(super) async fn apply(
     if let Some(paths) = crate::app::targets::layout(ctx) {
         crate::app::recover::journalled(
             &paths.journal(),
-            &recorded(&applied, &backup, &ctx.stamp()),
+            &recorded(&applied, &backup, ctx.stamp()),
         )
         .map_err(|failure| Box::new(crate::app::recover::unrecorded("The update", &failure)))?;
     }

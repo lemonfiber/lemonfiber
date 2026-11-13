@@ -49,7 +49,7 @@ pub struct NewsCheck {
     pub check: String,
     /// When the stack first saw it wrong since it last saw it right, in whole seconds
     /// since the epoch.
-    pub onset: String,
+    pub onset: crate::instant::Instant,
 }
 
 /// What a surface can mark as new, newest first within each kind.
@@ -98,7 +98,7 @@ pub struct NewsRequest {
     pub request: String,
     /// When it was asked for, where that is known.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub asked: Option<String>,
+    pub asked: Option<crate::instant::Instant>,
     /// What it is called, where a service has been told about it.
     pub title: Option<String>,
     /// The kind of title it asks for, as the household list names it.
@@ -118,7 +118,7 @@ pub struct NewsProblem {
     pub check: String,
     /// When the stack first saw it wrong since it last saw it right, in whole seconds
     /// since the epoch: the same moment the health summary names for it.
-    pub onset: String,
+    pub onset: crate::instant::Instant,
     /// What is wrong, in one line.
     pub summary: String,
 }
@@ -187,7 +187,7 @@ impl News {
                 .take(NEWEST)
                 .map(|problem| NewsCheck {
                     check: problem.check.clone(),
-                    onset: problem.onset.clone(),
+                    onset: problem.onset,
                 })
                 .collect(),
             unread: self.unread.clone(),
@@ -208,10 +208,7 @@ fn releases(record: &Record) -> Vec<NewsUpdate> {
 }
 
 /// Every request anybody in the household made, the most recently asked first, and one
-/// whose asking was not read after every one whose was.
-///
-/// Ordered by the instant each stamp reads as, since the two keepers write it to
-/// different precisions; one that cannot be read counts as not read.
+/// whose asking is not known after every one whose is.
 fn requests(household: &HouseholdReport) -> Vec<NewsRequest> {
     let mut requests: Vec<NewsRequest> = household
         .members
@@ -219,7 +216,7 @@ fn requests(household: &HouseholdReport) -> Vec<NewsRequest> {
         .flat_map(|member| {
             member.requests.iter().map(|request| NewsRequest {
                 request: request.id.clone(),
-                asked: request.asked.clone(),
+                asked: request.asked,
                 title: request.title.clone(),
                 kind: request.kind,
                 unit: request.unit,
@@ -227,31 +224,23 @@ fn requests(household: &HouseholdReport) -> Vec<NewsRequest> {
             })
         })
         .collect();
-    requests.sort_by_key(|request| {
-        std::cmp::Reverse(request.asked.as_deref().and_then(crate::instant::read))
-    });
+    requests.sort_by_key(|request| std::cmp::Reverse(request.asked));
     let mut seen = std::collections::BTreeSet::new();
     requests.retain(|request| seen.insert(request.request.clone()));
     requests
 }
 
 /// Every check found wrong, the most recent onset first, and by check within one.
-///
-/// An onset that is not a number sorts after every one that is: a stamp written by
-/// hand says nothing about when, and placing it first would call it the newest.
 fn problems(affected: &[Affected]) -> Vec<NewsProblem> {
     let mut problems: Vec<NewsProblem> = affected
         .iter()
         .map(|item| NewsProblem {
             check: item.check.clone(),
-            onset: item.onset.clone(),
+            onset: item.onset,
             summary: item.summary.clone(),
         })
         .collect();
-    problems.sort_by(|a, b| {
-        let at = |problem: &NewsProblem| problem.onset.parse::<u64>().ok();
-        at(b).cmp(&at(a)).then_with(|| a.check.cmp(&b.check))
-    });
+    problems.sort_by(|a, b| b.onset.cmp(&a.onset).then_with(|| a.check.cmp(&b.check)));
     problems
 }
 

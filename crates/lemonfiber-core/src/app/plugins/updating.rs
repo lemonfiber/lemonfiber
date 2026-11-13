@@ -19,6 +19,7 @@
 use std::path::Path;
 
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
 use super::super::Ctx;
@@ -435,7 +436,7 @@ pub(super) fn brought_back(
 /// from: the same record yields the same directories and the same document. Nothing is
 /// started where the files would not land, since a container started without its
 /// document is one Compose has no description of.
-async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
+async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: Instant) -> Restored {
     let asked = super::planned::asked(ctx, was).await;
     let startable = super::planned::fenced(ctx, was, &asked).is_ok();
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()

@@ -157,13 +157,14 @@ pub struct LogLine {
     pub service: String,
     /// Which stream it arrived on.
     pub stream: Stream,
-    /// When the container itself says it wrote the line, where it said so.
+    /// The container's own text stamped on the line, where it stamped one: not one
+    /// of lemonfiber's instants.
     ///
     /// Kept verbatim and unparsed. Containers disagree with the host clock and
     /// with each other, and the only defensible ordering is each container's own
     /// account of itself — which a reader can only apply if it is carried
     /// rather than replaced by an arrival time.
-    pub at: Option<String>,
+    pub stamped: Option<String>,
     /// The line, without its trailing newline.
     pub line: String,
 }

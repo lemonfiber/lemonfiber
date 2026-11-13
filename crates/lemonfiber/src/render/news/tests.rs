@@ -12,7 +12,9 @@ fn report() -> News {
         }],
         requests: vec![NewsRequest {
             request: "12".to_owned(),
-            asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
+            asked: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_794_139_200,
+            )),
             title: Some("Dune".to_owned()),
             kind: None,
             unit: None,
@@ -20,7 +22,7 @@ fn report() -> News {
         }],
         problems: vec![NewsProblem {
             check: "service.sonarr".to_owned(),
-            onset: "1759400000".to_owned(),
+            onset: lemonfiber_core::instant::Instant::from_seconds(1_759_400_000),
             summary: "Sonarr is stopped".to_owned(),
         }],
         unread: Vec::new(),
@@ -65,7 +67,9 @@ fn an_item_without_its_words_is_named_by_what_names_it_alone() {
         }],
         requests: vec![NewsRequest {
             request: "3".to_owned(),
-            asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
+            asked: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_794_139_200,
+            )),
             title: None,
             kind: None,
             unit: None,

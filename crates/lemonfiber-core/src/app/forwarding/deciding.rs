@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::condition::Fault;
 use crate::error::Severity;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 
 use super::{CHECK, FIELD, OPERATION, RESOURCE};
@@ -81,7 +82,7 @@ pub struct Client {
 impl Client {
     /// Setting it to `answer`, as the journal records it, where it was set.
     #[must_use]
-    pub fn change(&self, answer: Option<u16>, stamp: &str) -> Option<Change> {
+    pub fn change(&self, answer: Option<u16>, stamp: Instant) -> Option<Change> {
         let CameTo::Moved { from } = &self.came_to else {
             return None;
         };
@@ -143,7 +144,7 @@ impl Pass {
 
     /// What was set, as the journal records it.
     #[must_use]
-    pub fn changes(&self, stamp: &str) -> Vec<Change> {
+    pub fn changes(&self, stamp: Instant) -> Vec<Change> {
         self.clients
             .iter()
             .filter_map(|client| client.change(self.answer, stamp))

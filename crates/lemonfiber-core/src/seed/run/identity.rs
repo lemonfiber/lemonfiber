@@ -231,7 +231,7 @@ pub(super) async fn seed_request_identity(
         ctx.dry_run,
     )
     .await;
-    remember(&mut records, &requests.id, &told.state, &held, &ctx.stamp());
+    remember(&mut records, &requests.id, &told.state, &held, ctx.stamp());
 
     (
         [Some(wiring), linked, changed, Some(told)]

@@ -212,7 +212,7 @@ const UNGATED: &str = "the request service reaches a curator only through the re
 /// Hand the request service `wanted` as they are.
 async fn wired(ctx: &Ctx, requests: &dyn Requests, wanted: &[FulfilmentTarget]) -> Vec<Wiring> {
     let mut journal = crate::journal::Journal::new();
-    crate::seed::wire_fulfilment_targets(requests, wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
+    crate::seed::wire_fulfilment_targets(requests, wanted, &mut journal, ctx.stamp(), ctx.dry_run)
         .await
 }
 

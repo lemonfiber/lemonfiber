@@ -31,6 +31,7 @@ use crate::config::paths::{Paths, SECRETS};
 use crate::config::store::{self, is_secret};
 use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
 use crate::error::{Diagnose, Problem, Remedy};
+use crate::instant::Instant;
 use crate::journal::{scrubbed, store_of, Change, Journal, Kind, Seal};
 use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
@@ -347,7 +348,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
 /// Credentials are deliberately left out — a second file holding a password would be
 /// a second file to leak one — and best-effort, like every other record kept beside
 /// the settings: an apply that could not write it still applied.
-fn remembered(paths: &Paths, plan: &Plan, stamp: &str) {
+fn remembered(paths: &Paths, plan: &Plan, stamp: Instant) {
     let path = paths.baseline();
     let mut baseline = match std::fs::read_to_string(&path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Baseline::new(),
@@ -387,7 +388,7 @@ fn made_by(root: &Path) -> Vec<PathBuf> {
 }
 
 /// The journal entry for a directory apply created, so it can be removed again.
-fn made(path: &Path, stamp: &str) -> Change {
+fn made(path: &Path, stamp: Instant) -> Change {
     let path = path.display().to_string();
     Change {
         at: stamp.to_owned(),

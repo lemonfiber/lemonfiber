@@ -263,8 +263,8 @@ fn standing(member: &HouseholdMember) -> String {
     said.push(if member.claimed {
         member
             .last_seen
-            .as_deref()
-            .and_then(|at| at.split('T').next())
+            .and_then(|at| lemonfiber_core::instant::written(at.time()))
+            .and_then(|at| at.split('T').next().map(str::to_owned))
             .map_or_else(
                 // Not "never signed in": the account has been claimed, which on this
                 // media server is done *by* signing in. A date missing here is the
@@ -384,7 +384,10 @@ pub(super) fn trace(report: &TraceReport) -> Lines {
     if grabs > 1 || troubled {
         lines.put("  history:");
         for moment in &report.history {
-            lines.put(format!("      {}   {}", moment.outcome.phrase(), moment.at));
+            let at = moment
+                .at
+                .map_or_else(|| "at a moment not reported".to_owned(), super::news::when);
+            lines.put(format!("      {}   {at}", moment.outcome.phrase()));
         }
     }
     if let Some(coverage) = &report.coverage {

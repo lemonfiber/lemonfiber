@@ -91,11 +91,7 @@ pub struct Sessions {
 impl Sessions {
     /// Open one against the verifier that is on disk now, or nothing where this
     /// machine will not supply the secret to carry it by.
-    ///
-    /// The moment it ends is written the way every other instant this product
-    /// writes one, so a client reads it with what it already has. A clock too far
-    /// past the calendar to place leaves no session rather than one with no ending
-    /// written on it.
+
     pub async fn opened(
         &self,
         random: &dyn Random,
@@ -106,7 +102,7 @@ impl Sessions {
         let until = now.checked_add(LASTS)?;
         // Read from what is being held rather than passed alongside it, so the
         // envelope cannot name somebody the register does not have a session for.
-        let opened = Admitted::opened(token.clone(), until, who.member())?;
+        let opened = Admitted::opened(token.clone(), until, who.member());
         let mut held = self.held.lock().await;
         held.retain(|_, session| session.until > now);
         held.insert(token.clone(), Session { until, who });

@@ -239,7 +239,7 @@ fn a_fault_that_keeps_bouncing_is_not_called_fixed_in_the_gaps() {
     // What flaps is a service restarting every few seconds; what makes the
     // summary flap is declaring it fixed between the bounces.
     let mut bouncing = wrong("service.sonarr", Severity::Error, "sonarr stopped");
-    bouncing.clear("1100");
+    bouncing.clear(crate::instant::Instant::from_seconds(1100));
     bouncing.raise(
         &Fault::new(
             "service.stopped",
@@ -248,9 +248,9 @@ fn a_fault_that_keeps_bouncing_is_not_called_fixed_in_the_gaps() {
             "nothing that needs it is working",
             "look at it",
         ),
-        "1200",
+        crate::instant::Instant::from_seconds(1200),
     );
-    bouncing.clear("1300");
+    bouncing.clear(crate::instant::Instant::from_seconds(1300));
 
     let moments_later = (1300 + STEADY - 1).to_string();
     assert_eq!(
@@ -271,9 +271,14 @@ fn something_that_cleared_and_never_came_back_is_gone_at_once() {
     // Only a fault with a history of returning is held on to; a one-off that
     // resolved is not kept around for half a minute.
     let mut resolved = wrong("service.sonarr", Severity::Error, "sonarr stopped");
-    resolved.clear("1100");
+    resolved.clear(crate::instant::Instant::from_seconds(1100));
     assert_eq!(
-        Summary::of(Reach::Running, &[&resolved], "1101").standing,
+        Summary::of(
+            Reach::Running,
+            &[&resolved],
+            crate::instant::Instant::from_seconds(1101)
+        )
+        .standing,
         Standing::Healthy
     );
 }
@@ -281,7 +286,7 @@ fn something_that_cleared_and_never_came_back_is_gone_at_once() {
 #[test]
 fn a_clock_problem_cannot_pin_a_resolved_fault_to_the_summary_forever() {
     let mut resolved = wrong("service.sonarr", Severity::Error, "sonarr stopped");
-    resolved.clear("1100");
+    resolved.clear(crate::instant::Instant::from_seconds(1100));
     resolved.raise(
         &Fault::new(
             "service.stopped",
@@ -290,11 +295,16 @@ fn a_clock_problem_cannot_pin_a_resolved_fault_to_the_summary_forever() {
             "nothing that needs it is working",
             "look at it",
         ),
-        "1200",
+        crate::instant::Instant::from_seconds(1200),
     );
     resolved.cleared = Some("whenever".to_owned());
     assert_eq!(
-        Summary::of(Reach::Running, &[&resolved], "9000").standing,
+        Summary::of(
+            Reach::Running,
+            &[&resolved],
+            crate::instant::Instant::from_seconds(9000)
+        )
+        .standing,
         Standing::Healthy
     );
 }
@@ -303,7 +313,7 @@ fn a_clock_problem_cannot_pin_a_resolved_fault_to_the_summary_forever() {
 fn a_symptom_is_not_folded_into_a_cause_the_summary_has_stopped_counting() {
     // Folding into a root that is no longer reported would hide both.
     let mut gone_disk = wrong("storage.space", Severity::Error, "the disk is full");
-    gone_disk.clear("1100");
+    gone_disk.clear(crate::instant::Instant::from_seconds(1100));
     let import = caused_by(
         "import.sonarr",
         Severity::Error,
@@ -390,7 +400,7 @@ fn an_affected_item_carries_when_its_check_went_wrong() {
     // The condition's own stamp, so the summary and the doctor name one moment for
     // one check, and a later run does not make an old fault look new.
     let mut stopped = wrong("service.sonarr", Severity::Error, "Sonarr is stopped");
-    stopped.clear("2000");
+    stopped.clear(crate::instant::Instant::from_seconds(2000));
     stopped.raise(
         &Fault::new(
             "service.sonarr",
@@ -399,7 +409,7 @@ fn an_affected_item_carries_when_its_check_went_wrong() {
             "nothing that needs it is working",
             "look at it",
         ),
-        "3000",
+        crate::instant::Instant::from_seconds(3000),
     );
     let standing = wrong("vpn.egress", Severity::Error, "the tunnel is down");
 

@@ -153,8 +153,8 @@ pub struct Taken {
     pub lemonfiber: String,
     /// The stack it was written from.
     pub stack: String,
-    /// When, as a service writes a moment.
-    pub at: String,
+    /// When it was written.
+    pub at: crate::instant::Instant,
 }
 
 /// Everything gathered for a bundle, and everything that could not be.

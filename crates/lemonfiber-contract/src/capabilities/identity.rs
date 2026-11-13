@@ -11,6 +11,7 @@ use lemonfiber_ports::service::{
     Allowed, Certificate, Household, Invited, MediaServer, Member, NamedLibrary, Session, Signed,
     Unrated,
 };
+use lemonfiber_ports::Instant;
 
 use crate::conformance::Placeholder;
 
@@ -18,7 +19,7 @@ use crate::conformance::Placeholder;
 const INVITED: &str = "conformance-member";
 
 /// A moment before any account was made.
-const LONG_AGO: &str = "2000-01-01T00:00:00Z";
+const LONG_AGO: Instant = Instant::from_seconds(946_684_800);
 
 /// The age limit the conformance cases set on the invited account.
 const AGE_LIMIT: u32 = 12;
@@ -84,8 +85,8 @@ crate::contract! {
             /// Take an unclaimed invitation back.
             fn unclaim(str id: &str) -> () where asks = Asked { id: invited() };
             /// When each invitation since a moment was sent.
-            fn when_invited(str since: &str) -> Vec<Invited> where asks = Asked {
-                since: LONG_AGO.to_owned(),
+            fn when_invited(value since: Instant) -> Vec<Invited> where asks = Asked {
+                since: LONG_AGO,
             };
             /// The libraries.
             fn libraries() -> Vec<NamedLibrary> where asks = Asked {};

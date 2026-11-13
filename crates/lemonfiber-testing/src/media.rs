@@ -79,7 +79,8 @@ pub fn reaching(ctx: Ctx) -> Ctx {
 }
 
 /// When every claimed account in these fixtures was last seen.
-pub const LAST_SEEN: &str = "2026-01-01T00:00:00Z";
+pub const LAST_SEEN: lemonfiber_core::instant::Instant =
+    lemonfiber_core::instant::Instant::from_seconds(1_767_225_600);
 
 /// Somebody the media server holds an account for, opening every library, who has set a
 /// password where `claimed`.
@@ -93,7 +94,7 @@ pub fn member(id: &str, name: &str, claimed: bool) -> Member {
             every_library: true,
             ..Access::default()
         },
-        last_seen: claimed.then(|| LAST_SEEN.to_owned()),
+        last_seen: claimed.then_some(LAST_SEEN),
     }
 }
 

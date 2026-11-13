@@ -7,9 +7,7 @@
 //! A kind that could not be read says so in place of its list. An empty list under a
 //! heading reads as nothing being there, which is a different answer.
 
-use std::time::{Duration, UNIX_EPOCH};
-
-use lemonfiber_core::instant;
+use lemonfiber_core::instant::{self, Instant};
 use lemonfiber_core::news::{News, NewsKind, NewsProblem, NewsRequest, NewsUpdate};
 
 use super::Lines;
@@ -82,24 +80,19 @@ fn problem(problem: &NewsProblem) -> String {
     format!(
         "{}   since {}   {}",
         problem.check,
-        when(&problem.onset),
+        when(problem.onset),
         problem.summary
     )
 }
 
-/// An onset as a date and a time in UTC, or as the stack stamped it where it is not a
-/// number of seconds.
-pub(super) fn when(onset: &str) -> String {
-    onset
-        .parse::<u64>()
-        .ok()
-        .and_then(|seconds| instant::written(UNIX_EPOCH + Duration::from_secs(seconds)))
-        .map_or_else(|| onset.to_owned(), |written| format!("{written} UTC"))
+/// An instant as a date and a time in UTC, or as its seconds where no calendar holds it.
+pub(super) fn when(at: Instant) -> String {
+    instant::written(at.time()).map_or_else(|| at.to_string(), |written| format!("{written} UTC"))
 }
 
 /// A moment in seconds since the Unix epoch, as a date and a time in UTC.
 pub(super) fn moment(seconds: u64) -> String {
-    when(&seconds.to_string())
+    when(Instant::from_seconds(seconds))
 }
 
 #[cfg(test)]

@@ -15,7 +15,7 @@ fn made(caution: Option<&str>) -> Pairing {
         written: serde_json::to_string(&material).unwrap_or_default(),
         compare: lemonfiber_core::companion::comparable(&material.fingerprint),
         material,
-        until: "2026-10-01T00:10:00".to_owned(),
+        until: lemonfiber_core::instant::Instant::from_seconds(1_790_813_400),
         replacing: "It changes only when somebody replaces it.".to_owned(),
         caution: caution.map(str::to_owned),
     }

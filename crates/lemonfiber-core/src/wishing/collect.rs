@@ -164,7 +164,7 @@ pub(super) async fn asked(
             year: candidate.year,
             cover: candidate.cover,
             member: reached.member.id.clone(),
-            at: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+            at: ctx.stamp(),
             standing: if waits {
                 Standing::Waiting
             } else {

@@ -210,7 +210,7 @@ fn every_shape_this_module_prints_is_reachable() {
             fingerprint: "ab".repeat(32),
             backing: lemonfiber_core::device_keys::Backing::Tee,
             app: "ios:ABCDE12345.app.lemon".to_owned(),
-            registered: "2026-10-13T00:00:00Z".to_owned(),
+            registered: lemonfiber_core::instant::Instant::from_seconds(1_791_849_600),
         }),
         false,
     );

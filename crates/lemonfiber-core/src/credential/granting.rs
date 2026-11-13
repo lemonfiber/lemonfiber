@@ -17,7 +17,7 @@ pub struct Granted {
     #[serde(rename = "for")]
     pub serves: String,
     /// When the operator approved it.
-    pub at: String,
+    pub at: crate::instant::Instant,
 }
 
 impl Granted {

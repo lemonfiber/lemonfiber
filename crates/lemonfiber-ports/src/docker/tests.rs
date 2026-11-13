@@ -208,11 +208,11 @@ fn observations_carry_the_service_they_describe() {
     let line = LogLine {
         service: "sonarr".to_owned(),
         stream: Stream::Stderr,
-        at: Some("2026-07-25T10:00:00Z".to_owned()),
+        stamped: Some("2026-07-25T10:00:00Z".to_owned()),
         line: "something happened".to_owned(),
     };
     assert_eq!(line.clone().stream, Stream::Stderr);
-    assert_eq!(line.at.as_deref(), Some("2026-07-25T10:00:00Z"));
+    assert_eq!(line.stamped.as_deref(), Some("2026-07-25T10:00:00Z"));
 
     let stats = Stats {
         cpu: 0.5,

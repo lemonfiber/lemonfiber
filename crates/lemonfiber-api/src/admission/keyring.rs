@@ -89,12 +89,10 @@ impl Keyring {
         if recent {
             return;
         }
-        let Some(written) = lemonfiber_core::instant::written(now) else {
-            return;
-        };
         noted.insert(name.to_owned(), now);
         let mut used = Used::at(path);
-        used.at.insert(name.to_owned(), written);
+        used.at
+            .insert(name.to_owned(), lemonfiber_core::instant::Instant::of(now));
         used.keep(path);
     }
 }

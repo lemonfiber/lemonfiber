@@ -45,7 +45,7 @@ fn a_claim_and_its_link_are_never_printed() {
         scope: "read".to_owned(),
         purpose: Purpose::HomeAssistant,
         link: "lemonfiber://key?claim=lfc_secretish".to_owned(),
-        lapses: "2026-10-06T00:10:00".to_owned(),
+        lapses: crate::instant::Instant::from_seconds(1_791_245_400),
     };
     let said = format!("{claimed:?}");
     assert!(!said.contains("lfc_secretish"), "{said}");

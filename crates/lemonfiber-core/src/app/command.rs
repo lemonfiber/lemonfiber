@@ -176,8 +176,8 @@ pub enum Command {
     /// entry in the history carries, and names the whole run that entry belongs to — the
     /// unit an operator agreed to, never half of one.
     Undo {
-        /// The stamp of the run to put back, or `None` for the last repair.
-        run: Option<String>,
+        /// When the run to put back was made, or `None` for the last repair.
+        run: Option<crate::instant::Instant>,
     },
     /// Show or change the quality preset — how good media should look, and how
     /// much disk it should cost — in plain language.

@@ -26,6 +26,7 @@ pub use store::Conditions;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Severity;
+use crate::instant::Instant;
 
 /// Something that is wrong, or was.
 ///
@@ -57,9 +58,11 @@ pub struct Condition {
     /// When it was first raised. Untouched while it stays raised: an operator
     /// asking how long something has been broken means since it broke, not since
     /// it was last looked at.
-    pub since: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub since: Instant,
     /// When it cleared, or nothing while it is still raised.
-    pub cleared: Option<String>,
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    pub cleared: Option<Instant>,
     /// How many times it has come back after clearing. A condition that flaps is
     /// a different problem from one that has been steadily broken, and only the
     /// count tells them apart.
@@ -95,14 +98,14 @@ pub struct Condition {
 impl Condition {
     /// A condition raised now, for the first time.
     #[must_use]
-    pub fn raised(check: &str, fault: &Fault, now: &str) -> Self {
+    pub fn raised(check: &str, fault: &Fault, now: Instant) -> Self {
         Self {
             check: check.to_owned(),
             kind: fault.kind.clone(),
             severity: fault.severity,
             summary: fault.summary.clone(),
             meaning: fault.meaning.clone(),
-            since: now.to_owned(),
+            since: now,
             cleared: None,
             recurrences: 0,
             declined: false,
@@ -132,7 +135,7 @@ impl Condition {
     /// do about a fault, what it turns out to be downstream of and how the service
     /// last exited can all change as the picture fills in, and the stale answer is
     /// the wrong one to keep.
-    pub fn raise(&mut self, fault: &Fault, now: &str) {
+    pub fn raise(&mut self, fault: &Fault, now: Instant) {
         self.kind.clone_from(&fault.kind);
         self.severity = fault.severity;
         self.summary.clone_from(&fault.summary);
@@ -144,7 +147,7 @@ impl Condition {
             return;
         }
         self.cleared = None;
-        now.clone_into(&mut self.since);
+        self.since = now;
         self.recurrences = self.recurrences.saturating_add(1);
         self.declined = false;
         self.attempts = 0;
@@ -152,23 +155,18 @@ impl Condition {
 
     /// Clear it, `now`. Clearing what is already clear changes nothing, so a run
     /// over a healthy stack does not rewrite the store.
-    pub fn clear(&mut self, now: &str) {
+    pub fn clear(&mut self, now: Instant) {
         if self.is_raised() {
-            self.cleared = Some(now.to_owned());
+            self.cleared = Some(now);
         }
     }
 
     /// How long it has been clear, in seconds, as of `now`.
     ///
-    /// `None` while it is still raised, and `None` where either stamp cannot be
-    /// read — a store written by hand, or a clock that could not be reached.
-    /// Unknown rather than a confident zero, because a caller deciding whether
-    /// something has settled must be able to tell "not long" from "cannot say".
+    /// `None` while it is still raised.
     #[must_use]
-    pub(crate) fn settled_for(&self, now: &str) -> Option<u64> {
-        let cleared: u64 = self.cleared.as_deref()?.parse().ok()?;
-        let now: u64 = now.parse().ok()?;
-        Some(now.saturating_sub(cleared))
+    pub(crate) fn settled_for(&self, now: Instant) -> Option<u64> {
+        self.cleared.map(|cleared| now.since(cleared))
     }
 
     /// Whether this is worth interrupting the operator about, given what they

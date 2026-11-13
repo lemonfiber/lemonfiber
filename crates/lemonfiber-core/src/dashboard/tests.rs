@@ -158,7 +158,11 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
     // and the whole thing round-trips to the machine-readable form.
     let snapshot = Snapshot {
         telemetry: Telemetry::Degraded,
-        health: Summary::of(Reach::Running, &[], "1000"),
+        health: Summary::of(
+            Reach::Running,
+            &[],
+            crate::instant::Instant::from_seconds(1000),
+        ),
         vpn: Some(Panel::Ready(Vpn {
             exit_ip: "203.0.113.7".to_owned(),
             country: "Netherlands".to_owned(),

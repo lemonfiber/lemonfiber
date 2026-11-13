@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::error::codes::plugin::UNCONFORMING;
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::plugin::{CaseVerdict, Install, Installed, Installs, Register};
 
 use super::super::Ctx;
@@ -296,7 +297,7 @@ pub(super) fn settled(
     read: &Accepted,
     path: &Path,
     from: Option<&Fetched<'_>>,
-    stamp: &str,
+    stamp: Instant,
 ) -> (Installed, PathBuf) {
     let source = crate::plugin::root(path);
     let mut installed = Installed::of(&read.manifest)

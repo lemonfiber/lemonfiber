@@ -175,7 +175,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
             certificates: &certificates,
             asked: &asked,
             quality: &quality,
-            now: ctx.seams.clock.now(),
+            now: ctx.stamp(),
             reasons: &reasons,
             expiring: crate::app::arrangement::load(ctx).after(),
             no_room,
@@ -349,7 +349,7 @@ fn grouped(
     let mut by_whom: BTreeMap<String, Theirs> = BTreeMap::new();
     for request in requests {
         let state = State::of(request.request_status, request.media_status);
-        let made = request.made.clone();
+        let made = request.made;
         let theirs = by_whom.entry(whose(&request, &ids)).or_default();
         if theirs.shown_as.is_empty() {
             theirs.shown_as = request.member.to_lowercase();
@@ -361,22 +361,22 @@ fn grouped(
         // A request that was turned down is not, which is the service's own arithmetic
         // and not a choice made here: it excludes a declined one from the count, so
         // counting its date would name a day the window is not waiting on.
-        if let Some(made) = made.clone().filter(|_| state != Some(State::Declined)) {
+        if let Some(made) = made.filter(|_| state != Some(State::Declined)) {
             theirs.made.push(made);
         }
         let named = titled(&request, naming.titles).or_else(|| naming.unheld.get(&request.id));
         theirs.requests.push(MemberRequest {
             id: request.id.to_string(),
-            asked: request.made.clone(),
+            asked: request.made,
             title: named.map(|named| named.title.clone()),
             year: named.and_then(|named| named.year),
-            arrived: request.arrived.clone(),
+            arrived: request.arrived,
             shelf_id: request.shelf_id.clone(),
             media: request.kind.map(Kind::noun).map(str::to_owned),
             kind: request.kind.map(TitleKind::from),
             unit: None,
             state,
-            waiting_days: allowance::waiting(state, made.as_deref(), naming.now),
+            waiting_days: allowance::waiting(state, made, naming.now),
             estimate: allowance::estimated(request.kind, naming.quality),
             refused: naming.reasons.of(Reference::Filed(request.id)).cloned(),
         });
@@ -425,10 +425,9 @@ fn assemble(
         } else {
             held.map(|held| held.approves_own)
         };
-        let made: Vec<&str> = theirs.made.iter().map(String::as_str).collect();
         let mut member = HouseholdMember {
             access: named_access(&account.access, naming, approves_own),
-            asking: held.map(|held| allowance::reported(held, &made, naming.now)),
+            asking: held.map(|held| allowance::reported(held, &theirs.made, naming.now)),
             standing: standing::standing(&account, naming.expired, naming.declined),
             last_seen: account.last_seen,
             claimed: account.claimed,
@@ -512,8 +511,8 @@ fn assemble(
 struct Theirs {
     /// What they asked for, as the report carries it.
     requests: Vec<MemberRequest>,
-    /// When each was asked for, as the request service timestamps it.
-    made: Vec<String>,
+    /// When each was asked for, as the request service says.
+    made: Vec<crate::instant::Instant>,
     /// The name the request service showed them by, lower-cased, for saying who asked
     /// where nobody in the household did.
     shown_as: String,

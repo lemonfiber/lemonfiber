@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use crate::app::{Ctx, Outcome};
 use crate::config::store::Failure;
 use crate::error::{Diagnose, Problem};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::keys::names_a_key;
 
@@ -113,7 +114,7 @@ pub async fn register(
         fingerprint: key.fingerprint(),
         backing: attested.backing,
         app: attested.app.written(),
-        registered: crate::instant::written(now).unwrap_or_default(),
+        registered: Instant::of(now),
         under,
         used: None,
         revoked: None,
@@ -162,7 +163,7 @@ pub async fn list(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
 /// cannot be read or written.
 pub async fn revoke(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let now = written_now(ctx);
+    let now = ctx.stamp();
     let (found, kept, journaled) = changed(ctx, &path, |ctx, kept| {
         let found = kept
             .active(name)
@@ -171,7 +172,7 @@ pub async fn revoke(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
         let journaled = if ctx.dry_run {
             Ok(())
         } else {
-            revoked(ctx, kept, std::slice::from_ref(&found), &now)
+            revoked(ctx, kept, std::slice::from_ref(&found), now)
         };
         Ok((found, kept.clone(), journaled))
     })
@@ -211,14 +212,14 @@ pub async fn standing(ctx: &Ctx, name: &str) -> Result<Record, Box<Problem>> {
 /// A [`Problem`] where it no longer stands, or the record cannot be written.
 pub async fn used(ctx: &Ctx, name: &str) -> Result<(), Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let now = written_now(ctx);
+    let now = ctx.stamp();
     changed(ctx, &path, |_, kept| {
         let record = kept
             .keys
             .iter_mut()
             .find(|record| record.name == name && !record.is_revoked())
             .ok_or_else(|| Box::new(not_registered(name)))?;
-        record.used = Some(now.clone());
+        record.used = Some(now);
         Ok(())
     })
     .await
@@ -289,7 +290,7 @@ pub async fn restored(ctx: &Ctx, config: &Path) -> Result<(), Box<Problem>> {
     if matches!(path.try_exists(), Ok(false)) {
         return Ok(());
     }
-    let now = written_now(ctx);
+    let now = ctx.stamp();
     let (gone, journaled) = changed(ctx, &path, |ctx, kept| {
         let gone: Vec<Record> = kept
             .keys
@@ -297,7 +298,7 @@ pub async fn restored(ctx: &Ctx, config: &Path) -> Result<(), Box<Problem>> {
             .filter(|record| !record.is_revoked())
             .cloned()
             .collect();
-        let journaled = revoked(ctx, kept, &gone, &now);
+        let journaled = revoked(ctx, kept, &gone, now);
         Ok((gone, journaled))
     })
     .await?;
@@ -317,11 +318,11 @@ pub async fn restored(ctx: &Ctx, config: &Path) -> Result<(), Box<Problem>> {
 /// A [`Problem`] where the record cannot be read or written.
 pub(crate) async fn undone(ctx: &Ctx, name: &str) -> Result<(), Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let now = written_now(ctx);
+    let now = ctx.stamp();
     let found = changed(ctx, &path, |_, kept| {
         let found = kept.active(name).cloned();
         if found.is_some() {
-            mark_revoked(kept, name, &now);
+            mark_revoked(kept, name, now);
         }
         Ok(found)
     })
@@ -397,7 +398,7 @@ fn swept_then(
     let under = password(ctx);
     let apps: Result<Vec<String>, Failure> =
         trusted(ctx).map(|apps| apps.iter().map(AppIdentity::written).collect());
-    let now = written_now(ctx);
+    let now = ctx.stamp();
     let mut swept = Vec::new();
     let mut journaled = Ok(());
     let written = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
@@ -431,7 +432,12 @@ fn swept_then(
 
 /// Mark every one of `records` revoked at `now`, then journal each revoke, answering the
 /// first journal entry that could not be written once every one was tried.
-fn revoked(ctx: &Ctx, kept: &mut Kept, records: &[Record], now: &str) -> Result<(), Box<Problem>> {
+fn revoked(
+    ctx: &Ctx,
+    kept: &mut Kept,
+    records: &[Record],
+    now: Instant,
+) -> Result<(), Box<Problem>> {
     for record in records {
         mark_revoked(kept, &record.name, now);
     }
@@ -450,13 +456,13 @@ fn revoked(ctx: &Ctx, kept: &mut Kept, records: &[Record], now: &str) -> Result<
 }
 
 /// Mark the active device key holding `name` revoked at `now`.
-fn mark_revoked(kept: &mut Kept, name: &str, now: &str) {
+fn mark_revoked(kept: &mut Kept, name: &str, now: Instant) {
     for record in kept
         .keys
         .iter_mut()
         .filter(|record| record.name == name && !record.is_revoked())
     {
-        record.revoked = Some(now.to_owned());
+        record.revoked = Some(now);
     }
 }
 
@@ -473,11 +479,6 @@ fn listed(kept: &Kept, revoked: Option<String>) -> Listing {
 async fn refused(ctx: &Ctx, name: &str, problem: Problem) -> Box<Problem> {
     heard::refused(ctx, name, &problem).await;
     Box::new(problem)
-}
-
-/// Now, written as every instant this product writes is.
-fn written_now(ctx: &Ctx) -> String {
-    crate::instant::written(ctx.seams.clock.now()).unwrap_or_default()
 }
 
 /// Write a device key's registration or revoke into the journal, before it is made.

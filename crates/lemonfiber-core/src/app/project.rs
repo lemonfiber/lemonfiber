@@ -24,6 +24,7 @@ use lemonfiber_manifest::Manifest;
 use super::Ctx;
 use crate::error::codes::stack::PROJECT_EDITED;
 use crate::error::{Diagnose, Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::materialised::{checksum, decide, diff, Decision, Materialised};
 use crate::model::StackEdit;
@@ -477,7 +478,7 @@ pub(crate) fn rewritten(
     manifest: &Manifest,
     installed: &[Installed],
     operation: &str,
-    stamp: &str,
+    stamp: Instant,
 ) -> Result<(), Box<Problem>> {
     let text = current(ctx, manifest, installed).text;
     let previous = held(ctx);
@@ -506,7 +507,7 @@ pub(crate) fn change(
     previous: Option<String>,
     text: &str,
     operation: &str,
-    stamp: &str,
+    stamp: Instant,
 ) -> Change {
     let path = at.display().to_string();
     Change {

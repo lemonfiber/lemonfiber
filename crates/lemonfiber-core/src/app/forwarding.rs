@@ -17,6 +17,7 @@ use crate::condition::Conditions;
 use crate::config::store;
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::Diagnose as _;
+use crate::instant::Instant;
 
 use super::targets::{host_fillers, project_directory};
 use super::Ctx;
@@ -70,7 +71,7 @@ pub async fn pass(
             came_to: to_client(answer, inside.client.as_deref()).await,
             service: inside.service,
         };
-        if let Some(why) = journalled(ctx, client.change(answer, &ctx.stamp())) {
+        if let Some(why) = journalled(ctx, client.change(answer, ctx.stamp())) {
             pass.unrecorded = Some(why);
         }
         pass.clients.push(client);
@@ -95,7 +96,7 @@ async fn on_disk(ctx: &Ctx, manifest: &Manifest, asking: Asking) -> Option<Pass>
 }
 
 /// Raise the port not passed in `conditions`, or clear it, as `pass` found it.
-pub fn observe(conditions: &mut Conditions, pass: &Pass, stamp: &str) {
+pub fn observe(conditions: &mut Conditions, pass: &Pass, stamp: Instant) {
     conditions.observe(CHECK, pass.fault().as_ref(), stamp);
 }
 
@@ -138,7 +139,7 @@ fn journalled(ctx: &Ctx, change: Option<crate::journal::Change>) -> Option<Strin
 /// Raise or clear the port not passed in the conditions kept, as `pass` found it.
 fn raised(ctx: &Ctx, pass: &Pass) {
     let mut conditions = super::conditions::load(ctx);
-    observe(&mut conditions, pass, &ctx.stamp());
+    observe(&mut conditions, pass, ctx.stamp());
     super::conditions::save(ctx, &conditions);
 }
 

@@ -167,8 +167,9 @@ pub struct Manifest {
     pub schema: u32,
     /// The lemonfiber version that wrote it, checked against the one restoring.
     pub product_version: String,
-    /// When it was taken. Opaque here; the surface stamps it from the clock.
-    pub created_at: String,
+    /// When it was taken.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub created_at: crate::instant::Instant,
     /// The data root it was taken against, to notice a restore to a different one.
     pub data_root: String,
     /// What it covers.
@@ -196,9 +197,8 @@ pub struct Member {
 pub struct Existing {
     /// What the archive is called on disk.
     pub name: String,
-    /// When it was taken, compared lexically — the surface names archives so this
-    /// holds.
-    pub created_at: String,
+    /// When it was taken.
+    pub created_at: crate::instant::Instant,
 }
 
 use serde::{Deserialize, Serialize};
@@ -395,7 +395,7 @@ impl Manifest {
     pub fn describe(
         plan: &Plan,
         product_version: impl Into<String>,
-        created_at: impl Into<String>,
+        created_at: crate::instant::Instant,
         data_root: impl Into<String>,
     ) -> Self {
         let members = plan
@@ -409,7 +409,7 @@ impl Manifest {
         Self {
             schema: SCHEMA,
             product_version: product_version.into(),
-            created_at: created_at.into(),
+            created_at,
             data_root: data_root.into(),
             scope: plan.scope.clone(),
             sensitive: plan.sensitive,

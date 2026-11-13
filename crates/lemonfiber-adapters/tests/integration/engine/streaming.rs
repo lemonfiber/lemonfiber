@@ -36,7 +36,7 @@ async fn log_lines_are_tagged_with_the_service_and_the_stream_they_came_from() {
             seen.push((
                 line.service,
                 format!("{:?}", line.stream),
-                line.at,
+                line.stamped,
                 line.line,
             ));
         }
@@ -526,7 +526,7 @@ async fn a_line_the_container_did_not_timestamp_is_passed_through_whole() {
     let mut seen = Vec::new();
     if let Ok(mut lines) = daemon.logs("lemonfiber", &[], LogQuery::recent(10)).await {
         while let Some(line) = lines.recv().await {
-            seen.push((line.at, line.line));
+            seen.push((line.stamped, line.line));
         }
     }
 

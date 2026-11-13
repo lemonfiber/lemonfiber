@@ -15,6 +15,7 @@ use lemonfiber_manifest::Manifest;
 
 use super::super::Ctx;
 use crate::error::{Diagnose, Problem};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::ports::filesystem::{Confined, Lying};
 use crate::project::entry::{mounts, CONFIGURATION_TREE, MOUNT_TREE};
@@ -129,7 +130,7 @@ pub(super) fn shown(path: &Path) -> String {
 }
 
 /// One entry of the move about `target`, journalled under the project's own operation.
-pub(super) fn change(stamp: &str, kind: Kind, target: &Path) -> Change {
+pub(super) fn change(stamp: Instant, kind: Kind, target: &Path) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),

@@ -16,9 +16,9 @@
 //! disagree with the one that actually refuses the next request.
 
 use std::collections::BTreeMap;
-use std::time::SystemTime;
 
 use crate::asking::{Estimate, Policy, Standing};
+use crate::instant::Instant;
 use crate::model::{Counted, MemberAsking};
 use crate::ports::media::Kind;
 use crate::ports::service::{Asking, Failure, Headroom, HouseholdRequest, Left, Member};
@@ -126,7 +126,7 @@ pub(crate) struct OwnAllowance {
 pub(crate) async fn allowance_of(
     requests: &dyn lemonfiber_contract::capabilities::request::intake::Fills,
     account: &Member,
-    now: SystemTime,
+    now: Instant,
 ) -> Result<OwnAllowance, Failure> {
     let (id, approves_own, headroom) =
         if let Some(requesting) = requests.requesting(&account.id).await? {
@@ -149,14 +149,14 @@ pub(crate) async fn allowance_of(
             )
         };
     let asked = requests.requests().await?;
-    let made: Vec<&str> = asked
+    let made: Vec<Instant> = asked
         .iter()
         .filter(|request| made_by(request, account))
         .filter(|request| {
             crate::household::State::of(request.request_status, request.media_status)
                 != Some(crate::household::State::Declined)
         })
-        .filter_map(|request| request.made.as_deref())
+        .filter_map(|request| request.made)
         .collect();
     let held = Held {
         id: id.clone().unwrap_or_default(),
@@ -191,7 +191,7 @@ fn made_by(request: &HouseholdRequest, account: &Member) -> bool {
 /// is waiting on, and the earliest of everything they ever asked for would name a day
 /// already past — a date in the past is worse than no date, because it reads as room
 /// they already have.
-pub(super) fn reported(held: &Held, made: &[&str], now: SystemTime) -> MemberAsking {
+pub(super) fn reported(held: &Held, made: &[Instant], now: Instant) -> MemberAsking {
     let policy = Policy::of(&Asking {
         approves_own: held.approves_own,
         quota: None,
@@ -215,14 +215,17 @@ pub(super) fn reported(held: &Held, made: &[&str], now: SystemTime) -> MemberAsk
 
 /// The earliest of their requests that the window still counts, where any of them is.
 ///
-/// A stamp this cannot read is left out rather than guessed at, and so is one the
-/// window has already let go of: what is wanted is the moment one more becomes
+/// One the window has already let go of is left out: what is wanted is the moment one more becomes
 /// possible, and the earliest of everything they ever asked for would name a day that
 /// has already been.
-fn counting<'a>(made: &[&'a str], days: u32, now: SystemTime) -> Option<&'a str> {
-    crate::asking::earliest(made.iter().copied().filter(|stamp| {
-        crate::asking::waiting_for(Some(stamp), now).is_some_and(|since| since < u64::from(days))
-    }))
+fn counting(made: &[Instant], days: u32, now: Instant) -> Option<Instant> {
+    made.iter()
+        .copied()
+        .filter(|&stamp| {
+            crate::asking::waiting_for(Some(stamp), now)
+                .is_some_and(|since| since < u64::from(days))
+        })
+        .min()
 }
 
 /// The policy a member with a limit is under, given what happens to their requests.
@@ -369,8 +372,8 @@ pub(super) fn for_kind(kind: Kind, quality: &Selection) -> Estimate {
 #[must_use]
 pub(super) fn waiting(
     state: Option<crate::household::State>,
-    made: Option<&str>,
-    now: SystemTime,
+    made: Option<Instant>,
+    now: Instant,
 ) -> Option<u64> {
     (state == Some(crate::household::State::WaitingForApproval))
         .then(|| crate::asking::waiting_for(made, now))
