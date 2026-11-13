@@ -11,7 +11,7 @@
 //! rather than an omission: there is nothing for them to mean.
 
 use lemonfiber_core::app::{
-    Asker, Command, Diagnosing, Removing, Tracing, Viewing, Waiting, Whom, Wishing,
+    Asker, Command, Diagnosing, Removing, Shelf, Tracing, Viewing, Waiting, Whom, Wishing,
 };
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
@@ -189,11 +189,11 @@ pub(super) fn shelf(
 ) -> Result<Command, Refusal> {
     let member = whose_shelf(member, defaults)?;
     let most = counted(most, A_SHELF)?;
-    Ok(Command::Held {
+    Ok(Command::Held(Shelf {
         member,
         most,
         asker: Asker::Operator,
-    })
+    }))
 }
 
 /// Whose shelf a read is about: a member, or the household's defaults.

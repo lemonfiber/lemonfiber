@@ -2,7 +2,7 @@
 //! is read, and what they may ask for.
 
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, Asker, Chosen, Command, Decision, Inviting, Live, PlayFrom,
+    Allowance, Answer, Arranged, Asker, Chosen, Command, Decision, Inviting, Live, PlayFrom, Shelf,
     Viewing, Whom, Wishing,
 };
 use lemonfiber_core::asking::Policy;
@@ -13,7 +13,8 @@ use lemonfiber_core::ports::service::{HowFar, Quota, Unrated, Wish};
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    Collected, HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom, Wished, Within,
+    Collected, HouseholdCommand, RawAllowance, RawPlay, RawShelf, RawTune, RawUnrated, RawWhom,
+    Wished, Within,
 };
 
 /// The command line spells what somebody may watch as three flags and the core carries
@@ -59,12 +60,12 @@ fn narrowed(whom: RawWhom) -> Option<Whom> {
 /// number of nought or more than one read answers with is refused rather than rounded:
 /// somebody who asked for a thousand and was shown five hundred has been told that is
 /// the shelf.
-pub(crate) fn held(whom: RawWhom, asked: RawShelf) -> Result<Command, u8> {
+pub(crate) fn held(whom: RawWhom, shelf: RawShelf) -> Result<Command, u8> {
     let RawShelf {
         most,
         title,
         part_way,
-    } = asked;
+    } = shelf;
     let Some(member) = narrowed(whom) else {
         complain!(
             "error: name whose shelf with `--member`, or ask for the household's defaults \
@@ -95,11 +96,11 @@ pub(crate) fn held(whom: RawWhom, asked: RawShelf) -> Result<Command, u8> {
         );
         return Err(USAGE);
     }
-    Ok(Command::Held {
+    Ok(Command::Held(Shelf {
         member,
         most,
         asker,
-    })
+    }))
 }
 
 /// The live TV channels one member may watch. Naming nobody is refused by the core,
@@ -112,12 +113,13 @@ pub(crate) fn channels(member: Option<String>) -> Command {
 
 /// A channel opened, or a live stream kept or closed, for one member: a channel, or a
 /// stream with or without a stop, and never a channel beside a stream.
-pub(crate) fn tuning(
-    channel: Option<String>,
-    member: Option<String>,
-    stream: Option<String>,
-    stop: bool,
-) -> Result<Command, u8> {
+pub(crate) fn tuning(asked: RawTune) -> Result<Command, u8> {
+    let RawTune {
+        channel,
+        member,
+        stream,
+        stop,
+    } = asked;
     let live = match (channel, stream, stop) {
         (Some(channel), None, false) => Live::Open(channel),
         (None, Some(stream), false) => Live::Renew(stream),
@@ -139,12 +141,13 @@ pub(crate) fn tuning(
 
 /// Where one title plays in a member's browser, on a new session for `--device` or the
 /// one `--pass` holds, and never both.
-pub(crate) fn playing(
-    item: String,
-    member: Option<String>,
-    device: Option<String>,
-    pass: Option<String>,
-) -> Result<Command, u8> {
+pub(crate) fn playing(asked: RawPlay) -> Result<Command, u8> {
+    let RawPlay {
+        item,
+        member,
+        device,
+        pass,
+    } = asked;
     let from = match (device, pass) {
         (Some(device), None) => PlayFrom::Device(device),
         (None, Some(pass)) => PlayFrom::Pass(pass),

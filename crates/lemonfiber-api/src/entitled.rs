@@ -20,7 +20,7 @@
 //! another's requests asks for.
 
 use lemonfiber_core::app::{
-    Asker, Command, Diagnosing, Doorway, MigrateAction, Viewing, Whom, Wishing,
+    Asker, Command, Diagnosing, Doorway, MigrateAction, Shelf, Viewing, Whom, Wishing,
 };
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::notify::configuring::Asked as Notifying;
@@ -162,11 +162,11 @@ pub(crate) fn their_household(id: &str) -> Command {
 /// One member's own shelf, `most` of it.
 #[must_use]
 pub(crate) fn their_shelf(id: &str, most: u32) -> Command {
-    Command::Held {
+    Command::Held(Shelf {
         member: Whom::Named(id.to_owned()),
         most,
         asker: Asker::Member,
-    }
+    })
 }
 
 /// What one member is playing, and nobody else.
@@ -266,7 +266,7 @@ fn members(id: &str, command: &Command) -> Permitted {
         // Theirs, and narrowed the same way. How much of the shelf to answer with
         // is the caller's to choose and is carried through; whose shelf it is
         // never was, so what the request named is discarded rather than checked.
-        Command::Held { most, .. } => Permitted::This(their_shelf(id, *most)),
+        Command::Held(Shelf { most, .. }) => Permitted::This(their_shelf(id, *most)),
         // Theirs, narrowed the same way: what they are playing, and nobody else's.
         // Whatever the request named is discarded, so an operator's narrowing cannot
         // be borrowed to read another member's sessions.

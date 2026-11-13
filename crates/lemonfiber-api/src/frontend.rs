@@ -175,7 +175,7 @@ pub fn routes(app: Option<Source>, ctx: Arc<Ctx>) -> Router {
                 let front_door = if asked.starts_with(ENDPOINTS) {
                     None
                 } else {
-                    lemonfiber_core::screening::browser_origin(&ctx).await
+                    lemonfiber_core::screening::browser_origin(&ctx)
                 };
                 page_playing(app, asked, front_door.as_deref())
             },

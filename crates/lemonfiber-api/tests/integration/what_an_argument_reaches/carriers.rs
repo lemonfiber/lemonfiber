@@ -670,7 +670,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 59] = [
+pub(super) const SWEEPS: [Sweep; 62] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),

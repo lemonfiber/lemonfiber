@@ -102,6 +102,17 @@ pub enum Whom {
     Defaults,
 }
 
+/// Whose shelf to read, how much of it, and who asked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Shelf {
+    /// Whose shelf — a member, or somebody invited with the household's defaults.
+    pub member: Whom,
+    /// How many to answer with, newest first.
+    pub most: u32,
+    /// Who asked, which decides the words a title that cannot be located says why in.
+    pub asker: Asker,
+}
+
 /// Who asked for something a member is shown, which decides the words a reason is given
 /// in: a member is told it as the household would say it, and the operator is told what
 /// to fix.

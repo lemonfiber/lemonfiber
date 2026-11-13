@@ -383,8 +383,9 @@ pub(crate) async fn leaving(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest,
 
 /// The origin of the stack's front door a browser plays a title from, as a content
 /// security policy names it, where the core knows one.
-pub async fn browser_origin(ctx: &Ctx) -> Option<String> {
-    let base = door::for_a_browser(ctx).await.ok()?;
+#[must_use]
+pub fn browser_origin(ctx: &Ctx) -> Option<String> {
+    let base = door::for_a_browser(ctx).ok()?;
     let origin = url::Url::parse(&base).ok()?.origin();
     origin.is_tuple().then(|| origin.ascii_serialization())
 }

@@ -206,7 +206,7 @@ async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
         ))
         .build();
     assert_eq!(
-        super::standing(&ctx, &Declares::declaring(enforceable())).await,
+        super::standing(&ctx, &Declares::declaring(enforceable()), Asker::Operator).await,
         Door::Unknown(super::NO_STACK.to_owned())
     );
 }
@@ -236,19 +236,30 @@ async fn a_standing_door_locates_where_the_server_behind_it_declared() {
     let addressed = standing_at(Some(HOUSEHOLD_HOST));
 
     assert_eq!(
-        super::standing(&addressed, &Declares::declaring(enforceable())).await,
+        super::standing(
+            &addressed,
+            &Declares::declaring(enforceable()),
+            Asker::Operator
+        )
+        .await,
         Door::At {
             base: format!("https://{HOUSEHOLD_HOST}:{GUARDED}"),
             fingerprint: fingerprint.unwrap_or_default(),
             locations: enforceable().locations,
+            asker: Asker::Operator,
         }
     );
     assert_eq!(
-        super::standing(&addressed, &Declares::silent()).await,
+        super::standing(&addressed, &Declares::silent(), Asker::Operator).await,
         Door::Unknown(UNDECLARED.to_owned())
     );
     assert_eq!(
-        super::standing(&standing_at(None), &Declares::declaring(enforceable())).await,
+        super::standing(
+            &standing_at(None),
+            &Declares::declaring(enforceable()),
+            Asker::Operator
+        )
+        .await,
         Door::Unknown(NO_ADDRESS.to_owned())
     );
 }

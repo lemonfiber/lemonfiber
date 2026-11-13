@@ -192,9 +192,7 @@ async fn ready(
         .locations
         .playlist
         .ok_or_else(|| told(asker, NO_PLAYLIST.to_owned()))?;
-    let base = door::for_a_browser(ctx)
-        .await
-        .map_err(|why| told(asker, why))?;
+    let base = door::for_a_browser(ctx).map_err(|why| told(asker, why))?;
     Locations::played(
         &template,
         &base,
