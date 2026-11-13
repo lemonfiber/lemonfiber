@@ -266,8 +266,15 @@
                 "additionalProperties": false,
                 "description": "A path the upstream serves a live stream's bytes under, its playlists and segments\nincluded.",
                 "properties": {
+                  "parameter": {
+                    "description": "The query parameter whose whole value, decoded once, is the live stream's id,\nwhere the path does not hold it: carried once under this spelling.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "pattern": {
-                    "description": "The paths it covers, holding one group named `stream` where the live stream's id\nsits, every match starting at the path's start.",
+                    "description": "The paths it covers, holding one group named `stream` where the live stream's id\nsits, or none where [`Self::parameter`] holds it, every match starting at the\npath's start.",
                     "type": "string"
                   },
                   "stream": {
@@ -288,6 +295,13 @@
                   "backdrop": {
                     "description": "Its backdrop.",
                     "type": "string"
+                  },
+                  "playlist": {
+                    "description": "The playlist a browser plays it from, at the front door's route to the guard,\nwhere the upstream serves one.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "poster": {
                     "description": "Its poster.",

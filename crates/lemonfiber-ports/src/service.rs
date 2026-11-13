@@ -51,6 +51,7 @@ mod subtitles;
 mod syncing;
 mod throttling;
 mod trace;
+mod tuning;
 mod tunnelling;
 mod upkeep;
 
@@ -73,7 +74,7 @@ pub use collecting::{
 pub use declaring::{
     joined, spelled_as_a_space, Addressee, Answered, Answers, BytePath, Declared, Declaring, Held,
     InQuery, LivePath, Locations, Naming, Ports, Presentation, Question, Statuses, Token,
-    Undeclarable, BASE, ITEM, MAY, SPACE, SPACE_MOST, STREAM_NAME, TOKEN,
+    Undeclarable, BASE, ITEM, MAY, PLAY, SPACE, SPACE_MOST, STREAM_NAME, TOKEN,
 };
 pub use declining::{
     Claimed, Declinable, Declined, Declining, Invitations, KeyHeld, Lapsed, LeftBecause, TakenBack,
@@ -127,6 +128,7 @@ pub use subtitles::{Subtitles, Watched, Watching};
 pub use syncing::{Edited, Profiled, Reapplied, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
+pub use tuning::{Channel, Programme, Tuned, Tuning};
 pub use tunnelling::Tunnelling;
 pub use upkeep::{SeriesHeld, Upkeep, SERIES_MOST};
 

@@ -105,6 +105,9 @@
     "/lemonfiber/media.serve/v1/astray": {
       "$ref": "operations/astray.json"
     },
+    "/lemonfiber/media.serve/v1/channels": {
+      "$ref": "operations/channels.json"
+    },
     "/lemonfiber/media.serve/v1/dated": {
       "$ref": "operations/dated.json"
     },
@@ -176,6 +179,12 @@
     },
     "/lemonfiber/media.serve/v1/trust_only": {
       "$ref": "operations/trust_only.json"
+    },
+    "/lemonfiber/media.serve/v1/tune": {
+      "$ref": "operations/tune.json"
+    },
+    "/lemonfiber/media.serve/v1/untune": {
+      "$ref": "operations/untune.json"
     }
   }
 }

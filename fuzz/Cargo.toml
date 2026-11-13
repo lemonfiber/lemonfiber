@@ -110,3 +110,10 @@ doc = false
 bench = false
 
 [workspace]
+
+[[bin]]
+name = "pass_confirm"
+path = "fuzz_targets/pass_confirm.rs"
+test = false
+doc = false
+bench = false
