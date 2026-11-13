@@ -19,7 +19,7 @@ requirement = [
   { id = "C6-R15", state = "done", evidence = ["crates/lemonfiber-core/src/config/keys.rs", "crates/lemonfiber-core/src/config/reading.rs"] },
   { id = "C6-R16", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/bindings.rs"] },
   { id = "C6-R17", state = "done", evidence = ["crates/lemonfiber/tests/integration/publishing.rs"] },
-  { id = "C6-R18", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
+  { id = "C6-R18", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-core/src/plugin/container.rs"], landed = "5403cacdb044" },
   { id = "C6-R19", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
   { id = "C6-R20", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/seed/run/taken_back.rs"] },
   { id = "C6-R21", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/cors.rs", "crates/lemonfiber-contract/src/capabilities/media.rs"] },
