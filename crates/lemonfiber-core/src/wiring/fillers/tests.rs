@@ -489,6 +489,7 @@ fn a_service_inside_the_guard_the_operator_chose_is_reached_at_that_guard() {
     client.fields.network = Some(lemonfiber_manifest::container::Network {
         via: Some(lemonfiber_manifest::container::EGRESS_GUARD.to_owned()),
         fenced: false,
+        egress_for: None,
     });
     let rival = a_placed(
         "rival-guard",

@@ -196,3 +196,29 @@ async fn fronted_with_no_route_or_no_randomness_or_a_gate_refusing_tokens_signs_
         "{unrandom:?}"
     );
 }
+
+#[tokio::test]
+async fn the_request_services_page_offers_members_plex_sign_in_in_owner_and_fronted_alone() {
+    for (mode, offered, answer) in [
+        ("managed", false, media::taken()),
+        ("owner", true, media::refusing()),
+        ("fronted", true, media::taken()),
+    ] {
+        let http = signing(&[KEY], answer);
+        let held = Gate::admitting(vec![plex_route(&[sha256(KEY)])]);
+        let name = format!("plex-sign-offered-{mode}");
+        let (ctx, at, _) = plex_ctx(&name, Some(mode), held, http.clone());
+
+        signed(&ctx, &at, &http).await;
+
+        let established = asked_with(&http, "establish");
+        assert!(!established.is_empty(), "{mode}");
+        assert!(
+            established.iter().all(|body| body
+                .pointer("/source/members_sign_in")
+                .and_then(serde_json::Value::as_bool)
+                == Some(offered)),
+            "{mode}: {established:?}"
+        );
+    }
+}

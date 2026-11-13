@@ -17,13 +17,9 @@ use crate::ports::service::Left;
 /// The refusals a search answers with for who is named and what answers for them.
 pub(super) async fn kinds(ctx: &Ctx, named: &str) -> Result<AskableKindsReport, Box<Problem>> {
     let reached = reached(ctx, named).await?;
-    let theirs = crate::household::run::allowance_of(
-        reached.requests.as_ref(),
-        &reached.member,
-        ctx.seams.clock.now(),
-    )
-    .await
-    .map_err(|_| not_working())?;
+    let theirs = super::allowance(ctx, &reached)
+        .await
+        .map_err(|_| not_working())?;
     let mut kinds: Vec<AskableKind> = reached
         .kinds
         .iter()

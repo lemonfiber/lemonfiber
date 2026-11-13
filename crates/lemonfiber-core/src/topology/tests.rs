@@ -16,6 +16,7 @@ const fn member(id: &str) -> Member<'_> {
         publishes: false,
         inside: None,
         fronts: None,
+        egress_for: None,
     }
 }
 
@@ -452,4 +453,45 @@ fn the_pass_service_shares_one_network_with_the_guard_and_nothing_else() {
     );
     assert_eq!(unguarded.pass(), None);
     assert!(!unguarded.networks.contains_key("pass__door"));
+}
+
+#[test]
+fn an_egress_service_alone_reaches_off_the_host_and_shares_one_network_with_what_it_carries() {
+    let gate = Member {
+        confined: true,
+        publishes: true,
+        ..member("request-gate")
+    };
+    let egress = Member {
+        confined: true,
+        egress_for: Some("request-gate"),
+        ..member("request-gate-egress")
+    };
+    let topology = derived(
+        &[gate, egress, member("seerr")],
+        &[ask("seerr", "request.gate", "request-gate")],
+        &[],
+        None,
+        false,
+    );
+
+    let own_gate = topology.networks.get("own__request-gate");
+    assert!(own_gate.is_some_and(|network| !network.internal && !network.masquerade));
+    let own_egress = topology.networks.get("own__request-gate-egress");
+    assert!(own_egress.is_some_and(|network| !network.internal && network.masquerade));
+    let carrying = topology
+        .networks
+        .get("egress__request-gate__request-gate-egress");
+    assert!(carrying.is_some_and(|network| network.internal));
+    assert_eq!(
+        on(&topology, "request-gate-egress")
+            .into_keys()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from([
+            "own__request-gate-egress".to_owned(),
+            "egress__request-gate__request-gate-egress".to_owned(),
+        ])
+    );
+    assert!(on(&topology, "request-gate").contains_key("egress__request-gate__request-gate-egress"));
+    assert!(!on(&topology, "seerr").contains_key("egress__request-gate__request-gate-egress"));
 }

@@ -60,13 +60,9 @@ pub(super) async fn found(
             "This house can't fetch anything new right now.",
         ));
     }
-    let theirs = crate::household::run::allowance_of(
-        reached.requests.as_ref(),
-        &reached.member,
-        ctx.seams.clock.now(),
-    )
-    .await
-    .map_err(|_| not_working())?;
+    let theirs = super::allowance(ctx, &reached)
+        .await
+        .map_err(|_| not_working())?;
     let mut titles = Vec::new();
     let mut next = Some(place.page);
     for _ in 0..READ_PER_PAGE {

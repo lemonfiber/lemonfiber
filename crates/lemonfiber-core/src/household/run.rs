@@ -11,6 +11,7 @@
 //! password seeding already minted and recorded.
 
 mod allowance;
+pub(crate) mod as_owner;
 mod defaults;
 mod handing_over;
 mod holding;
@@ -122,7 +123,8 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
             None
         }
     };
-    let (requests, asked) = asked_of(reached.as_ref(), &accounts, &mut findings).await;
+    let kept = as_owner::kept(ctx);
+    let (requests, asked) = asked_of(reached.as_ref(), &accounts, &kept, &mut findings).await;
     if asked.household.is_none() {
         findings.push(
             "what the household may ask for could not be read, so no policy and no \
@@ -195,6 +197,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
 async fn asked_of(
     reached: Option<&crate::app::targets::HouseholdAccess>,
     accounts: &[Member],
+    kept: &as_owner::Kept,
     findings: &mut Vec<String>,
 ) -> (Vec<HouseholdRequest>, allowance::Asked) {
     let Some(access) = reached else {
@@ -206,14 +209,16 @@ async fn asked_of(
             },
         );
     };
-    let requests = access.requests.requests().await.unwrap_or_else(|_| {
+    let requests = if let Ok(requests) = access.requests.requests().await {
+        kept.attributed(requests)
+    } else {
         findings.push(
             "the request service's own record could not be read, so what the household \
              has asked for is not shown"
                 .to_owned(),
         );
         Vec::new()
-    });
+    };
     (
         requests,
         allowance::gathered(access.requests.as_ref(), accounts).await,

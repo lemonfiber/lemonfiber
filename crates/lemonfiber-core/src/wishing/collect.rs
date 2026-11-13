@@ -34,13 +34,9 @@ pub(super) async fn found(
     }
     let reached = reached(ctx, named).await?;
     let curator = curator_of(ctx, unit).await?;
-    let theirs = crate::household::run::allowance_of(
-        reached.requests.as_ref(),
-        &reached.member,
-        ctx.seams.clock.now(),
-    )
-    .await
-    .map_err(|_| not_working())?;
+    let theirs = super::allowance(ctx, &reached)
+        .await
+        .map_err(|_| not_working())?;
     let page = curator
         .lookup(unit, term, after)
         .await
@@ -88,13 +84,9 @@ pub(super) async fn asked(
         .await
         .map_err(|_| not_working())?
         .ok_or_else(super::no_such_title)?;
-    let theirs = crate::household::run::allowance_of(
-        reached.requests.as_ref(),
-        &reached.member,
-        ctx.seams.clock.now(),
-    )
-    .await
-    .map_err(|_| not_working())?;
+    let theirs = super::allowance(ctx, &reached)
+        .await
+        .map_err(|_| not_working())?;
     let kept = crate::collected::run::every(ctx);
     let left = crate::collected::run::left(
         &kept,

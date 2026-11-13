@@ -48,6 +48,13 @@ impl Mode {
     /// Every mode, in the order the setting lists them.
     pub(crate) const ALL: [Self; 3] = [Self::Managed, Self::Owner, Self::Fronted];
 
+    /// Whether the request service's own page offers members Plex sign-in in this mode:
+    /// only where plex.tv, or the gate answering for it, lists them on its owner.
+    #[must_use]
+    pub(crate) const fn members_sign_in(self) -> bool {
+        matches!(self, Self::Owner | Self::Fronted)
+    }
+
     /// The word the setting holds for this mode.
     #[must_use]
     pub(crate) const fn word(self) -> &'static str {

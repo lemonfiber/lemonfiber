@@ -28,6 +28,8 @@ pub(super) struct Standing {
     pub(super) fronts: Option<String>,
     /// Whether it declares itself fenced.
     pub(super) fenced: bool,
+    /// The service of its own plugin it carries out of the machine, where it is its egress.
+    pub(super) egress_for: Option<String>,
 }
 
 /// One settled ask: what asked, the capability and the medium it asked of, and the service
@@ -74,6 +76,7 @@ impl Inputs {
                 publishes: standing.publishes,
                 inside: standing.inside.as_deref(),
                 fronts: standing.fronts.as_deref(),
+                egress_for: standing.egress_for.as_deref(),
             })
             .collect();
         let asks: Vec<Settled<'_>> = self
@@ -110,6 +113,7 @@ pub(super) fn read(
             inside: inside(&service.id),
             fronts: None,
             fenced: service.fenced(),
+            egress_for: None,
         })
         .chain(
             installed
@@ -128,6 +132,12 @@ pub(super) fn read(
                         .network
                         .as_ref()
                         .is_some_and(|network| network.fenced),
+                    egress_for: placed
+                        .fields
+                        .network
+                        .as_ref()
+                        .and_then(Network::egress_for)
+                        .map(str::to_owned),
                 }),
         )
         .collect();
@@ -152,6 +162,7 @@ pub(super) fn read(
             inside: None,
             fronts: None,
             fenced: false,
+            egress_for: None,
         });
     }
     let (mut asks, links) = joined(settled, &vias);
@@ -273,6 +284,7 @@ fn fences(members: &mut Vec<Standing>) -> Vec<(String, Option<String>)> {
             inside: None,
             fronts: standing.fronts.clone(),
             fenced: false,
+            egress_for: None,
         });
         standing.inside = Some(fence.clone());
         fenced.push((standing.id.clone(), Some(fence)));

@@ -575,9 +575,13 @@
       "required": ["from", "to"]
     },
     "ServiceNetwork": {
-      "description": "The network a service runs inside instead of its own: its filler's, or a fence's.",
+      "description": "The network a service runs inside instead of its own, its filler's or a fence's, or the\nsibling it carries out of the machine.",
       "type": "object",
       "properties": {
+        "egress_for": {
+          "description": "The service of its own plugin it carries out of the machine, holding nothing, where\nit is that service's egress.",
+          "type": ["string", "null"]
+        },
         "fenced": {"description": "Whether it fetches whatever address it is handed, and so runs inside a fence that\nrefuses every private address.", "type": "boolean"},
         "via": {
           "description": "The capability whose filler's network it runs inside.",

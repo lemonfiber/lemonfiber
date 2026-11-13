@@ -78,6 +78,8 @@ pub(crate) const BANDWIDTH: &str = "bandwidth.json";
 pub(crate) const REFUSALS: &str = "refusals.json";
 /// Every ask for music or books the core keeps.
 pub(crate) const ASKS: &str = "household-asks.json";
+/// Each request the core filed as the request service's owner, beside the member it was for.
+pub(crate) const ASKED_AS_OWNER: &str = "asked-as-owner.json";
 /// Every host a cover was fetched from.
 pub(crate) const COVER_HOSTS: &str = "cover-hosts.json";
 /// When each person was first handed a code.

@@ -4,14 +4,19 @@
 //! member's allowance are all settled before the request service is asked to file
 //! anything, and a rehearsal settles all of them and files nothing.
 
+use lemonfiber_contract::capabilities::request::intake::Fills;
+
 use super::{not_working, reached, refused, refused_with, titled, Reached};
 use crate::app::Ctx;
-use crate::error::codes::wish::{ALREADY_HERE, NOTHING_LEFT, NOT_ITS_SEASON, NO_ROOM};
+use crate::config::paths::ASKED_AS_OWNER;
+use crate::error::codes::wish::{
+    ALREADY_HERE, NOTHING_LEFT, NOT_ITS_SEASON, NO_ROOM, THROUGH_THE_HOUSE,
+};
 use crate::error::Problem;
-use crate::household::run::OwnAllowance;
+use crate::household::run::{as_owner, OwnAllowance};
 use crate::model::{AskedReport, Became, LeftAfter};
 use crate::ports::media::Kind;
-use crate::ports::service::{Detail, Left, MediaStatus, Season, Wish};
+use crate::ports::service::{Detail, Failure, Left, MediaStatus, Season, Wish};
 
 /// What an ask names comes to before anything is filed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,13 +41,9 @@ enum Choice {
 pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedReport, Box<Problem>> {
     let reached = reached(ctx, named).await?;
     let detail = titled(&reached, wish.kind, &wish.id).await?;
-    let theirs = crate::household::run::allowance_of(
-        reached.requests.as_ref(),
-        &reached.member,
-        ctx.seams.clock.now(),
-    )
-    .await
-    .map_err(|_| not_working())?;
+    let theirs = super::allowance(ctx, &reached)
+        .await
+        .map_err(|_| not_working())?;
     let seasons = match chosen(&wish, &detail)? {
         Choice::Here => {
             return Err(refused(ALREADY_HERE, "It's already in the house."));
@@ -79,7 +80,7 @@ pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedRep
     let waiting = if ctx.dry_run {
         !theirs.approves_own
     } else {
-        filed(&reached, &theirs, &wish, &seasons).await?
+        filed(ctx, &reached, &theirs, &wish, &seasons).await?
     };
     let outcome = if waiting {
         Became::Waiting
@@ -156,38 +157,42 @@ fn chosen(wish: &Wish, detail: &Detail) -> Result<Choice, Box<Problem>> {
     })
 }
 
-/// File the ask, making the member an account on the request service first where it
-/// holds none, and say whether it waits for approval.
+/// File the ask, linking the member to an account on the request service first where it
+/// holds none, and say whether it waits for approval. Where it still holds none, the ask is
+/// filed as the request service's owner and kept beside the member, so it counts as
+/// theirs; a member whose asks wait for approval is refused then, since nothing filed as
+/// the owner waits for anybody.
 ///
 /// # Errors
 ///
-/// The refusal for what answers not answering, and for a service that let through an
-/// ask from a member whose asks wait for approval: what it filed is not reported as
-/// granted.
+/// The refusal for a member whose asks wait for approval and who holds no account, for
+/// what answers not answering, and for a service that let through an ask from a member
+/// whose asks wait for approval: what it filed is not reported as granted.
 async fn filed(
+    ctx: &Ctx,
     reached: &Reached,
     theirs: &OwnAllowance,
     wish: &Wish,
     seasons: &[u32],
 ) -> Result<bool, Box<Problem>> {
     let requests = reached.requests.as_ref();
-    let account = if let Some(id) = &theirs.id {
-        id.clone()
-    } else {
-        requests
-            .link_members(std::slice::from_ref(&reached.member.id))
-            .await
-            .map_err(|_| not_working())?;
-        requests
-            .requesting(&reached.member.id)
-            .await
-            .map_err(|_| not_working())?
-            .ok_or_else(not_working)?
-            .id
+    let account = match &theirs.id {
+        Some(id) => Some(id.clone()),
+        None => linked(requests, &reached.member.id).await?,
+    };
+    let keeping = match account {
+        Some(_) => None,
+        None if !theirs.approves_own => {
+            return Err(refused(THROUGH_THE_HOUSE, THROUGH_THE_HOUSE_SAID));
+        }
+        None => {
+            let path = crate::app::targets::beside_env(ctx, ASKED_AS_OWNER);
+            Some(path.ok_or_else(not_working)?)
+        }
     };
     let asked = requests
         .ask(
-            &account,
+            account.as_deref(),
             &Wish {
                 id: wish.id.clone(),
                 kind: wish.kind,
@@ -196,11 +201,43 @@ async fn filed(
         )
         .await
         .map_err(|_| not_working())?;
+    if let Some(path) = keeping {
+        let filing = as_owner::Filing {
+            request: asked.request,
+            title: &wish.id,
+            member: &reached.member,
+            kind: wish.kind,
+            counts: counted(wish.kind, seasons),
+            now: ctx.seams.clock.now(),
+            standing: &theirs.standing,
+            read: theirs.read,
+        };
+        as_owner::filed(&path, filing).map_err(|_| not_working())?;
+    }
     if !theirs.approves_own && !asked.waiting {
         return Err(not_working());
     }
     Ok(asked.waiting)
 }
+
+/// The request service's account for the member `id` names, once asked to link them: none
+/// where it holds none, as where it links nobody it could not find by their id.
+///
+/// # Errors
+///
+/// The refusal for what answers not answering.
+async fn linked(requests: &dyn Fills, id: &str) -> Result<Option<String>, Box<Problem>> {
+    match requests.link_members(&[id.to_owned()]).await {
+        Ok(()) | Err(Failure::Unsupported { .. }) => {}
+        Err(_) => return Err(not_working()),
+    }
+    let held = requests.requesting(id).await.map_err(|_| not_working())?;
+    Ok(held.map(|held| held.id))
+}
+
+/// What a member whose asks wait for approval and who holds no account is told.
+const THROUGH_THE_HOUSE_SAID: &str =
+    "Asks here go through whoever runs the house, so ask them for it.";
 
 /// How much of a member's allowance asking for `seasons` of a title of `kind` uses: one
 /// for a film, and one for each season of a series, a series asked for whole counting as

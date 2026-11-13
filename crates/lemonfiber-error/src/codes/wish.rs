@@ -108,4 +108,14 @@ codes! {
         meaning: "That title has no picture to show.",
         remedy: "The title can still be asked for by its name.",
     }
+    /// Said where a member whose asks wait for approval has no account of their own on what
+    /// files the household's asks, so nothing could wait for anybody's yes.
+    THROUGH_THE_HOUSE = "WISH-14" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "This member's asks wait for a yes from whoever runs the house, and here \
+            they go through that person, so nothing was asked for.",
+        remedy: "Ask whoever runs the house for it.",
+    }
 }

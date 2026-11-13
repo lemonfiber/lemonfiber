@@ -122,6 +122,8 @@ pub struct IdentitySource {
     /// The credential the request service's owner signs in with, where one is carried:
     /// none where the operator signs that owner in through the request service's own page.
     pub credential: Option<Credential>,
+    /// Whether the request service's own page offers members sign-in through it.
+    pub members_sign_in: bool,
 }
 
 /// What one member may ask for on the request service.
