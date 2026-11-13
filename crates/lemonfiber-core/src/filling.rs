@@ -39,7 +39,7 @@ pub const ASKED_BY_THE_CORE_ALONE: [&str; 8] = [
 /// The four the vocabulary's own states name. `Claimed` is not a weaker
 /// `Demonstrated`: it is what a declaration is before anything has asked the service,
 /// which is a fact about this moment rather than about the service.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Shown {
     /// A service declares it, and nothing has asked the service yet.
@@ -110,7 +110,7 @@ impl Claimant {
 ///
 /// Carried as one word and its subject rather than as three shapes, so a reader of the
 /// machine-readable form branches on `answer` and finds the rest where the word says.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "answer", rename_all = "kebab-case")]
 pub enum Filling {
     /// Exactly one candidate claims it, and it is what a wiring reaches.

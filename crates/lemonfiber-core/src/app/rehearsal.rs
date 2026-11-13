@@ -40,8 +40,8 @@ use super::command::{
 };
 use super::disturbance::Situation;
 use super::engine::Waiting;
-use super::plugins;
 use super::setup::SetupAction;
+use super::{authoring, plugins};
 use super::{Command, Ctx, Viewing, Wishing};
 
 /// Why a search cannot be rehearsed.
@@ -68,6 +68,11 @@ const MATERIAL_IS_MATERIAL: &str = "pairing material is the answer itself — a 
 const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observation — \
      what it reports is what this stack actually did with a real item, which cannot be \
      known without asking it to";
+
+/// Why recording a plugin's run proofs cannot be rehearsed.
+const A_RECORDING_IS_THE_RUN: &str = "a recording is what the plugin's services answered \
+     when they were run, which does not exist until they have been — `--check` holds a \
+     run to what is recorded and writes nothing";
 
 /// What a rehearsal means for one command.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -312,6 +317,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Pull { .. } => reports("pull", LIFECYCLE).disturbing(Situation::Fetching),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         Command::Plugins(asked) => plugin(asked),
+        Command::Authoring(asked) => authored(asked),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
         Command::Settings(Settling::Set { .. }) => reports("settings set", &[kind::SETTINGS]),
         Command::Settings(Settling::Clear { .. }) => reports("settings clear", &[kind::SETTINGS]),
@@ -436,6 +442,18 @@ mod withheld;
 
 pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
+/// What reading a plugin's own source reads and writes: recording writes what it takes,
+/// unless it is holding what it takes to what is there.
+const fn authored(asked: &authoring::Asked) -> Asked {
+    match asked {
+        authoring::Asked::Claims { .. } => reads("plugin claims"),
+        authoring::Asked::Conform { .. } => reads("plugin conform"),
+        authoring::Asked::Provenance { .. } => reads("plugin provenance"),
+        authoring::Asked::Record { taking, .. } if taking.check => reads("plugin record --check"),
+        authoring::Asked::Record { .. } => cannot("plugin record", A_RECORDING_IS_THE_RUN),
+    }
+}
+
 /// What a run of a plugin command reads, writes and disturbs.
 const fn plugin(asked: &plugins::Asked) -> Asked {
     match asked {

@@ -1,129 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use lemonfiber_core::plugin::Ungenerated;
 
-use lemonfiber::cli::Authoring;
-use lemonfiber_core::plugin::{Recorder, Retaking, Ungenerated};
-use lemonfiber_core::ports::program::{Program, Unran};
-use lemonfiber_core::ports::registry::Registry;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::serving::Serves;
-
-use super::{document_of, held_keys, taking, unrenderable, vocabulary, Answered};
+use super::{document_of, published, vocabulary, Answered, Document};
 use crate::exit::FAILURE;
-
-/// A manifest nothing refuses, pinning one image and claiming nothing.
-const WHOLE: &str = r#"
-schema_version = 1
-
-[plugin]
-id          = "kavita"
-name        = "Kavita"
-version     = "1.0.0"
-description = "Reads comics in a browser"
-without_it  = "Comics stay folders of images"
-upstream    = "https://example.invalid"
-license     = "MIT"
-forms       = ["library"]
-
-[[service]]
-id          = "kavita"
-name        = "Kavita"
-image       = "example.invalid/kavita"
-digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
-tag         = "1.0.0"
-criticality = "enhancing"
-"#;
-
-/// The same manifest with the one pin that is not a content address.
-///
-/// A digest that is not sixty-four hexadecimal characters is the refusal every
-/// other rule is built on: what was reviewed and what runs would be free to be
-/// different bytes.
-fn unpinned() -> String {
-    WHOLE.replace(
-        "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "sha256:not-a-digest",
-    )
-}
-
-/// A plugin source written to a scratch directory.
-fn source(named: &str, manifest: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("authoring-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
-    let _ = std::fs::write(at.join("plugin.toml"), manifest);
-    at
-}
-
-/// A file at a scratch path, holding whatever a case needs it to.
-fn written(named: &str, text: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("authoring-{named}")).kept();
-    let _ = std::fs::write(&at, text);
-    at
-}
-
-/// A path nothing has ever been written to.
-fn nowhere() -> PathBuf {
-    lemonfiber_fixtures::scratch::Scratch::named("authoring-absent").kept()
-}
-
-/// A registry that answers every question the same way, over no network.
-fn answering(status: u16, body: &'static str) -> impl Registry {
-    let reaching: Arc<dyn lemonfiber_core::ports::http::Http> =
-        Fake::always(Answer::reply(status, body));
-    lemonfiber_adapters::registry::Oci::new(reaching)
-}
-
-/// What `asked` came to, with `program` running any proof and no engine serving a service.
-async fn published(
-    asked: &Authoring,
-    json: bool,
-    registry: &dyn Registry,
-    program: &dyn Program,
-) -> Answered {
-    let serving = Serves::refusing(Unran::Unreachable {
-        reason: "no engine in a test".to_owned(),
-    });
-    let silent = || -> Arc<dyn lemonfiber_core::ports::http::Http> { Fake::always(Answer::Silent) };
-    super::published(
-        asked,
-        json,
-        registry,
-        Recorder {
-            program,
-            serving: &serving,
-            transport: &silent,
-            random: &lemonfiber_fixtures::support::FixedRandom(None),
-            taking: &Retaking::default(),
-            confined: &lemonfiber_adapters::Disk,
-            patience: std::time::Duration::from_secs(2),
-        },
-    )
-    .await
-}
-
-/// What one read came to, asked of a registry that offers nothing.
-async fn read(asked: Authoring, json: bool) -> Answered {
-    published(
-        &asked,
-        json,
-        &answering(404, "{}"),
-        lemonfiber_fixtures::proving::Proving::unreachable().as_ref(),
-    )
-    .await
-}
-
-/// A registry that offers one signature over one payload, over no network.
-fn offering(payload: &'static str) -> impl Registry {
-    const MANIFEST: &str = r#"{"schemaVersion":2,"layers":[
-            {"digest":"sha256:aaa","annotations":{"dev.cosignproject.cosign/signature":"AQID"}}
-        ]}"#;
-    let reaching: Arc<dyn lemonfiber_core::ports::http::Http> = Fake::by_path(vec![
-        ("/manifests/", Answer::reply(200, MANIFEST)),
-        ("/blobs/", Answer::reply(200, payload)),
-    ]);
-    lemonfiber_adapters::registry::Oci::new(reaching)
-}
 
 /// What was shown, or nothing where the read had no lines to show.
 fn said(answered: &Answered) -> String {
@@ -135,20 +13,17 @@ fn said(answered: &Answered) -> String {
 }
 
 /// Each published document arrives in both forms, and neither is a fault.
-#[tokio::test]
-async fn every_document_this_build_publishes_has_a_form_for_each_reader() {
-    /// Naming a read without making one, since a request is not `Clone`.
-    type Asking = fn() -> Authoring;
-
-    let asked: [(&str, Asking); 3] = [
-        ("schema", || Authoring::Schema),
-        ("extension-points", || Authoring::ExtensionPoints),
-        ("capabilities", || Authoring::Capabilities),
+#[test]
+fn every_document_this_build_publishes_has_a_form_for_each_reader() {
+    let asked = [
+        ("schema", Document::Schema),
+        ("extension-points", Document::ExtensionPoints),
+        ("capabilities", Document::Capabilities),
     ];
     let mut seen = 0_usize;
     for (named, one) in asked {
         for json in [true, false] {
-            let answered = read(one(), json).await;
+            let answered = published(one, json);
             assert_eq!(answered.code, 0, "{named} at json={json}");
             assert!(answered.fault.is_none(), "{named} at json={json}");
             assert!(!said(&answered).is_empty(), "{named} at json={json}");
@@ -162,206 +37,21 @@ async fn every_document_this_build_publishes_has_a_form_for_each_reader() {
 ///
 /// It is a thing an editor reads rather than a listing a person does, so unlike
 /// the other two it has no second form to fall back to.
-#[tokio::test]
-async fn the_schema_is_the_same_document_either_way() {
-    let plain = said(&read(Authoring::Schema, false).await);
-    let machine = said(&read(Authoring::Schema, true).await);
+#[test]
+fn the_schema_is_the_same_document_either_way() {
+    let plain = said(&published(Document::Schema, false));
+    let machine = said(&published(Document::Schema, true));
     assert_eq!(plain, machine);
     assert!(plain.contains("schema_version"), "{plain}");
 }
 
 /// The two listings are listings for a person and documents for a parser.
-#[tokio::test]
-async fn a_listing_reads_as_prose_and_a_document_reads_as_json() {
-    let listed = said(&read(Authoring::ExtensionPoints, false).await);
-    let document = said(&read(Authoring::ExtensionPoints, true).await);
+#[test]
+fn a_listing_reads_as_prose_and_a_document_reads_as_json() {
+    let listed = said(&published(Document::ExtensionPoints, false));
+    let document = said(&published(Document::ExtensionPoints, true));
     assert_ne!(listed, document);
     assert!(document.starts_with('{'), "{document}");
-}
-
-#[tokio::test]
-async fn a_plugin_nothing_refuses_is_read_and_the_run_ends_well() {
-    let at = source("whole", WHOLE);
-    let answered = read(Authoring::Claims { path: at }, false).await;
-    assert_eq!(answered.code, 0, "{:?}", answered.fault);
-    assert!(answered.fault.is_none());
-    assert!(said(&answered).contains("kavita"), "{}", said(&answered));
-}
-
-/// A plugin whose adapters speak nothing conforms with nothing to judge, and one the
-/// manifest rules refuse is shown and still fails.
-#[tokio::test]
-async fn conforming_ends_on_whether_the_plugin_would_fill_what_it_speaks() {
-    let whole = read(
-        Authoring::Conform {
-            path: source("conform-whole", WHOLE),
-        },
-        false,
-    )
-    .await;
-    assert_eq!(whole.code, 0, "{:?}", whole.fault);
-    assert!(
-        said(&whole).contains("nothing to judge"),
-        "{}",
-        said(&whole)
-    );
-
-    let refused = read(
-        Authoring::Conform {
-            path: source("conform-unpinned", &unpinned()),
-        },
-        false,
-    )
-    .await;
-    assert_eq!(refused.code, FAILURE);
-    assert!(refused.fault.is_none(), "{:?}", refused.fault);
-    assert!(said(&refused).contains("Refused"), "{}", said(&refused));
-}
-
-/// A refused manifest is shown and still fails.
-///
-/// The author's CI is asking whether this would be installed, and the whole of
-/// why it would not is in the lines — exiting non-zero without them would answer
-/// the question and withhold the reason.
-#[tokio::test]
-async fn a_plugin_that_would_not_install_says_why_and_still_fails() {
-    let at = source("unpinned", &unpinned());
-    let answered = read(Authoring::Claims { path: at }, false).await;
-    assert_eq!(answered.code, FAILURE);
-    assert!(answered.fault.is_none(), "{:?}", answered.fault);
-    assert!(!said(&answered).is_empty(), "the reason was withheld");
-}
-
-/// Pointing at the wrong directory is a different thing from a refused manifest.
-#[tokio::test]
-async fn a_path_holding_no_manifest_is_a_fault_rather_than_a_verdict() {
-    for asked in [
-        Authoring::Claims { path: nowhere() },
-        Authoring::Conform { path: nowhere() },
-        Authoring::Provenance {
-            path: nowhere(),
-            keys: Vec::new(),
-        },
-    ] {
-        let answered = read(asked, false).await;
-        assert_eq!(answered.code, FAILURE);
-        assert!(answered.lines.is_none());
-        let fault = answered.fault.unwrap_or_default();
-        assert!(fault.contains("plugin.toml"), "{fault}");
-    }
-}
-
-/// An image nobody signed does not stop an install, and says so in words.
-#[tokio::test]
-async fn an_image_no_registry_offers_a_signature_for_is_unproven_and_allowed() {
-    let at = source("unproven", WHOLE);
-    let answered = read(
-        Authoring::Provenance {
-            path: at,
-            keys: Vec::new(),
-        },
-        false,
-    )
-    .await;
-    assert_eq!(answered.code, 0, "{:?}", answered.fault);
-    let said = said(&answered);
-    assert!(said.contains("unproven"), "{said}");
-    assert!(said.contains("stops an install"), "{said}");
-}
-
-/// The same read for a parser is the document, not the prose.
-#[tokio::test]
-async fn what_was_vouched_for_is_a_document_where_a_script_asked() {
-    let at = source("vouched-json", WHOLE);
-    let said = said(
-        &read(
-            Authoring::Provenance {
-                path: at,
-                keys: Vec::new(),
-            },
-            true,
-        )
-        .await,
-    );
-    assert!(said.contains(r#""provenance": "unproven""#), "{said}");
-}
-
-/// A key that cannot be read stops the run rather than being dropped.
-///
-/// A check carried out against fewer keys than were asked for would report
-/// *unproven* about an image somebody did sign.
-#[test]
-fn a_key_this_build_cannot_read_stops_the_run_naming_it() {
-    let absent = held_keys(&[nowhere()]);
-    assert!(absent
-        .as_ref()
-        .err()
-        .is_some_and(|why| why.contains("could not be read")));
-
-    let nonsense = held_keys(&[written("not-a-key", "hello")]);
-    assert!(nonsense
-        .as_ref()
-        .err()
-        .is_some_and(|why| why.contains("P-256")));
-
-    assert!(held_keys(&[]).is_ok_and(|held| held.is_empty()));
-}
-
-/// A key on the P-256 curve is read and named as the operator named it.
-#[test]
-fn a_key_an_operator_named_is_read_under_the_path_they_gave() {
-    let at = written("a-key", PUBLIC_KEY);
-    let held = held_keys(std::slice::from_ref(&at));
-    assert_eq!(
-        held.ok()
-            .and_then(|held| held.first().map(|key| key.named.clone())),
-        Some(at.display().to_string())
-    );
-}
-
-/// A signature that does not hold stops the install and says why.
-///
-/// The payload names another image, which is the refusal that needs no key to
-/// establish — a signature somebody really made, about something else.
-#[tokio::test]
-async fn an_image_whose_signature_does_not_hold_stops_the_install() {
-    let elsewhere = r#"{"critical":{"image":{"docker-manifest-digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}}}"#;
-    let answered = published(
-        &Authoring::Provenance {
-            path: source("refused", WHOLE),
-            keys: vec![written("refusing-key", PUBLIC_KEY)],
-        },
-        false,
-        &offering(elsewhere),
-        lemonfiber_fixtures::proving::Proving::unreachable().as_ref(),
-    )
-    .await;
-
-    assert_eq!(answered.code, FAILURE, "{:?}", answered.fault);
-    assert!(answered.fault.is_none());
-    let said = said(&answered);
-    assert!(said.contains("refused"), "{said}");
-    assert!(said.contains("would not be installed"), "{said}");
-}
-
-/// A key named on the command line and not readable stops the whole read.
-#[tokio::test]
-async fn a_key_the_read_was_given_and_cannot_use_stops_it_before_asking() {
-    let answered = read(
-        Authoring::Provenance {
-            path: source("bad-key", WHOLE),
-            keys: vec![written("gibberish", "hello")],
-        },
-        false,
-    )
-    .await;
-
-    assert_eq!(answered.code, FAILURE);
-    assert!(
-        answered.lines.is_none(),
-        "a key it could not use was dropped"
-    );
-    assert!(answered.fault.is_some_and(|why| why.contains("P-256")));
 }
 
 /// A vocabulary this build could not generate is reported as this build's fault.
@@ -379,13 +69,7 @@ fn a_vocabulary_that_could_not_be_generated_is_this_builds_fault() {
         .is_some_and(|why| why.contains("could not be written as JSON")));
 }
 
-/// A public key on the curve this build verifies against.
-const PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\n\
-        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXO0Zk0m0jt9dqnbvJx6tQYFThLEC\n\
-        E9HmhZsMHLTKQ2u/0O4bnfsX+zEr1Nru7O6Yf+MbtXeJ+rNJ4BBBzbf9bA==\n\
-        -----END PUBLIC KEY-----\n";
-
-/// The two faults that are this build's own, said as this build's own.
+/// A document this build could not write, said as this build's own fault.
 ///
 /// Reached by calling them rather than by driving a document that fails to
 /// render, because neither can be made to happen from outside: a generated
@@ -400,12 +84,6 @@ fn a_document_this_build_could_not_write_is_reported_as_this_builds_fault() {
     assert!(unwritten
         .fault
         .is_some_and(|why| why.contains("could not be written")));
-
-    let unread = unrenderable();
-    assert_eq!(unread.code, FAILURE);
-    assert!(unread
-        .fault
-        .is_some_and(|why| why.contains("could not be written as JSON")));
 }
 
 /// A document that did render is shown and the run ends well.
@@ -417,183 +95,5 @@ fn a_document_that_rendered_is_shown_without_a_fault() {
     assert_eq!(
         written.lines.as_ref().map(super::render::Lines::text),
         Some("{}".to_owned())
-    );
-}
-
-/// The scratch paths are the ones these cases wrote, and nowhere else.
-#[test]
-fn nothing_here_reaches_outside_a_scratch_directory() {
-    for at in [
-        source("scoped", WHOLE),
-        written("scoped-file", "x"),
-        nowhere(),
-    ] {
-        assert!(at.starts_with(std::env::temp_dir()), "{}", at.display());
-    }
-}
-
-/// The path a read is given is the plugin's, and a file inside it reads the same.
-#[tokio::test]
-async fn a_directory_and_the_manifest_inside_it_are_the_same_plugin() {
-    let at = source("either-way", WHOLE);
-    let directory = read(Authoring::Claims { path: at.clone() }, true).await;
-    let file = read(
-        Authoring::Claims {
-            path: at.join("plugin.toml"),
-        },
-        true,
-    )
-    .await;
-    assert_eq!(said(&directory), said(&file));
-    assert_eq!(directory.code, file.code);
-}
-
-/// A path that is neither is refused, and the refusal names what was looked for.
-#[test]
-fn a_manifest_this_build_cannot_read_is_refused_rather_than_half_read() {
-    let at = source("half", "schema_version = 1\n");
-    let read = lemonfiber_core::plugin::read(Path::new(&at));
-    assert!(read.is_err(), "a manifest missing everything was read");
-}
-
-/// The same manifest with one proof that runs the image's own program.
-fn running() -> String {
-    format!(
-        "{WHOLE}\n[[proof]]\nid      = \"kavita.runs\"\ntitle   = \"It starts\"\n\
-         run     = {{ args = [\"--version\"] }}\n\
-         expect  = {{ exit = 0, stdout_starts_with = \"v1\" }}\n\
-         fixture = \"recordings/kavita/runs.json\"\nwhy     = \"It starts.\"\n"
-    )
-}
-
-/// Recording writes what the run said, and a run that cannot be made fails the run.
-#[tokio::test]
-async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made() {
-    let at = source("record", &running());
-    let wrote = published(
-        &Authoring::Record {
-            path: at.clone(),
-            check: false,
-            adapter: None,
-            built: None,
-        },
-        false,
-        &answering(404, "{}"),
-        lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
-    )
-    .await;
-    assert_eq!(
-        wrote.code, FAILURE,
-        "a recording with no note fails the run"
-    );
-    assert!(
-        said(&wrote).contains("written with an empty note"),
-        "{}",
-        said(&wrote)
-    );
-    let kept = at.join("recordings/kavita/runs.json");
-    let text = std::fs::read_to_string(&kept).unwrap_or_default();
-    assert!(
-        text.contains("\"stdout_starts_with\": \"v1.2\\n\""),
-        "{text}"
-    );
-    let _ = std::fs::write(
-        &kept,
-        text.replace("\"note\": \"\"", "\"note\": \"It starts.\""),
-    );
-    let noted = published(
-        &Authoring::Record {
-            path: at.clone(),
-            check: false,
-            adapter: None,
-            built: None,
-        },
-        false,
-        &answering(404, "{}"),
-        lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
-    )
-    .await;
-    assert_eq!(noted.code, 0, "{:?}", noted.fault);
-    assert!(said(&noted).contains("reproduced"), "{}", said(&noted));
-
-    let unmade = read(
-        Authoring::Record {
-            path: source("record-unmade", &running()),
-            check: false,
-            adapter: None,
-            built: None,
-        },
-        false,
-    )
-    .await;
-    assert_eq!(unmade.code, FAILURE);
-    assert!(said(&unmade).contains("not recorded"), "{}", said(&unmade));
-
-    let nowhere = read(
-        Authoring::Record {
-            path: PathBuf::from("/lemonfiber/no/such/plugin"),
-            check: false,
-            adapter: None,
-            built: None,
-        },
-        false,
-    )
-    .await;
-    assert_eq!(nowhere.code, FAILURE);
-    assert!(nowhere.fault.is_some());
-}
-
-#[test]
-fn a_check_holds_what_it_takes_and_starts_the_adapter_it_names() {
-    let asked = |check, adapter: Option<&str>| {
-        taking(&Authoring::Record {
-            path: PathBuf::from("."),
-            check,
-            adapter: adapter.map(str::to_owned),
-            built: None,
-        })
-    };
-    assert_eq!(asked(false, None), Retaking::default());
-    assert_eq!(
-        asked(true, None),
-        Retaking {
-            check: true,
-            adapter: None,
-            built: None
-        }
-    );
-    assert_eq!(
-        asked(true, Some("plugin-sonarr:pr")),
-        Retaking {
-            check: true,
-            adapter: Some("plugin-sonarr:pr".to_owned()),
-            built: None
-        }
-    );
-    assert_eq!(
-        asked(false, Some("plugin-seerr:pr")),
-        Retaking {
-            check: false,
-            adapter: Some("plugin-seerr:pr".to_owned()),
-            built: None
-        }
-    );
-    assert_eq!(taking(&Authoring::Capabilities), Retaking::default());
-}
-
-#[test]
-fn a_record_starts_the_plugins_own_service_from_the_image_built_names() {
-    assert_eq!(
-        taking(&Authoring::Record {
-            path: PathBuf::from("."),
-            check: true,
-            adapter: None,
-            built: Some("first-party-live-built".to_owned()),
-        }),
-        Retaking {
-            check: true,
-            adapter: None,
-            built: Some("first-party-live-built".to_owned()),
-        }
     );
 }

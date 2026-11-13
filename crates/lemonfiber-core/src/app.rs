@@ -42,6 +42,7 @@ pub mod appetite;
 pub mod apply;
 pub mod archives;
 pub(crate) mod arrangement;
+pub mod authoring;
 pub(crate) mod beside;
 pub(crate) mod boot;
 pub(crate) mod bounded;
@@ -312,6 +313,22 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
+    if !matches!(command, Command::Authoring(_)) {
+        stack_first(&command, ctx).await;
+    }
+    Box::pin(routed(rehearsal::carried(command, ctx), ctx))
+        .await
+        .map(|outcome| {
+            if ctx.dry_run {
+                outcome.said_as_a_rehearsal()
+            } else {
+                outcome
+            }
+        })
+}
+
+/// What every command that reaches a stack settles before it is routed.
+async fn stack_first(command: &Command, ctx: &Ctx) {
     // What a failed restart left, said before the answer to whatever was actually
     // asked for — and once, however many commands follow it. A boot that failed at
     // four in the morning has nobody to tell, so the only moment it can reach the
@@ -324,21 +341,12 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // Last, so that the sentence nearest the acting is the one about what acting
     // costs. The line above is news from a run nobody saw; this one is about the
     // run the operator is in the middle of asking for.
-    disturbance::said(&command, ctx).await;
+    disturbance::said(command, ctx).await;
     crate::settings::filing::everything(ctx).await;
     // Before anything signs in with a credential lemonfiber minted: a rotation that
     // stopped part-way left its replacement beside it, and which of the two the
     // service takes is settled here so every command after it signs in with that one.
     credentials::pending::settled(ctx).await;
-    Box::pin(routed(rehearsal::carried(command, ctx), ctx))
-        .await
-        .map(|outcome| {
-            if ctx.dry_run {
-                outcome.said_as_a_rehearsal()
-            } else {
-                outcome
-            }
-        })
 }
 
 /// What this product's own vocabulary answers: one word, or all of them.
@@ -452,6 +460,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Credentials(asked) => inventoried(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         Command::Plugins(action) => plugins::plugins(ctx, &action).await.map(Outcome::Plugins),
+        Command::Authoring(asked) => authoring::answered(ctx, asked).await,
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.

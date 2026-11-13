@@ -30,7 +30,7 @@ use crate::schema::Manifest;
 const SERVICE: &str = "/$defs/PluginService";
 
 /// One thing a manifest got wrong, and where.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Violation {
     /// Which declaration it is about, in the manifest's own terms.
     pub location: String,

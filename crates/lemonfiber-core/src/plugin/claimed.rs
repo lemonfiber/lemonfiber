@@ -140,7 +140,7 @@ pub struct FailingAsDeclared {
 }
 
 /// One probe a claim binds, and what running it against its recording came to.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Ran {
     /// The probe the vocabulary declares, by name.
     pub probe: String,
@@ -149,7 +149,7 @@ pub struct Ran {
 }
 
 /// One capability a plugin's service declares, and what this build makes of it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Claiming {
     /// The capability's name.
     pub name: String,
@@ -170,7 +170,7 @@ pub struct Claiming {
 }
 
 /// One row a plugin adds to a register lemonfiber already runs.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Contributed {
     /// The point it is made at.
     pub at: String,
@@ -184,7 +184,7 @@ pub struct Contributed {
 }
 
 /// Everything a plugin's source says, and what this build makes of it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Claimed {
     /// The plugin's id.
     pub id: String,
