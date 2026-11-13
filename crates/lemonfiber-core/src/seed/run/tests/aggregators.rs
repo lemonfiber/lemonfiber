@@ -71,7 +71,27 @@ fn curator_ctx(name: &str, http: Arc<Fake>, keyed: Option<&str>) -> Ctx {
 /// A moved curator reading from `held`, and taking every aggregator it is told about with
 /// `added`.
 fn reading(held: &[crate::ports::service::KnownAggregator], added: Answer) -> Arc<Fake> {
-    Fake::by_path(vec![books::aggregators(held), books::add_aggregator(added)])
+    pulling_again(held, added, books::taken())
+}
+
+/// The same, answering each ask to pull its indexers again with `pulled`.
+fn pulling_again(
+    held: &[crate::ports::service::KnownAggregator],
+    added: Answer,
+    pulled: Answer,
+) -> Arc<Fake> {
+    Fake::by_path(vec![
+        books::aggregators(held),
+        books::add_aggregator(added),
+        (books::pulling("pull"), pulled),
+    ])
+}
+
+/// How many times the moved curator was asked to pull its indexers again in `sent`.
+fn pulls(sent: &[crate::ports::http::Request]) -> usize {
+    sent.iter()
+        .filter(|one| one.url.ends_with(books::pulling("pull")))
+        .count()
 }
 
 /// What the pass tells the moved curator beside the stack's indexer.
@@ -129,6 +149,61 @@ async fn an_aggregator_already_known_is_not_registered_again() {
         "{wirings:?}"
     );
     assert!(books::added(&http.requests()).is_empty());
+    assert_eq!(pulls(&http.requests()), 1);
+}
+
+/// A curator already reading from the aggregator that cannot be asked to pull again keeps
+/// the pair as it was, and one whose pull fails is reported in its own words.
+#[tokio::test]
+async fn a_curator_asked_to_pull_again_that_cannot_keeps_the_pair_and_one_that_fails_is_reported() {
+    let known = [books::reading_from("http://prowlarr:9696", true)];
+    let unsupported = told(&curator_ctx(
+        "aggregators-pull-unsupported",
+        pulling_again(
+            &known,
+            books::taken(),
+            crate::test_support::adapted::refused(lemonfiber_contract::wire::Kind::Unsupported),
+        ),
+        Some(KEYED),
+    ))
+    .await;
+    let refused = told(&curator_ctx(
+        "aggregators-pull-refused",
+        pulling_again(&known, books::taken(), books::refusing()),
+        Some(KEYED),
+    ))
+    .await;
+
+    assert_eq!(
+        unsupported.first().map(|wiring| &wiring.state),
+        Some(&crate::seed::State::AlreadyWired),
+        "{unsupported:?}"
+    );
+    assert!(
+        refused
+            .first()
+            .is_some_and(|wiring| matches!(wiring.state, crate::seed::State::Failed { .. })),
+        "{refused:?}"
+    );
+}
+
+/// A rehearsal over a curator already reading from the aggregator asks it nothing.
+#[tokio::test]
+async fn a_rehearsal_asks_no_curator_to_pull_again() {
+    let http = reading(
+        &[books::reading_from("http://prowlarr:9696", true)],
+        books::taken(),
+    );
+    let ctx = curator_ctx("aggregators-pull-rehearsed", http.clone(), Some(KEYED)).rehearsing();
+
+    let wirings = told(&ctx).await;
+
+    assert_eq!(
+        wirings.first().map(|wiring| &wiring.state),
+        Some(&crate::seed::State::AlreadyWired),
+        "{wirings:?}"
+    );
+    assert_eq!(pulls(&http.requests()), 0);
 }
 
 /// One held without a key counts as absent, and is registered again: reading it back as

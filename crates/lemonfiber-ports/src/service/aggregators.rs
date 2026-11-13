@@ -97,4 +97,12 @@ pub trait PullsIndexers: Send + Sync {
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn add_aggregator(&self, aggregator: &AggregatorAt) -> Result<(), Failure>;
+
+    /// Read its indexers again, at once, from every aggregator it already reads from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses, and
+    /// [`Failure::Unsupported`] where it cannot be asked to.
+    async fn pull(&self) -> Result<(), Failure>;
 }

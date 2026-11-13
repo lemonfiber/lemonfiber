@@ -94,7 +94,7 @@ async fn told(
         .iter()
         .any(|known| known.url == aggregator.url && known.keyed)
     {
-        return crate::seed::State::AlreadyWired;
+        return pulled_again(puller, rehearsing).await;
     }
     // Below the read and the already-there check, because both are true of a real run
     // too: what a rehearsal leaves out is the registration, and nothing above it.
@@ -108,6 +108,21 @@ async fn told(
         return unreached(asker, aggregator, &failure);
     }
     crate::seed::State::Wired
+}
+
+/// A curator already reading from the aggregator, asked to read its indexers from it
+/// again, so one added to the aggregator since reaches it.
+///
+/// Not in a rehearsal, which asks nothing of a service. A curator that cannot be asked to
+/// keeps the pair as it was.
+async fn pulled_again(puller: &pull::Adapter, rehearsing: bool) -> crate::seed::State {
+    if rehearsing {
+        return crate::seed::State::AlreadyWired;
+    }
+    match puller.pull().await {
+        Ok(()) | Err(Failure::Unsupported { .. }) => crate::seed::State::AlreadyWired,
+        Err(failure) => crate::seed::unreached(&failure),
+    }
 }
 
 /// A curator that would not take the aggregator, in its own words: unpaired where it

@@ -139,6 +139,8 @@ crate::contract! {
                     key: Placeholder::Minted.written(),
                 },
             };
+            /// Read its indexers again, at once, from every aggregator it already reads from.
+            fn pull() -> () where since = 1, asks = Asked {};
         }
     }
 }
