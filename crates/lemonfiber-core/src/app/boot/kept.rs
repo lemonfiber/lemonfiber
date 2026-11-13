@@ -152,7 +152,7 @@ pub(crate) async fn booted(ctx: &Ctx) -> Result<BootReport, Box<Problem>> {
             .declined
             .filter(|declined| latest(declined.against))
             .map(|declined| declined.said),
-        failing_since: standing.and_then(|condition| condition.since.parse().ok()),
+        failing_since: standing.map(|condition| condition.since.seconds()),
         failed_boots: standing.map(|condition| condition.recurrences),
     })
 }

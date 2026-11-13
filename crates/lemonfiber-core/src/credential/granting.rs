@@ -16,8 +16,9 @@ pub struct Granted {
     /// The capability of the plugin's own it was granted to fill.
     #[serde(rename = "for")]
     pub serves: String,
-    /// When the operator approved it.
-    pub at: crate::instant::Instant,
+    /// When the operator approved it, where the record says.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<crate::instant::Instant>,
 }
 
 impl Granted {
@@ -29,7 +30,7 @@ impl Granted {
             credential: grant.credential.clone(),
             of: grant.of.clone(),
             serves: grant.serves.clone(),
-            at: grant.at.clone(),
+            at: grant.at,
         }
     }
 

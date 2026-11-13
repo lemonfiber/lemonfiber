@@ -16,8 +16,13 @@ pub struct Grant {
     #[serde(rename = "for")]
     pub serves: String,
     /// When the operator approved it, as the record stamps every change.
-    #[serde(deserialize_with = "crate::instant::kept")]
-    pub at: crate::instant::Instant,
+    /// Absent on an offer's account of a grant, which nobody has approved yet.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::instant::kept_option"
+    )]
+    pub at: Option<crate::instant::Instant>,
 }
 
 impl Grant {

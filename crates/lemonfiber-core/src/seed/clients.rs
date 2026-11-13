@@ -9,6 +9,8 @@ use super::{
     Wiring,
 };
 
+use crate::instant::Instant;
+
 /// Wire a service's download clients: register the ones it lacks, leave the ones
 /// it already has, and record each write as a change.
 ///
@@ -24,7 +26,7 @@ pub async fn wire_download_clients(
     wanted: &[DownloadClient],
     journal: &mut Journal,
     baselines: &mut Baselines<'_>,
-    at: &str,
+    at: Instant,
 ) -> Vec<Wiring> {
     let existing = match observe_or_skip(client.download_clients().await, wanted, |want| {
         describe_client(service, want)
@@ -67,7 +69,7 @@ async fn wire_one_client(
     existing: &[RegisteredClient],
     baselines: &mut Baselines<'_>,
     journal: &mut Journal,
-    at: &str,
+    at: Instant,
 ) -> (Wiring, Option<String>) {
     // What lemonfiber last recorded here — the expected leg of the three-way
     // comparison, read before the pass writes into `records` so the two do not both
@@ -196,7 +198,7 @@ async fn wire_by_intent(
     observed: Observed,
     found: Option<&String>,
     journal: &mut Journal,
-    at: &str,
+    at: Instant,
 ) -> State {
     match intent(observed) {
         Intent::Wire => {

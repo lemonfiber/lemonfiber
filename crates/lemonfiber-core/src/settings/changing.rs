@@ -148,12 +148,12 @@ async fn written(
     let mut journal: Vec<Change> = change
         .settings
         .iter()
-        .map(|one| journalled(one, &stamp))
+        .map(|one| journalled(one, stamp))
         .collect();
     journal.extend(
         overwrites
             .iter()
-            .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
+            .map(|overwrite| overwrite.journalled(super::OPERATION, stamp)),
     );
     crate::app::recover::journalled(&paths.journal(), &journal)
         .map_err(|failure| Box::new(failure.problem()))?;
@@ -200,7 +200,7 @@ fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>
 
 fn journalled(one: &SettingMove, stamp: Instant) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: one.setting.clone(),
         kind: Kind::Setting {

@@ -43,10 +43,10 @@ pub(crate) fn moved(ctx: &Ctx, manifest: &Manifest) -> Result<(), Box<Problem>> 
     for (from, to) in pending(confined, &directory, manifest, carried.files) {
         let mut changes: Vec<Change> = missing(&to)
             .into_iter()
-            .map(|path| change(&stamp, Kind::Made { path: shown(&path) }, &path))
+            .map(|path| change(stamp, Kind::Made { path: shown(&path) }, &path))
             .collect();
         changes.push(change(
-            &stamp,
+            stamp,
             Kind::Moved {
                 from: shown(&from),
                 to: shown(&to),
@@ -132,7 +132,7 @@ pub(super) fn shown(path: &Path) -> String {
 /// One entry of the move about `target`, journalled under the project's own operation.
 pub(super) fn change(stamp: Instant, kind: Kind, target: &Path) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: shown(target),
         kind,

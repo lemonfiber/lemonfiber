@@ -96,7 +96,7 @@ pub(crate) fn asked(
                 credential,
                 of: secret.of.clone(),
                 serves,
-                at: Instant::EPOCH,
+                at: None,
             });
         }
     }
@@ -104,7 +104,7 @@ pub(crate) fn asked(
 }
 
 /// Each of `grants` stamped as approved at `stamp`.
-pub(crate) fn approved(grants: &[Grant], stamp: Instant) -> Vec<Grant> {
+pub(crate) fn approved(grants: &[Grant], stamp: Option<Instant>) -> Vec<Grant> {
     grants
         .iter()
         .map(|grant| Grant {
@@ -151,7 +151,7 @@ pub(crate) fn journalled(
 /// The journalled change of `plugin` being given `grant`, or of the grant ending.
 fn change(plugin: &str, grant: &Grant, given: bool, stamp: Instant) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: crate::plugin::owner(plugin),
         target: grant.credential.clone(),
         kind: Kind::Granted {
@@ -215,7 +215,7 @@ pub(crate) async fn revoke(
     }
     let grant = grant.clone();
     let stamp = ctx.stamp();
-    journalled(ctx, plugin, std::slice::from_ref(&grant), &[], &stamp)?;
+    journalled(ctx, plugin, std::slice::from_ref(&grant), &[], stamp)?;
     let mut after = held;
     after.regrant(plugin, &grant, false);
     super::super::record::keep(super::kept_at(ctx).as_deref(), &after)?;

@@ -270,8 +270,8 @@ pub(super) fn answered(
 /// file.
 fn the_plugin(read: &str, would: &Installed) -> String {
     let source = Installed {
-        installed_at: String::new(),
-        granted: super::granting::approved(&would.granted, ""),
+        installed_at: None,
+        granted: super::granting::approved(&would.granted, None),
         ..would.clone()
     };
     crate::agreement::sealed(&[read, &json(&source)])

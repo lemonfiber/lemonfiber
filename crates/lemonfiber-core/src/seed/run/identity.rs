@@ -11,6 +11,7 @@
 use super::Ctx;
 use crate::app::credentials::Replacing;
 use crate::app::targets::MediaServer;
+use crate::instant::Instant;
 
 /// The media server's administrator, as the first half of the identity left it: how the
 /// request service's owner signs in, or the state the identity rests in without a way to,
@@ -325,7 +326,7 @@ fn remember(
     service: &str,
     state: &crate::seed::State,
     held: &crate::ports::service::Telling,
-    at: &str,
+    at: Instant,
 ) {
     match state {
         crate::seed::State::Wired | crate::seed::State::AlreadyWired => records.record(

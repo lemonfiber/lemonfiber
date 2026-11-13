@@ -304,7 +304,7 @@ pub(crate) fn an_installed(
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     }
 }
 

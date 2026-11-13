@@ -43,7 +43,7 @@ pub(crate) fn made(
         let changes: Vec<_> = missing(&source)
             .into_iter()
             .chain(std::iter::once(source.clone()))
-            .map(|path| change(&stamp, Kind::Made { path: shown(&path) }, &path))
+            .map(|path| change(stamp, Kind::Made { path: shown(&path) }, &path))
             .collect();
         crate::app::recover::journalled(&paths.journal(), &changes)
             .map_err(|failure| Box::new(failure.problem()))?;

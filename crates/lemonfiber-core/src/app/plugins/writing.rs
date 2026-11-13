@@ -254,7 +254,7 @@ pub(crate) struct Overwrite {
 }
 
 impl Overwrite {
-    pub(crate) fn journalled(&self, operation: &str, at: &str) -> Change {
+    pub(crate) fn journalled(&self, operation: &str, at: Instant) -> Change {
         super::super::project::change(
             &self.path,
             Some(self.previous.clone()),
@@ -423,7 +423,7 @@ fn missing_from(path: &Path, directory: bool) -> Vec<PathBuf> {
 fn made(plugin: &str, path: &Path, stamp: Instant) -> Change {
     let path = path.display().to_string();
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: crate::plugin::owner(plugin),
         target: path.clone(),
         kind: Kind::Made { path },

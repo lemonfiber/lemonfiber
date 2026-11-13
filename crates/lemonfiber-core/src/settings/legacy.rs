@@ -11,6 +11,7 @@ use crate::config::{
     INDEXER_APIKEY_KEY, PENDING_SUFFIX, PROVIDER_PASS_KEY, VPN_PORT_FORWARDING_KEY,
     VPN_PROVIDER_KEY,
 };
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::ports::random::Random;
 
@@ -119,7 +120,7 @@ pub(crate) struct Entering<'a> {
     /// The operation it is journalled under.
     pub(crate) operation: &'a str,
     /// The time it is journalled at.
-    pub(crate) stamp: &'a str,
+    pub(crate) stamp: Instant,
     /// The time the store records it entered at.
     pub(crate) at: u64,
     /// Where the secret store's key is drawn from, where it has none yet.
@@ -152,7 +153,7 @@ pub(crate) fn entered(
                 let changes: Vec<Change> = replaced
                     .iter()
                     .map(|one| Change {
-                        at: entering.stamp.to_owned(),
+                        at: entering.stamp,
                         operation: entering.operation.to_owned(),
                         target: one.name.clone(),
                         kind: Kind::Secret {

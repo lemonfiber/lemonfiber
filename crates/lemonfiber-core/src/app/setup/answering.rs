@@ -26,6 +26,7 @@ use crate::config::paths::Paths;
 use crate::config::store;
 use crate::error::codes::setup::{ALREADY_SET_UP, NOTHING_TO_RECOVER};
 use crate::error::{Diagnose, Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::model::{SettingReport, WizardReport};
 use crate::validate::{Credential, Validation, Validator};
 use crate::wizard::{
@@ -124,7 +125,7 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
                 super::would_apply(&mut wizard)?;
             } else {
                 let stamp = ctx.stamp();
-                super::resume(&mut wizard, &applying(ctx, &paths, &stamp, guard.as_ref()))?;
+                super::resume(&mut wizard, &applying(ctx, &paths, stamp, guard.as_ref()))?;
             }
         }
         // Refused where nothing is part-way through: the three ways out are about a
@@ -142,7 +143,7 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
             }
             if !ctx.dry_run {
                 let stamp = ctx.stamp();
-                let applying = applying(ctx, &paths, &stamp, guard.as_ref());
+                let applying = applying(ctx, &paths, stamp, guard.as_ref());
                 super::recovered(&mut wizard, &applying, choice)?;
                 // Starting over forgot the answers, so the walk is back at its
                 // beginning — and a report still reading them off the wizard in hand
@@ -181,7 +182,7 @@ fn kept(ctx: &Ctx, wizard: &Wizard, paths: &Paths) {
 fn applying<'a>(
     ctx: &'a Ctx,
     paths: &'a Paths,
-    stamp: &'a str,
+    stamp: Instant,
     guard: Option<&'a super::Guard>,
 ) -> Applying<'a> {
     Applying {

@@ -80,7 +80,7 @@ pub(super) fn minted(
         let changes: Vec<Change> = absent
             .iter()
             .map(|(one, current)| Change {
-                at: stamp.to_owned(),
+                at: stamp,
                 operation: crate::plugin::owner(plugin),
                 target: one.name.to_owned(),
                 kind: Kind::Secret {

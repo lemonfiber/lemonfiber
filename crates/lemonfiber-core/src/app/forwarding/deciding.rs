@@ -87,7 +87,7 @@ impl Client {
             return None;
         };
         Some(Change {
-            at: stamp.to_owned(),
+            at: stamp,
             operation: OPERATION.to_owned(),
             target: self.service.clone(),
             kind: Kind::Configured {
