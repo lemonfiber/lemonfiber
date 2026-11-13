@@ -12,7 +12,7 @@ async fn a_reset_reverts_a_drifted_category_to_lemonfibers() {
     // The same drift as above — the operator changed the category — but a reset writes
     // lemonfiber's own back over it: the client is updated in place, the connection reads
     // wired again, and the reverted value is recorded so the drift is gone.
-    let service = FakeService::with_clients(
+    let service = Receiving::with_clients(
         Mode::Normal,
         vec![RegisteredClient {
             id: "1".to_owned(),
@@ -58,7 +58,7 @@ async fn a_reset_reverts_a_drifted_category_to_lemonfibers() {
 async fn a_reset_a_service_refuses_is_reported_as_failed_not_recorded() {
     // A reset whose in-place update the service will not take leaves the drift reported
     // as a failure rather than falsely recorded as reverted.
-    let service = FakeService::with_clients(
+    let service = Receiving::with_clients(
         Mode::RefusesUpdate,
         vec![RegisteredClient {
             id: "1".to_owned(),
@@ -105,7 +105,7 @@ async fn a_reset_registers_nothing_a_preview_did_not_show() {
     // registered, so absent — is not a drift to revert, so a reset leaves it: it is not
     // registered, not reported as wired, and not recorded. A confirmed reset must do no
     // more than its preview showed, which listed no absent connection.
-    let service = FakeService::with_clients(Mode::Normal, Vec::new());
+    let service = Receiving::with_clients(Mode::Normal, Vec::new());
     let mut journal = Journal::new();
     let mut records = Baseline::new();
     let wirings = wire_download_clients(
@@ -156,7 +156,7 @@ async fn a_categoryless_client_lemonfiber_never_wrote_is_left_and_not_recorded()
         category: None,
     }];
     let (states, baseline) = seed_clients_recording(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;

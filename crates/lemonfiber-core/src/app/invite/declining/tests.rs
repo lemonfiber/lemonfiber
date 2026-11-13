@@ -164,9 +164,11 @@ fn reaching(decline: Decline) -> crate::app::Ctx {
     ctx.settings.env_file =
         crate::app::targets::project_directory(&ctx.stack, None).map(|at| at.join(".env"));
     let decline = Arc::new(decline);
-    DECLINE.reaching(ctx).with_http(Arc::new(
-        Serving::beside(lemonfiber_fixtures::http::Fake::silent()).decline(&decline),
-    ))
+    DECLINE.reaching(ctx).with_http(
+        Serving::beside(lemonfiber_fixtures::http::Fake::silent())
+            .decline(&decline)
+            .transport(),
+    )
 }
 
 /// What the decline service answers it declined is read, and an answer it will not give

@@ -1,5 +1,7 @@
 //! Tracing against the services: what is read, and what cannot be.
 
+use lemonfiber_fixtures::shelved::Shelf;
+
 use super::*;
 
 /// A context whose media server the trace cannot ask — it has not moved into its plugin,
@@ -17,28 +19,6 @@ fn ctx_with_media_server(fake: &Fake) -> Ctx {
     );
     crate::test_support::media::moved_in(&context);
     context
-}
-
-/// A library answering every question about what it holds with whether it holds it, or
-/// as one that cannot be reached where nothing is said.
-struct Holding(Option<bool>);
-
-#[async_trait::async_trait]
-impl crate::ports::service::Library for Holding {
-    async fn has_item(
-        &self,
-        _kind: TitleKind,
-        _term: &str,
-    ) -> Result<bool, crate::ports::service::Failure> {
-        self.0
-            .ok_or_else(|| crate::ports::service::Failure::Unavailable {
-                service: "jellyfin".to_owned(),
-            })
-    }
-
-    async fn rescan(&self) -> Result<(), crate::ports::service::Failure> {
-        Ok(())
-    }
 }
 
 #[tokio::test]
@@ -123,15 +103,24 @@ async fn tracing_a_matched_item_present_in_the_library_reports_available() {
 #[tokio::test]
 async fn a_media_server_with_nothing_reads_as_absent() {
     // The library answers, holding nothing: a confirmed absence, not an unknown.
-    let presence =
-        library_presence(Some(&Holding(Some(false))), TitleKind::Tv, "The Expanse").await;
+    let presence = library_presence(
+        Some(&Shelf::holding(Some(false))),
+        TitleKind::Tv,
+        "The Expanse",
+    )
+    .await;
     assert_eq!(presence, Some(Presence::Absent));
 }
 
 #[tokio::test]
 async fn a_media_server_that_will_not_answer_leaves_presence_unknown() {
     // The library cannot be read: presence is unknown — never inferred as absent.
-    let presence = library_presence(Some(&Holding(None)), TitleKind::Movies, "The Expanse").await;
+    let presence = library_presence(
+        Some(&Shelf::holding(None)),
+        TitleKind::Movies,
+        "The Expanse",
+    )
+    .await;
     assert_eq!(presence, None);
 }
 

@@ -5,32 +5,12 @@
 
 use std::net::SocketAddr;
 
-use async_trait::async_trait;
-use lemonfiber_core::ports::process::{Failure, Output, Runner};
-
-/// A run of a program that went the way the test chose.
-pub(crate) struct Ran(Result<Output, Failure>);
-
-#[async_trait]
-impl Runner for Ran {
-    async fn run(&self, _: &[String]) -> Result<Output, Failure> {
-        ran(&self.0)
-    }
-}
-
-/// What the fake was built to answer with, as a fresh answer each time.
-fn ran(answer: &Result<Output, Failure>) -> Result<Output, Failure> {
-    match answer {
-        Ok(output) => Ok(output.clone()),
-        Err(_) => Err(Failure::NotFound {
-            program: "xdg-open".to_owned(),
-        }),
-    }
-}
+use lemonfiber_core::ports::process::{Failure, Output};
+use lemonfiber_fixtures::support::Scripted;
 
 /// A program that ran and exited with this status.
-pub(crate) fn exited(status: i32) -> Ran {
-    Ran(Ok(Output {
+pub(crate) fn exited(status: i32) -> Scripted {
+    Scripted(Ok(Output {
         status: Some(status),
         stdout: String::new(),
         stderr: String::new(),
@@ -38,8 +18,8 @@ pub(crate) fn exited(status: i32) -> Ran {
 }
 
 /// A program that is not installed.
-pub(crate) fn missing() -> Ran {
-    Ran(Err(Failure::NotFound {
+pub(crate) fn missing() -> Scripted {
+    Scripted(Err(Failure::NotFound {
         program: "xdg-open".to_owned(),
     }))
 }

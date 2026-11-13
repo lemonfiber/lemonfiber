@@ -9,6 +9,8 @@
 //! inside a container, and the addresses each container publishes are five
 //! questions rather than one.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use lemonfiber_ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
@@ -54,6 +56,25 @@ pub struct Reporting {
     /// means `exec` has nothing to say and fails, as an engine asked for a
     /// container it does not know would.
     tunnel: Option<Tunnel>,
+    /// What every command run inside a container answers, where a test scripts one.
+    exec: Option<ExecOutput>,
+    /// The questions it refuses as an engine that is not answering them.
+    refusing: Vec<Question>,
+    /// Whether it takes every question and never answers any.
+    hangs: bool,
+    /// The engine listed beside it and asked everything else, where it stands beside one.
+    over: Option<Arc<dyn Engine>>,
+}
+
+/// A question an engine can be asked besides what it holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Question {
+    /// A command run inside a container.
+    Exec,
+    /// A sample of what each container uses.
+    Stats,
+    /// What the containers wrote.
+    Logs,
 }
 
 /// What a [`Reporting`] engine answers a VPN exec with: a public address for the
@@ -93,15 +114,8 @@ impl Reporting {
                     exit: None,
                 })
                 .collect(),
-            said: Vec::new(),
             reachable: true,
-            settles_after: None,
-            asked: std::sync::atomic::AtomicUsize::new(0),
-            refusals: 0,
-            refused: std::sync::atomic::AtomicUsize::new(0),
-            answers: None,
-            answered: std::sync::atomic::AtomicUsize::new(0),
-            tunnel: None,
+            ..Self::default()
         }
     }
 
@@ -249,46 +263,116 @@ impl Reporting {
         self
     }
 
+    /// The same engine, with this line among what its containers wrote.
+    #[must_use]
+    pub fn with_line(mut self, line: LogLine) -> Self {
+        self.said.push(line);
+        self
+    }
+
+    /// The same engine, answering every command run inside a container with `output`.
+    #[must_use]
+    pub fn answering_exec(mut self, output: ExecOutput) -> Self {
+        self.exec = Some(output);
+        self
+    }
+
+    /// The same engine, refusing each of `questions` as an engine not answering them.
+    #[must_use]
+    pub fn refusing(mut self, questions: &[Question]) -> Self {
+        self.refusing.extend_from_slice(questions);
+        self
+    }
+
+    /// The same engine, listed beside what `engine` holds, `engine` answering every other
+    /// question; what `engine` cannot list is listed as nothing.
+    #[must_use]
+    pub fn over(mut self, engine: Arc<dyn Engine>) -> Self {
+        self.over = Some(engine);
+        self
+    }
+
+    /// An engine that takes every question and never answers any.
+    #[must_use]
+    pub fn hanging() -> Self {
+        Self {
+            hangs: true,
+            ..Self::default()
+        }
+    }
+
     /// An engine that is not there.
     #[must_use]
     pub fn absent() -> Self {
-        Self {
-            containers: Vec::new(),
-            said: Vec::new(),
-            reachable: false,
-            settles_after: None,
-            asked: std::sync::atomic::AtomicUsize::new(0),
-            refusals: 0,
-            refused: std::sync::atomic::AtomicUsize::new(0),
-            answers: None,
-            answered: std::sync::atomic::AtomicUsize::new(0),
-            tunnel: None,
-        }
+        Self::default()
     }
 }
 
 #[async_trait]
 impl Engine for Reporting {
     async fn list(&self, project: &str) -> Result<Vec<Container>, EngineFailure> {
-        listed(self, project)
+        self.hang().await;
+        let Some(engine) = &self.over else {
+            return listed(self, project);
+        };
+        let mut running = engine.list(project).await.unwrap_or_default();
+        running.extend(listed(self, project)?);
+        Ok(running)
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        executed(self, container, argv)
+        self.hang().await;
+        if let Some(engine) = &self.over {
+            return engine.exec(container, argv).await;
+        }
+        self.answers(Question::Exec)?;
+        match &self.exec {
+            Some(output) => Ok(output.clone()),
+            None => executed(self, container, argv),
+        }
     }
 
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
+    async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
+        self.hang().await;
+        if let Some(engine) = &self.over {
+            return engine.stats(project).await;
+        }
+        self.answers(Question::Stats)?;
         let (_sender, receiver) = tokio::sync::mpsc::channel(1);
         Ok(receiver)
     }
 
     async fn logs(
         &self,
-        _project: &str,
+        project: &str,
         services: &[String],
-        _query: LogQuery,
+        query: LogQuery,
     ) -> Result<Receiver<LogLine>, EngineFailure> {
-        logs(self, _project, services, _query).await
+        self.hang().await;
+        if let Some(engine) = &self.over {
+            return engine.logs(project, services, query).await;
+        }
+        self.answers(Question::Logs)?;
+        logs(self, services).await
+    }
+}
+
+impl Reporting {
+    /// Never coming back, where this engine hangs.
+    async fn hang(&self) {
+        if self.hangs {
+            std::future::pending::<()>().await;
+        }
+    }
+
+    /// Refused as an engine not answering `question`, where it refuses that.
+    fn answers(&self, question: Question) -> Result<(), EngineFailure> {
+        if self.refusing.contains(&question) {
+            return Err(EngineFailure::Unreachable {
+                reason: "nothing is running here".to_owned(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -402,9 +486,7 @@ fn executed(
 
 async fn logs(
     reporting: &Reporting,
-    _project: &str,
     services: &[String],
-    _query: LogQuery,
 ) -> Result<Receiver<LogLine>, EngineFailure> {
     // Opening a stream means finding the containers first, so an engine
     // that cannot be reached refuses this as surely as it refuses a

@@ -3,138 +3,14 @@
 //! The same shape again, matched by the base URL the aggregator reaches the service on.
 
 use common::service::*;
-use std::sync::Mutex;
 
 use crate::common;
-use async_trait::async_trait;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
+    AppSync, Application, ApplicationKind, RegisteredApplication,
 };
 use lemonfiber_core::seed::{wire_applications, State};
-
-// ---- Aggregator applications: the same driver, matched by base URL not label. ----
-
-/// An indexer aggregator that answers the app-sync driver from a script.
-struct FakeAggregator {
-    mode: Mode,
-    applications: Mutex<Vec<RegisteredApplication>>,
-    reads: Mutex<u32>,
-    next_id: Mutex<u32>,
-    /// Whether the key it stores is one the curator no longer answers to.
-    stale: Mutex<bool>,
-    /// Whether a new key it is given still fails its test.
-    stays_stale: bool,
-    /// Every key it was given, in order.
-    rekeyed: Mutex<Vec<String>>,
-    /// Whether it refuses to be given a key at all.
-    refuses_rekey: bool,
-}
-
-impl FakeAggregator {
-    fn with(mode: Mode, applications: Vec<RegisteredApplication>) -> Self {
-        Self {
-            mode,
-            applications: Mutex::new(applications),
-            reads: Mutex::new(0),
-            next_id: Mutex::new(100),
-            stale: Mutex::new(false),
-            stays_stale: false,
-            rekeyed: Mutex::new(Vec::new()),
-            refuses_rekey: false,
-        }
-    }
-
-    /// The same, holding a key the curator has since replaced; where `stays_stale`, the
-    /// key it is given fails too.
-    fn stale(applications: Vec<RegisteredApplication>, stays_stale: bool) -> Self {
-        Self {
-            stale: Mutex::new(true),
-            stays_stale,
-            ..Self::with(Mode::Normal, applications)
-        }
-    }
-}
-
-#[async_trait]
-impl AppSync for FakeAggregator {
-    async fn register_application(&self, application: &Application) -> Result<(), Failure> {
-        match self.mode {
-            Mode::Down => Err(down("prowlarr")),
-            Mode::RejectsRegister => Err(Failure::Refused {
-                service: "prowlarr".to_owned(),
-                detail: "HTTP 400: unknown implementation".to_owned(),
-            }),
-            Mode::Swallows => Ok(()),
-            _ => {
-                if let (Ok(mut applications), Ok(mut id)) =
-                    (self.applications.lock(), self.next_id.lock())
-                {
-                    applications.push(RegisteredApplication {
-                        id: id.to_string(),
-                        // The aggregator stores the canonical address, dropping a
-                        // trailing slash — as its `fields` read back.
-                        base_url: application.base_url.trim_end_matches('/').to_owned(),
-                    });
-                    *id += 1;
-                }
-                Ok(())
-            }
-        }
-    }
-
-    async fn test_application(&self, _held: &RegisteredApplication) -> Result<(), Failure> {
-        if self.stale.lock().map_or(true, |stale| *stale) {
-            return Err(Failure::Refused {
-                service: "prowlarr".to_owned(),
-                detail: "HTTP 400: cannot connect to Sonarr".to_owned(),
-            });
-        }
-        Ok(())
-    }
-
-    async fn rekey_application(
-        &self,
-        _held: &RegisteredApplication,
-        key: &str,
-    ) -> Result<(), Failure> {
-        if self.refuses_rekey {
-            return Err(Failure::Refused {
-                service: "prowlarr".to_owned(),
-                detail: "HTTP 400: validation failed".to_owned(),
-            });
-        }
-        if let Ok(mut rekeyed) = self.rekeyed.lock() {
-            rekeyed.push(key.to_owned());
-        }
-        if let Ok(mut stale) = self.stale.lock() {
-            *stale = self.stays_stale;
-        }
-        Ok(())
-    }
-
-    async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure> {
-        let count = match self.reads.lock() {
-            Ok(mut reads) => {
-                *reads += 1;
-                *reads
-            }
-            Err(_) => 0,
-        };
-        match self.mode {
-            Mode::Down => Err(down("prowlarr")),
-            Mode::RefusesList => Err(Failure::Unauthorised {
-                service: "prowlarr".to_owned(),
-            }),
-            Mode::DropsAfterRegister if count >= 2 => Err(down("prowlarr")),
-            _ => Ok(self
-                .applications
-                .lock()
-                .map(|applications| applications.clone())
-                .unwrap_or_default()),
-        }
-    }
-}
+use lemonfiber_fixtures::applications::Applications;
 
 fn app(base_url: &str) -> Application {
     Application {
@@ -149,7 +25,7 @@ fn app(base_url: &str) -> Application {
 /// Run the app-sync driver for the wanted applications, returning their states
 /// and the number of changes journalled.
 async fn seed_applications(
-    aggregator: FakeAggregator,
+    aggregator: Applications,
     wanted: &[Application],
 ) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
@@ -162,7 +38,7 @@ async fn seed_applications(
 #[tokio::test]
 async fn an_absent_application_is_registered_read_back_and_recorded() {
     let (states, recorded) = seed_applications(
-        FakeAggregator::with(Mode::Normal, Vec::new()),
+        Applications::with(Mode::Normal, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -182,7 +58,7 @@ async fn an_application_at_the_same_base_url_is_left_untouched_despite_a_differe
     let mut renamed = app("http://sonarr:8989");
     renamed.name = "Sonarr — my own name".to_owned();
     let (states, recorded) =
-        seed_applications(FakeAggregator::with(Mode::Normal, existing), &[renamed]).await;
+        seed_applications(Applications::with(Mode::Normal, existing), &[renamed]).await;
     assert_eq!(states, vec![State::AlreadyWired]);
     assert_eq!(
         recorded, 0,
@@ -200,7 +76,7 @@ async fn a_present_application_is_matched_despite_a_trailing_slash() {
         base_url: "http://sonarr:8989".to_owned(),
     }];
     let (states, recorded) = seed_applications(
-        FakeAggregator::with(Mode::Normal, existing),
+        Applications::with(Mode::Normal, existing),
         &[app("http://sonarr:8989/")],
     )
     .await;
@@ -211,7 +87,7 @@ async fn a_present_application_is_matched_despite_a_trailing_slash() {
 #[tokio::test]
 async fn an_unavailable_aggregator_skips_every_application() {
     let (states, recorded) = seed_applications(
-        FakeAggregator::with(Mode::Down, Vec::new()),
+        Applications::with(Mode::Down, Vec::new()),
         &[app("http://sonarr:8989"), app("http://radarr:7878")],
     )
     .await;
@@ -231,7 +107,7 @@ async fn an_unavailable_aggregator_skips_every_application() {
 #[tokio::test]
 async fn an_aggregator_that_refuses_the_application_listing_fails() {
     let (states, _) = seed_applications(
-        FakeAggregator::with(Mode::RefusesList, Vec::new()),
+        Applications::with(Mode::RefusesList, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -244,7 +120,7 @@ async fn an_aggregator_that_refuses_the_application_listing_fails() {
 #[tokio::test]
 async fn a_rejected_application_registration_fails_with_the_aggregators_own_words() {
     let (states, recorded) = seed_applications(
-        FakeAggregator::with(Mode::RejectsRegister, Vec::new()),
+        Applications::with(Mode::RejectsRegister, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -263,7 +139,7 @@ async fn a_rejected_application_registration_fails_with_the_aggregators_own_word
 async fn an_application_write_that_does_not_appear_when_read_back_is_a_failure() {
     // Accepted but not reported back, so it did not land — not done, not recorded.
     let (states, recorded) = seed_applications(
-        FakeAggregator::with(Mode::Swallows, Vec::new()),
+        Applications::with(Mode::Swallows, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -279,7 +155,7 @@ async fn an_aggregator_that_stops_answering_after_the_write_is_skipped() {
     // The write went out but could not be confirmed, so it is left for a later
     // run to reconcile rather than declared wired.
     let (states, recorded) = seed_applications(
-        FakeAggregator::with(Mode::DropsAfterRegister, Vec::new()),
+        Applications::with(Mode::DropsAfterRegister, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -294,10 +170,7 @@ async fn an_aggregator_that_stops_answering_after_the_write_is_skipped() {
 /// registering left out. The journal is handed back for the half that matters most —
 /// a rehearsal that recorded a change would leave the next `undo` offering to reverse
 /// something nobody made.
-async fn would_register(
-    aggregator: &FakeAggregator,
-    wanted: &[Application],
-) -> (Vec<State>, usize) {
+async fn would_register(aggregator: &Applications, wanted: &[Application]) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
     let wirings = wire_applications(aggregator, "prowlarr", wanted, &mut journal, "t", true).await;
     (
@@ -316,7 +189,7 @@ async fn would_register(
 /// first assertion and be the defect this flag exists to prevent.
 #[tokio::test]
 async fn a_rehearsed_pass_names_the_address_it_would_register_and_registers_none() {
-    let aggregator = FakeAggregator::with(Mode::Normal, Vec::new());
+    let aggregator = Applications::with(Mode::Normal, Vec::new());
 
     let (states, recorded) = would_register(&aggregator, &[app("http://sonarr:8989")]).await;
 
@@ -340,7 +213,7 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         id: "1".to_owned(),
         base_url: "http://sonarr:8989".to_owned(),
     }];
-    let aggregator = FakeAggregator::stale(existing.clone(), false);
+    let aggregator = Applications::stale(existing.clone(), false);
     let mut journal = Journal::new();
 
     let wirings = wire_applications(
@@ -357,26 +230,16 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
         vec![State::Wired]
     );
-    assert_eq!(
-        aggregator
-            .rekeyed
-            .lock()
-            .map(|keys| keys.clone())
-            .unwrap_or_default(),
-        vec!["arr-key".to_owned()]
-    );
+    assert_eq!(aggregator.rekeyed(), vec!["arr-key".to_owned()]);
 
-    let refusing = FakeAggregator {
-        refuses_rekey: true,
-        ..FakeAggregator::stale(existing.clone(), false)
-    };
+    let refusing = Applications::stale(existing.clone(), false).refusing_rekey();
     let (states, _) = seed_applications(refusing, &[app("http://sonarr:8989")]).await;
     assert!(
         matches!(states.as_slice(), [State::Failed { detail }] if detail.contains("validation failed")),
         "{states:?}"
     );
 
-    let still = FakeAggregator::stale(existing, true);
+    let still = Applications::stale(existing, true);
     let (states, _) = seed_applications(still, &[app("http://sonarr:8989")]).await;
     assert!(
         matches!(states.as_slice(), [State::Failed { detail }] if detail.contains("cannot connect")),
@@ -391,7 +254,7 @@ async fn a_rehearsal_tests_nothing() {
         id: "1".to_owned(),
         base_url: "http://sonarr:8989".to_owned(),
     }];
-    let aggregator = FakeAggregator::stale(existing, false);
+    let aggregator = Applications::stale(existing, false);
     let mut journal = Journal::new();
 
     let wirings = wire_applications(
@@ -408,5 +271,5 @@ async fn a_rehearsal_tests_nothing() {
         wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
         vec![State::AlreadyWired]
     );
-    assert!(aggregator.rekeyed.lock().is_ok_and(|keys| keys.is_empty()));
+    assert!(aggregator.rekeyed().is_empty());
 }

@@ -68,7 +68,7 @@ fn contracted_identity_ctx(
     let mut ctx = contracted_ctx(project, CONTRACTED_REQUESTS, keyed, http)
         .with_random(Arc::new(FixedRandom(Some(vec![0x11; 24]))));
     ctx.settings.env_file = Some(env.to_path_buf());
-    ctx.seams.confined = crate::test_support::media::Keyed::holding(
+    ctx.seams.confined = crate::test_support::media::holding_keys(
         Arc::clone(&ctx.seams.confined),
         &[crate::test_support::media::ADAPTER],
     );

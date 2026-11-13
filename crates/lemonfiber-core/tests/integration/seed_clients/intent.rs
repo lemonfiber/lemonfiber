@@ -27,7 +27,7 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
     expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
-        &FakeService::with_clients(Mode::Normal, existing),
+        &Receiving::with_clients(Mode::Normal, existing),
         "sonarr",
         &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
         &mut journal,
@@ -71,7 +71,7 @@ async fn a_client_both_sides_changed_is_a_conflict() {
     expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
-        &FakeService::with_clients(Mode::Normal, existing),
+        &Receiving::with_clients(Mode::Normal, existing),
         "sonarr",
         &[client_with_category("SABnzbd", "sabnzbd", 8080, "tv-hd")],
         &mut journal,
@@ -119,7 +119,7 @@ async fn a_category_differing_only_by_whitespace_is_not_drift() {
     let mut expected = Baseline::new();
     expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
     let (states, _recorded, changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &expected,
         false,
@@ -148,7 +148,7 @@ async fn a_whitespace_only_difference_with_no_baseline_is_lemonfibers_own() {
         }),
     }];
     let (states, recorded, _changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &Baseline::new(),
         false,
@@ -174,7 +174,7 @@ async fn a_pre_existing_value_with_no_baseline_is_reported_unmanaged_not_drift()
     // mass drift, and records nothing: it does not claim the value as lemonfiber's on
     // its own, so a lost baseline is never silently frozen.
     let (states, recorded, changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, a_pre_existing_client()),
+        Receiving::with_clients(Mode::Normal, a_pre_existing_client()),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &Baseline::new(),
         false,

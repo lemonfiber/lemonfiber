@@ -90,7 +90,7 @@ async fn what_one_member_read_is_never_handed_to_another() {
 /// media server, they are refused at their next call, kept read or not.
 #[tokio::test]
 async fn a_member_removed_is_refused_at_their_next_call_whatever_was_kept() {
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     let (router, _, _) = door_with(
         Some(keeping("kept-removed")),
         Arc::clone(&household),
@@ -145,7 +145,7 @@ async fn an_opened_household_is_used_for_a_while_and_none_is_never_kept() {
     let counted = Arc::new(Counted {
         opened: std::sync::atomic::AtomicUsize::new(0),
         there: AtomicBool::new(false),
-        household: AHousehold::knowing("a7f3") as Arc<dyn Household>,
+        household: Recognising::knowing("a7f3") as Arc<dyn Household>,
     });
     let remembered = lemonfiber_api::admission::remembered::Remembered::over(
         Arc::clone(&counted) as Arc<dyn HouseholdAtHand>

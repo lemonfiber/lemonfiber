@@ -12,7 +12,7 @@ use lemonfiber_core::seed::{wire_download_clients, Baselines, State};
 /// is whether this is the pass that promotes an operator's value rather than the one
 /// that pushes lemonfiber's.
 async fn would_seed_clients(
-    service: &FakeService,
+    service: &Receiving,
     wanted: &[DownloadClient],
     expected: &Baseline,
     adopt: bool,
@@ -46,7 +46,7 @@ async fn would_seed_clients(
 /// what an operator asking what a run would do already has.
 #[tokio::test]
 async fn a_rehearsed_pass_names_what_it_would_push_and_pushes_none_of_it() {
-    let service = FakeService::with_clients(Mode::Normal, Vec::new());
+    let service = Receiving::with_clients(Mode::Normal, Vec::new());
     let (states, recorded) = would_seed_clients(
         &service,
         &[client("SABnzbd", "sabnzbd", 8080)],
@@ -73,7 +73,7 @@ async fn a_rehearsed_pass_names_what_it_would_push_and_pushes_none_of_it() {
 /// among the adopted is never put on display by a question.
 #[tokio::test]
 async fn a_rehearsed_adopt_names_the_connection_and_never_the_value() {
-    let service = FakeService::with_clients(
+    let service = Receiving::with_clients(
         Mode::Normal,
         vec![RegisteredClient {
             id: "1".to_owned(),
@@ -103,7 +103,7 @@ async fn a_rehearsed_adopt_names_the_connection_and_never_the_value() {
 #[tokio::test]
 async fn an_absent_download_client_is_registered_read_back_and_recorded() {
     let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::Normal, Vec::new()),
+        Receiving::with_clients(Mode::Normal, Vec::new()),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
@@ -127,7 +127,7 @@ async fn a_client_at_the_same_endpoint_is_left_untouched_despite_a_different_nam
         }),
     }];
     let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("qBittorrent — my own name", "qbittorrent", 8080)],
     )
     .await;

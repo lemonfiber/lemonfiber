@@ -1,14 +1,13 @@
 //! Installing by name: resolved only through an index whose signature verified, at the
 //! commit it reviewed, and recorded as reviewed with what signed it.
 
-use async_trait::async_trait;
 use lemonfiber_fixtures::http::Answer;
 
 use super::fetching::{served, Serving};
 use super::*;
 use crate::plugin::catalogue::signing::Signing;
 use crate::plugin::Source;
-use crate::ports::http::{Request, Response, Unreachable};
+use crate::ports::http::{Request, Response};
 
 /// Where the catalogue registers the plugin, and the commit of it that was reviewed.
 const ORIGIN: &str = "https://github.com/lemonfiber/plugin-komga";
@@ -59,7 +58,7 @@ fn cataloguing(
     http: Arc<dyn Http>,
     key: Option<crate::plugin::Key>,
 ) -> (Ctx, Arc<Serving>) {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let mut ctx = served(name, &serving).with_http(http);
     ctx.catalogue_key = key.map(Box::new);
     (ctx, serving)
@@ -282,39 +281,10 @@ async fn a_catalogue_with_no_release_is_refused_as_unreachable() {
     );
 }
 
-/// A release address that hands each file on to the host that serves it.
-struct HandingOn {
-    /// Where the index's address hands it on to.
-    index_at: &'static str,
-    index: String,
-    signature: String,
-    asked: std::sync::Mutex<Vec<String>>,
-}
-
-impl HandingOn {
-    fn to(index_at: &'static str, index: String, signature: String) -> Arc<Self> {
-        Arc::new(Self {
-            index_at,
-            index,
-            signature,
-            asked: std::sync::Mutex::new(Vec::new()),
-        })
-    }
-
-    fn asked(&self) -> Vec<String> {
-        self.asked
-            .lock()
-            .map(|asked| asked.clone())
-            .unwrap_or_default()
-    }
-}
-
-#[async_trait]
-impl Http for HandingOn {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut asked) = self.asked.lock() {
-            asked.push(request.url.clone());
-        }
+/// A release address that hands each file on to the host that serves it, the index's
+/// address handing it on to `index_at`.
+fn handing_on(index_at: &'static str, index: String, signature: String) -> Arc<Fake> {
+    Fake::handing(move |request| {
         let handed = |to: &str| Response {
             status: 302,
             headers: vec![("location".to_owned(), to.to_owned())],
@@ -325,14 +295,23 @@ impl Http for HandingOn {
             headers: Vec::new(),
             body: body.to_owned(),
         };
-        Ok(match request.url.as_str() {
-            crate::plugin::catalogue::INDEX => handed(self.index_at),
+        let answered = match request.url.as_str() {
+            crate::plugin::catalogue::INDEX => handed(index_at),
             crate::plugin::catalogue::SIGNATURE => handed("https://assets.example/sig"),
-            "https://assets.example/index" => served(&self.index),
-            "https://assets.example/sig" => served(&self.signature),
+            "https://assets.example/index" => served(&index),
+            "https://assets.example/sig" => served(&signature),
             _ => handed(request.url.as_str()),
-        })
-    }
+        };
+        Box::pin(std::future::ready(Ok(answered)))
+    })
+}
+
+/// Every address a transport was asked for, in order.
+fn addresses(http: &Fake) -> Vec<String> {
+    http.requests()
+        .into_iter()
+        .map(|request| request.url)
+        .collect()
 }
 
 /// The address a release file is handed on to is followed where it is encrypted, and
@@ -343,7 +322,7 @@ async fn a_release_file_handed_on_is_followed_and_verified() {
     assert!(signing.is_some(), "no key pair could be made");
     if let Some(signing) = signing {
         let listed = index(REVIEWED, MANIFEST);
-        let handing = HandingOn::to(
+        let handing = handing_on(
             "https://assets.example/index",
             listed.clone(),
             signing.signed(&listed),
@@ -352,8 +331,7 @@ async fn a_release_file_handed_on_is_followed_and_verified() {
 
         assert_eq!(counted(by_name(&ctx, "komga").await), Some(1));
         assert_eq!(
-            handing
-                .asked()
+            addresses(&handing)
                 .into_iter()
                 .filter(|url| url.contains("lemonfiber-plugins") || url.contains("assets.example"))
                 .collect::<Vec<_>>(),
@@ -378,11 +356,11 @@ async fn a_hop_that_is_unencrypted_or_endless_is_refused() {
         ("catalogue-plain", "http://assets.example/index", 1),
         ("catalogue-loop", "https://assets.example/loop", 4),
     ] {
-        let handing = HandingOn::to(index_at, String::new(), String::new());
+        let handing = handing_on(index_at, String::new(), String::new());
         let (ctx, _) = cataloguing(name, handing.clone(), None);
 
         assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-19", "{name}");
-        assert_eq!(handing.asked().len(), asked, "{name}");
+        assert_eq!(addresses(&handing).len(), asked, "{name}");
     }
 }
 

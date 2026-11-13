@@ -1,36 +1,18 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use lemonfiber_contract::adapter::{About, Release, KEY_FILE, UPSTREAM_FILE};
 use lemonfiber_contract::capabilities::subtitles::fetch;
 use lemonfiber_contract::wire;
+use lemonfiber_fixtures::upstream::subtitles::WatchingNothing;
 use lemonfiber_ports::media::Kind;
-use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
+use lemonfiber_ports::service::{Failure, Subtitles as _};
 use tower::ServiceExt as _;
 
 use super::{key_in, same_secret, serve, serving, upstream_in, Kit, UPSTREAM_MOST};
 
 pub(crate) const KEY: &str = "the-plugins-key";
-
-/// A subtitle finder watching nothing.
-struct Finding;
-
-#[async_trait]
-impl Subtitles for Finding {
-    async fn watching(&self, _which: Kind) -> Result<Watching, Failure> {
-        Ok(Watching {
-            enabled: false,
-            host: String::new(),
-            port: 0,
-            keyed: false,
-        })
-    }
-    async fn watch(&self, _watched: &Watched) -> Result<(), Failure> {
-        Ok(())
-    }
-}
 
 fn about() -> About {
     About {
@@ -44,7 +26,7 @@ fn about() -> About {
 }
 
 pub(crate) fn kit() -> Kit {
-    Kit::new(KEY, about()).serving(fetch::served(Arc::new(Finding)))
+    Kit::new(KEY, about()).serving(fetch::served(Arc::new(WatchingNothing)))
 }
 
 /// What the kit answers `method` at `path`, carrying `key`, as its status, its type and

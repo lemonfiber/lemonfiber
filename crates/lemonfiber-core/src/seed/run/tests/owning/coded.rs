@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use lemonfiber_fixtures::owning::Part;
+
 use super::*;
 use crate::ports::asking::Asking;
 use crate::test_support::Typing;
@@ -376,43 +378,9 @@ async fn a_rehearsal_leaves_a_code_that_lapsed_where_it_is() {
     assert_eq!(asked_at(&http, CLAIM), 0);
 }
 
-/// A part answering who holds it as `holder`, and a claim as `claimed`, counting claims.
-struct Part {
-    holder: crate::ports::service::Owner,
-    claimed: crate::ports::service::Owner,
-    claims: std::sync::atomic::AtomicUsize,
-    blocking: Option<PathBuf>,
-}
-
-#[async_trait::async_trait]
-impl crate::ports::service::Ownership for Part {
-    async fn owner(&self) -> Result<crate::ports::service::Owner, crate::ports::service::Failure> {
-        Ok(self.holder)
-    }
-
-    async fn claimed_by(&self) -> Result<Option<String>, crate::ports::service::Failure> {
-        Ok(None)
-    }
-
-    async fn claim(&self) -> Result<crate::ports::service::Claim, crate::ports::service::Failure> {
-        self.claims
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if let Some(blocking) = &self.blocking {
-            let _ = std::fs::remove_file(blocking);
-            let _ = std::fs::create_dir_all(blocking);
-        }
-        Ok(crate::ports::service::Claim::Held(self.claimed))
-    }
-}
-
 /// A part held by `holder` that a claim leaves `claimed`.
 fn part(holder: crate::ports::service::Owner, claimed: crate::ports::service::Owner) -> Part {
-    Part {
-        holder,
-        claimed,
-        claims: std::sync::atomic::AtomicUsize::new(0),
-        blocking: None,
-    }
+    Part::held(holder, claimed)
 }
 
 /// What install's claim of `part`, of `installed`, comes to through `ctx`: who holds it, why
@@ -458,7 +426,7 @@ async fn install_claims_an_open_part_with_the_code_entered_and_drops_it_after() 
     let open = part(Owner::Open, Owner::Ours);
     let (ctx, claimed) = installed_claim(&project, &open, Typing::answering(TYPED)).await;
     assert!(matches!(claimed, Ok(Ok(Owner::Ours))), "{claimed:?}");
-    assert_eq!(open.claims.load(std::sync::atomic::Ordering::Relaxed), 1);
+    assert_eq!(open.claims(), 1);
     assert_eq!(kept(&ctx), None);
 }
 
@@ -473,7 +441,7 @@ async fn install_says_an_open_part_nobody_enters_a_code_for_is_open_naming_the_c
         matches!(&claimed, Err(said) if said.contains(&setting())),
         "{claimed:?}"
     );
-    assert_eq!(open.claims.load(std::sync::atomic::Ordering::Relaxed), 0);
+    assert_eq!(open.claims(), 0);
 }
 
 #[tokio::test]
@@ -489,10 +457,7 @@ async fn install_asks_no_code_for_a_part_already_held_and_fails_one_it_cannot_ke
     let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-spanning");
     let (_, claimed) = installed_claim(&project, &spanning, Typing::answering("43\n21")).await;
     assert!(matches!(claimed, Ok(Err(_))), "{claimed:?}");
-    assert_eq!(
-        spanning.claims.load(std::sync::atomic::Ordering::Relaxed),
-        0
-    );
+    assert_eq!(spanning.claims(), 0);
 }
 
 #[tokio::test]
@@ -552,13 +517,10 @@ async fn install_says_a_code_it_could_not_drop_after_the_claim_answered() {
     use crate::ports::service::Owner;
     let project = lemonfiber_fixtures::scratch::Scratch::new("owning-coded-install-undropped");
     let ctx = coded_ctx(&project, Fake::silent(), FIRST, Typing::answering(TYPED));
-    let blocked = Part {
-        blocking: Some(upstream_json(&ctx)),
-        ..part(Owner::Open, Owner::Ours)
-    };
+    let blocked = part(Owner::Open, Owner::Ours).blocking(upstream_json(&ctx));
     let claimed = as_installed(&ctx, &coded(), &blocked).await;
     assert!(matches!(claimed, Ok(Err(_))), "{claimed:?}");
-    assert_eq!(blocked.claims.load(std::sync::atomic::Ordering::Relaxed), 1);
+    assert_eq!(blocked.claims(), 1);
 }
 
 /// Whether the part is kept off the household after one seed of `ctx` against `baseline`.

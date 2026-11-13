@@ -1,10 +1,9 @@
 //! `dashboard.show` across its contract: one script run against a dashboard in process
 //! and through the contract, which must answer alike and be told alike.
 
-use async_trait::async_trait;
-use lemonfiber_ports::service::{Entry, EntryWidget, Failure, Group, PageWidget, Panels, Showing};
+use lemonfiber_ports::service::{Entry, EntryWidget, Group, PageWidget, Panels, Showing};
 
-use super::{crosses_alike, show, Upstream};
+use super::{crosses_alike, show};
 
 /// A dashboard of one group, every part of it set.
 fn panels() -> Panels {
@@ -29,21 +28,6 @@ fn panels() -> Panels {
                 url: "https://search.example/?q=".to_owned(),
             },
         ],
-    }
-}
-
-#[async_trait]
-impl Showing for Upstream {
-    async fn apply(&self, panels: &Panels) -> Result<(), Failure> {
-        self.tell(format!("apply {panels:?}"));
-        Ok(())
-    }
-    async fn panels(&self) -> Result<Panels, Failure> {
-        self.tell("panels".to_owned());
-        Ok(Panels {
-            groups: Vec::new(),
-            widgets: vec![PageWidget::Resources],
-        })
     }
 }
 

@@ -1,10 +1,9 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use lemonfiber_fixtures::http::{Answer, Fake};
 use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
 use ring::rand::SystemRandom;
 
@@ -16,58 +15,20 @@ use crate::error::codes::push::{
     NOT_A_PUSH_NAME, PUSH_KEYS_UNREADABLE, PUSH_NAME_TAKEN, PUSH_NOT_HTTPS, PUSH_NOT_REGISTERED,
 };
 use crate::error::Severity;
-use crate::ports::http::{Http, Request, Response, Unreachable};
+use crate::ports::http::Http;
 use crate::push::Kept;
 
-/// An address sent to, with the headers and the bytes it was sent.
-type Took = (String, Vec<(String, String)>, Vec<u8>);
-
-/// A distributor answering `status`, holding what each request carried.
-struct Distributor {
-    /// What it answers.
-    status: u16,
-    /// Each message it took.
-    took: Mutex<Vec<Took>>,
-}
-
-#[async_trait]
-impl Http for Distributor {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        Err(Unreachable::once(&request.url, "only octets go to a phone"))
-    }
-
-    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
-        if let Ok(mut took) = self.took.lock() {
-            took.push((
-                request.url.clone(),
-                request.headers.clone(),
-                octets.to_vec(),
-            ));
-        }
-        Ok(Response {
-            status: self.status,
-            headers: Vec::new(),
-            body: String::new(),
-        })
-    }
-}
-
-impl Distributor {
-    /// How many messages it took.
-    fn took(&self) -> usize {
-        self.took.lock().map_or(0, |took| took.len())
-    }
+/// How many messages `distributor` took.
+fn messages(distributor: &Fake) -> usize {
+    distributor.octets().len()
 }
 
 /// A machine keeping its files beneath a directory named for `name`, reaching `distributor`.
-fn machine(name: &str, status: u16) -> (Ctx, Arc<Distributor>) {
+fn machine(name: &str, status: u16) -> (Ctx, Arc<Fake>) {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
-    let distributor = Arc::new(Distributor {
-        status,
-        took: Mutex::new(Vec::new()),
-    });
+    let distributor = Fake::distributing(vec![("", Answer::reply(status, ""))]);
     let ctx = crate::test_support::a_context()
         .settings(Settings {
             env_file: Some(dir.join("config").join(".env")),
@@ -296,7 +257,7 @@ async fn each_onset_and_resolution_is_sent_once_to_every_endpoint() {
         alert("service.sonarr", Moment::Onset),
     ];
     waking.owing(&ctx, &onset);
-    assert!(soon(|| distributor.took() == 2).await);
+    assert!(soon(|| messages(&distributor) == 2).await);
 
     let resolved = [
         alert("service.radarr", Moment::Resolved),
@@ -304,16 +265,13 @@ async fn each_onset_and_resolution_is_sent_once_to_every_endpoint() {
         alert("service.sonarr", Moment::Onset),
     ];
     waking.owing(&ctx, &resolved);
-    assert!(soon(|| distributor.took() == 4).await);
+    assert!(soon(|| messages(&distributor) == 4).await);
     assert!(soon(|| owed(&ctx) == [0, 0]).await);
 
-    let took = distributor
-        .took
-        .lock()
-        .map(|took| took.clone())
-        .unwrap_or_default();
-    assert!(took.iter().all(|(_, headers, octets)| {
-        headers
+    let took = distributor.octets();
+    assert!(took.iter().all(|(request, octets)| {
+        request
+            .headers
             .iter()
             .any(|(name, value)| name == "Content-Encoding" && value == "aes128gcm")
             && !octets.is_empty()
@@ -343,7 +301,7 @@ async fn an_endpoint_its_distributor_says_is_gone_stays_with_its_failure_shown()
 
         assert!(soon(|| failures(&ctx) == 1).await, "{status}");
         assert_eq!(names(&ctx), ["pixel"], "{status}");
-        assert_eq!(distributor.took(), 1, "{status}");
+        assert_eq!(messages(&distributor), 1, "{status}");
     }
 }
 
@@ -356,7 +314,7 @@ async fn an_endpoint_that_answers_anything_else_stays() {
     let waking = Waking::default();
     waking.owing(&ctx, &[]);
     waking.owing(&ctx, &[alert("service.sonarr", Moment::Onset)]);
-    assert!(soon(|| distributor.took() == 1).await);
+    assert!(soon(|| messages(&distributor) == 1).await);
     assert!(soon(|| owed(&ctx) == [0]).await);
     assert_eq!(names(&ctx), ["pixel"]);
 }
@@ -374,40 +332,32 @@ async fn nothing_is_sent_where_waking_is_switched_off() {
     waking.owing(&ctx, &[]);
     waking.owing(&ctx, &[alert("service.sonarr", Moment::Onset)]);
     tokio::task::yield_now().await;
-    assert_eq!(distributor.took(), 0);
+    assert_eq!(messages(&distributor), 0);
     assert_eq!(owed(&ctx), [0]);
 }
 
-/// A transport on which a message hangs, but for one to an address saying it answers.
-struct Hanging {
-    /// How many messages reached an address that hangs.
-    reached: AtomicUsize,
-    /// What takes a message to an address that answers.
-    answering: Arc<Distributor>,
+/// How many messages reached an address that hangs.
+fn reached(hanging: &Fake) -> usize {
+    hanging
+        .octets()
+        .iter()
+        .filter(|(request, _)| !request.url.contains("answers"))
+        .count()
 }
 
-#[async_trait]
-impl Http for Hanging {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        Err(Unreachable::once(&request.url, "only octets go to a phone"))
-    }
-
-    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
-        if request.url.contains("answers") {
-            return self.answering.send_octets(request, octets).await;
-        }
-        self.reached.fetch_add(1, Ordering::SeqCst);
-        std::future::pending().await
-    }
+/// How many messages reached an address saying it answers.
+fn answered(hanging: &Fake) -> usize {
+    messages(hanging) - reached(hanging)
 }
 
-/// A machine whose transport hangs, with each of `endpoints` registered by name and address.
-fn hanging_machine(name: &str, endpoints: &[(&str, &str)]) -> (Arc<Ctx>, Arc<Hanging>) {
-    let (ctx, answering) = machine(name, 201);
-    let hanging = Arc::new(Hanging {
-        reached: AtomicUsize::new(0),
-        answering,
-    });
+/// A machine whose transport hangs, but for a message to an address saying it answers,
+/// with each of `endpoints` registered by name and address.
+fn hanging_machine(name: &str, endpoints: &[(&str, &str)]) -> (Arc<Ctx>, Arc<Fake>) {
+    let (ctx, _) = machine(name, 201);
+    let hanging = Fake::distributing(vec![
+        ("answers", Answer::reply(201, "")),
+        ("", Answer::Hanging),
+    ]);
     let ctx = ctx.with_http(Arc::clone(&hanging) as Arc<dyn Http>);
     for (endpoint, address) in endpoints {
         assert!(asked(&ctx, registering(endpoint, address)).is_ok());
@@ -433,11 +383,11 @@ async fn what_is_owed_behind_a_hanging_endpoint_is_bounded_and_worked_through() 
     let many = crate::alert::KEPT + 50;
     waking.owing(&ctx, &alerts(many));
     tokio::task::yield_now().await;
-    assert_eq!(hanging.reached.load(Ordering::SeqCst), 1);
+    assert_eq!(reached(&hanging), 1);
     assert_eq!(owed(&ctx), [crate::alert::KEPT - 1]);
 
     tokio::time::sleep(super::WAITED_FOR + Duration::from_millis(1)).await;
-    assert_eq!(hanging.reached.load(Ordering::SeqCst), 2);
+    assert_eq!(reached(&hanging), 2);
 }
 
 /// An endpoint that hangs holds up no other endpoint's messages.
@@ -454,8 +404,8 @@ async fn an_endpoint_that_hangs_holds_up_no_other() {
     waking.owing(&ctx, &[]);
     waking.owing(&ctx, &alerts(3));
 
-    assert!(soon(|| hanging.answering.took() == 3).await);
-    assert_eq!(hanging.reached.load(Ordering::SeqCst), 1);
+    assert!(soon(|| answered(&hanging) == 3).await);
+    assert_eq!(reached(&hanging), 1);
 }
 
 /// A second reading while a delivery is under way starts no second delivery to that endpoint.
@@ -465,11 +415,11 @@ async fn a_delivery_under_way_is_not_started_again() {
     let waking = Waking::default();
     waking.owing(&ctx, &[]);
     waking.owing(&ctx, &alerts(1));
-    assert!(soon(|| hanging.reached.load(Ordering::SeqCst) == 1).await);
+    assert!(soon(|| reached(&hanging) == 1).await);
 
     waking.owing(&ctx, &alerts(2));
     tokio::task::yield_now().await;
-    assert_eq!(hanging.reached.load(Ordering::SeqCst), 1);
+    assert_eq!(reached(&hanging), 1);
     assert_eq!(owed(&ctx), [1]);
 }
 
@@ -491,7 +441,7 @@ async fn what_is_owed_is_delivered_by_the_next_run() {
 
     Waking::default().owing(&Arc::new(ctx), &[]);
 
-    assert!(soon(|| distributor.took() == 2).await);
+    assert!(soon(|| messages(&distributor) == 2).await);
 }
 
 /// An endpoint removed while it is owed messages is sent none of them.
@@ -530,7 +480,7 @@ async fn keys_that_cannot_be_read_send_nothing() {
     waking.owing(&ctx, &[alert("service.sonarr", Moment::Onset)]);
 
     assert!(soon(|| owed(&ctx) == [0]).await);
-    assert_eq!(distributor.took(), 0);
+    assert_eq!(messages(&distributor), 0);
     assert_eq!(names(&ctx), ["pixel"]);
 }
 

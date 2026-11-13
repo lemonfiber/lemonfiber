@@ -1,6 +1,5 @@
 //! An event is taken only with the key its service was handed, and told as it happened.
 
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -16,16 +15,6 @@ use crate::model::BackendKind;
 use crate::notify::backends;
 use crate::notify::configuring::{asked, Adding, Asked};
 use crate::ports::http::Http;
-use crate::ports::random::Random;
-
-/// Randomness that differs on every ask, so two keys minted one after the other differ.
-struct Turning(AtomicU8);
-
-impl Random for Turning {
-    fn bytes(&self, n: usize) -> Option<Vec<u8>> {
-        Some(vec![self.0.fetch_add(1, Ordering::SeqCst); n])
-    }
-}
 
 fn machine(name: &str) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
@@ -99,7 +88,7 @@ async fn an_event_is_taken_only_with_the_key_its_service_was_handed_and_owed_to_
 
 #[test]
 fn a_fresh_key_replaces_the_last_one_handed_out() {
-    let ctx = machine("notify-events-rekeyed").with_random(Arc::new(Turning(AtomicU8::new(1))));
+    let ctx = machine("notify-events-rekeyed").with_random(Arc::new(Chance::turning(1)));
     let first = minted(&ctx, "jellyfin").unwrap_or_default();
     let second = minted(&ctx, "jellyfin").unwrap_or_default();
     let added = event(Happened::Added, "Dune", None);

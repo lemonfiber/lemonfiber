@@ -180,7 +180,7 @@ fn scene(
             ..Settings::default()
         })
         .build()
-        .with_http(Arc::new(Serving::beside(http).gate(&gate)));
+        .with_http(Serving::beside(http).gate(&gate).transport());
     TELEVISION.gate_key(&at, curator);
     (ctx, at, gate)
 }

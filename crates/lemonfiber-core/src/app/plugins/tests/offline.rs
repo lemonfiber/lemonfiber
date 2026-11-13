@@ -2,15 +2,12 @@
 //! its install offered, offline, and nothing of the form written or started without the
 //! yes to it.
 
-use async_trait::async_trait;
-
 use super::embedding::ran;
 use super::fetching::Serving;
 use super::*;
 use crate::app::{Command, Outcome};
 use crate::model::LifecycleReport;
 use crate::ports::docker::{Health, Lifecycle};
-use crate::ports::process::{Failure, Output, Runner};
 use crate::test_support::Reporting;
 
 /// The part offered.
@@ -24,66 +21,29 @@ fn library() -> Vec<String> {
     vec!["library".to_owned()]
 }
 
-/// The git source an install reads, beside every other command run, each recorded.
-pub(super) struct Watching {
-    /// What answers git.
-    pub(super) serving: Arc<Serving>,
-    /// Every command run, git or not.
-    pub(super) seen: std::sync::Mutex<Vec<Vec<String>>>,
-    /// The Compose verb it refuses once something has been removed, where it refuses one.
-    pub(super) refusing: Option<&'static str>,
-}
-
-impl Watching {
-    /// Whether anything was brought up.
-    fn started(&self) -> bool {
-        self.seen.lock().is_ok_and(|seen| {
-            seen.iter()
-                .any(|argv| argv.iter().any(|word| word == "up" || word == "start"))
-        })
-    }
-}
-
-#[async_trait]
-impl Runner for Watching {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        let removed = self
-            .seen
-            .lock()
-            .is_ok_and(|seen| seen.iter().any(|argv| argv.iter().any(|word| word == "rm")));
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(argv.to_vec());
-        }
-        if removed
-            && self
-                .refusing
-                .is_some_and(|verb| argv.iter().any(|word| word == verb))
-        {
-            return Ok(lemonfiber_fixtures::support::refused("the daemon said no"));
-        }
-        self.serving.run(argv).await
-    }
-}
-
 /// A runner answering git as an install's source does, recording everything run.
-pub(super) fn watching() -> Arc<Watching> {
+pub(super) fn watching() -> Arc<Serving> {
     refusing(None)
 }
 
 /// The same, refusing `verb` once something has been removed, where one is named.
-pub(super) fn refusing(verb: Option<&'static str>) -> Arc<Watching> {
-    Arc::new(Watching {
-        serving: Arc::new(Serving::listing("")),
-        seen: std::sync::Mutex::new(Vec::new()),
-        refusing: verb,
-    })
+pub(super) fn refusing(verb: Option<&'static str>) -> Arc<Serving> {
+    Arc::new(Serving::listing("", MANIFEST).refusing_after_removal(verb))
+}
+
+/// Whether anything was brought up.
+fn started(serving: &Serving) -> bool {
+    serving
+        .ran()
+        .iter()
+        .any(|argv| argv.iter().any(|word| word == "up" || word == "start"))
 }
 
 /// A machine that has run every part the bundle installs but [`PART`], whose engine holds
 /// no container for it, with its server and adapter answering every proof its install
 /// asks.
-fn fresh(name: &str, serving: &Arc<Watching>) -> Ctx {
-    let mut ctx = super::embedding::unmoved(name, &serving.serving);
+fn fresh(name: &str, serving: &Arc<Serving>) -> Ctx {
+    let mut ctx = super::embedding::unmoved(name, serving);
     ctx.seams.runner = serving.clone();
     ctx.seams.engine = Arc::new(
         Reporting::holding(&[ADAPTER], Lifecycle::Running, Health::Healthy).publishing(&[(
@@ -140,7 +100,7 @@ async fn an_up_of_a_part_never_run_here_offers_its_install_and_starts_nothing() 
     assert!(report
         .as_ref()
         .is_some_and(|one| one.offer.is_some() && one.command.is_empty() && !one.rehearsed));
-    assert!(!serving.started());
+    assert!(!started(&serving));
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
@@ -158,7 +118,7 @@ async fn a_rehearsed_up_names_the_install_and_installs_nothing() {
         && !one.command.is_empty()
         && one.offer.is_some()
         && one.installing.iter().any(|install| install.plugin == PART)));
-    assert!(!serving.started());
+    assert!(!started(&serving));
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
@@ -174,7 +134,7 @@ async fn an_up_answering_the_offer_installs_the_part_and_starts() {
     let report = up(&ctx, offer).await;
 
     assert!(no_offer(&report), "{report:?}");
-    assert!(serving.started());
+    assert!(started(&serving));
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
@@ -191,7 +151,7 @@ async fn an_up_answering_a_moved_offer_is_refused() {
         refused.err().map(|problem| problem.code),
         Some(crate::error::codes::life::OFFLINE_INSTALL_MOVED)
     );
-    assert!(!serving.started());
+    assert!(!started(&serving));
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
@@ -214,7 +174,7 @@ async fn a_part_that_has_run_here_is_offered_a_move_and_no_install() {
             && one.moves.iter().any(|offered| offered.plugin == PART)),
         "{rehearsed:?}"
     );
-    assert!(no_offer(&real) && serving.started(), "{real:?}");
+    assert!(no_offer(&real) && started(&serving), "{real:?}");
 }
 
 /// A streamed start answering no install it offers is refused before anything runs.
@@ -229,17 +189,16 @@ async fn a_streamed_start_answering_nothing_is_refused() {
         opened.err().map(|problem| problem.code),
         Some(crate::error::codes::life::OFFLINE_INSTALL_UNANSWERED)
     );
-    assert!(!serving.started());
+    assert!(!started(&serving));
 }
 
 /// Whether the whole form was brought up: a start naming no service, as a start of
 /// forms is, rather than one naming a plugin's own.
-fn brought_the_form_up(serving: &Watching) -> bool {
-    serving.seen.lock().is_ok_and(|seen| {
-        seen.iter().any(|argv| {
-            argv.iter().any(|word| word == "up") && !argv.iter().any(|word| word == "--")
-        })
-    })
+fn brought_the_form_up(serving: &Serving) -> bool {
+    serving
+        .ran()
+        .iter()
+        .any(|argv| argv.iter().any(|word| word == "up") && !argv.iter().any(|word| word == "--"))
 }
 
 /// An install agreed to whose proofs do not hold is put back, and stops the start: the
@@ -300,12 +259,9 @@ async fn a_streamed_start_of_named_services_installs_nothing() {
 
     assert!(opened.is_ok(), "{:?}", opened.err());
     assert_eq!(counted(reading(&ctx).await), Some(0));
-    assert!(serving
-        .seen
-        .lock()
-        .is_ok_and(|seen| seen.iter().any(|argv| {
-            argv.iter().any(|word| word == "up") && argv.iter().any(|word| word == "navidrome")
-        })));
+    assert!(serving.ran().iter().any(|argv| {
+        argv.iter().any(|word| word == "up") && argv.iter().any(|word| word == "navidrome")
+    }));
 }
 
 /// Puts something in the way of every install's tree, so none can be read.
@@ -347,7 +303,7 @@ async fn an_up_whose_install_could_not_be_read_offers_no_yes_and_says_why() {
         Some(crate::error::codes::life::OFFLINE_INSTALL_UNREAD)
     );
     assert!(refused.is_some_and(|problem| problem.meaning.contains(PART)));
-    assert!(!serving.started());
+    assert!(!started(&serving));
     assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
@@ -371,7 +327,7 @@ async fn a_switch_and_a_streamed_start_refuse_a_yes_no_offer_stands_for() {
         opened.err().map(|problem| problem.code),
         Some(crate::error::codes::life::OFFLINE_INSTALL_UNREAD)
     );
-    assert!(!serving.started());
+    assert!(!started(&serving));
 }
 
 /// Nothing is offered where the record of what is installed cannot be read, and an
@@ -425,7 +381,7 @@ async fn a_switch_offers_the_install_as_an_up_does() {
         .as_ref()
         .is_some_and(|one| one.command.is_empty()
             && one.installing.iter().any(|install| install.plugin == PART)));
-    assert!(!serving.started());
+    assert!(!started(&serving));
 
     let mut rehearsing = ctx.clone();
     rehearsing.dry_run = true;

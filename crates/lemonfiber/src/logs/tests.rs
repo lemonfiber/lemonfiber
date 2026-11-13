@@ -5,6 +5,7 @@ use super::{cleared, colours, sampled, wanted, Asked, Press, Shown, Viewer, BATC
 use lemonfiber_core::bundle::Marks;
 use lemonfiber_core::logs::Level;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
+use lemonfiber_fixtures::ports::Chance;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// One keypress as this view reads it.
@@ -110,22 +111,10 @@ fn press(viewer: &mut Viewer, presses: &[Press]) {
     }
 }
 
-/// Randomness a test chose, so an export reads the same on every run.
-///
-/// Written here rather than borrowed from the fixtures crate, which this binary
-/// does not depend on: the port has one method, and this calls it.
-struct Chosen;
-
-impl lemonfiber_core::ports::random::Random for Chosen {
-    fn bytes(&self, count: usize) -> Option<Vec<u8>> {
-        Some(vec![7; count])
-    }
-}
-
 /// The view, redacted — empty where the chosen randomness somehow refused, which
 /// every caller rules out by asserting on what it got back.
 fn exported(viewer: &Viewer) -> String {
-    Marks::new(&Chosen)
+    Marks::new(&Chance::repeating(vec![7]))
         .and_then(|marks| viewer.exported(&marks).ok())
         .unwrap_or_default()
 }

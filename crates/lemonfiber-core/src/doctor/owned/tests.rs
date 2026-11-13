@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use lemonfiber_fixtures::owning;
 
 use super::{OwnedCheck, Part};
 use crate::doctor::{Check as _, Verdict};
-use crate::ports::service::{Failure, Owner, Ownership};
+use crate::ports::service::{Owner, Ownership};
 
 /// How a part the check asks answers.
 #[derive(Clone, Copy)]
@@ -15,30 +15,6 @@ enum Asked {
     Silent,
     /// It cannot be asked over its contract.
     Unaskable,
-}
-
-/// A part answering who holds it with `answer`, not answering where it is nothing, and
-/// refusing to be claimed.
-struct Answering(Option<Owner>);
-
-#[async_trait]
-impl Ownership for Answering {
-    async fn owner(&self) -> Result<Owner, Failure> {
-        self.0.ok_or_else(|| Failure::Unavailable {
-            service: "part".to_owned(),
-        })
-    }
-
-    async fn claimed_by(&self) -> Result<Option<String>, Failure> {
-        Ok(None)
-    }
-
-    async fn claim(&self) -> Result<crate::ports::service::Claim, Failure> {
-        Err(Failure::Refused {
-            service: "part".to_owned(),
-            detail: "a diagnosis claims nothing".to_owned(),
-        })
-    }
 }
 
 /// The verdicts the check comes to over `parts`, each a part answering as given.
@@ -55,8 +31,8 @@ async fn verdicts(parts: Vec<Asked>) -> Vec<Verdict> {
                         secrets: vec!["CLAIMER_PASSWORD".to_owned()],
                     },
                     match answer {
-                        Asked::Holding(owner) => Some(Answering(Some(owner))),
-                        Asked::Silent => Some(Answering(None)),
+                        Asked::Holding(owner) => Some(owning::Part::answering(Some(owner))),
+                        Asked::Silent => Some(owning::Part::answering(None)),
                         Asked::Unaskable => None,
                     }
                     .map(|part| Arc::new(part) as Arc<dyn Ownership>),

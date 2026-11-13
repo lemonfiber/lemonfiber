@@ -10,7 +10,7 @@
 //! passes against one copy and would have failed against the other.
 
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
@@ -86,6 +86,12 @@ impl Stopped {
     pub fn into_today(seconds: u64) -> Arc<Self> {
         Self::at(TODAY + seconds)
     }
+
+    /// Stopped this many seconds before the epoch, a reading nothing can be named for.
+    #[must_use]
+    pub fn before_the_epoch(seconds: u64) -> Arc<Self> {
+        Arc::new(Self(SystemTime::UNIX_EPOCH - Duration::from_secs(seconds)))
+    }
 }
 
 impl Clock for Stopped {
@@ -122,6 +128,32 @@ impl Clock for Following {
     }
 }
 
+/// A clock that moves a step on every reading, from the day [`Stopped::today`] is.
+pub struct Ticking {
+    step: Duration,
+    readings: AtomicU64,
+}
+
+impl Ticking {
+    /// A clock moving `step` further on each reading.
+    #[must_use]
+    pub const fn by(step: Duration) -> Self {
+        Self {
+            step,
+            readings: AtomicU64::new(0),
+        }
+    }
+}
+
+impl Clock for Ticking {
+    fn now(&self) -> SystemTime {
+        let taken = self.readings.fetch_add(1, Ordering::Relaxed);
+        SystemTime::UNIX_EPOCH
+            + Duration::from_secs(TODAY)
+            + self.step * u32::try_from(taken).unwrap_or(u32::MAX)
+    }
+}
+
 /// How a test scripts the randomness it is given.
 enum Given {
     /// Exactly these bytes, however many were asked for — or nothing at all.
@@ -129,6 +161,10 @@ enum Given {
     /// Letters cycled to the length asked for: a credential-shaped value built rather
     /// than written, which is how every credential fixture in this repository is made.
     Cycling,
+    /// These bytes repeated to the length asked for.
+    Repeating(Vec<u8>),
+    /// One byte repeated to the length asked for, a different byte on every ask.
+    Turning(AtomicU8),
 }
 
 /// Randomness a test chose, rather than any that varies between runs.
@@ -150,6 +186,19 @@ impl Chance {
     pub const fn cycling() -> Self {
         Self(Given::Cycling)
     }
+
+    /// These bytes repeated to whatever length is asked for.
+    #[must_use]
+    pub const fn repeating(bytes: Vec<u8>) -> Self {
+        Self(Given::Repeating(bytes))
+    }
+
+    /// A different byte on every ask, starting from `first`, so two values drawn one after
+    /// the other differ.
+    #[must_use]
+    pub const fn turning(first: u8) -> Self {
+        Self(Given::Turning(AtomicU8::new(first)))
+    }
 }
 
 impl Random for Chance {
@@ -163,6 +212,8 @@ impl Random for Chance {
                     .take(n)
                     .collect(),
             ),
+            Given::Repeating(bytes) => Some(bytes.iter().copied().cycle().take(n).collect()),
+            Given::Turning(next) => Some(vec![next.fetch_add(1, Ordering::SeqCst); n]),
         }
     }
 }

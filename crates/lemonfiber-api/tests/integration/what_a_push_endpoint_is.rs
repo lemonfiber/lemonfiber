@@ -2,6 +2,7 @@
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::Chance;
 use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
 use ring::rand::SystemRandom;
@@ -10,7 +11,7 @@ use lemonfiber_api::events::dashboard::Dashboard;
 use lemonfiber_api::events::live::Gathers as _;
 use lemonfiber_core::alert::{Alert, Moment, Notification, Outbox};
 use lemonfiber_core::error::Severity;
-use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::push::run::{asked, Asked, WAITED_FOR};
 
 use crate::door::*;
@@ -172,32 +173,6 @@ async fn a_registration_does_not_cross_a_network_in_the_clear() {
     assert!(!code(&crossed).starts_with("PUSH"), "{}", crossed.body);
 }
 
-/// A distributor that takes every message and never answers.
-#[derive(Default)]
-struct Hanging {
-    /// Whether a message has reached it.
-    reached: AtomicBool,
-}
-
-#[async_trait::async_trait]
-impl Http for Hanging {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        Err(Unreachable::once(
-            &request.url,
-            "nothing else is asked here",
-        ))
-    }
-
-    async fn send_octets(
-        &self,
-        _request: &Request,
-        _octets: &[u8],
-    ) -> Result<Response, Unreachable> {
-        self.reached.store(true, Ordering::SeqCst);
-        std::future::pending().await
-    }
-}
-
 /// The outbox beside `env`, holding one alert said.
 fn an_alert_said(env: &std::path::Path) {
     let mut outbox = Outbox::new();
@@ -228,7 +203,7 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    let hanging = Arc::new(Hanging::default());
+    let hanging = Fake::distributing(vec![("", Answer::Hanging)]);
     let ctx = lemonfiber_testing::a_context()
         .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
         .settings(lemonfiber_core::config::Settings {
@@ -254,10 +229,7 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
     let started = std::time::Instant::now();
     dashboard.gather(false).await;
     let alone = started.elapsed();
-    assert!(
-        !hanging.reached.load(Ordering::SeqCst),
-        "nothing is owed yet"
-    );
+    assert!(hanging.octets().is_empty(), "nothing is owed yet");
 
     an_alert_said(&env);
     let started = std::time::Instant::now();
@@ -265,7 +237,7 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
     let hung = started.elapsed();
 
     let reached = tokio::time::timeout(Duration::from_secs(5), async {
-        while !hanging.reached.load(Ordering::SeqCst) {
+        while hanging.octets().is_empty() {
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
     })

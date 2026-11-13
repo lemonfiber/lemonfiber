@@ -6,10 +6,11 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use lemonfiber_ports::registry::{Image, Offered, Registry, Tagged, Unanswerable};
 
-/// A registry publishing every tag at one digest, or none, or out of reach, signing
-/// nothing and recording each tag it is asked about.
+/// A registry publishing every tag at one digest, or none, or out of reach, offering the
+/// signatures it was given and recording each tag it is asked about.
 pub struct Registered {
     publishing: Result<Option<String>, String>,
+    signing: Result<Vec<Offered>, Unanswerable>,
     asked: Mutex<Vec<Tagged>>,
 }
 
@@ -32,9 +33,21 @@ impl Registered {
         Self::answering(Err(reason.to_owned()))
     }
 
+    /// A registry publishing nothing under any tag and answering every image's signatures
+    /// with `signing`.
+    #[must_use]
+    pub fn offering(signing: Result<Vec<Offered>, Unanswerable>) -> Arc<Self> {
+        Arc::new(Self {
+            publishing: Ok(None),
+            signing,
+            asked: Mutex::new(Vec::new()),
+        })
+    }
+
     fn answering(publishing: Result<Option<String>, String>) -> Arc<Self> {
         Arc::new(Self {
             publishing,
+            signing: Ok(Vec::new()),
             asked: Mutex::new(Vec::new()),
         })
     }
@@ -52,7 +65,7 @@ impl Registered {
 #[async_trait]
 impl Registry for Registered {
     async fn signatures(&self, _image: &Image) -> Result<Vec<Offered>, Unanswerable> {
-        Ok(Vec::new())
+        self.signing.clone()
     }
 
     async fn digest(&self, tagged: &Tagged) -> Result<Option<String>, Unanswerable> {

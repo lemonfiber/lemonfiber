@@ -25,7 +25,7 @@ requirement = [
   { id = "ARCH-R42", state = "partial", evidence = ["crates/lemonfiber/src/repair.rs"] },
   { id = "ARCH-R43", state = "done", evidence = ["crates/lemonfiber/build.rs"] },
   { id = "ARCH-R44", state = "done", evidence = ["crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/app/engine.rs"] },
-  { id = "ARCH-R45", state = "partial", evidence = ["crates/lemonfiber-fixtures/"] },
+  { id = "ARCH-R45", state = "done", evidence = ["crates/lemonfiber-fixtures/", "crates/lemonfiber/tests/architecture/a_port_is_faked_in_one_place.rs::every_fake_of_a_port_lives_in_the_fixtures", "crates/lemonfiber/tests/architecture/a_port_is_faked_in_one_place.rs::the_scan_refuses_a_fake_and_keeps_an_adapter"] },
   { id = "ARCH-R46", state = "done", evidence = ["crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-api/src/read/table/asked.rs"] },
   { id = "ARCH-R47", state = "done", evidence = ["crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-api/src/read/table/asked.rs"] },
   { id = "ARCH-R48", state = "done", evidence = ["crates/lemonfiber-api/src/actions.rs"] },

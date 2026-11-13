@@ -7,7 +7,7 @@ use lemonfiber_core::doctor::{autostart, Category, Finding, Overall, Verdict};
 use lemonfiber_core::error::Remedy;
 use lemonfiber_core::stack::Source;
 
-use crate::setup::tests::{ctx, working_ctx, FakeEngine, Scripted};
+use crate::setup::tests::{ctx, engine_quiet, working_ctx, Scripted};
 
 #[tokio::test(start_paused = true)]
 async fn an_environment_that_cannot_work_stops_setup_before_a_question() {
@@ -104,7 +104,7 @@ async fn a_first_run_ends_by_saying_what_to_send_the_people_who_live_here() {
     // the cost this stack was decided at, and then the address, which is the
     // question setup is about to be asked and the one nothing above it answers.
     let mut ctx = working_ctx();
-    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(engine_quiet());
     ctx.settings.protocols = Protocols::both();
 
     let said = afterwards(&ctx).await.join("\n");
@@ -127,7 +127,7 @@ async fn a_stack_that_came_up_reports_how_it_settled() {
     let stack_dir = lemonfiber_fixtures::scratch::Scratch::named("boot-started").kept();
     let _ = std::fs::remove_dir_all(&stack_dir);
     let mut ctx = working_ctx();
-    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(engine_quiet());
     ctx.stack = Source::Embedded(&QUIET);
     ctx.settings.protocols = Protocols::both();
     ctx.settings.stack_dir = Some(stack_dir.clone());
@@ -148,7 +148,7 @@ async fn a_start_refused_after_the_pull_is_reported_rather_than_settled() {
     let stack_dir = lemonfiber_fixtures::scratch::Scratch::named("boot-refused").kept();
     let _ = std::fs::remove_dir_all(&stack_dir);
     let mut ctx = working_ctx();
-    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(engine_quiet());
     ctx.stack = Source::Embedded(&QUIET);
     ctx.settings.stack_dir = Some(stack_dir.clone());
     ctx.settings.container = Some("lemonfiber-in-a-box".to_owned());
@@ -177,7 +177,7 @@ async fn a_stack_that_did_not_come_up_is_not_wired() {
 #[tokio::test(start_paused = true)]
 async fn a_stack_that_came_up_is_wired_as_seed_wires_it() {
     let mut ctx = working_ctx();
-    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.seams.engine = std::sync::Arc::new(engine_quiet());
     ctx.stack = Source::Embedded(&QUIET);
     assert_eq!(wire(&ctx, Some(Condition::Active)).await, Wired::Seeded);
 }

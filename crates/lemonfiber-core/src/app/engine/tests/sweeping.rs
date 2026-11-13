@@ -3,14 +3,13 @@
 
 use std::sync::{Arc, Mutex};
 
-use async_trait::async_trait;
 use lemonfiber_fixtures::networked::Networked;
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_fixtures::support::spoke;
+use lemonfiber_fixtures::support::{spoke, Recording};
 
 use crate::app::{Command, Ctx, Outcome};
 use crate::model::LifecycleReport;
-use crate::ports::process::{Failure, Output, Runner};
+use crate::ports::process::Runner;
 
 /// What the project names each network the engine holds: one nothing declares any more,
 /// one the project declares, and one the operator's overlay does.
@@ -23,23 +22,21 @@ const HELD: [(&str, &str); 3] = [
 /// The engine's name for the network the project no longer declares.
 const STALE: &str = "lemonfiber_default";
 
-/// A runner that notes which networks were taken away by the time Compose is asked to
-/// bring anything up.
-struct Watching {
-    networks: Arc<Networked>,
-    at_up: Mutex<Option<Vec<String>>>,
-}
+/// Which networks were taken away by the time Compose was asked to bring anything up.
+type AtUp = Arc<Mutex<Option<Vec<String>>>>;
 
-#[async_trait]
-impl Runner for Watching {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if argv.iter().any(|word| word == "up") {
-            if let Ok(mut at_up) = self.at_up.lock() {
-                *at_up = Some(self.networks.taken());
-            }
+/// A runner noting which networks were taken away by the time Compose is asked to bring
+/// anything up, with where it notes them.
+fn watching(networks: &Arc<Networked>) -> (Arc<Recording>, AtUp) {
+    let at_up: AtUp = Arc::new(Mutex::new(None));
+    let noted = Arc::clone(&at_up);
+    let networks = Arc::clone(networks);
+    let runner = Recording::answering(Ok(spoke(""))).on("up", move || {
+        if let Ok(mut at_up) = noted.lock() {
+            *at_up = Some(networks.taken());
         }
-        Ok(spoke(""))
-    }
+    });
+    (Arc::new(runner), at_up)
 }
 
 /// A machine whose engine holds `HELD`, running the stack through `runner`.
@@ -111,11 +108,8 @@ async fn a_rehearsed_start_names_the_networks_it_would_take_away_and_takes_none(
 #[tokio::test]
 async fn a_start_takes_away_what_the_project_no_longer_declares_before_anything_comes_up() {
     let networks = Networked::holding(&HELD);
-    let runner = Arc::new(Watching {
-        networks: networks.clone(),
-        at_up: Mutex::new(None),
-    });
-    let (_dir, ctx) = machine("started", &networks, runner.clone());
+    let (runner, at_up) = watching(&networks);
+    let (_dir, ctx) = machine("started", &networks, runner);
 
     let report = started(&ctx).await;
 
@@ -125,7 +119,7 @@ async fn a_start_takes_away_what_the_project_no_longer_declares_before_anything_
     );
     assert_eq!(networks.taken(), [STALE]);
     assert_eq!(
-        runner.at_up.lock().ok().and_then(|at_up| at_up.clone()),
+        at_up.lock().ok().and_then(|at_up| at_up.clone()),
         Some(vec![STALE.to_owned()]),
         "taken away before Compose was asked to bring anything up"
     );
@@ -154,11 +148,8 @@ async fn a_network_that_will_not_go_is_said_and_the_start_goes_on() {
 #[tokio::test]
 async fn a_start_whose_profiles_cannot_be_written_beside_the_project_brings_nothing_up() {
     let networks = Networked::holding(&HELD);
-    let runner = Arc::new(Watching {
-        networks: networks.clone(),
-        at_up: Mutex::new(None),
-    });
-    let (_dir, ctx) = machine("unprofiled", &networks, runner.clone());
+    let (runner, at_up) = watching(&networks);
+    let (_dir, ctx) = machine("unprofiled", &networks, runner);
     let project = crate::app::project::directory(&ctx).unwrap_or_default();
     let _ = std::fs::create_dir_all(&project);
     let _ = std::fs::remove_file(project.join(".env"));
@@ -166,11 +157,7 @@ async fn a_start_whose_profiles_cannot_be_written_beside_the_project_brings_noth
 
     assert!(started(&ctx).await.is_none());
     assert!(
-        runner
-            .at_up
-            .lock()
-            .ok()
-            .is_some_and(|at_up| at_up.is_none()),
+        at_up.lock().ok().is_some_and(|at_up| at_up.is_none()),
         "Compose was not asked to bring anything up"
     );
 }

@@ -1,6 +1,6 @@
 //! Seeing a credential once, and replacing one.
 
-use super::{asked, ctx, env_at, recorded, sealed, silent, the_recorded_password, Sealing};
+use super::{asked, ctx, env_at, recorded, sealed, sealing, silent, the_recorded_password};
 use lemonfiber_contract::wire::Kind;
 use lemonfiber_core::app::Asking;
 use lemonfiber_core::app::Ctx;
@@ -343,11 +343,11 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
         "unmoved-administrator",
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
-    let http = Arc::new(Sealing {
-        inner: administered(media::taken()),
-        env: env.clone(),
-        at: media::identity("replace_admin_password"),
-    });
+    let http = sealing(
+        administered(media::taken()),
+        env.clone(),
+        media::identity("replace_admin_password"),
+    );
 
     let inventory = asked(
         &moved(env.clone(), http),

@@ -1,8 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
-
 use super::{confirmed, on_battery_said, reported, waited, ALREADY_DONE, CHECK};
 use crate::app::Ctx;
 use crate::autostart::Returning;
@@ -18,26 +16,7 @@ use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripte
 use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::http::Fake;
 
-/// A machine that says when it started and where its power comes from, or will
-/// not say — both of which are facts no test could otherwise arrange.
-pub(super) struct Machine {
-    pub(super) at: Option<u64>,
-    pub(super) power: Option<Power>,
-}
-
-#[async_trait]
-impl Started for Machine {
-    async fn at(&self) -> Option<u64> {
-        self.at
-    }
-}
-
-#[async_trait]
-impl Supply for Machine {
-    async fn source(&self) -> Option<Power> {
-        self.power
-    }
-}
+pub(super) use lemonfiber_fixtures::machine::Booted as Machine;
 
 /// Everything the `library` form declares, which is the form these tests bring
 /// back.

@@ -1,41 +1,36 @@
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use super::{Http, Method, Request, Response, Retrying, Unreachable};
-use async_trait::async_trait;
+use super::{Http, Method, Request, Retrying};
 use lemonfiber_error::retry::ATTEMPTS;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// A transport that fails the first `failures` times and answers after that,
-/// counting how many times it was asked.
-struct Flaky {
-    failures: u32,
-    asked: Arc<AtomicU32>,
+/// What a service that is up answers.
+fn answered() -> Answer {
+    Answer::reply(200, "answered")
 }
 
-/// A flaky transport, wrapped, and the counter the test reads it through —
-/// shared rather than borrowed, since the wrapper takes ownership.
-fn failing(failures: u32) -> (Retrying<Flaky>, Arc<AtomicU32>) {
-    let asked = Arc::new(AtomicU32::new(0));
-    let flaky = Flaky {
-        failures,
-        asked: Arc::clone(&asked),
-    };
-    (Retrying::around(flaky), asked)
+/// A transport that fails the first `failures` times and answers after that, wrapped, and
+/// the fake the test counts its asks through — shared rather than borrowed, since the
+/// wrapper takes ownership.
+fn failing(failures: usize) -> (Retrying<Arc<dyn Http>>, Arc<Fake>) {
+    let mut answers = vec![Answer::Silent; failures];
+    answers.push(answered());
+    wrapped(Fake::in_turn(answers))
 }
 
-#[async_trait]
-impl Http for Flaky {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let asked = self.asked.fetch_add(1, Ordering::SeqCst).saturating_add(1);
-        if asked <= self.failures {
-            return Err(Unreachable::once(&request.url, "connection refused"));
-        }
-        Ok(Response {
-            status: 200,
-            headers: Vec::new(),
-            body: "answered".to_owned(),
-        })
-    }
+/// A transport that fails every time it is asked, wrapped.
+fn down() -> (Retrying<Arc<dyn Http>>, Arc<Fake>) {
+    wrapped(Fake::silent())
+}
+
+/// `fake`, wrapped, and `fake` again to count its asks through.
+fn wrapped(fake: Arc<Fake>) -> (Retrying<Arc<dyn Http>>, Arc<Fake>) {
+    (Retrying::around(Arc::clone(&fake) as Arc<dyn Http>), fake)
+}
+
+/// How many times `fake` was asked.
+fn asked(fake: &Fake) -> u32 {
+    u32::try_from(fake.requests().len()).unwrap_or(u32::MAX)
 }
 
 /// A request by method, to a service that does not matter here.
@@ -53,14 +48,14 @@ fn request(method: Method) -> Request {
 async fn a_service_that_was_only_starting_is_never_reported_at_all() {
     // The case the whole thing exists for: it failed once, it works now, and an
     // operator who was told about it would have learnt that lemonfiber cries wolf.
-    let (retrying, asked) = failing(1);
+    let (retrying, fake) = failing(1);
     assert!(retrying.send(&request(Method::Get)).await.is_ok());
-    assert_eq!(asked.load(Ordering::SeqCst), 2);
+    assert_eq!(asked(&fake), 2);
 }
 
 #[tokio::test]
 async fn a_service_that_is_down_is_reported_with_how_hard_it_was_tried() {
-    let (retrying, asked) = failing(u32::MAX);
+    let (retrying, fake) = down();
     let reported = retrying.send(&request(Method::Get)).await;
     assert_eq!(
         reported
@@ -70,7 +65,7 @@ async fn a_service_that_is_down_is_reported_with_how_hard_it_was_tried() {
         "the transport's own words, and our count beside them"
     );
     assert_eq!(
-        asked.load(Ordering::SeqCst),
+        asked(&fake),
         ATTEMPTS,
         "tried to exhaustion, and no further"
     );
@@ -80,25 +75,25 @@ async fn a_service_that_is_down_is_reported_with_how_hard_it_was_tried() {
 async fn a_create_that_went_unanswered_is_never_sent_twice() {
     // The response is what went missing, not necessarily the request — so a
     // retry risks a second root folder, a second download client.
-    let (retrying, asked) = failing(1);
+    let (retrying, fake) = failing(1);
     assert!(retrying.send(&request(Method::Post)).await.is_err());
-    assert_eq!(asked.load(Ordering::SeqCst), 1, "asked once and only once");
+    assert_eq!(asked(&fake), 1, "asked once and only once");
 }
 
 #[tokio::test]
 async fn a_replace_is_safe_to_repeat_and_so_is_retried() {
     // It lands on the same state however many times it arrives, which is the
     // property that makes trying again safe.
-    let (retrying, asked) = failing(1);
+    let (retrying, fake) = failing(1);
     assert!(retrying.send(&request(Method::Put)).await.is_ok());
-    assert_eq!(asked.load(Ordering::SeqCst), 2);
+    assert_eq!(asked(&fake), 2);
 }
 
 #[tokio::test]
 async fn a_failure_nobody_retried_says_it_was_tried_once() {
     // Not zero, and not the full count: claiming persistence for something
     // nobody retried is the same overstatement in the other direction.
-    let (retrying, _) = failing(u32::MAX);
+    let (retrying, _) = down();
     let reported = retrying.send(&request(Method::Post)).await;
     assert_eq!(reported.err().map(|failure| failure.attempts), Some(1));
 }
@@ -106,81 +101,49 @@ async fn a_failure_nobody_retried_says_it_was_tried_once() {
 #[tokio::test]
 async fn a_service_that_answers_first_time_is_asked_once() {
     // No wait, no second call: the ordinary path pays nothing for this.
-    let (retrying, asked) = failing(0);
+    let (retrying, fake) = failing(0);
     assert!(retrying.send(&request(Method::Get)).await.is_ok());
-    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    assert_eq!(asked(&fake), 1);
 }
 
 #[tokio::test]
 async fn a_refusal_is_an_answer_and_is_never_retried() {
     // Asking a service that said `401` again three times is neither more polite
     // nor more informative.
-    struct Refusing(Arc<AtomicU32>);
-    #[async_trait]
-    impl Http for Refusing {
-        async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-            self.0.fetch_add(1, Ordering::SeqCst);
-            Ok(Response {
-                status: 401,
-                headers: Vec::new(),
-                body: "no".to_owned(),
-            })
-        }
-    }
-    let asked = Arc::new(AtomicU32::new(0));
-    let retrying = Retrying::around(Refusing(Arc::clone(&asked)));
+    let (retrying, fake) = wrapped(Fake::always(Answer::reply(401, "no")));
     let answered = retrying.send(&request(Method::Get)).await;
     assert!(answered.is_ok_and(|response| response.status == 401));
-    assert_eq!(asked.load(Ordering::SeqCst), 1);
-}
-
-/// A transport whose service takes the connection and then says nothing.
-struct Silent {
-    asked: Arc<AtomicU32>,
-}
-
-#[async_trait]
-impl Http for Silent {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        self.asked.fetch_add(1, Ordering::SeqCst);
-        Err(Unreachable {
-            connected: true,
-            ..Unreachable::once(&request.url, "operation timed out")
-        })
-    }
+    assert_eq!(asked(&fake), 1);
 }
 
 /// Asking again would spend the whole wait twice more to hear the same silence.
 #[tokio::test]
 async fn a_service_that_took_the_connection_and_said_nothing_is_asked_once() {
-    let asked = Arc::new(AtomicU32::new(0));
-    let retrying = Retrying::around(Silent {
-        asked: Arc::clone(&asked),
-    });
+    let (retrying, fake) = wrapped(Fake::always(Answer::went_quiet("operation timed out")));
     let failure = retrying.send(&request(Method::Get)).await.err();
-    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    assert_eq!(asked(&fake), 1);
     assert_eq!(failure.map(|failure| failure.attempts), Some(1));
 }
 
 #[tokio::test]
 async fn a_fetch_is_handed_to_what_it_wraps() {
-    let (transport, asked) = failing(0);
+    let (transport, fake) = failing(0);
     let fetched = transport.fetch(&request(Method::Get), 64).await;
     assert_eq!(
         fetched.map(|fetched| fetched.bytes),
         Ok(Some(b"answered".to_vec()))
     );
-    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    assert_eq!(asked(&fake), 1);
 }
 
 /// Octets are handed to what is wrapped once, as a create is: a message sent twice would
 /// wake a phone twice.
 #[tokio::test]
 async fn octets_are_handed_on_once() {
-    let (transport, asked) = failing(0);
+    let (transport, fake) = failing(0);
     let sent = transport
         .send_octets(&request(Method::Post), b"sealed")
         .await;
     assert_eq!(sent.map(|answered| answered.status), Ok(200));
-    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    assert_eq!(asked(&fake), 1);
 }

@@ -140,7 +140,7 @@ fn scene(
             ..Settings::default()
         })
         .build()
-        .with_http(Arc::new(Serving::beside(http).decline(&decline)));
+        .with_http(Serving::beside(http).decline(&decline).transport());
     (ctx, at, decline)
 }
 

@@ -20,7 +20,7 @@ use lemonfiber_fixtures::support::SeedFs;
 /// service rather than of the report.
 #[tokio::test]
 async fn a_rehearsed_pass_names_the_folder_it_would_register_and_registers_none() {
-    let service = FakeService::with(Mode::Normal, Vec::new());
+    let service = Receiving::with(Mode::Normal, Vec::new());
     let states = would_wire(&service, &[folder("/data/media/tv")]).await;
 
     assert_eq!(
@@ -40,7 +40,7 @@ async fn a_rehearsed_pass_names_the_folder_it_would_register_and_registers_none(
 const DATA_ROOT: &str = "/srv/data";
 
 /// Wire one folder whose host directory `filesystem` makes, or reports it cannot.
-async fn backed(filesystem: &SeedFs, service: &FakeService, rehearsing: bool) -> Vec<State> {
+async fn backed(filesystem: &SeedFs, service: &Receiving, rehearsing: bool) -> Vec<State> {
     let backing = Backing {
         filesystem,
         data_root: std::path::Path::new(DATA_ROOT),
@@ -58,7 +58,7 @@ async fn backed(filesystem: &SeedFs, service: &FakeService, rehearsing: bool) ->
 /// file into it, and the folder is then registered.
 #[tokio::test]
 async fn a_folder_within_the_data_root_is_made_and_then_registered() {
-    let service = FakeService::with(Mode::Normal, Vec::new());
+    let service = Receiving::with(Mode::Normal, Vec::new());
 
     let states = backed(&SeedFs::keyed(None), &service, false).await;
 
@@ -70,7 +70,7 @@ async fn a_folder_within_the_data_root_is_made_and_then_registered() {
 /// service is never asked to file where nothing is.
 #[tokio::test]
 async fn a_folder_whose_directory_cannot_be_made_is_failed_and_not_registered() {
-    let service = FakeService::with(Mode::Normal, Vec::new());
+    let service = Receiving::with(Mode::Normal, Vec::new());
     let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
 
     let states = backed(&filesystem, &service, false).await;
@@ -86,7 +86,7 @@ async fn a_folder_whose_directory_cannot_be_made_is_failed_and_not_registered() 
 /// naming the folder a real run would register.
 #[tokio::test]
 async fn a_rehearsal_names_the_folder_without_making_its_directory() {
-    let service = FakeService::with(Mode::Normal, Vec::new());
+    let service = Receiving::with(Mode::Normal, Vec::new());
     let filesystem = SeedFs::keyed(None).missing(vec!["media/tv"]);
 
     let states = backed(&filesystem, &service, true).await;
@@ -103,7 +103,7 @@ async fn a_rehearsal_names_the_folder_without_making_its_directory() {
 /// would turn it down.
 #[tokio::test]
 async fn a_rehearsed_pass_refuses_a_folder_a_real_pass_would_refuse() {
-    let service = FakeService::with(Mode::Normal, Vec::new());
+    let service = Receiving::with(Mode::Normal, Vec::new());
     let states = would_wire(&service, &[folder("/elsewhere/tv")]).await;
 
     assert!(
@@ -118,7 +118,7 @@ async fn a_write_that_landed_before_an_interruption_is_not_duplicated_on_the_nex
     // before the read-back could confirm it. `DropsAfterRegister` is exactly that —
     // the folder is registered (and kept by the service), then the confirming read
     // fails, so the pass leaves it outstanding rather than calling it done.
-    let interrupted = FakeService::with(Mode::DropsAfterRegister, Vec::new());
+    let interrupted = Receiving::with(Mode::DropsAfterRegister, Vec::new());
     let first = wire_on(&interrupted, &[folder("/data/media/tv")]).await;
     assert!(
         matches!(first.as_slice(), [State::Skipped { .. }]),
@@ -131,7 +131,7 @@ async fn a_write_that_landed_before_an_interruption_is_not_duplicated_on_the_nex
     let landed = interrupted.registered();
     assert_eq!(landed.len(), 1, "the write did land at the service");
     let (states, wrote) = seed(
-        FakeService::with(Mode::Normal, landed),
+        Receiving::with(Mode::Normal, landed),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -145,7 +145,7 @@ async fn a_write_that_landed_before_an_interruption_is_not_duplicated_on_the_nex
 #[tokio::test]
 async fn an_absent_folder_is_registered_read_back_and_recorded() {
     let (states, recorded) = seed(
-        FakeService::with(Mode::Normal, Vec::new()),
+        Receiving::with(Mode::Normal, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -161,7 +161,7 @@ async fn a_folder_the_service_already_has_is_left_untouched() {
         path: "/data/media/tv".to_owned(),
     }];
     let (states, recorded) = seed(
-        FakeService::with(Mode::Normal, existing),
+        Receiving::with(Mode::Normal, existing),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -175,7 +175,7 @@ async fn a_wanted_path_is_matched_to_the_services_canonical_form() {
     // still recognise the folder it just registered, wire it, and record it —
     // rather than declaring the landed write a failure.
     let (states, recorded) = seed(
-        FakeService::with(Mode::Normal, Vec::new()),
+        Receiving::with(Mode::Normal, Vec::new()),
         &[folder("/data/media/tv/")],
     )
     .await;
@@ -193,7 +193,7 @@ async fn a_present_folder_is_matched_despite_a_trailing_slash() {
         path: "/data/media/tv".to_owned(),
     }];
     let (states, recorded) = seed(
-        FakeService::with(Mode::Normal, existing),
+        Receiving::with(Mode::Normal, existing),
         &[folder("/data/media/tv/")],
     )
     .await;
@@ -218,7 +218,7 @@ async fn a_root_folder_another_curator_also_wants_is_refused_not_wired() {
         vec!["radarr".to_owned(), "sonarr".to_owned()],
     )]);
     let (states, recorded) = seed_contested(
-        FakeService::with(Mode::Normal, Vec::new()),
+        Receiving::with(Mode::Normal, Vec::new()),
         &[folder("/data/media/tv")],
         &contested,
     )
@@ -245,7 +245,7 @@ async fn a_contested_folder_is_refused_even_where_the_service_already_holds_it()
         vec!["radarr".to_owned(), "sonarr".to_owned()],
     )]);
     let (states, recorded) = seed_contested(
-        FakeService::with(Mode::Normal, existing),
+        Receiving::with(Mode::Normal, existing),
         &[folder("/data/media/tv")],
         &contested,
     )
@@ -267,7 +267,7 @@ async fn only_the_contested_folder_is_refused_the_rest_are_wired() {
         vec!["radarr".to_owned(), "sonarr".to_owned()],
     )]);
     let (states, recorded) = seed_contested(
-        FakeService::with(Mode::Normal, Vec::new()),
+        Receiving::with(Mode::Normal, Vec::new()),
         &[folder("/data/media/tv"), folder("/data/media/movies")],
         &contested,
     )
@@ -346,7 +346,7 @@ async fn a_root_folder_outside_the_data_root_is_refused_with_an_explanation() {
     // would file where its downloads are neither hardlinked to nor visible to the
     // rest of the stack. The refusal names the path and why, and writes nothing.
     let (states, recorded) = seed(
-        FakeService::with(Mode::Normal, Vec::new()),
+        Receiving::with(Mode::Normal, Vec::new()),
         &[folder("/config/media/tv")],
     )
     .await;
@@ -366,7 +366,7 @@ async fn a_root_folder_outside_the_data_root_is_refused_with_an_explanation() {
 #[tokio::test]
 async fn an_unavailable_service_skips_every_folder() {
     let (states, recorded) = seed(
-        FakeService::with(Mode::Down, Vec::new()),
+        Receiving::with(Mode::Down, Vec::new()),
         &[folder("/data/media/tv"), folder("/data/media/movies")],
     )
     .await;
@@ -386,7 +386,7 @@ async fn an_unavailable_service_skips_every_folder() {
 #[tokio::test]
 async fn a_service_that_refuses_the_listing_fails() {
     let (states, _) = seed(
-        FakeService::with(Mode::RefusesList, Vec::new()),
+        Receiving::with(Mode::RefusesList, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -399,7 +399,7 @@ async fn a_service_that_refuses_the_listing_fails() {
 #[tokio::test]
 async fn a_service_refusing_the_listing_as_never_done_fails_in_its_own_words() {
     let (states, recorded) = seed(
-        FakeService::with(Mode::Disallowed, Vec::new()),
+        Receiving::with(Mode::Disallowed, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -415,7 +415,7 @@ async fn a_service_refusing_the_listing_as_never_done_fails_in_its_own_words() {
 #[tokio::test]
 async fn a_service_on_an_unsupported_api_version_does_not_offer_its_folders() {
     let (states, recorded) = seed(
-        FakeService::with(Mode::Unsupported, Vec::new()),
+        Receiving::with(Mode::Unsupported, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -431,7 +431,7 @@ async fn a_service_on_an_unsupported_api_version_does_not_offer_its_folders() {
 #[tokio::test]
 async fn a_rejected_registration_fails_with_the_services_own_words() {
     let (states, recorded) = seed(
-        FakeService::with(Mode::RejectsRegister, Vec::new()),
+        Receiving::with(Mode::RejectsRegister, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -451,7 +451,7 @@ async fn a_write_that_does_not_appear_when_read_back_is_a_failure() {
     // The service accepted the registration but does not report the folder, so it
     // did not land — not done, and not recorded.
     let (states, recorded) = seed(
-        FakeService::with(Mode::Swallows, Vec::new()),
+        Receiving::with(Mode::Swallows, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;
@@ -467,7 +467,7 @@ async fn a_service_that_stops_answering_after_the_write_is_skipped() {
     // The write went out but could not be confirmed, so it is left for a later
     // run to reconcile rather than declared wired.
     let (states, recorded) = seed(
-        FakeService::with(Mode::DropsAfterRegister, Vec::new()),
+        Receiving::with(Mode::DropsAfterRegister, Vec::new()),
         &[folder("/data/media/tv")],
     )
     .await;

@@ -2,7 +2,7 @@ use super::{
     prose, residual, settings, shown, Contents, Filenames, Marks, Piece, Residual, Taken, Terms,
     SALT_BYTES,
 };
-use crate::ports::random::Random;
+use lemonfiber_fixtures::ports::Chance;
 
 /// Salt built rather than written, for the reason every credential-shaped fixture in
 /// this repository is built: a literal that reaches a derivation is a hard-coded
@@ -25,30 +25,12 @@ fn key_shaped() -> String {
     ('a'..='j').chain('0'..='9').cycle().take(32).collect()
 }
 
-/// A source of bytes that answers with what it was built from.
-struct Fixed(Vec<u8>);
-
-impl Random for Fixed {
-    fn bytes(&self, n: usize) -> Option<Vec<u8>> {
-        Some(self.0.iter().copied().cycle().take(n).collect())
-    }
-}
-
-/// A source that cannot answer at all.
-struct Empty;
-
-impl Random for Empty {
-    fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
-        None
-    }
-}
-
 /// Stand-ins over a built salt. Made through the same door the real ones are, so the
 /// path that reads randomness is the path under test.
 fn marks(salt: Vec<u8>) -> Marks {
     // Built directly where the source will not answer: a fallback nothing can reach
     // is a branch no test can cover, and this file is held to covering all of them.
-    Marks::new(&Fixed(salt.clone())).unwrap_or(Marks::from_salt(salt))
+    Marks::new(&Chance::repeating(salt.clone())).unwrap_or(Marks::from_salt(salt))
 }
 
 /// Terms that hold what a test is about and default for the rest.
@@ -367,7 +349,7 @@ fn a_setting_with_no_value_is_left_as_it_is() {
 /// make every mark the same in every bundle anyone ever posted.
 #[test]
 fn marks_are_not_made_without_randomness() {
-    assert!(Marks::new(&Empty).is_none());
+    assert!(Marks::new(&Chance::exactly(None)).is_none());
     assert_eq!(salt().len(), SALT_BYTES);
 }
 
@@ -554,7 +536,7 @@ fn a_key_only_the_encoding_reveals_is_found_by_the_scan() {
 /// run like any other secret.
 #[test]
 fn an_integration_key_quoted_in_a_log_line_is_replaced() {
-    let Some(secret) = crate::keys::Secret::mint(&Fixed(vec![0xa7; 32])) else {
+    let Some(secret) = crate::keys::Secret::mint(&Chance::repeating(vec![0xa7; 32])) else {
         unreachable!("thirty-two bytes mint a key")
     };
     let line = format!(

@@ -1,22 +1,22 @@
 //! The transport every test drives a service through.
 //!
-//! Nine test crates each declared their own, and they were the same three ideas written out
-//! nine times: answer everything the same way, answer a scripted sequence in order, or
-//! answer by what was asked for. Nine copies is nine places for the semantics to drift.
-//!
-//! One transport with three ways to script it. What it records is the same in every case:
-//! every request, in order, so a test can assert on the last one, on all of them, or on
-//! whether something was ever asked for at all.
+//! One transport, scripted: the same answer to everything, a sequence in order, an answer
+//! by what was asked for, or a test's own function for a request carried somewhere in
+//! process. What it records is the same in every case: every request, in order, and the
+//! octets of each that carried them, so a test can assert on the last one, on all of them,
+//! or on whether something was ever asked for at all.
 //!
 //! A request nothing answers is unreachable rather than a default response. A test that
 //! reaches an endpoint it did not script has found something, and quietly handing it a
 //! `200` would hide it.
 
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
+use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 
 /// What the transport answers with.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +50,23 @@ pub enum Answer {
     },
     /// Nothing at all — the service is not there.
     Silent,
+    /// No answer, ever: the request is still waiting when whoever sent it gives up.
+    Hanging,
+    /// Bytes that need not be text, to a fetch; a send is answered by nothing, as a body
+    /// that is not text cannot be carried as one.
+    Octets {
+        /// The status.
+        status: u16,
+        /// The bytes.
+        bytes: Vec<u8>,
+    },
+    /// No answer, in the transport's own words.
+    Unreached {
+        /// Why nothing answered.
+        reason: String,
+        /// Whether a connection was made before the silence.
+        connected: bool,
+    },
 }
 
 impl Answer {
@@ -60,6 +77,25 @@ impl Answer {
     #[must_use]
     pub fn reply(status: u16, body: impl Into<String>) -> Self {
         Self::Reply(status, body.into())
+    }
+
+    /// No answer, because no connection could be made, for this reason.
+    #[must_use]
+    pub fn unreached(reason: impl Into<String>) -> Self {
+        Self::Unreached {
+            reason: reason.into(),
+            connected: false,
+        }
+    }
+
+    /// No answer from a service that took the connection and then said nothing, for this
+    /// reason.
+    #[must_use]
+    pub fn went_quiet(reason: impl Into<String>) -> Self {
+        Self::Unreached {
+            reason: reason.into(),
+            connected: true,
+        }
     }
 
     /// A response, said to have been served as this media type.
@@ -83,6 +119,23 @@ enum Script {
     /// By what was asked for: the first route whose fragment the URL contains,
     /// and whose method matches where one was given.
     ByRoute(Vec<Route>),
+    /// Handed to a test's own function, for a transport that carries a request somewhere
+    /// in process rather than answering from a table.
+    Handed(Handler),
+}
+
+/// What a transport handed to a test's own function answers with.
+pub type Handled = Pin<Box<dyn Future<Output = Result<Response, Unreachable>> + Send>>;
+
+/// A test's own function answering each request.
+type Handler = Box<dyn Fn(Request) -> Handled + Send + Sync>;
+
+/// What answers one request: a table's answer, or a test's own function.
+enum Resolved<'a> {
+    /// The answer a table gives.
+    Answer(Answer),
+    /// The function a test handed the request to.
+    Handed(&'a Handler),
 }
 
 /// One route of a fake answering by what was asked for.
@@ -144,8 +197,17 @@ impl Replies {
 /// A transport that answers from a script and remembers what it was asked.
 pub struct Fake {
     script: Script,
+    /// Whether a request carrying no octets is refused, as a push distributor refuses it.
+    octets_only: bool,
     seen: Mutex<Vec<Request>>,
+    octets: Mutex<Vec<(Request, Vec<u8>)>>,
 }
+
+/// What a fake taking only octets says to a request carrying none.
+const ONLY_OCTETS: &str = "only octets are taken here";
+
+/// What a fake answering bytes says to a send, which carries only text.
+const ONLY_FETCHED: &str = "only fetched";
 
 impl Fake {
     /// One answer, to everything.
@@ -158,6 +220,38 @@ impl Fake {
     #[must_use]
     pub fn silent() -> Arc<Self> {
         Self::always(Answer::Silent)
+    }
+
+    /// No answer to anything, ever.
+    #[must_use]
+    pub fn hanging() -> Arc<Self> {
+        Self::always(Answer::Hanging)
+    }
+
+    /// Each request handed to `handler`, which answers it.
+    #[must_use]
+    pub fn handing(handler: impl Fn(Request) -> Handled + Send + Sync + 'static) -> Arc<Self> {
+        Self::new(Script::Handed(Box::new(handler)))
+    }
+
+    /// A push distributor: octets answered by what the URL contains, the first route
+    /// matching, and every request carrying none refused.
+    #[must_use]
+    pub fn distributing(routes: Vec<(&'static str, Answer)>) -> Arc<Self> {
+        Arc::new(Self {
+            octets_only: true,
+            ..Self::built(Script::ByRoute(
+                routes
+                    .into_iter()
+                    .map(|(fragment, answer)| Route {
+                        method: None,
+                        fragment,
+                        body: None,
+                        replies: Replies::Same(answer),
+                    })
+                    .collect(),
+            ))
+        })
     }
 
     /// Each answer in turn.
@@ -288,16 +382,33 @@ impl Fake {
             .is_ok_and(|seen| seen.iter().any(|request| request.url.contains(fragment)))
     }
 
-    fn new(script: Script) -> Arc<Self> {
-        Arc::new(Self {
-            script,
-            seen: Mutex::new(Vec::new()),
-        })
+    /// Every request sent with octets, each beside the octets it carried, in order.
+    pub fn octets(&self) -> Vec<(Request, Vec<u8>)> {
+        self.octets
+            .lock()
+            .map(|octets| octets.clone())
+            .unwrap_or_default()
     }
 
-    /// What this script says to this request.
-    fn answer(&self, request: &Request) -> Answer {
-        match &self.script {
+    fn new(script: Script) -> Arc<Self> {
+        Arc::new(Self::built(script))
+    }
+
+    fn built(script: Script) -> Self {
+        Self {
+            script,
+            octets_only: false,
+            seen: Mutex::new(Vec::new()),
+            octets: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// What answers this request; `octets` says whether it carries them.
+    fn resolved(&self, request: &Request, octets: bool) -> Resolved<'_> {
+        if self.octets_only && !octets {
+            return Resolved::Answer(Answer::unreached(ONLY_OCTETS));
+        }
+        Resolved::Answer(match &self.script {
             Script::Always(answer) => answer.clone(),
             Script::InTurn(remaining) => remaining
                 .lock()
@@ -308,7 +419,8 @@ impl Fake {
                 .iter()
                 .find(|route| route.answers(request))
                 .map_or(Answer::Silent, |route| route.replies.answer()),
-        }
+            Script::Handed(handler) => return Resolved::Handed(handler),
+        })
     }
 }
 
@@ -316,7 +428,42 @@ impl Fake {
 impl Http for Fake {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
         crate::noted(&self.seen, request.clone());
-        answered(self.answer(request), request)
+        responding(request, self.resolved(request, false)).await
+    }
+
+    async fn send_octets(&self, request: &Request, octets: &[u8]) -> Result<Response, Unreachable> {
+        crate::noted(&self.seen, request.clone());
+        crate::noted(&self.octets, (request.clone(), octets.to_vec()));
+        responding(request, self.resolved(request, true)).await
+    }
+
+    async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
+        crate::noted(&self.seen, request.clone());
+        let (status, headers, bytes) = match self.resolved(request, false) {
+            Resolved::Answer(Answer::Octets { status, bytes }) => (status, Vec::new(), bytes),
+            resolved => {
+                let response = responding(request, resolved).await?;
+                (
+                    response.status,
+                    response.headers,
+                    response.body.into_bytes(),
+                )
+            }
+        };
+        Ok(Fetched {
+            status,
+            headers,
+            bytes: Some(bytes).filter(|bytes| bytes.len() <= most),
+        })
+    }
+}
+
+/// The response to this request, from whatever answers it.
+async fn responding(request: &Request, resolved: Resolved<'_>) -> Result<Response, Unreachable> {
+    match resolved {
+        Resolved::Answer(Answer::Hanging) => std::future::pending().await,
+        Resolved::Answer(answer) => answered(answer, request),
+        Resolved::Handed(handler) => handler(request.clone()).await,
     }
 }
 
@@ -346,7 +493,14 @@ fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> 
             headers,
             body,
         }),
-        Answer::Silent => Err(Unreachable {
+        Answer::Octets { .. } => Err(Unreachable::once(&request.url, ONLY_FETCHED)),
+        Answer::Unreached { reason, connected } => Err(Unreachable {
+            url: request.url.clone(),
+            reason,
+            attempts: 1,
+            connected,
+        }),
+        Answer::Silent | Answer::Hanging => Err(Unreachable {
             url: request.url.clone(),
             reason: "connection refused".to_owned(),
             attempts: 1,

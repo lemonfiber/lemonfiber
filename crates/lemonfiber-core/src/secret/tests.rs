@@ -1,15 +1,5 @@
 use super::{generate, render, SECRET_BYTES};
-use crate::ports::random::Random;
-
-/// A randomness source that answers with exactly what a test scripts, so a
-/// generated secret has a known value to assert.
-struct Fixed(Option<Vec<u8>>);
-
-impl Random for Fixed {
-    fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
-        self.0.clone()
-    }
-}
+use lemonfiber_fixtures::ports::Chance;
 
 #[test]
 fn bytes_render_as_lowercase_hex_two_characters_each() {
@@ -21,17 +11,17 @@ fn bytes_render_as_lowercase_hex_two_characters_each() {
 #[test]
 fn a_generated_secret_is_the_rendered_random_bytes() {
     let bytes = vec![0xde, 0xad, 0xbe, 0xef];
-    let secret = generate(&Fixed(Some(bytes.clone())));
+    let secret = generate(&Chance::exactly(Some(bytes.clone())));
     assert_eq!(secret.as_deref(), Some("deadbeef"));
 }
 
 #[test]
 fn without_randomness_there_is_no_secret_rather_than_a_weak_one() {
-    assert_eq!(generate(&Fixed(None)), None);
+    assert_eq!(generate(&Chance::exactly(None)), None);
 }
 
 #[test]
 fn a_full_length_secret_is_two_hex_characters_per_byte() {
-    let secret = generate(&Fixed(Some(vec![0x11; SECRET_BYTES])));
+    let secret = generate(&Chance::exactly(Some(vec![0x11; SECRET_BYTES])));
     assert_eq!(secret.map(|secret| secret.len()), Some(SECRET_BYTES * 2));
 }

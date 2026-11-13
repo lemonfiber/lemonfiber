@@ -12,7 +12,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 use super::super::context::a_context;
 use super::super::curators::TELEVISION;
 use super::super::usenet::{ADAPTER, PLUGIN};
-use super::{asked_at, installed_parts, Adapted, Keyed, KEY, PORT};
+use super::{asked_at, holding_keys, installed_parts, Adapted, KEY, PORT};
 
 const MOVED: Adapted = Adapted {
     plugin: PLUGIN,
@@ -162,7 +162,7 @@ fn a_context_naming_no_env_file_is_keyed_and_records_no_plugin() {
 #[test]
 fn a_keyed_disk_holds_the_adapters_key_and_reads_every_other_file_as_the_disk_does() {
     let directory = Scratch::new("adapted-keyed-disk");
-    let keyed = Keyed::holding(disk(), &[ADAPTER]);
+    let keyed = holding_keys(disk(), &[ADAPTER]);
     let key = lemonfiber_core::plugin::key_file(&directory, ADAPTER);
     let other = directory.join("other.txt");
 
@@ -215,7 +215,7 @@ fn a_keyed_disk_holds_the_adapters_key_and_reads_every_other_file_as_the_disk_do
 #[test]
 fn a_disk_keyed_for_other_services_holds_no_key_for_the_adapter() {
     let directory = Scratch::new("adapted-keyed-elsewhere");
-    let keyed = Keyed::holding(disk(), &["another-adapter"]);
+    let keyed = holding_keys(disk(), &["another-adapter"]);
 
     assert_eq!(
         keyed.read(

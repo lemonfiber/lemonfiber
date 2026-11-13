@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
+use lemonfiber_fixtures::dialled::Dialled;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{Credential, Live, Validation, Validator};
-use crate::ports::nntp::{Endpoint, Nntp};
 
 /// A validator whose transport answers with the given body at 200.
 fn answering(body: &str) -> Live {
@@ -154,52 +152,28 @@ fn a_certificate_that_was_not_trusted_is_told_apart_from_a_refused_connection() 
 }
 
 /// A transport that fails every attempt with the given reason.
-struct Failing(&'static str);
+fn failing(reason: &str) -> Arc<Fake> {
+    Fake::always(Answer::unreached(reason))
+}
 
 /// A transport that answers each attempt in turn: a reason to fail with, or an
 /// empty one to answer a search successfully.
-struct InTurn(std::sync::Mutex<std::collections::VecDeque<&'static str>>);
-
-impl InTurn {
-    fn of(reasons: &[&'static str]) -> Arc<Self> {
-        Arc::new(Self(std::sync::Mutex::new(
-            reasons.iter().copied().collect(),
-        )))
-    }
-}
-
-#[async_trait]
-impl crate::ports::http::Http for InTurn {
-    async fn send(
-        &self,
-        request: &crate::ports::http::Request,
-    ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-        let next = self
-            .0
-            .lock()
-            .ok()
-            .and_then(|mut queued| queued.pop_front())
-            .unwrap_or_default();
-        if next.is_empty() {
-            return Ok(crate::ports::http::Response {
-                status: 200,
-                headers: Vec::new(),
-                body: "<?xml version=\"1.0\"?><rss><channel><item>a</item></channel></rss>"
-                    .to_owned(),
-            });
-        }
-        Err(crate::ports::http::Unreachable::once(&request.url, next))
-    }
-}
-
-#[async_trait]
-impl crate::ports::http::Http for Failing {
-    async fn send(
-        &self,
-        request: &crate::ports::http::Request,
-    ) -> Result<crate::ports::http::Response, crate::ports::http::Unreachable> {
-        Err(crate::ports::http::Unreachable::once(&request.url, self.0))
-    }
+fn in_turn(reasons: &[&str]) -> Arc<Fake> {
+    Fake::in_turn(
+        reasons
+            .iter()
+            .map(|reason| {
+                if reason.is_empty() {
+                    Answer::reply(
+                        200,
+                        "<?xml version=\"1.0\"?><rss><channel><item>a</item></channel></rss>",
+                    )
+                } else {
+                    Answer::unreached(*reason)
+                }
+            })
+            .collect(),
+    )
 }
 
 /// How long a service was given to answer is part of what could not be reached.
@@ -207,7 +181,7 @@ impl crate::ports::http::Http for Failing {
 /// "unreachable" alone does not tell the operator which one happened.
 #[tokio::test]
 async fn a_service_that_did_not_answer_says_how_long_it_was_waited_for() {
-    let outcome = Live::new(Arc::new(Failing("connection refused")))
+    let outcome = Live::new(failing("connection refused"))
         .validate(&indexer())
         .await;
     let said = format!("{outcome:?}");
@@ -224,9 +198,7 @@ async fn a_service_that_did_not_answer_says_how_long_it_was_waited_for() {
 /// were never the problem.
 #[tokio::test]
 async fn a_network_that_is_down_is_said_once_and_not_against_each_credential() {
-    let validator = Live::new(Arc::new(Failing(
-        "dns error: failed to lookup address information",
-    )));
+    let validator = Live::new(failing("dns error: failed to lookup address information"));
 
     let first = format!("{:?}", validator.validate(&indexer()).await);
     assert!(first.contains("dns error"), "{first}");
@@ -246,7 +218,7 @@ async fn a_network_that_is_down_is_said_once_and_not_against_each_credential() {
 #[tokio::test]
 async fn an_outage_that_ended_is_not_the_outage_reported_before_it() {
     const DOWN: &str = "dns error: failed to lookup address information";
-    let validator = Live::new(InTurn::of(&[DOWN, DOWN, "", DOWN]));
+    let validator = Live::new(in_turn(&[DOWN, DOWN, "", DOWN]));
 
     let first = format!("{:?}", validator.validate(&indexer()).await);
     assert!(first.contains("Nothing on this machine"), "{first}");
@@ -279,7 +251,7 @@ fn a_handshake_that_failed_is_not_reported_as_an_untrusted_certificate() {
 #[tokio::test]
 async fn a_refusal_between_two_outages_ends_the_first_one() {
     const DOWN: &str = "dns error: failed to lookup address information";
-    let validator = Live::new(InTurn::of(&[DOWN, "connection refused", DOWN]));
+    let validator = Live::new(in_turn(&[DOWN, "connection refused", DOWN]));
 
     let first = format!("{:?}", validator.validate(&indexer()).await);
     assert!(first.contains("Nothing on this machine"), "{first}");
@@ -363,28 +335,12 @@ async fn nothing_answering_at_all_is_unreachable_with_the_transports_reason() {
     ));
 }
 
-/// An NNTP transport that answers `converse` with scripted reply lines, or
-/// with nothing at all where the connection could not be made.
-struct Dialogue(Result<Vec<String>, crate::ports::nntp::Unreachable>);
-
-#[async_trait]
-impl Nntp for Dialogue {
-    async fn converse(
-        &self,
-        _endpoint: &Endpoint,
-        _commands: &[String],
-    ) -> Result<Vec<String>, crate::ports::nntp::Unreachable> {
-        self.0.clone()
-    }
-}
-
 /// A validator that reaches Usenet through a transport scripted to reply with
 /// `lines` (greeting, then a reply per command).
 fn dialling(lines: &[&str]) -> Live {
-    let replies = lines.iter().map(|line| (*line).to_owned()).collect();
     Live::with_nntp(
         Fake::always(Answer::reply(200, String::new())),
-        Arc::new(Dialogue(Ok(replies))),
+        Dialled::replying(lines),
     )
 }
 
@@ -500,10 +456,7 @@ async fn an_exchange_that_did_not_finish_is_unreachable() {
 async fn a_provider_that_cannot_be_reached_is_unreachable() {
     let live = Live::with_nntp(
         Fake::always(Answer::reply(200, String::new())),
-        Arc::new(Dialogue(Err(crate::ports::nntp::Unreachable {
-            host: "news.provider.test".to_owned(),
-            reason: "connection refused".to_owned(),
-        }))),
+        Dialled::unreached("news.provider.test", "connection refused"),
     );
     assert!(matches!(
         live.validate(&usenet()).await,

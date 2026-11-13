@@ -1,100 +1,33 @@
 use crate::exit::{shown, success};
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::ports::docker::{
-    Container, Engine, ExecOutput, Failure as DockerFailure, LogLine, LogQuery, Stats, Stream,
-};
-use lemonfiber_core::ports::process::{Failure as RunFailure, Output, Runner};
+use lemonfiber_core::ports::docker::{Engine, Health, Lifecycle, LogLine, LogQuery, Stream};
+use lemonfiber_core::ports::process::Output;
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::support::{Question, Reporting, Scripted};
 
 use super::{claimed, emit_line, kind, pull, pull_showing, released, stream, Action, Ctx};
 
-/// A runner that answers every command the same way.
-struct Answering {
-    status: i32,
-    stdout: &'static str,
-}
-
-#[async_trait]
-impl Runner for Answering {
-    async fn run(&self, _argv: &[String]) -> Result<Output, RunFailure> {
-        Ok(Output {
-            status: Some(self.status),
-            stdout: self.stdout.to_owned(),
-            stderr: String::new(),
-        })
-    }
-}
-
 /// An engine that answers nothing, which is all these paths ask of it.
-struct Absent;
-
-#[async_trait]
-impl Engine for Absent {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, DockerFailure> {
-        Err(down())
-    }
-    async fn exec(&self, _c: &str, _a: &[String]) -> Result<ExecOutput, DockerFailure> {
-        Err(down())
-    }
-    async fn stats(
-        &self,
-        _p: &str,
-    ) -> Result<tokio::sync::mpsc::Receiver<(String, Stats)>, DockerFailure> {
-        Err(down())
-    }
-    async fn logs(
-        &self,
-        _p: &str,
-        _s: &[String],
-        _q: LogQuery,
-    ) -> Result<tokio::sync::mpsc::Receiver<LogLine>, DockerFailure> {
-        Err(down())
-    }
+fn absent() -> Reporting {
+    Reporting::absent().refusing(&[Question::Exec, Question::Stats])
 }
 
 /// An engine that answers: one log line, and nothing running.
-struct Talking;
-
-#[async_trait]
-impl Engine for Talking {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, DockerFailure> {
-        Ok(Vec::new())
-    }
-    async fn exec(&self, _c: &str, _a: &[String]) -> Result<ExecOutput, DockerFailure> {
-        Err(down())
-    }
-    async fn stats(
-        &self,
-        _p: &str,
-    ) -> Result<tokio::sync::mpsc::Receiver<(String, Stats)>, DockerFailure> {
-        Err(down())
-    }
-    async fn logs(
-        &self,
-        _p: &str,
-        _s: &[String],
-        _q: LogQuery,
-    ) -> Result<tokio::sync::mpsc::Receiver<LogLine>, DockerFailure> {
-        let (sender, receiver) = tokio::sync::mpsc::channel(4);
-        let _ = sender
-            .send(LogLine {
-                service: "sonarr".to_owned(),
-                stream: Stream::Stdout,
-                line: "started".to_owned(),
-                at: None,
-            })
-            .await;
-        Ok(receiver)
-    }
+fn talking() -> Reporting {
+    quiet().with_line(LogLine {
+        service: "sonarr".to_owned(),
+        stream: Stream::Stdout,
+        line: "started".to_owned(),
+        at: None,
+    })
 }
 
-fn down() -> DockerFailure {
-    DockerFailure::Unreachable {
-        reason: "nothing is running here".to_owned(),
-    }
+/// An engine that answers with no log lines at all.
+fn quiet() -> Reporting {
+    Reporting::holding(&[], Lifecycle::Running, Health::Healthy)
+        .refusing(&[Question::Exec, Question::Stats])
 }
 
 fn ctx(status: i32, stdout: &'static str) -> Ctx {
@@ -109,8 +42,12 @@ fn ctx(status: i32, stdout: &'static str) -> Ctx {
         ..Settings::default()
     };
     lemonfiber_testing::a_context()
-        .runner(Arc::new(Answering { status, stdout }))
-        .engine(Arc::new(Absent))
+        .runner(Arc::new(Scripted(Ok(Output {
+            status: Some(status),
+            stdout: stdout.to_owned(),
+            stderr: String::new(),
+        }))))
+        .engine(Arc::new(absent()))
         .clock(Arc::new(lemonfiber_adapters::System))
         .over(Source::Embedded(&lemonfiber::carried::STACK))
         .settings(settings)
@@ -190,7 +127,7 @@ fn both_shapes_a_pull_line_takes_are_reachable() {
 /// A context whose engine answers, for the paths that need one to.
 fn answering() -> Ctx {
     let mut ctx = ctx(0, "");
-    ctx.seams.engine = Arc::new(Talking);
+    ctx.seams.engine = Arc::new(talking());
     ctx
 }
 
@@ -213,38 +150,10 @@ async fn streaming_reads_each_line_for_a_person_and_for_a_script() {
     );
 }
 
-/// An engine that answers with no log lines at all.
-struct Quiet;
-
-#[async_trait]
-impl Engine for Quiet {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, DockerFailure> {
-        Ok(Vec::new())
-    }
-    async fn exec(&self, _c: &str, _a: &[String]) -> Result<ExecOutput, DockerFailure> {
-        Err(down())
-    }
-    async fn stats(
-        &self,
-        _p: &str,
-    ) -> Result<tokio::sync::mpsc::Receiver<(String, Stats)>, DockerFailure> {
-        Err(down())
-    }
-    async fn logs(
-        &self,
-        _p: &str,
-        _s: &[String],
-        _q: LogQuery,
-    ) -> Result<tokio::sync::mpsc::Receiver<LogLine>, DockerFailure> {
-        let (_sender, receiver) = tokio::sync::mpsc::channel(1);
-        Ok(receiver)
-    }
-}
-
 #[tokio::test]
 async fn a_stack_that_said_nothing_says_so_rather_than_printing_emptiness() {
     let mut ctx = ctx(0, "");
-    ctx.seams.engine = Arc::new(Quiet);
+    ctx.seams.engine = Arc::new(quiet());
     assert_eq!(
         format!("{:?}", stream(&ctx, &[], &[], false, 10, false).await),
         success()
@@ -254,8 +163,8 @@ async fn a_stack_that_said_nothing_says_so_rather_than_printing_emptiness() {
         format!("{:?}", stream(&ctx, &[], &[], false, 10, true).await),
         success()
     );
-    assert!(Quiet.exec("c", &[]).await.is_err());
-    assert!(Quiet.stats("p").await.is_err());
+    assert!(quiet().exec("c", &[]).await.is_err());
+    assert!(quiet().stats("p").await.is_err());
 }
 
 #[tokio::test]
@@ -279,15 +188,15 @@ async fn a_rehearsed_pull_that_cannot_be_described_is_reported() {
 
 #[tokio::test]
 async fn the_capabilities_these_reads_never_ask_for_answer_that_plainly() {
-    let engine = Absent;
+    let engine = absent();
     assert!(engine.list("p").await.is_err());
-    assert!(Talking.list("p").await.is_ok());
-    assert!(Quiet.list("p").await.is_ok());
+    assert!(talking().list("p").await.is_ok());
+    assert!(quiet().list("p").await.is_ok());
     assert!(engine.exec("c", &[]).await.is_err());
     assert!(engine.stats("p").await.is_err());
     assert!(engine.logs("p", &[], LogQuery::recent(10)).await.is_err());
-    assert!(Talking.exec("c", &[]).await.is_err());
-    assert!(Talking.stats("p").await.is_err());
+    assert!(talking().exec("c", &[]).await.is_err());
+    assert!(talking().stats("p").await.is_err());
 }
 
 #[tokio::test]

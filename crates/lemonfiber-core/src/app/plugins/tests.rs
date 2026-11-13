@@ -471,18 +471,24 @@ fn made_paths(ctx: &Ctx) -> Vec<String> {
         .collect()
 }
 
-/// A runner that stops answering one reading the moment the plugin's container
-/// is up.
+/// A runner that stops answering one reading the moment the plugin's container is up:
+/// a call carrying `version` and `once_up` is a program that is not there once anything
+/// was brought up, `compose` singling out the Compose reading and `version` itself taking
+/// the engine's own with it.
 ///
-/// The one lever a test has on the stack's own checks. Everything the diagnosis
-/// reaches here is a fake, and no fake answers differently because a file was
-/// written — so the change is tied to the install's own call, which is what the
-/// rule exists for said as plainly as a fake can say it.
-struct LostToTheInstall {
-    /// The word the failing call carries besides `version`: `compose` singles out
-    /// the Compose reading, and `version` itself takes the engine's own with it.
-    once_up: &'static str,
-    started: std::sync::atomic::AtomicBool,
+/// The one lever a test has on the stack's own checks, tied to the install's own call.
+fn losing(once_up: &str) -> Arc<Keyed> {
+    let failing = format!("version {once_up}");
+    Keyed::once(
+        "up",
+        vec![(
+            failing.as_str(),
+            Err(lemonfiber_ports::process::Failure::NotFound {
+                program: "docker".to_owned(),
+            }),
+        )],
+        Ok(spoke("25.0.5|1.44|1.44")),
+    )
 }
 
 fn read(at: &Path) -> String {

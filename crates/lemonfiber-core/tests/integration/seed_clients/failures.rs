@@ -7,7 +7,7 @@ use lemonfiber_core::seed::State;
 #[tokio::test]
 async fn an_unavailable_service_skips_every_download_client() {
     let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::Down, Vec::new()),
+        Receiving::with_clients(Mode::Down, Vec::new()),
         &[
             client("SABnzbd", "sabnzbd", 8080),
             client("qBittorrent", "qbittorrent", 8080),
@@ -30,7 +30,7 @@ async fn an_unavailable_service_skips_every_download_client() {
 #[tokio::test]
 async fn a_service_that_refuses_the_client_listing_fails() {
     let (states, _) = seed_clients(
-        FakeService::with_clients(Mode::RefusesList, Vec::new()),
+        Receiving::with_clients(Mode::RefusesList, Vec::new()),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
@@ -43,7 +43,7 @@ async fn a_service_that_refuses_the_client_listing_fails() {
 #[tokio::test]
 async fn a_rejected_client_registration_fails_with_the_services_own_words() {
     let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::RejectsRegister, Vec::new()),
+        Receiving::with_clients(Mode::RejectsRegister, Vec::new()),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
@@ -62,7 +62,7 @@ async fn a_rejected_client_registration_fails_with_the_services_own_words() {
 async fn a_client_write_that_does_not_appear_when_read_back_is_a_failure() {
     // Accepted but not reported back, so it did not land — not done, not recorded.
     let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::Swallows, Vec::new()),
+        Receiving::with_clients(Mode::Swallows, Vec::new()),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;
@@ -78,7 +78,7 @@ async fn a_service_that_stops_answering_after_the_client_write_is_skipped() {
     // The write went out but could not be confirmed, so it is left for a later
     // run to reconcile rather than declared wired.
     let (states, recorded) = seed_clients(
-        FakeService::with_clients(Mode::DropsAfterRegister, Vec::new()),
+        Receiving::with_clients(Mode::DropsAfterRegister, Vec::new()),
         &[client("SABnzbd", "sabnzbd", 8080)],
     )
     .await;

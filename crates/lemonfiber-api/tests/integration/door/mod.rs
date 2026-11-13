@@ -25,9 +25,8 @@ pub(crate) use lemonfiber_api::router::{routes, Serving};
 pub(crate) use lemonfiber_core::admission::{self as credential, Credential};
 pub(crate) use lemonfiber_core::app::Ctx;
 pub(crate) use lemonfiber_core::config::Settings;
-pub(crate) use lemonfiber_core::ports::service::{
-    Allowed, Certificate, Failure, Household, Invited, Member, NamedLibrary, Signed,
-};
+pub(crate) use lemonfiber_core::ports::service::{Household, Member, Signed};
+pub(crate) use lemonfiber_fixtures::household::Recognising;
 pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 pub(crate) use lemonfiber_fixtures::support::a_password;
@@ -351,173 +350,6 @@ pub(crate) fn carrying(secret: Option<&str>) -> HeaderMap {
     headers
 }
 
-/// A household that answers the questions a door asks and refuses the rest.
-///
-/// Who somebody is, whether a sign-in still stands, and whether an account a member's
-/// key names is still here: a stand-in answering more than the thing under test is one
-/// that can pass a test the surface would fail.
-pub(crate) struct AHousehold {
-    /// Who a name and password prove somebody to be, where it recognises them.
-    known: Option<String>,
-    /// Whether asking it fails outright, which is a different answer from not
-    /// recognising somebody.
-    ///
-    /// Shared and mutable for the reason `withdrawn` below is: a household that
-    /// goes quiet *after* somebody signed in is the sequence worth staging, and it
-    /// cannot be staged with two separate households.
-    unreachable: AtomicBool,
-    /// Whether the account it knows has since been taken off the server.
-    ///
-    /// Shared and mutable, so one test can sign somebody in and then remove them
-    /// behind the same surface — which is the sequence the requirement is written
-    /// about, and it cannot be staged with two separate households.
-    withdrawn: AtomicBool,
-    /// Whether the account's password has since been changed at the server, which
-    /// withdraws the access every earlier sign-in holds.
-    moved_on: AtomicBool,
-}
-
-impl AHousehold {
-    /// One that knows this account and nobody else.
-    pub(crate) fn knowing(id: &str) -> Arc<Self> {
-        Arc::new(Self {
-            known: Some(id.to_owned()),
-            unreachable: AtomicBool::new(false),
-            withdrawn: AtomicBool::new(false),
-            moved_on: AtomicBool::new(false),
-        })
-    }
-
-    /// Take the account off the server, as an operator removing somebody would.
-    pub(crate) fn withdraw(&self) {
-        self.withdrawn.store(true, Ordering::SeqCst);
-    }
-
-    /// Change the account's password at the server, as the member or an administrator
-    /// would.
-    pub(crate) fn change_password(&self) {
-        self.moved_on.store(true, Ordering::SeqCst);
-    }
-
-    /// Stop answering at all, as a media server being restarted would.
-    pub(crate) fn go_dark(&self) {
-        self.unreachable.store(true, Ordering::SeqCst);
-    }
-
-    /// One that recognises nobody.
-    pub(crate) fn knowing_nobody() -> Arc<Self> {
-        Arc::new(Self {
-            known: None,
-            unreachable: AtomicBool::new(false),
-            withdrawn: AtomicBool::new(false),
-            moved_on: AtomicBool::new(false),
-        })
-    }
-
-    /// One that could not be asked at all.
-    pub(crate) fn unreachable() -> Arc<Self> {
-        Arc::new(Self {
-            known: None,
-            unreachable: AtomicBool::new(true),
-            withdrawn: AtomicBool::new(false),
-            moved_on: AtomicBool::new(false),
-        })
-    }
-}
-
-#[async_trait::async_trait]
-impl Household for AHousehold {
-    async fn whoever(&self, _: &str, _: &str, device: &str) -> Result<Option<Signed>, Failure> {
-        if self.unreachable.load(Ordering::SeqCst) {
-            return Err(Failure::Unavailable {
-                service: "jellyfin".to_owned(),
-            });
-        }
-        Ok(self.known.clone().map(|id| Signed {
-            id,
-            token: device.to_owned(),
-        }))
-    }
-
-    async fn standing(&self, signed: &Signed) -> Result<bool, Failure> {
-        if self.unreachable.load(Ordering::SeqCst) {
-            return Err(Failure::Unavailable {
-                service: "jellyfin".to_owned(),
-            });
-        }
-        if self.withdrawn.load(Ordering::SeqCst) || self.moved_on.load(Ordering::SeqCst) {
-            return Ok(false);
-        }
-        Ok(self.known.as_deref() == Some(signed.id.as_str()))
-    }
-
-    /// Asked by a member's key, which was never a sign-in and so has no access to ask
-    /// about: whether the account is still here is the whole question.
-    async fn household(&self) -> Result<Vec<Member>, Failure> {
-        if self.unreachable.load(Ordering::SeqCst) {
-            return Err(Failure::Unavailable {
-                service: "jellyfin".to_owned(),
-            });
-        }
-        if self.withdrawn.load(Ordering::SeqCst) {
-            return Ok(Vec::new());
-        }
-        Ok(self
-            .known
-            .iter()
-            .map(|id| Member {
-                id: id.clone(),
-                name: "ana".to_owned(),
-                claimed: true,
-                access: lemonfiber_core::ports::service::Access::default(),
-                last_seen: None,
-            })
-            .collect())
-    }
-    async fn invite(&self, _: &str) -> Result<Member, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn claim(&self, _: &str, _: &str, _: &str) -> Result<bool, Failure> {
-        unreachable!("this household keeps no record of an offer, so nothing is claimed")
-    }
-    async fn unclaim(&self, _: &str) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn withdraw(&self, _: &str) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn when_invited(&self, _: &str) -> Result<Vec<Invited>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn country(&self) -> Result<Option<String>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn allow(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn claimable(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn suspend(&self, _: &str) -> Result<(), Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn sessions(
-        &self,
-        _: &str,
-    ) -> Result<Vec<lemonfiber_core::ports::service::Session>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn signs_devices_in(&self) -> Result<bool, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-}
-
 /// A surface with a household behind it, minting its sessions from `random`.
 ///
 /// **The source is named rather than defaulted, and that is load-bearing.**
@@ -529,7 +361,7 @@ impl Household for AHousehold {
 /// would pass.
 pub(crate) fn door_with(
     path: Option<PathBuf>,
-    household: Arc<AHousehold>,
+    household: Arc<Recognising>,
     random: Chance,
 ) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
     let admitting = Arc::new(Admitting {

@@ -23,6 +23,9 @@ lemonfiber-manifest = { workspace = true, features = ["testing"] }
 lemonfiber-bundled = { workspace = true }
 # Editing a carried manifest's root as the table it is.
 toml = { workspace = true }
+# Writing a port's value as it crosses a contract, for the upstream that records it.
+serde = { workspace = true }
+serde_json = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
 
