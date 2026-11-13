@@ -1,4 +1,4 @@
-use super::{arrived, filed, kept, settled, Asking, Standing};
+use super::{arrived, filed, kept, settled, withdrawn, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
 use crate::ports::service::{BookUnit, MusicUnit};
 
@@ -136,4 +136,41 @@ fn a_sent_ask_arrives_once_and_keeps_when_it_was_first_seen_held() {
         ))
     );
     assert_eq!(read(waiting), Some((Standing::Waiting, None, None)));
+}
+
+#[test]
+fn a_withdrawn_ask_keeps_its_number_and_is_withdrawn_once() {
+    let at = path("collected-withdrawn");
+    let album = Unit::Music(MusicUnit::Album);
+    let first = Reference::Kept(Medium::Music, 1);
+    let _ = filed(&at, &asking(album, Standing::Sent));
+
+    assert_eq!(
+        withdrawn(&at, first, "2026-11-13T10:00:00Z").ok(),
+        Some(true)
+    );
+    assert_eq!(
+        withdrawn(&at, first, "2026-11-13T11:00:00Z").ok(),
+        Some(false)
+    );
+    assert_eq!(
+        withdrawn(
+            &at,
+            Reference::Kept(Medium::Books, 1),
+            "2026-11-13T11:00:00Z"
+        )
+        .ok(),
+        Some(false)
+    );
+    let asks = kept(&at).map(|kept| kept.asks).unwrap_or_default();
+    assert_eq!(
+        asks.iter()
+            .map(|ask| (ask.standing, ask.settled_at.clone()))
+            .collect::<Vec<_>>(),
+        [(Standing::Withdrawn, Some("2026-11-13T10:00:00Z".to_owned()))]
+    );
+    assert_eq!(
+        filed(&at, &asking(album, Standing::Sent)).ok(),
+        Some(Reference::Kept(Medium::Music, 2))
+    );
 }

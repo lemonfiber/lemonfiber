@@ -223,6 +223,17 @@ impl Change {
                 title,
                 release,
             } => Action::regrab(*kind, *title, release),
+            Kind::Asked {
+                unit,
+                reference,
+                kept,
+                whole,
+            } => Action::Unask {
+                unit: *unit,
+                reference: reference.clone(),
+                kept: kept.clone(),
+                whole: *whole,
+            },
         }
     }
 }

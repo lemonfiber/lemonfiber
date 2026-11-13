@@ -172,6 +172,7 @@ pub fn described(change: &Change) -> String {
         Kind::Restarted { service } => format!("the restart of {service}"),
         Kind::MovedInPlace { service, .. } => format!("the move of {service} onto its plugin"),
         Kind::Unqueued { .. } => "the drop of a stuck download".to_owned(),
+        Kind::Asked { kept, .. } => format!("the ask {kept}"),
     }
 }
 

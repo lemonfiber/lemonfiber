@@ -95,6 +95,10 @@ impl MusicCurating for Curator {
     async fn profiles(&self) -> Result<AskedWith, Failure> {
         Ok(self.with.clone())
     }
+    async fn remove(&self, unit: MusicUnit, reference: &str) -> Result<(), Failure> {
+        self.told(format!("remove {unit:?} {reference}"));
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -126,6 +130,10 @@ impl BookCurating for Curator {
     async fn profiles(&self) -> Result<AskedWith, Failure> {
         Ok(self.with.clone())
     }
+    async fn remove(&self, unit: BookUnit, reference: &str) -> Result<(), Failure> {
+        self.told(format!("remove {unit:?} {reference}"));
+        Ok(())
+    }
 }
 
 const ALBUM: Unit = Unit::Music(MusicUnit::Album);
@@ -140,16 +148,19 @@ async fn a_curator_of_music_is_asked_for_music_at_its_first_folder_and_profiles_
     let page = collector.lookup(ALBUM, "blue", None).await;
     let one = collector.candidate(ALBUM, "mbid-1").await;
     let asked = collector.request(ALBUM, "mbid-1").await;
+    let removed = collector.remove(ALBUM, "mbid-1").await;
 
     assert!(page.is_ok_and(|page| page.found.len() == 1));
     assert!(one.is_ok_and(|one| one.is_some()));
     assert!(asked.is_ok());
+    assert!(removed.is_ok());
     assert_eq!(
         curator.asked(),
         [
             "lookup Album blue",
             "candidate Album mbid-1",
-            "request Album mbid-1 /library 3 3 true"
+            "request Album mbid-1 /library 3 3 true",
+            "remove Album mbid-1"
         ]
     );
 }
@@ -162,16 +173,19 @@ async fn a_curator_of_books_is_asked_for_books_at_its_first_folder_and_profile_s
     let page = collector.lookup(SERIES, "harbour", None).await;
     let one = collector.candidate(SERIES, "ol-1").await;
     let asked = collector.request(SERIES, "ol-1").await;
+    let removed = collector.remove(SERIES, "ol-1").await;
 
     assert!(page.is_ok());
     assert!(one.is_ok_and(|one| one.is_none()));
     assert!(asked.is_ok());
+    assert!(removed.is_ok());
     assert_eq!(
         curator.asked(),
         [
             "lookup Series harbour",
             "candidate Series ol-1",
-            "request Series ol-1 /library 3 true"
+            "request Series ol-1 /library 3 true",
+            "remove Series ol-1"
         ]
     );
 }
@@ -191,6 +205,8 @@ async fn a_unit_of_the_other_medium_is_not_asked_of_a_curator() {
         music.candidate(SERIES, "ol-1").await.map(|_| ())
     ));
     assert!(unsupported(music.request(SERIES, "ol-1").await.map(|_| ())));
+    assert!(unsupported(music.remove(SERIES, "ol-1").await));
+    assert!(unsupported(books.remove(ALBUM, "mbid-1").await));
     assert!(unsupported(
         books.lookup(ALBUM, "blue", None).await.map(|_| ())
     ));
