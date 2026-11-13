@@ -108,7 +108,10 @@ async fn routed(ctx: &Ctx, project: &std::path::Path) -> Option<State> {
 fn emby_is_the_media_server_the_gate_routes_in_embys_own_api() {
     let server = server(stack_root());
 
-    assert_eq!(server.as_ref().map(|one| one.id()), Some(SERVER));
+    assert_eq!(
+        server.as_ref().map(crate::app::targets::MediaServer::id),
+        Some(SERVER)
+    );
     assert_eq!(
         server
             .as_ref()
