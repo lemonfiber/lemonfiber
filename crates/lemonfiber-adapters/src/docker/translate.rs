@@ -14,7 +14,7 @@ use bollard::models::{
 };
 
 use super::{PROJECT_LABEL, SERVICE_LABEL};
-use lemonfiber_ports::docker::{Container, Health, Lifecycle, Published, Stats};
+use lemonfiber_ports::docker::{Container, Health, Lifecycle, Mounted, Published, Stats};
 
 /// What the engine calls a container's state, in the port's vocabulary.
 ///
@@ -82,17 +82,24 @@ pub(super) fn describe(summary: ContainerSummary) -> Container {
 
 /// The host addresses a container actually answers on.
 ///
-/// Every host path the engine says is mounted into a container.
+/// Every host path the engine says is mounted into a container, with where it lands.
 ///
 /// A mount with no source on the host is a named volume or an anonymous one, which is
 /// the engine's own storage rather than somewhere in the operator's tree, so it has no
 /// path a hardlink question could be asked about and is left out.
-fn mounted(mounts: Vec<MountPoint>) -> Vec<PathBuf> {
+fn mounted(mounts: Vec<MountPoint>) -> Vec<Mounted> {
     mounts
         .into_iter()
-        .filter_map(|mount| mount.source)
-        .filter(|source| !source.is_empty())
-        .map(PathBuf::from)
+        .filter_map(|mount| {
+            let source = mount.source.filter(|source| !source.is_empty())?;
+            let destination = mount
+                .destination
+                .filter(|destination| !destination.is_empty())?;
+            Some(Mounted {
+                source: PathBuf::from(source),
+                destination: PathBuf::from(destination),
+            })
+        })
         .collect()
 }
 

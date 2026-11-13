@@ -30,6 +30,8 @@ fn survey() -> MigrationReport {
                 running: true,
                 ports: vec![THEIR_PORT],
                 adoptable: true,
+                config: crate::model::Location::At("/srv/apps/sonarr".to_owned()),
+                library: crate::model::Location::At("/srv/media".to_owned()),
             }],
         }],
         ..MigrationReport::default()
@@ -50,7 +52,10 @@ fn theirs() -> Container {
             port: THEIR_PORT,
             private: 8989,
         }],
-        mounts: vec![std::path::PathBuf::from("/their/sonarr")],
+        mounts: vec![crate::ports::docker::Mounted {
+            source: std::path::PathBuf::from("/their/sonarr"),
+            destination: std::path::PathBuf::from("/config"),
+        }],
         exit: None,
     }
 }

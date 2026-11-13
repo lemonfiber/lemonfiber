@@ -39,6 +39,8 @@ pub(crate) fn ours(service: &str, image: &str, tag: &str, port: Option<u16>) -> 
         image: image.to_owned(),
         tag: tag.to_owned(),
         port,
+        configuration: "/config".to_owned(),
+        takes_data: true,
     }
 }
 

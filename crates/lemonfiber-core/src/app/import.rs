@@ -313,8 +313,8 @@ async fn borrowed(
 }
 
 /// The key their copy of `container`'s service wrote for itself, read from where the
-/// plugin `installed`'s secret `secret` says the service keeps it, beneath the first
-/// directory their container mounts.
+/// plugin `installed`'s secret `secret` says the service keeps it, beneath the directory
+/// their container mounts where that service keeps its configuration.
 async fn their_key(
     ctx: &Ctx,
     installed: &crate::plugin::Installed,
@@ -332,16 +332,18 @@ async fn their_key(
         .iter()
         .find(|service| service.id == container.service)
         .map(lemonfiber_plugin::Service::configuration);
-    let read = from
-        .zip(mount)
-        .zip(container.mounts.first())
-        .and_then(|((from, mount), theirs)| {
-            Some((
-                from,
-                theirs,
-                crate::app::targets::config_file(theirs, mount, &from.file)?,
-            ))
-        });
+    let read = from.zip(mount).and_then(|(from, mount)| {
+        let theirs = &container
+            .mounts
+            .iter()
+            .find(|mounted| mounted.destination == std::path::Path::new(mount))?
+            .source;
+        Some((
+            from,
+            theirs,
+            crate::app::targets::config_file(theirs, mount, &from.file)?,
+        ))
+    });
     let Some((from, theirs, path)) = read else {
         return Err(UNCONFIGURED.to_owned());
     };

@@ -175,14 +175,22 @@ impl Reporting {
         self
     }
 
-    /// The same containers, with the given host paths mounted into each.
+    /// The same containers, with each host path given mounted into each at the path
+    /// beside it.
     ///
     /// For the survey that asks where an existing setup keeps its data, which is the
     /// only way to tell whether a hardlink could reach between two of its directories.
     #[must_use]
-    pub fn mounting(mut self, paths: &[std::path::PathBuf]) -> Self {
+    pub fn mounting(mut self, mounts: &[(&str, &str)]) -> Self {
+        let mounted: Vec<lemonfiber_ports::docker::Mounted> = mounts
+            .iter()
+            .map(|(source, destination)| lemonfiber_ports::docker::Mounted {
+                source: std::path::PathBuf::from(source),
+                destination: std::path::PathBuf::from(destination),
+            })
+            .collect();
         for container in &mut self.containers {
-            container.mounts = paths.to_vec();
+            container.mounts.clone_from(&mounted);
         }
         self
     }

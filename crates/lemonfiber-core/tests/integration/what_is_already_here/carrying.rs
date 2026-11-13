@@ -102,7 +102,7 @@ async fn carrying_out_of_a_machine_that_could_not_be_read_carries_nothing() {
 async fn a_service_with_no_way_in_is_named_rather_than_passed_over() {
     let unreachable = Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
         .belonging_to("media")
-        .mounting(&[PathBuf::from("/their/sonarr")]);
+        .mounting(&[("/their/sonarr", "/config")]);
     let ctx = importing_over(
         unreachable,
         Source::External(project()),
@@ -123,7 +123,7 @@ async fn a_service_we_do_not_run_holds_nothing_to_carry() {
     let engine = Reporting::holding(&["sonarr", "ombi"], Lifecycle::Running, Health::Healthy)
         .belonging_to("media")
         .publishing(&[("sonarr", "0.0.0.0", 18989)])
-        .mounting(&[PathBuf::from("/their/sonarr")]);
+        .mounting(&[("/their/sonarr", "/config")]);
     let ctx = importing_over(
         engine,
         Source::External(project()),

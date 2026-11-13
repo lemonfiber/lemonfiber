@@ -5,9 +5,11 @@
 //! stack it could not take over.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
-use crate::model::{ConflictReport, OccupantReport, StandingReport, UnsupportedReport};
+use crate::model::{ConflictReport, Location, OccupantReport, StandingReport, UnsupportedReport};
 use crate::ports::docker::{Container, Lifecycle};
+use crate::project::entry::LIBRARY_TARGET;
 
 use super::Ours;
 
@@ -44,12 +46,52 @@ fn occupant(container: &Container, ours: &[Ours]) -> OccupantReport {
     ports.sort_unstable();
     ports.dedup();
 
+    let known = ours.iter().find(|one| one.service == container.service);
     OccupantReport {
         service: container.service.clone(),
         running: container.lifecycle == Lifecycle::Running,
         ports,
-        adoptable: ours.iter().any(|one| one.service == container.service),
+        adoptable: known.is_some(),
+        config: known.map_or_else(unknown, |one| {
+            located(container, &one.configuration, "its configuration")
+        }),
+        library: known.map_or_else(unknown, |one| {
+            if one.takes_data {
+                located(container, LIBRARY_TARGET, "its library")
+            } else {
+                Location::None(format!(
+                    "lemonfiber's {} takes no data mount, so it keeps no library",
+                    one.service
+                ))
+            }
+        }),
     }
+}
+
+/// Where `container` mounts what lands at `inside`, what it keeps there being `what`.
+fn located(container: &Container, inside: &str, what: &str) -> Location {
+    container
+        .mounts
+        .iter()
+        .find(|mount| mount.destination == Path::new(inside))
+        .map_or_else(
+            || {
+                Location::Unread(format!(
+                    "no host path is mounted at {inside}, where {} keeps {what}, so where \
+                     that is on this machine is not known",
+                    container.service
+                ))
+            },
+            |mount| Location::At(mount.source.display().to_string()),
+        )
+}
+
+/// Why a location of a service lemonfiber does not know is not said.
+fn unknown() -> Location {
+    Location::Unread(
+        "lemonfiber does not know this service, so which of its mounts holds what is not known"
+            .to_owned(),
+    )
 }
 
 /// Every host port anything already standing here answers on.

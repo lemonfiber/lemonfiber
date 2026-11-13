@@ -11,8 +11,8 @@
 //! rather than one function knowing about every case at once.
 
 use lemonfiber_core::model::{
-    AdoptReport, BesideReport, ImportReport, MigrationReport, RecordReport, ReplaceReport,
-    UnsupportedReport,
+    AdoptReport, BesideReport, ImportReport, Location, MigrationReport, RecordReport,
+    ReplaceReport, UnsupportedReport,
 };
 
 use lemonfiber_core::reconfigure::Stance;
@@ -232,7 +232,18 @@ fn standing_here(report: &MigrationReport, lines: &mut Lines) {
                 },
                 published(&service.ports)
             ));
+            lines.put(format!("    configuration  {}", located(&service.config)));
+            lines.put(format!("    library        {}", located(&service.library)));
         }
+    }
+}
+
+/// Where something a service keeps is, or why that is not said.
+fn located(location: &Location) -> String {
+    match location {
+        Location::At(path) => path.clone(),
+        Location::Unread(why) => format!("not read: {why}"),
+        Location::None(why) => format!("none: {why}"),
     }
 }
 

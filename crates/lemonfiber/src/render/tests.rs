@@ -170,6 +170,8 @@ fn the_migrations() -> Vec<Outcome> {
                     running: true,
                     ports: vec![8989],
                     adoptable: true,
+                    config: lemonfiber_core::model::Location::At("/srv/apps/sonarr".to_owned()),
+                    library: lemonfiber_core::model::Location::At("/srv/media".to_owned()),
                 }],
             }],
             conflicts: vec![ConflictReport {

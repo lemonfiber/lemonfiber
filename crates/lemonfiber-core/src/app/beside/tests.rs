@@ -43,6 +43,8 @@ fn nowhere_left_to_listen_stops_it() {
                 running: true,
                 ports: vec![8989],
                 adoptable: true,
+                config: crate::model::Location::At("/srv/apps/sonarr".to_owned()),
+                library: crate::model::Location::At("/srv/media".to_owned()),
             }],
         }],
         ..MigrationReport::default()

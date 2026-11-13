@@ -1,5 +1,7 @@
 use super::{conflicts, here, taken, unsupported};
 use crate::migration::tests::{container, ours, running};
+use crate::migration::Ours;
+use crate::model::{Location, OccupantReport};
 use crate::ports::docker::Lifecycle;
 
 #[test]
@@ -133,4 +135,108 @@ fn somebody_elses_unrelated_project_is_not_a_stack_we_failed_to_adopt() {
     ];
     let standing = here("lemonfiber", &seen, &running());
     assert!(unsupported(&standing).is_empty());
+}
+
+fn mounted(source: &str, destination: &str) -> crate::ports::docker::Mounted {
+    crate::ports::docker::Mounted {
+        source: std::path::PathBuf::from(source),
+        destination: std::path::PathBuf::from(destination),
+    }
+}
+
+fn occupant(seen: crate::ports::docker::Container, ours: &[Ours]) -> Option<OccupantReport> {
+    here("lemonfiber", &[seen], ours)
+        .first()
+        .and_then(|project| project.services.first())
+        .cloned()
+}
+
+#[test]
+fn a_known_service_says_where_its_configuration_and_its_library_are_mounted_from() {
+    let mut seen = container("media", "sonarr", &[8989]);
+    seen.mounts = vec![
+        mounted("/srv/media", "/data"),
+        mounted("/srv/apps/sonarr", "/config"),
+    ];
+
+    let found = occupant(seen, &running());
+
+    assert_eq!(
+        found.map(|one| (one.config, one.library)),
+        Some((
+            Location::At("/srv/apps/sonarr".to_owned()),
+            Location::At("/srv/media".to_owned())
+        ))
+    );
+}
+
+#[test]
+fn the_configuration_is_read_where_the_manifest_says_the_service_keeps_it() {
+    let mut seen = container("media", "sonarr", &[8989]);
+    seen.mounts = vec![
+        mounted("/srv/apps/sonarr", "/config"),
+        mounted("/srv/apps/sonarr-own", "/settings"),
+    ];
+    let mut kept_elsewhere = ours("sonarr", "linuxserver/sonarr", "4.0.1", Some(8989));
+    kept_elsewhere.configuration = "/settings".to_owned();
+
+    let found = occupant(seen, &[kept_elsewhere]);
+
+    assert_eq!(
+        found.map(|one| one.config),
+        Some(Location::At("/srv/apps/sonarr-own".to_owned()))
+    );
+}
+
+#[test]
+fn nothing_mounted_where_a_service_keeps_something_is_said_unread_naming_where() {
+    let mut seen = container("media", "sonarr", &[8989]);
+    seen.mounts = vec![mounted("/srv/tv", "/tv")];
+
+    let found = occupant(seen, &running());
+
+    let Some(found) = found else {
+        unreachable!("the service was not found");
+    };
+    assert!(
+        matches!(&found.config, Location::Unread(why) if why.contains("/config")),
+        "{found:?}"
+    );
+    assert!(
+        matches!(&found.library, Location::Unread(why) if why.contains("/data")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_service_that_takes_no_data_keeps_no_library() {
+    let mut seen = container("media", "prowlarr", &[9696]);
+    seen.mounts = vec![mounted("/srv/apps/prowlarr", "/config")];
+    let mut indexer = ours("prowlarr", "linuxserver/prowlarr", "1.0.0", Some(9696));
+    indexer.takes_data = false;
+
+    let found = occupant(seen, &[indexer]);
+
+    let Some(found) = found else {
+        unreachable!("the service was not found");
+    };
+    assert_eq!(found.config, Location::At("/srv/apps/prowlarr".to_owned()));
+    assert!(
+        matches!(&found.library, Location::None(why) if why.contains("no library")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_service_lemonfiber_does_not_know_has_both_locations_unread() {
+    let mut seen = container("media", "postgres", &[5432]);
+    seen.mounts = vec![mounted("/srv/db", "/config")];
+
+    let found = occupant(seen, &running());
+
+    let Some(found) = found else {
+        unreachable!("the service was not found");
+    };
+    assert!(matches!(found.config, Location::Unread(_)), "{found:?}");
+    assert!(matches!(found.library, Location::Unread(_)), "{found:?}");
 }

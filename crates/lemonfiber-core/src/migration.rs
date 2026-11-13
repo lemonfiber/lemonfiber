@@ -43,6 +43,10 @@ pub struct Ours {
     pub tag: String,
     /// The host port it would publish, absent for a service with no listener.
     pub port: Option<u16>,
+    /// Where inside its container it reads its configuration from.
+    pub configuration: String,
+    /// Whether its container takes the data mount, where its library is kept.
+    pub takes_data: bool,
 }
 
 /// Every service this build pins, as its own manifest declares them.
@@ -56,11 +60,16 @@ pub fn pins(manifest: &lemonfiber_manifest::Manifest) -> Vec<Ours> {
     manifest
         .services
         .iter()
-        .map(|service| Ours {
-            service: service.id.clone(),
-            image: service.image.clone(),
-            tag: service.tag.clone(),
-            port: service.port,
+        .map(|service| {
+            let container = service.container();
+            Ours {
+                service: service.id.clone(),
+                image: service.image.clone(),
+                tag: service.tag.clone(),
+                port: service.port,
+                configuration: container.configuration().to_owned(),
+                takes_data: container.takes_data,
+            }
         })
         .collect()
 }

@@ -91,7 +91,12 @@ fn driven(engine: Reporting, images: Arc<Pulled>, stack: Source, runner: Arc<dyn
 
 /// The same engine, with the given host paths mounted into its containers.
 fn mounting(engine: Reporting, paths: &[&str]) -> Reporting {
-    engine.mounting(&paths.iter().map(PathBuf::from).collect::<Vec<_>>())
+    engine.mounting(
+        &paths
+            .iter()
+            .map(|path| (*path, "/data"))
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// An engine holding one service, under a project that is not lemonfiber's.
@@ -180,7 +185,7 @@ fn both_stacks() -> (Reporting, Arc<Pulled>) {
     let engine = Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
         .belonging_to("media")
         .publishing(&[("sonarr", "0.0.0.0", 18989)])
-        .mounting(&[PathBuf::from("/their/sonarr")]);
+        .mounting(&[("/their/sonarr", "/config")]);
     let images = Pulled::holding(vec![Pulled::image(
         "lscr.io/linuxserver/sonarr:4.0.15",
         400,
