@@ -136,16 +136,9 @@ pub(crate) async fn requests_as_owner(
 }
 
 /// The curator filling `medium`'s capability among `fillers`, as the stack settles it,
-/// asked over its contract: nothing where nothing here fills it or it cannot be asked.
-pub(crate) async fn collector(ctx: &Ctx, fillers: &Fillers, medium: Medium) -> Option<Collector> {
-    collector_named(ctx, fillers, medium)
-        .await
-        .map(|(_, collector)| collector)
-}
-
-/// The curator of `medium` among `fillers`, with the id of the service it fronts, as
-/// [`collector`] finds it.
-pub(crate) async fn collector_named(
+/// asked over its contract, with the id of the service it fronts: nothing where nothing
+/// here fills it or it cannot be asked.
+pub(crate) async fn collector(
     ctx: &Ctx,
     fillers: &Fillers,
     medium: Medium,
