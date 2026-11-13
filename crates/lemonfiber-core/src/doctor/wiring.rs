@@ -91,7 +91,7 @@ pub struct WiringCheck {
 impl WiringCheck {
     /// A check over the wirings given.
     #[must_use]
-    pub fn new(managed: Vec<Managed>, stamp: String) -> Self {
+    pub fn new(managed: Vec<Managed>, stamp: crate::instant::Instant) -> Self {
         let managed = Arc::new(managed);
         Self {
             mender: WiringMender::new(Arc::clone(&managed), stamp),

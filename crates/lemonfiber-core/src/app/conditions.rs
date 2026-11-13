@@ -53,7 +53,7 @@ pub(crate) fn remembered(ctx: &Ctx, found: &[Finding]) -> Conditions {
     let mut conditions = load(ctx);
     let now = ctx.stamp();
     for finding in found {
-        conditions.observe(&finding.check, wrong(finding).as_ref(), &now);
+        conditions.observe(&finding.check, wrong(finding).as_ref(), now);
     }
     // Written down only by a run that is really happening. What this file holds is how
     // often a fault has been seen and how often a fix for it was tried and left it
