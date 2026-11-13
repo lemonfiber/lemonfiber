@@ -158,6 +158,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             Command::Held {
                 member: lemonfiber_core::app::Whom::Named("anybody".to_owned()),
                 most: 25,
+                asker: lemonfiber_core::app::Asker::Operator,
             },
         ),
         ("playing", Command::Playing { member: None }),

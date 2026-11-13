@@ -212,7 +212,7 @@ pub(crate) fn app(embedded: Option<Source>, assets: Option<PathBuf>) -> Option<S
 /// fallback answers every path the endpoints did not — which is what a client-side
 /// router needs, and would swallow the endpoints if it sat beneath them.
 pub(crate) fn surface(serving: Serving, streaming: Arc<Streaming>, app: Option<Source>) -> Router {
-    serving::routes(app).merge(router::routes(serving, streaming))
+    serving::routes(app, Arc::clone(&serving.ctx)).merge(router::routes(serving, streaming))
 }
 
 /// The signal that ends the serving loop.
@@ -347,6 +347,7 @@ async fn serving(
     // about it, so a guard whose browser went away is let go rather than left
     // polling a drive until this process stops.
     tokio::spawn(jobs.clone().sweeping(LEASE));
+    tokio::spawn(untuning(Arc::clone(&ctx)));
     let admitting = register(&ctx);
     let app = app(embedded, asked.assets.clone());
     let encrypting = match encrypted::encrypting(&ctx, asked.tls, asked.port) {
@@ -527,6 +528,15 @@ async fn revoked(admitting: Arc<Admitting>, offered: Offered, look: Duration) {
                 tokio::time::sleep(look).await;
             }
         }
+    }
+}
+
+/// Close the live streams whose passes lapsed unrenewed, every
+/// [`lemonfiber_core::screening::UNTUNED_EVERY`] for as long as this surface serves.
+async fn untuning(ctx: Arc<Ctx>) {
+    loop {
+        tokio::time::sleep(lemonfiber_core::screening::UNTUNED_EVERY).await;
+        lemonfiber_core::screening::untuned(&ctx).await;
     }
 }
 

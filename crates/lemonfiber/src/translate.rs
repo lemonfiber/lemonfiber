@@ -44,7 +44,7 @@ mod settling;
 
 pub(crate) use credentials::credentials;
 pub(crate) use notifying::notifying;
-pub(crate) use people::{held, household, invitation};
+pub(crate) use people::{channels, held, household, invitation, playing, tuning};
 pub(crate) use settling::settings;
 
 /// What a support bundle was asked to hold, and where it goes.

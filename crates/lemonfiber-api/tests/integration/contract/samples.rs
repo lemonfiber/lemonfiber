@@ -228,6 +228,31 @@ fn serving() -> Vec<Outcome> {
         Outcome::PartWay(lemonfiber_core::model::PartWayReport::default()),
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
+        Outcome::Channels(lemonfiber_core::model::ChannelsReport {
+            channels: vec![lemonfiber_core::ports::service::Channel {
+                id: "news".to_owned(),
+                name: "News".to_owned(),
+                number: Some("101".to_owned()),
+                now: Some(lemonfiber_core::ports::service::Programme {
+                    title: "The evening news".to_owned(),
+                    certificate: Some("PG".to_owned()),
+                    ends: Some("2026-11-13T19:00:00Z".to_owned()),
+                }),
+            }],
+            ..lemonfiber_core::model::ChannelsReport::default()
+        }),
+        Outcome::Tuned(lemonfiber_core::model::TunedReport {
+            stream: Some("ls1".to_owned()),
+            direct: Some("https://house.local:8920/live/ls1/stream.ts?lfpass=a.1.b".to_owned()),
+            fingerprint: Some("ab".repeat(32)),
+            lapses: Some(1_800_000_300),
+            ..lemonfiber_core::model::TunedReport::default()
+        }),
+        Outcome::Play(lemonfiber_core::model::PlayReport {
+            stream_from: Some("https://watch.example.org/master.m3u8?lfpass=a.1.b".to_owned()),
+            lapses: Some(1_800_000_300),
+            ..lemonfiber_core::model::PlayReport::default()
+        }),
         Outcome::Askable(a_search()),
         Outcome::AskableKinds(the_kinds()),
         Outcome::Asked(an_ask()),

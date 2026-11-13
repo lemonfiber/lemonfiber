@@ -43,7 +43,7 @@ pub use diagnosing::Diagnosing;
 pub use filling::{Filling, Linking};
 pub use gathering::Gathering;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
-pub use household::{Answer, Arranged, Chosen, Decision, Whom};
+pub use household::{Answer, Arranged, Asker, Chosen, Decision, Whom};
 pub use inviting::Inviting;
 pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
@@ -57,7 +57,7 @@ pub use settling::Settling;
 pub use teardown::Teardown;
 pub use tracing::Tracing;
 pub use uninstall::Removing;
-pub use viewing::Viewing;
+pub use viewing::{Live, PlayFrom, Viewing};
 pub use wishing::Wishing;
 
 /// What a surface is asking for.
@@ -220,6 +220,8 @@ pub enum Command {
         member: Whom,
         /// How many to answer with, newest first.
         most: u32,
+        /// Who asked, which decides the words a title that cannot be located says why in.
+        asker: Asker,
     },
     /// One title, what a member was part-way through, a grant for a device to play on,
     /// or how far a member got.

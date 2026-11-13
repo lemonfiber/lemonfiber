@@ -18,10 +18,10 @@ pub use takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BACKENDS,
     TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME,
-    TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
-    TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS,
-    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES,
-    TAKES_WAITING, TAKES_WISH,
+    TAKES_NARROWING, TAKES_PASS, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS,
+    TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES,
+    TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_STREAM, TAKES_TERM, TAKES_TIER, TAKES_TITLE,
+    TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -213,6 +213,13 @@ pub struct Arguments {
     /// Whether the member finished it. Absent says nothing about finishing, which is
     /// a position like any other.
     pub ended: Option<bool>,
+    /// The live stream a renewal or a stop names, as a channel opened for the member
+    /// answered it.
+    pub stream: Option<String>,
+    /// Whether to close the live stream named rather than renew its passes.
+    pub stop: Option<bool>,
+    /// The pass a browser holds, handed back for a new one around the same session.
+    pub pass: Option<Handed>,
     /// Whether the title asked for is a series, a film, music or books, as a page of a
     /// member's search names it: `tv`, `movies`, `music` or `books`.
     pub kind: Option<String>,
@@ -302,6 +309,18 @@ impl Arguments {
             backends: vec!["home-ntfy".to_owned()],
             ..Self::default()
         }
+    }
+}
+
+/// A pass handed back, never written where it is debugged.
+#[derive(Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct Handed(pub String);
+
+/// Written by hand so a pass is never in what is debugged or logged.
+impl std::fmt::Debug for Handed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(lemonfiber_core::model::WITHHELD)
     }
 }
 

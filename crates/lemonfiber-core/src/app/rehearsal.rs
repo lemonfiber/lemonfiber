@@ -205,6 +205,9 @@ const fn viewed(viewing: &Viewing) -> Asked {
         Viewing::PartWay { .. } => reports("part-way", &[kind::PART_WAY]),
         Viewing::Grant { .. } => reports("grant", &[kind::GRANT]),
         Viewing::Watched { .. } => reports("watched", &[kind::WATCHED]),
+        Viewing::Channels { .. } => reports("channels", &[kind::CHANNELS]),
+        Viewing::Tune { .. } => reports("tune", &[kind::TUNED]),
+        Viewing::Play { .. } => reports("play", &[kind::PLAY]),
     }
 }
 

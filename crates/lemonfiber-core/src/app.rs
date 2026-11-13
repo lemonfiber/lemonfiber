@@ -99,10 +99,10 @@ pub mod watch;
 pub(crate) mod watcher;
 
 pub use command::{
-    AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Queueing, Reclaiming, Removing, Restarting, Restoring, Setting, Settling,
-    Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
+    AlertAction, Allowance, Answer, Arranged, Asker, Asking, BandwidthAsked, Chosen, Command,
+    Decision, Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking,
+    Live, MigrateAction, PlayFrom, QualityAction, Queueing, Reclaiming, Removing, Restarting,
+    Restoring, Setting, Settling, Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -406,7 +406,13 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Migrate(action) => migration::migrate(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
         Command::Trace(tracing) => traced(ctx, tracing).await,
-        Command::Held { member, most } => held::held(ctx, &member, most).await.map(Outcome::Held),
+        Command::Held {
+            member,
+            most,
+            asker,
+        } => held::held(ctx, &member, most, asker)
+            .await
+            .map(Outcome::Held),
         Command::Playing { member } => playing::asked(ctx, member.as_deref()).await,
         Command::Viewing(viewing) => crate::screening::viewed(ctx, viewing).await,
         Command::Wish(wishing) => crate::wishing::wished(ctx, wishing).await,

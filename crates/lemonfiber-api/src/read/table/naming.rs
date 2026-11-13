@@ -11,7 +11,7 @@
 //! rather than an omission: there is nothing for them to mean.
 
 use lemonfiber_core::app::{
-    Command, Diagnosing, Removing, Tracing, Viewing, Waiting, Whom, Wishing,
+    Asker, Command, Diagnosing, Removing, Tracing, Viewing, Waiting, Whom, Wishing,
 };
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
@@ -189,7 +189,11 @@ pub(super) fn shelf(
 ) -> Result<Command, Refusal> {
     let member = whose_shelf(member, defaults)?;
     let most = counted(most, A_SHELF)?;
-    Ok(Command::Held { member, most })
+    Ok(Command::Held {
+        member,
+        most,
+        asker: Asker::Operator,
+    })
 }
 
 /// Whose shelf a read is about: a member, or the household's defaults.
@@ -227,7 +231,11 @@ pub(super) fn titled(
 ) -> Result<Command, Refusal> {
     let member = whose_shelf(member, defaults)?;
     let id = title.ok_or(Refusal::NoSuchRead)?;
-    Ok(Command::Viewing(Viewing::Title { member, id }))
+    Ok(Command::Viewing(Viewing::Title {
+        member,
+        id,
+        asker: Asker::Operator,
+    }))
 }
 
 /// What a member was part-way through, `most` of it, or why it cannot be answered.
@@ -242,7 +250,18 @@ pub(super) fn part_way(member: Option<String>, most: Option<String>) -> Result<C
     Ok(Command::Viewing(Viewing::PartWay {
         member: Whom::Named(member),
         most,
+        asker: Asker::Operator,
     }))
+}
+
+/// The live TV channels a member may watch, or why it cannot be answered.
+///
+/// Somebody has to be named: which channels may be watched is one account's answer.
+pub(super) fn channels(member: Option<String>) -> Result<Command, Refusal> {
+    let Some(member) = member.filter(|member| !member.is_empty()) else {
+        return Err(Refusal::NoShelfWithoutAMember);
+    };
+    Ok(Command::Viewing(Viewing::Channels { member }))
 }
 
 /// Following one item, or why the request could not be followed.

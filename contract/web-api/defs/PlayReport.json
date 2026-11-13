@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one title plays from in a member's browser, at the stack's front door, on a\npass sealing a session on their own account.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The title or episode, by the identifier the shelf lists it under.",
+      "type": "string"
+    },
+    "lapses": {
+      "description": "When the pass lapses, in whole seconds since the Unix epoch. A browser hands it\nback for a new one before then.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "member": {
+      "description": "The member it plays as, by the name they are known by.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    },
+    "stream_from": {
+      "description": "The playlist it plays from at the front door, carrying its pass.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unlocated": {
+      "description": "Why nothing is located, where nothing is.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "member",
+    "rehearsed"
+  ]
+}

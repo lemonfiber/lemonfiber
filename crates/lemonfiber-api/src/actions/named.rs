@@ -89,6 +89,8 @@ pub const OFFERED: &[&str] = &[
     "household-handoff",
     "grant",
     "watched",
+    "tune",
+    "play",
     "ask",
     "notify-choose",
     "push-woken",

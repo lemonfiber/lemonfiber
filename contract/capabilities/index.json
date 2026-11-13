@@ -129,8 +129,8 @@
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 32,
-      "sha256": "9e5cef023c26654e95a7552a937c1828ae61df9dd33734eeb8242f80184332c2"
+      "operations": 33,
+      "sha256": "79b90b5dc5475c494c411b617b87341c7313bf66c2ddaeccd9a7c4190ed3a6bc"
     },
     {
       "capability": "proxy.front",

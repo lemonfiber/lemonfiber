@@ -84,7 +84,7 @@ pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use filing::{Filed, Filing};
-pub use fronting::{AppKeys, Astray, Dated, Fronted, OutsideAccount, OutsideServer};
+pub use fronting::{Allowing, AppKeys, Astray, Dated, Fronted, OutsideAccount, OutsideServer};
 pub use fulfilling::{
     CuratedSeason, CuratedTitle, DownloadState, DownloadedEpisode, Downloading, Fulfilling,
     Grabbed, TitleRequest,

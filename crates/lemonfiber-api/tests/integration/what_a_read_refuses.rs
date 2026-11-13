@@ -506,6 +506,7 @@ fn a_shelf_asked_for_with_no_count_is_read_to_what_one_screen_holds() {
         Some(Command::Held {
             member: lemonfiber_core::app::Whom::Named("ada".to_owned()),
             most: table::A_SHELF,
+            asker: lemonfiber_core::app::Asker::Operator,
         })
     );
 }
@@ -537,6 +538,7 @@ fn both_household_reads_answer_as_the_defaults_where_asked() {
         Some(Command::Held {
             member: Whom::Defaults,
             most: table::A_SHELF,
+            asker: lemonfiber_core::app::Asker::Operator,
         })
     );
     assert_eq!(
@@ -550,6 +552,7 @@ fn both_household_reads_answer_as_the_defaults_where_asked() {
         Some(Command::Held {
             member: Whom::Named("ada".to_owned()),
             most: table::A_SHELF,
+            asker: lemonfiber_core::app::Asker::Operator,
         })
     );
     assert_eq!(

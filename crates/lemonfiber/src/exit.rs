@@ -203,12 +203,17 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Held(_)
         // Who is watching arrived, or that the media server would not say did.
         | Outcome::Playing(_)
-        // A title, what was part-way through, a grant and a player's progress each
-        // arrived; what could not be done already came back as a problem.
+        // A title, what was part-way through, a grant, a player's progress, the
+        // channels, a live stream and a browser's playlist each arrived; what could not
+        // be done already came back as a problem, and what could not be located is said
+        // in the answer.
         | Outcome::Title(_)
         | Outcome::PartWay(_)
         | Outcome::Granted(_)
         | Outcome::Watched(_)
+        | Outcome::Channels(_)
+        | Outcome::Tuned(_)
+        | Outcome::Play(_)
         // A page of a search and an ask each arrived; a refusal already came back as a
         // problem, and an ask already on its way is answered rather than refused.
         | Outcome::Askable(_)

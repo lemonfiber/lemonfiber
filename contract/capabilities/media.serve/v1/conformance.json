@@ -28,6 +28,7 @@
     {"asked":{},"case":"allowed_origins-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"allowed_origins","since":0},
     {"asked":{"origin":"https://watch.example"},"case":"allow_only-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"allow_only","since":0},
     {"asked":{},"case":"restart-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"restart","since":0},
+    {"asked":{"origins":["https://watch.example","https://console.example:8443"]},"case":"allow_origins-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"allow_origins","since":4},
     {"asked":{},"case":"declared-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"declared","since":0},
     {"asked":{"filed":[{"folder":"/data/conformance","media_type":"tv"}]},"case":"furnish-answers-tv","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"tv","operation":"furnish","since":0},
     {"asked":{"filed":[{"folder":"/data/conformance","media_type":"movies"}]},"case":"furnish-answers-movies","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"movies","operation":"furnish","since":0},

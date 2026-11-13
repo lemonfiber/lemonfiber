@@ -3,10 +3,14 @@
 //! Each says where it is served at the guarded front door, because at a terminal that is
 //! what an operator checks: whether a title a member cannot play is unlocated, and why.
 
-use lemonfiber_core::model::{GrantReport, Located, PartWayReport, TitleReport, WatchedReport};
+use lemonfiber_core::model::{
+    ChannelsReport, GrantReport, Located, PartWayReport, PlayReport, TitleReport, TunedReport,
+    WatchedReport,
+};
 
 use super::held::titled;
-use super::Lines;
+use super::news::moment;
+use super::{qr, Lines};
 
 /// One title, its details and where it is served.
 pub(super) fn title(report: &TitleReport) -> Lines {
@@ -96,6 +100,98 @@ pub(super) fn watched(report: &WatchedReport) -> Lines {
     } else {
         format!("Recorded at {}.", clock(report.position))
     });
+    lines
+}
+
+/// The channels a member may watch, a line each with what is on now.
+pub(super) fn channels(report: &ChannelsReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{} — live TV", report.member));
+    for channel in &report.channels {
+        let number = channel
+            .number
+            .as_ref()
+            .map_or_else(String::new, |number| format!("{number} "));
+        let now = channel.now.as_ref().map_or_else(String::new, |now| {
+            let certificate = now
+                .certificate
+                .as_ref()
+                .map_or_else(String::new, |certificate| format!(" ({certificate})"));
+            format!(" — {}{certificate}", now.title)
+        });
+        lines.put(format!("  {number}{}{now}  [{}]", channel.name, channel.id));
+    }
+    if report.channels.is_empty() {
+        lines.put("  No channel this member may watch now — which is the answer, not a gap.");
+    }
+    lines
+}
+
+/// A live stream opened, kept or closed, and where it is served, each also as a code.
+pub(super) fn tuned(report: &TunedReport) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(why) = &report.unlocated {
+        lines.put(format!("! {why}"));
+        return lines;
+    }
+    let (Some(stream), Some(lapses)) = (&report.stream, report.lapses) else {
+        lines.put(if report.rehearsed {
+            format!(
+                "Channel {} for {}: rehearsed, so nothing was opened, kept or closed.",
+                report.channel, report.member
+            )
+        } else {
+            format!(
+                "Channel {} is closed for {}.",
+                report.channel, report.member
+            )
+        });
+        return lines;
+    };
+    lines.put(format!(
+        "Channel {} is open for {} as {stream}, on passes lapsing at {}.",
+        report.channel,
+        report.member,
+        moment(lapses)
+    ));
+    if let Some(fingerprint) = &report.fingerprint {
+        lines.put(format!("  the door presents {fingerprint}"));
+    }
+    for (label, at) in [
+        ("As the tuner sends it:", &report.direct),
+        ("Transcoded:", &report.transcoded),
+    ] {
+        if let Some(at) = at {
+            lines.spaced(label);
+            lines.put(format!("  {at}"));
+            qr::labelled(&mut lines, "The same, for a camera:", at);
+        }
+    }
+    lines
+}
+
+/// Where a title plays in a browser, also as a code.
+pub(super) fn play(report: &PlayReport) -> Lines {
+    let mut lines = Lines::default();
+    if let Some(why) = &report.unlocated {
+        lines.put(format!("! {why}"));
+        return lines;
+    }
+    let (Some(at), Some(lapses)) = (&report.stream_from, report.lapses) else {
+        lines.put(format!(
+            "{} would play in a browser as {}.",
+            report.id, report.member
+        ));
+        return lines;
+    };
+    lines.put(format!(
+        "{} plays in a browser as {}, on a pass lapsing at {}:",
+        report.id,
+        report.member,
+        moment(lapses)
+    ));
+    lines.put(format!("  {at}"));
+    qr::labelled(&mut lines, "The same, for a camera:", at);
     lines
 }
 

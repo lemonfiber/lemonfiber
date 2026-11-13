@@ -159,6 +159,11 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         },
         // Left as the plainer of the two answers; the sweep gives the other.
         ended: None,
+        // Each names a request of its own beside the channel, the browser or the title
+        // the action already holds, so the sweep gives them.
+        stream: None,
+        stop: None,
+        pass: None,
         // Never handed here: a rehearsal is carried on the run rather than on the
         // command, so it changes no command these sweeps could compare.
         dry_run: false.into(),

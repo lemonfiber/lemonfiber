@@ -18,7 +18,6 @@ mod collect;
 mod cover;
 mod find;
 mod kinds;
-mod limits;
 mod place;
 mod poster;
 
@@ -39,8 +38,8 @@ use crate::ports::media::Kind;
 use crate::ports::service::{Detail, Member};
 use crate::wiring::Fillers;
 
+use crate::rating::Limits;
 use find::searched;
-use limits::Limits;
 
 pub use cover::{cover, kept_cover};
 pub use poster::poster;

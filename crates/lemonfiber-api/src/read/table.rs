@@ -33,8 +33,8 @@ mod naming;
 
 pub(crate) use naming::{askable, THE_STACK, THIS_BINARY};
 use naming::{
-    askable_kinds, diagnosing, following, household, moving, narrowed, part_way, removing, setting,
-    shelf, titled, watching,
+    askable_kinds, channels, diagnosing, following, household, moving, narrowed, part_way,
+    removing, setting, shelf, titled, watching,
 };
 
 /// How much of a shelf a read answers with, and the most it ever will.
@@ -112,6 +112,12 @@ pub const BACKDROP: &str = "/api/held/{id}/backdrop";
 
 /// What a member was part-way through, and how far, most recent first.
 pub const WATCHING: &str = "/api/watching";
+
+/// The live TV channels a member may watch, each with the programme on it now.
+///
+/// Read as the member, so a channel whose programme now is outside their limits is left
+/// out and a member whose account may not watch live TV is answered none.
+pub const CHANNELS: &str = "/api/channels";
 
 /// One page of a member's search for titles the house does not hold yet, under their
 /// limits.
@@ -326,6 +332,7 @@ pub const OFFERED: &[&str] = &[
     HELD,
     TITLE,
     WATCHING,
+    CHANNELS,
     ASKABLE,
     ASKABLE_KINDS,
     PLAYING,
@@ -481,6 +488,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         PLAYING => watching(member),
         TITLE => titled(member, defaults.as_deref(), title),
         WATCHING => part_way(member, most),
+        CHANNELS => channels(member),
         ASKABLE => askable(member, term, after, kind.as_deref(), unit.as_deref()),
         ASKABLE_KINDS => Ok(askable_kinds(member)),
         HOSTING => Ok(Command::Hosting(Keeping::Read)),

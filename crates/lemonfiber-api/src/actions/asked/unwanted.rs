@@ -8,10 +8,10 @@ use super::takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BACKENDS,
     TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME,
-    TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
-    TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTINGS,
-    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES,
-    TAKES_WAITING, TAKES_WISH,
+    TAKES_NARROWING, TAKES_PASS, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS,
+    TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES,
+    TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_STREAM, TAKES_TERM, TAKES_TIER, TAKES_TITLE,
+    TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 use super::Arguments;
 use crate::actions::Refused;
@@ -139,6 +139,21 @@ pub(crate) const TAKEN: &[Taken] = &[
         name: "ended",
         takers: TAKES_PROGRESS,
         given: |arguments| arguments.ended.is_some(),
+    },
+    Taken {
+        name: "stream",
+        takers: TAKES_STREAM,
+        given: |arguments| arguments.stream.is_some(),
+    },
+    Taken {
+        name: "stop",
+        takers: TAKES_STREAM,
+        given: |arguments| arguments.stop.is_some(),
+    },
+    Taken {
+        name: "pass",
+        takers: TAKES_PASS,
+        given: |arguments| arguments.pass.is_some(),
     },
     Taken {
         name: "libraries",

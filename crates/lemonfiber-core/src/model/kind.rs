@@ -117,6 +117,12 @@ kinds! {
     GRANT = "grant",
     /// How far a member got, as the media server now holds it.
     WATCHED = "watched",
+    /// The live TV channels a member may watch, each with the programme on it now.
+    CHANNELS = "channels",
+    /// A channel's live stream opened for a member, on passes.
+    TUNED = "tuned",
+    /// Where a title plays from in a member's browser, on a pass.
+    PLAY = "play",
     /// One page of what a member's search for a title found, under their limits.
     ASKABLE = "askable",
     /// Which kinds a member may ask for now, each with the units it is asked for in.

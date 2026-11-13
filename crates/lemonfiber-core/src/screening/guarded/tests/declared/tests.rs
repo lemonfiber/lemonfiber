@@ -169,8 +169,9 @@ fn each_location_built_from_its_template_is_where_the_door_locates_the_item() {
         base: DOOR.to_owned(),
         fingerprint: "ab12".to_owned(),
         locations: declared().locations,
+        asker: crate::app::Asker::Operator,
     };
-    let at = located(item, &door).at;
+    let at = located(item, &door, &lemonfiber_fixtures::ports::Chance::cycling()).at;
     let built = |template: &str| Some(template.replace(BASE, DOOR).replace(ITEM, ID));
     let locations = declared().locations;
     assert_eq!(at.stream_from, built(&locations.stream));

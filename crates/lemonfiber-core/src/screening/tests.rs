@@ -119,6 +119,7 @@ async fn a_title_named_by_something_else_is_refused_before_anything_is_asked() {
         Viewing::Title {
             member: Whom::Named("Ada".to_owned()),
             id: "../Users".to_owned(),
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -138,6 +139,7 @@ async fn a_title_is_read_as_the_member_and_says_why_it_is_not_located() {
         Viewing::Title {
             member: Whom::Named("ada".to_owned()),
             id: FILM.to_owned(),
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -174,6 +176,7 @@ async fn a_title_off_the_shelf_and_a_stranger_are_refused_by_name() {
         Viewing::Title {
             member: Whom::Defaults,
             id: FILM.to_owned(),
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -197,6 +200,7 @@ async fn nobody_and_nothing_to_play_from_are_refused() {
         Viewing::PartWay {
             member: Whom::Defaults,
             most: 3,
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -245,6 +249,7 @@ async fn part_way_is_located_and_a_server_that_will_not_say_is_unread() {
         Viewing::PartWay {
             member: Whom::Named("a7f3".to_owned()),
             most: 5,
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -266,6 +271,7 @@ async fn part_way_is_located_and_a_server_that_will_not_say_is_unread() {
         Viewing::PartWay {
             member: Whom::Named("a7f3".to_owned()),
             most: 5,
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -473,6 +479,7 @@ async fn a_stranger_and_a_silent_title_are_refused_by_name() {
     let for_whom = |member: Whom| Viewing::Title {
         member,
         id: FILM.to_owned(),
+        asker: crate::app::Asker::Operator,
     };
     let stranger = viewed(&ctx, for_whom(Whom::Named("Zed".to_owned()))).await;
     assert_eq!(code(stranger).as_deref(), Some("PLAY-7"));
@@ -483,6 +490,7 @@ async fn a_stranger_and_a_silent_title_are_refused_by_name() {
         Viewing::PartWay {
             member: Whom::Named("Zed".to_owned()),
             most: 3,
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -517,6 +525,7 @@ async fn progress_for_something_else_or_with_no_server_is_refused() {
         Viewing::Title {
             member: Whom::Defaults,
             id: FILM.to_owned(),
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -532,6 +541,7 @@ async fn a_stack_that_cannot_be_read_is_said_rather_than_taken_for_no_server() {
         Viewing::Title {
             member: Whom::Defaults,
             id: FILM.to_owned(),
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
@@ -609,6 +619,7 @@ async fn every_episode_of_a_series_is_located_like_the_series() {
         Viewing::Title {
             member: Whom::Defaults,
             id: FILM.to_owned(),
+            asker: crate::app::Asker::Operator,
         },
     )
     .await;
