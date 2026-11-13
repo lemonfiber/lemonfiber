@@ -69,8 +69,8 @@
         1
       ],
       "openapi": "indexer.pull/v1/openapi.json",
-      "operations": 2,
-      "sha256": "2e4ebc22c7332ee5d9260374cf6cf14c9c9a342b92e760ce0c34e2ae72c8b7ec"
+      "operations": 3,
+      "sha256": "66e36dbe3d3409cfe1d47e0c0f3ddaa8b24de1380c243842aaee510ae659f621"
     },
     {
       "capability": "indexer.proxy",

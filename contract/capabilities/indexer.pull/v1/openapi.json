@@ -95,6 +95,9 @@
     },
     "/lemonfiber/indexer.pull/v1/aggregators": {
       "$ref": "operations/aggregators.json"
+    },
+    "/lemonfiber/indexer.pull/v1/pull": {
+      "$ref": "operations/pull.json"
     }
   }
 }

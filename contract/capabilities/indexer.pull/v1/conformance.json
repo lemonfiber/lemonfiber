@@ -4,6 +4,7 @@
   "cases": [
     {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"aggregators","since":0},
     {"asked":{},"case":"aggregators-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"aggregators","since":0},
-    {"asked":{"aggregator":{"key":"{minted}","name":"conformance","protocol":"servarr","url":"http://conformance-aggregator:59696"}},"case":"add_aggregator-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"add_aggregator","since":0}
+    {"asked":{"aggregator":{"key":"{minted}","name":"conformance","protocol":"servarr","url":"http://conformance-aggregator:59696"}},"case":"add_aggregator-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"add_aggregator","since":0},
+    {"asked":{},"case":"pull-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"pull","since":1}
   ]
 }
