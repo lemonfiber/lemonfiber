@@ -85,8 +85,7 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
                     Asked::Export => {
                         written += 1;
                         if let Some((path, text)) = export(&mut viewer, ctx, written) {
-                            let ctx = Arc::clone(&shared);
-                            exports.spawn(async move { kept(&ctx, &path, &text).await });
+                            exports.spawn(written_apart(Arc::clone(&shared), path, text));
                         }
                     }
                     // Opening them is the asking, so what was opened is recorded.
@@ -110,8 +109,7 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
             },
             _ = looking.tick() => {
                 if asking.is_none() {
-                    let ctx = Arc::clone(&shared);
-                    asking = Some(tokio::spawn(async move { states(&ctx).await }));
+                    asking = Some(asked(Arc::clone(&shared)));
                 }
             },
             now = super::finished(&mut asking) => {
@@ -184,6 +182,20 @@ async fn kept(ctx: &Ctx, path: &Path, text: &str) -> String {
     } else {
         format!("could not write {}", path.display())
     }
+}
+
+/// An export, written apart from the loop that draws the screen.
+fn written_apart(
+    ctx: Arc<Ctx>,
+    path: PathBuf,
+    text: String,
+) -> impl std::future::Future<Output = String> + Send + 'static {
+    async move { kept(&ctx, &path, &text).await }
+}
+
+/// What each service is doing, asked apart from the loop that draws the screen.
+fn asked(ctx: Arc<Ctx>) -> JoinHandle<Option<Vec<(String, Lifecycle)>>> {
+    tokio::spawn(async move { states(&ctx).await })
 }
 
 /// What each service is doing, or nothing where the engine will not say.
