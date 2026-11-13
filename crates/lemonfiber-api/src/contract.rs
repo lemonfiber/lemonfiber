@@ -66,6 +66,7 @@ use crate::actions::published::Action;
 use crate::actions::{self, named, Arguments, KEY_CALLABLE};
 use crate::admission::admitted::Admitted;
 use crate::capabilities::Capabilities;
+use crate::jobs::ended::Ended;
 use crate::jobs::started::Started;
 
 use crate::read::published::{self, Read};
@@ -205,6 +206,7 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
         kind::DEVICE_CHALLENGE,
         schema_for!(Envelope<lemonfiber_core::device_keys::Challenged>),
     );
+    describing(kinds, kind::ENDED, schema_for!(Envelope<Ended>));
     describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, kind::JOB, schema_for!(Envelope<Started>));
     describing(kinds, kind::LOG, schema_for!(Envelope<LogLine>));

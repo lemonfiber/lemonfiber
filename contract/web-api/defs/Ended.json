@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Work that ended before it finished: its name, what it was, and why it ended.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "The action that was asked for, as it was named.",
+      "type": "string"
+    },
+    "ended": {
+      "description": "Why it ended.",
+      "$ref": "JobEnding.json"
+    },
+    "job": {
+      "description": "The name the work was answered with.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "job",
+    "action",
+    "ended"
+  ]
+}

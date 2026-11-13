@@ -18,6 +18,7 @@ use axum::body::to_bytes;
 use axum::http::StatusCode;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
+use lemonfiber_api::jobs::ended::Ending;
 use lemonfiber_api::jobs::{Jobs, Standing};
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::Ctx;
@@ -211,7 +212,10 @@ async fn the_lines_a_follow_reads_arrive_on_the_stream_the_browser_already_holds
     let Some(job) = run.followed("/api/logs?service=sonarr&follow=true").await else {
         unreachable!("a follow is answered with a name");
     };
-    assert_eq!(run.settled(&job).await, Some(Standing::Ended));
+    assert_eq!(
+        run.settled(&job).await,
+        Some(Standing::Ended(Ending::Quiet))
+    );
 
     let said = run.heard().await;
     assert!(said.contains("event: log"), "{said}");
@@ -234,7 +238,10 @@ async fn a_follow_takes_the_same_narrowing_the_scrollback_takes() {
     else {
         unreachable!("a follow is answered with a name");
     };
-    assert_eq!(run.settled(&job).await, Some(Standing::Ended));
+    assert_eq!(
+        run.settled(&job).await,
+        Some(Standing::Ended(Ending::Quiet))
+    );
 
     let said = run.heard().await;
     assert!(said.contains(r#""service":"jellyfin""#), "{said}");
@@ -255,7 +262,10 @@ async fn a_follow_ends_when_there_is_nothing_left_to_read_rather_than_with_an_ou
     let Some(job) = run.followed("/api/logs?follow=true").await else {
         unreachable!("a follow is answered with a name");
     };
-    assert_eq!(run.settled(&job).await, Some(Standing::Ended));
+    assert_eq!(
+        run.settled(&job).await,
+        Some(Standing::Ended(Ending::Quiet))
+    );
 }
 
 #[tokio::test]

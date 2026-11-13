@@ -25,6 +25,7 @@
     "device-key": "ref:RegisteredDeviceKey",
     "device-keys": "ref:DeviceKeyListing",
     "doctor": "ref:DoctorReport",
+    "ended": "ref:Ended",
     "error": "ref:Problem",
     "forms": "ref:FormsReport",
     "front-door": "ref:FrontDoorReport",

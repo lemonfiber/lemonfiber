@@ -38,6 +38,7 @@ use lemonfiber_core::ports::docker::LogQuery;
 use crate::actions::unnameable;
 use crate::events::live::Live;
 use crate::events::wire::{Nature, Rendered};
+use crate::jobs::ended::Ending;
 use crate::jobs::{accepted, Job, Lease, Standing};
 use crate::router::Serving;
 
@@ -76,9 +77,9 @@ pub(crate) async fn followed(
 ///
 /// A follow has no outcome. It ends because it was released, because the run
 /// ended, or because the containers it was reading stopped having anything to
-/// say — and none of those is a value. So it ends the way work released by name
-/// ends, and a caller redeeming the name afterwards reads that it is over rather
-/// than an answer it never had.
+/// say — and none of those is a value. Where the containers fell silent it ends
+/// `quiet`, so a caller redeeming the name afterwards reads that it is over and why,
+/// rather than an answer it never had.
 async fn following(
     ctx: &Ctx,
     live: &Live,
@@ -98,5 +99,5 @@ async fn following(
         let said = Rendered::of(Nature::Record, &Envelope::new(kind::LOG, &Line::from(line)));
         live.say_if_rendered(said).await;
     }
-    Standing::Ended
+    Standing::Ended(Ending::Quiet)
 }

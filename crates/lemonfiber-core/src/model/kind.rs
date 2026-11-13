@@ -89,6 +89,8 @@ kinds! {
     PUSH_ENDPOINTS = "push-endpoints",
     /// What the diagnostic checks found.
     DOCTOR = "doctor",
+    /// Work that ended before it finished, and why.
+    ENDED = "ended",
     /// A command could not do what was asked.
     ERROR = "error",
     /// Every form the stack declares.
