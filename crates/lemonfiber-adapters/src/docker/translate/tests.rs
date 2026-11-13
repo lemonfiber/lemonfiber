@@ -45,27 +45,37 @@ fn a_word_that_is_not_an_address_is_left_out() {
     assert!(published(vec![reported(Some("somewhere"), Some(8989))]).is_empty());
 }
 
-/// One mount as the engine reports it, with the host path it came from.
-fn point(source: Option<&str>) -> MountPoint {
+/// One mount as the engine reports it, with the host path it came from and where it
+/// lands.
+fn point(source: Option<&str>, destination: Option<&str>) -> MountPoint {
     MountPoint {
         source: source.map(std::borrow::ToOwned::to_owned),
+        destination: destination.map(std::borrow::ToOwned::to_owned),
         ..MountPoint::default()
     }
 }
 
+fn landing(source: &str, destination: &str) -> lemonfiber_ports::docker::Mounted {
+    lemonfiber_ports::docker::Mounted {
+        source: std::path::PathBuf::from(source),
+        destination: std::path::PathBuf::from(destination),
+    }
+}
+
 /// Where a container's data sits on this machine is what the hardlink question is
-/// asked about, so the host path is what comes back.
+/// asked about, and where it lands is what tells a configuration from a library, so
+/// both ends come back.
 #[test]
-fn the_host_path_of_each_mount_is_what_comes_back() {
+fn both_ends_of_each_mount_are_what_comes_back() {
     let read = mounted(vec![
-        point(Some("/srv/media")),
-        point(Some("/mnt/downloads")),
+        point(Some("/srv/media"), Some("/data")),
+        point(Some("/srv/sonarr"), Some("/config")),
     ]);
     assert_eq!(
         read,
         vec![
-            std::path::PathBuf::from("/srv/media"),
-            std::path::PathBuf::from("/mnt/downloads")
+            landing("/srv/media", "/data"),
+            landing("/srv/sonarr", "/config")
         ]
     );
 }
@@ -74,5 +84,10 @@ fn the_host_path_of_each_mount_is_what_comes_back() {
 /// the operator's tree, so it has no path to ask a hardlink question about.
 #[test]
 fn a_mount_with_no_host_path_is_not_somewhere_on_this_machine() {
-    assert!(mounted(vec![point(None), point(Some(""))]).is_empty());
+    assert!(mounted(vec![
+        point(None, Some("/config")),
+        point(Some(""), Some("/config")),
+        point(Some("/srv/sonarr"), None),
+    ])
+    .is_empty());
 }

@@ -101,13 +101,13 @@ pub struct Container {
     /// Read from the engine rather than from what asked for it, so a check about
     /// where things listen is asking what is listening.
     pub published: Vec<Published>,
-    /// Every host path mounted into it.
+    /// Every host path mounted into it, with where each lands inside it.
     ///
     /// Where the container's data actually lives on this machine, which is the only
     /// way to tell whether an existing setup keeps its downloads and its library
     /// somewhere a hardlink can reach between. Read from the engine rather than from
     /// a compose file, because what is mounted is what the container got.
-    pub mounts: Vec<std::path::PathBuf>,
+    pub mounts: Vec<Mounted>,
     /// How it exited, where it has exited and the engine still remembers.
     ///
     /// Present because stopping on purpose and falling over are the same
@@ -115,6 +115,15 @@ pub struct Container {
     /// service should not be shown a fault, and one whose service died should
     /// not be shown a tidy `stopped`.
     pub exit: Option<i32>,
+}
+
+/// One host path mounted into a container, and where it lands inside it.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Mounted {
+    /// The path on the host.
+    pub source: std::path::PathBuf,
+    /// Where it lands inside the container.
+    pub destination: std::path::PathBuf,
 }
 
 /// Resource use for one container at one moment.

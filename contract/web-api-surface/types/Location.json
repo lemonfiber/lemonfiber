@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "none": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "unread": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

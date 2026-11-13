@@ -19,6 +19,22 @@ pub struct OccupantReport {
     pub ports: Vec<u16>,
     /// Whether lemonfiber knows this service and could take it over as it stands.
     pub adoptable: bool,
+    /// Where it reads its configuration from on this machine.
+    pub config: Location,
+    /// Where its library is on this machine.
+    pub library: Location,
+}
+
+/// Where something a service keeps is on this machine, or why that is not said.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Location {
+    /// The host path it is mounted from.
+    At(String),
+    /// It could not be read, and why, in the operator's words.
+    Unread(String),
+    /// The service keeps none, and why, in the operator's words.
+    None(String),
 }
 
 /// One Compose project on this machine that is not lemonfiber's.

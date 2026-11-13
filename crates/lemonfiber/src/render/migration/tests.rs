@@ -19,6 +19,8 @@ fn a_survey() -> MigrationReport {
                 running: true,
                 ports: vec![8989],
                 adoptable: true,
+                config: lemonfiber_core::model::Location::At("/srv/apps/sonarr".to_owned()),
+                library: lemonfiber_core::model::Location::At("/srv/media".to_owned()),
             }],
         }],
         conflicts: vec![ConflictReport {
@@ -193,6 +195,8 @@ fn a_service_publishing_nothing_is_still_reported() {
                 running: false,
                 ports: Vec::new(),
                 adoptable: false,
+                config: lemonfiber_core::model::Location::Unread("it is not known".to_owned()),
+                library: lemonfiber_core::model::Location::None("it keeps none".to_owned()),
             }],
         }],
         ..MigrationReport::default()
@@ -202,6 +206,22 @@ fn a_service_publishing_nothing_is_still_reported() {
         text.contains("postgres — stopped, no published port"),
         "{text}"
     );
+    assert!(
+        text.contains("configuration  not read: it is not known"),
+        "{text}"
+    );
+    assert!(
+        text.contains("library        none: it keeps none"),
+        "{text}"
+    );
+}
+
+/// Where a service's configuration and library are mounted from is said under it.
+#[test]
+fn where_a_service_keeps_its_configuration_and_library_is_said() {
+    let text = migration(&a_survey()).text();
+    assert!(text.contains("configuration  /srv/apps/sonarr"), "{text}");
+    assert!(text.contains("library        /srv/media"), "{text}");
 }
 
 /// A refusal is the whole answer: an operator told they cannot do this needs the

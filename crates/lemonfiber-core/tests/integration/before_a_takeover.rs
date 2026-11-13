@@ -47,7 +47,12 @@ fn over(engine: Reporting, images: Arc<Pulled>) -> Ctx {
 fn theirs(lifecycle: Lifecycle, mounts: &[&str]) -> Reporting {
     Reporting::holding(&["sonarr"], lifecycle, Health::None)
         .belonging_to("media")
-        .mounting(&mounts.iter().map(PathBuf::from).collect::<Vec<_>>())
+        .mounting(
+            &mounts
+                .iter()
+                .map(|path| (*path, "/data"))
+                .collect::<Vec<_>>(),
+        )
 }
 
 /// The image that makes the survey see a setup worth taking over.

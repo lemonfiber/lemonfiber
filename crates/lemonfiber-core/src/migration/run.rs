@@ -83,7 +83,7 @@ async fn mounted(ctx: &Ctx, seen: &[Container]) -> Vec<(PathBuf, StorageFacts)> 
     let paths: BTreeSet<&PathBuf> = seen
         .iter()
         .filter(|container| container.project != ctx.settings.project)
-        .flat_map(|container| container.mounts.iter())
+        .flat_map(|container| container.mounts.iter().map(|mount| &mount.source))
         .collect();
 
     let mut found = Vec::new();
