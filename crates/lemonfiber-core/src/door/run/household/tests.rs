@@ -1,11 +1,11 @@
 use super::*;
 use crate::door::Chosen;
 
-fn at(url: &str) -> Option<Address> {
-    Some(Address {
+fn at(url: &str) -> Address {
+    Address {
         url: url.to_owned(),
         caution: None,
-    })
+    }
 }
 
 fn beside(service: &str, facing: Facing, address: Option<Address>, reaches: Reaches) -> Beside {
@@ -24,7 +24,7 @@ fn operators(reaches: Reaches) -> FrontDoorReport {
         standing: Standing::Established,
         chosen: Some(Chosen::Derived),
         service: Some("Requests".to_owned()),
-        address: at("http://192.168.1.5:5055"),
+        address: Some(at("http://192.168.1.5:5055")),
         reaches,
         unaddressed: None,
         facing: Some(Facing::Asking),
@@ -33,7 +33,7 @@ fn operators(reaches: Reaches) -> FrontDoorReport {
             beside(
                 "Jellyfin",
                 Facing::Watching,
-                at("http://192.168.1.5:8096"),
+                Some(at("http://192.168.1.5:8096")),
                 reaches,
             ),
             beside("Music", Facing::Shelf, None, Reaches::Unknown),
@@ -51,18 +51,26 @@ fn a_member_at_home_is_handed_the_services_facing_them_in_their_words() {
     assert_eq!(told.chosen, None);
     assert_eq!(told.service.as_deref(), Some("Requests"));
     assert_eq!(told.facing, Some(Facing::Asking));
-    assert_eq!(told.address, at("http://192.168.1.5:5055"));
+    assert_eq!(told.address, Some(at("http://192.168.1.5:5055")));
     assert_eq!(told.reaches, Reaches::Here);
     assert_eq!(told.unaddressed, None);
     assert!(told.meaning.starts_with("Start at Requests"));
     let named: Vec<&str> = told.beside.iter().map(|one| one.service.as_str()).collect();
     assert_eq!(named, ["Jellyfin", "Music"]);
-    assert_eq!(told.beside[0].address, at("http://192.168.1.5:8096"));
     assert_eq!(
-        Some(told.beside[0].because.as_str()),
+        told.beside.first().and_then(|one| one.address.clone()),
+        Some(at("http://192.168.1.5:8096"))
+    );
+    assert_eq!(
+        told.beside.first().map(|one| one.because.as_str()),
         Facing::Watching.household()
     );
-    assert_eq!(told.beside[1].unaddressed.as_deref(), Some(NO_ADDRESS));
+    assert_eq!(
+        told.beside
+            .get(1)
+            .and_then(|one| one.unaddressed.as_deref()),
+        Some(NO_ADDRESS)
+    );
 }
 
 #[test]
@@ -72,8 +80,16 @@ fn a_member_away_is_handed_no_address_that_will_not_answer_and_told_why() {
     assert_eq!(told.address, None);
     assert_eq!(told.reaches, Reaches::NotHere);
     assert_eq!(told.unaddressed.as_deref(), Some(AWAY));
-    assert_eq!(told.beside[0].address, None);
-    assert_eq!(told.beside[0].unaddressed.as_deref(), Some(AWAY));
+    assert_eq!(
+        told.beside.first().and_then(|one| one.address.clone()),
+        None
+    );
+    assert_eq!(
+        told.beside
+            .first()
+            .and_then(|one| one.unaddressed.as_deref()),
+        Some(AWAY)
+    );
 }
 
 #[test]
