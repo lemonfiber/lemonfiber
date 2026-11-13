@@ -147,8 +147,8 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     // Every served read, the logs and the bundle among them, and the event stream, but
     // a member's search, the kinds they may ask for, the poster of what it found and
     // what they are told on, which are a member's own and the operator's, and the
-    // settings, how the stack runs and where its alerts go, which are the operator's
-    // alone.
+    // settings, how the stack runs, what setup settled and where its alerts go, which
+    // are the operator's alone.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(BESIDE.iter().map(|(read, _)| read))
@@ -160,6 +160,7 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
                 crate::read::table::REQUEST_POSTER,
                 crate::read::table::SETTINGS,
                 crate::read::table::STACK,
+                crate::read::table::SETTLED,
                 crate::read::table::NOTIFY,
                 crate::read::table::NOTIFY_MINE,
             ]
@@ -182,6 +183,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     );
     assert_eq!(
         reading.capabilities.get(crate::read::table::STACK),
+        Some(&Standing::Unpermitted)
+    );
+    assert_eq!(
+        reading.capabilities.get(crate::read::table::SETTLED),
         Some(&Standing::Unpermitted)
     );
 

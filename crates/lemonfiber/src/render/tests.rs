@@ -321,6 +321,16 @@ fn the_first_of_them() -> Vec<Outcome> {
             beside: Vec::new(),
         }),
         a_stack(),
+        Outcome::Settled(lemonfiber_core::model::SettledReport {
+            setup: lemonfiber_core::model::SetUp::None,
+            data_root: None,
+            protocols: lemonfiber_core::config::Protocols::none(),
+            service_user: lemonfiber_core::model::ServiceUser {
+                uid: 1000,
+                gid: 1000,
+                from: lemonfiber_core::model::UserFrom::StackOwner,
+            },
+        }),
         Outcome::from(a_lifecycle("up", a_plan("media", Vec::new()))),
         Outcome::Credentials(lemonfiber_core::credential::Inventory::of(Vec::new())),
     ]

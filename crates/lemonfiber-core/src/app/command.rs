@@ -286,6 +286,9 @@ pub enum Command {
     FrontDoor,
     /// Say how the stack runs without lemonfiber, and the plain Compose words that start it.
     Stack,
+    /// Say what setup settled, read from the configuration as it stands, and whether this
+    /// stack is set up.
+    Settled,
     /// List the releases in this build's record, what the household has asked for, and
     /// the checks found wrong, each newest first, for a surface to mark what is new.
     News,

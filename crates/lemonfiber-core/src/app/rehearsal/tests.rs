@@ -247,6 +247,7 @@ fn reads() -> Vec<Command> {
         Command::Stuck,
         Command::FrontDoor,
         Command::Stack,
+        Command::Settled,
         Command::News,
         Command::Playing { member: None },
         Command::Explain {

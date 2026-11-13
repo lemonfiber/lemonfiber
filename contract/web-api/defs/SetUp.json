@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether this stack is set up.",
+  "oneOf": [
+    {
+      "description": "Nothing is configured and no setup has begun.",
+      "type": "string",
+      "const": "none"
+    },
+    {
+      "description": "A setup has begun and not finished: answers are being gathered, are waiting for\nreview, or an apply stopped part-way.",
+      "type": "string",
+      "const": "part-way"
+    },
+    {
+      "description": "The stack is configured and no setup is part-way through.",
+      "type": "string",
+      "const": "done"
+    }
+  ]
+}

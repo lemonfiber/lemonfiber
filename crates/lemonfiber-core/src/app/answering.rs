@@ -42,6 +42,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Hosting(Keeping::Read) => &[kind::HOSTING],
         Command::FrontDoor => &[kind::FRONT_DOOR],
         Command::Stack => &[kind::STACK],
+        Command::Settled => &[kind::SETTLED],
         Command::Notify(crate::notify::configuring::Asked::List) => &[kind::NOTIFY],
         Command::Notify(crate::notify::configuring::Asked::Mine { .. }) => &[kind::NOTIFY_MINE],
         Command::News => &[kind::NEWS_ITEMS],

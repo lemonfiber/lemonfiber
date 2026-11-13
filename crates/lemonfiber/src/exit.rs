@@ -220,6 +220,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Hosting(_)
         | Outcome::FrontDoor(_)
         | Outcome::Stack(_)
+        | Outcome::Settled(_)
         // A kind that could not be read is named in the answer, which still arrived.
         | Outcome::News(_)
         | Outcome::Stuck(_)

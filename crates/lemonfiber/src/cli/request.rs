@@ -272,6 +272,12 @@ pub enum Request {
     /// Compose project and `.env` are, the exact `docker compose` words that start it with
     /// no lemonfiber running, and anything those words alone do not start.
     Stack,
+    /// Say what setup settled and whether this stack is set up.
+    ///
+    /// The data root, the ways of downloading and the user the services run as, read
+    /// from the configuration as it stands, and whether setup is done, part-way or not
+    /// begun. It offers no setup and changes nothing.
+    Settled,
     /// List lemonfiber's releases, what the household has asked for, and the checks
     /// found wrong, each newest first.
     ///

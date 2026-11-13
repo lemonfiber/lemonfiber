@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where the user the services run as comes from.",
+  "oneOf": [
+    {
+      "description": "The operator set both `PUID` and `PGID`.",
+      "type": "string",
+      "const": "set"
+    },
+    {
+      "description": "The operator set one of `PUID` and `PGID`, and the other is the stack\ndirectory's owner's.",
+      "type": "string",
+      "const": "part-set"
+    },
+    {
+      "description": "The operator set neither, so both are the stack directory's owner's, or 1000\nwhere that owner is root or cannot be read.",
+      "type": "string",
+      "const": "stack-owner"
+    }
+  ]
+}

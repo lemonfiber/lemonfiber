@@ -232,4 +232,6 @@ kinds! {
     SUBSTITUTION = "substitution",
     /// Every setting and secret the services read, and what changing a setting came to.
     SETTINGS = "settings",
+    /// What setup settled, and whether this stack is set up.
+    SETTLED = "settled",
 }

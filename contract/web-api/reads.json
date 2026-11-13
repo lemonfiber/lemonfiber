@@ -215,6 +215,14 @@
     "file": false
   },
   {
+    "path": "/api/settled",
+    "parameters": [],
+    "kinds": [
+      "settled"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/notify",
     "parameters": [],
     "kinds": [

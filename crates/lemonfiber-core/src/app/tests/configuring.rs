@@ -56,6 +56,7 @@ fn settings_of(
             | Outcome::Asked(_)
             | Outcome::FrontDoor(_)
             | Outcome::Stack(_)
+            | Outcome::Settled(_)
             | Outcome::News(_)
             | Outcome::Stuck(_)
             | Outcome::Boot(_)

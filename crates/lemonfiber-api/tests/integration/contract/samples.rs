@@ -274,6 +274,19 @@ fn serving() -> Vec<Outcome> {
         }),
         Outcome::FrontDoor(a_front_door()),
         Outcome::Stack(a_stack()),
+        Outcome::Settled(lemonfiber_core::model::SettledReport {
+            setup: lemonfiber_core::model::SetUp::Done,
+            data_root: Some("/srv/media".to_owned()),
+            protocols: lemonfiber_core::config::Protocols {
+                usenet: true,
+                torrent: false,
+            },
+            service_user: lemonfiber_core::model::ServiceUser {
+                uid: 1000,
+                gid: 1000,
+                from: lemonfiber_core::model::UserFrom::StackOwner,
+            },
+        }),
         Outcome::Pairing(a_pairing()),
         Outcome::Certificate(lemonfiber_core::companion::Replacement {
             rehearsed: false,

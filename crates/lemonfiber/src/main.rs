@@ -330,6 +330,7 @@ async fn main() -> ExitCode {
         Request::Queue { action } => translate::queue(action),
         Request::FrontDoor => Command::FrontDoor,
         Request::Stack => Command::Stack,
+        Request::Settled => Command::Settled,
         Request::News => Command::News,
         Request::Companion(asked) => translate::paired(&asked),
         Request::Catalogue => Command::Catalogue,

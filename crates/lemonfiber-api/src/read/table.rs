@@ -140,6 +140,9 @@ pub const FRONT_DOOR: &str = "/api/front-door";
 /// How the stack runs without lemonfiber.
 pub const STACK: &str = "/api/stack";
 
+/// What setup settled, and whether this stack is set up.
+pub const SETTLED: &str = "/api/settled";
+
 /// The back-ends the stack delivers its alerts to, the operator's alone.
 pub const NOTIFY: &str = "/api/notify";
 
@@ -317,6 +320,7 @@ pub const OFFERED: &[&str] = &[
     HOSTING,
     FRONT_DOOR,
     STACK,
+    SETTLED,
     NOTIFY,
     NOTIFY_MINE,
     NEWS,
@@ -467,6 +471,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         HOSTING => Ok(Command::Hosting(Keeping::Read)),
         FRONT_DOOR => Ok(Command::FrontDoor),
         STACK => Ok(Command::Stack),
+        SETTLED => Ok(Command::Settled),
         NOTIFY => Ok(Command::Notify(Notifying::List)),
         NOTIFY_MINE => Ok(Command::Notify(Notifying::Mine {
             member: member.unwrap_or_default(),
