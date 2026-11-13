@@ -1,5 +1,6 @@
 use super::{Conditions, Fault};
 use crate::error::Severity;
+use crate::instant::Instant;
 
 /// What a check reports, with something to do about it.
 fn wrong(severity: Severity, summary: &str) -> Fault {
@@ -19,7 +20,7 @@ fn stalled() -> Conditions {
     conditions.observe(
         "queue.stalled",
         Some(&wrong(Severity::Warning, "two downloads have not moved")),
-        crate::instant::Instant::from_seconds(1000),
+        Instant::from_seconds(1000),
     );
     conditions
 }
@@ -32,7 +33,7 @@ fn attempts_count_repairs_that_left_the_fault_standing() {
     conditions.observe(
         "vpn.port-forward-client",
         Some(&wrong(Severity::Warning, "it is on the wrong port")),
-        crate::instant::Instant::from_seconds(1000),
+        Instant::from_seconds(1000),
     );
 
     conditions.attempted("vpn.port-forward-client");
@@ -76,13 +77,13 @@ fn a_standing_fault_seen_again_is_the_same_condition() {
     conditions.observe(
         "queue.stalled",
         Some(&wrong(Severity::Error, "and now the disk is full")),
-        crate::instant::Instant::from_seconds(2000),
+        Instant::from_seconds(2000),
     );
     assert_eq!(conditions.raised().len(), 1, "one problem, not two");
     let condition = conditions.get("queue.stalled");
     assert_eq!(
-        condition.map(|c| (c.since.as_str(), c.severity, c.recurrences)),
-        Some(("1000", Severity::Error, 0)),
+        condition.map(|c| (c.since, c.severity, c.recurrences)),
+        Some((Instant::from_seconds(1000), Severity::Error, 0)),
         "since it broke, at the severity it has become"
     );
 }
@@ -92,16 +93,12 @@ fn a_check_that_finds_nothing_clears_what_it_raised() {
     // The self-resolving stall: it went away on its own, and that is recorded
     // rather than silently forgotten.
     let mut conditions = stalled();
-    conditions.observe(
-        "queue.stalled",
-        None,
-        crate::instant::Instant::from_seconds(1500),
-    );
+    conditions.observe("queue.stalled", None, Instant::from_seconds(1500));
     assert!(conditions.raised().is_empty());
     let cleared = conditions
         .get("queue.stalled")
-        .and_then(|condition| condition.cleared.clone());
-    assert_eq!(cleared.as_deref(), Some("1500"));
+        .and_then(|condition| condition.cleared);
+    assert_eq!(cleared, Some(Instant::from_seconds(1500)));
 }
 
 #[test]
@@ -109,11 +106,7 @@ fn a_healthy_check_that_never_failed_writes_nothing() {
     // Inventing a cleared condition for every passing check would fill the
     // store with things that never happened.
     let mut conditions = Conditions::new();
-    conditions.observe(
-        "vpn.egress-match",
-        None,
-        crate::instant::Instant::from_seconds(1000),
-    );
+    conditions.observe("vpn.egress-match", None, Instant::from_seconds(1000));
     assert!(conditions.is_empty());
 }
 
@@ -129,7 +122,7 @@ fn what_is_wrong_is_listed_worst_first_and_stably_within_a_severity() {
         conditions.observe(
             check,
             Some(&wrong(severity, "wrong")),
-            crate::instant::Instant::from_seconds(1000),
+            Instant::from_seconds(1000),
         );
     }
     let order: Vec<&str> = conditions
@@ -184,27 +177,23 @@ fn the_store_round_trips_through_its_serialised_form() {
 fn a_copy_lays_only_what_it_changed_over_the_store_as_it_stands() {
     let read = stalled();
     let mut copy = read.clone();
-    copy.observe(
-        "queue.stalled",
-        None,
-        crate::instant::Instant::from_seconds(2000),
-    );
+    copy.observe("queue.stalled", None, Instant::from_seconds(2000));
     copy.forget("never.there");
 
     let mut meanwhile = read;
     meanwhile.observe(
         "storage.space",
         Some(&wrong(Severity::Error, "the volume is full")),
-        crate::instant::Instant::from_seconds(1500),
+        Instant::from_seconds(1500),
     );
     let written = copy.over(meanwhile);
 
     assert!(written
         .get("queue.stalled")
-        .is_some_and(|condition| condition.cleared.as_deref() == Some("2000")));
+        .is_some_and(|condition| condition.cleared == Some(Instant::from_seconds(2000))));
     assert!(written
         .get("storage.space")
-        .is_some_and(|condition| condition.since == "1500"));
+        .is_some_and(|condition| condition.since == Instant::from_seconds(1500)));
 }
 
 #[test]

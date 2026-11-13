@@ -2,7 +2,7 @@
   "fields": {
     "at": {
       "type": [
-        "string"
+        "integer/uint64"
       ],
       "required": true
     },

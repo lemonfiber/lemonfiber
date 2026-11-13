@@ -207,9 +207,9 @@ pub(super) async fn owned(
             }
         };
         if matches!(wiring.state, State::Wired | State::AlreadyWired) {
-            baseline.record(id, FIELD, OURS, &at);
+            baseline.record(id, FIELD, OURS, at);
         } else if coded.is_some() && recorded {
-            baseline.record(id, FIELD, NOT_OURS, &at);
+            baseline.record(id, FIELD, NOT_OURS, at);
         }
         wirings.push(wiring);
     }

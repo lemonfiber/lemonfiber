@@ -2,7 +2,7 @@
   "fields": {
     "lapses": {
       "type": [
-        "string"
+        "integer/uint64"
       ],
       "required": true
     },

@@ -26,19 +26,19 @@
     },
     "registered": {
       "type": [
-        "string"
+        "integer/uint64"
       ],
       "required": true
     },
     "revoked": {
       "type": [
-        "null|string"
+        "integer|null/uint64"
       ],
       "required": false
     },
     "used": {
       "type": [
-        "null|string"
+        "integer|null/uint64"
       ],
       "required": false
     }

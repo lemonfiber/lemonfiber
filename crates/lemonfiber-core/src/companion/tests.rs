@@ -13,11 +13,12 @@ use crate::app::Ctx;
 use crate::certificate;
 use crate::config::Settings;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
+use crate::instant::Instant;
 use crate::platform::Environment;
 use crate::test_support::a_context;
 
 /// The seconds the stopped clock reads, and ten minutes on from them.
-const EXPIRES: u64 = lemonfiber_fixtures::ports::TODAY + 600;
+const EXPIRES: Instant = lemonfiber_fixtures::ports::moment(600);
 
 /// A machine kept at `directory`, answering to `name`, with the household's address as
 /// the operator wrote it, if they did.
@@ -84,10 +85,7 @@ async fn material_names_where_the_stack_is_and_the_certificate_it_presents() {
         .map(|said| said.keys().cloned().collect())
         .unwrap_or_default();
     assert_eq!(keys, ["address", "expires", "fingerprint", "stack"]);
-    assert_eq!(
-        pairing.as_ref().map(|made| made.until.clone()).ok(),
-        Some(lemonfiber_fixtures::ports::stamp(600))
-    );
+    assert_eq!(pairing.as_ref().map(|made| made.until).ok(), Some(EXPIRES));
     assert!(
         pairing
             .as_ref()

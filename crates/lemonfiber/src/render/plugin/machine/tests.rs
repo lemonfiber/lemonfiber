@@ -62,7 +62,7 @@ pub(super) fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     }
 }
 

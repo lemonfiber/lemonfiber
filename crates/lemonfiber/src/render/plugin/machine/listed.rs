@@ -61,7 +61,7 @@ pub(super) fn provenance(one: &Installed, report: &Installs) -> Lines {
         "    installed  {}",
         one.installed_at.map_or_else(
             || "at a moment the record does not hold".to_owned(),
-            |at| format!("at {}", crate::render::news::when(at))
+            |at| format!("at {}", at.said())
         )
     ));
     if !declared.upstream.is_empty() {

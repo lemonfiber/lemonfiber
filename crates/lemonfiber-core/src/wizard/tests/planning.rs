@@ -1,6 +1,8 @@
 //! What a reviewed setup plans, applies and puts back.
 
 use super::*;
+use crate::instant::Instant;
+use lemonfiber_fixtures::ports::STAMPED;
 
 #[test]
 fn a_reviewed_wizard_plans_every_setting_it_gathered() {
@@ -394,7 +396,7 @@ fn recovery_reports_exactly_what_the_interrupted_apply_wrote() {
 fn a_moved_setting_is_said_by_both_its_names() {
     assert_eq!(
         described(&Change {
-            at: String::new(),
+            at: Instant::EPOCH,
             operation: "settings".to_owned(),
             target: "MEDIA_SERVER_MODE".to_owned(),
             kind: Kind::Renamed {
@@ -411,7 +413,7 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
     // What whoever is choosing is shown of an interrupted run: the point is
     // that they recognise it, not that it round-trips.
     let change = |kind| Change {
-        at: String::new(),
+        at: Instant::EPOCH,
         operation: "setup".to_owned(),
         target: "the environment file".to_owned(),
         kind,
@@ -613,7 +615,7 @@ fn applying_the_plan_records_each_setting_against_what_was_there() {
     // one change has a previous value to restore and the other has none.
     let current = EnvFile::parse("LEMONFIBER_USENET=off\n");
     let set = |key: &str, previous: Option<&str>, value: &str| Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -623,7 +625,7 @@ fn applying_the_plan_records_each_setting_against_what_was_there() {
         },
     };
     assert_eq!(
-        wizard.plan().changes(&current, "t"),
+        wizard.plan().changes(&current, STAMPED),
         vec![
             set("LEMONFIBER_USENET", Some("off"), "on"),
             set("LEMONFIBER_TORRENT", None, "on"),
@@ -642,7 +644,7 @@ fn a_setting_that_was_present_but_empty_is_captured_as_empty_not_absent() {
         .unwrap_or(());
     let current = EnvFile::parse("LEMONFIBER_USENET=\n");
     let set = |key: &str, previous: Option<&str>, value: &str| Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -652,7 +654,7 @@ fn a_setting_that_was_present_but_empty_is_captured_as_empty_not_absent() {
         },
     };
     assert_eq!(
-        wizard.plan().changes(&current, "t"),
+        wizard.plan().changes(&current, STAMPED),
         vec![
             set("LEMONFIBER_USENET", Some(""), "on"),
             set("LEMONFIBER_TORRENT", None, "on"),
@@ -663,7 +665,7 @@ fn a_setting_that_was_present_but_empty_is_captured_as_empty_not_absent() {
 #[test]
 fn a_device_key_is_named_as_a_key_is() {
     let change = |kind| Change {
-        at: String::new(),
+        at: Instant::EPOCH,
         operation: "device-key".to_owned(),
         target: "pixel".to_owned(),
         kind,
@@ -743,7 +745,7 @@ fn a_device_key_is_named_as_a_key_is() {
 fn a_grant_is_named_by_its_plugin_and_credential() {
     assert_eq!(
         described(&Change {
-            at: String::new(),
+            at: Instant::EPOCH,
             operation: "plugin:reader".to_owned(),
             target: "LIBRARY_CURATE_TV_API_KEY".to_owned(),
             kind: Kind::Granted {
@@ -759,7 +761,7 @@ fn a_grant_is_named_by_its_plugin_and_credential() {
 #[test]
 fn a_move_and_a_copy_are_said_plainly_enough_to_recognise() {
     let change = |kind| Change {
-        at: String::new(),
+        at: Instant::EPOCH,
         operation: "project".to_owned(),
         target: "the mount tree".to_owned(),
         kind,

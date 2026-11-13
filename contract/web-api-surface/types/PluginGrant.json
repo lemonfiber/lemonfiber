@@ -2,9 +2,9 @@
   "fields": {
     "at": {
       "type": [
-        "string"
+        "integer|null/uint64"
       ],
-      "required": true
+      "required": false
     },
     "credential": {
       "type": [

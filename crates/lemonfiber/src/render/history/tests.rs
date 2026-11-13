@@ -1,3 +1,4 @@
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{ChangeReport, HistoryReport};
 use lemonfiber_core::rollback::Reversal;
 
@@ -6,7 +7,7 @@ use super::history;
 /// One change on the record, with the fields a test is not varying already filled.
 fn change(did: &str, reversal: Reversal) -> ChangeReport {
     ChangeReport {
-        at: "1709287200".to_owned(),
+        at: Instant::from_seconds(1_709_287_200),
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         did: did.to_owned(),

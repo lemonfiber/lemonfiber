@@ -32,9 +32,11 @@
     "onset": {
       "description": "When the stack first saw this check wrong since it last saw it right, in whole\nseconds since the epoch.\n\nSet after the run from the store of conditions, like [`Self::said`], so it is\nthe moment the health summary names for the same check and a restart does not\nmove it. Absent where the finding says nothing is wrong, and where the checks\nran for something other than a diagnosis.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "origin": {
       "description": "Whose check this is: one this build ships, or one a named plugin contributed.\n\nCarried rather than read off the identifier. A contributed check's id is\nnamespaced with the plugin's, and a reader could decode that from the colon —\nbut an origin a reader has to decode is one a reader gets wrong, and the day a\nbundled id grew a colon every such reader would misattribute it in silence.",

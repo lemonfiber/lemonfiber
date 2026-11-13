@@ -9,6 +9,7 @@ use crate::app::Ctx;
 use crate::error::codes::wish::{ALREADY_HERE, NOTHING_LEFT, NOT_ITS_SEASON, NO_ROOM};
 use crate::error::Problem;
 use crate::household::run::OwnAllowance;
+use crate::instant::Instant;
 use crate::model::{AskedReport, Became, LeftAfter};
 use crate::ports::media::Kind;
 use crate::ports::service::{Detail, Left, MediaStatus, Season, Wish};
@@ -39,7 +40,7 @@ pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedRep
     let theirs = crate::household::run::allowance_of(
         reached.requests.as_ref(),
         &reached.member,
-        ctx.seams.clock.now(),
+        ctx.stamp(),
     )
     .await
     .map_err(|_| not_working())?;
@@ -242,14 +243,11 @@ fn leaves(theirs: &OwnAllowance, kind: Kind, cost: u32) -> LeftAfter {
 /// known.
 pub(super) fn nothing_left(theirs: &OwnAllowance) -> Box<Problem> {
     let summary = "You've asked for all you can for now.";
-    match &theirs.asking.frees_up {
-        Some(at) => refused_with(
+    match theirs.asking.frees_up.and_then(Instant::day) {
+        Some(day) => refused_with(
             NOTHING_LEFT,
             summary,
-            &format!(
-                "You can ask again from {}.",
-                at.split('T').next().unwrap_or(at)
-            ),
+            &format!("You can ask again from {day}."),
         ),
         None => refused(NOTHING_LEFT, summary),
     }

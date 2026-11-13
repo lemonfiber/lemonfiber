@@ -5,6 +5,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use super::{allowing, deciding, found, now_reads, one_named, settled, theirs, Ctx};
 use crate::app::command::{Answer as Ruling, Chosen, Decision};
 use crate::asking::Policy;
+use crate::instant::Instant;
 use crate::ports::service::{
     Address, Asking, Headroom, HouseholdRequest, Left, MediaStatus, Member, Quota, RequestStatus,
     Requesting,
@@ -22,7 +23,7 @@ const FIVE_A_WEEK: Quota = Quota {
 /// forgiving about.
 fn accounts() -> Vec<Member> {
     let mut alex = media::member("a1", "Alex", true);
-    alex.last_seen = Some("2026-08-30T10:00:00Z".to_owned());
+    alex.last_seen = Some(Instant::from_seconds(1_788_084_000));
     vec![alex]
 }
 
@@ -53,7 +54,7 @@ const MEMBER: &str = "4";
 fn waiting() -> HouseholdRequest {
     HouseholdRequest {
         id: 7,
-        made: Some(crate::instant::Instant::from_seconds(1_787_000_649)),
+        made: Some(Instant::from_seconds(1_787_000_649)),
         member: "Alex".to_owned(),
         member_id: None,
         kind: Some(crate::ports::media::Kind::Movies),

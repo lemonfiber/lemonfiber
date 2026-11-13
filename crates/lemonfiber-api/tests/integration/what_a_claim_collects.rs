@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 
 use lemonfiber_api::admission::Keyring;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Claim, Kept, Minter, Purpose, Record, Scope};
 
 use crate::door::*;
@@ -29,8 +30,8 @@ fn waiting_machine(named: &str, claim: &Claim) -> (axum::Router, String, PathBuf
         Scope::Read,
         Purpose::HomeAssistant,
         claim,
-        "2099-01-01T00:00:00".to_owned(),
-        "2026-10-05T06:00:00".to_owned(),
+        Instant::from_seconds(4_070_908_800),
+        Instant::from_seconds(1_791_180_000),
         Minter::Operator,
     );
     assert!(Kept {

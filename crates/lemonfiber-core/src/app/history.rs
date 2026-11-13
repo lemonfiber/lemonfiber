@@ -50,7 +50,7 @@ pub fn history(ctx: &Ctx) -> Result<HistoryReport, Box<crate::error::Problem>> {
             told(
                 change,
                 standing(change, later, &holds, &reads),
-                together(changes, &change.operation, &change.at).len(),
+                together(changes, &change.operation, change.at).len(),
             )
         })
         .collect();

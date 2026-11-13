@@ -19,6 +19,7 @@ use std::sync::Arc;
 use crate::common::household::{recorded_admin, stack_without};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{HandedSession, Handoff, HandoffRemedy, HandoffState};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::ports::http::Request;
@@ -35,12 +36,12 @@ fn household() -> Vec<Member> {
 }
 
 /// A device signed in to Ana's account.
-fn session(device_id: &str, device: &str, client: &str, last_seen: Option<&str>) -> Session {
+fn session(device_id: &str, device: &str, client: &str, last_seen: Option<Instant>) -> Session {
     Session {
         device_id: device_id.to_owned(),
         device: device.to_owned(),
         client: client.to_owned(),
-        last_seen: last_seen.map(str::to_owned),
+        last_seen,
     }
 }
 
@@ -50,7 +51,7 @@ fn ana_signed_in() -> Vec<Session> {
         "pixel-8",
         "Pixel 8",
         "Jellyfin Android",
-        Some("2026-09-29T10:05:00Z"),
+        Some(Instant::from_seconds(1_790_676_300)),
     )]
 }
 
@@ -276,9 +277,7 @@ async fn a_device_signed_in_is_read_from_the_media_server() {
         vec![HandedSession {
             device: "Pixel 8".to_owned(),
             client: "Jellyfin Android".to_owned(),
-            last_seen: Some(lemonfiber_core::instant::Instant::from_seconds(
-                1_790_676_300
-            )),
+            last_seen: Some(Instant::from_seconds(1_790_676_300)),
         }],
         "only Ana's own device is hers"
     );
@@ -342,7 +341,7 @@ async fn a_record_of_the_moment_alone_reads_as_nothing_signed_in_then() {
     gone(&env);
 
     assert_eq!(signed_in.state, HandoffState::Connected);
-    assert_eq!(signed_in.issued.as_deref(), Some("2026-09-29T10:00:00Z"));
+    assert_eq!(signed_in.issued, Some(Instant::from_seconds(1_790_676_000)));
     assert_eq!(waiting.state, HandoffState::Pending);
 }
 

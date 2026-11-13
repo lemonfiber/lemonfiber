@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 
 use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
+use lemonfiber_core::instant::Instant;
 use serde::Deserialize;
 
 /// What an `only` names: one group of checks or one check on a diagnosis, and a list of
@@ -261,7 +262,7 @@ impl Arguments {
             preset: Some("balanced".to_owned()),
             media_type: Some("tv".to_owned()),
             archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),
-            at: Some("1700000000".to_owned()),
+            at: Some(Instant::from_seconds(1_700_000_000)),
             logs: Some(1),
             reveal: Vec::new(),
             only: Some(Only::One("vpn".to_owned())),

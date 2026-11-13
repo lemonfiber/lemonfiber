@@ -17,7 +17,6 @@ use crate::bundle::{self, Contents, Filenames, Marks, Piece, Residual, Taken, Te
 use crate::bytes::humanize;
 use crate::doctor::Verdict;
 use crate::error::{Problem, Remedy, State};
-use crate::instant;
 use crate::ports::docker::LogQuery;
 
 use crate::app::Ctx;

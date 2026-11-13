@@ -4,8 +4,10 @@
   "type": "object",
   "properties": {
     "lapses": {
-      "description": "When the claim stops collecting the key, written as every other instant is.",
-      "type": "string"
+      "description": "When the claim stops collecting the key.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     },
     "link": {
       "description": "The key link: `lemonfiber://key` with the address, the certificate fingerprint,\nthe stack, when the claim lapses and the claim. Shown once, and drawn as a code.",

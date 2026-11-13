@@ -8,6 +8,7 @@ use super::{
 };
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy};
+use crate::instant::Instant;
 use crate::ports::media::TitleKind;
 use crate::ports::service::{FoundItem, ItemPart, QueueItem, StuckItem, TraceEvent};
 use crate::test_support::curators::{self, answered, curated, curating, refusing, TELEVISION};
@@ -110,7 +111,7 @@ fn happened(outcome: Outcome) -> Answer {
 fn event(outcome: Outcome) -> TraceEvent {
     TraceEvent {
         outcome,
-        at: "2026-01-01T00:00:00Z".to_owned(),
+        at: Some(Instant::from_seconds(1_767_225_600)),
         part: None,
     }
 }

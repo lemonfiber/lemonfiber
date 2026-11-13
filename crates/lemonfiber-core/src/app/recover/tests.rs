@@ -1,5 +1,8 @@
+use crate::instant::Instant;
 use crate::test_support::a_fresh_write;
 use std::path::Path;
+
+use lemonfiber_fixtures::ports::STAMPED;
 
 use super::undo;
 use crate::config::store;
@@ -96,7 +99,7 @@ fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
         let recorded = super::journalled(
             &path,
             &[crate::journal::Change {
-                at: stamp.to_string(),
+                at: Instant::from_seconds(u64::try_from(stamp).unwrap_or_default()),
                 ..a_fresh_write("PUID", "1000")
             }],
         );
@@ -110,8 +113,8 @@ fn a_record_written_past_the_bound_leaves_the_bound_on_disk() {
         "the bound is what the file holds"
     );
     assert_eq!(
-        held.changes().first().map(|change| change.at.as_str()),
-        Some("1"),
+        held.changes().first().map(|change| change.at),
+        Some(Instant::from_seconds(1)),
         "and the oldest run went, rather than the newest"
     );
 }
@@ -250,7 +253,7 @@ fn a_full_rollback_restores_the_settings_and_removes_the_directory() {
     assert!(std::fs::create_dir_all(&made).is_ok());
 
     let write = |key: &str| Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -261,7 +264,7 @@ fn a_full_rollback_restores_the_settings_and_removes_the_directory() {
     };
     let mut journal = Journal::new();
     journal.record(Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: made.display().to_string(),
         kind: Kind::Made {
@@ -495,7 +498,7 @@ fn a_setting_that_cannot_be_rewritten_stops_the_reversal() {
 /// the repair put there.
 fn moved_the_port(previous: &str, current: &str) -> Change {
     Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: crate::repair::OPERATION.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {

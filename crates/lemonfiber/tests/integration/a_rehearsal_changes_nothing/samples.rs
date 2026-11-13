@@ -9,6 +9,7 @@ use lemonfiber_core::app::{
 };
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::instant::Instant;
 
 /// The subcommands that never become a [`Command`], and why.
 ///
@@ -416,7 +417,7 @@ pub(super) fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
         (
             "undo-a-named-run",
             Command::Undo {
-                run: Some("2026-07-30T00:00:00Z".to_owned()),
+                run: Some(Instant::from_seconds(1_785_369_600)),
             },
         ),
         // The read half of a support bundle, which is what a rehearsal of the writing

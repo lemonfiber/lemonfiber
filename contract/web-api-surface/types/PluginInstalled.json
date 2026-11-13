@@ -32,7 +32,7 @@
     },
     "installed_at": {
       "type": [
-        "string"
+        "integer|null/uint64"
       ],
       "required": false
     },

@@ -99,7 +99,7 @@ pub(crate) async fn held(ctx: &Ctx, server: &dyn crate::ports::service::Househol
         .collect();
     Held {
         household,
-        spent: run_out(&waiting, &cutoff),
+        spent: run_out(&waiting, cutoff),
         offers,
     }
 }

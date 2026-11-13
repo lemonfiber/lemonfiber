@@ -2,6 +2,7 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::credential::{
     Held, Inventory, Origin, Propagation, Revealed, Rotation, Settled, State, REVEALED, SHOULDER,
 };
+use lemonfiber_core::instant::Instant;
 
 /// One credential, with the state and advisory a test is about.
 fn held(state: State, advisory: Option<&str>) -> Held {
@@ -303,7 +304,7 @@ fn a_grant() -> lemonfiber_core::credential::Granted {
         credential: "QBITTORRENT_PASSWORD".to_owned(),
         of: "qbittorrent".to_owned(),
         serves: "download.torrent".to_owned(),
-        at: "1".to_owned(),
+        at: Some(Instant::from_seconds(1)),
     }
 }
 

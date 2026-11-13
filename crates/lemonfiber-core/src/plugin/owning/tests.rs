@@ -1,11 +1,12 @@
 //! Whose a journalled change is.
 
 use super::{owner, owns};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind, OPERATIONS};
 
 fn under(operation: &str, kind: Kind) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: operation.to_owned(),
         target: "somewhere".to_owned(),
         kind,

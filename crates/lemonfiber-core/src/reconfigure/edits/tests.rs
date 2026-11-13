@@ -1,11 +1,12 @@
 use super::{standing, Standing};
 use crate::baseline::{Origin, Record};
+use crate::instant::Instant;
 
 /// What lemonfiber last wrote here, as the baseline holds it.
 fn wrote(value: &str) -> Record {
     Record {
         value: value.to_owned(),
-        at: "0".to_owned(),
+        at: Instant::from_seconds(0),
         origin: Origin::Written,
     }
 }
@@ -64,7 +65,7 @@ fn a_value_lemonfiber_adopted_from_the_operator_stays_theirs() {
     // and a change over it is still a change over theirs.
     let adopted = Record {
         value: "/mnt/theirs".to_owned(),
-        at: "0".to_owned(),
+        at: Instant::from_seconds(0),
         origin: Origin::Adopted,
     };
     assert_eq!(

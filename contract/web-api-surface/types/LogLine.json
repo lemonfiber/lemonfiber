@@ -1,11 +1,5 @@
 {
   "fields": {
-    "at": {
-      "type": [
-        "null|string"
-      ],
-      "required": false
-    },
     "level": {
       "type": [
         "anyOf(null,ref:LogLevel)"
@@ -23,6 +17,12 @@
         "string"
       ],
       "required": true
+    },
+    "stamped": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     },
     "stream": {
       "type": [

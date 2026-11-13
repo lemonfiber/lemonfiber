@@ -1,4 +1,5 @@
-use super::{did, history, stamped};
+use super::{did, history};
+use crate::instant::Instant;
 
 /// A region reads as what it was: something written into a file that was there.
 #[test]
@@ -67,24 +68,6 @@ fn a_move_and_a_copy_read_as_where_each_went() {
         }),
         "moved the setting JELLYFIN_MODE to MEDIA_SERVER_MODE"
     );
-}
-
-/// Every stamp this build writes goes out as it was written.
-#[test]
-fn a_stamp_of_seconds_goes_out_as_written() {
-    assert_eq!(stamped("1709287200"), "1709287200");
-    assert_eq!(stamped("0"), "0");
-}
-
-/// An earlier build wrote an empty stamp where its clock would not answer, and a
-/// journal outlives the build that wrote it. The report promises digits, so what is
-/// not digits is read as the epoch — this build's own spelling of that clock —
-/// rather than passed on as a promise it does not keep.
-#[test]
-fn a_stamp_that_is_not_seconds_is_read_as_the_epoch() {
-    for unreadable in ["", "t", "2024-03-01T10:00:00Z", "-1", "12a"] {
-        assert_eq!(stamped(unreadable), "0", "{unreadable:?}");
-    }
 }
 
 /// A device key is named with its backing where it was registered, and alone where revoked.
@@ -223,7 +206,7 @@ fn a_setting_edited_since_is_read_off_the_settings_file() {
     let ctx = crate::test_support::a_context().settings(settings).build();
     let journal = crate::app::targets::layout(&ctx).map(|paths| paths.journal());
     let change = crate::journal::Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "config".to_owned(),
         target: ".env".to_owned(),
         kind: crate::journal::Kind::Set {
@@ -324,7 +307,7 @@ fn a_setting_recorded_since_is_read_off_the_settings_store() {
         })
         .build();
     let change = crate::journal::Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: crate::settings::OPERATION.to_owned(),
         target: "komga:mode".to_owned(),
         kind: crate::journal::Kind::Setting {

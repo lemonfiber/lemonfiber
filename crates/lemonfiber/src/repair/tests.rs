@@ -1,3 +1,4 @@
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::repair::run::{Mended, Report};
 use lemonfiber_core::repair::{Outcome, Repair};
 
@@ -145,7 +146,7 @@ async fn an_undo_puts_back_what_the_last_repair_set() {
         std::fs::create_dir_all(dir).ok();
     }
     let recorded = Change {
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         operation: lemonfiber_core::repair::OPERATION.to_owned(),
         target: "qbittorrent".to_owned(),
         kind: Kind::Set {
@@ -198,7 +199,7 @@ async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
         std::fs::create_dir_all(dir).ok();
     }
     let recorded = Change {
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         operation: lemonfiber_core::repair::OPERATION.to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Created {

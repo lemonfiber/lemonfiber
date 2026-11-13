@@ -6,9 +6,11 @@
     "at": {
       "description": "When it happened, as the service reported it — absent for a stage inferred\nrather than timed, such as being monitored.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "service": {
       "description": "The service that recorded it.",

@@ -1,21 +1,25 @@
 use lemonfiber_core::companion::{Material, Pairing, Replacement};
+use lemonfiber_core::instant::Instant;
 
 use super::{certificate, pairing};
 use crate::render::fixtures::drawn_under;
+
+/// When the material in these tests stops being good.
+const UNTIL: Instant = Instant::from_seconds(1_790_813_400);
 
 /// Material as a phone would be handed it, from a machine answering to its own name.
 fn made(caution: Option<&str>) -> Pairing {
     let material = Material {
         address: "https://den.local:8443".to_owned(),
         fingerprint: "ab".repeat(32),
-        expires: 1_790_813_400,
+        expires: UNTIL,
         stack: "000102030405060708090a0b0c0d0e0f".to_owned(),
     };
     Pairing {
         written: serde_json::to_string(&material).unwrap_or_default(),
         compare: lemonfiber_core::companion::comparable(&material.fingerprint),
         material,
-        until: lemonfiber_core::instant::Instant::from_seconds(1_790_813_400),
+        until: UNTIL,
         replacing: "It changes only when somebody replaces it.".to_owned(),
         caution: caution.map(str::to_owned),
     }

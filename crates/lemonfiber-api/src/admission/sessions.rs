@@ -91,7 +91,6 @@ pub struct Sessions {
 impl Sessions {
     /// Open one against the verifier that is on disk now, or nothing where this
     /// machine will not supply the secret to carry it by.
-
     pub async fn opened(
         &self,
         random: &dyn Random,

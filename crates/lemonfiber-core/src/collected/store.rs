@@ -66,12 +66,18 @@ pub(crate) struct Ask {
     /// Where it stands.
     pub standing: Standing,
     /// When it last changed where it stands, where it has.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::instant::kept_option"
+    )]
     pub settled_at: Option<Instant>,
     /// When the core first saw the house hold any of it, where it has.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::instant::kept_option"
+    )]
     pub arrived_at: Option<Instant>,
 }
 

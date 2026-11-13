@@ -11,6 +11,7 @@ use crate::config::store::Failure;
 use crate::error::codes::quota::UNREACHABLE;
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::household::State;
+use crate::instant::Instant;
 use crate::model::{MemberRequest, TitleKind, TitleUnit};
 use crate::ports::service::{CandidateState, Left};
 
@@ -118,11 +119,10 @@ pub(crate) fn expired(ctx: &Ctx, after: u32, reason: &str) -> Result<usize, Stri
     if ctx.dry_run || overdue.is_empty() {
         return Ok(overdue.len());
     }
-    let at = now;
     let mut reasons = crate::app::refusals::load(ctx);
     for named in &overdue {
-        store::settled(&path, *named, Standing::Expired, at).map_err(|why| why.to_string())?;
-        reasons.closed(*named, reason, Some(at));
+        store::settled(&path, *named, Standing::Expired, now).map_err(|why| why.to_string())?;
+        reasons.closed(*named, reason, Some(now));
     }
     crate::app::refusals::keep(ctx, &reasons).map_err(|why| why.summary)?;
     Ok(overdue.len())
@@ -131,13 +131,7 @@ pub(crate) fn expired(ctx: &Ctx, after: u32, reason: &str) -> Result<usize, Stri
 /// What the member `member` may still ask for of `medium`: the limit and period `films`,
 /// what the household holds them to for a film, give, each ask they made of `medium`
 /// inside that period counted once, and none that was turned down or closed.
-pub(crate) fn left(
-    kept: &[Ask],
-    films: Left,
-    member: &str,
-    medium: Medium,
-    now: std::time::SystemTime,
-) -> Left {
+pub(crate) fn left(kept: &[Ask], films: Left, member: &str, medium: Medium, now: Instant) -> Left {
     let used = films.days.map_or(0, |days| {
         kept.iter()
             .filter(|ask| ask.member == member && ask.unit.medium() == medium)
@@ -221,11 +215,7 @@ pub(crate) async fn sent(
 
 /// `ask` as a line of the household list, with the reason it was turned down where
 /// `reasons` holds one.
-pub(crate) fn listed(
-    ask: &Ask,
-    reasons: &crate::asking::Reasons,
-    now: std::time::SystemTime,
-) -> MemberRequest {
+pub(crate) fn listed(ask: &Ask, reasons: &crate::asking::Reasons, now: Instant) -> MemberRequest {
     let state = match ask.standing {
         Standing::Waiting => State::WaitingForApproval,
         Standing::Sent => State::Getting,
@@ -235,10 +225,10 @@ pub(crate) fn listed(
     };
     MemberRequest {
         id: ask.named().to_string(),
-        asked: Some(ask.asked_at.clone()),
+        asked: Some(ask.asked_at),
         title: Some(ask.name.clone()),
         year: ask.year,
-        arrived: ask.arrived_at.clone(),
+        arrived: ask.arrived_at,
         shelf_id: None,
         media: Some(ask.unit.noun().to_owned()),
         kind: Some(TitleKind::from(ask.unit.medium())),

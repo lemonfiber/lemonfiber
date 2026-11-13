@@ -1,5 +1,6 @@
 use crate::app::Ctx;
 use crate::config::store;
+use crate::instant::Instant;
 use crate::journal::Kind;
 use crate::test_support::{a_context, env_without_password};
 
@@ -209,7 +210,7 @@ fn a_grant_naming_a_credential_by_its_earlier_name_is_rewritten_and_journalled()
         credential: "SONARR_API_KEY".to_owned(),
         of: "sonarr".to_owned(),
         serves: "media.serve".to_owned(),
-        at: "1".to_owned(),
+        at: Some(Instant::from_seconds(1)),
     }];
     let mut register = crate::plugin::Register::empty();
     assert!(register.record(reader).is_ok());
@@ -292,7 +293,7 @@ fn a_grant_the_journal_will_not_take_is_not_rewritten() {
         credential: "SONARR_API_KEY".to_owned(),
         of: "sonarr".to_owned(),
         serves: "media.serve".to_owned(),
-        at: "1".to_owned(),
+        at: Some(Instant::from_seconds(1)),
     }];
     let mut register = crate::plugin::Register::empty();
     assert!(register.record(reader).is_ok());

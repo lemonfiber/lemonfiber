@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use lemonfiber_fixtures::ports::STAMPED;
+
 use super::*;
 use crate::config::paths::{SECRETS, SETTINGS};
 use crate::error::codes::setup::GUARD_UNANSWERED;
@@ -32,7 +34,7 @@ fn answering(dir: &Path, answers: &[(&str, &str)]) -> Scripted {
 fn guarded<'a>(paths: &'a Paths, guard: &'a super::super::Guard) -> Applying<'a> {
     Applying {
         guard: Some(guard),
-        ..applying(paths, "t")
+        ..applying(paths, STAMPED)
     }
 }
 
@@ -157,7 +159,7 @@ async fn an_apply_with_no_guard_to_hold_a_vpn_answer_to_writes_none_of_it() {
     }
     assert!(wizard.ready_for_review(), "{:?}", wizard.unanswered());
 
-    let applied = super::super::resume(&mut wizard, &applying(&paths, "t"));
+    let applied = super::super::resume(&mut wizard, &applying(&paths, STAMPED));
 
     assert_eq!(
         applied.err().map(|problem| problem.code),

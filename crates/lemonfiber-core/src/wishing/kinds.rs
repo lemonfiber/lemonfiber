@@ -20,7 +20,7 @@ pub(super) async fn kinds(ctx: &Ctx, named: &str) -> Result<AskableKindsReport, 
     let theirs = crate::household::run::allowance_of(
         reached.requests.as_ref(),
         &reached.member,
-        ctx.seams.clock.now(),
+        ctx.stamp(),
     )
     .await
     .map_err(|_| not_working())?;

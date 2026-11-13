@@ -10,9 +10,11 @@
     "frees_up": {
       "description": "When the count next lets go of something, so one more becomes possible.\n\nAbsent where nothing limits them, and where the request service's own dates\ncould not be read — an invented one would be a promise about a day on which\nnothing happens. The period is a window that rolls rather than a month that\nends, so this is the moment their earliest counted request ages out.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "policy": {
       "description": "What happens to what they ask for.",

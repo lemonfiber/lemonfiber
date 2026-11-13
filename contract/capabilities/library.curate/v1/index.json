@@ -103,7 +103,7 @@
     },
     {
       "path": "library.curate/v1/operations/item_history.json",
-      "sha256": "a53f973a20f2cea497fff03dc7d7e2b4b800f49c7582260bb96acabdc018f119"
+      "sha256": "8a39ee1a597bacca5a58aea027bff522e23dfd07d18caa41bccd8952a9d1d863"
     },
     {
       "path": "library.curate/v1/operations/item_queue.json",

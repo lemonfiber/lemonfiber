@@ -3,6 +3,8 @@
 
 use std::path::Path;
 
+use lemonfiber_fixtures::ports::STAMPED;
+
 use super::{machine, manifest, plan};
 use crate::app::Ctx;
 
@@ -33,7 +35,7 @@ fn preparing(ctx: &Ctx) -> bool {
 /// Write the project as a change to what is installed does.
 fn rewriting(ctx: &Ctx) -> bool {
     manifest().is_some_and(|manifest| {
-        super::super::rewritten(ctx, &manifest, &[], "plugin tools", "stamp").is_ok()
+        super::super::rewritten(ctx, &manifest, &[], "plugin tools", STAMPED).is_ok()
     })
 }
 

@@ -338,7 +338,7 @@ impl Prompt for Scripted {
 /// What an apply writes with: a real directory, the stack a test names, and a real
 /// machine's randomness — which is what the key the journal's credentials are
 /// sealed under is made from.
-fn applying<'a>(paths: &'a Paths, stamp: Instant) -> Applying<'a> {
+fn applying(paths: &Paths, stamp: Instant) -> Applying<'_> {
     Applying {
         paths,
         source: external(),

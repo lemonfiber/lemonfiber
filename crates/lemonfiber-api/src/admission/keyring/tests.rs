@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime};
 
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Kept, Minter, Purpose, Record, Scope, Secret, Used};
 use lemonfiber_fixtures::ports::Chance;
 
@@ -24,11 +25,11 @@ fn one_key(named: &str, byte: u8, revoked: bool) -> (Keyring, Secret) {
         Scope::Read,
         Purpose::HomeAssistant,
         &secret,
-        "2026-10-05T06:00:00".to_owned(),
+        Instant::from_seconds(1_791_180_000),
         Minter::Operator,
     );
     if revoked {
-        record.revoked = Some("2026-10-05T07:00:00".to_owned());
+        record.revoked = Some(Instant::from_seconds(1_791_183_600));
     }
     let kept = dir.join("keys.json");
     assert!(Kept { keys: vec![record] }.keep(&kept).is_ok());
@@ -80,20 +81,20 @@ async fn a_use_is_written_down_once_a_minute_at_most() {
     let then = SystemTime::UNIX_EPOCH + Duration::from_secs(1_790_000_000);
     keyring.note("home-assistant", then).await;
     let used = keyring.used.as_deref().map(Used::at).unwrap_or_default();
-    let first = used.at.get("home-assistant").cloned();
+    let first = used.at.get("home-assistant").copied();
     assert!(first.is_some());
 
     keyring
         .note("home-assistant", then + Duration::from_secs(30))
         .await;
     let used = keyring.used.as_deref().map(Used::at).unwrap_or_default();
-    assert_eq!(used.at.get("home-assistant").cloned(), first);
+    assert_eq!(used.at.get("home-assistant").copied(), first);
 
     keyring
         .note("home-assistant", then + Duration::from_secs(61))
         .await;
     let used = keyring.used.as_deref().map(Used::at).unwrap_or_default();
-    assert_ne!(used.at.get("home-assistant").cloned(), first);
+    assert_ne!(used.at.get("home-assistant").copied(), first);
 }
 
 #[tokio::test]

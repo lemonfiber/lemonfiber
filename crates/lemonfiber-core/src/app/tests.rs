@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::doctor::Narrowing;
+use crate::instant::Instant;
 
 use super::{
     dispatch, pull_progress, AlertAction, Allowance, Answer as Ruling, Asking, BandwidthAsked,
@@ -82,10 +83,10 @@ fn answering(
 }
 
 /// The media server's record of account `id` being made at `at`.
-fn made(id: &str, at: String) -> Vec<Recorded> {
+fn made(id: &str, at: Instant) -> Vec<Recorded> {
     vec![Recorded {
         member: id.to_owned(),
-        at,
+        at: Some(at),
     }]
 }
 
@@ -96,7 +97,7 @@ fn made_lately(id: &str) -> Vec<Recorded> {
 
 /// What the media server records of account `id` being made long before any window.
 fn made_long_ago(id: &str) -> Vec<Recorded> {
-    made(id, "2000-01-01T00:00:00Z".to_owned())
+    made(id, Instant::from_seconds(946_684_800))
 }
 
 /// A context over the shipped stack with its media server moved into its plugin, the env

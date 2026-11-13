@@ -191,3 +191,23 @@ fn the_shapes_the_services_write_read_as_the_second_they_name() {
         Some(Instant::from_seconds(1_793_042_551))
     );
 }
+
+#[test]
+fn an_instant_is_said_as_the_day_and_time_of_day_it_falls_on_in_utc() {
+    let moment = Instant::from_seconds(1_787_000_649);
+    assert_eq!(
+        moment.day().map(|day| day.to_string()).as_deref(),
+        Some("2026-08-17")
+    );
+    assert_eq!(moment.calendar().as_deref(), Some(STAMPED));
+    assert_eq!(moment.said(), "2026-08-17T21:04:09 UTC");
+    assert_eq!(Instant::EPOCH.said(), "1970-01-01T00:00:00 UTC");
+}
+
+#[test]
+fn an_instant_no_calendar_holds_is_said_as_its_digits() {
+    let beyond = Instant::from_seconds(u64::MAX);
+    assert_eq!(beyond.day(), None);
+    assert_eq!(beyond.calendar(), None);
+    assert_eq!(beyond.said(), u64::MAX.to_string());
+}

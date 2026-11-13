@@ -33,7 +33,7 @@ impl Retention {
     /// were listed in.
     #[must_use]
     pub fn prune(self, mut existing: Vec<Existing>) -> Vec<Existing> {
-        existing.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        existing.sort_by_key(|one| one.created_at);
         let surplus = existing.len().saturating_sub(self.keep);
         existing.truncate(surplus);
         existing

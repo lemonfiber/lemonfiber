@@ -1,3 +1,4 @@
+use crate::instant::Instant;
 use crate::ports::service::{MediaStatus, RequestStatus};
 use std::sync::Arc;
 
@@ -17,7 +18,6 @@ use crate::test_support::curators::curated;
 use crate::test_support::requests as request_service;
 use crate::test_support::{a_context, a_password, json, media, SeedFs};
 use std::collections::BTreeMap;
-use std::time::SystemTime;
 
 /// A request service that answered nothing, which is what these cases are about.
 fn nothing_asked() -> allowance::Asked {
@@ -250,7 +250,7 @@ fn account(name: &str, claimed: bool) -> Member {
             every_library: true,
             ..Access::default()
         },
-        last_seen: claimed.then(|| "2026-08-30T10:00:00Z".to_owned()),
+        last_seen: claimed.then_some(Instant::from_seconds(1_788_084_000)),
     }
 }
 
@@ -327,7 +327,7 @@ const PARTS: [crate::test_support::adapted::Adapted; 4] = [
 /// doing `unrated` with content it has no rating for.
 fn alex(age_limit: Option<u32>, unrated: Unrated) -> Member {
     let mut alex = media::member("a1", "Alex", true);
-    alex.last_seen = Some("2026-08-30T10:00:00Z".to_owned());
+    alex.last_seen = Some(Instant::from_seconds(1_788_084_000));
     alex.access.age_limit = age_limit;
     alex.access.unrated = unrated;
     alex

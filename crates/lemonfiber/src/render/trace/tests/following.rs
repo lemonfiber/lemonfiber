@@ -1,6 +1,7 @@
 //! A trace: its stages, its history and its season coverage.
 
 use super::*;
+use lemonfiber_core::instant::Instant;
 
 #[test]
 fn a_trace_link_names_the_term_the_trace_searches_by() {
@@ -86,18 +87,18 @@ fn a_trace_shows_its_stages_stall_history_and_horizon() {
             TraceStage {
                 stage: Stage::Grabbed,
                 service: "Sonarr".to_owned(),
-                at: Some("2026-01-01".to_owned()),
+                at: Some(Instant::from_seconds(1_767_225_600)),
             },
         ],
         stall: Some("the download client never took it".to_owned()),
         history: vec![
             TraceMoment {
                 outcome: TraceOutcome::Grabbed,
-                at: "2026-01-01".to_owned(),
+                at: Some(Instant::from_seconds(1_767_225_600)),
             },
             TraceMoment {
                 outcome: TraceOutcome::DownloadFailed,
-                at: "2026-01-02".to_owned(),
+                at: Some(Instant::from_seconds(1_767_312_000)),
             },
         ],
         findings: vec!["the queue could not be read".to_owned()],
@@ -119,7 +120,7 @@ fn a_single_clean_grab_does_not_repeat_itself_as_history() {
     let report = TraceReport {
         history: vec![TraceMoment {
             outcome: TraceOutcome::Grabbed,
-            at: "2026-01-01".to_owned(),
+            at: Some(Instant::from_seconds(1_767_225_600)),
         }],
         ..a_trace()
     };

@@ -509,9 +509,7 @@ async fn the_doctor_dates_the_decline_key_from_the_media_server() {
         media::serve("dated"),
         media::answered(&[Dated {
             created: Some("2026-10-05T00:00:00Z".to_owned()),
-            last_used: Some(lemonfiber_core::instant::Instant::from_seconds(
-                1_791_158_430,
-            )),
+            last_used: Some("2026-10-05T00:00:30Z".to_owned()),
         }]),
     )]);
     let ctx = over(

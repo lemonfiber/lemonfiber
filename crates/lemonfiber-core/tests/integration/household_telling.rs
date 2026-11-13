@@ -14,6 +14,7 @@ use lemonfiber_contract::capabilities::request::intake as contract;
 use lemonfiber_core::doctor::narrowing::Narrowing;
 use lemonfiber_core::doctor::telling::TellingCheck;
 use lemonfiber_core::doctor::{examine, Category, Check, Verdict};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::ports::service::{Occasion, Requests, Telling};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_testing::requests::{answered, intake, taken, told, unavailable, REQUESTS};
@@ -89,7 +90,7 @@ async fn a_request_service_that_will_not_answer_is_unverified() {
 async fn a_telling_left_behind_what_lemonfiber_now_sends_warns() {
     let recorded = lemonfiber_core::baseline::Record {
         value: "on:8".to_owned(),
-        at: "2026-08-28T00:00:00Z".to_owned(),
+        at: Instant::from_seconds(1_787_875_200),
         origin: lemonfiber_core::baseline::Origin::Written,
     };
     let check = TellingCheck::new(
@@ -108,7 +109,7 @@ async fn a_telling_left_behind_what_lemonfiber_now_sends_warns() {
 async fn a_setting_the_operator_chose_is_reported_as_theirs() {
     let recorded = lemonfiber_core::baseline::Record {
         value: format!("on:{OCCASIONS}"),
-        at: "2026-08-28T00:00:00Z".to_owned(),
+        at: Instant::from_seconds(1_787_875_200),
         origin: lemonfiber_core::baseline::Origin::Written,
     };
     let check = TellingCheck::new(Some(asking(holding(false, &[]))), Some(recorded));

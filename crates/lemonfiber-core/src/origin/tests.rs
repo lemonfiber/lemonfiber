@@ -1,11 +1,12 @@
 use super::{of_setting, Origin};
 use crate::baseline::{Origin as Recorded, Record};
+use crate::instant::Instant;
 
 /// A record of what lemonfiber last wrote, in the origin named.
 fn recorded(value: &str, origin: Recorded) -> Record {
     Record {
         value: value.to_owned(),
-        at: "0".to_owned(),
+        at: Instant::from_seconds(0),
         origin,
     }
 }

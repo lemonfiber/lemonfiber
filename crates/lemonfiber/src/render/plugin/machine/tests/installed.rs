@@ -1,6 +1,7 @@
 //! What is installed, and what an install and its rehearsal say.
 
 use super::*;
+use lemonfiber_core::instant::Instant;
 
 /// A listing of `installed`, with nothing else on the page.
 pub(super) fn listing(installed: Vec<Installed>) -> Installs {
@@ -376,7 +377,7 @@ fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
 fn the_listing_says_what_each_plugin_is_doing() {
     let mut full = recorded("komga", None);
     full.from = "/srv/plugins/komga".to_owned();
-    full.installed_at = "1709287200".to_owned();
+    full.installed_at = Some(Instant::from_seconds(1_709_287_200));
     full.provides = vec!["media.serve".to_owned()];
     full.contributions = Vec::new();
     full.declared = lemonfiber_core::plugin::Declaration {
@@ -410,14 +411,14 @@ fn the_listing_says_what_each_plugin_is_doing() {
                 capability: "media.serve".to_owned(),
                 operation: "playing".to_owned(),
                 why: "the answer did not read".to_owned(),
-                at: "2026-10-09T20:00:00Z".to_owned(),
+                at: Instant::from_seconds(1_791_576_000),
             },
             lemonfiber_core::plugin::Nonconforming {
                 plugin: "elsewhere".to_owned(),
                 capability: "identity.source".to_owned(),
                 operation: "household".to_owned(),
                 why: "not this plugin's".to_owned(),
-                at: "2026-10-09T20:00:00Z".to_owned(),
+                at: Instant::from_seconds(1_791_576_000),
             },
         ],
         proof: None,
@@ -701,7 +702,7 @@ fn an_answer_kept_against_a_plugin_is_named_with_when_why_and_what_it_stops() {
             capability: "media.serve".to_owned(),
             operation: "holdings".to_owned(),
             why: "the answer did not read".to_owned(),
-            at: "2026-10-23T08:00:00Z".to_owned(),
+            at: Instant::from_seconds(1_792_742_400),
         }],
         proof: None,
         rehearsed: false,

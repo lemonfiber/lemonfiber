@@ -1,6 +1,7 @@
 //! What an install writes to disk, and how every write is journalled.
 
 use super::*;
+use crate::instant::Instant;
 
 /// The install puts the plugin's own wiring where the stack reads it: a
 /// configuration directory for the service, and its entry in the project.
@@ -52,7 +53,7 @@ async fn every_write_is_journalled_under_the_plugin_s_own_name_as_one_run() {
         .iter()
         .all(|change| change.operation == "plugin komga"));
 
-    let stamps: BTreeSet<&str> = changes.iter().map(|change| change.at.as_str()).collect();
+    let stamps: BTreeSet<Instant> = changes.iter().map(|change| change.at).collect();
     assert_eq!(stamps.len(), 1, "one install is one run");
 }
 
@@ -339,7 +340,10 @@ fn a_write_whose_record_cannot_be_written_is_not_made() {
             beneath: stack_of(&ctx),
         },
     }];
-    assert!(super::super::writing::carry_out(&ctx, "komga", "1", &directory).is_err());
+    assert!(
+        super::super::writing::carry_out(&ctx, "komga", Instant::from_seconds(1), &directory)
+            .is_err()
+    );
     assert!(
         !made.exists(),
         "the directory was made with no record of it"
@@ -358,7 +362,7 @@ fn an_adapters_key_is_minted_once_kept_after_and_never_made_up() {
         path: path.clone(),
         lands: Lands::Key,
     }];
-    assert!(super::super::writing::carry_out(&ctx, "plex", "1", &key).is_ok());
+    assert!(super::super::writing::carry_out(&ctx, "plex", Instant::from_seconds(1), &key).is_ok());
     let minted = std::fs::read_to_string(&path).unwrap_or_default();
     assert!(minted.len() > 32, "{minted}");
     #[cfg(unix)]
@@ -371,12 +375,14 @@ fn an_adapters_key_is_minted_once_kept_after_and_never_made_up() {
             "the key is readable beyond its owner"
         );
     }
-    assert!(super::super::writing::carry_out(&ctx, "plex", "2", &key).is_ok());
+    assert!(super::super::writing::carry_out(&ctx, "plex", Instant::from_seconds(2), &key).is_ok());
     assert_eq!(std::fs::read_to_string(&path).ok(), Some(minted));
 
     assert!(std::fs::remove_file(&path).is_ok());
     ctx.seams.random = std::sync::Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None));
-    assert!(super::super::writing::carry_out(&ctx, "plex", "3", &key).is_err());
+    assert!(
+        super::super::writing::carry_out(&ctx, "plex", Instant::from_seconds(3), &key).is_err()
+    );
     assert!(!path.exists());
 }
 
@@ -394,12 +400,15 @@ fn a_secrets_file_is_written_owner_only_and_refused_where_the_store_does_not_rea
             holding: Holding::Store("komga:key".to_owned()),
         }]),
     }];
-    assert!(super::super::writing::carry_out(&ctx, "komga", "1", &planned).is_ok());
+    assert!(
+        super::super::writing::carry_out(&ctx, "komga", Instant::from_seconds(1), &planned).is_ok()
+    );
     assert_eq!(std::fs::read_to_string(&path).ok().as_deref(), Some(""));
 
     assert!(std::fs::remove_file(&path).is_ok());
     assert!(std::fs::write(env.with_file_name("secrets.json"), "{ not json").is_ok());
-    let refused = super::super::writing::carry_out(&ctx, "komga", "2", &planned);
+    let refused =
+        super::super::writing::carry_out(&ctx, "komga", Instant::from_seconds(2), &planned);
     assert!(
         refused
             .as_ref()
@@ -466,7 +475,10 @@ fn a_directory_reached_through_a_link_is_not_made() {
         path: stack.join("mounts").join("komga"),
         lands: Lands::Directory { beneath: stack },
     }];
-    assert!(super::super::writing::carry_out(&ctx, "komga", "1", &directory).is_err());
+    assert!(
+        super::super::writing::carry_out(&ctx, "komga", Instant::from_seconds(1), &directory)
+            .is_err()
+    );
     assert!(!elsewhere.join("komga").exists());
 }
 

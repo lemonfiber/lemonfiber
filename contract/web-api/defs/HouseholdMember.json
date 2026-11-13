@@ -23,11 +23,13 @@
       "type": "boolean"
     },
     "last_seen": {
-      "description": "When the media server last saw them, as it timestamps it. Absent where nobody\nhas ever signed in, which is exactly the unclaimed invitations.",
+      "description": "When the media server last saw them. Absent where nobody has ever signed in,\nwhich is exactly the unclaimed invitations.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "name": {
       "description": "The member, by the name their account is held under.",

@@ -1,18 +1,16 @@
-use std::time::{Duration, SystemTime};
-
 use lemonfiber_fixtures::ports::Chance;
 
 use super::{claim_shaped, Claim, Claimed, Pending, CLAIM_PREFIX};
+use crate::instant::Instant;
 use crate::keys::{shaped, Purpose};
 
-fn at(seconds: u64) -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)
-}
+/// When the claims in these tests lapse: 2026-10-06T00:10:00.
+const LAPSES: Instant = Instant::from_seconds(1_791_245_400);
 
-fn pending(lapses: &str) -> Pending {
+fn pending(lapses: Instant) -> Pending {
     Pending {
         digest: "d".repeat(64),
-        lapses: lapses.to_owned(),
+        lapses,
     }
 }
 
@@ -45,25 +43,19 @@ fn a_claim_and_its_link_are_never_printed() {
         scope: "read".to_owned(),
         purpose: Purpose::HomeAssistant,
         link: "lemonfiber://key?claim=lfc_secretish".to_owned(),
-        lapses: crate::instant::Instant::from_seconds(1_791_245_400),
+        lapses: LAPSES,
     };
     let said = format!("{claimed:?}");
     assert!(!said.contains("lfc_secretish"), "{said}");
-    assert!(said.contains("2026-10-06T00:10:00"), "{said}");
-    let said = format!("{:?}", pending("2026-10-06T00:10:00"));
+    assert!(said.contains("1791245400"), "{said}");
+    let said = format!("{:?}", pending(LAPSES));
     assert!(!said.contains(&"d".repeat(64)), "{said}");
 }
 
 #[test]
 fn a_claim_lapses_at_its_moment_and_not_before() {
-    let lapses = pending("2026-10-06T00:10:00");
-    let moment = 1_791_245_400;
-    assert!(!lapses.lapsed(at(moment - 1)));
-    assert!(lapses.lapsed(at(moment)));
-    assert!(lapses.lapsed(at(moment + 1)));
-}
-
-#[test]
-fn a_lapse_nobody_can_read_has_lapsed() {
-    assert!(pending("soon").lapsed(at(0)));
+    let lapses = pending(LAPSES);
+    assert!(!lapses.lapsed(LAPSES.earlier(1)));
+    assert!(lapses.lapsed(LAPSES));
+    assert!(lapses.lapsed(LAPSES.later(1)));
 }

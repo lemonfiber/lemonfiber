@@ -154,7 +154,7 @@ pub(crate) async fn update(
         would: &would,
         stack,
         source: &crate::plugin::root(path),
-        stamp: stamp,
+        stamp,
         standing: &standing,
         before: &before,
         services: &stack_manifest.services,
