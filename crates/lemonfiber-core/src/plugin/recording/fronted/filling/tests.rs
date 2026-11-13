@@ -116,9 +116,9 @@ fn a_claimed_upstreams_missing_field_is_asked_with_a_credential_minted_for_the_c
             claimed: true,
             ..filler.filling()
         };
-        let filled = filling.filled(&asks).map(|filled| filled.value);
+        let answered = filling.filled(&asks).map(|filled| filled.value);
         let code = if upstream.is_some() { "4XQZ" } else { MINTED };
-        assert_eq!(filled, Ok(json!({"name": MINTED, "code": code})));
+        assert_eq!(answered, Ok(json!({"name": MINTED, "code": code})));
         assert_eq!(filling.made.len(), if upstream.is_some() { 1 } else { 2 });
     }
 }
