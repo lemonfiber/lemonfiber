@@ -1,6 +1,7 @@
 //! One sample of every outcome, so each kind's description can be held against the
 //! document that kind actually writes.
 
+mod authoring;
 mod built;
 mod healing;
 mod installed;
@@ -26,13 +27,14 @@ use installed::what_is_installed;
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
 ///
-/// Gathered from five lists, one for each part of what the product does.
+/// Gathered from six lists, one for each part of what the product does.
 pub(crate) fn samples() -> Vec<Outcome> {
     let mut every = running();
     every.extend(diagnosing());
     every.extend(serving());
     every.extend(keeping());
     every.extend(notifying::samples());
+    every.extend(authoring::samples());
     every
 }
 

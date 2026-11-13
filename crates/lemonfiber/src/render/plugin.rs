@@ -28,10 +28,7 @@ pub(crate) mod conformance;
 mod machine;
 pub(crate) mod recording;
 
-pub(crate) use conformance::conformed;
-
 pub(crate) use machine::installs;
-pub(crate) use recording::recorded;
 
 use super::Lines;
 

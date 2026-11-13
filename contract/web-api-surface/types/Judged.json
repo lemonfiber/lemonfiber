@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "case": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "contract": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "recording": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "verdict": {
+      "type": [
+        "ref:Verdict"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

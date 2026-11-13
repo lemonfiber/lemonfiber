@@ -47,11 +47,11 @@ pub(crate) async fn answered(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Pro
     match asked {
         Asked::Claims { path } => crate::plugin::claimed(&path)
             .map(Outcome::PluginClaims)
-            .map_err(unreadable),
+            .map_err(|why| unreadable(&why)),
         Asked::Conform { path } => crate::plugin::conformed(&path)
             .await
             .map(Outcome::PluginConformance)
-            .map_err(unreadable),
+            .map_err(|why| unreadable(&why)),
         Asked::Provenance { path, keys } => vouched(ctx, &path, &keys).await,
         Asked::Record { path, taking } => recorded(ctx, &path, &taking).await,
     }
@@ -59,7 +59,7 @@ pub(crate) async fn answered(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Pro
 
 /// What anybody has said about the images the plugin at `path` pins.
 async fn vouched(ctx: &Ctx, path: &Path, keys: &[PathBuf]) -> Result<Outcome, Box<Problem>> {
-    let manifest = crate::plugin::read(path).map_err(unreadable)?;
+    let manifest = crate::plugin::read(path).map_err(|why| unreadable(&why))?;
     let held = held_keys(ctx, keys).await?;
     let read = crate::plugin::vouched(&manifest, &held, ctx.seams.registry.as_ref()).await;
     Ok(Outcome::PluginProvenance(read))
@@ -80,12 +80,12 @@ async fn recorded(ctx: &Ctx, path: &Path, taking: &Retaking) -> Result<Outcome, 
     crate::plugin::record(path, recorder)
         .await
         .map(Outcome::PluginRecording)
-        .map_err(unreadable)
+        .map_err(|why| unreadable(&why))
 }
 
 /// Nothing at the path the author named is a plugin this build can read.
-fn unreadable(why: crate::plugin::Unreadable) -> Box<Problem> {
-    Box::new(super::plugins::unreadable_source(&why))
+fn unreadable(why: &crate::plugin::Unreadable) -> Box<Problem> {
+    Box::new(super::plugins::unreadable_source(why))
 }
 
 /// The keys an author named, read from the paths they gave.

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "location": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "message": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

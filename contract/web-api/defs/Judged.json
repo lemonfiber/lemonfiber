@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One case, as its recording answered it.",
+  "type": "object",
+  "properties": {
+    "case": {
+      "description": "The case.",
+      "type": "string"
+    },
+    "contract": {
+      "description": "The contract it is a case of, as `capability@major`.",
+      "type": "string"
+    },
+    "recording": {
+      "description": "Where its recording is, beneath the plugin's source.",
+      "type": "string"
+    },
+    "verdict": {
+      "description": "What it came to.",
+      "$ref": "Verdict.json"
+    }
+  },
+  "required": [
+    "contract",
+    "case",
+    "recording",
+    "verdict"
+  ]
+}

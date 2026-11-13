@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One probe a claim binds, and what running it against its recording came to.",
+  "type": "object",
+  "properties": {
+    "probe": {
+      "description": "The probe the vocabulary declares, by name.",
+      "type": "string"
+    },
+    "verdict": {
+      "description": "What the recording said about it.",
+      "$ref": "PluginVerdict.json"
+    }
+  },
+  "required": [
+    "probe",
+    "verdict"
+  ]
+}

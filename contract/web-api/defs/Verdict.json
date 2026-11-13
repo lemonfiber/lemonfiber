@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one case's recording came to.",
+  "oneOf": [
+    {
+      "description": "The recorded answer is one the contract declares for the case.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "passed"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "It is not, in every way it is not.",
+      "type": "object",
+      "properties": {
+        "faults": {
+          "description": "Every way the recorded answer is outside the case.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcome": {
+          "type": "string",
+          "const": "failed"
+        }
+      },
+      "required": [
+        "outcome",
+        "faults"
+      ]
+    },
+    {
+      "description": "No recording of the case is there.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unrecorded"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "A recording is there and could not be judged, so it established nothing.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unproven"
+        },
+        "why": {
+          "description": "What stopped it being judged.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "why"
+      ]
+    }
+  ]
+}

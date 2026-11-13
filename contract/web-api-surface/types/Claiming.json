@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "filling": {
+      "type": [
+        "anyOf(null,ref:Filling)"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "own": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "probes": {
+      "type": [
+        "array[ref:ProbeRan]"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "shown": {
+      "type": [
+        "ref:Shown"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

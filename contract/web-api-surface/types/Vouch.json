@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "digest": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "image": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "provenance": {
+      "type": [
+        "const:\"refused\"",
+        "const:\"signed\"",
+        "const:\"unproven\""
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"refused\"",
+    "\"signed\"",
+    "\"unproven\""
+  ]
+}
