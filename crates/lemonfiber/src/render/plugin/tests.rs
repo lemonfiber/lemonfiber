@@ -1,4 +1,4 @@
-use super::{capabilities, claimed, claims, document, points};
+use super::{capabilities, claims, document, points};
 
 use lemonfiber_core::filling::{Filling, Shown};
 use lemonfiber_core::plugin::{
@@ -303,23 +303,28 @@ fn a_name_nothing_publishes_is_not_reported_as_the_plugins_own() {
     assert!(text.contains("would not be installed"), "{text}");
 }
 
-/// The two forms are two renderings of one answer, and the machine-readable one is
-/// the report itself rather than a shape written beside it.
+/// The machine-readable form is the report itself, in an envelope that names its kind
+/// and the version of the interface it is written under.
 #[test]
-fn the_machine_readable_form_is_the_same_answer_as_the_page() {
+fn the_machine_readable_form_is_the_report_in_an_envelope() {
     let read = read(
         vec![claiming("kavita:opds", Shown::Claimed, None)],
         Vec::new(),
     );
-    let document = claimed(&read, true)
-        .map(|lines| lines.text())
-        .unwrap_or_default();
-    assert!(document.contains(r#""installable": true"#), "{document}");
-    assert!(document.contains(r#""name": "kavita:opds""#), "{document}");
-    let page = claimed(&read, false)
-        .map(|lines| lines.text())
-        .unwrap_or_default();
-    assert_eq!(page, claims(&read).text());
+    let document = crate::render::answer(
+        &lemonfiber_core::app::Outcome::PluginClaims(read.clone()),
+        true,
+    )
+    .text();
+    assert!(document.contains(r#""kind":"plugin-claims""#), "{document}");
+    assert!(document.contains(r#""api_version""#), "{document}");
+    assert!(document.contains(r#""installable":true"#), "{document}");
+    let page = crate::render::answer(
+        &lemonfiber_core::app::Outcome::PluginClaims(read.clone()),
+        false,
+    )
+    .text();
+    assert!(page.starts_with(&claims(&read).text()), "{page}");
 }
 
 /// What a probe came to is said in its own words, whichever of the three it was —
@@ -625,15 +630,15 @@ fn a_read_over_no_image_says_it_asked_about_nothing() {
 }
 
 #[test]
-fn what_was_vouched_for_is_carried_as_json_where_a_script_asked() {
+fn what_was_vouched_for_is_carried_in_an_envelope_where_a_script_asked() {
     let read = Vouched {
         id: "komga".to_owned(),
         images: Vec::new(),
         installable: false,
     };
-    let json = super::vouched(&read, true)
-        .map(|lines| lines.text())
-        .unwrap_or_default();
-    assert!(json.contains(r#""id": "komga""#), "{json}");
-    assert!(json.contains(r#""installable": false"#), "{json}");
+    let json =
+        crate::render::answer(&lemonfiber_core::app::Outcome::PluginProvenance(read), true).text();
+    assert!(json.contains(r#""kind":"plugin-provenance""#), "{json}");
+    assert!(json.contains(r#""id":"komga""#), "{json}");
+    assert!(json.contains(r#""installable":false"#), "{json}");
 }

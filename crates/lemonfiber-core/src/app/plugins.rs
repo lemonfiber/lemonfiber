@@ -112,10 +112,9 @@ pub use refusals::REFUSALS;
 /// is: the shape of what may be asked and the code that answers it move together,
 /// and a word added to one without the other does not compile.
 ///
-/// Apart from the five documents a plugin *author* reads, which are generated at
-/// build time and answer the same on a machine with nothing installed as on one
-/// running everything — so nothing dispatches them and nothing needs a stack. These
-/// are about one operator's machine, so they arrive the way every other verb does.
+/// Apart from what a plugin *author* asks of a plugin's own source, which is
+/// [`super::authoring::Asked`] and needs no stack. These are about one operator's
+/// machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Asked {
     /// Install the plugin at this source, and record what that decided.
@@ -456,7 +455,7 @@ pub(crate) fn kept_at(ctx: &Ctx) -> Option<PathBuf> {
 }
 
 /// Nothing at the path the operator named is a plugin this build can read.
-fn unreadable_source(why: &crate::plugin::Unreadable) -> Problem {
+pub(crate) fn unreadable_source(why: &crate::plugin::Unreadable) -> Problem {
     Problem::new(
         UNREADABLE,
         "That is not a plugin lemonfiber can read",

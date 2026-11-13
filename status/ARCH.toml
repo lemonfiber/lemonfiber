@@ -8,7 +8,7 @@ requirement = [
   { id = "ARCH-R4", state = "done", evidence = ["crates/lemonfiber-manifest/src/binary.rs", "crates/lemonfiber-core/src/stack.rs"] },
   { id = "ARCH-R5", state = "done", evidence = ["crates/lemonfiber-manifest/src/binary.rs", "crates/lemonfiber-core/src/stack.rs"] },
   { id = "ARCH-R6", state = "done", evidence = ["crates/lemonfiber/build.rs"] },
-  { id = "ARCH-R9", state = "partial", evidence = ["crates/lemonfiber/src/render/plugin.rs", "crates/lemonfiber-core/src/model.rs", "contract/web-api-surface/index.json", "crates/lemonfiber-api/src/contract/stability.rs"] },
+  { id = "ARCH-R9", state = "done", evidence = ["crates/lemonfiber-core/src/app/authoring.rs", "crates/lemonfiber-core/src/app/authoring/tests.rs::a_plugin_nothing_refuses_answers_under_its_claims_kind_and_is_installable", "crates/lemonfiber/src/render/plugin/tests.rs::the_machine_readable_form_is_the_report_in_an_envelope", "crates/lemonfiber/src/render/plugin/tests.rs::what_was_vouched_for_is_carried_in_an_envelope_where_a_script_asked", "crates/lemonfiber-core/src/model.rs", "contract/web-api/kinds/plugin-claims.json", "contract/web-api-surface/index.json", "crates/lemonfiber-api/src/contract/stability.rs"] },
   { id = "ARCH-R10", state = "done", evidence = ["crates/lemonfiber-core/src/config/store.rs"], landed = "da104f4ced69" },
   { id = "ARCH-R11", state = "done", evidence = ["crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/app/engine.rs"] },
   { id = "ARCH-R12", state = "done", evidence = ["crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/app/engine.rs"] },

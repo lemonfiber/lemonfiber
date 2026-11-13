@@ -13,9 +13,9 @@
 use crate::model::kind::{self, Kind};
 
 use super::command::{Asking, Keeping, Linking, MigrateAction, Queueing, Settling, Wishing};
-use super::plugins;
 use super::rehearsal;
 use super::Command;
+use super::{authoring, plugins};
 
 /// The kinds `command`'s answer is written under.
 ///
@@ -65,6 +65,10 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::History => &[kind::HISTORY],
         Command::SelfUpdate { .. } => &[kind::SELF_UPDATE],
         Command::Plugins(plugins::Asked::Installed) => &[kind::PLUGINS],
+        Command::Authoring(authoring::Asked::Claims { .. }) => &[kind::PLUGIN_CLAIMS],
+        Command::Authoring(authoring::Asked::Conform { .. }) => &[kind::PLUGIN_CONFORMANCE],
+        Command::Authoring(authoring::Asked::Provenance { .. }) => &[kind::PLUGIN_PROVENANCE],
+        Command::Authoring(authoring::Asked::Record { .. }) => &[kind::PLUGIN_RECORDING],
         Command::Wiring(Linking::Read) => &[kind::WIRING],
         Command::Settings(Settling::Read) => &[kind::SETTINGS],
         Command::Playing { .. } => &[kind::PLAYING],

@@ -18,7 +18,9 @@ pub const RECORDINGS: &str = "conformance";
 pub const ASKED_WITH: &str = "POST";
 
 /// What one case's recording came to.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(tag = "outcome", rename_all = "kebab-case")]
 pub enum Verdict {
     /// The recorded answer is one the contract declares for the case.
@@ -38,7 +40,7 @@ pub enum Verdict {
 }
 
 /// One case, as its recording answered it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Judged {
     /// The contract it is a case of, as `capability@major`.
     pub contract: String,

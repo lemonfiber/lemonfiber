@@ -16,7 +16,7 @@ use reqwest::Url;
 
 use lemonfiber_error::withheld::without_credentials;
 use lemonfiber_error::withheld::REDACTED;
-use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
+use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Sessions, Unreachable};
 
 /// How long to wait for a service to accept a connection before treating it as
 /// not answering. One that is up answers a local connection at once; the wait is
@@ -107,6 +107,16 @@ impl Web {
     pub const fn limited(mut self, bytes: usize) -> Self {
         self.limit = bytes;
         self
+    }
+}
+
+/// A new client for each session, keeping no cookie another one set.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Fresh;
+
+impl Sessions for Fresh {
+    fn opened(&self) -> Arc<dyn Http> {
+        Arc::new(Web::new())
     }
 }
 
