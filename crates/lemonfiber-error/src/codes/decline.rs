@@ -11,5 +11,6 @@ codes! {
             last recorded something, if it ever did.",
         remedy: "If nobody declined an invitation or had one run out then, rotate the key with \
             lemonfiber credentials rotate, and check what the decline service is running.",
+        household: fault,
     }
 }

@@ -53,7 +53,10 @@ fn a_located_title_says_where_it_plays_and_what_the_door_presents() {
 #[test]
 fn an_unlocated_title_says_why() {
     let text = title(&a_title(Located {
-        unlocated: Some("no address".to_owned()),
+        unlocated: Some(lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "no address",
+        )),
         ..Located::default()
     }))
     .text();
@@ -161,7 +164,10 @@ fn a_series_lists_its_seasons_and_numbered_episodes() {
 fn what_could_not_be_read_part_way_is_said() {
     let report = PartWayReport {
         member: "ana".to_owned(),
-        findings: vec!["unread".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "unread",
+        )],
         ..PartWayReport::default()
     };
     let text = part_way(&report).text();

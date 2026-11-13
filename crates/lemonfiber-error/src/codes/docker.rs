@@ -9,6 +9,7 @@ codes! {
             changed while it is down.",
         remedy: "Start Docker Desktop, or the docker service on Linux. This is the first thing \
             to fix.",
+        household: fault,
     }
     /// Raised when a container that should exist does not.
     NO_SUCH_CONTAINER = "DOCKER-2" {
@@ -18,6 +19,7 @@ codes! {
         meaning: "A container that should be up is not. It may have stopped on its own, or never \
             been started.",
         remedy: "Start the form that includes it. lemonfiber ps shows what is running.",
+        household: fault,
     }
     /// Raised when the host an endpoint names cannot be found on the network.
     HOST_UNRESOLVED = "DOCKER-3" {
@@ -29,6 +31,7 @@ codes! {
             may be running perfectly on a machine this one cannot name.",
         remedy: "Check the host name, and that this machine can resolve it. Trying the host's \
             address in place of its name tells the two apart.",
+        household: fault,
     }
     /// Raised when the host is found and refuses the connection.
     HOST_REFUSED = "DOCKER-4" {
@@ -39,6 +42,7 @@ codes! {
             about the endpoint is not: either Docker is not running over there, or it is not \
             listening where the endpoint says.",
         remedy: "Check Docker is running on that machine, and on the port the endpoint names.",
+        household: fault,
     }
     /// Raised when the host is reached and will not accept the SSH login.
     LOGIN_REJECTED = "DOCKER-5" {
@@ -49,6 +53,7 @@ codes! {
             and accounts rather than about Docker — lemonfiber uses the SSH configuration you \
             already have and makes no keys of its own.",
         remedy: "Connect to the host with ssh and read what it says, then try again.",
+        household: fault,
     }
     /// Raised when an endpoint names a transport this build cannot drive.
     ENDPOINT_UNSUPPORTED = "DOCKER-6" {
@@ -59,6 +64,7 @@ codes! {
             nothing was changed, because reading one machine while writing to another is worse \
             than reaching neither.",
         remedy: "Point DOCKER_HOST at an ssh:// or tcp:// endpoint, or at a local socket.",
+        household: fault,
     }
     /// Raised when a named Docker context is not one this machine records.
     UNKNOWN_CONTEXT = "DOCKER-7" {
@@ -70,6 +76,7 @@ codes! {
             daemon would answer about this machine while you were asking about another.",
         remedy: "List the contexts this machine has with docker context ls, and name one of \
             those.",
+        household: fault,
     }
     /// Raised when a remote host does not answer for a reason nothing here recognises.
     HOST_SILENT = "DOCKER-8" {
@@ -79,5 +86,6 @@ codes! {
         meaning: "A remote host did not answer, for a reason nothing here recognises. What the \
             transport said is quoted beside it; it names that machine rather than this one.",
         remedy: "Read what the transport said. It is the most specific thing known about this.",
+        household: fault,
     }
 }

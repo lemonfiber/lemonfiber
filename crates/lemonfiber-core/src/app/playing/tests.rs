@@ -130,11 +130,21 @@ fn a_name_names_them_however_it_was_typed() {
 
 #[test]
 fn a_reading_that_could_not_be_made_says_so_rather_than_reading_as_nobody_watching() {
-    let report = unread(None, "the server would not say");
+    let report = unread(
+        None,
+        crate::error::codes::play::SERVER_SILENT,
+        "the server would not say",
+    );
     assert!(!report.available);
     assert!(report.sessions.is_empty());
     assert_eq!(report.member, "");
-    assert_eq!(report.findings, vec!["the server would not say".to_owned()]);
+    assert_eq!(
+        report.findings,
+        vec![crate::error::household::Obstacle::new(
+            crate::error::codes::play::SERVER_SILENT,
+            "the server would not say"
+        )]
+    );
 }
 
 /// Naming nobody is the whole house: every session playing something.
@@ -213,7 +223,7 @@ async fn nobody_of_that_name_is_unread_rather_than_everybody() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("nobody in this household")),
+            .any(|finding| finding.said.contains("nobody in this household")),
         "{report:?}"
     );
 }
@@ -238,7 +248,7 @@ async fn a_household_the_server_will_not_name_leaves_it_unread() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("who holds an account")),
+            .any(|finding| finding.said.contains("who holds an account")),
         "{report:?}"
     );
 }
@@ -259,10 +269,9 @@ async fn sessions_the_server_will_not_list_are_unread_and_still_say_whose() {
     assert!(!report.available, "{report:?}");
     assert_eq!(report.member, "Ada");
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.contains("unread rather than as nobody watching")),
+        report.findings.iter().any(|finding| finding
+            .said
+            .contains("unread rather than as nobody watching")),
         "{report:?}"
     );
 }
@@ -279,7 +288,7 @@ async fn no_media_server_to_ask_is_unread() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("no media server to ask")),
+            .any(|finding| finding.said.contains("no media server to ask")),
         "{report:?}"
     );
 }

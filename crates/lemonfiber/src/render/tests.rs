@@ -304,6 +304,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             members: Vec::new(),
             available: true,
             findings: Vec::new(),
+            noted: Vec::new(),
             filtering: None,
             policy: None,
             allows: None,

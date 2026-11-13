@@ -77,7 +77,7 @@ async fn a_full_disk_stops_the_household_asking_and_writes_down_what_it_took() {
         report
             .findings
             .iter()
-            .all(|said| !said.contains("would not stop")),
+            .all(|said| !said.said.contains("would not stop")),
         "{report:?}"
     );
     assert_eq!(
@@ -130,7 +130,7 @@ async fn a_service_that_will_not_stop_the_asking_says_so() {
         report
             .findings
             .iter()
-            .any(|said| said.contains("would not stop the household asking")),
+            .any(|said| said.said.contains("would not stop the household asking")),
         "{report:?}"
     );
     assert!(
@@ -174,7 +174,7 @@ async fn a_service_that_will_not_give_it_back_keeps_the_record() {
         report
             .findings
             .iter()
-            .any(|said| said.contains("give the household back")),
+            .any(|said| said.said.contains("give the household back")),
         "{report:?}"
     );
     let kept = std::fs::read_to_string(record_of(&context)).unwrap_or_default();
@@ -201,7 +201,7 @@ async fn a_record_that_cannot_be_written_is_said_out_loud() {
         report
             .findings
             .iter()
-            .any(|said| said.contains("could not be written down")),
+            .any(|said| said.said.contains("could not be written down")),
         "{report:?}"
     );
 }

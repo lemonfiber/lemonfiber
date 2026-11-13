@@ -18,5 +18,6 @@ codes! {
             with the stack.",
         remedy: "Ask about one of the words its reports use. The message lists every word it \
             knows.",
+        household: fault,
     }
 }

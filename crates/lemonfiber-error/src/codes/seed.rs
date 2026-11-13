@@ -7,6 +7,7 @@ codes! {
         meaning: "A service was not answering yet, so it was skipped. Nothing was changed for \
             it.",
         remedy: "Wait for it to finish starting, then run lemonfiber seed again.",
+        household: fault,
     }
     /// Raised when a service rejects the credential lemonfiber holds.
     SERVICE_UNAUTHORISED = "SEED-2" {
@@ -17,6 +18,7 @@ codes! {
             changed in the service's own interface.",
         remedy: "Have lemonfiber re-read the service's credential with lemonfiber doctor \
             --fix.",
+        household: fault,
     }
     /// Raised when a service answers with something unusable.
     SERVICE_REFUSED = "SEED-3" {
@@ -28,6 +30,7 @@ codes! {
         remedy: "Nothing is known to fix this. Send a [support \
             bundle](https://docs.lemonfiber.app/fixing/the-support-bundle/); the service's own \
             words are attached to the message.",
+        household: fault,
     }
     /// Raised when a service answers that it does not offer what was asked.
     SERVICE_UNSUPPORTED = "SEED-4" {
@@ -38,6 +41,7 @@ codes! {
             this build does not, or cannot do this at all. Nothing was changed for it.",
         remedy: "Where the service's release is the cause, match it to the version lemonfiber \
             supports or update lemonfiber, then run lemonfiber seed again.",
+        household: fault,
     }
     /// Raised when a service refuses what was asked because it never does what was asked.
     SERVICE_DISALLOWED = "SEED-5" {
@@ -47,5 +51,6 @@ codes! {
         meaning: "A service answered that what was asked is something it never does, so \
             asking again would be refused the same way. Nothing failed on its side.",
         remedy: "Ask it for something it does.",
+        household: fault,
     }
 }

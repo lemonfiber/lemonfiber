@@ -71,9 +71,9 @@ pub struct PlayingReport {
     /// collapsing them would report a quiet house on the day the media server was down.
     /// Anything that could not be read is said in `findings` and this goes false.
     pub available: bool,
-    /// What is worth saying about this reading, in the words its reader would use.
+    /// What stood in the way of this reading, each by the code that names it.
     ///
     /// Always written, empty or not, so a reader never has to guess what an absent
     /// field means.
-    pub findings: Vec<String>,
+    pub findings: Vec<crate::error::household::Obstacle>,
 }

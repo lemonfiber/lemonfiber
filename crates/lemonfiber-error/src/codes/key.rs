@@ -8,6 +8,7 @@ codes! {
             the journal, so it is lower-case letters, digits, dots, dashes and underscores, \
             beginning with a letter or a digit, and at most 64 characters.",
         remedy: "Name it as the program that holds it, as in home-assistant.",
+        household: fault,
     }
     /// Raised when a key is asked for with a scope that is none of the three.
     NOT_A_SCOPE = "KEY-2" {
@@ -17,6 +18,7 @@ codes! {
         meaning: "That is not a scope a key can have. A key has exactly one scope, and it \
             decides everything the key admits.",
         remedy: "Give it one of read, act or member:<account>.",
+        household: fault,
     }
     /// Raised when a key is asked for with a purpose that is none of the three.
     NOT_A_PURPOSE = "KEY-3" {
@@ -26,6 +28,7 @@ codes! {
         meaning: "That is not a purpose a key can carry. A key says what it is for, so the \
             listing can tell keys apart.",
         remedy: "Give it one of home-assistant, mcp or other.",
+        household: fault,
     }
     /// Raised when the record of keys is there and does not read as keys.
     UNREADABLE = "KEY-4" {
@@ -36,6 +39,7 @@ codes! {
             is written over it, because it may still hold keys somebody depends on, and every \
             key it held is refused until it reads again. The message names the file.",
         remedy: "Look at the file, and move it aside if it is damaged.",
+        household: fault,
     }
     /// Raised when a key is asked for under a name another key holds.
     NAME_TAKEN = "KEY-5" {
@@ -45,6 +49,7 @@ codes! {
         meaning: "A key by that name already exists, active or revoked. A name identifies one \
             key for good, so an alert or a journal entry naming it always means the same key.",
         remedy: "Mint it under another name.",
+        household: fault,
     }
     /// Raised when a member's key names an account the household does not hold.
     NO_SUCH_MEMBER = "KEY-6" {
@@ -54,6 +59,7 @@ codes! {
         meaning: "Nobody in the household goes by that name. A member's key admits exactly what \
             that member's own account does, so it is minted for an account the household holds.",
         remedy: "Name them as they appear in the household, as lemonfiber household lists it.",
+        household: fault,
     }
     /// Raised when the household could not be asked about a member's account.
     UNASKED = "KEY-7" {
@@ -64,6 +70,7 @@ codes! {
             did not answer, so nothing was minted. A member's key is minted for an account the \
             media server holds.",
         remedy: "Try again once the media server is running.",
+        household: fault,
     }
     /// Raised when a household member asks for a key, or a revoke, that is not theirs
     /// alone.
@@ -75,6 +82,7 @@ codes! {
             admits what their own account does and nothing more, so the only key a member may \
             mint or revoke is one scoped to themselves.",
         remedy: "Ask for member:<your own account>, or ask whoever looks after this machine.",
+        household: fault,
     }
     /// Raised when this machine would not supply the bytes a secret is made of.
     NO_SECRET = "KEY-9" {
@@ -86,6 +94,7 @@ codes! {
             was minted.",
         remedy: "Try again. If it happens twice, the operating system's own random source is at \
             fault.",
+        household: fault,
     }
     /// Raised when no active key holds the name a revoke gave.
     NO_SUCH_KEY = "KEY-10" {
@@ -95,6 +104,7 @@ codes! {
         meaning: "There is no active key by that name: none was minted under it, or it was \
             revoked already, and the message says when.",
         remedy: "List the keys with lemonfiber key list, and revoke one by the name it shows.",
+        household: fault,
     }
     /// Raised when a household member asks to mint a key and the operator has not
     /// allowed members to.
@@ -108,6 +118,7 @@ codes! {
             allows first.",
         remedy: "Ask whoever looks after this machine to allow it, with lemonfiber config set \
             LEMONFIBER_MEMBER_KEYS on.",
+        household: fault,
     }
     /// Raised when a key is asked to be collected with a claim that collects nothing.
     CLAIM_NOT_OPEN = "KEY-12" {
@@ -119,6 +130,7 @@ codes! {
             learns nothing.",
         remedy: "Ask whoever looks after this machine to mint the key as a claim again, and \
             collect it within ten minutes.",
+        household: fault,
     }
     /// Raised when a key is asked to be minted as a claim and no address another machine
     /// reaches can go in its link.
@@ -131,5 +143,6 @@ codes! {
             so there is no link to write. Nothing was minted.",
         remedy: "Serve the stack encrypted on the network first, then mint the key as a claim \
             again.",
+        household: fault,
     }
 }

@@ -20,6 +20,7 @@ use lemonfiber_core::app::{Command, Ctx};
 use tokio::sync::Mutex;
 
 use super::{enveloped, rendered};
+use crate::spoken::Audience;
 
 /// How long a member's household read is handed back before it is read again.
 ///
@@ -56,7 +57,7 @@ impl Kept {
         if let Some(answer) = held.get(member) {
             return enveloped(answer.status, answer.body.clone());
         }
-        let (status, body) = rendered(ctx, command).await;
+        let (status, body) = rendered(ctx, command, Audience::Household).await;
         if let Some(until) = now.checked_add(KEPT_FOR) {
             held.insert(
                 member.to_owned(),

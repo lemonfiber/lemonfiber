@@ -9,6 +9,7 @@ codes! {
             affected; new acquisitions will simply fill the disk quickly.",
         remedy: "Free space, move the data location to a larger volume, or choose a lighter \
             preset for the media that does not need it.",
+        household: fault,
     }
     /// Raised when releases exist but the profile — the chosen quality included — wants
     /// none of them.
@@ -20,6 +21,7 @@ codes! {
             The indexer is working; the preset is stricter than what can be found.",
         remedy: "Choose a less demanding preset for that media, or wait for a matching release. \
             The content stays wanted either way.",
+        household: fault,
     }
     /// Raised when a clean search turns up nothing at all for wanted content.
     NONE_AVAILABLE = "QUAL-3" {
@@ -30,6 +32,7 @@ codes! {
             answered — this is not an indexer failure — there is simply nothing to grab yet.",
         remedy: "Check the indexer carries this content, or wait. No action is needed if it is \
             merely not out yet.",
+        household: fault,
     }
     /// Raised where a quality sync speaking its contract would not show or put back the
     /// preset over a hand edit.
@@ -40,5 +43,6 @@ codes! {
         meaning: "The quality sync did not show or put back the preset over the hand-edited \
             configuration, so the edit stands as it was.",
         remedy: "Check the quality sync is running with lemonfiber status, then ask again.",
+        household: fault,
     }
 }

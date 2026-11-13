@@ -55,7 +55,10 @@ fn an_empty_shelf_and_an_unread_one_do_not_read_alike() {
 
     let unread = shown(&HeldReport {
         member: "Ada".to_owned(),
-        findings: vec!["the media server would not say".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "the media server would not say",
+        )],
         ..HeldReport::default()
     });
     assert!(

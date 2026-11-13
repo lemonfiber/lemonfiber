@@ -8,6 +8,7 @@ codes! {
             Nothing was changed.",
         remedy: "List the services with lemonfiber catalogue, then see what is wired with \
             lemonfiber wiring.",
+        household: fault,
     }
     /// The service named cannot do the thing it was asked to fill.
     CANNOT_FILL = "WIRE-2" {
@@ -20,6 +21,7 @@ codes! {
             changed and nothing needed to be.",
         remedy: "See which services declare it with lemonfiber plugin capabilities, and what \
             is wired now with lemonfiber wiring.",
+        household: fault,
     }
     /// Nothing in this stack asks for the capability, so a choice would change nothing.
     NOTHING_ASKS = "WIRE-3" {
@@ -29,6 +31,7 @@ codes! {
         meaning: "Nothing in this stack asks for that capability, so choosing who fills it would \
             record a setting no wiring reads. Nothing was changed.",
         remedy: "See what the stack does ask for with lemonfiber wiring.",
+        household: fault,
     }
     /// The setting recording the choice could not be written.
     CHOICE_UNWRITABLE = "WIRE-4" {
@@ -38,6 +41,7 @@ codes! {
         meaning: "Which service fills a capability is a setting, and there is no settings file \
             to record it in. Nothing was changed.",
         remedy: "Set this machine up first, with lemonfiber setup.",
+        household: fault,
     }
     /// Raised when a choice answers an offer that was read against a wiring that has
     /// since moved.
@@ -50,6 +54,7 @@ codes! {
             agreeing to something nobody saw, so nothing was changed; the message names what \
             moved.",
         remedy: "Read the choice again, and answer the name it prints.",
+        household: fault,
     }
     /// Raised when the reason given for a choice is longer than a reason may be, or
     /// holds a line break or another control character.
@@ -61,6 +66,7 @@ codes! {
             on one line beside the choice it explains, so it may be at most 280 characters and \
             hold no line break or other control character. Nothing was changed.",
         remedy: "Say why in one shorter line, or make the choice with no reason.",
+        household: fault,
     }
     /// Raised where the service chosen already fills the capability, so there is nothing
     /// to change.
@@ -71,5 +77,6 @@ codes! {
         meaning: "The service asked for already fills the capability, so nothing was changed, \
             and nothing needed to be.",
         remedy: "Nothing to do. lemonfiber wiring lists what fills each capability.",
+        household: fault,
     }
 }

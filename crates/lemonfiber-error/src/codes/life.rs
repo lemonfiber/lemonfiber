@@ -9,6 +9,7 @@ codes! {
             finish starting.",
         remedy: "Look at what the service said, then start it again: lemonfiber logs \
             <service>.",
+        household: fault,
     }
     /// Raised when stopping would take a service out from under a form still running.
     STILL_NEEDED = "LIFE-2" {
@@ -19,6 +20,7 @@ codes! {
             running. Nothing was stopped.",
         remedy: "Stop both if neither is wanted, or leave both up. A service two forms reach \
             belongs to whichever you are using.",
+        household: fault,
     }
     /// Another run is already working on this stack.
     ALREADY_WORKING = "LIFE-3" {
@@ -30,6 +32,7 @@ codes! {
             stack in a state neither asked for.",
         remedy: "Wait for the other run to finish, then run this again. If you are sure that run \
             is gone, --force takes the stack from it.",
+        household: fault,
     }
     /// Fetching images is switched off, so there was nothing to fetch with.
     REGISTRY_REFUSED = "LIFE-4" {
@@ -42,6 +45,7 @@ codes! {
             start.",
         remedy: "Turn fetching back on with lemonfiber config set LEMONFIBER_REACH_REGISTRY \
             on, then run this again.",
+        household: fault,
     }
     /// Raised when a start was asked for over a data location that is not there.
     NO_DATA_LOCATION = "LIFE-5" {
@@ -54,6 +58,7 @@ codes! {
             files a second library into it while the real one is offline.",
         remedy: "Connect the drive or mount holding the data location, then start again. If it \
             has moved for good, run setup and choose where it is now.",
+        household: fault,
     }
     /// Raised when the stack's own location is not on the machine being operated.
     ABSENT_THERE = "LIFE-6" {
@@ -66,6 +71,7 @@ codes! {
             services would have come up with nothing in them.",
         remedy: "Make the location on that machine, or point lemonfiber at one that is there: \
             lemonfiber config set DATA_ROOT <path on that machine>.",
+        household: fault,
     }
     /// Raised when a path the stack mounts is not at the same path on the machine
     /// under the container lemonfiber runs in.
@@ -80,6 +86,7 @@ codes! {
             message names both paths.",
         remedy: "Mount the directory at the same path inside the container as on the machine, \
             and point lemonfiber at that path.",
+        household: fault,
     }
     /// Raised when lemonfiber runs in a container that cannot reach the engine.
     NO_ENGINE_IN_HERE = "LIFE-8" {
@@ -91,6 +98,7 @@ codes! {
             /var/run/docker.sock, and nothing answered there. Nothing was started.",
         remedy: "Mount the host's Docker socket into the container at /var/run/docker.sock, as \
             the templates do.",
+        household: fault,
     }
     /// Raised when the engine lemonfiber reaches from a container does not know that
     /// container.
@@ -104,6 +112,7 @@ codes! {
             somewhere nobody checked. Nothing was started.",
         remedy: "Mount the socket of the engine running this container at \
             /var/run/docker.sock.",
+        household: fault,
     }
     /// Raised where a restart names an offer that is not the one a fresh look at the
     /// stack builds.
@@ -115,6 +124,7 @@ codes! {
             names other services — one added, removed or renamed since the restart was \
             rehearsed — so nothing was restarted.",
         remedy: "Rehearse the restart again, and answer the offer it gives now.",
+        household: fault,
     }
     /// Raised when a start finds a service's mount source reached through a link.
     MOUNT_LINKED = "LIFE-11" {
@@ -128,6 +138,7 @@ codes! {
             service and the path.",
         remedy: "Look at what put a link at the path named, take the link away, and start \
             again.",
+        household: fault,
     }
     /// Raised where an `up` or a `switch` names an offer that is not the install a fresh
     /// look at the stack offers.
@@ -139,6 +150,7 @@ codes! {
             another install of a part this build carries — one installed, run or changed since \
             the offer was made — so nothing was installed, written or started.",
         remedy: "Rehearse the start again, and answer the offer it gives now.",
+        household: fault,
     }
     /// Raised where a start would install a part this build carries and nobody said yes.
     OFFLINE_INSTALL_UNANSWERED = "LIFE-13" {
@@ -149,6 +161,7 @@ codes! {
             and starting it installs that part from the build. Nobody agreed to the install, so \
             nothing of the form was written or started; the message names the part.",
         remedy: "Rehearse the start, and answer the install it offers.",
+        household: fault,
     }
     /// Raised where an install a start was agreed to did not hold.
     OFFLINE_INSTALL_UNHELD = "LIFE-14" {
@@ -159,6 +172,7 @@ codes! {
             and nothing of the form was started; the message names the part.",
         remedy: "Run lemonfiber plugin install with the part's name to see what its proofs \
             found, then start the form again.",
+        household: fault,
     }
     /// Raised where a start would install a part whose install could not be read.
     OFFLINE_INSTALL_UNREAD = "LIFE-15" {
@@ -169,5 +183,6 @@ codes! {
             and its install could not be read, so no offer stands for a yes to answer. Nothing \
             was installed, written or started; the message names the part and why.",
         remedy: "Put right what stopped the read, and rehearse the start again.",
+        household: fault,
     }
 }

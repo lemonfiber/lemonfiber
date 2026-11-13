@@ -36,7 +36,16 @@ fn every_code_is_published_with_all_it_is_declared_with() {
     assert!(!codes.is_empty());
     for code in &codes {
         for key in [
-            "code", "family", "name", "severity", "summary", "meaning", "remedy", "since",
+            "code",
+            "family",
+            "name",
+            "severity",
+            "summary",
+            "meaning",
+            "remedy",
+            "household",
+            "household_remedy",
+            "since",
         ] {
             assert!(
                 code.get(key)
@@ -45,6 +54,10 @@ fn every_code_is_published_with_all_it_is_declared_with() {
                 "{code} has no {key}"
             );
         }
+        assert!(
+            code.get("stack_fault").is_some_and(Value::is_boolean),
+            "{code}"
+        );
         assert!(
             code.get("exit")
                 .and_then(Value::as_u64)

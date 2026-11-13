@@ -7,6 +7,7 @@ codes! {
         meaning: "The archive could not be read. Most often it is truncated, or is not a \
             lemonfiber backup. Nothing was touched.",
         remedy: "Check the archive, or restore from a different backup.",
+        household: fault,
     }
     /// Raised when an archive was written by a newer lemonfiber than this one.
     TOO_NEW = "RESTORE-2" {
@@ -16,6 +17,7 @@ codes! {
         meaning: "The archive was written by a newer lemonfiber than this one, and may hold \
             configuration this version would not restore correctly. Nothing was touched.",
         remedy: "Update lemonfiber to at least the version that made the backup, then restore.",
+        household: fault,
     }
     /// Raised when an archive's format cannot be restored by this build.
     INCOMPATIBLE = "RESTORE-3" {
@@ -25,6 +27,7 @@ codes! {
         meaning: "The archive's format cannot be restored by this build. Restoring it could \
             leave the configuration in a state neither version expects. Nothing was touched.",
         remedy: "Restore it with the lemonfiber version that made it.",
+        household: fault,
     }
     /// Raised when an archive holds a member that would be written outside its area.
     UNSAFE = "RESTORE-4" {
@@ -35,6 +38,7 @@ codes! {
             in, which a genuine lemonfiber backup never does. It is refused and nothing was \
             touched.",
         remedy: "Do not restore this archive. It is corrupt, or was tampered with.",
+        household: fault,
     }
     /// Raised when a restore onto a different data root awaits the operator's consent.
     NEEDS_REPOINT = "RESTORE-5" {
@@ -45,6 +49,7 @@ codes! {
             would keep a setting naming a location that is not on this machine.",
         remedy: "Re-run the restore with --repoint to accept moving it to this machine's data \
             root.",
+        household: fault,
     }
     /// Raised when an archive could not be unpacked.
     NOT_RESTORED = "RESTORE-6" {
@@ -55,6 +60,7 @@ codes! {
             writing the configuration back.",
         remedy: "Check the configuration location is writable and restore again. A seed \
             afterwards reconciles anything left half-written.",
+        household: fault,
     }
     /// Raised when a restore could not be shown that nothing is writing to a database.
     STILL_RUNNING = "RESTORE-7" {
@@ -65,6 +71,7 @@ codes! {
             over the service databases, and an engine that will not say whether the services are \
             running is refused as firmly as one that says they are.",
         remedy: "Stop the stack, check the container engine is answering, then restore again.",
+        household: fault,
     }
     /// Raised when a name does not name one of the backups this machine kept.
     NOT_KEPT_HERE = "RESTORE-8" {
@@ -76,6 +83,7 @@ codes! {
             directory; a name carrying a path, or climbing out of that directory, is refused \
             rather than followed. Nothing was touched.",
         remedy: "Ask for one of the backups by the name it was written under.",
+        household: fault,
     }
     /// Raised when this run has nowhere it knows to look for an archive.
     NOWHERE_KEPT = "RESTORE-9" {
@@ -86,6 +94,7 @@ codes! {
             lemonfiber's own directory, and this machine would not say where that is. Nothing \
             was touched.",
         remedy: "Set a home directory for this user, then restore again.",
+        household: fault,
     }
     /// Raised when the restored settings could not be pointed at this machine's data root.
     NOT_REPOINTED = "RESTORE-10" {
@@ -95,6 +104,7 @@ codes! {
         meaning: "The archive was unpacked, and the data root it recorded could not be changed \
             to this machine's — so the settings that landed name a library that is not here.",
         remedy: "Set the data root by hand, then run lemonfiber seed.",
+        household: fault,
     }
     /// Raised when consent was given for a listing that no longer stands.
     MOVED_ON = "RESTORE-11" {
@@ -105,6 +115,7 @@ codes! {
             archive lists something else, so something changed between reading the listing and \
             answering it. Nothing was overwritten.",
         remedy: "Ask what the backup holds again, and read what it says now.",
+        household: fault,
     }
     /// Raised when the archive holds trees lemonfiber does not manage.
     NOT_OURS = "RESTORE-12" {
@@ -115,5 +126,6 @@ codes! {
             lemonfiber took over, so putting it back means writing into directories that are not \
             lemonfiber's to write to. Nothing was touched.",
         remedy: "Unpack it yourself with tar -xzf, into the paths the message names.",
+        household: fault,
     }
 }

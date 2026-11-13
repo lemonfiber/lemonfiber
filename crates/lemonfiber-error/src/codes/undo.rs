@@ -8,6 +8,7 @@ codes! {
             outside the horizon the record keeps, or the stamp may be mistyped. Nothing was put \
             back.",
         remedy: "Run lemonfiber history and take the stamp from the entry you want.",
+        household: fault,
     }
     /// Raised when a stamp names more than one run, so which to put back is not settled.
     MORE_THAN_ONE_RUN = "UNDO-2" {
@@ -18,6 +19,7 @@ codes! {
             something to guess at. Nothing was put back.",
         remedy: "The message names each run the stamp covers; ask for one of them once the \
             surfaces carry it.",
+        household: fault,
     }
     /// Raised when a run cannot be put back, carrying the reason it cannot.
     CANNOT_SUCCEED = "UNDO-3" {
@@ -32,6 +34,7 @@ codes! {
         remedy: "Deal with that change first, or restore from a backup. Where a change could not \
             be recorded, check that lemonfiber's configuration directory can be written and has \
             space.",
+        household: fault,
     }
     /// Raised when a run cannot say where lemonfiber's own files are.
     NOWHERE_TO_LOOK = "UNDO-4" {
@@ -42,6 +45,7 @@ codes! {
             changed is recorded in its own directory, and this machine would not say where that \
             is. Nothing was put back.",
         remedy: "Set a home directory for this user and run it again.",
+        household: fault,
     }
     /// Raised when a run moved one of lemonfiber's own guards onto its plugin, which no
     /// undo or removal puts back.
@@ -56,5 +60,6 @@ codes! {
             standing nowhere. Nothing was put back or removed.",
         remedy: "Leave the guard on its plugin. To stop using it, choose another filler for \
             its capability.",
+        household: fault,
     }
 }

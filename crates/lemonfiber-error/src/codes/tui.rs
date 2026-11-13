@@ -7,5 +7,6 @@ codes! {
         meaning: "A screen could not be drawn. The terminal stopped accepting output, which \
             usually means it was closed or resized out from under the process.",
         remedy: "Run it again in a terminal that stays open.",
+        household: fault,
     }
 }

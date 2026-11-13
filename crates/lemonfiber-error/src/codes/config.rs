@@ -8,6 +8,7 @@ codes! {
         meaning: "Your settings exist and could not be read. Nothing has been changed — \
             lemonfiber will not guess at settings it cannot read.",
         remedy: "Check the file is readable. The message names its path.",
+        household: fault,
     }
     /// Raised when configuration cannot be written.
     CONFIG_NOT_WRITTEN = "CONFIG-2" {
@@ -17,6 +18,7 @@ codes! {
         meaning: "Your settings could not be saved. The change was not made and your existing \
             settings are untouched.",
         remedy: "Check the location is writable and has space.",
+        household: fault,
     }
     /// Raised when there is nowhere to keep configuration.
     CONFIG_NOWHERE = "CONFIG-3" {
@@ -26,6 +28,7 @@ codes! {
         meaning: "There is nowhere to keep settings, because setup has not chosen a location \
             yet.",
         remedy: "Run lemonfiber setup.",
+        household: fault,
     }
     /// Raised when a file holding a credential can be read by more than its owner.
     CREDENTIALS_EXPOSED = "CONFIG-4" {
@@ -35,6 +38,7 @@ codes! {
         meaning: "A file holding a credential can be read by somebody other than its owner. \
             Nothing has been changed — this is the doctor reporting what it found.",
         remedy: "Take the permissions back to their owner. The message names each file.",
+        household: fault,
     }
     /// Raised when configuration was written by a newer lemonfiber.
     CONFIG_TOO_NEW = "CONFIG-5" {
@@ -47,6 +51,7 @@ codes! {
             way back to the one you had.",
         remedy: "Run the newer lemonfiber, or take this one forward with lemonfiber update \
             self. The message names both versions.",
+        household: fault,
     }
     /// Raised when a setting's key or value spans more than one line.
     CONFIG_SPANS_LINES = "CONFIG-6" {
@@ -58,6 +63,7 @@ codes! {
             would have been read as settings you never chose.",
         remedy: "Check where the value came from, and set it to a single line. The message names \
             the settings file.",
+        household: fault,
     }
     /// Raised where the operator's overlay changes services, merged over the project
     /// lemonfiber writes and held to nothing it vets.
@@ -72,6 +78,7 @@ codes! {
         remedy: "Keep the overlay to what the services need, or move a change into the stack's \
             own settings where one says it. The message names the overlay and each service \
             it changes.",
+        household: fault,
     }
     /// Raised where a path is still recorded under the retired overlay setting, which is no
     /// longer read.
@@ -85,6 +92,7 @@ codes! {
         remedy: "Move the named file to overlay.yml in lemonfiber's configuration directory, \
             then remove the LEMONFIBER_OVERLAY line from the settings file. The message names \
             both paths.",
+        household: fault,
     }
     /// Raised where the project directory still holds a Compose file of the stack's own
     /// that lemonfiber no longer reads.
@@ -98,6 +106,7 @@ codes! {
             applied.",
         remedy: "Move whatever the file changed into overlay.yml in lemonfiber's configuration \
             directory, then delete the file. The message names each one.",
+        household: fault,
     }
     /// Raised where a part that belongs to whoever claims it first is held by nobody, is
     /// held by somebody other than lemonfiber, or could not be asked who holds it.
@@ -113,5 +122,6 @@ codes! {
             lemonfiber claimed it before. Where somebody else holds it and that was not you, \
             reset its configuration and run lemonfiber seed. The message names the service and \
             the secret lemonfiber holds for it.",
+        household: fault,
     }
 }

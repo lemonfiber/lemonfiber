@@ -8,6 +8,7 @@ codes! {
             nothing, which looks exactly like a broken stack from the outside. A block account \
             does not refill on its own.",
         remedy: "Top the account up, or point the client at one that has data left.",
+        household: fault,
     }
     /// Raised when an account is running out, with time left to act.
     PROVIDER_LOW = "PROVIDER-2" {
@@ -18,6 +19,7 @@ codes! {
             being used it runs out shortly, and downloads will stop with nothing else having \
             changed.",
         remedy: "Top the account up before it runs out.",
+        household: fault,
     }
     /// Raised when the subscription behind an account ends soon.
     PROVIDER_ENDING = "PROVIDER-3" {
@@ -27,6 +29,7 @@ codes! {
         meaning: "The subscription behind a Usenet account ends on the date recorded for it in \
             the download client. When it lapses the account stops serving.",
         remedy: "Renew the subscription, or clear its date in the client if it renews itself.",
+        household: fault,
     }
     /// Raised when an indexer has been failing and its aggregator has rested it.
     INDEXER_RESTED = "PROVIDER-4" {
@@ -38,6 +41,7 @@ codes! {
             pool.",
         remedy: "Check the indexer's subscription and its status page, then test it in the \
             aggregator.",
+        household: fault,
     }
     /// Raised when every indexer is failing at once.
     INDEXERS_ALL_FAILING = "PROVIDER-5" {
@@ -48,6 +52,7 @@ codes! {
             afternoon, so the cause is almost always on this side of the connection.",
         remedy: "Check this machine's network and DNS, and the tunnel if searches run through \
             one.",
+        household: fault,
     }
     /// Raised when an account refuses the credential the client offers it.
     PROVIDER_REFUSED = "PROVIDER-6" {
@@ -59,6 +64,7 @@ codes! {
             nothing downloads.",
         remedy: "Check the account's username and password in the download client, and that the \
             subscription behind it is still active.",
+        household: fault,
     }
     /// Raised when an account has stopped answering the client entirely.
     PROVIDER_SILENT = "PROVIDER-7" {
@@ -71,6 +77,7 @@ codes! {
             anything.",
         remedy: "Check the provider's status page and this machine's connection. The client \
             picks the account up again on its own once it answers.",
+        household: fault,
     }
     /// Raised when the client is set to open more connections than an account allows.
     PROVIDER_CROWDED = "PROVIDER-8" {
@@ -82,6 +89,7 @@ codes! {
             and the refusals read as an unreliable provider rather than as one setting too high.",
         remedy: "Lower the connection count for that account in the download client to what the \
             plan includes.",
+        household: fault,
     }
     /// Raised when an indexer has spent the allowance recorded against it.
     INDEXER_CAPPED = "PROVIDER-9" {
@@ -92,5 +100,6 @@ codes! {
             come back empty until it resets, and neither it nor the aggregator says so anywhere.",
         remedy: "Wait for the allowance to reset, or raise the limit recorded for that indexer \
             in the aggregator if the subscription allows more.",
+        household: fault,
     }
 }

@@ -12,6 +12,7 @@
 //! happens here; nothing reaches a service.
 
 pub(crate) mod run;
+mod spoken;
 
 use serde::Serialize;
 

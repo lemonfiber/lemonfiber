@@ -62,6 +62,7 @@ pub(crate) fn a_snapshot() -> Snapshot {
             members: Vec::new(),
             available: true,
             findings: Vec::new(),
+            noted: Vec::new(),
             filtering: None,
             policy: None,
             allows: None,

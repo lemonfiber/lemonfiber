@@ -9,6 +9,7 @@ codes! {
             request service asked a curator or the media server for more than requests need, \
             and the gate stopped it. The message lists the calls.",
         remedy: "If nobody changed the request service's settings, check what it is running.",
+        household: fault,
     }
     /// Raised when more entries reached the gate's record between two diagnoses than
     /// it keeps, so some could not be reported.
@@ -20,5 +21,6 @@ codes! {
             some were dropped before they were read. What those entries were cannot be told now; \
             the message says how many.",
         remedy: "Run the diagnosis more often while this keeps happening.",
+        household: fault,
     }
 }

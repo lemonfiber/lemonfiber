@@ -30,7 +30,10 @@ async fn a_service_still_starting_costs_names_without_being_called_a_failed_read
     // about what the household may *ask* for either, and that gap has a line of
     // its own — one whose arrival here would otherwise read as the library's.
     assert!(
-        !report.findings.iter().any(|said| said.contains("librar")),
+        !report
+            .findings
+            .iter()
+            .any(|said| said.said.contains("librar")),
         "{report:?}"
     );
 }
@@ -62,7 +65,7 @@ async fn a_refused_key_costs_the_requests_and_not_the_household() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("would not accept")),
+            .any(|finding| finding.said.contains("would not accept")),
         "{report:?}"
     );
 }
@@ -91,7 +94,7 @@ async fn an_unreadable_request_record_costs_the_requests_and_not_the_household()
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("could not be read")),
+            .any(|finding| finding.said.contains("could not be read")),
         "{report:?}"
     );
 }
@@ -144,7 +147,7 @@ async fn a_media_server_that_will_not_say_who_is_here_is_unavailable_not_empty()
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("would not say who holds an account")),
+            .any(|finding| finding.said.contains("would not say who holds an account")),
         "{report:?}"
     );
 }
@@ -171,7 +174,7 @@ async fn libraries_that_will_not_read_cost_their_names_and_not_the_access() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("libraries could not be read")),
+            .any(|finding| finding.said.contains("libraries could not be read")),
         "{report:?}"
     );
 }
@@ -196,7 +199,7 @@ async fn an_unreadable_library_costs_names_not_the_view() {
     assert!(report
         .findings
         .iter()
-        .any(|finding| finding.contains("library could not be read")));
+        .any(|finding| finding.said.contains("library could not be read")));
 }
 
 #[tokio::test]
@@ -210,7 +213,7 @@ async fn a_media_server_that_has_not_moved_has_nothing_to_ask() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("cannot be asked over its contracts")),
+            .any(|finding| finding.said.contains("cannot be asked over its contracts")),
         "{report:?}"
     );
 }
@@ -238,7 +241,7 @@ async fn ratings_that_will_not_read_cost_the_certificates_and_not_the_limit() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("own ratings could not be read")),
+            .any(|finding| finding.said.contains("own ratings could not be read")),
         "{report:?}"
     );
     let rated = report

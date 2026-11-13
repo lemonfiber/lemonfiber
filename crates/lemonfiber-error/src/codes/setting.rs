@@ -9,6 +9,7 @@ codes! {
             the core's own, so writing it would record a value nothing reads. Nothing was \
             changed.",
         remedy: "List the settings with lemonfiber settings.",
+        household: fault,
     }
     /// Raised where the name given is a secret's, which this command never writes.
     A_SECRET = "SETTING-2" {
@@ -19,6 +20,7 @@ codes! {
         meaning: "That name is a secret's. A secret is entered where it is first needed and \
             replaced at the terminal, never written as a setting, so nothing was changed.",
         remedy: "Replace it at the terminal with lemonfiber credentials --rotate.",
+        household: fault,
     }
     /// Raised where the name given belongs to the other of the two commands that write
     /// settings.
@@ -31,6 +33,7 @@ codes! {
             settings and lemonfiber config, so nothing was changed; the message names the \
             command and the name that take it.",
         remedy: "Run the command the message names.",
+        household: fault,
     }
     /// Raised where a value cannot be written as the setting asked for.
     UNWRITABLE_VALUE = "SETTING-4" {
@@ -42,6 +45,7 @@ codes! {
             control character, and a core setting is held to the form its table names. \
             Nothing was changed.",
         remedy: "Give the value on one line, in the form the message names.",
+        household: fault,
     }
     /// Raised when a change answers an offer read against settings that have since moved.
     SETTINGS_MOVED = "SETTING-5" {
@@ -53,6 +57,7 @@ codes! {
             be agreeing to something nobody saw, so nothing was changed; the message names \
             what moved.",
         remedy: "Read the change again, and answer the name it prints.",
+        household: fault,
     }
     /// Raised where the setting already holds what the change asks for.
     ALREADY_HOLDS = "SETTING-6" {
@@ -62,6 +67,7 @@ codes! {
         meaning: "The setting already holds what was asked for, so nothing was changed, and \
             nothing needed to be.",
         remedy: "Nothing to do. lemonfiber settings lists what each setting holds.",
+        household: fault,
     }
     /// Raised where a change would leave a setting holding a value outside its choices.
     OUTSIDE_ITS_CHOICES = "SETTING-7" {
@@ -74,6 +80,7 @@ codes! {
             the setting, the value and the choices it has.",
         remedy: "Give one of the choices the message names, moving the settings it depends \
             on in the same act where they have to change too.",
+        household: fault,
     }
     /// Raised where a service is held back until the operator gives what it needs to start.
     HELD_BACK = "SETTING-8" {
@@ -86,6 +93,7 @@ codes! {
             runs through the service; the message names each service and what it waits for.",
         remedy: "Give each setting the message names with lemonfiber settings set; the act that \
             gives the last thing a service waits for starts it.",
+        household: fault,
     }
     /// Raised where `PLEX_LINK_MODE` would enter or leave `owner` for a request service already
     /// set up.
@@ -100,6 +108,7 @@ codes! {
             nothing was changed.",
         remedy: "Keep the mode, or move between managed and fronted, which share an owner. \
             Entering or leaving owner takes setting the request service up again.",
+        household: fault,
     }
     /// Raised on every diagnosis while `PLEX_LINK_MODE` is `owner`, as a standing notice.
     OWNER_HELD = "SETTING-10" {
@@ -114,5 +123,6 @@ codes! {
         remedy: "Signing the request service's device out at plex.tv takes the token back. \
             Only before the request service is set up can the mode move to managed or \
             fronted, which hold no token of yours.",
+        household: fault,
     }
 }

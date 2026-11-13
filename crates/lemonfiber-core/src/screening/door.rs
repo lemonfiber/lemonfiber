@@ -12,6 +12,8 @@ use lemonfiber_contract::capabilities::stream::guard;
 
 use crate::app::{Asker, Ctx};
 use crate::certificate::{self, Kept, Unkept};
+use crate::error::codes::play::{DOOR_UNREADY, MISNAMED, NO_HOUSEHOLD_ADDRESS, UNDECLARED};
+use crate::error::household::Obstacle;
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
 use crate::ports::random::Random;
 use crate::ports::service::{Declaring, Item, ItemDetail, ItemProgress, Locations, Medium};
@@ -71,7 +73,7 @@ pub(crate) enum Door {
         asker: Asker,
     },
     /// Why nothing can be located at the door.
-    Unknown(String),
+    Unknown(Obstacle),
 }
 
 /// The directory the door's certificate is kept in, beneath `project`.
@@ -125,7 +127,7 @@ async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let Some(project) = project else {
-        return Door::Unknown(NO_STACK.to_owned());
+        return Door::Unknown(Obstacle::new(DOOR_UNREADY, NO_STACK));
     };
     let at = crate::app::invite::household_address(ctx, GUARDED).await;
     let (base, fingerprint) = match at_the_door(
@@ -151,29 +153,32 @@ async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
 fn at_the_door(
     url: Option<String>,
     kept: Result<Option<Kept>, Unkept>,
-) -> Result<(String, String), String> {
+) -> Result<(String, String), Obstacle> {
     let fingerprint = match kept {
         Ok(Some(kept)) => kept.fingerprint,
-        Ok(None) => return Err(NOT_MADE.to_owned()),
-        Err(why) => return Err(format!("{UNREADABLE} {why}")),
+        Ok(None) => return Err(Obstacle::new(DOOR_UNREADY, NOT_MADE)),
+        Err(why) => return Err(Obstacle::new(DOOR_UNREADY, format!("{UNREADABLE} {why}"))),
     };
     url.map(|url| (url.replacen("http://", "https://", 1), fingerprint))
-        .ok_or_else(|| NO_ADDRESS.to_owned())
+        .ok_or_else(|| Obstacle::new(NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
 }
 
 /// Where `server` serves each item, from its declaration once that is checked.
-async fn served_at(server: &dyn Declaring) -> Result<Locations, String> {
+async fn served_at(server: &dyn Declaring) -> Result<Locations, Obstacle> {
     declared(server).await.map(|declared| declared.locations)
 }
 
 /// What `server` declared, once that is checked, or why it is not held to it.
 pub(crate) async fn declared(
     server: &dyn Declaring,
-) -> Result<crate::ports::service::Declared, String> {
-    let declared = server.declared().await.map_err(|_| UNDECLARED.to_owned())?;
+) -> Result<crate::ports::service::Declared, Obstacle> {
+    let declared = server
+        .declared()
+        .await
+        .map_err(|_| Obstacle::new(UNDECLARED, NOT_DECLARED))?;
     declared
         .checked()
-        .map_err(|why| format!("{REFUSED_DECLARATION} {why}"))
+        .map_err(|why| Obstacle::new(UNDECLARED, format!("{REFUSED_DECLARATION} {why}")))
 }
 
 /// `why` nothing is located, in the words `asker` is told: what to fix for the operator,
@@ -258,7 +263,7 @@ const NO_DOMAIN: &str = "No domain is configured for the household's proxy, so t
                          title plays in a browser.";
 
 /// Said where the media server would not say where it serves each item.
-const UNDECLARED: &str = "The media server would not say where it serves each title, so \
+const NOT_DECLARED: &str = "The media server would not say where it serves each title, so \
                           nothing can be located at the front door.";
 
 /// Said before the reason the media server's declaration was refused.
@@ -284,13 +289,17 @@ const NO_ADDRESS: &str = "This machine's household address is not known, so noth
                           it at, and every title says where it is served.";
 
 /// Why an item the media server named by something other than an item id is not located.
-const NOT_AN_ITEM: &str = "the media server named this item by something that is not an item id";
+const NOT_AN_ITEM: &str = "The media server named this item by something that is not an item id.";
 
 /// The same item, located at the door: its pictures where it has them, and where it
 /// streams from where it plays.
 #[must_use]
 pub(crate) fn located(item: Item, door: &Door, random: &dyn Random) -> Held {
     let at = match door {
+        _ if !super::an_item(&item.id) => Located {
+            unlocated: Some(Obstacle::new(MISNAMED, NOT_AN_ITEM)),
+            ..Located::default()
+        },
         Door::Unknown(why) => Located {
             unlocated: Some(why.clone()),
             ..Located::default()

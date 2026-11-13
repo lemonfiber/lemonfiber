@@ -1,21 +1,5 @@
 use super::{for_the_house, NO_ROOM, RETURNS};
 
-/// Words no member is shown: a size, a service, the machine and how it is run.
-pub(in crate::household::run) const NOT_FOR_THE_HOUSEHOLD: [&str; 12] = [
-    "GB",
-    "MB",
-    "disk",
-    "server",
-    "service",
-    "lemonfiber",
-    "Seerr",
-    "Jellyfin",
-    "stack",
-    "quality",
-    "gigabyte",
-    "storage",
-];
-
 /// Every notice the house could be shown.
 fn every_notice() -> Vec<String> {
     [false, true]
@@ -115,11 +99,10 @@ fn what_each_notice_is_for_survives_a_telephone() {
 #[test]
 fn nothing_the_house_is_shown_is_in_anything_but_its_own_words() {
     for notice in every_notice() {
-        for word in NOT_FOR_THE_HOUSEHOLD {
-            assert!(
-                !notice.contains(word),
-                "the household was shown {word:?}: {notice}"
-            );
-        }
+        assert_eq!(
+            crate::error::household::unhoused(&notice),
+            None,
+            "the household was shown something not in its words: {notice}"
+        );
     }
 }
