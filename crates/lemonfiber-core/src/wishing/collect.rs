@@ -33,7 +33,7 @@ pub(super) async fn found(
         return Err(refused(NOT_A_PLACE, "That search can't go on from there."));
     }
     let reached = reached(ctx, named).await?;
-    let curator = curator_of(ctx, unit).await?;
+    let (_, curator) = curator_of(ctx, unit).await?;
     let theirs = crate::household::run::allowance_of(
         reached.requests.as_ref(),
         &reached.member,
@@ -82,7 +82,7 @@ pub(super) async fn asked(
 ) -> Result<AskedReport, Box<Problem>> {
     let path = crate::collected::run::kept_at(ctx).map_err(|_| not_working())?;
     let reached = reached(ctx, named).await?;
-    let curator = curator_of(ctx, unit).await?;
+    let (service, curator) = curator_of(ctx, unit).await?;
     let candidate = curator
         .candidate(unit, reference)
         .await
@@ -154,11 +154,12 @@ pub(super) async fn asked(
             .await
             .map_err(|_| not_working())?;
     }
+    let whole = candidate.state == CandidateState::MayAsk;
     let filed = crate::collected::store::filed(
         &path,
         &Asking {
             unit,
-            reference: candidate.reference,
+            reference: candidate.reference.clone(),
             name: candidate.name,
             by: candidate.by,
             year: candidate.year,
@@ -173,6 +174,9 @@ pub(super) async fn asked(
         },
     )
     .map_err(|_| not_working())?;
+    if !waits {
+        crate::collected::run::journalled(ctx, &service, unit, &candidate.reference, filed, whole)?;
+    }
     Ok(report(outcome, ONE, Some(filed.to_string())))
 }
 
@@ -201,8 +205,8 @@ fn leaves_of(unit: Unit, left: Left, cost: u32) -> LeftAfter {
 /// # Errors
 ///
 /// The refusal for a house with none that can be asked now.
-pub(super) async fn curator_of(ctx: &Ctx, unit: Unit) -> Result<Collector, Box<Problem>> {
-    crate::collected::run::collector(ctx, unit.medium())
+pub(super) async fn curator_of(ctx: &Ctx, unit: Unit) -> Result<(String, Collector), Box<Problem>> {
+    crate::collected::run::named_collector(ctx, unit.medium())
         .await
         .ok_or_else(|| {
             refused(

@@ -35,6 +35,8 @@ pub enum Standing {
     Declined,
     /// Left waiting past the household's window, and so let go.
     Expired,
+    /// Undone: removed from the curator and taken off the household list.
+    Withdrawn,
 }
 
 /// One ask a member made.
@@ -199,6 +201,28 @@ pub(crate) fn arrived(
         Ok(())
     })
     .map(|()| first)
+}
+
+/// Mark the ask `reference` names at `path` as withdrawn at `at`, and say whether one was.
+///
+/// # Errors
+///
+/// The [`Failure`] the file was read or written with.
+pub(crate) fn withdrawn(path: &Path, reference: Reference, at: &str) -> Result<bool, Failure> {
+    let mut found = false;
+    crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
+        if let Some(ask) = kept
+            .asks
+            .iter_mut()
+            .find(|ask| ask.named() == reference && ask.standing != Standing::Withdrawn)
+        {
+            ask.standing = Standing::Withdrawn;
+            ask.settled_at = Some(at.to_owned());
+            found = true;
+        }
+        Ok(())
+    })
+    .map(|()| found)
 }
 
 /// The number the next ask of `medium` is given: one past the highest it has given.

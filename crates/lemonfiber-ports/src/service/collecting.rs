@@ -231,6 +231,16 @@ pub trait MusicCurating: Send + Sync {
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
     async fn profiles(&self) -> Result<AskedWith, Failure>;
+
+    /// Remove the `unit` `reference` names with its files, excluding nothing from a later
+    /// import: an album alone, or an artist with every album it holds, and whoever `request` added only to hold it where nothing
+    /// else of theirs is held.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Refused`] where it holds no such album or artist, and [`Failure`] when
+    /// the curator is unreachable.
+    async fn remove(&self, unit: MusicUnit, reference: &str) -> Result<(), Failure>;
 }
 
 /// What a member asks a curator of books for, found and asked for over `books.curate`.
@@ -275,6 +285,16 @@ pub trait BookCurating: Send + Sync {
     ///
     /// Returns [`Failure`] when the curator is unreachable or refuses.
     async fn profiles(&self) -> Result<AskedWith, Failure>;
+
+    /// Remove the `unit` `reference` names with its files, excluding nothing from a later
+    /// import: a book alone, or an author or a series with every book it holds, and whoever `request` added only to hold it where nothing
+    /// else of theirs is held.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Refused`] where it holds no such book, author or series, and [`Failure`] when
+    /// the curator is unreachable.
+    async fn remove(&self, unit: BookUnit, reference: &str) -> Result<(), Failure>;
 }
 
 #[cfg(test)]

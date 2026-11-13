@@ -88,6 +88,13 @@ impl MusicCurating for Upstream {
         self.tell("profiles".to_owned());
         Ok(asked_with(true))
     }
+    async fn remove(&self, _: MusicUnit, reference: &str) -> Result<(), Failure> {
+        self.tell("remove".to_owned());
+        if reference == UNHELD {
+            return Err(unheld(reference));
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -126,6 +133,13 @@ impl BookCurating for Upstream {
         self.tell("profiles".to_owned());
         Ok(asked_with(false))
     }
+    async fn remove(&self, _: BookUnit, reference: &str) -> Result<(), Failure> {
+        self.tell("remove".to_owned());
+        if reference == UNHELD {
+            return Err(unheld(reference));
+        }
+        Ok(())
+    }
 }
 
 /// A result as the script writes it down: a failure by its kind and words alone.
@@ -159,6 +173,8 @@ async fn listening<C: MusicCurating>(curator: &C) -> Vec<String> {
         said(curator.request(&ask(MusicUnit::Album, "album-0d1e")).await),
         said(curator.request(&ask(MusicUnit::Artist, UNHELD)).await),
         said(curator.profiles().await),
+        said(curator.remove(MusicUnit::Album, "album-0d1e").await),
+        said(curator.remove(MusicUnit::Artist, UNHELD).await),
     ]
 }
 
@@ -179,6 +195,8 @@ async fn reading<C: BookCurating>(curator: &C) -> Vec<String> {
         said(curator.request(&ask(BookUnit::Author, "author-0d1e")).await),
         said(curator.request(&ask(BookUnit::Book, UNHELD)).await),
         said(curator.profiles().await),
+        said(curator.remove(BookUnit::Series, "series-0d1e").await),
+        said(curator.remove(BookUnit::Book, UNHELD).await),
     ]
 }
 
@@ -194,7 +212,9 @@ async fn a_curator_of_music_answers_and_is_told_through_its_contract_as_it_is_in
             "candidate",
             "request",
             "request",
-            "profiles"
+            "profiles",
+            "remove",
+            "remove"
         ]
     );
 }
@@ -211,7 +231,9 @@ async fn a_curator_of_books_answers_and_is_told_through_its_contract_as_it_is_in
             "candidate",
             "request",
             "request",
-            "profiles"
+            "profiles",
+            "remove",
+            "remove"
         ]
     );
 }

@@ -266,6 +266,15 @@ pub fn standing(
             Some("mint a new key for whatever still needs one"),
         ),
         Kind::DeviceKeyRevoked { name } => device_key_revoked(name),
+        Kind::Asked {
+            kept, whole: false, ..
+        } => Standing::refused(
+            &format!(
+                "the ask {kept} was for the rest of what the house held in part, and removing \
+                 it would take what was held before with it"
+            ),
+            Some("remove what is not wanted in the curator's own interface"),
+        ),
         Kind::PushEndpointRegistered { name } | Kind::PushEndpointRemoved { name } => {
             only_the_phone(name)
         }
@@ -291,7 +300,8 @@ pub fn standing(
         | Kind::Granted { .. }
         | Kind::Ran { .. }
         | Kind::Restarted { .. }
-        | Kind::Unqueued { .. } => Standing::whole(),
+        | Kind::Unqueued { .. }
+        | Kind::Asked { whole: true, .. } => Standing::whole(),
     }
 }
 

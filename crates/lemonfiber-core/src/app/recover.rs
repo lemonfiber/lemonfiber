@@ -63,6 +63,20 @@ pub(crate) async fn reconfigured(
                 .await;
             continue;
         }
+        if let Action::Unask {
+            unit,
+            reference,
+            kept,
+            whole: true,
+        } = &undo.action
+        {
+            match crate::collected::run::unasked(ctx, &undo.target, (*unit, reference, kept)).await
+            {
+                Ok(()) => reached.put_back.push(undo.clone()),
+                Err(unreached) => reached.unreached.push(unreached),
+            }
+            continue;
+        }
         let Action::Reconfigure {
             resource,
             id,
@@ -311,6 +325,11 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         ))),
         Action::Unmoved { service } => Ok(Step::BeyondReach(format!("{service} on its plugin"))),
         Action::Regrab { .. } => Ok(Step::BeyondReach("a stuck download dropped".to_owned())),
+        Action::Unask { kept, whole, .. } => Ok(Step::BeyondReach(if *whole {
+            format!("the ask {kept}")
+        } else {
+            format!("the ask {kept}, for the rest of what the house held in part")
+        })),
         Action::Resettle {
             name,
             value,
