@@ -23,8 +23,10 @@
       "type": "string"
     },
     "until": {
-      "description": "When it stops being good, as a date and a time of day.",
-      "type": "string"
+      "description": "When it stops being good.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     },
     "written": {
       "description": "The material as the one line a code carries and a person types.",

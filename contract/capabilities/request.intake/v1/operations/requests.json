@@ -26,9 +26,12 @@
                   "description": "One thing a household member asked for, as the request service records it.\n\nWhat became of the request and what became of the media it asked for are two\nstatuses; the household model turns the pair into the one word a member reads.",
                   "properties": {
                     "arrived": {
-                      "description": "When the media it asked for arrived on the media server, as the request service\ntimestamps it, or nothing until it is there.",
+                      "default": null,
+                      "description": "When the media it asked for arrived on the media server, or nothing until it is\nthere.",
+                      "format": "uint64",
+                      "minimum": 0,
                       "type": [
-                        "string",
+                        "integer",
                         "null"
                       ]
                     },
@@ -57,9 +60,12 @@
                       "description": "Which service files the media — television or film — or `None` where the\nrequest service names a media type this build does not know."
                     },
                     "made": {
-                      "description": "When it was asked for, as the service timestamps it — what a request waiting\non somebody is measured against, and what a counting period runs from.",
+                      "default": null,
+                      "description": "When it was asked for, where the service says — what a request waiting\non somebody is measured against, and what a counting period runs from.",
+                      "format": "uint64",
+                      "minimum": 0,
                       "type": [
-                        "string",
+                        "integer",
                         "null"
                       ]
                     },

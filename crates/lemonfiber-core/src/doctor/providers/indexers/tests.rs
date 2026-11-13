@@ -39,7 +39,7 @@ fn allowed(name: &str, queries: Option<u64>, grabs: Option<u64>) -> IndexerUse {
 
 fn rested(name: &str) -> IndexerUse {
     IndexerUse {
-        rested_until: Some(crate::instant::Instant::from_seconds(1_786_910_400)),
+        rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
         ..answering(name)
     }
 }
@@ -228,7 +228,7 @@ fn a_passing_indexer_with_a_cap_says_what_it_is_measured_against() {
 fn a_failing_indexer_is_reported_as_failing_rather_than_as_capped() {
     let both = IndexerUse {
         queries: 100,
-        rested_until: Some(crate::instant::Instant::from_seconds(1_786_910_400)),
+        rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
         ..allowed("Fast", Some(100), None)
     };
     let found = findings(&[both, answering("Other")]);

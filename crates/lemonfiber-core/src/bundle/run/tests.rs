@@ -5,6 +5,7 @@ use crate::app::fixtures::FakeArchive;
 use crate::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
 use crate::doctor::Verdict;
 use crate::error::{Code, Problem, Remedy};
+use crate::instant::Instant;
 
 /// Naming a field and agreeing to publish it are two acts. The refusal names what
 /// would have been shown, so what gets confirmed is those settings rather than a
@@ -134,7 +135,7 @@ async fn a_bundle_is_handed_to_the_archive_whole() {
         taken: Taken {
             lemonfiber: "0.7.0".to_owned(),
             stack: "1.2.0".to_owned(),
-            at: "2026-08-18T00:00:00Z".to_owned(),
+            at: Instant::from_seconds(1_787_011_200),
         },
         terms: Terms::default(),
     };

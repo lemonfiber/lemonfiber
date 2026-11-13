@@ -462,13 +462,13 @@ async fn putting_back_the_run_that_registered_a_device_key_revokes_it_and_record
     registered(&ctx, "pixel").await;
     let Some(at) = crate::app::targets::layout(&ctx)
         .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
-        .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+        .and_then(|journal| journal.changes().last().map(|change| change.at))
     else {
         unreachable!("a registration is journaled")
     };
     let mut today = ctx.clone();
     today.seams.clock = a_context().build().seams.clock;
-    assert!(crate::app::putting_back::undo(&today, Some(&at))
+    assert!(crate::app::putting_back::undo(&today, Some(at))
         .await
         .is_ok());
     assert!(kept(&ctx).active("pixel").is_none());

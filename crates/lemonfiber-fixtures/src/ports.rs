@@ -15,13 +15,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use lemonfiber_manifest::Date;
 pub use lemonfiber_manifest::TODAY;
 use lemonfiber_ports::network::Site;
 use lemonfiber_ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_ports::random::Random;
 use lemonfiber_ports::resolve::Resolver;
 use lemonfiber_ports::time::Clock;
+use lemonfiber_ports::Instant;
 
 /// A runner that spawns nothing.
 ///
@@ -47,21 +47,20 @@ pub const HOUR: i64 = 3_600;
 /// A day, in seconds.
 pub const DAY: i64 = 24 * HOUR;
 
+/// An instant a test stamps a record with where which instant it is does not matter.
+pub const STAMPED: Instant = Instant::from_seconds(1_786_924_800);
+
+/// The instant `seconds` after [`TODAY`], or before it where negative.
+#[must_use]
+pub const fn moment(seconds: i64) -> Instant {
+    Instant::from_seconds(TODAY.saturating_add_signed(seconds))
+}
+
 /// The moment `seconds` after [`TODAY`], or before it where negative, written
 /// `YYYY-MM-DDTHH:MM:SS` in UTC.
 #[must_use]
 pub fn stamp(seconds: i64) -> String {
-    let at = i64::try_from(TODAY).unwrap_or_default() + seconds;
-    let date = Date::from_unix_seconds(at)
-        .map(|date| date.to_string())
-        .unwrap_or_default();
-    let past = at.rem_euclid(DAY);
-    format!(
-        "{date}T{:02}:{:02}:{:02}",
-        past / HOUR,
-        past % HOUR / 60,
-        past % 60
-    )
+    moment(seconds).calendar().unwrap_or_default()
 }
 
 impl Stopped {

@@ -190,7 +190,7 @@ pub(super) async fn seed_curator(
             crate::seed::wholesale_drift(&existing, &clients, seeding.expected, curator.name())
         });
     if let Some(live) = &live_version {
-        records.record(curator.name(), SCHEMA_VERSION_FIELD, live, &at);
+        records.record(curator.name(), SCHEMA_VERSION_FIELD, live, at);
     }
 
     let mut wirings = crate::seed::wire_root_folders(
@@ -206,7 +206,7 @@ pub(super) async fn seed_curator(
             }),
         },
         &mut journal,
-        &at,
+        at,
         ctx.dry_run,
     )
     .await;
@@ -235,7 +235,7 @@ pub(super) async fn seed_curator(
                     reset: false,
                     rehearsing: ctx.dry_run,
                 },
-                &at,
+                at,
             )
             .await,
         );

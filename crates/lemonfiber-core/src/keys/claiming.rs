@@ -82,7 +82,6 @@ impl std::fmt::Debug for Pending {
 
 impl Pending {
     /// Whether it has stopped collecting anything by `now`.
-    ///
     #[must_use]
     pub fn lapsed(&self, now: Instant) -> bool {
         now >= self.lapses

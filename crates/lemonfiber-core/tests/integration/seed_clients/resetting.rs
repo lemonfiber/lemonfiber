@@ -3,6 +3,7 @@
 use super::common::service::*;
 use super::seed_clients_recording;
 use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Category, RegisteredClient};
 use lemonfiber_core::seed::{wire_download_clients, Baselines, State};
@@ -26,7 +27,12 @@ async fn a_reset_reverts_a_drifted_category_to_lemonfibers() {
     );
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &service,
@@ -40,7 +46,7 @@ async fn a_reset_reverts_a_drifted_category_to_lemonfibers() {
             reset: true,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await
     .into_iter()
@@ -72,7 +78,12 @@ async fn a_reset_a_service_refuses_is_reported_as_failed_not_recorded() {
     );
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let wirings = wire_download_clients(
         &service,
@@ -86,7 +97,7 @@ async fn a_reset_a_service_refuses_is_reported_as_failed_not_recorded() {
             reset: true,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await;
     assert!(matches!(
@@ -120,7 +131,7 @@ async fn a_reset_registers_nothing_a_preview_did_not_show() {
             reset: true,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await;
     assert!(

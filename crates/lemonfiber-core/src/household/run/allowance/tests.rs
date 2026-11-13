@@ -1,18 +1,18 @@
 use super::{counted, estimated, limited, reported, waiting, worth_saying, Asked, Held};
 use crate::asking::{Policy, Standing};
 use crate::household::State;
+use crate::instant::{Instant, DAY};
 use crate::model::{HouseholdMember, MemberRequest};
 use crate::ports::media::Kind;
 use crate::ports::service::{Asking, Headroom, Left, Quota};
 use crate::quality::{Preset, Selection};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Three days after the moment these fixtures ask at.
 ///
 /// Inside every window they are given, so what these cases turn on is the reading
 /// rather than the request having aged out from under them.
-fn now() -> SystemTime {
-    crate::instant::read(ASKED).unwrap_or(UNIX_EPOCH) + Duration::from_secs(3 * 86_400)
+const fn now() -> Instant {
+    ASKED.later(3 * DAY)
 }
 
 /// One member, with what they may ask for and what they have asked for.
@@ -140,8 +140,11 @@ fn nothing_that_has_waited_long_enough_is_nothing_said() {
     assert!(worth_saying(&[member(None, &[])], None, false).is_empty());
 }
 
-/// A moment the calendar holds, and the same moment nine days later.
-const ASKED: &str = "2026-08-17T21:04:09";
+/// A moment the calendar holds: 2026-08-17T21:04:09.
+const ASKED: Instant = Instant::from_seconds(1_787_000_649);
+
+/// A week after [`ASKED`], when a weekly window lets go of it.
+const FREES_UP: Instant = Instant::from_seconds(1_787_605_449);
 
 /// One member, as the request service holds them.
 fn holding(approves_own: bool, limit: Option<u32>, used: u32) -> Held {
@@ -251,7 +254,7 @@ fn a_member_held_to_a_limit_reads_as_living_inside_one() {
     assert_eq!(said.standing, Standing::NearQuota);
     assert_eq!(said.films.remaining, Some(1));
     assert_eq!(said.films.period.as_deref(), Some("a week"));
-    assert_eq!(said.frees_up.as_deref(), Some("2026-08-24T21:04:09"));
+    assert_eq!(said.frees_up, Some(FREES_UP));
 }
 
 /// A member nothing limits reads as trusted, and has no date to give.
@@ -284,25 +287,21 @@ fn a_member_whose_requests_wait_reads_as_waiting() {
 /// which is worse than no day at all: it reads as room they already have.
 #[test]
 fn a_request_the_window_has_let_go_of_names_no_day() {
-    let stale = "2026-01-01T00:00:00";
+    let stale = Instant::from_seconds(1_767_225_600);
 
     let only_stale = reported(&holding(true, Some(5), 5), &[stale], now());
     assert_eq!(only_stale.frees_up, None, "a day already past was named");
 
     // The one still inside the window is the one it is waiting on.
     let both = reported(&holding(true, Some(5), 5), &[stale, ASKED], now());
-    assert_eq!(both.frees_up.as_deref(), Some("2026-08-24T21:04:09"));
+    assert_eq!(both.frees_up, Some(FREES_UP));
 }
 
-/// A member with a limit and no readable dates has no date to give.
+/// A member with a limit and no dated requests has no date to give.
 ///
 /// An invented one would be a promise about a day on which nothing happens.
 #[test]
-fn a_member_with_no_readable_dates_has_no_date_to_give() {
-    assert_eq!(
-        reported(&holding(true, Some(5), 5), &["soon"], now()).frees_up,
-        None
-    );
+fn a_member_with_no_dated_requests_has_no_date_to_give() {
     assert_eq!(
         reported(&holding(true, Some(5), 5), &[], now()).frees_up,
         None
@@ -345,7 +344,7 @@ fn each_kind_is_estimated_at_the_quality_it_is_fetched_at() {
 /// Only a request nobody has ruled on has been waiting.
 #[test]
 fn only_a_request_nobody_has_ruled_on_has_been_waiting() {
-    let now = crate::instant::read(ASKED).unwrap_or(UNIX_EPOCH) + Duration::from_secs(777_600);
+    let now = ASKED.later(9 * DAY);
 
     assert_eq!(
         waiting(Some(State::WaitingForApproval), Some(ASKED), now),

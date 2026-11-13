@@ -1,6 +1,7 @@
 //! The files written beside the project, and what the overlay merged after it comes to.
 
 use super::machine;
+use crate::instant::Instant;
 
 /// A project holding a stack service of the `dl` profile and a plugin's service.
 const HOLDING: &str =
@@ -183,8 +184,20 @@ fn rewriting_a_project_that_would_not_change_journals_nothing() {
         unreachable!("the carried stack reads")
     };
 
-    let first = super::super::rewritten(&ctx, &manifest, &[], "plugin komga", "1");
-    let second = super::super::rewritten(&ctx, &manifest, &[], "plugin komga", "2");
+    let first = super::super::rewritten(
+        &ctx,
+        &manifest,
+        &[],
+        "plugin komga",
+        Instant::from_seconds(1),
+    );
+    let second = super::super::rewritten(
+        &ctx,
+        &manifest,
+        &[],
+        "plugin komga",
+        Instant::from_seconds(2),
+    );
 
     assert!(first.is_ok() && second.is_ok(), "{first:?} {second:?}");
     assert_eq!(super::journal(&ctx).len(), 1);

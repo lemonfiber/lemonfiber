@@ -37,7 +37,7 @@ pub(super) async fn found(
     let theirs = crate::household::run::allowance_of(
         reached.requests.as_ref(),
         &reached.member,
-        ctx.seams.clock.now(),
+        ctx.stamp(),
     )
     .await
     .map_err(|_| not_working())?;
@@ -91,7 +91,7 @@ pub(super) async fn asked(
     let theirs = crate::household::run::allowance_of(
         reached.requests.as_ref(),
         &reached.member,
-        ctx.seams.clock.now(),
+        ctx.stamp(),
     )
     .await
     .map_err(|_| not_working())?;
@@ -101,7 +101,7 @@ pub(super) async fn asked(
         theirs.headroom.films,
         &reached.member.id,
         unit.medium(),
-        ctx.seams.clock.now(),
+        ctx.stamp(),
     );
     let report = |outcome: Became, cost: u32, request: Option<String>| {
         let leaves = leaves_of(unit, left, cost);

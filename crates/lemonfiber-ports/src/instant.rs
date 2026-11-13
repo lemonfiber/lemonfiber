@@ -103,6 +103,34 @@ impl Instant {
     pub const fn since(self, before: Self) -> u64 {
         self.0.saturating_sub(before.0)
     }
+
+    /// The day it falls on in UTC, where a calendar holds it.
+    #[must_use]
+    pub fn day(self) -> Option<Date> {
+        Date::from_unix_seconds(i64::try_from(self.0).ok()?)
+    }
+
+    /// The day and time of day it falls on in UTC as [`written`] writes them, where a
+    /// calendar holds it.
+    #[must_use]
+    pub fn calendar(self) -> Option<String> {
+        let date = self.day()?;
+        let clock = self.0 % DAY;
+        Some(format!(
+            "{date}T{:02}:{:02}:{:02}",
+            clock / HOUR,
+            (clock % HOUR) / MINUTE,
+            clock % MINUTE
+        ))
+    }
+
+    /// The day and time of day it falls on in UTC as a person reads them, or its digits
+    /// where no calendar holds it.
+    #[must_use]
+    pub fn said(self) -> String {
+        self.calendar()
+            .map_or_else(|| self.to_string(), |text| format!("{text} UTC"))
+    }
 }
 
 /// Written as its decimal digits, the shape it takes in a link's query.
@@ -221,24 +249,9 @@ pub fn kept_each<'de, D: Deserializer<'de>>(
 }
 
 /// `at` as a service writes an instant, or nothing where no calendar holds it.
-///
-/// A count of seconds too large for the calendar to place is passed on as the largest one
-/// there is, so it fails at the one place that can say so rather than at two — a moment
-/// out past the end of time is refused either way, and one refusal is enough.
 #[must_use]
 pub fn written(at: SystemTime) -> Option<String> {
-    let seconds = at.duration_since(UNIX_EPOCH).ok()?.as_secs();
-    let date = Date::from_unix_seconds(i64::try_from(seconds).unwrap_or(i64::MAX))?;
-    let clock = seconds % DAY;
-    Some(format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-        date.year,
-        date.month,
-        date.day,
-        clock / HOUR,
-        (clock % HOUR) / MINUTE,
-        clock % MINUTE
-    ))
+    Instant(at.duration_since(UNIX_EPOCH).ok()?.as_secs()).calendar()
 }
 
 /// The instant a service wrote, where what it wrote can be read as one.

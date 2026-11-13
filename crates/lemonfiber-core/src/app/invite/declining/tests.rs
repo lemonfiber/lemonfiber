@@ -60,17 +60,6 @@ fn the_invitations_hold_each_unclaimed_offer_that_carries_a_token() {
 }
 
 #[test]
-fn an_offer_whose_dates_cannot_be_read_is_left_out() {
-    let mut unreadable = offer(Some("ana-token"));
-    unreadable.offered = "yesterday".to_owned();
-    let offers: Offers = [("9".to_owned(), unreadable)].into_iter().collect();
-
-    assert!(invitations(&offers, &[member("9", "ana", false)])
-        .invitations
-        .is_empty());
-}
-
-#[test]
 fn a_token_is_recorded_as_its_hash_on_an_offer_already_recorded() {
     let offers: Offers = [("9".to_owned(), offer(None))].into_iter().collect();
 

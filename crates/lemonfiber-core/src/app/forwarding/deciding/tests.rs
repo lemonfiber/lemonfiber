@@ -1,4 +1,5 @@
 use super::{acts, came_to, unheld, Asking, CameTo, Client, Last, Pass};
+use crate::instant::Instant;
 use crate::journal::{Action, Kind};
 
 const LAST: Last = Last { port: Some(51413) };
@@ -79,7 +80,7 @@ fn a_set_refused_is_said_in_the_refusers_words_and_raised() {
         was: None,
     };
     assert!(!pass.passed());
-    assert!(pass.changes("1000").is_empty());
+    assert!(pass.changes(Instant::from_seconds(1000)).is_empty());
     assert_eq!(
         pass.said(),
         vec![
@@ -112,7 +113,7 @@ fn a_moved_port_is_journalled_as_the_clients_own_field_and_put_back_through_it()
     };
     assert!(pass.passed());
     assert_eq!(pass.fault(), None);
-    let changes = pass.changes("1000");
+    let changes = pass.changes(Instant::from_seconds(1000));
     let kinds: Vec<(String, Kind)> = changes
         .iter()
         .map(|change| (change.target.clone(), change.kind.clone()))

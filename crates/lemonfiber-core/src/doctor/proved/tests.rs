@@ -6,6 +6,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{declared, Running};
 use crate::doctor::{Category, Verdict};
+use crate::instant::Instant;
 use crate::plugin::program::{starting_digest, Operator, Starting};
 use crate::plugin::Installed;
 use crate::ports::program::Unran;
@@ -26,7 +27,7 @@ fn installed(kept: &Scratch) -> Option<Installed> {
     }))
 }
 
-fn running(program: Arc<Proving>, kept: &Scratch, now: &str, uid: &str) -> Running {
+fn running(program: Arc<Proving>, kept: &Scratch, now: Instant, uid: &str) -> Running {
     Running {
         program,
         operator: Operator {
@@ -35,7 +36,7 @@ fn running(program: Arc<Proving>, kept: &Scratch, now: &str, uid: &str) -> Runni
         },
         starting: Some(kept.path().to_path_buf()),
         kept: Some(kept.join("run-proofs.json")),
-        now: now.to_owned(),
+        now,
         random: Arc::new(lemonfiber_fixtures::ports::Chance::cycling()),
         confined: Arc::new(lemonfiber_adapters::Disk),
     }
@@ -67,7 +68,12 @@ async fn a_run_proof_is_run_once_and_its_verdict_kept_with_when_it_was_reached()
     let first = Proving::exiting(0, "v8.7.3 (Branch)");
     let said = verdicts(
         &installed,
-        &running(Arc::clone(&first), &kept, "100", "1000"),
+        &running(
+            Arc::clone(&first),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
     assert_eq!(first.asked().len(), 1);
@@ -76,7 +82,12 @@ async fn a_run_proof_is_run_once_and_its_verdict_kept_with_when_it_was_reached()
     let again = Proving::exiting(1, "broken");
     let said = verdicts(
         &installed,
-        &running(Arc::clone(&again), &kept, "200", "1000"),
+        &running(
+            Arc::clone(&again),
+            &kept,
+            Instant::from_seconds(200),
+            "1000",
+        ),
     )
     .await;
     assert!(again.asked().is_empty(), "a kept verdict is not run again");
@@ -95,14 +106,23 @@ async fn runs_again(named: &str, moved: impl Fn(&mut Installed, &mut String)) ->
     };
     let _ = verdicts(
         &installed,
-        &running(Proving::exiting(0, "v8.7.3 ("), &kept, "100", "1000"),
+        &running(
+            Proving::exiting(0, "v8.7.3 ("),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
     let mut changed = installed.clone();
     let mut uid = "1000".to_owned();
     moved(&mut changed, &mut uid);
     let again = Proving::exiting(0, "v8.7.3 (");
-    let _ = verdicts(&changed, &running(Arc::clone(&again), &kept, "200", &uid)).await;
+    let _ = verdicts(
+        &changed,
+        &running(Arc::clone(&again), &kept, Instant::from_seconds(200), &uid),
+    )
+    .await;
     again.asked().len() == 1
 }
 
@@ -153,7 +173,12 @@ async fn a_kept_verdict_is_kept_against_everything_its_run_depended_on() {
     };
     let _ = verdicts(
         &installed,
-        &running(Proving::exiting(0, "v8.7.3 ("), &kept, "100", "1000"),
+        &running(
+            Proving::exiting(0, "v8.7.3 ("),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
     let held = super::kept::read(Some(&kept.join("run-proofs.json")));
@@ -189,7 +214,12 @@ async fn starting_files_changed_since_the_install_leave_it_unverified_and_unrun(
     let program = Proving::exiting(0, "v8.7.3 (");
     let said = verdicts(
         &installed,
-        &running(Arc::clone(&program), &kept, "100", "1000"),
+        &running(
+            Arc::clone(&program),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
     assert!(program.asked().is_empty());
@@ -207,7 +237,12 @@ async fn a_failed_run_is_kept_and_reported_as_the_plugins_failure() {
     };
     let said = verdicts(
         &installed,
-        &running(Proving::exiting(2, "nope"), &kept, "100", "1000"),
+        &running(
+            Proving::exiting(2, "nope"),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
     assert!(
@@ -219,7 +254,12 @@ async fn a_failed_run_is_kept_and_reported_as_the_plugins_failure() {
     let again = Proving::exiting(0, "v8.7.3 (");
     let said = verdicts(
         &installed,
-        &running(Arc::clone(&again), &kept, "200", "1000"),
+        &running(
+            Arc::clone(&again),
+            &kept,
+            Instant::from_seconds(200),
+            "1000",
+        ),
     )
     .await;
     assert!(again.asked().is_empty());
@@ -238,7 +278,11 @@ async fn a_run_that_could_not_be_made_is_unverified_and_not_kept() {
     let unmade = Proving::answering(Err(Unran::NoImage {
         image: "x".to_owned(),
     }));
-    let said = verdicts(&installed, &running(unmade, &kept, "100", "1000")).await;
+    let said = verdicts(
+        &installed,
+        &running(unmade, &kept, Instant::from_seconds(100), "1000"),
+    )
+    .await;
     assert!(
         matches!(said.first(), Some(Verdict::Unverified { reason, .. }) if reason.contains("pulls no image")),
         "{said:?}"
@@ -246,7 +290,12 @@ async fn a_run_that_could_not_be_made_is_unverified_and_not_kept() {
     let later = Proving::exiting(0, "v8.7.3 (");
     let _ = verdicts(
         &installed,
-        &running(Arc::clone(&later), &kept, "200", "1000"),
+        &running(
+            Arc::clone(&later),
+            &kept,
+            Instant::from_seconds(200),
+            "1000",
+        ),
     )
     .await;
     assert_eq!(later.asked().len(), 1, "nothing was kept, so it runs");
@@ -260,7 +309,7 @@ fn a_run_proofs_check_is_the_plugins_and_bounded_by_its_own_limit() {
     };
     let checks = declared(
         &installed,
-        &running(Proving::unreachable(), &kept, "1", "1"),
+        &running(Proving::unreachable(), &kept, Instant::from_seconds(1), "1"),
     );
     assert_eq!(checks.len(), 1);
     let Some(check) = checks.first() else {
@@ -283,7 +332,11 @@ fn a_run_proofs_check_is_the_plugins_and_bounded_by_its_own_limit() {
     );
     let mut lost = installed;
     lost.services.clear();
-    assert!(declared(&lost, &running(Proving::unreachable(), &kept, "1", "1")).is_empty());
+    assert!(declared(
+        &lost,
+        &running(Proving::unreachable(), &kept, Instant::from_seconds(1), "1")
+    )
+    .is_empty());
 }
 
 #[tokio::test]
@@ -294,7 +347,12 @@ async fn a_run_proof_runs_again_for_new_starting_files_and_for_another_release()
     };
     let _ = verdicts(
         &installed,
-        &running(Proving::exiting(0, "v8.7.3 ("), &kept, "100", "1000"),
+        &running(
+            Proving::exiting(0, "v8.7.3 ("),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
 
@@ -313,7 +371,12 @@ async fn a_run_proof_runs_again_for_new_starting_files_and_for_another_release()
     let new_files = Proving::exiting(0, "v8.7.3 (");
     let _ = verdicts(
         &updated,
-        &running(Arc::clone(&new_files), &kept, "200", "1000"),
+        &running(
+            Arc::clone(&new_files),
+            &kept,
+            Instant::from_seconds(200),
+            "1000",
+        ),
     )
     .await;
     assert_eq!(
@@ -334,7 +397,12 @@ async fn a_run_proof_runs_again_for_new_starting_files_and_for_another_release()
     let new_release = Proving::exiting(0, "v8.7.3 (");
     let _ = verdicts(
         &updated,
-        &running(Arc::clone(&new_release), &kept, "300", "1000"),
+        &running(
+            Arc::clone(&new_release),
+            &kept,
+            Instant::from_seconds(300),
+            "1000",
+        ),
     )
     .await;
     assert_eq!(
@@ -357,7 +425,12 @@ async fn starting_files_that_cannot_be_read_leave_it_unverified_and_unrun() {
     let program = Proving::exiting(0, "v8.7.3 (");
     let said = verdicts(
         &installed,
-        &running(Arc::clone(&program), &kept, "100", "1000"),
+        &running(
+            Arc::clone(&program),
+            &kept,
+            Instant::from_seconds(100),
+            "1000",
+        ),
     )
     .await;
     assert!(program.asked().is_empty());

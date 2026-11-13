@@ -13,6 +13,7 @@ use ring::rand::SystemRandom;
 use super::{delivered, woke};
 use crate::app::Ctx;
 use crate::config::Settings;
+use crate::instant::Instant;
 use crate::model::DeliveryOutcome;
 use crate::ports::http::Http;
 use crate::push::{Kept, Record};
@@ -26,7 +27,7 @@ fn record(auth: &str) -> Record {
             .map(|public| URL_SAFE_NO_PAD.encode(public.as_ref()))
             .unwrap_or_default(),
         auth: auth.to_owned(),
-        registered: String::new(),
+        registered: Instant::EPOCH,
         owed: 1,
         owner: None,
         wakes: Vec::new(),

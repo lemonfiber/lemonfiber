@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
-use lemonfiber_fixtures::ports::{stamp, DAY, HOUR};
+use lemonfiber_fixtures::ports::{moment, stamp, DAY, HOUR};
 
 use super::{chosen, counted, said, Choice};
 use crate::app::{Ctx, Outcome};
@@ -479,7 +479,7 @@ async fn an_ask_past_the_members_allowance_is_refused_saying_when_it_frees_up() 
                 arrived: None,
                 shelf_id: None,
                 id,
-                made: Some(format!("{}.000Z", stamp(at))),
+                made: Some(moment(at)),
                 member: member.to_owned(),
                 member_id: member_id.map(str::to_owned),
                 kind: Some(Kind::Movies),

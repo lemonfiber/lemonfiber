@@ -7,6 +7,7 @@ use crate::alert::Notification;
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::error::codes::notify::NO_SUCH_WAKE;
+use crate::instant::Instant;
 use crate::model::DeliveryOutcome;
 use crate::push::{Kept, Record};
 
@@ -16,7 +17,7 @@ fn record(name: &str, owner: Option<&str>) -> Record {
         endpoint: "https://push.example/a".to_owned(),
         p256dh: String::new(),
         auth: String::new(),
-        registered: String::new(),
+        registered: Instant::EPOCH,
         owed: 0,
         owner: owner.map(str::to_owned),
         wakes: Vec::new(),

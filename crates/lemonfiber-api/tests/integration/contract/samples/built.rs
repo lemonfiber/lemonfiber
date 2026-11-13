@@ -2,6 +2,7 @@
 
 use lemonfiber_core::credential::Inventory;
 use lemonfiber_core::glossary::Term;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{
     FrontDoorReport, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove,
     SettingRead, SettingsReport, SubstitutionReport, UpdateReport, WalkthroughReport, WiringReport,
@@ -620,7 +621,7 @@ pub(super) fn manifest() -> lemonfiber_core::backup::Manifest {
     lemonfiber_core::backup::Manifest {
         schema: lemonfiber_core::backup::SCHEMA,
         product_version: "0.1.0".to_owned(),
-        created_at: lemonfiber_core::instant::Instant::from_seconds(0),
+        created_at: Instant::EPOCH,
         data_root: String::new(),
         scope: lemonfiber_core::backup::Scope::WholeStack,
         sensitive: true,

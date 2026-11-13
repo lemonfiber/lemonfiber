@@ -27,7 +27,7 @@
 //! next door already keep — so a run stopped at the terminal loses the summary and none of
 //! the substance, and the household reading this answers with is where all of it is read.
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use crate::asking::Expiry;
 use crate::error::{Diagnose, Problem};

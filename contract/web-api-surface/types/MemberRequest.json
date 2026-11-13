@@ -2,13 +2,13 @@
   "fields": {
     "arrived": {
       "type": [
-        "null|string"
+        "integer|null/uint64"
       ],
       "required": false
     },
     "asked": {
       "type": [
-        "null|string"
+        "integer|null/uint64"
       ],
       "required": false
     },

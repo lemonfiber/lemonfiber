@@ -11,6 +11,7 @@ use crate::error::codes::key::{
     BAD_NAME, MEMBERS_MAY_NOT_MINT, NAME_TAKEN, NOT_A_PURPOSE, NOT_A_SCOPE, NOT_FOR_YOURSELF,
     NO_SECRET, NO_SUCH_KEY, NO_SUCH_MEMBER, UNASKED, UNREADABLE,
 };
+use crate::instant::Instant;
 use crate::journal::Kind;
 use crate::keys::{Kept, Minter, Purpose, State, Used};
 use crate::test_support::{a_context, media};
@@ -358,13 +359,13 @@ async fn the_listing_says_when_each_key_was_last_used() {
         .is_ok());
     let mut used = Used::default();
     used.at
-        .insert("ha".to_owned(), "2026-10-05T08:00:00".to_owned());
+        .insert("ha".to_owned(), Instant::from_seconds(1_791_187_200));
     used.keep(&used_at(&ctx).unwrap_or_default());
     let listing = list(&ctx, &Minter::Operator).await;
     assert!(listing.is_ok_and(|listing| listing
         .keys
         .iter()
-        .any(|key| key.used.as_deref() == Some("2026-10-05T08:00:00"))));
+        .any(|key| key.used == Some(Instant::from_seconds(1_791_187_200)))));
 }
 
 #[tokio::test]
@@ -415,11 +416,11 @@ async fn putting_back_the_run_that_minted_a_key_revokes_it_and_records_the_revok
         .is_ok());
     let Some(at) = crate::app::targets::layout(&ctx)
         .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
-        .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+        .and_then(|journal| journal.changes().last().map(|change| change.at))
     else {
         unreachable!("a mint is journaled")
     };
-    let reversed = crate::app::putting_back::undo(&ctx, Some(&at)).await;
+    let reversed = crate::app::putting_back::undo(&ctx, Some(at)).await;
     assert!(
         reversed.is_ok(),
         "{:?}",
@@ -508,7 +509,7 @@ async fn keys_that_cannot_be_written_are_not_put_back() {
         .is_ok());
     let Some(at) = crate::app::targets::layout(&ctx)
         .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
-        .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+        .and_then(|journal| journal.changes().last().map(|change| change.at))
     else {
         unreachable!("a mint is journaled")
     };
@@ -517,7 +518,7 @@ async fn keys_that_cannot_be_written_are_not_put_back() {
     };
     assert!(std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).is_ok());
     let undone_now = undone(&ctx, "ha").await;
-    let put_back = crate::app::putting_back::undo(&ctx, Some(&at)).await;
+    let put_back = crate::app::putting_back::undo(&ctx, Some(at)).await;
     let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755));
     assert!(undone_now.is_err());
     assert!(put_back.is_err());
@@ -545,7 +546,7 @@ async fn a_member_key_is_listed_unconfirmed_while_the_household_cannot_be_asked(
         },
         Purpose::Mcp,
         &secret,
-        "2026-10-05T06:00:00".to_owned(),
+        Instant::from_seconds(1_791_180_000),
         Minter::Operator,
     );
     let Some(path) = at(&ctx) else {

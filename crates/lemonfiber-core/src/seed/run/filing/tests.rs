@@ -6,6 +6,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{categories, completed, field, filed};
 use crate::baseline::Baseline;
+use crate::instant::Instant;
 use crate::ports::service::{Failure, Filed, Filing};
 use crate::seed::State;
 use crate::test_support::{a_context, torrent};
@@ -112,7 +113,12 @@ fn tv_and_movies() -> BTreeSet<String> {
 /// A baseline recording that lemonfiber filed `category` where it files it.
 fn filed_before(category: &str) -> Baseline {
     let mut baseline = Baseline::new();
-    baseline.record(CLIENT, &field(category), &completed(category), "earlier");
+    baseline.record(
+        CLIENT,
+        &field(category),
+        &completed(category),
+        Instant::from_seconds(1_000),
+    );
     baseline
 }
 

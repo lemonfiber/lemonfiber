@@ -7,6 +7,7 @@ use crate::alert::{Digest, Outbox};
 use crate::condition::{Conditions, Fault};
 use crate::error::Severity;
 use crate::health::Reach;
+use crate::instant::Instant;
 use crate::notify::{Channel, Undelivered};
 use crate::test_support::{a_context, spoke, Reporting, Scripted as ScriptedRunner};
 
@@ -78,7 +79,7 @@ fn stalled() -> Conditions {
             "nothing is arriving for them",
             "check the indexer is answering",
         )),
-        "1000",
+        Instant::from_seconds(1000),
     );
     conditions
 }
@@ -197,7 +198,7 @@ async fn a_channel_that_starts_working_again_stops_being_wrong() {
             "nothing can be written until something goes",
             "delete something, or move the library",
         )),
-        "2000",
+        Instant::from_seconds(2000),
     );
     notify(
         &ctx,
@@ -267,7 +268,7 @@ async fn a_resolution_is_said_to_whoever_heard_the_onset() {
     )
     .await;
 
-    conditions.observe("queue.stalled", None, "2026-08-09T11:00:00Z");
+    conditions.observe("queue.stalled", None, Instant::from_seconds(1_786_273_200));
     let over = notify(
         &ctx,
         Reach::Running,
@@ -336,7 +337,7 @@ fn critical() -> Conditions {
             "this connection's address is visible to every peer",
             "stop the client",
         )),
-        "1",
+        Instant::from_seconds(1),
     );
     conditions
 }

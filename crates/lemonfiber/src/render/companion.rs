@@ -36,7 +36,7 @@ pub(super) fn pairing(report: &Pairing) -> Lines {
     }
     lines.put(format!(
         "It stops being good at {}, {} minutes from now.",
-        crate::render::news::when(report.until),
+        report.until.said(),
         LASTS.as_secs() / 60
     ));
     lines.spaced(format!(

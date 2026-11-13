@@ -4,6 +4,7 @@ use super::{cleared, fills, held, witness};
 use crate::app::plugins::tests::unrewritable;
 use crate::app::Ctx;
 use crate::config::paths::NONCONFORMING;
+use crate::instant::Instant;
 use crate::test_support::a_context;
 
 /// A context whose settings live in a directory of the test's own, and that directory.
@@ -38,7 +39,7 @@ fn an_answer_outside_the_contract_keeps_the_plugin_from_filling_that_capability_
     );
     assert!(kept
         .iter()
-        .all(|one| one.plugin == "plex" && !one.at.is_empty()));
+        .all(|one| one.plugin == "plex" && one.at > Instant::EPOCH));
     assert!(!fills(&ctx, "plex", "media.serve"));
     assert!(fills(&ctx, "plex", "identity.source"));
     assert!(fills(&ctx, "jellyfin", "media.serve"));

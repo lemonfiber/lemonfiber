@@ -3,6 +3,7 @@ use crate::asking::Policy;
 use crate::changelog::Record;
 use crate::error::Severity;
 use crate::health::Affected;
+use crate::instant::{Instant, HOUR};
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, TitleKind, TitleUnit};
 
 /// A record holding three releases, a file each, as the pipeline writes them.
@@ -30,7 +31,7 @@ fn asked(id: &str, hour: Option<u32>, title: Option<&str>) -> MemberRequest {
         arrived: None,
         shelf_id: None,
         id: id.to_owned(),
-        asked: hour.map(|hour| format!("2026-11-08T{hour:02}:00:00.000Z")),
+        asked: hour.map(|hour| Instant::from_seconds(1_794_096_000 + u64::from(hour) * HOUR)),
         title: title.map(str::to_owned),
         media: None,
         kind: None,
@@ -60,10 +61,10 @@ fn household(members: Vec<HouseholdMember>) -> HouseholdReport {
     }
 }
 
-fn wrong(check: &str, onset: &str) -> Affected {
+fn wrong(check: &str, onset: Instant) -> Affected {
     Affected {
         check: check.to_owned(),
-        onset: onset.to_owned(),
+        onset,
         severity: Severity::Error,
         summary: format!("{check} is wrong"),
         meaning: String::new(),
@@ -125,10 +126,10 @@ fn a_request_is_newer_by_when_it_was_asked_whoever_keeps_it_and_whoever_asked() 
 #[test]
 fn a_problem_is_newer_by_when_it_went_wrong_and_by_check_within_a_moment() {
     let affected = [
-        wrong("vpn.egress", "1000"),
-        wrong("service.sonarr", "3000"),
-        wrong("service.radarr", "3000"),
-        wrong("storage.space", "written by hand"),
+        wrong("vpn.egress", Instant::from_seconds(1000)),
+        wrong("service.sonarr", Instant::from_seconds(3000)),
+        wrong("service.radarr", Instant::from_seconds(3000)),
+        wrong("storage.space", Instant::EPOCH),
     ];
 
     let news = News::of(None, None, &affected);
@@ -167,7 +168,7 @@ fn a_kind_that_could_not_be_read_is_named_rather_than_left_empty() {
 #[test]
 fn the_newest_of_each_kind_is_the_first_ten_by_what_names_them() {
     let affected: Vec<Affected> = (0..15)
-        .map(|at| wrong(&format!("check.{at:02}"), &(1000 + at).to_string()))
+        .map(|at| wrong(&format!("check.{at:02}"), Instant::from_seconds(1000 + at)))
         .collect();
     let house = household(vec![member(
         "Anna",
@@ -189,8 +190,8 @@ fn the_newest_of_each_kind_is_the_first_ten_by_what_names_them() {
         newest
             .problems
             .first()
-            .map(|one| (one.check.as_str(), one.onset.as_str())),
-        Some(("check.14", "1014"))
+            .map(|one| (one.check.as_str(), one.onset)),
+        Some(("check.14", Instant::from_seconds(1014)))
     );
     assert_eq!(newest.requests.last().map(String::as_str), Some("6"));
 }

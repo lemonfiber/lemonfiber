@@ -150,7 +150,12 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         format!("{:?}", source.claim("Ana", &chosen, "phone").await),
         format!("{:?}", source.unclaim("b8e4").await),
         format!("{:?}", source.withdraw("b8e4").await),
-        format!("{:?}", source.when_invited("2026-10-01").await),
+        format!(
+            "{:?}",
+            source
+                .when_invited(lemonfiber_ports::Instant::from_seconds(1_790_812_800))
+                .await
+        ),
         format!("{:?}", source.libraries().await),
         format!("{:?}", source.ratings().await),
         format!("{:?}", source.country().await),

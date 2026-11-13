@@ -17,13 +17,14 @@ pub mod identifier;
 pub mod served;
 
 use std::path::Path;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 use serde::Serialize;
 
 use crate::app::Ctx;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::PRODUCT;
 
 /// What was asked of pairing.

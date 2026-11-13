@@ -2,6 +2,7 @@
 //! and never into the project.
 
 use super::machine;
+use crate::instant::Instant;
 
 /// The key the operator entered for the egress guard.
 const KEY: &str = "wireguard-private-key-value";
@@ -424,7 +425,7 @@ fn the_guards_key_entered_under_its_earlier_name_is_read_by_the_kept_guard() {
 fn entering() -> crate::settings::legacy::Entering<'static> {
     crate::settings::legacy::Entering {
         operation: crate::settings::OPERATION,
-        stamp: "0",
+        stamp: Instant::from_seconds(0),
         at: 0,
         random: &RANDOM,
     }

@@ -8,10 +8,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use lemonfiber_fixtures::ports::STAMPED;
 
 use crate::archive::{Archive, Archiving, Fault, Reader, Space};
 use crate::backup::{self, Existing, Item, Manifest, Scope, SCHEMA};
 use crate::config::paths::Paths;
+use crate::instant::Instant;
 use crate::test_support::a_context;
 
 /// More room than any writer asks to keep free, so a test that is not about room does not
@@ -74,15 +76,14 @@ impl FakeArchive {
         }
     }
 
-    /// The same archive, keeping the backups named — each with the moment it was
-    /// taken, written the way the adapter writes one.
-    pub(crate) fn keeping_backups(kept: &[(&str, &str)]) -> Self {
+    /// The same archive, keeping the backups named, each with the instant it was taken.
+    pub(crate) fn keeping_backups(kept: &[(&str, Instant)]) -> Self {
         Self {
             existing: Ok(kept
                 .iter()
                 .map(|(name, taken)| Existing {
                     name: (*name).to_owned(),
-                    created_at: (*taken).to_owned(),
+                    created_at: *taken,
                 })
                 .collect()),
             ..Self::roomy()
@@ -128,7 +129,7 @@ pub(crate) const CURRENT: &str = "0.3.0";
 /// A whole-stack manifest taken against `/srv/media`, as an archive carries one.
 fn manifest_of(version: &str, schema: u32) -> Manifest {
     let plan = backup::plan(&paths(), &Scope::WholeStack, &[]);
-    let mut manifest = Manifest::describe(&plan, version, "t", "/srv/media");
+    let mut manifest = Manifest::describe(&plan, version, STAMPED, "/srv/media");
     manifest.schema = schema;
     manifest
 }

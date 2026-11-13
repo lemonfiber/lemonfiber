@@ -1,8 +1,10 @@
 use super::{Action, Change, Journal, Kind, Undo};
+use crate::instant::Instant;
+use lemonfiber_fixtures::ports::STAMPED;
 
 fn created(target: &str, id: &str) -> Change {
     Change {
-        at: "2026-07-28T00:00:00Z".to_owned(),
+        at: Instant::from_seconds(1_785_196_800),
         operation: "seed".to_owned(),
         target: target.to_owned(),
         kind: Kind::Created {
@@ -14,7 +16,7 @@ fn created(target: &str, id: &str) -> Change {
 
 fn configured(previous: Option<&str>) -> Change {
     Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "repair".to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Configured {
@@ -64,7 +66,7 @@ fn a_field_that_held_nothing_is_put_back_to_nothing() {
 
 fn made(path: &str) -> Change {
     Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: path.to_owned(),
         kind: Kind::Made {
@@ -75,7 +77,7 @@ fn made(path: &str) -> Change {
 
 fn pinned(service: &str, previous: &str, current: &str) -> Change {
     Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "update".to_owned(),
         target: service.to_owned(),
         kind: Kind::Pinned {
@@ -107,7 +109,7 @@ fn undoing_a_version_move_asks_for_the_previous_pin() {
 #[test]
 fn undoing_a_rewritten_file_puts_back_what_it_held() {
     let rewritten = Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "wiring".to_owned(),
         target: "/srv/stack/compose/plugins/server.yml".to_owned(),
         kind: Kind::Rewritten {
@@ -135,7 +137,7 @@ fn undoing_a_rewritten_file_puts_back_what_it_held() {
 #[test]
 fn undoing_a_region_takes_it_back_out() {
     let region = Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "plugin komga".to_owned(),
         target: "/srv/stack/config/caddy/Caddyfile".to_owned(),
         kind: Kind::Region {
@@ -162,7 +164,7 @@ fn undoing_a_region_takes_it_back_out() {
 #[test]
 fn undoing_a_move_moves_it_back_and_undoing_a_copy_keeps_it() {
     let at = |kind: Kind| Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "project".to_owned(),
         target: "/srv/stack/mounts/jellyfin/cache".to_owned(),
         kind,
@@ -198,7 +200,7 @@ fn undoing_a_move_moves_it_back_and_undoing_a_copy_keeps_it() {
 #[test]
 fn undoing_a_rename_moves_the_value_back_under_the_key_it_left() {
     let renamed = Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "settings".to_owned(),
         target: "MEDIA_SERVER_MODE".to_owned(),
         kind: Kind::Renamed {
@@ -288,7 +290,7 @@ fn undoing_a_creation_removes_exactly_what_was_created() {
 #[test]
 fn undoing_a_set_restores_what_was_there() {
     let change = Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -310,7 +312,7 @@ fn undoing_a_set_restores_what_was_there() {
 #[test]
 fn undoing_a_set_that_had_nothing_before_removes_it() {
     let change = Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -337,7 +339,7 @@ fn rewinding_unwinds_most_recent_first() {
     let mut journal = Journal::new();
     journal.record(created("sonarr", "1"));
     journal.record(Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -382,7 +384,7 @@ fn a_prior_empty_string_is_restored_rather_than_removed() {
     // An empty prior value is a value, distinct from no value at all: undoing
     // restores the empty string, it does not remove the setting.
     let change = Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -411,7 +413,7 @@ fn a_journal_is_restored_from_the_changes_read_back() {
 #[test]
 fn a_change_survives_a_round_trip_through_the_log_format() {
     let set = |previous: Option<&str>| Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -505,7 +507,7 @@ fn every_reversal_writes_itself_as_what_it_does() {
 #[test]
 fn a_key_change_is_reversed_by_name() {
     let change = |kind: Kind| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "key".to_owned(),
         target: "ha".to_owned(),
         kind,
@@ -535,7 +537,7 @@ fn a_key_change_is_reversed_by_name() {
 #[test]
 fn a_device_key_change_is_reversed_by_name() {
     let change = |kind: Kind| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "device-key".to_owned(),
         target: "pixel".to_owned(),
         kind,
@@ -579,7 +581,7 @@ fn a_device_key_change_is_reversed_by_name() {
 #[test]
 fn a_change_to_the_overlay_is_reversed_by_leaving_it() {
     let overlaid = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "overlay".to_owned(),
         target: "/cfg/overlay.yml".to_owned(),
         kind: Kind::Overlaid {
@@ -599,7 +601,7 @@ fn a_change_to_the_overlay_is_reversed_by_leaving_it() {
 #[test]
 fn a_replaced_certificate_is_reversed_by_leaving_it() {
     let replaced = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "internal-certificate".to_owned(),
         target: "jellyfin".to_owned(),
         kind: Kind::Certified {
@@ -621,7 +623,7 @@ fn a_replaced_certificate_is_reversed_by_leaving_it() {
 #[test]
 fn a_guard_moved_in_place_round_trips_and_is_reversed_by_leaving_it() {
     let moved = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "plugin request-gate".to_owned(),
         target: "request-gate".to_owned(),
         kind: Kind::MovedInPlace {
@@ -648,7 +650,7 @@ fn a_guard_moved_in_place_round_trips_and_is_reversed_by_leaving_it() {
 #[test]
 fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left() {
     let setting = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "settings".to_owned(),
         target: "komga:mode".to_owned(),
         kind: Kind::Setting {
@@ -692,7 +694,7 @@ fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left
 #[test]
 fn undoing_a_grant_gives_back_what_it_ended_and_ends_what_it_gave() {
     let granted = |given: bool| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "plugin:reader".to_owned(),
         target: "SONARR_API_KEY".to_owned(),
         kind: Kind::Granted {
@@ -713,7 +715,7 @@ fn undoing_a_grant_gives_back_what_it_ended_and_ends_what_it_gave() {
 #[test]
 fn undoing_a_part_stopped_starts_it_and_one_started_stops_it() {
     let ran = |running: bool| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "substitute".to_owned(),
         target: "prowlarr".to_owned(),
         kind: Kind::Ran {
@@ -735,7 +737,7 @@ fn undoing_a_part_stopped_starts_it_and_one_started_stops_it() {
 #[test]
 fn undoing_a_restart_leaves_the_service_running() {
     let restarted = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "seed".to_owned(),
         target: "recyclarr".to_owned(),
         kind: Kind::Restarted {

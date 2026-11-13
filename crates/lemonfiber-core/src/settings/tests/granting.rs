@@ -1,6 +1,7 @@
 use super::changing::{machine, running, Machine};
 use super::reaching::{refused_as_unreached, unwritable_files};
 use crate::config::store;
+use crate::instant::Instant;
 use crate::journal::Kind;
 use crate::plugin::{Grant, Installed, Register};
 use crate::settings::Resolved;
@@ -108,7 +109,7 @@ fn a_third_party_install_asks_one_grant_for_each_credential_it_names_and_a_trust
     assert_eq!(
         asked,
         vec![Grant {
-            at: String::new(),
+            at: None,
             ..the_grant()
         }]
     );
@@ -252,7 +253,7 @@ fn an_undone_grant_gives_back_only_what_is_absent_and_ends_only_the_approval_it_
     let mut register = Register::empty();
     assert!(register.record(reader(Vec::new())).is_ok());
     let later = Grant {
-        at: "2".to_owned(),
+        at: Some(Instant::from_seconds(2)),
         ..the_grant()
     };
 
@@ -271,12 +272,19 @@ fn a_grant_is_journalled_as_ended_where_an_act_drops_it_and_given_where_it_adds_
     let given = crate::app::plugins::granting::journalled;
     let machine = granting("granted-journalled", reader(Vec::new()));
     let later = Grant {
-        at: "2".to_owned(),
+        at: Some(Instant::from_seconds(2)),
         ..the_grant()
     };
 
-    assert!(given(&machine.ctx, "reader", &[], &[], "3").is_ok());
-    assert!(given(&machine.ctx, "reader", &[the_grant()], &[later], "3").is_ok());
+    assert!(given(&machine.ctx, "reader", &[], &[], Instant::from_seconds(3)).is_ok());
+    assert!(given(
+        &machine.ctx,
+        "reader",
+        &[the_grant()],
+        &[later],
+        Instant::from_seconds(3)
+    )
+    .is_ok());
 
     assert_eq!(
         journalled(&machine),
@@ -310,7 +318,7 @@ fn a_grant_is_asked_once_for_each_credential_held_here_and_never_for_an_aimless_
     assert_eq!(
         asked,
         vec![Grant {
-            at: String::new(),
+            at: None,
             ..the_grant()
         }]
     );
@@ -319,12 +327,12 @@ fn a_grant_is_asked_once_for_each_credential_held_here_and_never_for_an_aimless_
 #[test]
 fn an_approved_grant_is_stamped_when_it_was_approved() {
     let asked = Grant {
-        at: String::new(),
+        at: None,
         ..the_grant()
     };
 
     assert_eq!(
-        crate::app::plugins::granting::approved(&[asked], "1"),
+        crate::app::plugins::granting::approved(&[asked], Some(Instant::from_seconds(1))),
         vec![the_grant()]
     );
 }
@@ -337,8 +345,22 @@ fn a_grant_change_with_no_journal_to_take_it_is_refused() {
     let journal = crate::app::targets::layout(&machine.ctx).map(|paths| paths.journal());
     assert!(journal.is_some_and(|journal| std::fs::create_dir_all(journal).is_ok()));
 
-    assert!(given(&homeless, "reader", &[], &[the_grant()], "3").is_err());
-    assert!(given(&machine.ctx, "reader", &[], &[the_grant()], "3").is_err());
+    assert!(given(
+        &homeless,
+        "reader",
+        &[],
+        &[the_grant()],
+        Instant::from_seconds(3)
+    )
+    .is_err());
+    assert!(given(
+        &machine.ctx,
+        "reader",
+        &[],
+        &[the_grant()],
+        Instant::from_seconds(3)
+    )
+    .is_err());
 }
 
 #[tokio::test]
@@ -405,10 +427,10 @@ async fn a_revoke_asked_of_the_credentials_for_a_grant_not_held_is_refused_and_e
 }
 
 /// The stamp of the newest change the journal on `machine` holds.
-fn newest(machine: &Machine) -> String {
+fn newest(machine: &Machine) -> Instant {
     crate::app::targets::layout(&machine.ctx)
         .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
-        .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+        .and_then(|journal| journal.changes().last().map(|change| change.at))
         .unwrap_or_default()
 }
 
@@ -435,7 +457,7 @@ async fn an_undone_revoke_gives_the_grant_back_and_it_crosses_again() {
     assert!(ended.is_ok_and(|(ended, _)| ended.ended));
     assert!(std::fs::read_to_string(&file).is_ok_and(|text| !text.contains("series-key")));
 
-    let undone = crate::app::putting_back::undo(&machine.ctx, Some(&newest(&machine))).await;
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some(newest(&machine))).await;
 
     assert!(undone.is_ok(), "{undone:?}");
     assert_eq!(recorded(&machine), vec![the_grant()]);
@@ -459,11 +481,11 @@ async fn an_undone_grant_ends_it_and_writes_the_credential_out() {
         "reader",
         &[],
         &[the_grant()],
-        "2"
+        Instant::from_seconds(2)
     )
     .is_ok());
 
-    let undone = crate::app::putting_back::undo(&machine.ctx, Some("2")).await;
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some(Instant::from_seconds(2))).await;
 
     assert!(undone.is_ok(), "{undone:?}");
     assert!(recorded(&machine).is_empty());

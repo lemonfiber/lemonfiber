@@ -8,7 +8,6 @@ use lemonfiber_core::device_keys;
 use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, State};
 use lemonfiber_core::push;
 
-use super::news::when;
 use super::{qr, Lines};
 
 /// A key minted, with its secret, the address and the pin a client elsewhere needs.
@@ -58,7 +57,7 @@ pub(super) fn claimed(report: &Claimed) -> Lines {
     lines.spaced(format!(
         "The program collects the key with it once, until {}. A key nobody collects by then \
          is revoked, and collecting it is told to you.",
-        when(report.lapses)
+        report.lapses.said()
     ));
     lines
 }
@@ -103,14 +102,14 @@ fn one(key: &Listed) -> Lines {
     ));
     let used = key.used.map_or_else(
         || "never used".to_owned(),
-        |used| format!("last used {}", when(used)),
+        |used| format!("last used {}", used.said()),
     );
-    lines.put(format!("    minted {}, {used}", when(key.minted)));
+    lines.put(format!("    minted {}, {used}", key.minted.said()));
     if let Some(device) = key.proved_by.as_deref() {
         lines.put(format!("    proved by the device key {device}"));
     }
     if let Some(revoked) = key.revoked {
-        lines.put(format!("    revoked {}", when(revoked)));
+        lines.put(format!("    revoked {}", revoked.said()));
     }
     lines
 }
@@ -158,17 +157,18 @@ pub(super) fn devices(report: &device_keys::Listing) -> Lines {
     for key in &report.keys {
         let used = key.used.map_or_else(
             || "never used".to_owned(),
-            |used| format!("last used {}", when(used)),
+            |used| format!("last used {}", used.said()),
         );
-        let standing = key
-            .revoked
-            .map_or_else(|| "active".to_owned(), |at| format!("revoked {}", when(at)));
+        let standing = key.revoked.map_or_else(
+            || "active".to_owned(),
+            |at| format!("revoked {}", at.said()),
+        );
         lines.put(format!(
             "  {}  {}  {}  registered {}  {used}  {standing}",
             key.name,
             key.backing.written(),
             key.app,
-            when(key.registered)
+            key.registered.said()
         ));
         lines.put(format!("    fingerprint  {}", key.fingerprint));
     }
@@ -210,7 +210,7 @@ pub(super) fn pushes(report: &push::Listing) -> Lines {
             "  {}  {}  registered {}",
             one.name,
             one.endpoint,
-            when(one.registered)
+            one.registered.said()
         ));
     }
     lines

@@ -4,8 +4,13 @@
   "type": "object",
   "properties": {
     "at": {
-      "description": "When the service reported it.",
-      "type": "string"
+      "description": "When it happened, where the service reported it.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "outcome": {
       "description": "What happened.",
@@ -13,7 +18,6 @@
     }
   },
   "required": [
-    "outcome",
-    "at"
+    "outcome"
   ]
 }

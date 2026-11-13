@@ -17,11 +17,12 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{InvitationStanding, MemberStanding};
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Invited, Member};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::ports::{stamp, DAY, HOUR};
+use lemonfiber_fixtures::ports::{moment, stamp, DAY, HOUR};
 use lemonfiber_testing::media;
 
 /// The household.
@@ -39,11 +40,11 @@ fn household() -> Vec<Member> {
     owner.last_seen = None;
     let mut ana = media::member("9", "ana", false);
     ana.access.disabled = true;
-    ana.last_seen = Some("2026-03-01T10:00:00Z".to_owned());
+    ana.last_seen = Some(Instant::from_seconds(1_772_359_200));
     let mut cy = media::member("5", "cy", false);
-    cy.last_seen = Some("2025-12-01T10:00:00Z".to_owned());
+    cy.last_seen = Some(Instant::from_seconds(1_764_583_200));
     let mut fay = media::member("12", "fay", true);
-    fay.last_seen = Some(format!("{}Z", stamp(-2 * DAY + 10 * HOUR)));
+    fay.last_seen = Some(moment(-2 * DAY + 10 * HOUR));
     vec![
         owner,
         ana,
@@ -59,19 +60,19 @@ fn household() -> Vec<Member> {
 ///
 /// January is long past the window, and yesterday is inside it.
 fn recorded() -> Vec<Invited> {
-    let january = "2026-01-04T09:00:00Z";
+    let january = Instant::from_seconds(1_767_517_200);
     vec![
         Invited {
             member: "7".to_owned(),
-            at: january.to_owned(),
+            at: Some(january),
         },
         Invited {
             member: "5".to_owned(),
-            at: january.to_owned(),
+            at: Some(january),
         },
         Invited {
             member: "11".to_owned(),
-            at: format!("{}Z", stamp(-DAY + 10 * HOUR)),
+            at: Some(moment(-DAY + 10 * HOUR)),
         },
     ]
 }

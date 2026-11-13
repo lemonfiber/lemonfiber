@@ -6,6 +6,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{identified, identity, media, served, serving};
 use crate::app::Ctx;
+use crate::instant::Instant;
 use crate::plugin::Installed;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::test_support::media as moved_in;
@@ -245,7 +246,7 @@ async fn members_reach_a_media_server_claimed_against_an_outside_account_only_on
         &part,
         crate::seed::run::owning::FIELD,
         "ours",
-        "2026-10-31T00:00:00Z",
+        Instant::from_seconds(1_793_404_800),
     );
     crate::seed::run::save_baseline(&ctx, &baseline);
     assert!(media(&ctx, &manifest).await.is_some());

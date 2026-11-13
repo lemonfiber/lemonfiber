@@ -189,7 +189,7 @@ fn made_whole(
 /// reversal has to remove. Recorded parent-first and so unwound child-first, exactly as an
 /// apply records the data root it makes.
 pub(super) fn recorded_making(
-    (plugin, stamp, journal): (&str, &str, &Path),
+    (plugin, stamp, journal): (&str, Instant, &Path),
     path: &Path,
     directory: bool,
 ) -> Result<(), Box<Problem>> {

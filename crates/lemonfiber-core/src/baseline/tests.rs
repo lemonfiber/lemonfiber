@@ -1,12 +1,23 @@
 use super::{Baseline, Origin, Record};
+use crate::instant::Instant;
 
 #[test]
 fn a_recorded_value_is_written_and_an_adopted_one_is_adopted() {
     // The origin is the whole of the difference a later comparison reads: what
     // lemonfiber wrote is written, what it took from the operator is adopted.
     let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
-    baseline.adopt("radarr", "downloadclient:qbittorrent:8081", "mine", "1");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
+    baseline.adopt(
+        "radarr",
+        "downloadclient:qbittorrent:8081",
+        "mine",
+        Instant::from_seconds(1),
+    );
     assert_eq!(
         baseline
             .entry("sonarr", "downloadclient:sabnzbd:8080")
@@ -24,7 +35,7 @@ fn a_record_without_an_origin_reads_as_written() {
     // deserialize as written, the only kind those runs recorded.
     let record: Record = serde_json::from_str(r#"{"value":"tv","at":"1"}"#).unwrap_or(Record {
         value: String::new(),
-        at: String::new(),
+        at: Instant::EPOCH,
         origin: Origin::Adopted,
     });
     assert_eq!(record.origin, Origin::Written);
@@ -38,7 +49,12 @@ fn merging_keeps_each_record_s_origin() {
     // the one baseline the run persists.
     let mut main = Baseline::new();
     let mut other = Baseline::new();
-    other.adopt("sonarr", "downloadclient:sabnzbd:8080", "mine", "1");
+    other.adopt(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "mine",
+        Instant::from_seconds(1),
+    );
     main.merge(&other);
     assert_eq!(
         main.entry("sonarr", "downloadclient:sabnzbd:8080")
@@ -50,7 +66,12 @@ fn merging_keeps_each_record_s_origin() {
 #[test]
 fn a_recorded_value_is_read_back_as_the_expected_state() {
     let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(100),
+    );
     assert_eq!(
         baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
         Some("tv"),
@@ -60,7 +81,12 @@ fn a_recorded_value_is_read_back_as_the_expected_state() {
 #[test]
 fn a_field_never_written_has_no_expected_value() {
     let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(100),
+    );
     // A different field on the same service, and a service never touched, both
     // read as nothing recorded — not as an empty value.
     assert_eq!(
@@ -78,8 +104,18 @@ fn the_newest_write_to_a_field_is_what_is_expected() {
     // lemonfiber's intent for a field can change between runs; the baseline
     // keeps the latest, since that is what a next run compares against.
     let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv-hd", "200");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(100),
+    );
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv-hd",
+        Instant::from_seconds(200),
+    );
     assert_eq!(
         baseline.expected("sonarr", "downloadclient:sabnzbd:8080"),
         Some("tv-hd"),
@@ -92,14 +128,29 @@ fn re_recording_the_same_value_keeps_its_original_timestamp() {
     // idempotent re-record leaves it — and a no-op re-seed does not restamp the
     // file. A genuine value change does take the new stamp.
     let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "200");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(100),
+    );
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(200),
+    );
     let unchanged = serde_json::to_string(&baseline).unwrap_or_default();
     assert!(
         unchanged.contains(r#""at":"100""#) && !unchanged.contains(r#""at":"200""#),
         "a re-record of the same value keeps the first timestamp: {unchanged}"
     );
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv-hd", "300");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv-hd",
+        Instant::from_seconds(300),
+    );
     let changed = serde_json::to_string(&baseline).unwrap_or_default();
     assert!(
         changed.contains(r#""at":"300""#),
@@ -111,18 +162,38 @@ fn re_recording_the_same_value_keeps_its_original_timestamp() {
 fn an_empty_baseline_is_empty_and_a_written_one_is_not() {
     let mut baseline = Baseline::new();
     assert!(baseline.is_empty(), "nothing has been written yet");
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(100),
+    );
     assert!(!baseline.is_empty(), "a written baseline is not empty");
 }
 
 #[test]
 fn merging_gathers_each_baselines_records_and_keeps_timestamps() {
     let mut main = Baseline::new();
-    main.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    main.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut other = Baseline::new();
     // Another service's record, and the same service's unchanged value.
-    other.record("radarr", "downloadclient:sabnzbd:8080", "movies", "2");
-    other.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "9");
+    other.record(
+        "radarr",
+        "downloadclient:sabnzbd:8080",
+        "movies",
+        Instant::from_seconds(2),
+    );
+    other.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(9),
+    );
     main.merge(&other);
     assert_eq!(
         main.expected("radarr", "downloadclient:sabnzbd:8080"),
@@ -142,8 +213,18 @@ fn a_baseline_round_trips_through_its_serialised_form() {
     // The baseline is stored as one file between runs, so it must survive a
     // round trip through its serialised form unchanged.
     let mut baseline = Baseline::new();
-    baseline.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "100");
-    baseline.record("radarr", "downloadclient:qbittorrent:8081", "movies", "100");
+    baseline.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(100),
+    );
+    baseline.record(
+        "radarr",
+        "downloadclient:qbittorrent:8081",
+        "movies",
+        Instant::from_seconds(100),
+    );
     let json = serde_json::to_string(&baseline).unwrap_or_default();
     let restored: Baseline = serde_json::from_str(&json).unwrap_or_default();
     assert_eq!(restored, baseline);
@@ -152,9 +233,9 @@ fn a_baseline_round_trips_through_its_serialised_form() {
 #[test]
 fn owed_items_are_found_by_their_prefix_and_forgotten_once_done() {
     let mut baseline = Baseline::new();
-    baseline.record("seerr", "held-key:sonarr", "owed", "1");
-    baseline.record("seerr", "held-key:radarr", "owed", "1");
-    baseline.record("seerr", "telling", "on", "1");
+    baseline.record("seerr", "held-key:sonarr", "owed", Instant::from_seconds(1));
+    baseline.record("seerr", "held-key:radarr", "owed", Instant::from_seconds(1));
+    baseline.record("seerr", "telling", "on", Instant::from_seconds(1));
 
     assert_eq!(
         baseline.named("seerr", "held-key:"),

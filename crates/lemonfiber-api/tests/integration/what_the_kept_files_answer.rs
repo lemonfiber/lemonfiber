@@ -38,6 +38,7 @@ use lemonfiber_api::router::Serving;
 use lemonfiber_core::archive::{Archive, Archiving, Fault, Reader, Space};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
 use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// A vault that answers with the backups a test scripted and packs nothing.
@@ -49,12 +50,12 @@ struct Kept(Result<Vec<Existing>, Fault>);
 
 impl Kept {
     /// A vault keeping the backups named, each with the moment it was taken.
-    fn holding(kept: &[(&str, &str)]) -> Self {
+    fn holding(kept: &[(&str, Instant)]) -> Self {
         Self(Ok(kept
             .iter()
             .map(|(name, taken)| Existing {
                 name: (*name).to_owned(),
-                created_at: (*taken).to_owned(),
+                created_at: *taken,
             })
             .collect()))
     }
@@ -197,8 +198,8 @@ async fn the_backups_kept_here_are_served_newest_first() {
     let ctx = ctx(
         &dir,
         Kept::holding(&[
-            ("lemonfiber-full-1.tar.gz", "00000000000000000001"),
-            ("lemonfiber-full-2.tar.gz", "00000000000000000002"),
+            ("lemonfiber-full-1.tar.gz", Instant::from_seconds(1)),
+            ("lemonfiber-full-2.tar.gz", Instant::from_seconds(2)),
         ]),
     );
     let (status, _, body) = got(ctx, "/api/backups").await;

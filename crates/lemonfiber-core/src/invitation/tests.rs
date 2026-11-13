@@ -1,7 +1,11 @@
-use super::{
-    closed, comparable, lapsed_unseen, offered, recorded, run_out, Offer, Offered, Offers,
-};
+use super::{closed, lapsed_unseen, offered, recorded, run_out, Offer, Offered, Offers};
+use crate::instant::Instant;
 use crate::ports::service::{Access, Invited, Member};
+
+/// The instant ISO-8601 text in UTC names, as the server writes one.
+fn on(stamp: &str) -> Instant {
+    Instant::from_service_text(stamp).unwrap_or(Instant::EPOCH)
+}
 
 fn member(id: &str, name: &str, claimed: bool) -> Member {
     Member {
@@ -12,17 +16,17 @@ fn member(id: &str, name: &str, claimed: bool) -> Member {
     }
 }
 
-fn invited(id: &str, at: &str) -> Invited {
+fn invited(id: &str, at: Option<Instant>) -> Invited {
     Invited {
         member: id.to_owned(),
-        at: at.to_owned(),
+        at,
     }
 }
 
 fn offer(offered: &str) -> Offer {
     Offer {
-        offered: offered.to_owned(),
-        lapses: String::new(),
+        offered: on(offered),
+        lapses: Instant::EPOCH,
         decline: None,
         claim: None,
     }
@@ -55,7 +59,7 @@ fn only_the_accounts_somebody_could_still_claim_are_invitations() {
         switched_off,
         runs_the_server,
     ];
-    let records = [invited("1", "2026-08-29T09:00:00.0000000Z")];
+    let records = [invited("1", Some(on("2026-08-29T09:00:00.0000000Z")))];
 
     let waiting = offered(household, &records, &Offers::new());
 
@@ -65,8 +69,8 @@ fn only_the_accounts_somebody_could_still_claim_are_invitations() {
         "an account nobody can claim was read as an invitation"
     );
     assert_eq!(
-        waiting.first().and_then(|o| o.at.as_deref()),
-        Some("2026-08-29T09:00:00.0000000Z")
+        waiting.first().and_then(|o| o.at),
+        Some(on("2026-08-29T09:00:00.0000000Z"))
     );
     assert!(
         waiting.get(1).is_some_and(|o| o.at.is_none()),
@@ -77,8 +81,8 @@ fn only_the_accounts_somebody_could_still_claim_are_invitations() {
 /// The one the sweep used to leave alone: an invitation nobody can date has run out.
 ///
 /// The server's record is bounded and can be pushed along, so an account that fell out
-/// of it would otherwise stand claimable for good. A record that is missing, empty, or
-/// written in a shape this cannot order is the same answer — nothing dates it.
+/// of it would otherwise stand claimable for good. A record that is missing and one
+/// carrying no date are the same answer — nothing dates it.
 #[test]
 fn an_invitation_that_cannot_be_dated_has_run_out() {
     let household = vec![
@@ -86,10 +90,10 @@ fn an_invitation_that_cannot_be_dated_has_run_out() {
         member("2", "bo", false),
         member("3", "cy", false),
     ];
-    let records = [invited("2", ""), invited("3", "last tuesday")];
+    let records = [invited("2", None)];
 
     let waiting = offered(household, &records, &Offers::new());
-    let spent = run_out(&waiting, "2026-08-27T09:00:00Z");
+    let spent = run_out(&waiting, on("2026-08-27T09:00:00Z"));
 
     assert_eq!(
         names(&spent.withdrawn),
@@ -103,15 +107,15 @@ fn an_invitation_older_than_the_window_has_run_out() {
     let waiting = vec![
         Offered {
             member: member("1", "ana", false),
-            at: Some("2026-08-01T09:00:00.0000000Z".to_owned()),
+            at: Some(on("2026-08-01T09:00:00.0000000Z")),
         },
         Offered {
             member: member("2", "bo", false),
-            at: Some("2026-08-29T09:00:00.0000000Z".to_owned()),
+            at: Some(on("2026-08-29T09:00:00.0000000Z")),
         },
     ];
 
-    let spent = run_out(&waiting, "2026-08-27T09:00:00Z");
+    let spent = run_out(&waiting, on("2026-08-27T09:00:00Z"));
 
     assert_eq!(
         names(&spent.withdrawn),
@@ -128,13 +132,13 @@ fn an_invitation_older_than_the_window_has_run_out() {
 #[test]
 fn a_reset_that_runs_out_is_switched_off_rather_than_removed() {
     let been_in = Member {
-        last_seen: Some(crate::instant::Instant::from_seconds(1_772_359_200)),
+        last_seen: Some(Instant::from_seconds(1_772_359_200)),
         ..member("1", "ana", false)
     };
     let waiting = vec![
         Offered {
             member: been_in,
-            at: Some("2026-08-01T09:00:00Z".to_owned()),
+            at: Some(on("2026-08-01T09:00:00Z")),
         },
         Offered {
             member: member("2", "bo", false),
@@ -142,7 +146,7 @@ fn a_reset_that_runs_out_is_switched_off_rather_than_removed() {
         },
     ];
 
-    let spent = run_out(&waiting, "2026-08-27T09:00:00Z");
+    let spent = run_out(&waiting, on("2026-08-27T09:00:00Z"));
 
     assert_eq!(names(&spent.suspended), ["ana"]);
     assert_eq!(names(&spent.withdrawn), ["bo"]);
@@ -168,20 +172,22 @@ fn a_reset_that_runs_out_is_switched_off_rather_than_removed() {
 fn an_account_offered_again_is_dated_by_the_later_offer() {
     let household = vec![member("1", "ana", false)];
     let records = [
-        invited("1", "2026-01-04T09:00:00.0000000Z"),
-        invited("1", "2026-08-30T10:00:00.0000000Z"),
+        invited("1", Some(on("2026-01-04T09:00:00.0000000Z"))),
+        invited("1", Some(on("2026-08-30T10:00:00.0000000Z"))),
     ];
 
     let waiting = offered(household, &records, &Offers::new());
 
     assert_eq!(
-        waiting.first().and_then(|o| o.at.as_deref()),
-        Some("2026-08-30T10:00:00.0000000Z"),
+        waiting.first().and_then(|o| o.at),
+        Some(on("2026-08-30T10:00:00.0000000Z")),
         "the invitation was dated by when the account was made rather than by when \
          it was last offered"
     );
     assert_eq!(
-        run_out(&waiting, "2026-08-27T09:00:00Z").every().count(),
+        run_out(&waiting, on("2026-08-27T09:00:00Z"))
+            .every()
+            .count(),
         0,
         "an account offered two days ago was taken back as an eight-month-old \
          invitation nobody claimed"
@@ -201,18 +207,18 @@ fn an_offer_recorded_here_dates_what_the_server_forgot() {
     ]
     .into_iter()
     .collect();
-    let records = [invited("2", "2026-08-30T11:00:00.0000000Z")];
+    let records = [invited("2", Some(on("2026-08-30T11:00:00.0000000Z")))];
 
     let waiting = offered(household, &records, &offers);
 
     assert_eq!(
-        waiting.first().and_then(|o| o.at.as_deref()),
-        Some("2026-08-30T10:00:00Z"),
+        waiting.first().and_then(|o| o.at),
+        Some(on("2026-08-30T10:00:00Z")),
         "an offer recorded here was ignored"
     );
     assert_eq!(
-        waiting.get(1).and_then(|o| o.at.as_deref()),
-        Some("2026-08-30T11:00:00.0000000Z"),
+        waiting.get(1).and_then(|o| o.at),
+        Some(on("2026-08-30T11:00:00.0000000Z")),
         "the later of the two dates was not the one taken"
     );
 }
@@ -220,7 +226,7 @@ fn an_offer_recorded_here_dates_what_the_server_forgot() {
 /// An offer made at `offered` that runs out at `lapses`.
 fn lasting(offered: &str, lapses: &str) -> Offer {
     Offer {
-        lapses: lapses.to_owned(),
+        lapses: on(lapses),
         ..offer(offered)
     }
 }
@@ -247,15 +253,6 @@ fn the_record_keeps_only_the_offers_still_out() {
         ["1", "4"],
         "a claimed or removed account was kept, or the new offer was not"
     );
-}
-
-#[test]
-fn only_a_moment_written_as_the_server_writes_it_is_ordered() {
-    assert!(comparable("2026-08-29T09:00:00.0000000Z"));
-    assert!(comparable("2026-08-29T09:00:00Z"));
-    assert!(!comparable("2026-08-29T09:00:00"), "no zone");
-    assert!(!comparable("2026-08-29Z"), "too short to be an instant");
-    assert!(!comparable(""), "nothing at all");
 }
 
 /// An account claimed only after its offer ran out is kept on the record, so offering
@@ -307,7 +304,7 @@ fn an_offer_taken_up_in_time_is_closed_and_one_still_out_is_not() {
     .into_iter()
     .collect();
 
-    let open = closed(offers, &household, "2026-08-30T10:00:00Z");
+    let open = closed(offers, &household, on("2026-08-30T10:00:00Z"));
 
     assert_eq!(
         open.keys().map(String::as_str).collect::<Vec<_>>(),
@@ -331,13 +328,13 @@ fn an_offer_still_out_past_its_end_is_one_nobody_was_seen_to_take_up() {
     ]
     .into_iter()
     .collect();
-    let now = "2026-08-30T10:00:00Z";
+    let now = on("2026-08-30T10:00:00Z");
 
     assert!(lapsed_unseen(&offers, "1", now), "a lapsed offer");
     assert!(!lapsed_unseen(&offers, "2", now), "an offer still standing");
     assert!(
         lapsed_unseen(&offers, "3", now),
-        "an offer whose end cannot be read"
+        "an offer whose end is the epoch"
     );
     assert!(
         !lapsed_unseen(&offers, "4", now),

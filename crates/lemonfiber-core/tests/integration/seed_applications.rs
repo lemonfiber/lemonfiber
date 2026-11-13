@@ -12,6 +12,7 @@ use lemonfiber_core::ports::service::{
     AppSync, Application, ApplicationKind, Failure, RegisteredApplication,
 };
 use lemonfiber_core::seed::{wire_applications, State};
+use lemonfiber_fixtures::ports::STAMPED;
 
 // ---- Aggregator applications: the same driver, matched by base URL not label. ----
 
@@ -153,8 +154,15 @@ async fn seed_applications(
     wanted: &[Application],
 ) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings =
-        wire_applications(&aggregator, "prowlarr", wanted, &mut journal, "t", false).await;
+    let wirings = wire_applications(
+        &aggregator,
+        "prowlarr",
+        wanted,
+        &mut journal,
+        STAMPED,
+        false,
+    )
+    .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }
@@ -299,7 +307,8 @@ async fn would_register(
     wanted: &[Application],
 ) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_applications(aggregator, "prowlarr", wanted, &mut journal, "t", true).await;
+    let wirings =
+        wire_applications(aggregator, "prowlarr", wanted, &mut journal, STAMPED, true).await;
     (
         wirings.into_iter().map(|wiring| wiring.state).collect(),
         journal.changes().len(),
@@ -348,7 +357,7 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         "prowlarr",
         &[app("http://sonarr:8989")],
         &mut journal,
-        "t",
+        STAMPED,
         false,
     )
     .await;
@@ -399,7 +408,7 @@ async fn a_rehearsal_tests_nothing() {
         "prowlarr",
         &[app("http://sonarr:8989")],
         &mut journal,
-        "t",
+        STAMPED,
         true,
     )
     .await;

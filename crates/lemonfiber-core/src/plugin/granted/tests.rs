@@ -1,4 +1,5 @@
 use super::{granting, Grant, Granting};
+use crate::instant::Instant;
 
 #[test]
 fn each_credential_that_would_cross_is_stated_with_how_it_is_approved() {
@@ -7,7 +8,7 @@ fn each_credential_that_would_cross_is_stated_with_how_it_is_approved() {
         credential: "SONARR_API_KEY".to_owned(),
         of: "sonarr".to_owned(),
         serves: "library.curate".to_owned(),
-        at: "2026-10-24T18:00:00Z".to_owned(),
+        at: Some(Instant::from_seconds(1_792_864_800)),
     }];
 
     assert_eq!(

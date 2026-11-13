@@ -27,7 +27,7 @@ fn assembled(
             certificates: &[],
             asked: &nothing_asked(),
             quality: &Selection::everywhere(crate::quality::Preset::Balanced),
-            now: SystemTime::UNIX_EPOCH,
+            now: Instant::EPOCH,
             reasons: &crate::asking::Reasons::default(),
             hosted: false,
             expired: &std::collections::BTreeSet::new(),
@@ -135,7 +135,7 @@ fn an_invitation_nobody_has_taken_up_is_listed_as_one() {
         "{report:?}"
     );
     assert_eq!(
-        waiting.and_then(|member| member.last_seen.clone()),
+        waiting.and_then(|member| member.last_seen),
         None,
         "{report:?}"
     );
@@ -663,18 +663,16 @@ fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known()
         .members
         .iter()
         .flat_map(|member| member.requests.iter())
-        .map(|request| {
-            (
-                request.year,
-                request.arrived.as_deref(),
-                request.shelf_id.as_deref(),
-            )
-        })
+        .map(|request| (request.year, request.arrived, request.shelf_id.as_deref()))
         .collect();
     assert_eq!(
         said,
         vec![
-            (Some(2015), Some("2026-10-01T20:00:00.000Z"), Some("f00d")),
+            (
+                Some(2015),
+                Some(Instant::from_seconds(1_790_884_800)),
+                Some("f00d")
+            ),
             (None, None, None),
             (None, None, None),
         ]

@@ -4,6 +4,7 @@
 use super::proving::verdicts;
 use super::speaking::{adapting, speaking};
 use super::*;
+use crate::instant::Instant;
 
 /// The adapter's upstream key, minted, in the starting file and in `upstream.json`.
 fn seeded() -> String {
@@ -295,7 +296,7 @@ fn carried(ctx: &Ctx, lands: crate::plugin::Lands) -> Option<String> {
         path: stack_of(ctx).join("config/komga/application.yml"),
         lands,
     }];
-    super::super::writing::carry_out(ctx, "komga", "1", &planned)
+    super::super::writing::carry_out(ctx, "komga", Instant::from_seconds(1), &planned)
         .err()
         .map(|problem| problem.detail.unwrap_or_default())
 }
@@ -351,7 +352,7 @@ fn nothing_is_minted_where_the_secret_store_cannot_be_written() {
         &unfiled,
         &crate::plugin::Installed::of(&manifest),
         &manifest,
-        "1",
+        Instant::from_seconds(1),
         &[],
     )
     .is_err());
@@ -359,7 +360,7 @@ fn nothing_is_minted_where_the_secret_store_cannot_be_written() {
         &storeless,
         &crate::plugin::Installed::of(&manifest),
         &manifest,
-        "1",
+        Instant::from_seconds(1),
         &[],
     )
     .is_err());

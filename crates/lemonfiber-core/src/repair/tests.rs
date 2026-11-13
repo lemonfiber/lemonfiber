@@ -4,6 +4,7 @@ use super::{
 };
 use crate::condition::{Condition, Fault};
 use crate::error::{Severity, State};
+use crate::instant::Instant;
 
 /// A raised condition for `check`, downstream of `cause` where one is given.
 fn raised(check: &str, cause: Option<&str>) -> Condition {
@@ -15,7 +16,7 @@ fn raised(check: &str, cause: Option<&str>) -> Condition {
         "start it",
     );
     fault.caused_by = cause.map(str::to_owned);
-    Condition::raised(check, &fault, crate::instant::Instant::from_seconds(1000))
+    Condition::raised(check, &fault, Instant::from_seconds(1000))
 }
 
 /// A repair answering `check` and nothing else.
@@ -44,8 +45,8 @@ fn undoing_a_repair_reverses_that_repair_and_nothing_else() {
     use super::{undoing, OPERATION};
     use crate::journal::{Change, Kind, Undo};
 
-    let change = |operation: &str, at: &str, key: &str| Change {
-        at: at.to_owned(),
+    let change = |operation: &str, at: Instant, key: &str| Change {
+        at,
         operation: operation.to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Set {
@@ -56,11 +57,11 @@ fn undoing_a_repair_reverses_that_repair_and_nothing_else() {
     };
 
     let journal = vec![
-        change("seed", "1000", "SEEDED"),
-        change(OPERATION, "2000", "FIRST"),
+        change("seed", Instant::from_seconds(1000), "SEEDED"),
+        change(OPERATION, Instant::from_seconds(2000), "FIRST"),
         // The most recent repair, which set two values at once.
-        change(OPERATION, "3000", "SECOND"),
-        change(OPERATION, "3000", "THIRD"),
+        change(OPERATION, Instant::from_seconds(3000), "SECOND"),
+        change(OPERATION, Instant::from_seconds(3000), "THIRD"),
     ];
 
     let put_back = |key: &str| Undo {
@@ -80,7 +81,7 @@ fn undoing_a_repair_reverses_that_repair_and_nothing_else() {
     );
 
     // Nothing repaired yet is nothing to undo, rather than the whole journal.
-    assert!(undoing(&[change("seed", "1000", "SEEDED")]).is_empty());
+    assert!(undoing(&[change("seed", Instant::from_seconds(1000), "SEEDED")]).is_empty());
     assert!(undoing(&[]).is_empty());
 }
 
@@ -99,7 +100,7 @@ fn a_repair_writes_over_what_lemonfiber_wrote_and_nothing_else() {
 
     let recorded = |origin| Record {
         value: "8080".to_owned(),
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         origin,
     };
 
@@ -214,7 +215,7 @@ fn a_repair_is_offered_while_it_is_wanted_and_might_still_work() {
     assert!(exhausted(&condition), "it has had its chances");
     condition.attempts = 0;
 
-    condition.clear(crate::instant::Instant::from_seconds(2000));
+    condition.clear(Instant::from_seconds(2000));
     assert!(!offerable(&condition), "nothing to put right");
 }
 
@@ -225,7 +226,7 @@ fn a_fault_that_comes_back_is_worth_trying_again() {
     let mut condition = raised("service.sonarr", None);
     condition.attempts = ATTEMPTS;
     condition.declined = true;
-    condition.clear(crate::instant::Instant::from_seconds(2000));
+    condition.clear(Instant::from_seconds(2000));
 
     let fault = Fault::new(
         "service.stopped",
@@ -234,7 +235,7 @@ fn a_fault_that_comes_back_is_worth_trying_again() {
         "nothing that needs it is working",
         "start it",
     );
-    condition.raise(&fault, crate::instant::Instant::from_seconds(3000));
+    condition.raise(&fault, Instant::from_seconds(3000));
 
     assert_eq!(condition.attempts, 0);
     assert!(!condition.declined);

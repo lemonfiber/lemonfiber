@@ -4,6 +4,8 @@
 //! drives a command through lives in `lemonfiber-testing`; both are reached from here.
 //! What is written here names a type of this crate that neither of those can.
 
+use lemonfiber_fixtures::ports::STAMPED;
+
 pub(crate) use lemonfiber_fixtures::support::*;
 
 /// The context a command is driven through, the same file the testing crate is built from:
@@ -112,7 +114,7 @@ pub(crate) fn overlaid(ctx: &crate::app::Ctx) -> Vec<(Option<String>, Option<Str
 /// it is written out three times.
 pub(crate) fn a_fresh_write(key: &str, value: &str) -> crate::journal::Change {
     crate::journal::Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: ".env".to_owned(),
         kind: crate::journal::Kind::Set {

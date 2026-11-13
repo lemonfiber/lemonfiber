@@ -11,6 +11,7 @@ use crate::app::fixtures::{keeping, paths, FakeArchive};
 use crate::app::Ctx;
 use crate::archive::{Fault, Space};
 use crate::backup::{Existing, Retention, Scope};
+use crate::instant::Instant;
 use crate::ports::docker::{Health, Lifecycle};
 
 async fn capturing(archive: &FakeArchive) -> Result<Report, Box<crate::error::Problem>> {
@@ -18,7 +19,7 @@ async fn capturing(archive: &FakeArchive) -> Result<Report, Box<crate::error::Pr
         &paths(),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
-        "2026-07-30T00:00:00Z",
+        Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(2), false),
         archive,
@@ -35,7 +36,7 @@ async fn rehearsing(
         &paths(),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
-        "2026-07-30T00:00:00Z",
+        Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(retention, true),
         archive,
@@ -45,18 +46,18 @@ async fn rehearsing(
 
 /// A whole-stack archive on disk, named as a capture would name it, taken at
 /// the given time.
-fn full(at: &str) -> Existing {
+fn full(at: Instant) -> Existing {
     Existing {
         name: format!("lemonfiber-full-{at}.tar.gz"),
-        created_at: at.to_owned(),
+        created_at: at,
     }
 }
 
 /// A single-service archive on disk, for `service`, taken at the given time.
-fn service(service: &str, at: &str) -> Existing {
+fn service(service: &str, at: Instant) -> Existing {
     Existing {
         name: format!("lemonfiber-{service}-{at}.tar.gz"),
-        created_at: at.to_owned(),
+        created_at: at,
     }
 }
 
@@ -70,8 +71,14 @@ async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
     // drop are all settled before the write, so the report is the real one and the
     // archive directory is untouched.
     let archive = FakeArchive::keeping_backups(&[
-        ("lemonfiber-full-2026-07-01T00-00-00Z.tar.gz", "2026-07-01"),
-        ("lemonfiber-full-2026-07-02T00-00-00Z.tar.gz", "2026-07-02"),
+        (
+            "lemonfiber-full-2026-07-01T00-00-00Z.tar.gz",
+            Instant::from_seconds(1_782_864_000),
+        ),
+        (
+            "lemonfiber-full-2026-07-02T00-00-00Z.tar.gz",
+            Instant::from_seconds(1_782_950_400),
+        ),
     ]);
     let report = rehearsing(&archive, Retention::keeping(1))
         .await
@@ -126,7 +133,7 @@ async fn a_single_service_capture_is_named_for_its_service() {
             &[],
         ),
         "0.3.0",
-        "2026-07-30T00:00:00Z",
+        Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(2), false),
         &archive,
@@ -145,9 +152,9 @@ async fn a_single_service_capture_is_named_for_its_service() {
 async fn a_capture_prunes_the_oldest_backups_past_the_keep_count() {
     let archive = FakeArchive {
         existing: Ok(vec![
-            full("2026-07-02"),
-            full("2026-07-01"),
-            full("2026-07-03"),
+            full(Instant::from_seconds(1_782_950_400)),
+            full(Instant::from_seconds(1_782_864_000)),
+            full(Instant::from_seconds(1_783_036_800)),
         ]),
         ..FakeArchive::roomy()
     };
@@ -169,9 +176,9 @@ async fn retention_keeps_each_scope_on_its_own_count() {
     // targeted backup is not swept away because later whole-stack ones are newer.
     let archive = FakeArchive {
         existing: Ok(vec![
-            full("2026-07-01"),
-            service("sonarr", "2026-07-02"),
-            full("2026-07-29"),
+            full(Instant::from_seconds(1_782_864_000)),
+            service("sonarr", Instant::from_seconds(1_782_950_400)),
+            full(Instant::from_seconds(1_785_283_200)),
         ]),
         ..FakeArchive::roomy()
     };
@@ -179,7 +186,7 @@ async fn retention_keeps_each_scope_on_its_own_count() {
         &paths(),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
-        "2026-07-30T00:00:00Z",
+        Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(1), false),
         &archive,
@@ -203,9 +210,9 @@ async fn the_archive_just_written_is_never_pruned() {
         existing: Ok(vec![
             Existing {
                 name: FRESH.to_owned(),
-                created_at: "2000-01-01".to_owned(),
+                created_at: Instant::from_seconds(946_684_800),
             },
-            full("2026-07-29"),
+            full(Instant::from_seconds(1_785_283_200)),
         ]),
         ..FakeArchive::roomy()
     };
@@ -215,7 +222,7 @@ async fn the_archive_just_written_is_never_pruned() {
         &paths(),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
-        "2026-07-30T00:00:00Z",
+        Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(1), false),
         &archive,
@@ -284,7 +291,10 @@ async fn a_capture_still_succeeds_when_the_older_backups_cannot_be_listed() {
 #[tokio::test]
 async fn an_old_backup_that_will_not_delete_is_left_and_the_capture_still_succeeds() {
     let archive = FakeArchive {
-        existing: Ok(vec![full("2026-07-01"), full("2026-07-02")]),
+        existing: Ok(vec![
+            full(Instant::from_seconds(1_782_864_000)),
+            full(Instant::from_seconds(1_782_950_400)),
+        ]),
         remove: Err(Fault::new("busy")),
         ..FakeArchive::roomy()
     };
@@ -294,7 +304,7 @@ async fn an_old_backup_that_will_not_delete_is_left_and_the_capture_still_succee
         &paths(),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
-        "2026-07-30T00:00:00Z",
+        Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(1), false),
         &archive,

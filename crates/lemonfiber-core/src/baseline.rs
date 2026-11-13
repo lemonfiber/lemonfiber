@@ -173,7 +173,7 @@ impl Baseline {
     pub fn merge(&mut self, other: &Baseline) {
         for (service, fields) in &other.services {
             for (field, record) in fields {
-                self.write(service, field, &record.value, &record.at, record.origin);
+                self.write(service, field, &record.value, record.at, record.origin);
             }
         }
     }

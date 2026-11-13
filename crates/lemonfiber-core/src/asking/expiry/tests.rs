@@ -1,7 +1,8 @@
 use super::Expiry;
+use crate::instant::Instant;
 
 /// A moment the calendar holds, for these records to be stamped with.
-const AT: &str = "2026-08-17T21:04:09";
+const AT: Instant = Instant::from_seconds(1_787_000_649);
 
 /// A household nobody arranged this for closes nothing.
 #[test]
@@ -15,7 +16,7 @@ fn nothing_is_arranged_until_somebody_arranges_it() {
 /// What was agreed to comes back, with the day it was agreed on.
 #[test]
 fn what_was_agreed_to_comes_back_with_the_day_it_was_agreed_on() {
-    let agreed = Expiry::agreed_to(30, Some(AT.to_owned()));
+    let agreed = Expiry::agreed_to(30, Some(AT));
 
     assert_eq!(agreed.after(), Some(30));
     assert_eq!(agreed.agreed(), Some(AT));
@@ -33,7 +34,7 @@ fn a_clock_that_could_not_be_written_costs_the_day_and_not_the_period() {
 /// It survives being written down and read back.
 #[test]
 fn it_survives_being_written_down_and_read_back() {
-    let agreed = Expiry::agreed_to(45, Some(AT.to_owned()));
+    let agreed = Expiry::agreed_to(45, Some(AT));
 
     let written = serde_json::to_string(&agreed).unwrap_or_default();
     let read: Expiry = serde_json::from_str(&written).unwrap_or_default();

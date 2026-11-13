@@ -12,6 +12,7 @@ use lemonfiber_core::ports::service::{
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::seed::{wire_root_folders, Backing, Placing, State};
+use lemonfiber_fixtures::ports::STAMPED;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -310,7 +311,7 @@ pub async fn seed_contested(
             backing: None,
         },
         &mut journal,
-        "t",
+        STAMPED,
         false,
     )
     .await;
@@ -351,7 +352,7 @@ pub async fn wire_with(
             backing,
         },
         &mut journal,
-        "t",
+        STAMPED,
         rehearsing,
     )
     .await

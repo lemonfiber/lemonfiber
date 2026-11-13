@@ -33,6 +33,7 @@ use flate2::Compression;
 use lemonfiber_core::archive::{Archive, Reader};
 use lemonfiber_core::backup::{self, Item, Manifest, Scope};
 use lemonfiber_core::config::paths::Paths;
+use lemonfiber_fixtures::ports::STAMPED;
 
 use super::{Tar, MANIFEST};
 
@@ -64,7 +65,7 @@ async fn a_backup_written_reads_its_manifest_and_unpacks_its_contents_back() {
     let root = scratch("round-trip");
     let paths = install(&root);
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
 
     let tar = Tar;
@@ -138,7 +139,7 @@ async fn restoring_one_service_leaves_the_others_untouched() {
         },
         &[],
     );
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let dest = paths.backups().join("sonarr.tar.gz");
     assert!(tar.write(&dest, &manifest, &plan.items).await.is_ok());
 
@@ -263,7 +264,7 @@ async fn a_backup_is_not_written_over_one_already_there() {
     let root = scratch("no-overwrite");
     let paths = install(&root);
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
 
     let tar = Tar;
@@ -279,7 +280,7 @@ async fn backups_are_listed_and_pruned() {
     let root = scratch("list");
     let paths = install(&root);
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let tar = Tar;
     for name in ["lemonfiber-full-a.tar.gz", "lemonfiber-full-b.tar.gz"] {
         assert!(tar
@@ -439,7 +440,7 @@ async fn a_directory_item_is_packed_whole_and_comes_back() {
         left_out: Vec::new(),
     }];
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     assert!(tar.write(&dest, &manifest, &items).await.is_ok());
 
     let back = scratch("dir-item-back");
@@ -635,7 +636,7 @@ async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
     let root = scratch("mode");
     let paths = install(&root);
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
     let written = Tar.write(&dest, &manifest, &plan.items).await;
 

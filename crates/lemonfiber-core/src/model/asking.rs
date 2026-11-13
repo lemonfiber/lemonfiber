@@ -14,6 +14,8 @@
 
 use serde::Serialize;
 
+use crate::instant::Instant;
+
 /// One of the two counts the request service keeps, and what it has left.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Counted {
@@ -50,7 +52,7 @@ pub struct MemberAsking {
     /// could not be read — an invented one would be a promise about a day on which
     /// nothing happens. The period is a window that rolls rather than a month that
     /// ends, so this is the moment their earliest counted request ages out.
-    pub frees_up: Option<crate::instant::Instant>,
+    pub frees_up: Option<Instant>,
 }
 
 impl MemberAsking {
@@ -66,9 +68,9 @@ impl MemberAsking {
             .find(|counted| counted.limit.is_some())?;
         let limit = spent.limit?;
         let period = spent.period.clone().unwrap_or_else(|| "so far".to_owned());
-        let when = self.frees_up.as_ref().map_or_else(
+        let when = self.frees_up.and_then(Instant::day).map_or_else(
             || "as soon as an earlier one ages out".to_owned(),
-            |at| format!("from {}", at.split('T').next().unwrap_or(at)),
+            |day| format!("from {day}"),
         );
         Some(format!(
             "{} of {limit} {period} used; there is room again {when}",

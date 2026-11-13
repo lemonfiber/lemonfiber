@@ -5,9 +5,11 @@
       "name": "at",
       "type": {
         "default": null,
-        "description": "The stamp of the run to put back, as the history writes it.",
+        "description": "When the run to put back was made, as the history writes it.",
+        "format": "uint64",
+        "minimum": 0,
         "type": [
-          "string",
+          "integer",
           "null"
         ]
       }

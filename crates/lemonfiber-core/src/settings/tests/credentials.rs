@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::app::Ctx;
 use crate::config::store;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::settings::Secrets;
 use crate::test_support::{a_context, env_without_password};
@@ -299,7 +300,7 @@ fn a_credential_entered_is_held_in_the_store_and_its_old_line_goes() {
     let entered = value("entered");
     let entering = crate::settings::legacy::Entering {
         operation: crate::settings::OPERATION,
-        stamp: "1",
+        stamp: Instant::from_seconds(1),
         at: 1,
         random: &lemonfiber_fixtures::ports::Chance::cycling(),
     };

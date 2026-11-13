@@ -33,7 +33,9 @@
     },
     "onset": {
       "description": "When the stack first saw it wrong since it last saw it right, in whole\nseconds since the epoch.\n\nThe condition's own stamp, kept between runs, so every surface that reports\nthe check names the same moment and a restart does not make an old fault new.",
-      "type": "string"
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     },
     "remedies": {
       "description": "What to do about it, most likely first.",
