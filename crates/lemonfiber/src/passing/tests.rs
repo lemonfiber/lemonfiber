@@ -1,8 +1,8 @@
 use std::process::ExitCode;
 
 use lemonfiber_core::pass::{
-    renewed_as, File, ItemPath, Key, LivePath, Paths, Renewals, Renewed, Session, FORWARDED,
-    KEY_BYTES, NONCE_BYTES, PATH, SESSION,
+    renewed_as, Confirmed, File, ItemPath, Key, LivePath, Paths, Renewals, Renewed, Session,
+    FORWARDED, KEY_BYTES, NONCE_BYTES, PATH, SESSION,
 };
 use lemonfiber_fixtures::scratch::Scratch;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
@@ -22,6 +22,9 @@ const fn key() -> Key {
 
 /// A live stream's id, in the shape the paths below declare.
 const STREAM: &str = "abc123";
+
+/// An item's id, in the shape the paths below declare.
+const ITEM: &str = "0123456789abcdef0123456789abcdef";
 
 /// A configuration directory holding the key and the live-stream paths.
 fn configured(name: &str) -> Scratch {
@@ -147,6 +150,11 @@ fn files_the_service_cannot_read_are_named() {
     assert!(held(unmatchable.path())
         .err()
         .is_some_and(|why| why.contains("cannot be matched with")));
+    let renewals_unreadable = configured("pass-renewals-unreadable");
+    let _ = std::fs::create_dir(renewals_unreadable.path().join(File::Renewals.name()));
+    assert!(held(renewals_unreadable.path())
+        .err()
+        .is_some_and(|why| why.contains(File::Renewals.name())));
 }
 
 #[tokio::test]
@@ -197,14 +205,13 @@ fn an_item_pass_is_answered_with_its_session_in_the_one_header_and_a_live_pass_w
     let Ok(held) = held(config.path()) else {
         unreachable!("the configured files compile");
     };
-    let item = "0123456789abcdef0123456789abcdef";
     let session = Session {
         member: "member-1".to_owned(),
         token: "ab".repeat(16),
     };
     let now = 1_800_000_000;
     let pass = key()
-        .seal(item, &session, [4; NONCE_BYTES], now)
+        .seal(ITEM, &session, [4; NONCE_BYTES], now)
         .unwrap_or_default();
     let asking = |forwarded: String| {
         let mut headers = axum::http::HeaderMap::new();
@@ -214,7 +221,7 @@ fn an_item_pass_is_answered_with_its_session_in_the_one_header_and_a_live_pass_w
         answered(&held, &headers, now)
     };
 
-    let opened = asking(format!("/videos/{item}/master.m3u8?lfpass={pass}"));
+    let opened = asking(format!("/videos/{ITEM}/master.m3u8?lfpass={pass}"));
     let elsewhere = asking(format!(
         "/videos/fedcba9876543210fedcba9876543210/master.m3u8?lfpass={pass}"
     ));
@@ -239,6 +246,37 @@ fn an_item_pass_is_answered_with_its_session_in_the_one_header_and_a_live_pass_w
     assert!(elsewhere.headers().get(SESSION).is_none());
     assert_eq!(live.status(), 204);
     assert!(live.headers().get(SESSION).is_none());
+}
+
+#[test]
+fn an_item_pass_sealing_a_session_no_header_can_carry_is_refused() {
+    let config = configured("pass-item-unsendable");
+    let Ok(held) = held(config.path()) else {
+        unreachable!("the configured files compile");
+    };
+    let session = Session {
+        member: "member-1".to_owned(),
+        token: "ab\ncd".to_owned(),
+    };
+    let now = 1_800_000_000;
+    let pass = key()
+        .seal(ITEM, &session, [4; NONCE_BYTES], now)
+        .unwrap_or_default();
+    let forwarded = format!("/videos/{ITEM}/master.m3u8?lfpass={pass}");
+    let mut headers = axum::http::HeaderMap::new();
+    if let Ok(value) = axum::http::HeaderValue::from_str(&forwarded) {
+        headers.insert(FORWARDED, value);
+    }
+
+    let refused = answered(&held, &headers, now);
+
+    assert_eq!(
+        held.watching
+            .confirms(&held.key, &forwarded, now, &held.renewals),
+        Some(Confirmed::Item(session))
+    );
+    assert_eq!(refused.status(), 403);
+    assert!(refused.headers().get(SESSION).is_none());
 }
 
 #[test]

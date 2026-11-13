@@ -328,3 +328,43 @@ fn a_query_naming_a_parameter_in_any_but_plain_letters_is_refused() {
         None
     );
 }
+
+#[test]
+fn the_pass_service_is_told_each_path_with_the_parameter_it_finds_an_item_in() {
+    let mut declared = lemonfiber_fixtures::declaring::enforceable();
+    let Some(mut photo) = declared.bytes.first().cloned() else {
+        unreachable!("an enforceable declaration serves bytes under one path");
+    };
+    photo.pattern = "^/photo$".to_owned();
+    photo.query = Some(lemonfiber_ports::service::InQuery {
+        parameter: "url".to_owned(),
+        pattern: "/library/(?P<item>[0-9a-f]+)".to_owned(),
+    });
+    declared.bytes.push(photo);
+
+    assert_eq!(
+        super::told(&declared),
+        Paths::of(
+            vec![LivePath {
+                pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
+                parameter: None,
+                stream: "^[0-9a-f]{32}$".to_owned(),
+            }],
+            vec![
+                ItemPath {
+                    pattern: "^/media/(?P<item>[^/]+)/bytes$".to_owned(),
+                    query: None,
+                    item: "^[0-9a-f]{32}$".to_owned(),
+                },
+                ItemPath {
+                    pattern: "^/photo$".to_owned(),
+                    query: Some(InQuery {
+                        parameter: "url".to_owned(),
+                        pattern: "/library/(?P<item>[0-9a-f]+)".to_owned(),
+                    }),
+                    item: "^[0-9a-f]{32}$".to_owned(),
+                },
+            ],
+        )
+    );
+}
