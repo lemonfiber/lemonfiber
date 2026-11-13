@@ -215,7 +215,7 @@ impl Keyed {
         answers: Vec<(&str, Result<Output, Failure>)>,
         otherwise: Result<Output, Failure>,
     ) -> Arc<Self> {
-        Arc::new(Self::keyed(answers, Some(otherwise), Matching::Words))
+        Arc::new(Self::built(answers, Some(otherwise), Matching::Words))
     }
 
     /// A runner answering each command whose leading words are a key its own way, and
@@ -226,7 +226,7 @@ impl Keyed {
         answers: Vec<(&str, Result<Output, Failure>)>,
         otherwise: Option<Result<Output, Failure>>,
     ) -> Arc<Self> {
-        Arc::new(Self::keyed(answers, otherwise, Matching::Command))
+        Arc::new(Self::built(answers, otherwise, Matching::Command))
     }
 
     /// A runner answering each call whose spoken form contains a key its own way, and
@@ -236,7 +236,7 @@ impl Keyed {
         answers: Vec<(&str, Result<Output, Failure>)>,
         otherwise: Result<Output, Failure>,
     ) -> Arc<Self> {
-        Arc::new(Self::keyed(answers, Some(otherwise), Matching::Spoken))
+        Arc::new(Self::built(answers, Some(otherwise), Matching::Spoken))
     }
 
     /// A runner answering everything alike until a call carrying `after` arrives, and
@@ -248,7 +248,7 @@ impl Keyed {
         then: Vec<(&str, Result<Output, Failure>)>,
         otherwise: Result<Output, Failure>,
     ) -> Arc<Self> {
-        let mut keyed = Self::keyed(Vec::new(), Some(otherwise), Matching::Words);
+        let mut keyed = Self::built(Vec::new(), Some(otherwise), Matching::Words);
         keyed.after = Some(after.to_owned());
         keyed.then = owned(then);
         Arc::new(keyed)
@@ -262,7 +262,7 @@ impl Keyed {
             .is_ok_and(|seen| seen.iter().any(|argv| argv.iter().any(|said| said == word)))
     }
 
-    fn keyed(
+    fn built(
         answers: Vec<(&str, Result<Output, Failure>)>,
         otherwise: Option<Result<Output, Failure>>,
         matching: Matching,

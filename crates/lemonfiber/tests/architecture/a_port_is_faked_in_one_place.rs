@@ -143,7 +143,7 @@ impl Imported {
     fn walk(&mut self, tree: &syn::UseTree, through: &str) {
         match tree {
             syn::UseTree::Path(step) => {
-                self.walk(&step.tree, &format!("{through}{}::", step.ident))
+                self.walk(&step.tree, &format!("{through}{}::", step.ident));
             }
             syn::UseTree::Name(name) => self.0.push((name.ident.to_string(), through.to_owned())),
             syn::UseTree::Rename(renamed) => {
@@ -160,7 +160,7 @@ impl Imported {
     }
 
     /// Whether `name` was brought in through a path naming the ports.
-    fn from_ports(&self, name: &str) -> bool {
+    fn brought_through_ports(&self, name: &str) -> bool {
         self.0
             .iter()
             .any(|(imported, through)| imported == name && through.contains("ports::"))
@@ -198,7 +198,7 @@ impl Implemented<'_> {
         let port = if qualified {
             through_ports || !named_alike
         } else {
-            !named_alike || self.imported.from_ports(&name)
+            !named_alike || self.imported.brought_through_ports(&name)
         };
         port.then_some(name)
     }
@@ -220,7 +220,7 @@ impl<'ast> Visit<'ast> for Implemented<'_> {
     }
 
     fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
-        if let Some((_, path, _)) = &item.trait_ {
+        if let Some((path, _)) = &item.trait_ {
             if let Some(port) = self.is_port(path) {
                 let standing_in = match item.self_ty.as_ref() {
                     syn::Type::Path(named) => named

@@ -1,7 +1,7 @@
 //! Whether the data location can hardlink, and what to do when it cannot.
 
 use super::*;
-use crate::ports::filesystem::{Fault, FsKind, Identity, StorageFacts};
+use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, StorageFacts};
 
 #[tokio::test]
 async fn an_answer_that_does_not_apply_here_stops_the_run() {
