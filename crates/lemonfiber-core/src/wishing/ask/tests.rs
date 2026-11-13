@@ -365,9 +365,13 @@ async fn what_was_asked_for_as_the_owner_counts_toward_the_members_allowance() {
         .unwrap_or_default();
     let filing = crate::household::run::as_owner::Filing {
         request: 7,
+        title: "550",
         member: &ada,
         kind: Kind::Movies,
         counts: 1,
+        now: std::time::UNIX_EPOCH,
+        standing: &[],
+        read: std::time::UNIX_EPOCH,
     };
     assert!(crate::household::run::as_owner::filed(&kept_at, filing).is_ok());
 

@@ -204,9 +204,13 @@ async fn filed(
     if let Some(path) = keeping {
         let filing = as_owner::Filing {
             request: asked.request,
+            title: &wish.id,
             member: &reached.member,
             kind: wish.kind,
             counts: counted(wish.kind, seasons),
+            now: ctx.seams.clock.now(),
+            standing: &theirs.standing,
+            read: theirs.read,
         };
         as_owner::filed(&path, filing).map_err(|_| not_working())?;
     }

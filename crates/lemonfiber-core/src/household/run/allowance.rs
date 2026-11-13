@@ -114,6 +114,10 @@ pub(crate) struct OwnAllowance {
     pub(crate) headroom: Headroom,
     /// The same, as the household read reports it.
     pub(crate) asking: MemberAsking,
+    /// Every request the service held when this was read.
+    pub(crate) standing: Vec<HouseholdRequest>,
+    /// When it was read.
+    pub(crate) read: SystemTime,
 }
 
 /// What one member may ask for, as the request service holds it: their own account's
@@ -165,11 +169,14 @@ pub(crate) async fn allowance_of(
         approves_own,
         headroom,
     };
+    let asking = reported(&held, &made, now);
     Ok(OwnAllowance {
-        asking: reported(&held, &made, now),
+        asking,
         id,
         approves_own,
         headroom,
+        standing: asked,
+        read: now,
     })
 }
 
