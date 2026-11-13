@@ -418,7 +418,7 @@ fn swept_then(
             })
             .collect();
         let stale: Vec<Record> = swept.iter().map(|(record, _)| record.clone()).collect();
-        journaled = revoked(ctx, kept, &stale, &now);
+        journaled = revoked(ctx, kept, &stale, now);
         if journaled.is_ok() {
             change(ctx, kept);
         }

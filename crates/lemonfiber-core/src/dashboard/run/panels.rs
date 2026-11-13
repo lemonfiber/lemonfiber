@@ -119,11 +119,11 @@ pub(super) fn summarise(
 ) -> Summary {
     let now = ctx.stamp();
     for (check, fault) in observed(services, egress) {
-        conditions.observe(&check, fault.as_ref(), &now);
+        conditions.observe(&check, fault.as_ref(), now);
     }
     // Everything the store knows, not only what is raised: a fault that has been
     // flapping is not called fixed the moment it blinks off.
-    Summary::of(reach, &conditions.all(), &now)
+    Summary::of(reach, &conditions.all(), now)
 }
 
 /// What one download's speed was last time it was seen, where it was.
