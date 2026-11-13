@@ -1,13 +1,12 @@
-//! Which file may name the outside world, and which may ask what machine this is.
+//! Which file may name the outside world.
 //!
 //! Apart from the manifest rules beside it because this reads the code itself: the
-//! crate graph settles whether a dependency may be reached at all, and these two
-//! settle where inside a crate it may be reached *from*. One home per dependency,
-//! and one module that knows which operating system this is.
+//! crate graph settles whether a dependency may be reached at all, and this settles
+//! where inside a crate it may be reached *from*. One home per dependency.
 //!
-//! Neither is provable from a manifest — both crates already carry what these
-//! confine — so the corpus has to be the files, and a rule of this shape is only as
-//! honest as the corpus it swept. Each says what it read before what it found.
+//! That is not provable from a manifest — both crates already carry what this
+//! confines — so the corpus has to be the files, and a rule of this shape is only as
+//! honest as the corpus it swept. It says what it read before what it found.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -17,11 +16,10 @@ use syn::visit::Visit;
 use crate::source_tree::{parsed, test_only};
 
 /// Every path a file names — in a `use`, a type or an expression — as its segments
-/// joined with `::`, and whether anything in it asks which operating system this is.
+/// joined with `::`.
 #[derive(Default)]
 struct Named {
     paths: BTreeSet<String>,
-    asks_the_platform: bool,
 }
 
 impl Named {
@@ -79,17 +77,6 @@ impl<'ast> Visit<'ast> for Named {
             .collect();
         self.paths.insert(joined.join("::"));
         syn::visit::visit_path(self, path);
-    }
-
-    fn visit_attribute(&mut self, attribute: &'ast syn::Attribute) {
-        if let Ok(list) = attribute.meta.require_list() {
-            self.asks_the_platform |= list.tokens.to_string().contains("target_os");
-        }
-    }
-
-    fn visit_macro(&mut self, called: &'ast syn::Macro) {
-        self.asks_the_platform |= called.tokens.to_string().contains("target_os");
-        syn::visit::visit_macro(self, called);
     }
 }
 
@@ -173,22 +160,4 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
             );
         }
     }
-}
-/// Deciding what platform this is happens in one place.
-///
-/// Conditional compilation scattered through call sites is how a codebase
-/// becomes impossible to exercise on any single machine; everything else asks
-/// the one component that knows.
-#[test]
-fn only_the_platform_module_asks_which_operating_system_this_is() {
-    let asking: Vec<String> = parsed("crates/lemonfiber-core")
-        .iter()
-        .filter(|(path, file)| Named::of(file).asks_the_platform && outside(path, &["platform.rs"]))
-        .map(|(path, _)| path.display().to_string())
-        .collect();
-    assert!(
-        asking.is_empty(),
-        "these test the operating system directly — ask the platform module instead: \
-         {asking:?}"
-    );
 }

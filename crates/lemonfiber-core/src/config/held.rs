@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
+use lemonfiber_platform::fs;
+
 const SUFFIX: &str = ".lock";
 
 #[derive(Debug)]
@@ -13,7 +15,7 @@ impl Hold {
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
             .unwrap_or(Path::new("."));
-        super::store::make_private_dir(parent)?;
+        fs::private_directory(parent, true)?;
         let file = opened(&at)?;
         file.lock()?;
         Ok(Self(file))
@@ -32,25 +34,9 @@ pub(crate) fn beside(path: &Path) -> PathBuf {
     path.with_file_name(name)
 }
 
-#[cfg(unix)]
 fn opened(at: &Path) -> std::io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    File::options()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(at)
-}
-
-#[cfg(not(unix))]
-fn opened(at: &Path) -> std::io::Result<File> {
-    File::options()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(at)
+    let mut options = File::options();
+    options.read(true).write(true).create(true).truncate(false);
+    fs::owner_only(&mut options);
+    fs::unfollowed_unwaiting(&mut options).open(at)
 }

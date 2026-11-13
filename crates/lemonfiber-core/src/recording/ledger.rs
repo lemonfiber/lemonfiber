@@ -85,7 +85,7 @@ impl Ledger {
 fn appended(at: &Path, lines: &[String]) -> std::io::Result<()> {
     // A record named with no directory is kept where the process stands, and an
     // empty directory is one there is nothing to make.
-    crate::config::store::make_private_dir(at.parent().unwrap_or(Path::new("")))?;
+    lemonfiber_platform::fs::private_directory(at.parent().unwrap_or(Path::new("")), true)?;
     let mut file = opened(at)?;
     file.lock()?;
     let mut text = lines.join("\n");
@@ -117,25 +117,14 @@ fn trimmed(file: &mut std::fs::File) -> std::io::Result<()> {
 
 /// The record opened to be appended to, created owner-only where the platform
 /// tracks a file mode.
-#[cfg(unix)]
 fn opened(at: &Path) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    std::fs::OpenOptions::new()
-        .read(true)
-        .append(true)
-        .create(true)
-        .mode(0o600)
-        .open(at)
-}
-
-/// Where the platform has no owner-only mode to set at creation, an ordinary open.
-#[cfg(not(unix))]
-fn opened(at: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::OpenOptions::new()
-        .read(true)
-        .append(true)
-        .create(true)
-        .open(at)
+    lemonfiber_platform::fs::owner_only(
+        std::fs::OpenOptions::new()
+            .read(true)
+            .append(true)
+            .create(true),
+    )
+    .open(at)
 }
 
 #[cfg(test)]

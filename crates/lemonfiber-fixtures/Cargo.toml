@@ -21,6 +21,8 @@ lemonfiber-ports = { workspace = true }
 lemonfiber-manifest = { workspace = true, features = ["testing"] }
 # The stack the bundle declares, which is the stack this repository carries.
 lemonfiber-bundled = { workspace = true }
+# A link planted where a test needs one, made the way the platform makes one.
+lemonfiber-platform = { workspace = true }
 # Editing a carried manifest's root as the table it is.
 toml = { workspace = true }
 async-trait = { workspace = true }
