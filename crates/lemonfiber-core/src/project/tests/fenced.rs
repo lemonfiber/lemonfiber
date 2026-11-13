@@ -27,6 +27,14 @@ fn fenced(id: &str) -> Installed {
 }
 
 fn written(installed: &[Installed], fence: Option<&str>, host: &[IpAddr]) -> Project {
+    written_holding(installed, (fence, host), true)
+}
+
+fn written_holding(
+    installed: &[Installed],
+    (fence, host): (Option<&str>, &[IpAddr]),
+    nftables: bool,
+) -> Project {
     generated(
         &carried(),
         installed,
@@ -34,6 +42,7 @@ fn written(installed: &[Installed], fence: Option<&str>, host: &[IpAddr]) -> Pro
         &Reading {
             fence,
             host,
+            nftables,
             ..Reading::bare()
         },
     )
@@ -120,17 +129,31 @@ fn the_fence_is_written_with_the_one_posture_its_requirement_names() {
 fn a_fenced_service_no_fence_can_be_written_for_is_held_back_on_no_network() {
     let mut taken = fenced("solver");
     taken.services.push(a_placed("solver-fence", &[], None));
-    for (installed, fence, host, why) in [
-        (fenced("solver"), None, HOST.as_slice(), Unfenced::Unpinned),
+    for (installed, fence, host, nftables, why) in [
+        (
+            fenced("solver"),
+            None,
+            HOST.as_slice(),
+            true,
+            Unfenced::Unpinned,
+        ),
+        (
+            fenced("solver"),
+            Some(FENCE),
+            HOST.as_slice(),
+            false,
+            Unfenced::Unheld,
+        ),
         (
             fenced("solver"),
             Some(FENCE),
             [].as_slice(),
+            true,
             Unfenced::Unaddressed,
         ),
-        (taken, Some(FENCE), HOST.as_slice(), Unfenced::Taken),
+        (taken, Some(FENCE), HOST.as_slice(), true, Unfenced::Taken),
     ] {
-        let project = written(&[installed], fence, host);
+        let project = written_holding(&[installed], (fence, host), nftables);
         let solver = entry(&project, "solver");
 
         assert_eq!(sequence(&solver, "profiles"), [UNFENCED], "{why:?}");

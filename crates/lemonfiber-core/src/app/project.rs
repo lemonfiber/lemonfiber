@@ -36,7 +36,7 @@ use crate::wiring::Chosen;
 
 pub(crate) use copying::{pending as copies, Copies};
 #[cfg(test)]
-pub(crate) use fencing::ASKED as FENCE_ASKED;
+pub(crate) use fencing::{ASKED as FENCE_ASKED, PROBED as FENCE_PROBED};
 pub(crate) use host::{asked as host_asked, Asked};
 pub(crate) use linking::unlinked;
 pub(crate) use moving::{beneath as moved_beneath, moved};
@@ -215,6 +215,12 @@ pub(crate) fn host_addresses(ctx: &Ctx) -> Vec<std::net::IpAddr> {
     held_as(ctx, crate::fence::HELD)
         .map(|held| crate::fence::kept(&held))
         .unwrap_or_default()
+}
+
+/// Whether the engine's containers held the rules a fence installs, as the engine last
+/// answered.
+pub(crate) fn nftables_held(ctx: &Ctx) -> bool {
+    held_as(ctx, crate::fence::NFTABLES_HELD).is_some_and(|held| crate::fence::holds(&held))
 }
 
 /// The profiles of the services `services` run inside, which Compose has to activate for

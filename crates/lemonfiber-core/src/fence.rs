@@ -22,6 +22,15 @@ pub const GRANTED: [&str; 1] = ["NET_ADMIN"];
 /// one to a line, as the engine last answered them.
 pub const HELD: &str = "fence.addresses";
 
+/// The file beneath the project directory holding [`HOLDS`] where the engine's containers
+/// last held the rules a fence installs, and nothing where they did not or the engine
+/// could not be asked.
+pub const NFTABLES_HELD: &str = "fence.nftables";
+
+/// What the fence image's `fence nftables` answers where the container it ran in held
+/// the rules a fence installs.
+pub const HOLDS: &str = "held";
+
 /// The file beneath the project directory holding the id of the group that owns the
 /// engine's host's render devices, as the engine last answered it, and nothing where the
 /// host has none or the engine could not be asked.
@@ -57,6 +66,12 @@ pub fn kept(held: &str) -> Vec<IpAddr> {
         .unwrap_or_default()
 }
 
+/// Whether `held` says the engine's containers held the rules a fence installs.
+#[must_use]
+pub fn holds(held: &str) -> bool {
+    held.trim() == HOLDS
+}
+
 /// The group id `held` keeps, where it keeps one and nothing else.
 #[must_use]
 pub fn group(held: &str) -> Option<u32> {
@@ -74,6 +89,8 @@ pub enum Unfenced {
     Taken,
     /// This build's bundle pins no image for a fence to run.
     Unpinned,
+    /// The engine's containers were not shown to hold the rules a fence installs.
+    Unheld,
     /// The addresses of the engine's host are not known, so a fence could not refuse them.
     Unaddressed,
 }
@@ -90,6 +107,10 @@ impl Unfenced {
             ),
             Self::Unpinned => format!(
                 "{service} is fenced, and this build's bundle pins no image for its fence to run"
+            ),
+            Self::Unheld => format!(
+                "{service} is fenced, and the engine's containers were not shown to hold the \
+                 nftables rules its fence installs"
             ),
             Self::Unaddressed => format!(
                 "{service} is fenced, and the addresses of the engine's host are not known, so \
