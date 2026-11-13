@@ -268,13 +268,7 @@ pub fn standing(
         Kind::DeviceKeyRevoked { name } => device_key_revoked(name),
         Kind::Asked {
             kept, whole: false, ..
-        } => Standing::refused(
-            &format!(
-                "the ask {kept} was for the rest of what the house held in part, and removing \
-                 it would take what was held before with it"
-            ),
-            Some("remove what is not wanted in the curator's own interface"),
-        ),
+        } => held_in_part(kept),
         Kind::PushEndpointRegistered { name } | Kind::PushEndpointRemoved { name } => {
             only_the_phone(name)
         }
@@ -303,6 +297,17 @@ pub fn standing(
         | Kind::Unqueued { .. }
         | Kind::Asked { whole: true, .. } => Standing::whole(),
     }
+}
+
+/// Why the ask kept as `kept`, for the rest of what the house held in part, is not removed.
+fn held_in_part(kept: &str) -> Standing {
+    Standing::refused(
+        &format!(
+            "the ask {kept} was for the rest of what the house held in part, and removing \
+             it would take what was held before with it"
+        ),
+        Some("remove what is not wanted in the curator's own interface"),
+    )
 }
 
 /// Why a revoke of the device key `name` is not put back.
