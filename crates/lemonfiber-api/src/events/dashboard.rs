@@ -11,6 +11,10 @@
 //! pace is carried forward until it is due — both done by handing the previous
 //! gather back in.
 //!
+//! The gather comes in two waves where some source is slow: what the fast sources
+//! answered is said as a dashboard of its own at once, and the dashboard that
+//! follows fills in the rest.
+//!
 //! An alert is said as it happens from the same gather too: what the dashboard's list
 //! carries that it did not a moment ago is what started or resolved since.
 //!
@@ -27,7 +31,7 @@ use async_trait::async_trait;
 use lemonfiber_core::alert::{Alert, Moment};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::changelog::Record;
-use lemonfiber_core::dashboard::run::{paced, Gathered};
+use lemonfiber_core::dashboard::run::{waves, Gathered};
 use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::news::{Newest, News};
@@ -36,7 +40,7 @@ use tokio::sync::Mutex;
 use lemonfiber_core::app::{dispatch, Command};
 use tokio::time::Instant;
 
-use super::live::Gathers;
+use super::live::{Early, Gathers};
 use super::theirs::{due, playing_unread, PLAYING_EVERY};
 use super::wire::{Nature, Rendered};
 
@@ -81,7 +85,11 @@ impl Dashboard {
 #[async_trait]
 impl Gathers for Dashboard {
     async fn gather(&self, joined: bool) -> Vec<Rendered> {
-        gathered(self, joined).await
+        gathered(self, joined, None).await
+    }
+
+    async fn waves(&self, joined: bool, early: &Early) -> Vec<Rendered> {
+        gathered(self, joined, Some(early)).await
     }
 
     fn wanted_unheard(&self) -> bool {
@@ -92,9 +100,20 @@ impl Gathers for Dashboard {
 
 /// The dashboard rendered, with the snapshot it was made from kept for the next one,
 /// and what is new where a listener has just arrived or it has changed.
-async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
+///
+/// What the fast sources answered goes to `early` as a dashboard of its own where
+/// some source is slower, so the panels beside a slow one are not held up by it.
+async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) -> Vec<Rendered> {
     let mut last = dashboard.last.lock().await;
-    let gathered = paced(&dashboard.ctx, last.as_ref()).await;
+    let gathered = waves(&dashboard.ctx, last.as_ref(), |first| {
+        if let Some(early) = early {
+            early.say(Rendered::of(
+                Nature::State,
+                &Envelope::new(kind::DASHBOARD, &first),
+            ));
+        }
+    })
+    .await;
     let snapshot = &gathered.snapshot;
     let mut said: Vec<Rendered> =
         Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, snapshot))
@@ -169,7 +188,7 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
 async fn newly(dashboard: &Dashboard, snapshot: &Snapshot, joined: bool) -> Option<Rendered> {
     let household = match &snapshot.household {
         Panel::Ready(household) => Some(household),
-        Panel::Unavailable { .. } => None,
+        Panel::Unavailable { .. } | Panel::Pending => None,
     };
     let newest = News::of(
         dashboard.record.as_ref(),

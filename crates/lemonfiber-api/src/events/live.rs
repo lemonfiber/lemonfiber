@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_core::ports::Clock;
-use tokio::sync::{broadcast, watch, Mutex, Notify};
+use tokio::sync::{broadcast, mpsc, watch, Mutex, Notify};
 
 use super::backlog::Backlog;
 use super::wire::{Audience, Event, Rendered, BEAT, BEAT_SAID};
@@ -49,9 +49,37 @@ pub trait Gathers: Send + Sync {
     /// changes owes a listener that has just arrived the current value all the same.
     async fn gather(&self, joined: bool) -> Vec<Rendered>;
 
+    /// Gather once, handing what is ready before the rest to `early`, and answer
+    /// with the rest.
+    ///
+    /// A source whose sources answer at different speeds says what the fast ones
+    /// gave through `early` as soon as it has it, so a listener is not kept waiting
+    /// on the slowest. Every other source says everything at the end.
+    async fn waves(&self, joined: bool, _early: &Early) -> Vec<Rendered> {
+        self.gather(joined).await
+    }
+
     /// Whether this source is worth gathering with nobody listening.
     fn wanted_unheard(&self) -> bool {
         false
+    }
+}
+
+/// What a source hands over before its gather is done, said as soon as it is.
+pub struct Early(mpsc::UnboundedSender<Rendered>);
+
+impl Early {
+    /// A way to hand things over early, and the end they are heard at.
+    fn channel() -> (Self, mpsc::UnboundedReceiver<Rendered>) {
+        let (said, heard) = mpsc::unbounded_channel();
+        (Self(said), heard)
+    }
+
+    /// Hand one thing over, where there was one to hand.
+    pub fn say(&self, said: Option<Rendered>) {
+        if let Some(said) = said {
+            let _sent = self.0.send(said);
+        }
     }
 }
 
@@ -162,10 +190,22 @@ impl Live {
         self.wanted.notify_one();
     }
 
-    /// One gather, said to everyone listening.
+    /// One gather, said to everyone listening: what the source hands over early as
+    /// it does, then the rest.
     pub async fn refresh(&self, source: &dyn Gathers) {
         let joined = self.joined.swap(false, Ordering::SeqCst);
-        for said in source.gather(joined).await {
+        let (early, mut heard) = Early::channel();
+        let mut gathering = std::pin::pin!(source.waves(joined, &early));
+        let rest = loop {
+            tokio::select! {
+                rest = &mut gathering => break rest,
+                Some(said) = heard.recv() => self.say(said).await,
+            };
+        };
+        while let Ok(said) = heard.try_recv() {
+            self.say(said).await;
+        }
+        for said in rest {
             self.say(said).await;
         }
     }

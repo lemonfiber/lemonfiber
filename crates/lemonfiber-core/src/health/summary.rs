@@ -99,6 +99,18 @@ impl Summary {
         }
     }
 
+    /// The same summary, standing `unknown` unless something critical is known: what a
+    /// summary says while a source it rests on has not answered yet, which is never
+    /// `healthy`.
+    #[must_use]
+    pub(crate) fn unsettled(self) -> Self {
+        let standing = match self.standing {
+            Standing::Critical => Standing::Critical,
+            _ => Standing::Unknown,
+        };
+        Self { standing, ..self }
+    }
+
     /// Everything that is wrong, worst first, as the summary expands to it.
     ///
     /// Apart from [`Self::of`] because what is wrong does not turn on how far the

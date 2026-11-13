@@ -12,33 +12,33 @@
 //! panels are read at once rather than one after another, each within a bound of
 //! its own, and the slow ones at the pace [`crate::dashboard::pace`] sets. At that pace
 //! it also passes the egress guard's forwarded port on, while a surface is open.
+//!
+//! A refresh loop gathers in two waves, so a slow source holds up no panel beside it:
+//! what answers within [`FIRST_WAVE`] goes out at once, and a second snapshot fills in
+//! the panels still waiting.
 
 mod panels;
+mod waves;
 
 use std::collections::BTreeSet;
 use std::future::Future;
+use std::path::Path;
+use std::pin::{pin, Pin};
 use std::time::Duration;
 
-use crate::app::screen::Screen;
+use futures_util::future::{maybe_done, MaybeDone};
+
 use crate::app::targets::project_directory;
-use crate::app::{conditions, forwarding, outbox, Ctx};
-use crate::condition::Conditions;
-use crate::dashboard::pace::{Paced, Readings, HOUSEHOLD_WITHIN, PANEL_WITHIN};
-use crate::dashboard::{Hardlink, Panel, Reading, Snapshot, Telemetry};
+use crate::app::{forwarding, Ctx};
+use crate::dashboard::pace::{Paced, Readings, FIRST_WAVE, HOUSEHOLD_WITHIN, PANEL_WITHIN};
+use crate::dashboard::{Hardlink, Reading, Snapshot};
 use crate::error::Diagnose;
-use crate::health::Reach;
-use crate::notify::run as notify;
 use crate::queue::run::Answered;
-use crate::queue::Thresholds;
 
-use panels::{
-    download_rate, downloading, egress, free, front_door, last_config_free, last_free, linking,
-    observe, queues, storage, summarise, transfers, vpn, waiting_on,
-};
-
-/// How many alerts the screen carries. Enough to see what happened, few enough
-/// that the newest is not buried under a week of history.
-const SHOWN_ALERTS: usize = 8;
+use panels::{free, linking, observe, queues, transfers, vpn, waiting_on};
+#[cfg(test)]
+use waves::carried_link;
+use waves::{assembled, Answers, Asked, Wave};
 
 /// One gather, and what the next one carries forward from it.
 ///
@@ -89,140 +89,155 @@ impl Gathered {
 /// stale rather than blanked: the source has told us something, and throwing it
 /// away is as dishonest as presenting it as current. A first refresh has nothing
 /// to carry, so it passes `None`.
+///
+/// A one-shot read: it answers once every source has answered or run out its bound,
+/// with no first wave in between.
 pub async fn gather(ctx: &Ctx, previous: Option<&Snapshot>) -> Snapshot {
     paced(ctx, previous.cloned().map(Gathered::after).as_ref())
         .await
         .snapshot
 }
 
-/// Gather one snapshot, reading each slow panel only where its pace says it is due.
+/// Gather one snapshot, reading each slow panel only where its pace says it is due,
+/// and answer once every source has answered or run out its bound.
+pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
+    waves(ctx, previous, |_| ()).await
+}
+
+/// Gather in two waves: what answers within [`FIRST_WAVE`] is handed to `first` as a
+/// snapshot of its own, and the snapshot answered fills in the rest.
 ///
 /// What a refresh loop calls, handing back what the last call returned. A panel that
 /// is not due is carried forward from it unchanged, and one that is due is read
-/// within its bound — a source that will not answer marks its own panel and holds up
-/// nothing beside it.
+/// within its bound, so a source that will not answer marks its own panel and holds
+/// up nothing beside it. `first` is called only where some source has not answered
+/// within the first wave; each panel still waiting is carried from the last gather,
+/// or `pending` where there is nothing to carry. Only the second wave records what it
+/// found and tells the operator: the first is a picture, not a reading of record.
 ///
 /// The health summary is not read from the panels but computed from what they
 /// found, through the one shared computation every surface uses. So the tunnel is
 /// read before the summary rather than beside it: a stack whose containers are all
 /// healthy while its download client's traffic leaves outside the tunnel is the
-/// case this ordering exists for.
-pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
+/// case this ordering exists for, and a first wave the tunnel has not answered
+/// says `unknown`.
+pub async fn waves(
+    ctx: &Ctx,
+    previous: Option<&Gathered>,
+    first: impl FnOnce(Snapshot) + Send,
+) -> Gathered {
     let mut readings = previous.map(|was| was.readings.clone()).unwrap_or_default();
     let last = previous.map(|was| &was.snapshot);
     let due = Due::at(&mut readings, ctx.seams.clock.now());
 
-    let configured = ctx.settings.data_root.is_some();
     let manifest = manifest_of(ctx);
     let manifest = manifest.as_ref();
     let directory = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let project = directory.as_deref();
     let root = ctx.settings.data_root.as_deref();
+    let kept = project.map(crate::app::targets::services_config_dir);
 
-    let (seen, tunnel, household, named, moving, queued, asked, (space, kept, linked), forwarded) = tokio::join!(
-        within(PANEL_WITHIN, observe(ctx, manifest)),
-        when(
-            due.is(Paced::Vpn),
-            PANEL_WITHIN,
-            vpn(ctx, manifest, project)
-        ),
-        when(due.is(Paced::Household), HOUSEHOLD_WITHIN, waiting_on(ctx)),
-        when(due.is(Paced::Door), PANEL_WITHIN, ctx.site.name()),
-        within(PANEL_WITHIN, transfers(ctx, manifest, project, last)),
-        when(
-            due.is(Paced::Queues),
-            PANEL_WITHIN,
-            queues(ctx, manifest, project)
-        ),
-        within(PANEL_WITHIN, crate::bandwidth::run::pausing::standing(ctx)),
-        volume(ctx, root, project, &due),
-        passed_on(ctx, due.is(Paced::Forwarded)),
-    );
+    let mut seen = pin!(maybe_done(always(observe(ctx, manifest))));
+    let mut tunnel = pin!(maybe_done(when(
+        due.is(Paced::Vpn),
+        PANEL_WITHIN,
+        vpn(ctx, manifest, project)
+    )));
+    let mut household = pin!(maybe_done(when(
+        due.is(Paced::Household),
+        HOUSEHOLD_WITHIN,
+        waiting_on(ctx)
+    )));
+    let mut named = pin!(maybe_done(when(
+        due.is(Paced::Door),
+        PANEL_WITHIN,
+        ctx.site.name()
+    )));
+    let mut moving = pin!(maybe_done(always(transfers(ctx, manifest, project, last))));
+    let mut queued = pin!(maybe_done(when(
+        due.is(Paced::Queues),
+        PANEL_WITHIN,
+        queues(ctx, manifest, project)
+    )));
+    let mut asked = pin!(maybe_done(always(
+        crate::bandwidth::run::pausing::standing(ctx)
+    )));
+    let mut space = pin!(maybe_done(free_space(ctx, root, &due)));
+    let mut config_space = pin!(maybe_done(config_free(ctx, root, kept.as_deref(), &due)));
+    let mut linked = pin!(maybe_done(hardlink(ctx, root, &due)));
+    let mut forwarded = pin!(maybe_done(passed_on(ctx, due.is(Paced::Forwarded))));
 
-    let (seen, undeclared) = match seen.unwrap_or_else(|| Err(late(ENGINE))) {
-        Ok((surveyed, undeclared)) => (Ok(surveyed), undeclared),
-        Err(reason) => (Err(reason), Vec::new()),
+    let answered_at_once = tokio::time::timeout(FIRST_WAVE, async {
+        tokio::join!(
+            seen.as_mut(),
+            tunnel.as_mut(),
+            household.as_mut(),
+            named.as_mut(),
+            moving.as_mut(),
+            queued.as_mut(),
+            asked.as_mut(),
+            space.as_mut(),
+            config_space.as_mut(),
+            linked.as_mut(),
+            forwarded.as_mut(),
+        );
+    })
+    .await
+    .is_ok();
+
+    if !answered_at_once {
+        let so_far = Answers {
+            seen: peek(seen.as_mut()),
+            tunnel: peek(tunnel.as_mut()),
+            household: peek(household.as_mut()),
+            named: peek(named.as_mut()),
+            moving: peek(moving.as_mut()),
+            queued: peek(queued.as_mut()),
+            asked: peek(asked.as_mut()),
+            space: peek(space.as_mut()),
+            config_space: peek(config_space.as_mut()),
+            linked: peek(linked.as_mut()),
+            forwarded: Asked::Pending,
+        };
+        first(
+            assembled(ctx, previous, manifest, Wave::First, so_far)
+                .await
+                .snapshot,
+        );
+        tokio::join!(
+            seen.as_mut(),
+            tunnel.as_mut(),
+            household.as_mut(),
+            named.as_mut(),
+            moving.as_mut(),
+            queued.as_mut(),
+            asked.as_mut(),
+            space.as_mut(),
+            config_space.as_mut(),
+            linked.as_mut(),
+            forwarded.as_mut(),
+        );
+    }
+
+    let answers = Answers {
+        seen: taken(seen),
+        tunnel: taken(tunnel),
+        household: taken(household),
+        named: taken(named),
+        moving: taken(moving),
+        queued: taken(queued),
+        asked: taken(asked),
+        space: taken(space),
+        config_space: taken(config_space),
+        linked: taken(linked),
+        forwarded: taken(forwarded),
     };
-    let reach = Reach::of(configured, seen.as_deref().ok());
-    let vpn = tunnel.settled(
-        last.map(|was| was.vpn.clone()),
-        Some(Panel::unavailable(late(TUNNEL))),
-    );
-    let household = household.settled(
-        last.map(|was| was.household.clone()),
-        Panel::unavailable(late_after(HOUSEHOLD, HOUSEHOLD_WITHIN)),
-    );
-    let named = named.settled(previous.map(|was| was.named.clone()), None);
-    let transfers = moving.unwrap_or(Panel::unavailable(late(DOWNLOADS)));
-    let (queue, answers) = queued.settled(
-        previous.map(|was| (was.snapshot.queue.clone(), was.answers.clone())),
-        (Panel::unavailable(late(QUEUES)), Vec::new()),
-    );
-
-    // One store for the whole refresh: the health summary, the queue check and the
-    // notifier all read and write the same history, and three loads would be three
-    // pictures of it — the last one written winning.
-    let mut conditions = conditions::load(ctx);
-    let found = conditions.clone();
-    observe_passed(ctx, &mut conditions, &forwarded);
-    // A stack that could not be read has nothing to raise conditions about; the
-    // summary then rests on the reach alone and says `unknown` rather than healthy.
-    let health = summarise(
-        ctx,
-        reach,
-        seen.as_deref().unwrap_or_default(),
-        egress(vpn.as_ref()),
-        &mut conditions,
-    );
-    let services = match seen {
-        Ok(services) => Panel::Ready(services),
-        Err(reason) => Panel::unavailable(reason),
-    };
-    let door = front_door(ctx, manifest, &services, &undeclared, named.as_deref());
-
-    let storage = stored(
-        root,
-        (
-            carried(space, last_free(last)),
-            carried(kept, last_config_free(last)),
-        ),
-        carried_link(linked, last),
-        &transfers,
-    );
-
-    // What the pipeline is doing, assessed across the services together. Recorded
-    // against the same store, so a stall that has held for a day is known to have
-    // held for a day rather than looking new on every refresh.
-    let watched = crate::queue::run::watch(
-        &answers,
-        &downloading(&transfers),
-        &mut conditions,
-        Thresholds::conservative(),
-        &ctx.stamp(),
-    );
-
-    let alerts = told(ctx, reach, &mut conditions, &found).await;
-
+    let found = assembled(ctx, previous, manifest, Wave::Second, answers).await;
     Gathered {
-        snapshot: Snapshot {
-            // Not read from the panels: each one that could not be filled says so in
-            // its own words, and the screen around it is still refreshing.
-            telemetry: Telemetry::read(reach, false),
-            health,
-            vpn,
-            transfers,
-            queue,
-            downloaders: downloaders(asked),
-            stuck: watched.stuck,
-            alerts,
-            storage,
-            services,
-            door,
-            household,
-        },
+        snapshot: found.snapshot,
         readings,
-        named,
-        answers,
+        named: found.named,
+        answers: found.answers,
     }
 }
 
@@ -238,17 +253,6 @@ fn manifest_of(ctx: &Ctx) -> Result<lemonfiber_manifest::Manifest, String> {
 /// The forwarded port passed on, where it is due, within the bound a panel has.
 async fn passed_on(ctx: &Ctx, due: bool) -> Asked<Option<forwarding::Pass>> {
     when(due, PANEL_WITHIN, Box::pin(forwarding::on_the_minute(ctx))).await
-}
-
-/// Raise or clear the port not passed, where it was passed on this refresh.
-fn observe_passed(
-    ctx: &Ctx,
-    conditions: &mut Conditions,
-    passed: &Asked<Option<forwarding::Pass>>,
-) {
-    if let Asked::Read(Some(pass)) = passed {
-        forwarding::observe(conditions, pass, &ctx.stamp());
-    }
 }
 
 /// Which paced panels are due this refresh, each recorded as read at `now` if it is.
@@ -273,137 +277,53 @@ impl Due {
     }
 }
 
-/// Tell the operator what this refresh found, and answer with what the screen shows.
-///
-/// Last, because everything gathered is what there is to tell them about — and
-/// through the screen, which is the one channel that needs no configuring and cannot
-/// be down. The history and the outbox are written only where this refresh changed
-/// them: a store rewritten every second with what it already held is a flush to the
-/// disk for nothing. A rehearsal writes neither: what it found is shown, and the
-/// records stay as they were for the run that is not one.
-async fn told(
-    ctx: &Ctx,
-    reach: Reach,
-    conditions: &mut Conditions,
-    found: &Conditions,
-) -> Vec<crate::alert::Alert> {
-    let mut outbox = outbox::load(ctx);
-    let owed = outbox.clone();
-    notify::notify(ctx, reach, conditions, &mut outbox, &[&Screen]).await;
-    let alerts = outbox
-        .owing()
-        .iter()
-        .chain(outbox.history())
-        .take(SHOWN_ALERTS)
-        .cloned()
-        .collect();
-    if !ctx.dry_run && conditions != found {
-        conditions::save(ctx, conditions);
-    }
-    if !ctx.dry_run && outbox != owed {
-        outbox::save(ctx, &outbox);
-    }
-    alerts
-}
-
-/// The storage panel, where there is a data location to have one.
-///
-/// Its exhaustion projection needs the rate downloads are landing on the disk at, so
-/// it is worked out from the transfers read this refresh, whichever free space
-/// reading is current.
-fn stored(
-    root: Option<&std::path::Path>,
-    (free, config_free): (Reading<u64>, Reading<u64>),
-    hardlink: Hardlink,
-    transfers: &Panel<Vec<crate::dashboard::Transfer>>,
-) -> Panel<crate::dashboard::Storage> {
+/// The data location's free space, where it is due, and not asked where no location
+/// is configured, since then there is nothing to read.
+async fn free_space(ctx: &Ctx, root: Option<&Path>, due: &Due) -> Asked<Reading<u64>> {
     match root {
-        None => Panel::unavailable("no data location is configured"),
-        Some(_) => Panel::Ready(storage(
-            free,
-            config_free,
-            hardlink,
-            download_rate(transfers),
-        )),
+        Some(root) => when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, root)).await,
+        None => Asked::NotDue,
     }
 }
 
-/// What a paced panel's reading came to this refresh.
-#[derive(Debug, PartialEq, Eq)]
-enum Asked<T> {
-    /// It was not due, so what it showed last stands.
-    NotDue,
-    /// It was due and answered in time.
-    Read(T),
-    /// It was due and did not answer within its bound.
-    Late,
-}
-
-impl<T> Asked<T> {
-    /// What a panel shows: what it read, `late` where that reading did not answer in
-    /// time, and otherwise what it showed last.
-    fn settled(self, carried: Option<T>, late: T) -> T {
-        match self {
-            Self::Read(read) => read,
-            Self::Late => late,
-            Self::NotDue => carried.unwrap_or(late),
+/// The free space where the services keep their configuration, where it is due:
+/// unknown where the stack names no such place, and not asked where no data location
+/// is configured.
+async fn config_free(
+    ctx: &Ctx,
+    root: Option<&Path>,
+    kept: Option<&Path>,
+    due: &Due,
+) -> Asked<Reading<u64>> {
+    match (root, kept) {
+        (None, _) => Asked::NotDue,
+        (Some(_), None) => Asked::Read(Reading::Unknown),
+        (Some(_), Some(kept)) => {
+            when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, kept)).await
         }
     }
 }
 
-/// What a free space reads as this refresh: what was read now, carried forward
-/// marked stale where it could not be, or the last reading where none was due.
-fn carried(space: Asked<Reading<u64>>, last: Option<&Reading<u64>>) -> Reading<u64> {
-    match space {
-        Asked::NotDue => last.copied().unwrap_or(Reading::Unknown),
-        asked => asked.settled(None, Reading::Unknown).or_stale(last),
+/// Whether imports into the data location link, where it is due. A rehearsal never
+/// probes, since the probe writes: it carries what an earlier refresh found, or says
+/// it does not know.
+async fn hardlink(ctx: &Ctx, root: Option<&Path>, due: &Due) -> Asked<Hardlink> {
+    match root {
+        Some(root) => {
+            when(
+                due.is(Paced::Hardlink) && !ctx.dry_run,
+                PANEL_WITHIN,
+                linking(ctx, root),
+            )
+            .await
+        }
+        None => Asked::NotDue,
     }
 }
 
-/// Whether imports link, as of this refresh: what the probe found now, or what it
-/// found last where it was not due.
-fn carried_link(linked: Asked<Hardlink>, last: Option<&Snapshot>) -> Hardlink {
-    let shown = match last.map(|was| &was.storage) {
-        Some(Panel::Ready(storage)) => Some(storage.hardlink),
-        _ => None,
-    };
-    linked.settled(shown, Hardlink::Unknown)
-}
-
-/// The data location's free space, the free space where the services keep their
-/// configuration, and whether imports into the data location link, each where it is
-/// due — and none where no location is configured, since then there is nothing to
-/// read. A rehearsal never probes, since the probe writes: it carries what an earlier
-/// refresh found, or says it does not know.
-async fn volume(
-    ctx: &Ctx,
-    root: Option<&std::path::Path>,
-    project: Option<&std::path::Path>,
-    due: &Due,
-) -> (Asked<Reading<u64>>, Asked<Reading<u64>>, Asked<Hardlink>) {
-    let Some(root) = root else {
-        return (Asked::NotDue, Asked::NotDue, Asked::NotDue);
-    };
-    let kept = project.map(crate::app::targets::services_config_dir);
-    tokio::join!(
-        when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, root)),
-        async {
-            match kept.as_deref() {
-                Some(kept) => when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, kept)).await,
-                None => Asked::Read(Reading::Unknown),
-            }
-        },
-        when(
-            due.is(Paced::Hardlink) && !ctx.dry_run,
-            PANEL_WITHIN,
-            linking(ctx, root)
-        ),
-    )
-}
-
-/// What a reading came to within `bound`, or nothing where it did not answer in time.
-async fn within<T>(bound: Duration, reading: impl Future<Output = T>) -> Option<T> {
-    tokio::time::timeout(bound, reading).await.ok()
+/// A reading made on every refresh: what it came to within a panel's bound.
+async fn always<T>(reading: impl Future<Output = T>) -> Asked<T> {
+    when(true, PANEL_WITHIN, reading).await
 }
 
 /// A paced reading: not asked where it is not due, and otherwise what it came to
@@ -412,56 +332,22 @@ async fn when<T>(due: bool, bound: Duration, reading: impl Future<Output = T>) -
     if !due {
         return Asked::NotDue;
     }
-    within(bound, reading)
+    tokio::time::timeout(bound, reading)
         .await
         .map_or(Asked::Late, Asked::Read)
 }
 
-/// Whether each download client is paused, from what each said it is doing: unknown
-/// for a client that could not be asked, and the panel unavailable where the stack
-/// could not be read or the clients did not answer in time.
-fn downloaders(
-    asked: Option<Result<Vec<crate::bandwidth::pausing::Paused>, Box<crate::error::Problem>>>,
-) -> Panel<Vec<crate::dashboard::Downloader>> {
-    use crate::bandwidth::Pulling;
-    use crate::dashboard::Fetching;
-    match asked {
-        None => Panel::unavailable(late(DOWNLOADS)),
-        Some(Err(problem)) => Panel::unavailable(problem.summary),
-        Some(Ok(each)) => Panel::Ready(
-            each.into_iter()
-                .map(|said| crate::dashboard::Downloader {
-                    client: said.client,
-                    state: match said.was {
-                        Some(Pulling::Stopped) => Fetching::Paused,
-                        Some(Pulling::Fetching) => Fetching::Fetching,
-                        None => Fetching::Unknown,
-                    },
-                })
-                .collect(),
-        ),
-    }
+/// What a reading has come to so far: what it answered, or pending where it is still
+/// being read.
+fn peek<T: Clone>(reading: Pin<&mut MaybeDone<impl Future<Output = Asked<T>>>>) -> Asked<T> {
+    reading
+        .output_mut()
+        .map_or(Asked::Pending, |answered| answered.clone())
 }
 
-/// The services panel's source, as a panel that did not answer names it.
-const ENGINE: &str = "the container engine";
-/// The VPN panel's source, as a panel that did not answer names it.
-const TUNNEL: &str = "the VPN";
-/// The household panel's sources, as a panel that did not answer names them.
-const HOUSEHOLD: &str = "the household's services";
-/// The transfers panel's sources, as a panel that did not answer names them.
-const DOWNLOADS: &str = "the download clients";
-/// The queue panel's sources, as a panel that did not answer names them.
-const QUEUES: &str = "the media managers";
-
-/// Why a panel whose source did not answer within [`PANEL_WITHIN`] is unavailable.
-fn late(source: &str) -> String {
-    late_after(source, PANEL_WITHIN)
-}
-
-/// Why a panel whose source did not answer within `bound` is unavailable.
-fn late_after(source: &str, bound: Duration) -> String {
-    format!("{source} did not answer within {} seconds", bound.as_secs())
+/// What a finished reading came to, taken out of it.
+fn taken<T>(reading: Pin<&mut MaybeDone<impl Future<Output = Asked<T>>>>) -> Asked<T> {
+    reading.take_output().unwrap_or(Asked::Late)
 }
 
 #[cfg(test)]

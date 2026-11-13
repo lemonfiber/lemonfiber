@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use lemonfiber_core::app::{plugins, Ctx, Outcome};
 use tokio::sync::Mutex;
 
-use super::live::Gathers;
+use super::live::{Early, Gathers};
 use super::wire::{Nature, Rendered};
 
 /// The plugins and the wiring, as the stream's source.
@@ -107,7 +107,11 @@ impl Together {
 #[async_trait]
 impl Gathers for Together {
     async fn gather(&self, joined: bool) -> Vec<Rendered> {
-        each(&self.0, joined).await
+        each(&self.0, joined, None).await
+    }
+
+    async fn waves(&self, joined: bool, early: &Early) -> Vec<Rendered> {
+        each(&self.0, joined, Some(early)).await
     }
 
     fn wanted_unheard(&self) -> bool {
@@ -115,11 +119,15 @@ impl Gathers for Together {
     }
 }
 
-/// What each source says, in the order given.
-async fn each(sources: &[Arc<dyn Gathers>], joined: bool) -> Vec<Rendered> {
+/// What each source says, in the order given, each handing what it has early to
+/// `early` where there is one.
+async fn each(sources: &[Arc<dyn Gathers>], joined: bool, early: Option<&Early>) -> Vec<Rendered> {
     let mut said = Vec::new();
     for source in sources {
-        said.extend(source.gather(joined).await);
+        said.extend(match early {
+            Some(early) => source.waves(joined, early).await,
+            None => source.gather(joined).await,
+        });
     }
     said
 }
