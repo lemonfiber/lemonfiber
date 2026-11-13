@@ -136,6 +136,7 @@ fn the_index_carries_the_version_and_names_every_other_file() {
             "api_version": 7,
             "actions": {},
             "bodies": {},
+            "events": { "heartbeat_seconds": 15, "kinds": {} },
             "key_callable": "key-callable.json",
             "kinds": { "doctor": "kinds/doctor.json" },
             "reads": "reads.json",
