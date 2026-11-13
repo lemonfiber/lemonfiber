@@ -231,6 +231,32 @@ fn a_transcoded_live_stream_is_read_from_its_one_parameter_alone() {
     );
 }
 
+#[test]
+fn a_request_without_the_live_streams_parameter_is_held_to_the_byte_paths() {
+    let at = format!("/videos/{ITEM}/live.m3u8");
+    let confirmed =
+        |forwarded: &str| everything().confirms(&key(), forwarded, NOW, &Renewals::none());
+
+    assert_eq!(
+        confirmed(&format!("{at}?lfpass={}", sealed(ITEM))),
+        Some(Confirmed::Item(session()))
+    );
+    assert_eq!(
+        confirmed(&format!(
+            "{at}?lfpass={}",
+            key().issue(TRANSCODED, "member-1", NOW)
+        )),
+        None
+    );
+    assert_eq!(
+        confirmed(&format!(
+            "{at}?livestreamid={TRANSCODED}&lfpass={}",
+            sealed(ITEM)
+        )),
+        None
+    );
+}
+
 /// The session the item passes below seal.
 fn session() -> Session {
     Session {
